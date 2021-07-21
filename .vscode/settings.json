@@ -1,9 +1,12 @@
 {
+	"editor.tabSize": 4,
 	"cSpell.words": [
 		"CWORD",
 		"Popen",
 		"Zhang",
 		"datefmt",
+		"hexa",
+		"nargs",
 		"pygittools"
 	]
 }
