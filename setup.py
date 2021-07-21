@@ -35,8 +35,7 @@ setup(
     install_requires=[],
     entry_points="""
         [console_scripts]
-        pygittools=pygittools.main:main
-        g=pygittools.terminal_git.main:command_g
+        g=pygittools.__main__:command_g
     """,
     # python_requires=">=3.7",
 )
