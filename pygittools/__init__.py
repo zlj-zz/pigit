@@ -45,12 +45,17 @@ Log = logging.getLogger(__name__)
 
 
 ###################################### Utils
-def ensure_path(file_name):
-    if not os.path.exists(file_name):
-        dir_path = "/".join(file_name.split("/")[:-1])
+def ensure_path(file_path):
+    """Determine whether the file path exists. If not, create a directory.
+    Args:
+        file_path: (str), like: "~/.config/xxx/xxx.log"
+    """
+    if not os.path.exists(file_path):
+        dir_path = os.path.dirname(file_path)
         os.makedirs(dir_path, exist_ok=True)
 
 
+# Exit code.
 EXIT_NORMAL = 0
 EXIT_ERROR = 1
 
@@ -94,6 +99,19 @@ def run_cmd_with_resp(*args):
         Log.warning(e)
         print(e)
         return e, ""
+
+
+def git_version():
+    """Get Git version."""
+    try:
+        _, git_version = run_cmd_with_resp("git --version")
+        if git_version:
+            return git_version
+        else:
+            return None
+    except Exception:
+        Log.warning("Can not found Git in environment.")
+        return None
 
 
 #################################### Log
@@ -378,6 +396,7 @@ class CommandColor:
     YELLOW = Color.fg("#FFD700")  # Gold
 
 
+############################## Output
 def echo(msg, color="", style="", nl=True):
     """Print to terminal.
 
@@ -1220,21 +1239,25 @@ def echo_one_help_msg(k):
         k: Short command.
     """
     echo("    " + k, color=CommandColor.GREEN, nl=False)
-    if GIT_OPTIONS[k]["help-msg"]:
-        msg = GIT_OPTIONS[k]["help-msg"]
+
+    msg = GIT_OPTIONS[k]["help-msg"]
+    command = GIT_OPTIONS[k]["command"]
+
+    if msg:
+        echo((9 - len(k)) * " " + str(msg))
+        echo(13 * " " + str(command), color=CommandColor.YELLOW)
     else:
-        msg = GIT_OPTIONS[k]["command"]
-    echo((9 - len(k)) * " " + str(msg))
+        echo((9 - len(k)) * " " + str(command), color=CommandColor.YELLOW)
 
 
-def echo_help_msg():
+def echo_help_msgs():
     """Print help message."""
     echo("These are short commands that can replace git operations:")
     for k in GIT_OPTIONS.keys():
         echo_one_help_msg(k)
 
 
-def give_tip(t):
+def give_tip(command_type):
     """Print a part of help message.
 
     Print the help information of the corresponding part according to the
@@ -1242,15 +1265,19 @@ def give_tip(t):
     type.
 
     Args:
-        t: A command type.
+        command_type: A command type of `TYPE`.
     """
-    t = t[0].upper() + t[1:].lower() if len(t) > 2 else ""
-    if t not in TYPES:
-        err("There is no such type")
+    command_type = (
+        command_type[0].upper() + command_type[1:].lower()
+        if len(command_type) > 2
+        else ""
+    )
+    if command_type not in TYPES:
+        err("There is no such type.")
         raise SystemExit(0)
 
-    echo("These are the orders of {}".format(t))
-    prefix = t[0].lower()
+    echo("These are the orders of {}".format(command_type))
+    prefix = command_type[0].lower()
     for k in GIT_OPTIONS.keys():
         if k.startswith(prefix):
             echo_one_help_msg(k)
@@ -1259,31 +1286,31 @@ def give_tip(t):
 def echo_types():
     """Print all command types."""
     for t in TYPES:
+        # TODO: may need new format.
         print(" {}".format(t))
 
 
-def echo_description():
-    """Print the description information"""
+def introduce():
+    """Print the description information."""
 
-    has_git = False
-    try:
-        _, git_version = run_cmd_with_resp("git --version")
-        if git_version:
-            has_git = True
-    except Exception:
-        Log.warning("Can not found Git in environment.")
-        git_version = ""
-
+    # Print tools version and path.
     echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
     echo("path: %s" % __name__)
-    echo(git_version)
+
+    # Print git version.
+    _git_version = git_version()
+    if _git_version is None:
+        warn("Don't found Git, maybe need install.")
+    else:
+        echo(_git_version)
+
     echo("Description:", style=Fx.b)
     echo(
         (
-            "Fungit terminal tool, help you use git more simple."
+            "  Fungit terminal tool, help you use git more simple."
             " Support Linux and MacOS.\n"
         ),
-        style=Fx.underline,
+        style=Fx.italic,
     )
 
     echo("You can use ", nl=False)
@@ -1292,12 +1319,10 @@ def echo_description():
     echo("--help", color=CommandColor.GREEN, nl=False)
     echo(" to get how to use command fungit.\n")
 
-    if not has_git:
-        warn("Don't found Git, maybe need install.")
 
-
-def echo_version():
-    echo('version: %s' % __version__)
+def version():
+    """Print version info."""
+    echo("version: %s" % __version__)
 
 
 def command_g(custom_commands=None):
@@ -1356,7 +1381,7 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.show_commands:
-        echo_help_msg()
+        echo_help_msgs()
         raise SystemExit(0)
 
     if stdargs.command_type:
@@ -1368,12 +1393,16 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.version:
-        echo_version()
+        version()
         raise SystemExit(0)
 
     if stdargs.command:
         if stdargs.command == "|":
-            echo_description()
+            introduce()
         else:
             command = stdargs.command
             process(command, stdargs.args)
+
+
+if __name__ == "__main__":
+    command_g()

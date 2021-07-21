@@ -7,7 +7,15 @@
 		"Zhang",
 		"datefmt",
 		"hexa",
+		"msecs",
 		"nargs",
-		"pygittools"
+		"pygittools",
+		"unblink",
+		"unbold",
+		"uncolor",
+		"undark",
+		"unitalic",
+		"unstrike",
+		"ununderline"
 	]
 }
