@@ -1,0 +1,14 @@
+.DS_Store
+
+build/
+dist/
+*.egg-info/
+
+log
+__pycache__/
+
+./test.py
+ignore_files/
+
+
+
