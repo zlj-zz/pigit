@@ -21,8 +21,9 @@
 # SOFTWARE.
 
 
+__project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.0-beta"
+__version__ = "1.0.0"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -1263,7 +1264,6 @@ def echo_types():
 
 def echo_description():
     """Print the description information"""
-    # from . import __version__
 
     has_git = False
     try:
@@ -1271,10 +1271,11 @@ def echo_description():
         if git_version:
             has_git = True
     except Exception:
-        Log.warning("Happen error when run command with get Git version")
+        Log.warning("Can not found Git in environment.")
         git_version = ""
 
-    echo("[fungit] version: %s" % __version__, style=Fx.b)
+    echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
+    echo("path: %s" % __name__)
     echo(git_version)
     echo("Description:", style=Fx.b)
     echo(
@@ -1295,6 +1296,10 @@ def echo_description():
         warn("Don't found Git, maybe need install.")
 
 
+def echo_version():
+    echo('version: %s' % __version__)
+
+
 def command_g(custom_commands=None):
     setup_logging(debug=False, log_file=TOOLS_HOME + "/log/gittools.log")
 
@@ -1308,13 +1313,16 @@ def command_g(custom_commands=None):
         description="If you want to use some original git commands, please use -- to indicate.",
     )
     args.add_argument(
-        "-c", "--complete", action="store_true", help="Add shell prompt script and exit"
+        "-c",
+        "--complete",
+        action="store_true",
+        help="Add shell prompt script and exit.",
     )
     args.add_argument(
         "-s",
         "--show-commands",
         action="store_true",
-        help="List all available fame and wealth and exit",
+        help="List all available fame and wealth and exit.",
     )
     args.add_argument(
         "-S",
@@ -1322,18 +1330,21 @@ def command_g(custom_commands=None):
         type=str,
         metavar="TYPE",
         dest="command_type",
-        help="According to given type list available fame and wealth and exit",
+        help="According to given type list available fame and wealth and exit.",
     )
     args.add_argument(
         "-t",
         "--types",
         action="store_true",
-        help="List all command type and exit",
+        help="List all command type and exit.",
     )
     args.add_argument(
-        "command", nargs="?", default="|", type=str, help="Short git command"
+        "-v", "--version", action="store_true", help="Show version and exit."
     )
-    args.add_argument("args", nargs="*", type=str, help="Command parameter list")
+    args.add_argument(
+        "command", nargs="?", default="|", type=str, help="Short git command."
+    )
+    args.add_argument("args", nargs="*", type=str, help="Command parameter list.")
     stdargs = args.parse_args()
 
     if custom_commands is not None:
@@ -1354,6 +1365,10 @@ def command_g(custom_commands=None):
 
     if stdargs.types:
         echo_types()
+        raise SystemExit(0)
+
+    if stdargs.version:
+        echo_version()
         raise SystemExit(0)
 
     if stdargs.command:
