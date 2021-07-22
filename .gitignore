@@ -1,14 +1,15 @@
 .DS_Store
 
+# Python
 build/
 dist/
 *.egg-info/
-
-log
 __pycache__/
 
-./test.py
 ignore_files/
+log
 
 
 
+test.py
+trans.txt
