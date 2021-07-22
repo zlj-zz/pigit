@@ -1307,17 +1307,22 @@ def introduce():
     echo("Description:", style=Fx.b)
     echo(
         (
-            "  Fungit terminal tool, help you use git more simple."
+            "  Terminal tool, help you use git more simple."
             " Support Linux and MacOS.\n"
+            '  It use short command to replace the original command, like: \n'
+            '  `g ws` -> `git status --short`, `g b` -> `git branch`.\n'
+            '  Also you use `g -s` to get the all short command, have fun'
+            ' and good lucky.\n'
+            '  The open source path: %s' % __git_url__
         ),
         style=Fx.italic,
     )
 
-    echo("You can use ", nl=False)
+    echo("\nYou can use ", nl=False)
     echo("-h", color=CommandColor.GREEN, nl=False)
     echo(" and ", nl=False)
     echo("--help", color=CommandColor.GREEN, nl=False)
-    echo(" to get how to use command fungit.\n")
+    echo(" to get help and more usage.\n")
 
 
 def version():
