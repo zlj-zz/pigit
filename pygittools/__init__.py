@@ -1,3 +1,5 @@
+# codeing: utf-8
+
 # MIT License
 #
 # Copyright (c) 2021 Zachary
@@ -23,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.0"
+__version__ = "1.0.1-beta"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -394,6 +396,7 @@ class CommandColor:
     RED = Color.fg("#FF6347")  # Tomato
     GREEN = Color.fg("#98FB98")  # PaleGreen
     YELLOW = Color.fg("#FFD700")  # Gold
+    SKYBLUE = Color.fg("#87CEFA")
 
 
 ############################## Output
@@ -1295,7 +1298,6 @@ def introduce():
 
     # Print tools version and path.
     echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
-    echo("path: %s" % __name__)
 
     # Print git version.
     _git_version = git_version()
@@ -1304,16 +1306,20 @@ def introduce():
     else:
         echo(_git_version)
 
+    # Print package path.
+    echo("Path: ", style=Fx.b, nl=False)
+    echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
+
     echo("Description:", style=Fx.b)
     echo(
         (
             "  Terminal tool, help you use git more simple."
             " Support Linux and MacOS.\n"
-            '  It use short command to replace the original command, like: \n'
-            '  `g ws` -> `git status --short`, `g b` -> `git branch`.\n'
-            '  Also you use `g -s` to get the all short command, have fun'
-            ' and good lucky.\n'
-            '  The open source path: %s' % __git_url__
+            "  It use short command to replace the original command, like: \n"
+            "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
+            "  Also you use `g -s` to get the all short command, have fun"
+            " and good lucky.\n"
+            "  The open source path: %s" % (CommandColor.SKYBLUE + Fx.underline+ __git_url__)
         ),
         style=Fx.italic,
     )
