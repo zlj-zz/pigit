@@ -25,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.1-beta"
+__version__ = "1.0.1"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -156,18 +156,23 @@ def setup_logging(debug=False, log_file="-"):
     root_logger.setLevel(0)
 
 
-# def current_repository():
-#     err, path = run_cmd_with_resp("git rev-parse --git-dir")
+##########################################
+def current_repository():
+    err, path = run_cmd_with_resp("git rev-parse --git-dir")
 
-#     if err:
-#         return ""
+    if err:
+        return ""
 
-#     path = path.strip()
-#     if path == ".git":
-#         repository_path = os.getcwd()
-#     else:
-#         repository_path = "/".join(path.split("/")[:-1])
-#     return repository_path
+    path = path.strip()
+    if path == ".git":
+        repository_path = os.getcwd()
+    else:
+        repository_path = "/".join(path.split("/")[:-1])
+    return repository_path
+
+
+Git_Path = current_repository()
+IS_Git_Repository = True if Git_Path else False
 
 
 ################################## Style
@@ -1277,6 +1282,11 @@ def give_tip(command_type):
     )
     if command_type not in TYPES:
         err("There is no such type.")
+        echo("Please use `", nl=False)
+        echo("g --types", color=CommandColor.GREEN, nl=False)
+        echo(
+            "` to view the supported types.",
+        )
         raise SystemExit(0)
 
     echo("These are the orders of {}".format(command_type))
@@ -1319,7 +1329,8 @@ def introduce():
             "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
             "  Also you use `g -s` to get the all short command, have fun"
             " and good lucky.\n"
-            "  The open source path: %s" % (CommandColor.SKYBLUE + Fx.underline+ __git_url__)
+            "  The open source path: %s"
+            % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
         ),
         style=Fx.italic,
     )
@@ -1329,6 +1340,84 @@ def introduce():
     echo(" and ", nl=False)
     echo("--help", color=CommandColor.GREEN, nl=False)
     echo(" to get help and more usage.\n")
+
+
+def config():
+    """Print the local config of current git repository."""
+    if IS_Git_Repository:
+        _re = re.compile(r"\w+\s=\s.*?")
+        try:
+            with open(Git_Path + "/.git/config", "r") as cf:
+                for line in cf.read().split("\n"):
+                    res = _re.search(line)
+                    if line.startswith("["):
+                        err(line)
+                    else:
+                        if _re.search(line) is not None:
+                            key, value = line.split("=")
+                            echo(key, color=CommandColor.YELLOW, nl=False)
+                            print("=" + value)
+        except Exception as e:
+            err("Error reading configuration file.")
+    else:
+        err("This directory is not a git repository yet.")
+
+
+def info():
+    """Print some information of the repository.
+    repository:
+    remote:
+    current branch:
+    all branch: git branch --all
+    lastest log: git log -1
+    """
+    echo("waiting ...", nl=False)
+
+    # Get remote url.
+    error_str = CommandColor.RED + "Error getting" + Fx.reset
+    try:
+        with open(Git_Path + "/.git/config", "r") as cf:
+            config = cf.read()
+            res = re.findall(r"url\s=\s(.*)", config)
+            remote = "\n".join(
+                [
+                    "\t%s%s%s%s" % (Fx.italic, CommandColor.SKYBLUE, x, Fx.reset)
+                    for x in res
+                ]
+            )
+    except Exception:
+        remote = error_str
+
+    # Get all branches.
+    err, res = run_cmd_with_resp("git branch --all --color")
+    if err:
+        branches = error_str
+    else:
+        branches = "\n".join(["\t" + x for x in res.strip().split("\n")])
+
+    # Get the lastest log.
+    err, res = run_cmd_with_resp("git log --stat --oneline --decorate -1 --color")
+    if err:
+        git_log = error_str
+    else:
+        git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
+
+    echo(
+        (
+            "\r[%s]        \n"
+            "Repository: \n\t%s\n"
+            "Remote: \n%s\n"
+            "Branches: \n%s\n"
+            "Lastest log:\n%s"
+            % (
+                Fx.b + "Info" + Fx.reset,
+                CommandColor.SKYBLUE + Git_Path + Fx.reset,
+                remote,
+                branches,
+                git_log,
+            )
+        )
+    )
 
 
 def version():
@@ -1375,6 +1464,18 @@ def command_g(custom_commands=None):
         help="List all command type and exit.",
     )
     args.add_argument(
+        "-C",
+        "--config",
+        action="store_true",
+        help="Display the config of current git repository and exit.",
+    )
+    args.add_argument(
+        "-i",
+        "--information",
+        action="store_true",
+        help="",
+    )
+    args.add_argument(
         "-v", "--version", action="store_true", help="Show version and exit."
     )
     args.add_argument(
@@ -1401,6 +1502,14 @@ def command_g(custom_commands=None):
 
     if stdargs.types:
         echo_types()
+        raise SystemExit(0)
+
+    if stdargs.config:
+        config()
+        raise SystemExit(0)
+
+    if stdargs.information:
+        info()
         raise SystemExit(0)
 
     if stdargs.version:
