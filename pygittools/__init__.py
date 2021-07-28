@@ -1441,13 +1441,13 @@ def command_g(custom_commands=None):
         "-c",
         "--complete",
         action="store_true",
-        help="Add shell prompt script and exit.",
+        help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
     )
     args.add_argument(
         "-s",
         "--show-commands",
         action="store_true",
-        help="List all available fame and wealth and exit.",
+        help="List all available short command and wealth and exit.",
     )
     args.add_argument(
         "-S",
@@ -1455,16 +1455,16 @@ def command_g(custom_commands=None):
         type=str,
         metavar="TYPE",
         dest="command_type",
-        help="According to given type list available fame and wealth and exit.",
+        help="According to given type list available short command and wealth and exit.",
     )
     args.add_argument(
         "-t",
         "--types",
         action="store_true",
-        help="List all command type and exit.",
+        help="List all command types and exit.",
     )
     args.add_argument(
-        "-C",
+        "-f",
         "--config",
         action="store_true",
         help="Display the config of current git repository and exit.",
@@ -1473,7 +1473,7 @@ def command_g(custom_commands=None):
         "-i",
         "--information",
         action="store_true",
-        help="",
+        help="Show some information about the current git repository.",
     )
     args.add_argument(
         "-v", "--version", action="store_true", help="Show version and exit."
