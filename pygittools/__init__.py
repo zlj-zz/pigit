@@ -1,4 +1,4 @@
-# codeing: utf-8
+# -*- coding:utf-8 -*-
 
 # MIT License
 #
