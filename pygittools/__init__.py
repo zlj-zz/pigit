@@ -422,6 +422,10 @@ class Color(object):
             return cls.escape_color(hexa=args[0], depth="bg")
 
 
+if not PYTHON3:
+    Color.TRUE_COLOR = True
+
+
 class Fx(object):
     """Text effects
     * trans(string: str): Replace whitespace with escape move right to not overwrite background behind whitespace.
