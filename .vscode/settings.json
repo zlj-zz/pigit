@@ -19,5 +19,6 @@
 		"unstrike",
 		"untracked",
 		"ununderline"
-	]
+	],
+	"restructuredtext.confPath": ""
 }
