@@ -39,6 +39,9 @@ import signal
 import argparse
 import logging
 import logging.handlers
+import time
+import random
+from functools import wraps
 
 
 # Compat
@@ -119,6 +122,21 @@ def run_cmd_with_resp(*args):
         Log.warning(e)
         print(e)
         return e, ""
+
+
+def time_testing(fn):
+    @wraps(fn)
+    def wrap_(*args, **kwargs):
+        start_time = time.time()
+        res = None
+        try:
+            res = fn(*args, **kwargs)
+        except SystemExit:
+            pass
+        print("\nruntime: %fs" % (time.time() - start_time))
+        return res
+
+    return wrap_
 
 
 #################################### Log
@@ -432,7 +450,9 @@ class CommandColor:
 
     RED = Color.fg("#FF6347")  # Tomato
     GREEN = Color.fg("#98FB98")  # PaleGreen
-    YELLOW = Color.fg("#FFD700")  # Gold
+    DEEPGREEN = Color.fg("#A4BE8C")  # PaleGreen
+    YELLOW = Color.fg("#EBCB8C")
+    Gold = Color.fg("#FFD700")  # Gold
     SKYBLUE = Color.fg("#87CEFA")
 
 
@@ -463,7 +483,7 @@ def okay(msg, nl=True):
 
 def warn(msg, nl=True):
     """Print yellow information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.YELLOW, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, CommandColor.Gold, msg, Fx.reset), nl=nl)
 
 
 def err(msg, nl=True):
@@ -1072,6 +1092,33 @@ GIT_OPTIONS = {
 }
 
 
+def color_command(command):
+    command_list = command.split(" ")
+    color_command = (
+        Fx.bold
+        + CommandColor.DEEPGREEN
+        + command_list.pop(0)
+        + " "
+        + CommandColor.YELLOW
+        + command_list.pop(0)
+        + " "
+        + Fx.unbold
+        + Fx.italic
+        + CommandColor.SKYBLUE
+    )
+    while len(command_list) > 0:
+        temp = command_list.pop(0)
+        if temp.startswith("-"):
+            color_command += temp + " "
+        else:
+            break
+    if len(command_list) > 0:
+        color_command += " ".join(command_list)
+    color_command += Fx.reset
+
+    return color_command
+
+
 def process(c, args=None):
     """Process command and arguments."""
     if Git_Version is None:
@@ -1095,7 +1142,7 @@ def process(c, args=None):
             command()
         elif state & GitOptionState.String:
             echo("🌈  ", nl=False)
-            warn(command)
+            echo(color_command(command))
             run_cmd(command)
         else:
             pass
@@ -1107,7 +1154,7 @@ def process(c, args=None):
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
             echo("🌈  ", nl=False)
-            warn(command)
+            echo(color_command(command))
             run_cmd(command)
         else:
             pass
@@ -1311,115 +1358,127 @@ def add_completion():
 
 
 #################### Help msg
-def echo_one_help_msg(k):
-    """Print a tip.
+class HelpMsg(object):
+    @staticmethod
+    def echo_one_help_msg(k):
+        """Print a tip.
 
-    Find the corresponding help information according to the `k` value and
-    print it. If the help information does not exist, print the executed
-    full command.
+        Find the corresponding help information according to the `k` value and
+        print it. If the help information does not exist, print the executed
+        full command.
 
-    Args:
-        k: Short command.
-    """
-    echo("    " + k, color=CommandColor.GREEN, nl=False)
+        Args:
+            k: Short command.
+        """
+        echo("    " + k, color=CommandColor.GREEN, nl=False)
 
-    msg = GIT_OPTIONS[k]["help-msg"]
-    command = GIT_OPTIONS[k]["command"]
+        msg = GIT_OPTIONS[k]["help-msg"]
+        command = GIT_OPTIONS[k]["command"]
 
-    if callable(command):
-        command = "Callable: %s" % command.__name__
+        if callable(command):
+            command = "Callable: %s" % command.__name__
 
-    if len(command) > 100:
-        command = command[:70] + ' ...'
+        if len(command) > 100:
+            command = command[:70] + " ..."
 
-    if msg:
-        echo((9 - len(k)) * " " + str(msg))
-        echo(13 * " " + str(command), color=CommandColor.YELLOW)
-    else:
-        echo((9 - len(k)) * " " + str(command), color=CommandColor.YELLOW)
+        if msg:
+            echo((9 - len(k)) * " " + str(msg))
+            echo(13 * " " + str(command), color=CommandColor.Gold)
+        else:
+            echo((9 - len(k)) * " " + str(command), color=CommandColor.Gold)
 
+    @classmethod
+    def echo_help_msgs(cls):
+        """Print help message."""
+        echo("These are short commands that can replace git operations:")
+        for k in GIT_OPTIONS.keys():
+            cls.echo_one_help_msg(k)
 
-def echo_help_msgs():
-    """Print help message."""
-    echo("These are short commands that can replace git operations:")
-    for k in GIT_OPTIONS.keys():
-        echo_one_help_msg(k)
+    @classmethod
+    def give_tip(cls, command_type):
+        """Print a part of help message.
 
+        Print the help information of the corresponding part according to the
+        incoming command type string. If there is no print error prompt for the
+        type.
 
-def give_tip(command_type):
-    """Print a part of help message.
-
-    Print the help information of the corresponding part according to the
-    incoming command type string. If there is no print error prompt for the
-    type.
-
-    Args:
-        command_type: A command type of `TYPE`.
-    """
-    command_type = (
-        command_type[0].upper() + command_type[1:].lower()
-        if len(command_type) > 2
-        else ""
-    )
-    if command_type not in TYPES:
-        err("There is no such type.")
-        echo("Please use `", nl=False)
-        echo("g --types", color=CommandColor.GREEN, nl=False)
-        echo(
-            "` to view the supported types.",
+        Args:
+            command_type: A command type of `TYPE`.
+        """
+        command_type = (
+            command_type[0].upper() + command_type[1:].lower()
+            if len(command_type) > 2
+            else ""
         )
-        raise SystemExit(0)
+        if command_type not in TYPES:
+            err("There is no such type.")
+            echo("Please use `", nl=False)
+            echo("g --types", color=CommandColor.GREEN, nl=False)
+            echo(
+                "` to view the supported types.",
+            )
+            raise SystemExit(0)
 
-    echo("These are the orders of {}".format(command_type))
-    prefix = command_type[0].lower()
-    for k in GIT_OPTIONS.keys():
-        if k.startswith(prefix):
-            echo_one_help_msg(k)
+        echo("These are the orders of {}".format(command_type))
+        prefix = command_type[0].lower()
+        for k in GIT_OPTIONS.keys():
+            if k.startswith(prefix):
+                cls.echo_one_help_msg(k)
 
+    @staticmethod
+    def echo_types():
+        """Print all command types with random color."""
+        for t in TYPES:
+            echo(
+                "{}{}  ".format(
+                    Color.fg(
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                    ),
+                    t,
+                ),
+                nl=False,
+            )
+        echo(Fx.reset)
 
-def echo_types():
-    """Print all command types."""
-    for t in TYPES:
-        # TODO: may need new format.
-        print(" {}".format(t))
+    @staticmethod
+    def introduce():
+        """Print the description information."""
 
+        # Print tools version and path.
+        echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
 
-def introduce():
-    """Print the description information."""
+        # Print git version.
+        if Git_Version is None:
+            warn("Don't found Git, maybe need install.")
+        else:
+            echo(Git_Version)
 
-    # Print tools version and path.
-    echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
+        # Print package path.
+        echo("Path: ", style=Fx.b, nl=False)
+        echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
 
-    # Print git version.
-    if Git_Version is None:
-        warn("Don't found Git, maybe need install.")
-    else:
-        echo(Git_Version)
+        echo("Description:", style=Fx.b)
+        echo(
+            (
+                "  Terminal tool, help you use git more simple."
+                " Support Linux and MacOS.\n"
+                "  It use short command to replace the original command, like: \n"
+                "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
+                "  Also you use `g -s` to get the all short command, have fun"
+                " and good lucky.\n"
+                "  The open source path: %s"
+                % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
+            ),
+            style=Fx.italic,
+        )
 
-    # Print package path.
-    echo("Path: ", style=Fx.b, nl=False)
-    echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
-
-    echo("Description:", style=Fx.b)
-    echo(
-        (
-            "  Terminal tool, help you use git more simple."
-            " Support Linux and MacOS.\n"
-            "  It use short command to replace the original command, like: \n"
-            "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
-            "  Also you use `g -s` to get the all short command, have fun"
-            " and good lucky.\n"
-            "  The open source path: %s"
-            % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
-        ),
-        style=Fx.italic,
-    )
-
-    echo("\nYou can use ", nl=False)
-    echo("-h", color=CommandColor.GREEN, nl=False)
-    echo(" and ", nl=False)
-    echo("--help", color=CommandColor.GREEN, nl=False)
-    echo(" to get help and more usage.\n")
+        echo("\nYou can use ", nl=False)
+        echo("-h", color=CommandColor.GREEN, nl=False)
+        echo(" and ", nl=False)
+        echo("--help", color=CommandColor.GREEN, nl=False)
+        echo(" to get help and more usage.\n")
 
 
 def config():
@@ -1435,7 +1494,7 @@ def config():
                     else:
                         if _re.search(line) is not None:
                             key, value = line.split("=")
-                            echo(key, color=CommandColor.YELLOW, nl=False)
+                            echo(key, color=CommandColor.Gold, nl=False)
                             print("=" + value)
         except Exception as e:
             err("Error reading configuration file.")
@@ -1595,6 +1654,7 @@ class GitignoreGenetor(object):
                 err("Write gitignore file failed.")
 
 
+@time_testing
 def command_g(custom_commands=None):
     try:
         signal.signal(signal.SIGINT, exit_)
@@ -1686,15 +1746,15 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.show_commands:
-        echo_help_msgs()
+        HelpMsg.echo_help_msgs()
         raise SystemExit(0)
 
     if stdargs.command_type:
-        give_tip(stdargs.command_type)
+        HelpMsg.give_tip(stdargs.command_type)
         raise SystemExit(0)
 
     if stdargs.types:
-        echo_types()
+        HelpMsg.echo_types()
         raise SystemExit(0)
 
     if stdargs.config:
@@ -1715,7 +1775,7 @@ def command_g(custom_commands=None):
 
     if stdargs.command:
         if stdargs.command == "|":
-            introduce()
+            HelpMsg.introduce()
         else:
             command = stdargs.command
             process(command, stdargs.args)

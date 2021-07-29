@@ -31,6 +31,6 @@ install: del
 	$(PY) setup.py install
 
 todo:
-	@grep --color -Ion '\(TODO\|XXX\).*' -r fungit
+	@grep --color -Ion '\(TODO\|XXX\).*' -r $(Project)
 
 .PHONY: run lint clean del install release todo
