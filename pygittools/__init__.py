@@ -1094,6 +1094,7 @@ def process(c, args=None):
         if state & GitOptionState.Func:
             command()
         elif state & GitOptionState.String:
+            echo("🌈  ", nl=False)
             warn(command)
             run_cmd(command)
         else:
@@ -1105,6 +1106,7 @@ def process(c, args=None):
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
+            echo("🌈  ", nl=False)
             warn(command)
             run_cmd(command)
         else:
@@ -1123,6 +1125,24 @@ typeset -A opt_args
 
 _alternative\\
   \'args:options arg:((\\
+    -c\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
+    --complete\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
+    -s\:"List all available short command and wealth and exit."\\
+    --show-commands\:"List all available short command and wealth and exit."\\
+    -S\:"According to given type list available short command and wealth and exit."\\
+    --show-command\:"According to given type list available short command and wealth and exit."\\
+    -t\:"List all command types and exit."\\
+    --types\:"List all command types and exit."\\
+    -f\:"Display the config of current git repository and exit."\\
+    --config\:"Display the config of current git repository and exit."\\
+    -i\:"Show some information about the current git repository."\\
+    --information\:"Show some information about the current git repository."\\
+    -v\:"Show version and exit."\\
+    --version\:"Show version and exit."\\
+    --create-ignore\:"Create a demo .gitignore file. Need one argument"\\
+    --debug\:"Run in debug mode."\\
+    --out-log\:"Print log to console."\\
+
 %s
   ))\'\\
   'files:filename:_files'
@@ -1237,7 +1257,7 @@ def using_completion(file_name, path, config_path):
             exit_(1, e)
         okay("\nPlease run: source {}".format(config_path))
     else:
-        warn("This configuration already exists.")
+        warn("This configuration already exists. 😅")
 
 
 def add_zsh_completion():
@@ -1305,6 +1325,12 @@ def echo_one_help_msg(k):
 
     msg = GIT_OPTIONS[k]["help-msg"]
     command = GIT_OPTIONS[k]["command"]
+
+    if callable(command):
+        command = "Callable: %s" % command.__name__
+
+    if len(command) > 100:
+        command = command[:70] + ' ...'
 
     if msg:
         echo((9 - len(k)) * " " + str(msg))
@@ -1479,84 +1505,94 @@ def version():
     echo("version: %s" % __version__)
 
 
-Genres = {
-    "android": "Android",
-    "c++": "C++",
-    "cpp": "C++",
-    "c": "C",
-    "dart": "Dart",
-    "elisp": "Elisp",
-    "gitbook": "GitBook",
-    "go": "Go",
-    "java": "Java",
-    "kotlin": "Java",
-    "lua": "Lua",
-    "maven": "Maven",
-    "node": "Node",
-    "python": "Python",
-    "qt": "Qt",
-    "r": "R",
-    "ros": "ROS",
-    "ruby": "Ruby",
-    "rust": "Rust",
-    "sass": "Sass",
-    "swift": "Swift",
-    "unity": "Unity",
-}
+class GitignoreGenetor(object):
 
+    # Supported type.
+    Genres = {
+        "android": "Android",
+        "c++": "C++",
+        "cpp": "C++",
+        "c": "C",
+        "dart": "Dart",
+        "elisp": "Elisp",
+        "gitbook": "GitBook",
+        "go": "Go",
+        "java": "Java",
+        "kotlin": "Java",
+        "lua": "Lua",
+        "maven": "Maven",
+        "node": "Node",
+        "python": "Python",
+        "qt": "Qt",
+        "r": "R",
+        "ros": "ROS",
+        "ruby": "Ruby",
+        "rust": "Rust",
+        "sass": "Sass",
+        "swift": "Swift",
+        "unity": "Unity",
+    }
 
-def get_ignore_from_url(url):
-    try:
-        handle = urlopen(url, timeout=60)
-    except Exception:
-        err("Failed to get content and will exit.")
-        raise SystemExit(0)
-
-    content = handle.read().decode("utf-8")
-
-    text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
-    if not text:
-        return ""
-
-    content_re = re.compile(r"<\/?\w+.*?>", re.S)
-    res = content_re.sub("", text[0])
-    res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
-    return res
-
-
-def create_gitignore(genre):
-    ignore_path = Repository_Path + "/.gitignore"
-    whether_write = True
-    if os.path.exists(ignore_path):
-        echo("`.gitignore` existed, overwrite this file? (default: y) [y/n]:", nl=False)
+    @staticmethod
+    def get_ignore_from_url(url):
+        """Crawl gitignore template."""
         try:
-            flag = input().strip()
-            if flag in ["n", "N", "no", "No", "NO"]:
-                whether_write = False
+            handle = urlopen(url, timeout=60)
         except Exception:
-            pass
-    if whether_write:
-        base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-        name = Genres.get(genre.lower(), None)
-        if name is None:
-            err("Unsupported type: %s" % genre)
-            echo("Supported type: %s.  Case insensitive." % " ".join(Genres.keys()))
+            err("Failed to get content and will exit.")
             raise SystemExit(0)
 
-        target_url = base_url % name
-        echo(
-            "Will get ignore file content from %s"
-            % (Fx.italic + target_url + Fx.unitalic)
-        )
-        ignore_content = get_ignore_from_url(target_url)
+        content = handle.read().decode("utf-8")
 
-        echo("Got content, trying to write ... ")
-        try:
-            with open(ignore_path, "w") as f:
-                f.write(ignore_content)
-            echo("Write gitignore file successful.😊")
-        except Exception:
-            err("Write gitignore file failed.")
+        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
+        if not text:
+            return ""
+
+        content_re = re.compile(r"<\/?\w+.*?>", re.S)
+        res = content_re.sub("", text[0])
+        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
+        return res
+
+    @classmethod
+    def create_gitignore(cls, genre):
+        ignore_path = Repository_Path + "/.gitignore"
+        whether_write = True
+        if os.path.exists(ignore_path):
+            echo(
+                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
+                nl=False,
+            )
+            try:
+                flag = input().strip()
+                if flag in ["n", "N", "no", "No", "NO"]:
+                    whether_write = False
+            except Exception:
+                pass
+        if whether_write:
+            base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+            name = cls.Genres.get(genre.lower(), None)
+            if name is None:
+                err("Unsupported type: %s" % genre)
+                echo(
+                    "Supported type: %s.  Case insensitive."
+                    % " ".join(cls.Genres.keys())
+                )
+                raise SystemExit(0)
+
+            target_url = base_url % name
+            echo(
+                "Will get ignore file content from %s"
+                % (Fx.italic + target_url + Fx.unitalic)
+            )
+            ignore_content = cls.get_ignore_from_url(target_url)
+
+            echo("Got content, trying to write ... ")
+            try:
+                with open(ignore_path, "w") as f:
+                    f.write(ignore_content)
+                echo("Write gitignore file successful.😊")
+            except Exception:
+                err("Write gitignore file failed.")
 
 
 def command_g(custom_commands=None):
@@ -1617,7 +1653,7 @@ def command_g(custom_commands=None):
         metavar="TYPE",
         dest="ignore_type",
         help="Create a demo .gitignore file. Need one argument, support: [%s]"
-        % ", ".join(Genres.keys()),
+        % ", ".join(GitignoreGenetor.Genres.keys()),
     )
     args.add_argument(
         "--debug",
@@ -1670,7 +1706,7 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.ignore_type:
-        create_gitignore(stdargs.ignore_type)
+        GitignoreGenetor.create_gitignore(stdargs.ignore_type)
         raise SystemExit(0)
 
     if stdargs.version:
