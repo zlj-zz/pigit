@@ -101,6 +101,10 @@ def exit_(*args):
 
 
 def run_cmd(*args):
+    """
+    >>> with subprocess.Popen("git status", shell=True) as proc:
+    >>>    proc.wait()
+    """
     try:
         with subprocess.Popen(" ".join(args), shell=True) as proc:
             proc.wait()
@@ -111,13 +115,22 @@ def run_cmd(*args):
 
 
 def run_cmd_with_resp(*args):
+    """
+    >>> proc = subprocess.Popen(
+    ...    "git --version", stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
+    ... )
+    >>> res = proc.stdout.read().decode()
+    >>> err = proc.stderr.read().decode()
+    >>> print(err, res)
+    """
     try:
-        with subprocess.Popen(
+        proc = subprocess.Popen(
             " ".join(args), stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
-        ) as proc:
-            res = proc.stdout.read().decode()
-            err = proc.stderr.read().decode()
-            return err, res
+        )
+        res = proc.stdout.read().decode()
+        err = proc.stderr.read().decode()
+        proc.kill()
+        return err, res
     except Exception as e:
         Log.warning(e)
         print(e)
