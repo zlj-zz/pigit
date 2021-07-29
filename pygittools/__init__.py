@@ -41,6 +41,22 @@ import logging
 import logging.handlers
 
 
+# Compat
+PYTHON3 = sys.version_info > (3, 0)
+if PYTHON3:
+    input = input
+
+    import urllib.request
+
+    urlopen = urllib.request.urlopen
+else:
+    input = raw_input
+
+    import urllib2
+
+    urlopen = urllib2.urlopen
+
+
 USER_HOME = os.environ["HOME"]
 TOOLS_HOME = USER_HOME + "/.config/pygittools"
 Log = logging.getLogger(__name__)
@@ -187,8 +203,8 @@ def current_repository():
     return repository_path
 
 
-Git_Path = current_repository()
-IS_Git_Repository = True if Git_Path else False
+Repository_Path = current_repository()
+IS_Git_Repository = True if Repository_Path else False
 
 
 ################################## Style
@@ -440,19 +456,19 @@ def echo(msg, color="", style="", nl=True):
     sys.stdout.flush()
 
 
-def okay(msg):
+def okay(msg, nl=True):
     """Print green information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.GREEN, msg, Fx.reset))
+    echo("%s%s%s%s" % (Fx.b, CommandColor.GREEN, msg, Fx.reset), nl=nl)
 
 
-def warn(msg):
+def warn(msg, nl=True):
     """Print yellow information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.YELLOW, msg, Fx.reset))
+    echo("%s%s%s%s" % (Fx.b, CommandColor.YELLOW, msg, Fx.reset), nl=nl)
 
 
-def err(msg):
+def err(msg, nl=True):
     """Print red information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.RED, msg, Fx.reset))
+    echo("%s%s%s%s" % (Fx.b, CommandColor.RED, msg, Fx.reset), nl=nl)
 
 
 ########################## Command
@@ -1385,7 +1401,7 @@ def config():
     if IS_Git_Repository:
         _re = re.compile(r"\w+\s=\s.*?")
         try:
-            with open(Git_Path + "/.git/config", "r") as cf:
+            with open(Repository_Path + "/.git/config", "r") as cf:
                 for line in cf.read().split("\n"):
                     res = _re.search(line)
                     if line.startswith("["):
@@ -1414,7 +1430,7 @@ def info():
     # Get remote url.
     error_str = CommandColor.RED + "Error getting" + Fx.reset
     try:
-        with open(Git_Path + "/.git/config", "r") as cf:
+        with open(Repository_Path + "/.git/config", "r") as cf:
             config = cf.read()
             res = re.findall(r"url\s=\s(.*)", config)
             remote = "\n".join(
@@ -1449,7 +1465,7 @@ def info():
             "Lastest log:\n%s"
             % (
                 Fx.b + "Info" + Fx.reset,
-                CommandColor.SKYBLUE + Git_Path + Fx.reset,
+                CommandColor.SKYBLUE + Repository_Path + Fx.reset,
                 remote,
                 branches,
                 git_log,
@@ -1461,6 +1477,86 @@ def info():
 def version():
     """Print version info."""
     echo("version: %s" % __version__)
+
+
+Genres = {
+    "android": "Android",
+    "c++": "C++",
+    "cpp": "C++",
+    "c": "C",
+    "dart": "Dart",
+    "elisp": "Elisp",
+    "gitbook": "GitBook",
+    "go": "Go",
+    "java": "Java",
+    "kotlin": "Java",
+    "lua": "Lua",
+    "maven": "Maven",
+    "node": "Node",
+    "python": "Python",
+    "qt": "Qt",
+    "r": "R",
+    "ros": "ROS",
+    "ruby": "Ruby",
+    "rust": "Rust",
+    "sass": "Sass",
+    "swift": "Swift",
+    "unity": "Unity",
+}
+
+
+def get_ignore_from_url(url):
+    try:
+        handle = urlopen(url, timeout=60)
+    except Exception:
+        err("Failed to get content and will exit.")
+        raise SystemExit(0)
+
+    content = handle.read().decode("utf-8")
+
+    text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
+    if not text:
+        return ""
+
+    content_re = re.compile(r"<\/?\w+.*?>", re.S)
+    res = content_re.sub("", text[0])
+    res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
+    return res
+
+
+def create_gitignore(genre):
+    ignore_path = Repository_Path + "/.gitignore"
+    whether_write = True
+    if os.path.exists(ignore_path):
+        echo("`.gitignore` existed, overwrite this file? (default: y) [y/n]:", nl=False)
+        try:
+            flag = input().strip()
+            if flag in ["n", "N", "no", "No", "NO"]:
+                whether_write = False
+        except Exception:
+            pass
+    if whether_write:
+        base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+        name = Genres.get(genre.lower(), None)
+        if name is None:
+            err("Unsupported type: %s" % genre)
+            echo("Supported type: %s.  Case insensitive." % " ".join(Genres.keys()))
+            raise SystemExit(0)
+
+        target_url = base_url % name
+        echo(
+            "Will get ignore file content from %s"
+            % (Fx.italic + target_url + Fx.unitalic)
+        )
+        ignore_content = get_ignore_from_url(target_url)
+
+        echo("Got content, trying to write ... ")
+        try:
+            with open(ignore_path, "w") as f:
+                f.write(ignore_content)
+            echo("Write gitignore file successful.😊")
+        except Exception:
+            err("Write gitignore file failed.")
 
 
 def command_g(custom_commands=None):
@@ -1491,7 +1587,8 @@ def command_g(custom_commands=None):
         type=str,
         metavar="TYPE",
         dest="command_type",
-        help="According to given type list available short command and wealth and exit.",
+        help="According to given type(%s) list available short command and wealth and exit."
+        % ", ".join(TYPES),
     )
     args.add_argument(
         "-t",
@@ -1513,6 +1610,14 @@ def command_g(custom_commands=None):
     )
     args.add_argument(
         "-v", "--version", action="store_true", help="Show version and exit."
+    )
+    args.add_argument(
+        "--create-ignore",
+        type=str,
+        metavar="TYPE",
+        dest="ignore_type",
+        help="Create a demo .gitignore file. Need one argument, support: [%s]"
+        % ", ".join(Genres.keys()),
     )
     args.add_argument(
         "--debug",
@@ -1562,6 +1667,10 @@ def command_g(custom_commands=None):
 
     if stdargs.information:
         info()
+        raise SystemExit(0)
+
+    if stdargs.ignore_type:
+        create_gitignore(stdargs.ignore_type)
         raise SystemExit(0)
 
     if stdargs.version:
