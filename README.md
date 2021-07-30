@@ -47,7 +47,7 @@ You can use -h and --help to get help and more usage.
 You can run `g -h` or `g --help` to get the help message.
 
 ```bash
-usage: g [-h] [-c] [-s] [-S TYPE] [-t] [-f] [-i] [-v] [--debug] [--out-log] [command] [args ...]
+usage: g [-h] [-c] [-s] [-S TYPE] [-t] [-f] [-i] [-v] [--create-ignore TYPE] [--debug] [--out-log] [command] [args ...]
 
 If you want to use some original git commands, please use -- to indicate.
 
@@ -60,11 +60,16 @@ optional arguments:
   -c, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`)
   -s, --show-commands   List all available short command and wealth and exit.
   -S TYPE, --show-command TYPE
-                        According to given type list available short command and wealth and exit.
+                        According to given type(Branch, Commit, Conflict, Fetch, Index, Log, Merge, Push, Remote, Stash, Tag, Working
+                        tree, Setting) list available short command and wealth and exit.
   -t, --types           List all command types and exit.
   -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
   -v, --version         Show version and exit.
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c, dart, elisp, gitbook, go,
+                        java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity]
   --debug               Run in debug mode.
   --out-log             Print log to console.
+
+runtime: 0.001976s
 ```

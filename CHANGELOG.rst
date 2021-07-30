@@ -2,6 +2,15 @@
 Changelog of pygittools
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.2 (2021-07-30)
+----------
+- Add debug mode.
+- Update completion function.
+- Support create \``.gitignore`\` template according to given type.
+- Show runtime.
+- Improve print, more color and beautiful.
+- Fix color compatibility with python2.
+
 v1.0.1 (2021-07-28)
 ----------
 - Support quick view of GIT config

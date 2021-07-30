@@ -25,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.2-beta"
+__version__ = "1.0.2"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -1129,9 +1129,10 @@ def color_command(command):
             color_command += temp + " "
         else:
             break
+
+    color_command += Fx.reset
     if len(command_list) > 0:
         color_command += " ".join(command_list)
-    color_command += Fx.reset
 
     return color_command
 
