@@ -25,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.2"
+__version__ = "1.0.3-beta"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -43,8 +43,10 @@ import time
 import random
 from functools import wraps
 
-
-# Compat
+#####################################################################
+# Part of compatibility.                                            #
+# Handled the incompatibility between python2 and python3.          #
+#####################################################################
 PYTHON3 = sys.version_info > (3, 0)
 if PYTHON3:
     input = input
@@ -60,12 +62,16 @@ else:
     urlopen = urllib2.urlopen
 
 
+#####################################################################
+# Part of Utils.                                                    #
+# Some tools and methods for global use. Also contains some special #
+# global variables (readonly).                                      #
+#####################################################################
 USER_HOME = os.environ["HOME"]
 TOOLS_HOME = USER_HOME + "/.config/pygittools"
 Log = logging.getLogger(__name__)
 
 
-###################################### Utils
 def ensure_path(dir_path):
     """Determine whether the file path exists. If not, create a directory.
     Args:
@@ -80,6 +86,56 @@ def ensure_path(dir_path):
         except Exception as e:
             err("An error occurred while creating %s" % dir_path)
             exit(1, e)
+
+
+class LogHandle(object):
+    """Set log handle.
+    Attributes:
+        FMT_NORMAL: Log style in normal mode.
+        FMT_DEBUG: Log style in debug mode.
+
+    Methods:
+        setup_logging: setup log handle setting.
+    """
+
+    FMT_NORMAL = logging.Formatter(
+        fmt="%(asctime)s %(levelname).4s %(message)s", datefmt="%H:%M:%S"
+    )
+    FMT_DEBUG = logging.Formatter(
+        fmt="%(asctime)s.%(msecs)03d %(levelname).4s [%(name)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    @classmethod
+    def setup_logging(cls, debug=False, log_file=None):
+        root_logger = logging.getLogger()
+
+        if debug:
+            log_level = logging.DEBUG
+            formatter = cls.FMT_DEBUG
+        else:
+            log_level = logging.INFO
+            formatter = cls.FMT_NORMAL
+
+        if log_file:
+            if log_file is None:
+                log_handle = logging.StreamHandler()
+            else:
+                dir_path = os.path.dirname(log_file)
+                ensure_path(dir_path)
+                try:
+                    log_handle = logging.handlers.RotatingFileHandler(
+                        log_file, maxBytes=1048576, backupCount=4
+                    )
+                except PermissionError:
+                    print('No permission to write to "{}" directory!'.format(log_file))
+                    raise SystemExit(1)
+
+        log_handle.setFormatter(formatter)
+        log_handle.setLevel(log_level)
+
+        root_logger.addHandler(log_handle)
+        root_logger.setLevel(0)
 
 
 # Exit code.
@@ -143,73 +199,6 @@ def run_cmd_with_resp(*args):
         return e, ""
 
 
-def time_testing(fn):
-    @wraps(fn)
-    def wrap_(*args, **kwargs):
-        start_time = time.time()
-        res = None
-        try:
-            res = fn(*args, **kwargs)
-        except SystemExit:
-            pass
-        print("\nruntime: %fs" % (time.time() - start_time))
-        return res
-
-    return wrap_
-
-
-#################################### Log
-class LogHandle(object):
-    """Set log handle.
-    Attributes:
-        FMT_NORMAL: Log style in normal mode.
-        FMT_DEBUG: Log style in debug mode.
-
-    Methods:
-        setup_logging: setup log handle setting.
-    """
-
-    FMT_NORMAL = logging.Formatter(
-        fmt="%(asctime)s %(levelname).4s %(message)s", datefmt="%H:%M:%S"
-    )
-    FMT_DEBUG = logging.Formatter(
-        fmt="%(asctime)s.%(msecs)03d %(levelname).4s [%(name)s] %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    @classmethod
-    def setup_logging(cls, debug=False, log_file=None):
-        root_logger = logging.getLogger()
-
-        if debug:
-            log_level = logging.DEBUG
-            formatter = cls.FMT_DEBUG
-        else:
-            log_level = logging.INFO
-            formatter = cls.FMT_NORMAL
-
-        if log_file:
-            if log_file is None:
-                log_handle = logging.StreamHandler()
-            else:
-                dir_path = os.path.dirname(log_file)
-                ensure_path(dir_path)
-                try:
-                    log_handle = logging.handlers.RotatingFileHandler(
-                        log_file, maxBytes=1048576, backupCount=4
-                    )
-                except PermissionError:
-                    print('No permission to write to "{}" directory!'.format(log_file))
-                    raise SystemExit(1)
-
-        log_handle.setFormatter(formatter)
-        log_handle.setLevel(log_level)
-
-        root_logger.addHandler(log_handle)
-        root_logger.setLevel(0)
-
-
-##########################################
 def git_version():
     """Get Git version."""
     try:
@@ -245,9 +234,26 @@ Repository_Path = current_repository()
 IS_Git_Repository = True if Repository_Path else False
 
 
-################################## Style
+def time_testing(fn):
+    @wraps(fn)
+    def wrap_(*args, **kwargs):
+        start_time = time.time()
+        res = None
+        try:
+            res = fn(*args, **kwargs)
+        except SystemExit:
+            pass
+        print("\nruntime: %fs" % (time.time() - start_time))
+        return res
+
+    return wrap_
 
 
+#####################################################################
+# Part of Style.                                                    #
+# Defines classes that generate colors and styles to beautify the   #
+# output. The method of color printing is also defined.             #
+#####################################################################
 class Color(object):
     """Holds representations for a 24-bit color value
     __init__(color, depth="fg", default=False)
@@ -480,7 +486,6 @@ class CommandColor:
     SKYBLUE = Color.fg("#87CEFA")
 
 
-############################## Output
 def echo(msg, color="", style="", nl=True):
     """Print to terminal.
 
@@ -515,7 +520,9 @@ def err(msg, nl=True):
     echo("%s%s%s%s" % (Fx.b, CommandColor.RED, msg, Fx.reset), nl=nl)
 
 
-########################## Command
+#####################################################################
+# Part of command.                                                  #
+#####################################################################
 class GitOptionState:
     # command type.
     String = 1
@@ -1187,7 +1194,135 @@ def process(c, args=None):
         pass
 
 
-########################### Completion
+#####################################################################
+# Print command help message.                                       #
+#####################################################################
+class HelpMsg(object):
+    @staticmethod
+    def echo_one_help_msg(k):
+        """Print a tip.
+
+        Find the corresponding help information according to the `k` value and
+        print it. If the help information does not exist, print the executed
+        full command.
+
+        Args:
+            k: Short command.
+        """
+        echo("    " + k, color=CommandColor.GREEN, nl=False)
+
+        msg = GIT_OPTIONS[k]["help-msg"]
+        command = GIT_OPTIONS[k]["command"]
+
+        if callable(command):
+            command = "Callable: %s" % command.__name__
+
+        if len(command) > 100:
+            command = command[:70] + " ..."
+
+        if msg:
+            echo((9 - len(k)) * " " + str(msg))
+            echo(13 * " " + str(command), color=CommandColor.Gold)
+        else:
+            echo((9 - len(k)) * " " + str(command), color=CommandColor.Gold)
+
+    @classmethod
+    def echo_help_msgs(cls):
+        """Print help message."""
+        echo("These are short commands that can replace git operations:")
+        for k in GIT_OPTIONS.keys():
+            cls.echo_one_help_msg(k)
+
+    @classmethod
+    def give_tip(cls, command_type):
+        """Print a part of help message.
+
+        Print the help information of the corresponding part according to the
+        incoming command type string. If there is no print error prompt for the
+        type.
+
+        Args:
+            command_type: A command type of `TYPE`.
+        """
+        command_type = (
+            command_type[0].upper() + command_type[1:].lower()
+            if len(command_type) > 2
+            else ""
+        )
+        if command_type not in TYPES:
+            err("There is no such type.")
+            echo("Please use `", nl=False)
+            echo("g --types", color=CommandColor.GREEN, nl=False)
+            echo(
+                "` to view the supported types.",
+            )
+            raise SystemExit(0)
+
+        echo("These are the orders of {}".format(command_type))
+        prefix = command_type[0].lower()
+        for k in GIT_OPTIONS.keys():
+            if k.startswith(prefix):
+                cls.echo_one_help_msg(k)
+
+    @staticmethod
+    def echo_types():
+        """Print all command types with random color."""
+        for t in TYPES:
+            echo(
+                "{}{}  ".format(
+                    Color.fg(
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                    ),
+                    t,
+                ),
+                nl=False,
+            )
+        echo(Fx.reset)
+
+    @staticmethod
+    def introduce():
+        """Print the description information."""
+
+        # Print tools version and path.
+        echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
+
+        # Print git version.
+        if Git_Version is None:
+            warn("Don't found Git, maybe need install.")
+        else:
+            echo(Git_Version)
+
+        # Print package path.
+        echo("Path: ", style=Fx.b, nl=False)
+        echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
+
+        echo("Description:", style=Fx.b)
+        echo(
+            (
+                "  Terminal tool, help you use git more simple."
+                " Support Linux and MacOS.\n"
+                "  It use short command to replace the original command, like: \n"
+                "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
+                "  Also you use `g -s` to get the all short command, have fun"
+                " and good lucky.\n"
+                "  The open source path: %s"
+                % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
+            ),
+            style=Fx.italic,
+        )
+
+        echo("\nYou can use ", nl=False)
+        echo("-h", color=CommandColor.GREEN, nl=False)
+        echo(" and ", nl=False)
+        echo("--help", color=CommandColor.GREEN, nl=False)
+        echo(" to get help and more usage.\n")
+
+
+#####################################################################
+# Injection Completion Script.                                      #
+#####################################################################
 _TEMPLATE_ZSH = """\
 #compdef g
 
@@ -1385,130 +1520,9 @@ class Completion(object):
             warn("Don't support completion of %s" % current_shell)
 
 
-#################### Help msg
-class HelpMsg(object):
-    @staticmethod
-    def echo_one_help_msg(k):
-        """Print a tip.
-
-        Find the corresponding help information according to the `k` value and
-        print it. If the help information does not exist, print the executed
-        full command.
-
-        Args:
-            k: Short command.
-        """
-        echo("    " + k, color=CommandColor.GREEN, nl=False)
-
-        msg = GIT_OPTIONS[k]["help-msg"]
-        command = GIT_OPTIONS[k]["command"]
-
-        if callable(command):
-            command = "Callable: %s" % command.__name__
-
-        if len(command) > 100:
-            command = command[:70] + " ..."
-
-        if msg:
-            echo((9 - len(k)) * " " + str(msg))
-            echo(13 * " " + str(command), color=CommandColor.Gold)
-        else:
-            echo((9 - len(k)) * " " + str(command), color=CommandColor.Gold)
-
-    @classmethod
-    def echo_help_msgs(cls):
-        """Print help message."""
-        echo("These are short commands that can replace git operations:")
-        for k in GIT_OPTIONS.keys():
-            cls.echo_one_help_msg(k)
-
-    @classmethod
-    def give_tip(cls, command_type):
-        """Print a part of help message.
-
-        Print the help information of the corresponding part according to the
-        incoming command type string. If there is no print error prompt for the
-        type.
-
-        Args:
-            command_type: A command type of `TYPE`.
-        """
-        command_type = (
-            command_type[0].upper() + command_type[1:].lower()
-            if len(command_type) > 2
-            else ""
-        )
-        if command_type not in TYPES:
-            err("There is no such type.")
-            echo("Please use `", nl=False)
-            echo("g --types", color=CommandColor.GREEN, nl=False)
-            echo(
-                "` to view the supported types.",
-            )
-            raise SystemExit(0)
-
-        echo("These are the orders of {}".format(command_type))
-        prefix = command_type[0].lower()
-        for k in GIT_OPTIONS.keys():
-            if k.startswith(prefix):
-                cls.echo_one_help_msg(k)
-
-    @staticmethod
-    def echo_types():
-        """Print all command types with random color."""
-        for t in TYPES:
-            echo(
-                "{}{}  ".format(
-                    Color.fg(
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                    ),
-                    t,
-                ),
-                nl=False,
-            )
-        echo(Fx.reset)
-
-    @staticmethod
-    def introduce():
-        """Print the description information."""
-
-        # Print tools version and path.
-        echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
-
-        # Print git version.
-        if Git_Version is None:
-            warn("Don't found Git, maybe need install.")
-        else:
-            echo(Git_Version)
-
-        # Print package path.
-        echo("Path: ", style=Fx.b, nl=False)
-        echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
-
-        echo("Description:", style=Fx.b)
-        echo(
-            (
-                "  Terminal tool, help you use git more simple."
-                " Support Linux and MacOS.\n"
-                "  It use short command to replace the original command, like: \n"
-                "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
-                "  Also you use `g -s` to get the all short command, have fun"
-                " and good lucky.\n"
-                "  The open source path: %s"
-                % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
-            ),
-            style=Fx.italic,
-        )
-
-        echo("\nYou can use ", nl=False)
-        echo("-h", color=CommandColor.GREEN, nl=False)
-        echo(" and ", nl=False)
-        echo("--help", color=CommandColor.GREEN, nl=False)
-        echo(" to get help and more usage.\n")
-
-
+#####################################################################
+# Implementation of additional functions.                           #
+#####################################################################
 def git_local_config():
     """Print the local config of current git repository."""
     if IS_Git_Repository:
@@ -1516,7 +1530,6 @@ def git_local_config():
         try:
             with open(Repository_Path + "/.git/config", "r") as cf:
                 for line in cf.read().split("\n"):
-                    res = _re.search(line)
                     if line.startswith("["):
                         err(line)
                     else:
