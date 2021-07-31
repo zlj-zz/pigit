@@ -1211,7 +1211,7 @@ def color_command(command):
     return color_command
 
 
-def process(c, args=None):
+def process_command(c, args=None):
     """Process command and arguments."""
     if Git_Version is None:
         err("Git is not detected. Please install Git first.")
@@ -1304,7 +1304,7 @@ class HelpMsg(object):
             cls.echo_one_help_msg(k)
 
     @classmethod
-    def give_tip(cls, command_type):
+    def echo_tip_with_type(cls, command_type):
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -1326,6 +1326,15 @@ class HelpMsg(object):
             echo(
                 "` to view the supported types.",
             )
+            predicted_type = similar_command(command_type, TYPES)
+            echo(
+                "🧐 The wanted type is %s ?"
+                % (CommandColor.GREEN + predicted_type + Fx.reset),
+                nl=False,
+            )
+            flag = confirm("[y/n]:")
+            if flag:
+                command_g(["-S", predicted_type])
             raise SystemExit(0)
 
         echo("These are the orders of {}".format(command_type))
@@ -1856,7 +1865,7 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.command_type:
-        HelpMsg.give_tip(stdargs.command_type)
+        HelpMsg.echo_tip_with_type(stdargs.command_type)
         raise SystemExit(0)
 
     if stdargs.types:
@@ -1884,7 +1893,7 @@ def command_g(custom_commands=None):
             HelpMsg.introduce()
         else:
             command = stdargs.command
-            process(command, stdargs.args)
+            process_command(command, stdargs.args)
 
 
 if __name__ == "__main__":
