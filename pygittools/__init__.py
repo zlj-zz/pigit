@@ -41,7 +41,9 @@ import logging
 import logging.handlers
 import time
 import random
+from collections import Counter
 from functools import wraps
+
 
 #####################################################################
 # Part of compatibility.                                            #
@@ -199,6 +201,23 @@ def run_cmd_with_resp(*args):
         return e, ""
 
 
+def confirm(text="", default=True):
+    """Obtain confirmation results.
+    Args:
+        text (str): Confirmation prompt.
+        default (bool): Result returned when unexpected input.
+
+    Return: (bool)
+    """
+    input_command = input(text).strip().lower()
+    if input_command in ["n", "no"]:
+        return False
+    elif input_command in ["y", "yes"]:
+        return True
+    else:
+        return default
+
+
 def git_version():
     """Get Git version."""
     try:
@@ -235,15 +254,23 @@ IS_Git_Repository = True if Repository_Path else False
 
 
 def time_testing(fn):
+    """Print the overall running time.
+    When recursive calls exist, only the outermost layer is printed.
+    """
+    time_testing.deep = 0
+
     @wraps(fn)
     def wrap_(*args, **kwargs):
+        time_testing.deep += 1
         start_time = time.time()
         res = None
         try:
             res = fn(*args, **kwargs)
         except SystemExit:
             pass
-        print("\nruntime: %fs" % (time.time() - start_time))
+        time_testing.deep -= 1
+        if time_testing.deep == 0:
+            print("\nruntime: %fs" % (time.time() - start_time))
         return res
 
     return wrap_
@@ -563,8 +590,14 @@ def set_email_and_username(args):
         other = " "
 
     name = input("Please input username:")
-    email = input("Please input email:")
+    while True:
+        if not name:
+            err("Name is empty.")
+            name = input("Please input username again:")
+        else:
+            break
 
+    email = input("Please input email:")
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:
         if email_re.match(email) is None:
@@ -1123,6 +1156,33 @@ GIT_OPTIONS = {
 }
 
 
+def similar_command(command, all_commands):
+    """Get the most similar command with K-NearestNeighbor.
+    Args:
+        command (str): command string.
+        all_commands (list): The list of all command.
+    """
+    #  The dictionary of letter frequency of all commands.
+    words = {word: dict(Counter(word)) for word in all_commands}
+    # Letter frequency of command.
+    fre = dict(Counter(command))
+    # The distance between the frequency of each letter in the command
+    # to be tested and all candidate commands, that is the difference
+    # between the frequency of letters.
+    frequency_difference = {
+        word: [fre[ch] - words[word].get(ch, 0) for ch in command]
+        + [words[word][ch] - fre.get(ch, 0) for ch in word]
+        for word in words
+    }
+    # The order of minimizing the sum of squares of the difference between
+    # letter frequencies.
+    min_frequency_command = min(
+        frequency_difference.items(),
+        key=lambda item: sum(map(lambda i: i ** 2, item[1])),
+    )[0]
+    return min_frequency_command
+
+
 def color_command(command):
     command_list = command.split(" ")
     color_command = (
@@ -1162,6 +1222,16 @@ def process(c, args=None):
     if option is None:
         echo("Don't support this command, please try ", nl=False)
         warn("g --show-commands")
+        predicted_command = similar_command(c, GIT_OPTIONS.keys())
+        echo(
+            "🧐 The wanted command is %s ?"
+            % (CommandColor.GREEN + predicted_command + Fx.reset),
+            nl=False,
+        )
+        flag = confirm("[y/n]:")
+        if flag:
+            command_g([predicted_command])
+
         raise SystemExit(0)
 
     state = option.get("state", None)
@@ -1662,12 +1732,7 @@ class GitignoreGenetor(object):
                 "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
                 nl=False,
             )
-            try:
-                flag = input().strip()
-                if flag in ["n", "N", "no", "No", "NO"]:
-                    whether_write = False
-            except Exception:
-                pass
+            whether_write = confirm()
         if whether_write:
             base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
             name = cls.Genres.get(genre.lower(), None)
