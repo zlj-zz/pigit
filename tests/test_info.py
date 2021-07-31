@@ -2,6 +2,6 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pygittools import info
+from pygittools import repository_info
 
-info()
+repository_info()

@@ -2,6 +2,6 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pygittools import add_completion
+from pygittools import Completion
 
-add_completion()
+Completion.complete()

@@ -66,14 +66,20 @@ Log = logging.getLogger(__name__)
 
 
 ###################################### Utils
-def ensure_path(file_path):
+def ensure_path(dir_path):
     """Determine whether the file path exists. If not, create a directory.
     Args:
-        file_path: (str), like: "~/.config/xxx/xxx.log"
+        dir_path: (str), like: "~/.config/xxx"
     """
-    if not os.path.exists(file_path):
-        dir_path = os.path.dirname(file_path)
-        os.makedirs(dir_path, exist_ok=True)
+    if not os.path.isdir(dir_path):
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except PermissionError as e:
+            err("Don't have permission to create: %s" % dir_path)
+            exit(1, e)
+        except Exception as e:
+            err("An error occurred while creating %s" % dir_path)
+            exit(1, e)
 
 
 # Exit code.
@@ -186,7 +192,8 @@ class LogHandle(object):
             if log_file is None:
                 log_handle = logging.StreamHandler()
             else:
-                ensure_path(log_file)
+                dir_path = os.path.dirname(log_file)
+                ensure_path(dir_path)
                 try:
                     log_handle = logging.handlers.RotatingFileHandler(
                         log_file, maxBytes=1048576, backupCount=4
@@ -1208,7 +1215,7 @@ _alternative\\
     --debug\:"Run in debug mode."\\
     --out-log\:"Print log to console."\\
 
-%s
+    %s
   ))\'\\
   'files:filename:_files'
 return ret
@@ -1222,7 +1229,10 @@ _TEMPLATE_BASH = """\
 
 _complete_g(){
   if [[ "${COMP_CWORD}" == "1" ]];then
-    COMP_WORD="%s"
+    COMP_WORD="-c --complete -s --show-commands -S --show-command -t --types\\
+        -f --config -i --information -v --version --create-ignore\\
+        --debug --out-log\\
+         %s"
     COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
 }
@@ -1231,148 +1241,148 @@ complete -F _complete_g g
 """
 
 
-def get_current_shell():
-    """Gets the currently used shell.
+class Completion(object):
+    """Implement and inject help classes for completion scripts."""
 
-    Returns:
-        shell_: Current shell string.
-    """
-    current_shell = ""
-    _, resp = run_cmd_with_resp("echo $SHELL")
-    if resp:
-        current_shell = resp.split("/")[-1].strip()
-    return current_shell
+    @staticmethod
+    def get_current_shell():
+        """Gets the currently used shell.
 
+        Returns:
+            shell_: Current shell string.
+        """
+        current_shell = ""
+        _, resp = run_cmd_with_resp("echo $SHELL")
+        if resp:
+            current_shell = resp.split("/")[-1].strip()
+        return current_shell
 
-def ensure_config_path(file_name):
-    """Check config path.
+    @staticmethod
+    def ensure_config_path(file_name):
+        """Check config path.
 
-    Check whether the configuration directory exists, if not, try to create
-    it. Failed to exit, successfully returned to complete the file path.
+        Check whether the configuration directory exists, if not, try to create
+        it. Failed to exit, successfully returned to complete the file path.
 
-    Args:
-        file_name: Completion prompt script name.
+        Args:
+            file_name: Completion prompt script name.
 
-    Returns:
-        file_path: Full path of completion prompt script.
-    """
-    Log.debug("{}, {}".format(TOOLS_HOME, file_name))
-    if not os.path.exists(TOOLS_HOME):
+        Returns:
+            file_path: Full path of completion prompt script.
+        """
+        Log.debug("{}, {}".format(TOOLS_HOME, file_name))
+        ensure_path(TOOLS_HOME)
+
+        return "{}/{}".format(TOOLS_HOME, file_name)
+
+    @staticmethod
+    def generate_complete_script(template, fn, name="_g"):
+        """Generate completion scirpt.
+
+        Generate the completion script of the corresponding shell according to
+        the template.
+
+        Args:
+            template: Script template.
+            fn: Method of generating script content.
+            name: Completion script name.
+        """
+        complete_src = fn()
+        script_src = template % (complete_src)
+
         try:
-            os.mkdir(TOOLS_HOME)
+            with open("%s/%s" % (TOOLS_HOME, name), "w") as f:
+                for line in script_src:
+                    f.write(line)
         except Exception as e:
             exit_(1, e)
 
-    file_path = "{}/{}".format(TOOLS_HOME, file_name)
-    return file_path
+    @staticmethod
+    def using_completion(file_name, path, config_path):
+        """Try using completion script.
 
+        Inject the load of completion script into the configuration of shell.
+        If it exists in the configuration, the injection will not be repeated.
 
-def generate_complete_script(template, fn, name="_g"):
-    """Generate completion scirpt.
-
-    Generate the completion script of the corresponding shell according to
-    the template.
-
-    Args:
-        template: Script template.
-        fn: Method of generating script content.
-        name: Completion script name.
-    """
-    complete_src = fn()
-    script_src = template % (complete_src)
-
-    try:
-        with open("%s/%s" % (TOOLS_HOME, name), "w") as f:
-            for line in script_src:
-                f.write(line)
-    except Exception as e:
-        exit_(1, e)
-
-
-def using_completion(file_name, path, config_path):
-    """Try using completion script.
-
-    Inject the load of completion script into the configuration of shell.
-    If it exists in the configuration, the injection will not be repeated.
-
-    Args:
-        file_name: generated completion script.
-        path: `fungit` configuration path.
-        config_path: shell configuration path.
-    """
-    try:
-        with open(config_path) as f:
-            shell_conf = f.read()
-            _re = re.compile(r"\/\.config\/pygittools/([^\s]+)")
-            files = _re.findall(shell_conf)
-    except Exception as e:
-        exit_(1, e)
-
-    has_injected = False
-    if files:
-        for file in files:
-            if file == file_name:
-                has_injected = True
-    Log.debug("has_injected: {}".format(has_injected))
-
-    if not has_injected:
+        Args:
+            file_name: generated completion script.
+            path: `fungit` configuration path.
+            config_path: shell configuration path.
+        """
         try:
-            run_cmd('echo "source %s" >> %s ' % (path, config_path))
+            with open(config_path) as f:
+                shell_conf = f.read()
+                _re = re.compile(r"\/\.config\/pygittools/([^\s]+)")
+                files = _re.findall(shell_conf)
         except Exception as e:
             exit_(1, e)
-        okay("\nPlease run: source {}".format(config_path))
-    else:
-        warn("This configuration already exists. 😅")
 
+        has_injected = False
+        if files:
+            for file in files:
+                if file == file_name:
+                    has_injected = True
+        Log.debug("has_injected: {}".format(has_injected))
 
-def add_zsh_completion():
-    """Add Zsh completion prompt script."""
+        if not has_injected:
+            try:
+                run_cmd('echo "source %s" >> %s ' % (path, config_path))
+            except Exception as e:
+                exit_(1, e)
+            okay("\nPlease run: source {}".format(config_path))
+        else:
+            warn("This configuration already exists. 😅")
 
-    _name = "_g"
-    _path = ensure_config_path(_name)
+    @classmethod
+    def add_zsh_completion(cls):
+        """Add Zsh completion prompt script."""
 
-    def gen_completion():
-        vars = []
+        _name = "_g"
+        _path = cls.ensure_config_path(_name)
 
-        for k in GIT_OPTIONS.keys():
-            desc = GIT_OPTIONS[k]["help-msg"]
-            if not desc:
-                desc = "no description."
-            vars.append('    {}\\:"{}"\\\n'.format(k, desc))
+        def gen_completion():
+            vars = []
 
-        return ("\n".join(vars)).rstrip()
+            for k in GIT_OPTIONS.keys():
+                desc = GIT_OPTIONS[k]["help-msg"]
+                if not desc:
+                    desc = "no description."
+                vars.append('    {}\\:"{}"\\'.format(k, desc))
 
-    generate_complete_script(_TEMPLATE_ZSH, gen_completion, _name)
+            return ("\n".join(vars)).strip()
 
-    using_completion(_name, _path, USER_HOME + "/.zshrc")
+        cls.generate_complete_script(_TEMPLATE_ZSH, gen_completion, _name)
 
+        cls.using_completion(_name, _path, USER_HOME + "/.zshrc")
 
-def add_bash_completion():
-    """Add Bash completion prompt script."""
+    @classmethod
+    def add_bash_completion(cls):
+        """Add Bash completion prompt script."""
 
-    _name = "complete_script"
-    _path = ensure_config_path(_name)
+        _name = "complete_script"
+        _path = cls.ensure_config_path(_name)
 
-    def gen_completion():
-        return " ".join(GIT_OPTIONS.keys())
+        def gen_completion():
+            return " ".join(GIT_OPTIONS.keys())
 
-    generate_complete_script(_TEMPLATE_BASH, gen_completion, _name)
+        cls.generate_complete_script(_TEMPLATE_BASH, gen_completion, _name)
 
-    using_completion(_name, _path, USER_HOME + "/.bashrc")
+        cls.using_completion(_name, _path, USER_HOME + "/.bashrc")
 
+    @classmethod
+    def complete(cls):
+        """Add completion prompt script."""
+        echo("\nTry to add completion ...")
 
-def add_completion():
-    """Add completion prompt script."""
-    echo("\nTry to add completion ...")
+        current_shell = cls.get_current_shell()
+        echo("Detected shell: %s" % current_shell)
 
-    current_shell = get_current_shell()
-    echo("Detect shell: %s" % current_shell)
-    if current_shell == "zsh":
-        add_zsh_completion()
-    elif current_shell == "bash":
-        add_bash_completion()
-    else:
-        warn("Don't support completion of %s" % current_shell)
+        if current_shell == "zsh":
+            cls.add_zsh_completion()
+        elif current_shell == "bash":
+            cls.add_bash_completion()
+        else:
+            warn("Don't support completion of %s" % current_shell)
 
 
 #################### Help msg
@@ -1499,7 +1509,7 @@ class HelpMsg(object):
         echo(" to get help and more usage.\n")
 
 
-def config():
+def git_local_config():
     """Print the local config of current git repository."""
     if IS_Git_Repository:
         _re = re.compile(r"\w+\s=\s.*?")
@@ -1520,7 +1530,7 @@ def config():
         err("This directory is not a git repository yet.")
 
 
-def info():
+def repository_info():
     """Print some information of the repository.
     repository:
     remote:
@@ -1760,7 +1770,7 @@ def command_g(custom_commands=None):
     )
 
     if stdargs.complete:
-        add_completion()
+        Completion.complete()
         raise SystemExit(0)
 
     if stdargs.show_commands:
@@ -1776,11 +1786,11 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.config:
-        config()
+        git_local_config()
         raise SystemExit(0)
 
     if stdargs.information:
-        info()
+        repository_info()
         raise SystemExit(0)
 
     if stdargs.ignore_type:
