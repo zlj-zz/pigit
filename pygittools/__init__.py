@@ -1684,6 +1684,197 @@ def version():
     echo("version: %s" % __version__)
 
 
+class CodeCounter(object):
+    rules = [
+        {"pattern": re.compile(r"\.git"), "include": False},
+        {
+            # Exclude all picture formats.
+            "pattern": re.compile(
+                r"\.xbm|\.tif|\.pjp|\.svgz|\.jpg|\.jpeg|\.ico|\.tiff|\.gif|\.svg|\.jfif|\.webp|\.png|\.bmp|\.jpeg|\.avif$",
+                re.I,
+            ),
+            "include": False,
+        },
+        {
+            # Exclude all video formats.
+            "pattern": re.compile(
+                r"\.avi|\.rmvb|\.rm|\.asf|\.divx|\.mpg|\.mpeg|\.mpe|\.wmv|\.mp4|\.mkv|\.vob",
+                re.I,
+            ),
+            "include": False,
+        },
+        {
+            # Exclude all audio frequency formats.
+            "pattern": re.compile(
+                r"\.mp3|\.wma|\.mid[i]?|\.mpeg|\.cda|\.wav|\.ape|\.flac|\.aiff|\.au",
+                re.I,
+            ),
+            "include": False,
+        },
+    ]
+
+    FileTypes = {
+        "": "",
+        "conf": "Properties",
+        "cfg": "Properties",
+        "cpp": "C++",
+        "cs": "C#",
+        "bat": "Batch",
+        "dart": "Dart",
+        "gradle": "Groovy",
+        "html": "HTML",
+        "java": "Java",
+        "js": "Java Script",
+        "json": "Json",
+        "kt": "Kotlin",
+        "lua": "Lua",
+        "md": "Markdown",
+        "php": "PHP",
+        "py": "Python",
+        "plist": "XML",
+        "properties": "Propertie",
+        "ts": "Type Script",
+        "rst": "reStructuredText",
+        "sh": "Shell",
+        "swift": "Swift",
+        "vue": "Vue",
+        "vim": "Vim Scirpt",
+        "xml": "XML",
+        "yaml": "YAML",
+        "yml": "YAML",
+        "zsh": "Shell",
+    }
+
+    @classmethod
+    def process_gitignore(cls, root, files):
+        """Process `.gitignore` files and add matching rules.
+        Args:
+            root (str): Absolute or relative path to the directory.
+            files (list): The list of all file names under the `root` path.
+        """
+        if ".gitignore" in files:
+            with open(os.path.join(root, ".gitignore")) as f:
+                ignore_content = filter(
+                    # Filter out comment lines.
+                    lambda x: x and not x.startswith("#"),
+                    map(
+                        # Filter out white space lines.
+                        # Replace `\` to `/` for windows.
+                        lambda x: x.strip().replace("\\", "/"),
+                        # Read the file and split the lines.
+                        f.read().split("\n"),
+                    ),
+                )
+
+                for item in ignore_content:
+                    is_negative = item[0] == "!"
+                    if is_negative:
+                        item = item[1:]
+
+                    slash_index = item.find("/")
+                    if slash_index == 0:
+                        item = root + item
+                    elif slash_index == -1 or slash_index == len(item) - 1:
+                        item = os.path.join(root, "**", item)
+                    else:
+                        item = os.path.join(root, item)
+
+                    item = re.sub(r"([\{\}\(\)\+\.\^\$\|])", r"\1", item)
+                    item = re.sub(r"(^|[^\\])\?", ".", item)
+                    item = re.sub(r"\/\*\*", "([\\\\/][^\\\\/]+)?", item)
+                    item = re.sub(r"\*\*\/", "([^\\\\/]+[\\\\/])?", item)
+                    item = re.sub(r"\*", "([^\\\\/]+)", item)
+                    item = re.sub(r"\?", "*", item)
+                    item = re.sub(r"([^\/])$", r"\1(([\\\\/].*)|$)", item)
+                    item = re.sub(r"\/$", "(([\\\\/].*)|$)", item)
+                    cls.rules.append(
+                        {"pattern": re.compile(item), "include": is_negative}
+                    )
+
+    @classmethod
+    def matching(cls, full_path):
+        """Judge whether it is the required file according to the rule matching path.
+        Returns `True` if the file not needs to be ignored, or `False` if needs.
+        """
+        # TODO: has bug.
+        res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.rules))
+        if res is not None and list(filter(lambda rule: rule["include"] == False, res)):
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def count_err_callback(e):
+        """Handle of processing walk error."""
+        print(e)
+        raise SystemExit(0)
+
+    @classmethod
+    def count(cls, root_path="."):
+        """
+
+        Return:
+            result (dict): Dictionary containing statistical results.
+            >>> result = {
+            ...     'py': {
+            ...         'files': 5,
+            ...         'lines': 2124,
+            ...     }
+            ... }
+        """
+
+        result = {}
+        for root, _, files in os.walk(
+            root_path,
+            onerror=cls.count_err_callback,
+        ):
+
+            cls.process_gitignore(root, files)
+
+            for file in files:
+                full_path = os.path.join(root, file)
+                is_effective = cls.matching(full_path)
+                if is_effective:
+                    # TODO: improve adjust file type.
+                    suffix = file.split(".")[-1]
+                    suffix = cls.FileTypes.get(suffix.lower(), suffix)
+                    # TODO: counter, may need use threading.
+                    try:
+                        with open(full_path) as f:
+                            count = len(f.read().split("\n"))
+                    except Exception as e:
+                        print(e)
+                        print(full_path)
+                        continue
+
+                    # Superposition.
+                    if result.get(suffix, None) is None:
+                        result[suffix] = {"files": 1, "lines": count}
+                    else:
+                        result[suffix]["files"] += 1
+                        result[suffix]["lines"] += count
+
+        return result
+        # pprint(cls.rules)
+
+    @staticmethod
+    def format_print(d):
+        echo("-" * 50)
+        echo("| Language            | Files     | Code lines   |")
+        echo("-" * 50)
+        for key, value in d.items():
+            print(
+                "| {:<20}| {:<10}| {:<13}|".format(key, value["files"], value["lines"])
+            )
+        echo("-" * 50)
+        # print(key, value)
+
+    @classmethod
+    def count_and_format_print(cls, root_path="."):
+        result = cls.count(root_path)
+        cls.format_print(result)
+
+
 class GitignoreGenetor(object):
 
     # Supported type.
@@ -1831,6 +2022,11 @@ def command_g(custom_commands=None):
         % ", ".join(GitignoreGenetor.Genres.keys()),
     )
     args.add_argument(
+        "--count",
+        action="store_true",
+        help="Statistical documents.",
+    )
+    args.add_argument(
         "--debug",
         action="store_true",
         help="Run in debug mode.",
@@ -1882,6 +2078,10 @@ def command_g(custom_commands=None):
 
     if stdargs.ignore_type:
         GitignoreGenetor.create_gitignore(stdargs.ignore_type)
+        raise SystemExit(0)
+
+    if stdargs.count:
+        CodeCounter.count_and_format_print()
         raise SystemExit(0)
 
     if stdargs.version:

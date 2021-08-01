@@ -5,13 +5,19 @@
 		"CWORD",
 		"Popen",
 		"Zhang",
+		"avif",
 		"datefmt",
+		"divx",
 		"elisp",
+		"flac",
 		"gitbook",
 		"hexa",
+		"jfif",
 		"msecs",
 		"nargs",
 		"pygittools",
+		"rmvb",
+		"svgz",
 		"unblink",
 		"unbold",
 		"uncolor",
@@ -19,7 +25,8 @@
 		"unitalic",
 		"unstrike",
 		"untracked",
-		"ununderline"
+		"ununderline",
+		"webp"
 	],
 	"restructuredtext.confPath": ""
 }
