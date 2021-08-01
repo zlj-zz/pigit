@@ -41,6 +41,7 @@ import logging
 import logging.handlers
 import time
 import random
+import threading
 from collections import Counter
 from functools import wraps
 
@@ -1743,7 +1744,18 @@ class CodeCounter(object):
         "yaml": "YAML",
         "yml": "YAML",
         "zsh": "Shell",
+        "dea": "XML",
+        "urdf": "XML",
+        "launch": "XML",
+        "rviz": "YAML",
+        "srdf": "YAML",
+        "msg": "ROS Message",
+        "srv": "ROS Message",
     }
+
+    Max_Thread = 10
+    Current_Thread = 0
+    Thread_Lock = threading.Lock()
 
     @classmethod
     def process_gitignore(cls, root, files):
@@ -1798,10 +1810,14 @@ class CodeCounter(object):
         """
         # TODO: has bug.
         res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.rules))
-        if res is not None and list(filter(lambda rule: rule["include"] == False, res)):
-            return False
-        else:
+        if not res or list(filter(lambda rule: rule["include"] == True, res)):
             return True
+        else:
+            return False
+
+    @staticmethod
+    def count_file_thread(full_path):
+        pass
 
     @staticmethod
     def count_err_callback(e):
@@ -1831,11 +1847,16 @@ class CodeCounter(object):
 
             cls.process_gitignore(root, files)
 
+            # First judge whether the directory is valid. Invalid directories
+            # do not traverse files.
+            is_effective_dir = cls.matching(root)
+            if not is_effective_dir:
+                continue
+
             for file in files:
                 full_path = os.path.join(root, file)
                 is_effective = cls.matching(full_path)
                 if is_effective:
-                    # TODO: improve adjust file type.
                     suffix = file.split(".")[-1]
                     suffix = cls.FileTypes.get(suffix.lower(), suffix)
                     # TODO: counter, may need use threading.
@@ -1854,19 +1875,25 @@ class CodeCounter(object):
                         result[suffix]["files"] += 1
                         result[suffix]["lines"] += count
 
-        return result
+        # from pprint import pprint
+
         # pprint(cls.rules)
+        return result
 
     @staticmethod
     def format_print(d):
+        echo("{:^50}".format("[Code Counter Result]"))
         echo("-" * 50)
         echo("| Language            | Files     | Code lines   |")
         echo("-" * 50)
+        sum = 0
         for key, value in d.items():
             print(
                 "| {:<20}| {:<10}| {:<13}|".format(key, value["files"], value["lines"])
             )
+            sum += value["lines"]
         echo("-" * 50)
+        echo(" Total: {}".format(sum))
         # print(key, value)
 
     @classmethod
