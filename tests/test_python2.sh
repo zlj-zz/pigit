@@ -25,3 +25,5 @@ Sleep 2
 ${PY2} ${Project}/__init__.py ws
 Sleep 2
 ${PY2} ${Project}/__init__.py wS
+Sleep 2
+${PY2} ${Project}/__init__.py --count

@@ -503,6 +503,48 @@ class Fx(object):
         return cls.color_re.sub("", string)
 
 
+class Cursor:
+    """Class with collection of cursor movement functions:
+    Functions:
+        .t[o](line, column)
+        .r[ight](columns)
+        .l[eft](columns)
+        .u[p](lines)
+        .d[own](lines)
+        .save()
+        .restore()
+    """
+
+    @staticmethod
+    def to(line, col):
+        # * Move cursor to line, column
+        return "\033[{};{}f".format(line, col)
+
+    @staticmethod
+    def right(dx):
+        return "\033[{}C".format(dx)
+
+    @staticmethod
+    def left(dx):
+        return "\033[{}D".format(dx)
+
+    @staticmethod
+    def up(dy):
+        return "\033[{}A".format(dy)
+
+    @staticmethod
+    def down(dy):
+        return "\033[{}B".format(dy)
+
+    save = "\033[s"  # * Save cursor position
+    restore = "\033[u"  # * Restore saved cursor postion
+    t = to
+    r = right
+    l = left
+    u = up
+    d = down
+
+
 class CommandColor:
     """Terminal print color class."""
 
@@ -1429,6 +1471,7 @@ _alternative\\
     --create-ignore\:"Create a demo .gitignore file. Need one argument"\\
     --debug\:"Run in debug mode."\\
     --out-log\:"Print log to console."\\
+    --count\:"Count the number of codes and output them in tabular form."\\
 
     %s
   ))\'\\
@@ -1446,7 +1489,7 @@ _complete_g(){
   if [[ "${COMP_CWORD}" == "1" ]];then
     COMP_WORD="-c --complete -s --show-commands -S --show-command -t --types\\
         -f --config -i --information -v --version --create-ignore\\
-        --debug --out-log\\
+        --debug --out-log --count\\
          %s"
     COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
@@ -1840,6 +1883,9 @@ class CodeCounter(object):
         """
 
         result = {}
+        valid_counter = 0
+        invalid_counter = 0
+        invalid_list = []
         for root, _, files in os.walk(
             root_path,
             onerror=cls.count_err_callback,
@@ -1863,22 +1909,31 @@ class CodeCounter(object):
                     try:
                         with open(full_path) as f:
                             count = len(f.read().split("\n"))
-                    except Exception as e:
-                        print(e)
-                        print(full_path)
-                        continue
 
-                    # Superposition.
-                    if result.get(suffix, None) is None:
-                        result[suffix] = {"files": 1, "lines": count}
-                    else:
-                        result[suffix]["files"] += 1
-                        result[suffix]["lines"] += count
+                        # Superposition.
+                        if result.get(suffix, None) is None:
+                            result[suffix] = {"files": 1, "lines": count}
+                        else:
+                            result[suffix]["files"] += 1
+                            result[suffix]["lines"] += count
+                        valid_counter += 1
+                    except Exception as e:
+                        invalid_counter += 1
+                        invalid_list.append(file)
+                        continue
+                    finally:
+                        echo(
+                            "\rValid files found: {}, Invalid files found: {}".format(
+                                valid_counter, invalid_counter
+                            ),
+                            nl=False,
+                        )
 
         # from pprint import pprint
 
         # pprint(cls.rules)
-        return result
+        echo("")
+        return result, invalid_list
 
     @staticmethod
     def format_print(d):
@@ -1898,8 +1953,12 @@ class CodeCounter(object):
 
     @classmethod
     def count_and_format_print(cls, root_path="."):
-        result = cls.count(root_path)
+        result, invalid_list = cls.count(root_path)
         cls.format_print(result)
+        if invalid_list and confirm(
+            "Wether print invalid file list?[y/n]", default=False
+        ):
+            print(invalid_list)
 
 
 class GitignoreGenetor(object):
@@ -2051,7 +2110,7 @@ def command_g(custom_commands=None):
     args.add_argument(
         "--count",
         action="store_true",
-        help="Statistical documents.",
+        help="Count the number of codes and output them in tabular form.",
     )
     args.add_argument(
         "--debug",
