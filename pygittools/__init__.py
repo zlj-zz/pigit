@@ -211,6 +211,8 @@ def confirm(text="", default=True):
         default (bool): Result returned when unexpected input.
 
     Return: (bool)
+
+    >>> confirm('[y/n] (default: yes):')
     """
     input_command = input(text).strip().lower()
     if input_command in ["n", "no"]:
@@ -248,7 +250,7 @@ def current_repository():
     if path == ".git":
         repository_path = os.getcwd()
     else:
-        repository_path = "/".join(path.split("/")[:-1])
+        repository_path = path[:-5]
     return repository_path
 
 
@@ -287,12 +289,20 @@ def time_testing(fn):
 class Color(object):
     """Holds representations for a 24-bit color value
     __init__(color, depth="fg", default=False)
-    -- color accepts 6 digit hexadecimal: string "#RRGGBB", 2 digit hexadecimal: string "#FF" or decimal RGB "255 255 255" as a string.
+    -- color accepts 6 digit hexadecimal: string "#RRGGBB", 2 digit
+        hexadecimal: string "#FF" or decimal RGB "255 255 255" as a string.
     -- depth accepts "fg" or "bg"
     __call__(*args) joins str arguments to a string and apply color
     __str__ returns escape sequence to set color
     __iter__ returns iteration over red, green and blue in integer values of 0-255.
-    * Values:  .hexa: str  |  .dec: Tuple[int, int, int]  |  .red: int  |  .green: int  |  .blue: int  |  .depth: str  |  .escape: str
+    * Values:
+        .hexa: str
+        .dec: Tuple[int, int, int]
+        .red: int
+        .green: int
+        .blue: int
+        .depth: str
+        .escape: str
     """
 
     # hexa: str
@@ -471,7 +481,8 @@ if not PYTHON3:
 
 class Fx(object):
     """Text effects
-    * trans(string: str): Replace whitespace with escape move right to not overwrite background behind whitespace.
+    * trans(string: str): Replace whitespace with escape move right to not
+        overwrite background behind whitespace.
     * uncolor(string: str) : Removes all 24-bit color and returns string .
     """
 
