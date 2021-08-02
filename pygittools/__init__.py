@@ -41,6 +41,7 @@ import logging
 import logging.handlers
 import time
 import random
+import json
 import threading
 from math import sqrt, exp
 from collections import Counter
@@ -555,6 +556,7 @@ class CommandColor:
     YELLOW = Color.fg("#EBCB8C")
     Gold = Color.fg("#FFD700")  # Gold
     SKYBLUE = Color.fg("#87CEFA")
+    Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
 
 
 def echo(msg, color="", style="", nl=True):
@@ -1843,9 +1845,11 @@ class CodeCounter(object):
         "srv": "ROS Message",
     }
 
-    Max_Thread = 10
-    Current_Thread = 0
-    Thread_Lock = threading.Lock()
+    Result_Saved_Path = TOOLS_HOME + "/Counter"
+
+    # Max_Thread = 10
+    # Current_Thread = 0
+    # Thread_Lock = threading.Lock()
 
     @classmethod
     def process_gitignore(cls, root, files):
@@ -1904,9 +1908,9 @@ class CodeCounter(object):
         else:
             return False
 
-    @staticmethod
-    def count_file_thread(full_path):
-        pass
+    # @staticmethod
+    # def count_file_thread(full_path):
+    #     pass
 
     @staticmethod
     def count_err_callback(e):
@@ -1983,25 +1987,112 @@ class CodeCounter(object):
         return result, invalid_list
 
     @staticmethod
-    def format_print(d):
-        echo("{:^50}".format("[Code Counter Result]"))
-        echo("-" * 50)
-        echo("| Language            | Files     | Code lines   |")
-        echo("-" * 50)
+    def recorded_result(root_path):
+        file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
+        file_path = os.path.join(CodeCounter.Result_Saved_Path, file_name)
+        try:
+            with open(file_path) as rf:
+                res = json.load(rf)
+                return res
+        except Exception:
+            return None
+
+    @staticmethod
+    def save_result(result, root_path):
+        """Save the record result to `TOOLS_HOME`/Counter"""
+
+        file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
+        file_path = os.path.join(CodeCounter.Result_Saved_Path, file_name)
+        ensure_path(CodeCounter.Result_Saved_Path)
+        try:
+            with open(file_path, "w") as wf:
+                json.dump(result, wf, indent=2)
+                return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def format_print(d, old=None):
+        """Try to load the record result from `TOOLS_HOME`/Counter"""
+
+        echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
+        echo("{}{:^52}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
+        echo("-" * 65)
+        echo(
+            "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<20}{unbold}|".format(
+                "Language", "Files", "Code lines", bold=Fx.bold, unbold=Fx.unbold
+            )
+        )
+        echo("-" * 65)
         sum = 0
         for key, value in d.items():
+            # Processing too long name.
+            if len(key) > 20:
+                key = "..." + key[-17:]
+
+            # Set color.
+            if value["lines"] <= 10000:
+                lines_color = ""
+            elif value["lines"] <= 100000:
+                lines_color = CommandColor.YELLOW
+            else:
+                lines_color = CommandColor.RED
+
+            # Compare change.
+            if isinstance(old, dict) and old.get(key, None) is not None:
+                old_files = old.get(key).get("files", None)
+                old_lines = old.get(key).get("lines", None)
+
+                if value["files"] > old_files:
+                    files_symbol = "+"
+                    files_change = value["files"] - old_files
+                elif value["files"] < old_files:
+                    files_symbol = "-"
+                    files_change = old_files - value["files"]
+                else:
+                    files_symbol = files_change = ""
+
+                if value["lines"] > old_lines:
+                    lines_symbol = "+"
+                    lines_change = value["lines"] - old_lines
+                elif value["lines"] < old_lines:
+                    lines_symbol = "-"
+                    lines_change = old_lines - value["lines"]
+                else:
+                    lines_symbol = lines_change = ""
+
+            else:
+                files_change = files_symbol = lines_change = lines_symbol = ""
+
+            # TODO: You can try adding color.
             print(
-                "| {:<20}| {:<10}| {:<13}|".format(key, value["files"], value["lines"])
+                "| {:<21}| {file_style}{:<11}{reset} {file_change_style}{file_change:>5}{reset}| {lines_style}{:<13}{reset} {line_change_style}{line_change:>6}{reset}|".format(
+                    key,
+                    value["files"],
+                    value["lines"],
+                    file_style=Fx.italic,
+                    file_change_style=CommandColor.Symbol.get(files_symbol, ""),
+                    file_change=files_symbol + str(files_change),
+                    lines_style=lines_color,
+                    line_change_style=CommandColor.Symbol.get(lines_symbol, ""),
+                    line_change=lines_symbol + str(lines_change),
+                    reset=Fx.reset,
+                )
             )
             sum += value["lines"]
-        echo("-" * 50)
+        echo("-" * 65)
         echo(" Total: {}".format(sum))
         # print(key, value)
 
     @classmethod
-    def count_and_format_print(cls, root_path=".", use_ignore=True):
+    def count_and_format_print(
+        cls, root_path=os.path.abspath(os.path.curdir), use_ignore=True, if_save=True
+    ):
         result, invalid_list = cls.count(root_path, use_ignore)
-        cls.format_print(result)
+        old_result = cls.recorded_result(root_path)
+        cls.format_print(result, old_result)
+        if if_save:
+            cls.save_result(result, root_path)
         if invalid_list and confirm(
             "Wether print invalid file list?[y/n]", default=False
         ):
