@@ -550,12 +550,13 @@ class Cursor:
 class CommandColor:
     """Terminal print color class."""
 
-    RED = Color.fg("#FF6347")  # Tomato
-    GREEN = Color.fg("#98FB98")  # PaleGreen
-    DEEPGREEN = Color.fg("#A4BE8C")  # PaleGreen
-    YELLOW = Color.fg("#EBCB8C")
+    Red = Color.fg("#FF6347")  # Tomato
+    Green = Color.fg("#98FB98")  # PaleGreen
+    DeepGreen = Color.fg("#A4BE8C")  # PaleGreen
+    Yellow = Color.fg("#EBCB8C")
     Gold = Color.fg("#FFD700")  # Gold
-    SKYBLUE = Color.fg("#87CEFA")
+    SkyBlue = Color.fg("#87CEFA")
+    MediumVioletRed = Color.fg("#C71585")
     Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
 
 
@@ -580,7 +581,7 @@ def echo(msg, color="", style="", nl=True):
 
 def okay(msg, nl=True):
     """Print green information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.GREEN, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, CommandColor.Green, msg, Fx.reset), nl=nl)
 
 
 def warn(msg, nl=True):
@@ -590,7 +591,7 @@ def warn(msg, nl=True):
 
 def err(msg, nl=True):
     """Print red information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.RED, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, CommandColor.Red, msg, Fx.reset), nl=nl)
 
 
 #####################################################################
@@ -610,6 +611,7 @@ def add(args):
     if args:
         args_str = " ".join(args)
 
+    echo("🌈  Storage file: {}".format("all" if args_str.strip() == "." else args_str))
     run_cmd("git add " + args_str)
 
 
@@ -1267,15 +1269,15 @@ def color_command(command):
     command_list = command.split(" ")
     color_command = (
         Fx.bold
-        + CommandColor.DEEPGREEN
+        + CommandColor.DeepGreen
         + command_list.pop(0)
         + " "
-        + CommandColor.YELLOW
+        + CommandColor.Yellow
         + command_list.pop(0)
         + " "
         + Fx.unbold
         + Fx.italic
-        + CommandColor.SKYBLUE
+        + CommandColor.SkyBlue
     )
     while len(command_list) > 0:
         temp = command_list.pop(0)
@@ -1305,12 +1307,12 @@ def process_command(c, args=None):
         predicted_command = similar_command(c, GIT_OPTIONS.keys())
         echo(
             "🧐 The wanted command is %s ?"
-            % (CommandColor.GREEN + predicted_command + Fx.reset),
+            % (CommandColor.Green + predicted_command + Fx.reset),
             nl=False,
         )
         flag = confirm("[y/n]:")
         if flag:
-            command_g([predicted_command])
+            process_command(predicted_command, args=args)
 
         raise SystemExit(0)
 
@@ -1359,7 +1361,7 @@ class HelpMsg(object):
         Args:
             k: Short command.
         """
-        echo("    " + k, color=CommandColor.GREEN, nl=False)
+        echo("    " + k, color=CommandColor.Green, nl=False)
 
         msg = GIT_OPTIONS[k]["help-msg"]
         command = GIT_OPTIONS[k]["command"]
@@ -1402,14 +1404,14 @@ class HelpMsg(object):
         if command_type not in TYPES:
             err("There is no such type.")
             echo("Please use `", nl=False)
-            echo("g --types", color=CommandColor.GREEN, nl=False)
+            echo("g --types", color=CommandColor.Green, nl=False)
             echo(
                 "` to view the supported types.",
             )
             predicted_type = similar_command(command_type, TYPES)
             echo(
                 "🧐 The wanted type is %s ?"
-                % (CommandColor.GREEN + predicted_type + Fx.reset),
+                % (CommandColor.Green + predicted_type + Fx.reset),
                 nl=False,
             )
             flag = confirm("[y/n]:")
@@ -1439,44 +1441,6 @@ class HelpMsg(object):
                 nl=False,
             )
         echo(Fx.reset)
-
-    @staticmethod
-    def introduce():
-        """Print the description information."""
-
-        # Print tools version and path.
-        echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
-
-        # Print git version.
-        if Git_Version is None:
-            warn("Don't found Git, maybe need install.")
-        else:
-            echo(Git_Version)
-
-        # Print package path.
-        echo("Path: ", style=Fx.b, nl=False)
-        echo("%s\n" % __file__, color=CommandColor.SKYBLUE, style=Fx.underline)
-
-        echo("Description:", style=Fx.b)
-        echo(
-            (
-                "  Terminal tool, help you use git more simple."
-                " Support Linux and MacOS.\n"
-                "  It use short command to replace the original command, like: \n"
-                "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
-                "  Also you use `g -s` to get the all short command, have fun"
-                " and good lucky.\n"
-                "  The open source path: %s"
-                % (CommandColor.SKYBLUE + Fx.underline + __git_url__)
-            ),
-            style=Fx.italic,
-        )
-
-        echo("\nYou can use ", nl=False)
-        echo("-h", color=CommandColor.GREEN, nl=False)
-        echo(" and ", nl=False)
-        echo("--help", color=CommandColor.GREEN, nl=False)
-        echo(" to get help and more usage.\n")
 
 
 #####################################################################
@@ -1689,15 +1653,22 @@ def git_local_config():
         _re = re.compile(r"\w+\s=\s.*?")
         try:
             with open(Repository_Path + "/.git/config", "r") as cf:
-                for line in cf.read().split("\n"):
+                for line in re.split(r"\r\n|\r|\n", cf.read()):
                     if line.startswith("["):
                         err(line)
                     else:
                         if _re.search(line) is not None:
                             key, value = line.split("=")
-                            echo(key, color=CommandColor.Gold, nl=False)
-                            print("=" + value)
+                            echo(key, color=CommandColor.SkyBlue, nl=False)
+                            print(
+                                "="
+                                + Fx.italic
+                                + CommandColor.MediumVioletRed
+                                + value
+                                + Fx.reset
+                            )
         except Exception as e:
+            print(e)
             err("Error reading configuration file.")
     else:
         err("This directory is not a git repository yet.")
@@ -1705,23 +1676,22 @@ def git_local_config():
 
 def repository_info():
     """Print some information of the repository.
-    repository:
-    remote:
-    current branch:
-    all branch: git branch --all
-    lastest log: git log -1
+    repository: `Repository_Path`
+    remote: read from '.git/conf'
+    >>> all_branch = run_cmd_with_resp('git branch --all --color')
+    >>> lastest_log = run_cmd_with_resp('git log -1')
     """
     echo("waiting ...", nl=False)
 
+    error_str = CommandColor.Red + "Error getting" + Fx.reset
     # Get remote url.
-    error_str = CommandColor.RED + "Error getting" + Fx.reset
     try:
         with open(Repository_Path + "/.git/config", "r") as cf:
             config = cf.read()
             res = re.findall(r"url\s=\s(.*)", config)
             remote = "\n".join(
                 [
-                    "\t%s%s%s%s" % (Fx.italic, CommandColor.SKYBLUE, x, Fx.reset)
+                    "\t%s%s%s%s" % (Fx.italic, CommandColor.SkyBlue, x, Fx.reset)
                     for x in res
                 ]
             )
@@ -1751,18 +1721,13 @@ def repository_info():
             "Lastest log:\n%s"
             % (
                 Fx.b + "Info" + Fx.reset,
-                CommandColor.SKYBLUE + Repository_Path + Fx.reset,
+                CommandColor.SkyBlue + Repository_Path + Fx.reset,
                 remote,
                 branches,
                 git_log,
             )
         )
     )
-
-
-def version():
-    """Print version info."""
-    echo("version: %s" % __version__)
 
 
 class CodeCounter(object):
@@ -1839,6 +1804,8 @@ class CodeCounter(object):
         "dea": "XML",
         "urdf": "XML",
         "launch": "XML",
+        "rb": "Ruby",
+        "rs": "Rust",
         "rviz": "YAML",
         "srdf": "YAML",
         "msg": "ROS Message",
@@ -2036,9 +2003,9 @@ class CodeCounter(object):
             if value["lines"] <= 10000:
                 lines_color = ""
             elif value["lines"] <= 100000:
-                lines_color = CommandColor.YELLOW
+                lines_color = CommandColor.Yellow
             else:
-                lines_color = CommandColor.RED
+                lines_color = CommandColor.Red
 
             # Compare change.
             if isinstance(old, dict) and old.get(key, None) is not None:
@@ -2088,8 +2055,8 @@ class CodeCounter(object):
         echo(" Total: {}".format(sum))
         if additions > 0 or deletions > 0:
             echo(" Altered: ", nl=False)
-            echo("+" * ceil(additions / 10), color=CommandColor.GREEN, nl=False)
-            echo("-" * ceil(deletions / 10), color=CommandColor.RED)
+            echo("+" * ceil(additions / 10), color=CommandColor.Green, nl=False)
+            echo("-" * ceil(deletions / 10), color=CommandColor.Red)
 
     @classmethod
     def count_and_format_print(
@@ -2187,6 +2154,49 @@ class GitignoreGenetor(object):
                 echo("Write gitignore file successful.😊")
             except Exception:
                 err("Write gitignore file failed.")
+
+
+def version():
+    """Print version info."""
+    echo("Version: %s" % __version__)
+
+
+def introduce():
+    """Print the description information."""
+
+    # Print tools version and path.
+    echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
+
+    # Print git version.
+    if Git_Version is None:
+        warn("Don't found Git, maybe need install.")
+    else:
+        echo(Git_Version)
+
+    # Print package path.
+    echo("Path: ", style=Fx.b, nl=False)
+    echo("%s\n" % __file__, color=CommandColor.SkyBlue, style=Fx.underline)
+
+    echo("Description:", style=Fx.b)
+    echo(
+        (
+            "  Terminal tool, help you use git more simple."
+            " Support Linux and MacOS.\n"
+            "  It use short command to replace the original command, like: \n"
+            "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
+            "  Also you use `g -s` to get the all short command, have fun"
+            " and good lucky.\n"
+            "  The open source path: %s"
+            % (CommandColor.SkyBlue + Fx.underline + __git_url__)
+        ),
+        style=Fx.italic,
+    )
+
+    echo("\nYou can use ", nl=False)
+    echo("-h", color=CommandColor.Green, nl=False)
+    echo(" and ", nl=False)
+    echo("--help", color=CommandColor.Green, nl=False)
+    echo(" to get help and more usage.\n")
 
 
 @time_testing
@@ -2319,7 +2329,7 @@ def command_g(custom_commands=None):
 
     if stdargs.command:
         if stdargs.command == "|":
-            HelpMsg.introduce()
+            introduce()
         else:
             command = stdargs.command
             process_command(command, stdargs.args)
