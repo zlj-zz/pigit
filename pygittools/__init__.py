@@ -1768,6 +1768,14 @@ class CodeCounter(object):
             ),
             "include": False,
         },
+        {
+            # Exclude all font formats.
+            "pattern": re.compile(
+                r"\.otf|\.woff|\.woff2|\.ttf|\.eot",
+                re.I,
+            ),
+            "include": False,
+        },
     ]
 
     FileTypes = {
