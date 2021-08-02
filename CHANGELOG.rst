@@ -2,6 +2,12 @@
 Changelog of pygittools
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.3 (2021-08-02)
+----------
+- Support code statistics.
+- Support command correction.
+- Update completion.
+
 v1.0.2 (2021-07-30)
 ----------
 - Add debug mode.
