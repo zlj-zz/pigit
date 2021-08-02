@@ -25,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.3-beta"
+__version__ = "1.0.3"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -1881,8 +1881,8 @@ class CodeCounter(object):
         raise SystemExit(0)
 
     @classmethod
-    def count(cls, root_path="."):
-        """
+    def count(cls, root_path=".", use_ignore=True):
+        """Statistics file and returns the result dictionary.
 
         Return:
             result (dict): Dictionary containing statistical results.
@@ -1903,7 +1903,8 @@ class CodeCounter(object):
             onerror=cls.count_err_callback,
         ):
 
-            cls.process_gitignore(root, files)
+            if use_ignore:
+                cls.process_gitignore(root, files)
 
             # First judge whether the directory is valid. Invalid directories
             # do not traverse files.
@@ -1964,8 +1965,8 @@ class CodeCounter(object):
         # print(key, value)
 
     @classmethod
-    def count_and_format_print(cls, root_path="."):
-        result, invalid_list = cls.count(root_path)
+    def count_and_format_print(cls, root_path=".", use_ignore=True):
+        result, invalid_list = cls.count(root_path, use_ignore)
         cls.format_print(result)
         if invalid_list and confirm(
             "Wether print invalid file list?[y/n]", default=False
@@ -2023,6 +2024,12 @@ class GitignoreGenetor(object):
 
     @classmethod
     def create_gitignore(cls, genre):
+        name = cls.Genres.get(genre.lower(), None)
+        if name is None:
+            err("Unsupported type: %s" % genre)
+            echo("Supported type: %s.  Case insensitive." % " ".join(cls.Genres.keys()))
+            raise SystemExit(0)
+
         ignore_path = Repository_Path + "/.gitignore"
         whether_write = True
         if os.path.exists(ignore_path):
@@ -2033,19 +2040,11 @@ class GitignoreGenetor(object):
             whether_write = confirm()
         if whether_write:
             base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-            name = cls.Genres.get(genre.lower(), None)
-            if name is None:
-                err("Unsupported type: %s" % genre)
-                echo(
-                    "Supported type: %s.  Case insensitive."
-                    % " ".join(cls.Genres.keys())
-                )
-                raise SystemExit(0)
 
             target_url = base_url % name
             echo(
                 "Will get ignore file content from %s"
-                % (Fx.italic + target_url + Fx.unitalic)
+                % (Fx.italic + Fx.underline + target_url + Fx.reset)
             )
             ignore_content = cls.get_ignore_from_url(target_url)
 
