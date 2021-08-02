@@ -43,7 +43,7 @@ import time
 import random
 import json
 import threading
-from math import sqrt, exp
+from math import sqrt, ceil, exp
 from collections import Counter
 from functools import wraps
 
@@ -2025,6 +2025,8 @@ class CodeCounter(object):
         )
         echo("-" * 65)
         sum = 0
+        additions = 0
+        deletions = 0
         for key, value in d.items():
             # Processing too long name.
             if len(key) > 20:
@@ -2055,9 +2057,11 @@ class CodeCounter(object):
                 if value["lines"] > old_lines:
                     lines_symbol = "+"
                     lines_change = value["lines"] - old_lines
+                    additions += lines_change
                 elif value["lines"] < old_lines:
                     lines_symbol = "-"
                     lines_change = old_lines - value["lines"]
+                    deletions += lines_change
                 else:
                     lines_symbol = lines_change = ""
 
@@ -2082,7 +2086,10 @@ class CodeCounter(object):
             sum += value["lines"]
         echo("-" * 65)
         echo(" Total: {}".format(sum))
-        # print(key, value)
+        if additions > 0 or deletions > 0:
+            echo(" Altered: ", nl=False)
+            echo("+" * ceil(additions / 10), color=CommandColor.GREEN, nl=False)
+            echo("-" * ceil(deletions / 10), color=CommandColor.RED)
 
     @classmethod
     def count_and_format_print(
