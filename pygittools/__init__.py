@@ -1223,6 +1223,7 @@ def similar_command(command, all_commands):
         frequency_difference.items(),
         key=lambda item: sum(map(lambda i: i ** 2, item[1])),
     )[0]
+    # TODO: need improve.
     return min_frequency_command
 
 
@@ -1759,26 +1760,38 @@ class CodeCounter(object):
 
     FileTypes = {
         "": "",
+        "c": "C",
         "conf": "Properties",
         "cfg": "Properties",
+        "hpp": "C++",
         "cpp": "C++",
         "cs": "C#",
+        "css": "CSS",
         "bat": "Batch",
         "dart": "Dart",
+        "go": "Go",
         "gradle": "Groovy",
+        "h": "C",
+        "htm": "HTML",
         "html": "HTML",
         "java": "Java",
         "js": "Java Script",
+        "jsx": "React",
         "json": "Json",
         "kt": "Kotlin",
+        "less": "CSS",
         "lua": "Lua",
         "md": "Markdown",
+        "markdown": "Markdown",
         "php": "PHP",
         "py": "Python",
         "plist": "XML",
         "properties": "Propertie",
         "ts": "Type Script",
+        "tsx": "React",
         "rst": "reStructuredText",
+        "sass": "CSS",
+        "scss": "CSS",
         "sh": "Shell",
         "swift": "Swift",
         "vue": "Vue",
@@ -1851,7 +1864,6 @@ class CodeCounter(object):
         """Judge whether it is the required file according to the rule matching path.
         Returns `True` if the file not needs to be ignored, or `False` if needs.
         """
-        # TODO: has bug.
         res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.rules))
         if not res or list(filter(lambda rule: rule["include"] == True, res)):
             return True
