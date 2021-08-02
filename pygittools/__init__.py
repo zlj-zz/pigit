@@ -42,6 +42,7 @@ import logging.handlers
 import time
 import random
 import threading
+from math import sqrt, exp
 from collections import Counter
 from functools import wraps
 
@@ -1217,13 +1218,46 @@ def similar_command(command, all_commands):
         + [words[word][ch] - fre.get(ch, 0) for ch in word]
         for word in words
     }
-    # The order of minimizing the sum of squares of the difference between
-    # letter frequencies.
+    # Square of sum of squares of word frequency difference.
+    frequency_sum_square = list(
+        map(
+            lambda item: [item[0], sqrt(sum(map(lambda i: i ** 2, item[1])))],
+            frequency_difference.items(),
+        )
+    )
+
+    def _comparison_reciprocal(a, b):
+        """
+        Returns how many identical letters
+        are compared from the head. sigmod
+        to 0 ~ 1.
+
+        Args:
+            a (str): need compare string.
+            b (str): need compare string.
+        """
+        i = 0
+        while i < len(a) and i < len(b):
+            if a[i] == b[i]:
+                i += 1
+            else:
+                break
+        return 1 / (i + 1)
+
+    # The value of `frequency_sum_square` is multiplied by the weight to find
+    # the minimum.
+    # Distance weight: compensate for the effect of length difference.
+    # Compare Weight: The more similar the beginning, the higher the weight.
     min_frequency_command = min(
-        frequency_difference.items(),
-        key=lambda item: sum(map(lambda i: i ** 2, item[1])),
+        frequency_sum_square,
+        key=lambda item: item[1]
+        * (
+            len(command) / len(item[0])
+            if len(command) / len(item[0])
+            else len(item[0]) / len(command)
+        )
+        * _comparison_reciprocal(command, item[0]),
     )[0]
-    # TODO: need improve.
     return min_frequency_command
 
 
@@ -1360,8 +1394,8 @@ class HelpMsg(object):
         """
         command_type = (
             command_type[0].upper() + command_type[1:].lower()
-            if len(command_type) > 2
-            else ""
+            if len(command_type) > 1
+            else command_type
         )
         if command_type not in TYPES:
             err("There is no such type.")
