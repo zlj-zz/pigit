@@ -2,10 +2,12 @@
 
 ![Python 2.7](https://img.shields.io/badge/Python-v2.7%5E-green?logo=python)
 ![Python 3](https://img.shields.io/badge/Python-v3%5E-green?logo=python)
-[![pypi_version](https://img.shields.io/pypi/v/pygittools?label=pypi)](https://pypi.org/project/fungit)
+[![pypi_version](https://img.shields.io/pypi/v/pygittools?label=pypi)](https://pypi.org/project/pygittools)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 A terminal tool for git. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
+
+![demo display](./demo.gif)
 
 ## Installation
 

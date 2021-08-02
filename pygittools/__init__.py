@@ -25,7 +25,7 @@
 
 __project__ = "git-tools"
 __license__ = "MIT"
-__version__ = "1.0.3"
+__version__ = "1.0.4-beta.1"
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 __git_url__ = "https://github.com/zlj-zz/pygittools.git"
@@ -1735,7 +1735,7 @@ class CodeCounter(object):
         {
             # Exclude all picture formats.
             "pattern": re.compile(
-                r"\.xbm|\.tif|\.pjp|\.svgz|\.jpg|\.jpeg|\.ico|\.tiff|\.gif|\.svg|\.jfif|\.webp|\.png|\.bmp|\.jpeg|\.avif$",
+                r"\.xbm|\.tif|\.pjp|\.svgz|\.jpg|\.jpeg|\.ico|\.icns|\.tiff|\.gif|\.svg|\.jfif|\.webp|\.png|\.bmp|\.jpeg|\.avif$",
                 re.I,
             ),
             "include": False,
