@@ -68,14 +68,31 @@ else:
 
     urlopen = urllib2.urlopen
 
+# For windows.
+if sys.platform.lower().startswith("win"):
+    USER_HOME = os.environ["USERPROFILE"]
+    TOOLS_HOME = USER_HOME + "/pygittools"
+else:
+    USER_HOME = os.environ["HOME"]
+    TOOLS_HOME = USER_HOME + "/.config/pygittools"
+
+# For encoding.
+System_Encoding = sys.getdefaultencoding().lower()
+if System_Encoding in ["utf-8"]:
+    Icon_Rainbow = "🌈"
+    Icon_Thinking = "🧐"
+    Icon_Sorry = "😅"
+else:
+    Icon_Rainbow = "->"
+    Icon_Thinking = ""
+    Icon_Sorry = ""
+
 
 #####################################################################
 # Part of Utils.                                                    #
 # Some tools and methods for global use. Also contains some special #
 # global variables (readonly).                                      #
 #####################################################################
-USER_HOME = os.environ["HOME"]
-TOOLS_HOME = USER_HOME + "/.config/pygittools"
 Log = logging.getLogger(__name__)
 
 
@@ -624,7 +641,11 @@ def add(args):
     if args:
         args_str = " ".join(args)
 
-    echo("🌈  Storage file: {}".format("all" if args_str.strip() == "." else args_str))
+    echo(
+        "{} Storage file: {}".format(
+            Icon_Rainbow, "all" if args_str.strip() == "." else args_str
+        )
+    )
     run_cmd("git add " + args_str)
 
 
@@ -1319,8 +1340,8 @@ def process_command(c, args=None):
         warn("g --show-commands")
         predicted_command = similar_command(c, GIT_OPTIONS.keys())
         echo(
-            "🧐 The wanted command is %s ?"
-            % (CommandColor.Green + predicted_command + Fx.reset),
+            "{} The wanted command is %s ?"
+            % (Icon_Thinking, CommandColor.Green + predicted_command + Fx.reset),
             nl=False,
         )
         flag = confirm("[y/n]:")
@@ -1338,7 +1359,7 @@ def process_command(c, args=None):
         if state & GitOptionState.Func:
             command()
         elif state & GitOptionState.String:
-            echo("🌈  ", nl=False)
+            echo("{}  ".format(Icon_Rainbow), nl=False)
             echo(color_command(command))
             run_cmd(command)
         else:
@@ -1350,7 +1371,7 @@ def process_command(c, args=None):
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
-            echo("🌈  ", nl=False)
+            echo("{} ".format(Icon_Rainbow), nl=False)
             echo(color_command(command))
             run_cmd(command)
         else:
@@ -1423,8 +1444,8 @@ class HelpMsg(object):
             )
             predicted_type = similar_command(command_type, TYPES)
             echo(
-                "🧐 The wanted type is %s ?"
-                % (CommandColor.Green + predicted_type + Fx.reset),
+                "{} The wanted type is %s ?"
+                % (Icon_Thinking, CommandColor.Green + predicted_type + Fx.reset),
                 nl=False,
             )
             flag = confirm("[y/n]:")
@@ -1606,7 +1627,7 @@ class Completion(object):
                 exit_(1, e)
             okay("\nPlease run: source {}".format(config_path))
         else:
-            warn("This configuration already exists. 😅")
+            warn("This configuration already exists. {}".format(Icon_Sorry))
 
     @classmethod
     def add_zsh_completion(cls):
@@ -1872,18 +1893,20 @@ class CodeCounter(object):
                     if slash_index == 0:
                         item = root + item
                     elif slash_index == -1 or slash_index == len(item) - 1:
-                        item = os.path.join(root, "**", item)
+                        item = '/'.join([root, "**", item])
                     else:
-                        item = os.path.join(root, item)
+                        item = '/'.join([root, item])
 
-                    item = re.sub(r"([\{\}\(\)\+\.\^\$\|])", r"\1", item)
+                    item = re.sub(r"([\{\}\(\)\+\.\^\$\|])", r"\1", item)  # escape char
                     item = re.sub(r"(^|[^\\])\?", ".", item)
-                    item = re.sub(r"\/\*\*", "([\\\\/][^\\\\/]+)?", item)
-                    item = re.sub(r"\*\*\/", "([^\\\\/]+[\\\\/])?", item)
-                    item = re.sub(r"\*", "([^\\\\/]+)", item)
-                    item = re.sub(r"\?", "*", item)
+                    item = re.sub(r"\/\*\*", "([\\\\/][^\\\\/]+)?", item)  # /**
+                    item = re.sub(r"\*\*\/", "([^\\\\/]+[\\\\/])?", item)  # **/
+                    item = re.sub(r"\*", "([^\\\\/]+)", item)  # for `*`
+                    item = re.sub(r"\?", "*", item)  # for `?``
                     item = re.sub(r"([^\/])$", r"\1(([\\\\/].*)|$)", item)
-                    item = re.sub(r"\/$", "(([\\\\/].*)|$)", item)
+                    item = re.sub(
+                        r"\/$", "(([\\\\/].*)|$)", item
+                    )  # for trialing with `/`
                     cls.rules.append(
                         {"pattern": re.compile(item), "include": is_negative}
                     )
@@ -2178,6 +2201,9 @@ class GitignoreGenetor(object):
                 echo("Write gitignore file successful.😊")
             except Exception:
                 err("Write gitignore file failed.")
+                echo("You can replace it with the following:")
+                echo("#" * 60)
+                echo(ignore_content)
 
 
 def introduce():
