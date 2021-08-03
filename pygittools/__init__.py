@@ -35,15 +35,17 @@ import os
 import re
 import sys
 import subprocess
+import pathlib
 import signal
 import argparse
 import logging
 import logging.handlers
+import textwrap
 import time
 import random
 import json
 import threading
-from math import sqrt, ceil, exp
+from math import sqrt, ceil
 from collections import Counter
 from functools import wraps
 
@@ -1457,62 +1459,65 @@ class HelpMsg(object):
 #####################################################################
 # Injection Completion Script.                                      #
 #####################################################################
-_TEMPLATE_ZSH = """\
-#compdef g
-
-complete_g(){
-local curcontext="$curcontext" state line ret=1
-typeset -A opt_args
-
-_alternative\\
-  \'args:options arg:((\\
-    -c\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
-    --complete\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
-    -s\:"List all available short command and wealth and exit."\\
-    --show-commands\:"List all available short command and wealth and exit."\\
-    -S\:"According to given type list available short command and wealth and exit."\\
-    --show-command\:"According to given type list available short command and wealth and exit."\\
-    -t\:"List all command types and exit."\\
-    --types\:"List all command types and exit."\\
-    -f\:"Display the config of current git repository and exit."\\
-    --config\:"Display the config of current git repository and exit."\\
-    -i\:"Show some information about the current git repository."\\
-    --information\:"Show some information about the current git repository."\\
-    -v\:"Show version and exit."\\
-    --version\:"Show version and exit."\\
-    --create-ignore\:"Create a demo .gitignore file. Need one argument"\\
-    --debug\:"Run in debug mode."\\
-    --out-log\:"Print log to console."\\
-    --count\:"Count the number of codes and output them in tabular form."\\
-
-    %s
-  ))\'\\
-  'files:filename:_files'
-return ret
-}
-
-compdef complete_g g
-"""
-
-_TEMPLATE_BASH = """\
-#!/usr/env bash
-
-_complete_g(){
-  if [[ "${COMP_CWORD}" == "1" ]];then
-    COMP_WORD="-c --complete -s --show-commands -S --show-command -t --types\\
-        -f --config -i --information -v --version --create-ignore\\
-        --debug --out-log --count\\
-         %s"
-    COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
-  fi
-}
-
-complete -F _complete_g g
-"""
-
-
 class Completion(object):
     """Implement and inject help classes for completion scripts."""
+
+    _TEMPLATE_ZSH = textwrap.dedent(
+        """\
+        #compdef g
+
+        complete_g(){
+        local curcontext="$curcontext" state line ret=1
+        typeset -A opt_args
+
+        _alternative\\
+        \'args:options arg:((\\
+            -c\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
+            --complete\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
+            -s\:"List all available short command and wealth and exit."\\
+            --show-commands\:"List all available short command and wealth and exit."\\
+            -S\:"According to given type list available short command and wealth and exit."\\
+            --show-command\:"According to given type list available short command and wealth and exit."\\
+            -t\:"List all command types and exit."\\
+            --types\:"List all command types and exit."\\
+            -f\:"Display the config of current git repository and exit."\\
+            --config\:"Display the config of current git repository and exit."\\
+            -i\:"Show some information about the current git repository."\\
+            --information\:"Show some information about the current git repository."\\
+            -v\:"Show version and exit."\\
+            --version\:"Show version and exit."\\
+            --create-ignore\:"Create a demo .gitignore file. Need one argument"\\
+            --debug\:"Run in debug mode."\\
+            --out-log\:"Print log to console."\\
+            --count\:"Count the number of codes and output them in tabular form."\\
+
+            %s
+        ))\'\\
+        'files:filename:_files'
+        return ret
+        }
+
+        compdef complete_g g
+    """
+    )
+
+    _TEMPLATE_BASH = textwrap.dedent(
+        """\
+        #!/usr/env bash
+
+        _complete_g(){
+        if [[ "${COMP_CWORD}" == "1" ]];then
+            COMP_WORD="-c --complete -s --show-commands -S --show-command -t --types\\
+                -f --config -i --information -v --version --create-ignore\\
+                --debug --out-log --count\\
+                %s"
+            COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
+        fi
+        }
+
+        complete -F _complete_g g
+    """
+    )
 
     @staticmethod
     def get_current_shell():
@@ -1621,7 +1626,7 @@ class Completion(object):
 
             return ("\n".join(vars)).strip()
 
-        cls.generate_complete_script(_TEMPLATE_ZSH, gen_completion, _name)
+        cls.generate_complete_script(cls._TEMPLATE_ZSH, gen_completion, _name)
 
         cls.using_completion(_name, _path, USER_HOME + "/.zshrc")
 
@@ -1635,7 +1640,7 @@ class Completion(object):
         def gen_completion():
             return " ".join(GIT_OPTIONS.keys())
 
-        cls.generate_complete_script(_TEMPLATE_BASH, gen_completion, _name)
+        cls.generate_complete_script(cls._TEMPLATE_BASH, gen_completion, _name)
 
         cls.using_completion(_name, _path, USER_HOME + "/.bashrc")
 
@@ -2079,7 +2084,7 @@ class CodeCounter(object):
 
     @classmethod
     def count_and_format_print(
-        cls, root_path=os.path.abspath(os.path.curdir), use_ignore=True, if_save=True
+        cls, root_path=os.getcwd(), use_ignore=True, if_save=True
     ):
         result, invalid_list = cls.count(root_path, use_ignore)
         old_result = cls.recorded_result(root_path)
@@ -2175,11 +2180,6 @@ class GitignoreGenetor(object):
                 err("Write gitignore file failed.")
 
 
-def version():
-    """Print version info."""
-    echo("Version: %s" % __version__)
-
-
 def introduce():
     """Print the description information."""
 
@@ -2218,6 +2218,100 @@ def introduce():
     echo(" to get help and more usage.\n")
 
 
+class CustomHelpFormatter(argparse.HelpFormatter):
+    """Formatter for generating usage messages and argument help strings.
+
+    This class inherits `argparse.HelpFormatter` and rewrites some methods
+    to complete customization.
+    """
+
+    def __init__(
+        self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
+    ):
+        super(CustomHelpFormatter, self).__init__(
+            prog, indent_increment, max_help_position, width
+        )
+        if not colors or not isinstance(colors, list):
+            colors = [
+                Color.fg("#FF6347"),  # Tomato
+                Color.fg("#98FB98"),  # PaleGreen
+                Color.fg("#EBCB8C"),  # Yellow
+                Color.fg("#87CEFA"),  # SkyBlue
+                # Color.fg("#FFC0CB"),  # Pink
+            ]
+        self.colors = colors
+        self.color_len = len(colors)
+        self._old_color = None
+
+    def _format_action(self, action):
+        # determine the required width and the entry label
+        help_position = min(self._action_max_length + 2, self._max_help_position)
+        help_width = max(self._width - help_position, 11)
+        action_width = help_position - self._current_indent - 2
+        action_header = self._format_action_invocation(action)
+
+        # no help; start on same line and add a final newline
+        if not action.help:
+            tup = self._current_indent, "", action_header
+            action_header = "%*s%s\n" % tup
+
+        # short action name; start on the same line and pad two spaces
+        elif len(action_header) <= action_width:
+            tup = self._current_indent, "", action_width, action_header
+            action_header = "%*s%-*s  " % tup
+            indent_first = 0
+
+        # long action name; start on the next line
+        else:
+            tup = self._current_indent, "", action_header
+            action_header = "%*s%s\n" % tup
+            indent_first = help_position
+
+        # collect the pieces of the action help
+        # @Overwrite
+        while True:
+            _index = random.randint(0, self.color_len - 1)
+            if _index == self._old_color:
+                continue
+            else:
+                self._old_color = _index
+                break
+        _color = self.colors[_index]
+        parts = [_color + action_header + Fx.reset]
+
+        # if there was help for the action, add lines of help text
+        if action.help:
+            help_text = self._expand_help(action)
+            help_lines = self._split_lines(help_text, help_width)
+            parts.append("%*s%s\n" % (indent_first, "", help_lines[0]))
+            for line in help_lines[1:]:
+                parts.append("%*s%s\n" % (help_position, "", line))
+
+        # or add a newline if the description doesn't end with one
+        elif not action_header.endswith("\n"):
+            parts.append("\n")
+
+        # if there are any sub-actions, add their help as well
+        for subaction in self._iter_indented_subactions(action):
+            parts.append(self._format_action(subaction))
+
+        # return a single string
+        return self._join_parts(parts)
+
+    def _fill_text(self, text, width, indent):
+        return "".join(indent + line for line in text.splitlines(keepends=True))
+
+    def _get_help_string(self, action):
+        help = action.help
+        if "%(default)" not in action.help:
+            if action.default is not argparse.SUPPRESS:
+                defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
+                if action.option_strings or action.nargs in defaulting_nargs:
+                    # help += " (default: %(default)s)"
+                    pass
+        return help
+
+
 @time_testing
 def command_g(custom_commands=None):
     try:
@@ -2228,9 +2322,11 @@ def command_g(custom_commands=None):
     args = argparse.ArgumentParser(
         prog="g",
         description="If you want to use some original git commands, please use -- to indicate.",
+        prefix_chars="-",
+        formatter_class=CustomHelpFormatter,
     )
     args.add_argument(
-        "-c",
+        "-C",
         "--complete",
         action="store_true",
         help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
@@ -2269,7 +2365,16 @@ def command_g(custom_commands=None):
         help="Show some information about the current git repository.",
     )
     args.add_argument(
-        "-v", "--version", action="store_true", help="Show version and exit."
+        "-c",
+        "--count",
+        nargs="?",
+        const=".",
+        type=str,
+        metavar="PATH",
+        help=(
+            "Count the number of codes and output them in tabular form.\n"
+            "A given path can be accepted, and the default is the current directory."
+        ),
     )
     args.add_argument(
         "--create-ignore",
@@ -2280,11 +2385,6 @@ def command_g(custom_commands=None):
         % ", ".join(GitignoreGenetor.Genres.keys()),
     )
     args.add_argument(
-        "--count",
-        action="store_true",
-        help="Count the number of codes and output them in tabular form.",
-    )
-    args.add_argument(
         "--debug",
         action="store_true",
         help="Run in debug mode.",
@@ -2293,6 +2393,13 @@ def command_g(custom_commands=None):
         "--out-log",
         action="store_true",
         help="Print log to console.",
+    )
+    args.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        help="Show version and exit.",
+        version="Version: %s" % __version__,
     )
     args.add_argument(
         "command", nargs="?", default="|", type=str, help="Short git command."
@@ -2339,11 +2446,8 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.count:
-        CodeCounter.count_and_format_print()
-        raise SystemExit(0)
-
-    if stdargs.version:
-        version()
+        path = stdargs.count if stdargs.count != "." else os.getcwd()
+        CodeCounter.count_and_format_print(root_path=path)
         raise SystemExit(0)
 
     if stdargs.command:
