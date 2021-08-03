@@ -6,6 +6,10 @@ ifeq ($(PY),)
   $(error No suitable python found(>=3.7).)
 endif
 
+test:
+	@if [ ! -f pytest ]; then $(PY) -m pip install pytest; fi
+	pytest -s ./tests
+
 run:
 	$(PY) ./tests/test_run.py
 
@@ -33,4 +37,4 @@ install: del
 todo:
 	@grep --color -Ion '\(TODO\|XXX\).*' -r $(Project)
 
-.PHONY: run lint clean del install release todo
+.PHONY: run lint clean del install release todo test

@@ -1,19 +1,16 @@
-import urllib.request
-import re
+import sys
+
 # import urllib2
 
-base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-name = "Python"
+sys.path.insert(0, ".")
 
-r = urllib.request.urlopen(base_url % name, timeout=1)
-# r = urllib2.urlopen(base_url % name, timeout=1)
-text= r.read().decode('utf-8')
-# print(text)
+from pygittools import GitignoreGenetor
 
-text = re.findall(r"(<table.*?>.*?<\/table>)", text, re.S)
 
-content_re = re.compile(r"<\/?\w+.*?>", re.S)
-res = content_re.sub("", text[0])
-print(res.encode())
-res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
-print(res)
+def test_fetch_gitignore():
+    base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+    name = "Python"
+
+    content = GitignoreGenetor.get_ignore_from_url(base_url % name)
+    ignore_content = GitignoreGenetor.parse_gitignore(content)
+    print(ignore_content)

@@ -1,0 +1,3 @@
+flask8
+black
+pytest

@@ -2,6 +2,9 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pygittools import repository_info
+from pygittools import repository_info, git_local_config
 
-repository_info()
+
+def test_info():
+    repository_info()
+    git_local_config()
