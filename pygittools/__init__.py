@@ -69,23 +69,30 @@ else:
     urlopen = urllib2.urlopen
 
 # For windows.
-if sys.platform.lower().startswith("win"):
+IS_WIN = sys.platform.lower().startswith("win")
+if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
     TOOLS_HOME = USER_HOME + "/pygittools"
 else:
     USER_HOME = os.environ["HOME"]
     TOOLS_HOME = USER_HOME + "/.config/pygittools"
 
+# For windows print color.
+if os.name == "nt":
+    os.system("")
+
 # For encoding.
 System_Encoding = sys.getdefaultencoding().lower()
 if System_Encoding in ["utf-8"]:
     Icon_Rainbow = "🌈"
+    Icon_Smiler = "😊"
     Icon_Thinking = "🧐"
     Icon_Sorry = "😅"
 else:
-    Icon_Rainbow = "->"
-    Icon_Thinking = ""
-    Icon_Sorry = ""
+    Icon_Rainbow = "::"
+    Icon_Smiler = "^_^"
+    Icon_Thinking = "-?-"
+    Icon_Sorry = "Orz"
 
 
 #####################################################################
@@ -98,8 +105,10 @@ Log = logging.getLogger(__name__)
 
 def ensure_path(dir_path):
     """Determine whether the file path exists. If not, create a directory.
+
     Args:
-        dir_path: (str), like: "~/.config/xxx"
+        dir_path (str): like: "~/.config/xxx"
+        >>> ensure_path('~/.config/pygittools')
     """
     if not os.path.isdir(dir_path):
         try:
@@ -110,6 +119,30 @@ def ensure_path(dir_path):
         except Exception as e:
             err("An error occurred while creating %s" % dir_path)
             exit(1, e)
+
+
+def shorten(text, width, placeholder="...", front=False):
+    """Truncate exceeded characters.
+
+    Args:
+        text (str): Target string.
+        width (int): Limit length.
+        placeholder (str): Placeholder string.
+        front (bool): Head hidden or tail hidden.
+
+    Return: shorten string.
+
+    >>> shorten('Hello world!', 5, placeholder='^-')
+    """
+    if len(text) > width:
+        if front:
+            _text = placeholder + text[-width + len(placeholder) :]
+        else:
+            _text = text[: width - len(placeholder)] + placeholder
+    else:
+        _text = text
+
+    return _text
 
 
 class LogHandle(object):
@@ -1713,6 +1746,7 @@ def git_local_config():
 
 def repository_info():
     """Print some information of the repository.
+
     repository: `Repository_Path`
     remote: read from '.git/conf'
     >>> all_branch = run_cmd_with_resp('git branch --all --color')
@@ -1768,6 +1802,18 @@ def repository_info():
 
 
 class CodeCounter(object):
+    """Class of statistical code.
+
+    Attributes:
+        rules (dict): The dictionary for saving filtering rules has
+            stored some general rules in advance.
+        File_Type (dict): Supported file suffix dictionary.
+        Level_Color (list): Color list. The levels are calibrated by
+            subscript, and the codes of different levels are colored
+            when the results are output.
+        Result_Saved_Path (str): Directory to save and load results.
+    """
+
     rules = [
         {"pattern": re.compile(r"\.git"), "include": False},
         {
@@ -1804,7 +1850,7 @@ class CodeCounter(object):
         },
     ]
 
-    FileTypes = {
+    File_Types = {
         "": "",
         "c": "C",
         "conf": "Properties",
@@ -1857,6 +1903,14 @@ class CodeCounter(object):
         "srv": "ROS Message",
     }
 
+    Level_Color = [
+        "",
+        CommandColor.Yellow,
+        CommandColor.Red,
+        CommandColor.MediumVioletRed,
+        CommandColor.SkyBlue,
+    ]
+
     Result_Saved_Path = TOOLS_HOME + "/Counter"
 
     # Max_Thread = 10
@@ -1866,10 +1920,12 @@ class CodeCounter(object):
     @classmethod
     def process_gitignore(cls, root, files):
         """Process `.gitignore` files and add matching rules.
+
         Args:
             root (str): Absolute or relative path to the directory.
             files (list): The list of all file names under the `root` path.
         """
+        root = root.replace("\\", "/")
         if ".gitignore" in files:
             with open(os.path.join(root, ".gitignore")) as f:
                 ignore_content = filter(
@@ -1893,9 +1949,9 @@ class CodeCounter(object):
                     if slash_index == 0:
                         item = root + item
                     elif slash_index == -1 or slash_index == len(item) - 1:
-                        item = '/'.join([root, "**", item])
+                        item = "/".join([root, "**", item])
                     else:
-                        item = '/'.join([root, item])
+                        item = "/".join([root, item])
 
                     item = re.sub(r"([\{\}\(\)\+\.\^\$\|])", r"\1", item)  # escape char
                     item = re.sub(r"(^|[^\\])\?", ".", item)
@@ -1913,7 +1969,9 @@ class CodeCounter(object):
 
     @classmethod
     def matching(cls, full_path):
-        """Judge whether it is the required file according to the rule matching path.
+        """Matching rules.
+
+        Judge whether it is the required file according to the rule matching path.
         Returns `True` if the file not needs to be ignored, or `False` if needs.
         """
         res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.rules))
@@ -1936,6 +1994,10 @@ class CodeCounter(object):
     def count(cls, root_path=".", use_ignore=True):
         """Statistics file and returns the result dictionary.
 
+        Args:
+            root_path (str): The path is walk needed.
+            use_ignore (bool): Wether ignore files in `.gitignore`
+
         Return:
             result (dict): Dictionary containing statistical results.
             >>> result = {
@@ -1944,6 +2006,7 @@ class CodeCounter(object):
             ...         'lines': 2124,
             ...     }
             ... }
+            >>> CodeCounter.count('~/.config', use_ignore=True)
         """
 
         result = {}
@@ -1969,7 +2032,7 @@ class CodeCounter(object):
                 is_effective = cls.matching(full_path)
                 if is_effective:
                     suffix = file.split(".")[-1]
-                    suffix = cls.FileTypes.get(suffix.lower(), suffix)
+                    suffix = cls.File_Types.get(suffix.lower(), suffix)
                     # TODO: counter, may need use threading.
                     try:
                         with open(full_path) as f:
@@ -2002,6 +2065,7 @@ class CodeCounter(object):
 
     @staticmethod
     def recorded_result(root_path):
+        """Load count result."""
         file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
         file_path = os.path.join(CodeCounter.Result_Saved_Path, file_name)
         try:
@@ -2013,7 +2077,18 @@ class CodeCounter(object):
 
     @staticmethod
     def save_result(result, root_path):
-        """Save the record result to `TOOLS_HOME`/Counter"""
+        """Save count result.
+
+        Generate name according to `root_path`, then try save the record
+        result to [`TOOLS_HOME`/Counter].
+
+        Args:
+            result (dict): Statistical results.
+            root_path (str): Traversal directory.
+
+        Return:
+            (bool): Wether saving successful.
+        """
 
         file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
         file_path = os.path.join(CodeCounter.Result_Saved_Path, file_name)
@@ -2025,9 +2100,22 @@ class CodeCounter(object):
         except Exception:
             return False
 
-    @staticmethod
-    def format_print(d, old=None):
-        """Try to load the record result from `TOOLS_HOME`/Counter"""
+    @classmethod
+    def color_index(cls, _count):
+        _index = len(str(_count // 1000))
+        if _index > len(cls.Level_Color):
+            return -1
+        else:
+            return _index - 1
+
+    @classmethod
+    def format_print(cls, new, old=None):
+        """Print result with color and diff.
+
+        Args:
+            new (dict): Current statistical results.
+            old (dict): The results saved in the past may not exist.
+        """
 
         echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
         echo("{}{:^52}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
@@ -2041,41 +2129,32 @@ class CodeCounter(object):
         sum = 0
         additions = 0
         deletions = 0
-        for key, value in d.items():
+        for key, value in new.items():
             # Processing too long name.
-            if len(key) > 20:
-                key = "..." + key[-17:]
+            key = shorten(key, 20, front=True)
 
             # Set color.
-            if value["lines"] <= 10000:
-                lines_color = ""
-            elif value["lines"] <= 100000:
-                lines_color = CommandColor.Yellow
-            else:
-                lines_color = CommandColor.Red
+            lines_color = cls.Level_Color[cls.color_index(value["lines"])]
 
             # Compare change.
             if isinstance(old, dict) and old.get(key, None) is not None:
                 old_files = old.get(key).get("files", None)
                 old_lines = old.get(key).get("lines", None)
 
-                if value["files"] > old_files:
-                    files_symbol = "+"
-                    files_change = value["files"] - old_files
-                elif value["files"] < old_files:
-                    files_symbol = "-"
-                    files_change = old_files - value["files"]
+                if old_files and old_files != value["files"]:
+                    files_change = "{:+}".format(value["files"] - old_files)
+                    files_symbol = files_change[0]
                 else:
                     files_symbol = files_change = ""
 
-                if value["lines"] > old_lines:
-                    lines_symbol = "+"
-                    lines_change = value["lines"] - old_lines
-                    additions += lines_change
-                elif value["lines"] < old_lines:
-                    lines_symbol = "-"
-                    lines_change = old_lines - value["lines"]
-                    deletions += lines_change
+                if old_lines and old_lines != value["lines"]:
+                    _change = value["lines"] - old_lines
+                    lines_change = "{:+}".format(_change)
+                    lines_symbol = lines_change[0]
+                    if _change > 0:
+                        additions += _change
+                    else:
+                        deletions -= _change
                 else:
                     lines_symbol = lines_change = ""
 
@@ -2090,10 +2169,10 @@ class CodeCounter(object):
                     value["lines"],
                     file_style=Fx.italic,
                     file_change_style=CommandColor.Symbol.get(files_symbol, ""),
-                    file_change=files_symbol + str(files_change),
+                    file_change=files_change,
                     lines_style=lines_color,
                     line_change_style=CommandColor.Symbol.get(lines_symbol, ""),
-                    line_change=lines_symbol + str(lines_change),
+                    line_change=lines_change,
                     reset=Fx.reset,
                 )
             )
@@ -2149,6 +2228,17 @@ class GitignoreGenetor(object):
     }
 
     @staticmethod
+    def parse_gitignore(content):
+        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
+        if not text:
+            return ""
+
+        content_re = re.compile(r"<\/?\w+.*?>", re.S)
+        res = content_re.sub("", text[0])
+        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
+        return res
+
+    @staticmethod
     def get_ignore_from_url(url):
         """Crawl gitignore template."""
         try:
@@ -2159,17 +2249,15 @@ class GitignoreGenetor(object):
 
         content = handle.read().decode("utf-8")
 
-        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
-        if not text:
-            return ""
-
-        content_re = re.compile(r"<\/?\w+.*?>", re.S)
-        res = content_re.sub("", text[0])
-        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
-        return res
+        return content
 
     @classmethod
     def create_gitignore(cls, genre):
+        """Try to create gitignore template file.
+
+        Args:
+            genre: template type, like: python.
+        """
         name = cls.Genres.get(genre.lower(), None)
         if name is None:
             err("Unsupported type: %s" % genre)
@@ -2192,13 +2280,14 @@ class GitignoreGenetor(object):
                 "Will get ignore file content from %s"
                 % (Fx.italic + Fx.underline + target_url + Fx.reset)
             )
-            ignore_content = cls.get_ignore_from_url(target_url)
+            content = cls.get_ignore_from_url(target_url)
+            ignore_content = cls.parse_gitignore(content)
 
             echo("Got content, trying to write ... ")
             try:
                 with open(ignore_path, "w") as f:
                     f.write(ignore_content)
-                echo("Write gitignore file successful.😊")
+                echo("Write gitignore file successful. {}".format(Icon_Smiler))
             except Exception:
                 err("Write gitignore file failed.")
                 echo("You can replace it with the following:")
