@@ -2,6 +2,13 @@
 Changelog of pygittools
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.4 (2021-08-04)
+----------
+- Optimized recommendation algorithm.
+- Optimize the output of CodeCounter results.
+- Repair CodeCounter matching rule.
+- Compatible with windows.
+
 v1.0.3 (2021-08-02)
 ----------
 - Support code statistics.
