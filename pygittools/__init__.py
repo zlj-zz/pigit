@@ -671,782 +671,831 @@ class GitOptionState:
     Multi = 1 << 4
 
 
-def add(args):
-    args_str = " ."
-    if args:
-        args_str = " ".join(args)
+class GitProcessor(object):
+    """Git short command processor.
 
-    echo(
-        "{} Storage file: {}".format(
-            Icon_Rainbow, "all" if args_str.strip() == "." else args_str
-        )
-    )
-    run_cmd("git add " + args_str)
+    Subclass: _Function
 
+    Attributes:
+        Types (list): The short command type list.
+        Git_Options (dict): Available short commands dictionaries.
+            >>> d = {
+            ...     'short_command': {
+            ...         'state': GitOptionState.String,
+            ...         'command': 'git status --short',
+            ...         'help_msg': 'display repository status.'
+            ...     }
+            ... }
+            >>> print(d)
 
-def fetch_remote_branch(args):
-    branch = args[0] if len(args) > 1 else None
-
-    if branch:
-        run_cmd("git fetch origin {}:{} ".format(branch, branch))
-    else:
-        err("This option need a branch name.")
-
-
-def set_email_and_username(args):
-    print("Set the interactive environment of user name and email ...")
-    __global = re.compile(r"\-\-global")
-    for i in args:
-        r = __global.search(i)
-        if r is not None:
-            other = " --global "
-            print("Now set for global.")
-            break
-    else:
-        print("Now set for local.")
-        other = " "
-
-    name = input("Please input username:")
-    while True:
-        if not name:
-            err("Name is empty.")
-            name = input("Please input username again:")
-        else:
-            break
-
-    email = input("Please input email:")
-    email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
-    while True:
-        if email_re.match(email) is None:
-            err("Bad mailbox format.")
-            email = input("Please input email again:")
-        else:
-            break
-
-    if run_cmd(GIT_OPTIONS["user"]["command"] + other + name) and run_cmd(
-        GIT_OPTIONS["email"]["command"] + other + email
-    ):
-        okay("Successfully set.")
-    else:
-        err("Failed. Please check log.")
-
-
-TYPES = [
-    "Branch",
-    "Commit",
-    "Conflict",
-    "Fetch",
-    "Index",
-    "Log",
-    "Merge",
-    "Push",
-    "Remote",
-    "Stash",
-    "Tag",
-    "Working tree",
-    "Setting",
-]
-
-# Global command dictionary, including attributes:
-#     command type,
-#     complete command,
-#     help information
-GIT_OPTIONS = {
-    # Branch
-    "b": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git branch ",
-        "help-msg": "lists, creates, renames, and deletes branches.",
-    },
-    "bc": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git checkout -b ",
-        "help-msg": "creates a new branch.",
-    },
-    "bl": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git branch -vv ",
-        "help-msg": "lists branches and their commits.",
-    },
-    "bL": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git branch --all -vv ",
-        "help-msg": "lists local and remote branches and their commits.",
-    },
-    "bs": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git show-branch ",
-        "help-msg": "lists branches and their commits with ancestry graphs.",
-    },
-    "bS": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git show-branch --all ",
-        "help-msg": "lists local and remote branches and their commits with ancestry graphs.",
-    },
-    "bm": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git branch --move ",
-        "help-msg": "renames a branch.",
-    },
-    "bM": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git branch --move --force ",
-        "help-msg": "renames a branch even if the new branch name already exists.",
-    },
-    # Commit
-    "c": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --verbose ",
-        "help-msg": "records changes to the repository.",
-    },
-    "ca": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --verbose --all ",
-        "help-msg": "commits all modified and deleted files.",
-    },
-    "cA": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --verbose --patch ",
-        "help-msg": "commits all modified and deleted files interactively",
-    },
-    "cm": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --verbose --message ",
-        "help-msg": "commits with the given message.",
-    },
-    "co": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git checkout ",
-        "help-msg": "checks out a branch or paths to the working tree.",
-    },
-    "cO": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git checkout --patch ",
-        "help-msg": "checks out hunks from the index or the tree interactively.",
-    },
-    "cf": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --amend --reuse-message HEAD ",
-        "help-msg": "amends the tip of the current branch reusing the same log message as HEAD.",
-    },
-    "cF": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git commit --verbose --amend ",
-        "help-msg": "amends the tip of the current branch.",
-    },
-    "cr": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git revert ",
-        "help-msg": "reverts existing commits by reverting patches and recording new commits.",
-    },
-    "cR": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": 'git reset "HEAD^" ',
-        "help-msg": "removes the HEAD commit.",
-    },
-    "cs": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": 'git show --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"',
-        "help-msg": "shows one or more objects (blobs, trees, tags and commits).",
-    },
-    # Conflict(C)
-    "Cl": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git --no-pager diff --diff-filter=U --name-only ",
-        "help-msg": "lists unmerged files.",
-    },
-    "Ca": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git add git --no-pager diff --diff-filter=U --name-only ",
-        "help-msg": "adds unmerged file contents to the index.",
-    },
-    "Ce": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git mergetool git --no-pager diff --diff-filter=U --name-only ",
-        "help-msg": "executes merge-tool on all unmerged files.",
-    },
-    "Co": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git checkout --ours -- ",
-        "help-msg": "checks out our changes for unmerged paths.",
-    },
-    "CO": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git checkout --ours -- git --no-pager diff --diff-filter=U --name-only ",
-        "help-msg": "checks out our changes for all unmerged paths.",
-    },
-    "Ct": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git checkout --theirs -- ",
-        "help-msg": "checks out their changes for unmerged paths.",
-    },
-    "CT": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git checkout --theirs -- git --no-pager diff --diff-filter=U --name-only ",
-        "help-msg": "checks out their changes for all unmerged paths.",
-    },
-    # Fetch(f)
-    "f": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git fetch ",
-        "help-msg": "downloads objects and references from another repository.",
-    },
-    "fc": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git clone ",
-        "help-msg": "clones a repository into a new directory.",
-    },
-    "fC": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git clone --depth=1 ",
-        "help-msg": "clones a repository into a new directory clearly(depth:1).",
-    },
-    "fm": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git pull ",
-        "help-msg": "fetches from and merges with another repository or local branch.",
-    },
-    "fr": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git pull --rebase ",
-        "help-msg": "fetches from and rebase on top of another repository or local branch.",
-    },
-    "fu": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git fetch --all --prune && git merge --ff-only @{u} ",
-        "help-msg": "removes un-existing remote-tracking references, fetches all remotes and merges.",
-    },
-    "fb": {
-        "state": GitOptionState.Func | GitOptionState.No,
-        "command": fetch_remote_branch,
-        "help-msg": "fetch other branch to local as same name.",
-    },
-    # Index(i)
-    "ia": {
-        "state": GitOptionState.Func | GitOptionState.Multi,
-        "command": add,
-        "help-msg": "adds file contents to the index(default: all files).",
-    },
-    "iA": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git add --patch ",
-        "help-msg": "adds file contents to the index interactively.",
-    },
-    "iu": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git add --update ",
-        "help-msg": "adds file contents to the index (updates only known files).",
-    },
-    "id": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git diff --no-ext-diff --cached ",
-        "help-msg": "displays changes between the index and a named commit (diff).",
-    },
-    "iD": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git diff --no-ext-diff --cached --word-diff ",
-        "help-msg": "displays changes between the index and a named commit (word diff).",
-    },
-    "ir": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git reset ",
-        "help-msg": "resets the current HEAD to the specified state.",
-    },
-    "iR": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git reset --patch ",
-        "help-msg": "resets the current index interactively.",
-    },
-    "ix": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git rm --cached -r ",
-        "help-msg": "removes files from the index (recursively).",
-    },
-    "iX": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git rm --cached -rf ",
-        "help-msg": "removes files from the index (recursively and forced).",
-    },
-    # Log(l)
-    "l": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git log --graph --all --decorate ",
-        "help-msg": "displays the log with good format.",
-    },
-    "l1": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git log --graph --all --decorate --oneline ",
-        "help-msg": "",
-    },
-    "ls": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": 'git log --topo-order --stat --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
-        "help-msg": "displays the stats log.",
-    },
-    "ld": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": 'git log --topo-order --stat --patch --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
-        "help-msg": "displays the diff log.",
-    },
-    "lv": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": 'git log --topo-order --show-signature --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
-        "help-msg": "displays the log, verifying the GPG signature of commits.",
-    },
-    "lc": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git shortlog --summary --numbered ",
-        "help-msg": "displays the commit count for each contributor in descending order.",
-    },
-    "lr": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git reflog ",
-        "help-msg": "manages reflog information.",
-    },
-    # Merge(m)
-    "m": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge ",
-        "help-msg": "joins two or more development histories together.",
-    },
-    "ma": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge --abort ",
-        "help-msg": "aborts the conflict resolution, and reconstructs the pre-merge state.",
-    },
-    "mC": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge --no-commit ",
-        "help-msg": "performs the merge but does not commit.",
-    },
-    "mF": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge --no-ff ",
-        "help-msg": "creates a merge commit even if the merge could be resolved as a fast-forward.",
-    },
-    "mS": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge -S ",
-        "help-msg": "performs the merge and GPG-signs the resulting commit.",
-    },
-    "mv": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git merge --verify-signatures ",
-        "help-msg": "verifies the GPG signature of the tip commit of the side branch being merged.",
-    },
-    "mt": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git mergetool ",
-        "help-msg": "runs the merge conflict resolution tools to resolve conflicts.",
-    },
-    # Push(p)
-    "p": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push ",
-        "help-msg": "updates remote refs along with associated objects.",
-    },
-    "pf": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push --force-with-lease ",
-        "help-msg": 'forces a push safely (with "lease").',
-    },
-    "pF": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push --force ",
-        "help-msg": "forces a push. ",
-    },
-    "pa": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push --all ",
-        "help-msg": "pushes all branches.",
-    },
-    "pA": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push --all && git push --tags ",
-        "help-msg": "pushes all branches and tags.",
-    },
-    "pt": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git push --tags ",
-        "help-msg": "pushes all tags.",
-    },
-    "pc": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": 'git push --set-upstream origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" ',
-        "help-msg": "pushes the current branch and adds origin as an upstream reference for it.",
-    },
-    "pp": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": 'git pull origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" && git push origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" ',
-        "help-msg": "pulls and pushes the current branch from origin to origin.",
-    },
-    # Remote(R)
-    "R": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote ",
-        "help-msg": "manages tracked repositories.",
-    },
-    "Rl": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote --verbose ",
-        "help-msg": "lists remote names and their URLs.",
-    },
-    "Ra": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote add ",
-        "help-msg": "adds a new remote.",
-    },
-    "Rx": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote rm ",
-        "help-msg": "removes a remote.",
-    },
-    "Rm": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote rename ",
-        "help-msg": "renames a remote.",
-    },
-    "Ru": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote update ",
-        "help-msg": "fetches remotes updates.",
-    },
-    "Rp": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote prune ",
-        "help-msg": "prunes all stale remote tracking branches.",
-    },
-    "Rs": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote show ",
-        "help-msg": "shows information about a given remote.",
-    },
-    "RS": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git remote set-url ",
-        "help-msg": "changes URLs for a remote.",
-    },
-    # Stash(s)
-    "s": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git stash ",
-        "help-msg": "stashes the changes of the dirty working directory.",
-    },
-    "sp": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git stash pop ",
-        "help-msg": "removes and applies a single stashed state from the stash list.",
-    },
-    "sl": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git stash list ",
-        "help-msg": "lists stashed states.",
-    },
-    "sd": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git stash show",
-        "help-msg": "",
-    },
-    "sD": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git stash show --patch --stat",
-        "help-msg": "",
-    },
-    # 'sr': {
-    #     'state': GitOptionState.STRING | GitOptionState.MULTI,
-    #     'command': '_git_stash_recover ',
-    #     'help-msg': '',
-    # },
-    # 'sc': {
-    #     'state': GitOptionState.STRING | GitOptionState.MULTI,
-    #     'command': '_git_clear_stash_interactive',
-    #     'help-msg': '',
-    # },
-    # Tag (t)
-    "t": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git tag ",
-        "help-msg": "creates, lists, deletes or verifies a tag object signed with GPG.",
-    },
-    "ta": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git tag -a ",
-        "help-msg": "create a new tag.",
-    },
-    "tx": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git tag --delete ",
-        "help-msg": "deletes tags with given names.",
-    },
-    # Working tree(w)
-    "ws": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git status --short ",
-        "help-msg": "displays working-tree status in the short format.",
-    },
-    "wS": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git status ",
-        "help-msg": "displays working-tree status.",
-    },
-    "wd": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git diff --no-ext-diff ",
-        "help-msg": "displays changes between the working tree and the index (diff).",
-    },
-    "wD": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git diff --no-ext-diff --word-diff ",
-        "help-msg": "displays changes between the working tree and the index (word diff).",
-    },
-    "wr": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git reset --soft ",
-        "help-msg": "resets the current HEAD to the specified state, does not touch the index nor the working tree.",
-    },
-    "wR": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git reset --hard ",
-        "help-msg": "resets the current HEAD, index and working tree to the specified state.",
-    },
-    "wc": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git clean --dry-run ",
-        "help-msg": "cleans untracked files from the working tree (dry-run).",
-    },
-    "wC": {
-        "state": GitOptionState.String | GitOptionState.No,
-        "command": "git clean -d --force ",
-        "help-msg": "cleans untracked files from the working tree.",
-    },
-    "wm": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git mv ",
-        "help-msg": "moves or renames files.",
-    },
-    "wM": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git mv -f ",
-        "help-msg": "moves or renames files (forced).",
-    },
-    "wx": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git rm -r ",
-        "help-msg": "removes files from the working tree and from the index (recursively).",
-    },
-    "wX": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git rm -rf ",
-        "help-msg": "removes files from the working tree and from the index (recursively and forced).",
-    },
-    # Setting
-    "savepd": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git config credential.helper store ",
-        "help-msg": "Remember your account and password.",
-    },
-    "ue": {
-        "state": GitOptionState.Func | GitOptionState.Multi,
-        "command": set_email_and_username,
-        "help-msg": "set email and username interactively.",
-    },
-    "user": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git config user.name ",
-        "help-msg": "set username.",
-    },
-    "email": {
-        "state": GitOptionState.String | GitOptionState.Multi,
-        "command": "git config user.email ",
-        "help-msg": "set user email.",
-    },
-    # 'clear': {
-    #     'state': GitOptionState.STRING | GitOptionState.MULTI,
-    #     'command': '_git_clear ${@:2:$((${#@}))} ',
-    #     'help-msg': '',
-    # },
-    # 'ignore': {
-    #     'state': GitOptionState.STRING | GitOptionState.MULTI,
-    #     'command': '_git_ignore_files ${@:2:$((${#@}))} ',
-    #     'help-msg': '',
-    # },
-}
-
-
-def similar_command(command, all_commands):
-    """Get the most similar command with K-NearestNeighbor.
-    Args:
-        command (str): command string.
-        all_commands (list): The list of all command.
     """
-    #  The dictionary of letter frequency of all commands.
-    words = {word: dict(Counter(word)) for word in all_commands}
-    # Letter frequency of command.
-    fre = dict(Counter(command))
-    # The distance between the frequency of each letter in the command
-    # to be tested and all candidate commands, that is the difference
-    # between the frequency of letters.
-    frequency_difference = {
-        word: [fre[ch] - words[word].get(ch, 0) for ch in command]
-        + [words[word][ch] - fre.get(ch, 0) for ch in word]
-        for word in words
-    }
-    # Square of sum of squares of word frequency difference.
-    frequency_sum_square = list(
-        map(
-            lambda item: [item[0], sqrt(sum(map(lambda i: i ** 2, item[1])))],
-            frequency_difference.items(),
-        )
-    )
 
-    def _comparison_reciprocal(a, b):
+    Types = [
+        "Branch",
+        "Commit",
+        "Conflict",
+        "Fetch",
+        "Index",
+        "Log",
+        "Merge",
+        "Push",
+        "Remote",
+        "Stash",
+        "Tag",
+        "Working tree",
+        "Setting",
+    ]
+
+    class _Function(object):
+        """Command methods class.
+
+        This class encapsulates some methods corresponding to command.
+        All methods are [classmethod] or [staticmethod], must and only
+        accept an `args` parameter -- a list of parameters to be processed.
         """
-        Returns how many identical letters
-        are compared from the head. sigmod
-        to 0 ~ 1.
+
+        @staticmethod
+        def add(args):
+            args_str = " ."
+            if args:
+                args_str = " ".join(args)
+
+            echo(
+                "{} Storage file: {}".format(
+                    Icon_Rainbow, "all" if args_str.strip() == "." else args_str
+                )
+            )
+            run_cmd("git add " + args_str)
+
+        @staticmethod
+        def fetch_remote_branch(args):
+            branch = args[0] if len(args) > 1 else None
+
+            if branch:
+                run_cmd("git fetch origin {}:{} ".format(branch, branch))
+            else:
+                err("This option need a branch name.")
+
+        @staticmethod
+        def set_email_and_username(args):
+            print("Set the interactive environment of user name and email ...")
+            __global = re.compile(r"\-\-global")
+            for i in args:
+                r = __global.search(i)
+                if r is not None:
+                    other = " --global "
+                    print("Now set for global.")
+                    break
+            else:
+                print("Now set for local.")
+                other = " "
+
+            name = input("Please input username:")
+            while True:
+                if not name:
+                    err("Name is empty.")
+                    name = input("Please input username again:")
+                else:
+                    break
+
+            email = input("Please input email:")
+            email_re = re.compile(
+                r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$"
+            )
+            while True:
+                if email_re.match(email) is None:
+                    err("Bad mailbox format.")
+                    email = input("Please input email again:")
+                else:
+                    break
+
+            if run_cmd(
+                GitProcessor.Git_Options["user"]["command"] + other + name
+            ) and run_cmd(GitProcessor.Git_Options["email"]["command"] + other + email):
+                okay("Successfully set.")
+            else:
+                err("Failed. Please check log.")
+
+    Git_Options = {
+        # Branch
+        "b": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git branch ",
+            "help-msg": "lists, creates, renames, and deletes branches.",
+        },
+        "bc": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git checkout -b ",
+            "help-msg": "creates a new branch.",
+        },
+        "bl": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git branch -vv ",
+            "help-msg": "lists branches and their commits.",
+        },
+        "bL": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git branch --all -vv ",
+            "help-msg": "lists local and remote branches and their commits.",
+        },
+        "bs": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git show-branch ",
+            "help-msg": "lists branches and their commits with ancestry graphs.",
+        },
+        "bS": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git show-branch --all ",
+            "help-msg": "lists local and remote branches and their commits with ancestry graphs.",
+        },
+        "bm": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git branch --move ",
+            "help-msg": "renames a branch.",
+        },
+        "bM": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git branch --move --force ",
+            "help-msg": "renames a branch even if the new branch name already exists.",
+        },
+        # Commit
+        "c": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --verbose ",
+            "help-msg": "records changes to the repository.",
+        },
+        "ca": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --verbose --all ",
+            "help-msg": "commits all modified and deleted files.",
+        },
+        "cA": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --verbose --patch ",
+            "help-msg": "commits all modified and deleted files interactively",
+        },
+        "cm": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --verbose --message ",
+            "help-msg": "commits with the given message.",
+        },
+        "co": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git checkout ",
+            "help-msg": "checks out a branch or paths to the working tree.",
+        },
+        "cO": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git checkout --patch ",
+            "help-msg": "checks out hunks from the index or the tree interactively.",
+        },
+        "cf": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --amend --reuse-message HEAD ",
+            "help-msg": "amends the tip of the current branch reusing the same log message as HEAD.",
+        },
+        "cF": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git commit --verbose --amend ",
+            "help-msg": "amends the tip of the current branch.",
+        },
+        "cr": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git revert ",
+            "help-msg": "reverts existing commits by reverting patches and recording new commits.",
+        },
+        "cR": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": 'git reset "HEAD^" ',
+            "help-msg": "removes the HEAD commit.",
+        },
+        "cs": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": 'git show --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"',
+            "help-msg": "shows one or more objects (blobs, trees, tags and commits).",
+        },
+        # Conflict(C)
+        "Cl": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git --no-pager diff --diff-filter=U --name-only ",
+            "help-msg": "lists unmerged files.",
+        },
+        "Ca": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git add git --no-pager diff --diff-filter=U --name-only ",
+            "help-msg": "adds unmerged file contents to the index.",
+        },
+        "Ce": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git mergetool git --no-pager diff --diff-filter=U --name-only ",
+            "help-msg": "executes merge-tool on all unmerged files.",
+        },
+        "Co": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git checkout --ours -- ",
+            "help-msg": "checks out our changes for unmerged paths.",
+        },
+        "CO": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git checkout --ours -- git --no-pager diff --diff-filter=U --name-only ",
+            "help-msg": "checks out our changes for all unmerged paths.",
+        },
+        "Ct": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git checkout --theirs -- ",
+            "help-msg": "checks out their changes for unmerged paths.",
+        },
+        "CT": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git checkout --theirs -- git --no-pager diff --diff-filter=U --name-only ",
+            "help-msg": "checks out their changes for all unmerged paths.",
+        },
+        # Fetch(f)
+        "f": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git fetch ",
+            "help-msg": "downloads objects and references from another repository.",
+        },
+        "fc": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git clone ",
+            "help-msg": "clones a repository into a new directory.",
+        },
+        "fC": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git clone --depth=1 ",
+            "help-msg": "clones a repository into a new directory clearly(depth:1).",
+        },
+        "fm": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git pull ",
+            "help-msg": "fetches from and merges with another repository or local branch.",
+        },
+        "fr": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git pull --rebase ",
+            "help-msg": "fetches from and rebase on top of another repository or local branch.",
+        },
+        "fu": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git fetch --all --prune && git merge --ff-only @{u} ",
+            "help-msg": "removes un-existing remote-tracking references, fetches all remotes and merges.",
+        },
+        "fb": {
+            "state": GitOptionState.Func | GitOptionState.No,
+            "command": _Function.fetch_remote_branch,
+            "help-msg": "fetch other branch to local as same name.",
+        },
+        # Index(i)
+        "ia": {
+            "state": GitOptionState.Func | GitOptionState.Multi,
+            "command": _Function.add,
+            "help-msg": "adds file contents to the index(default: all files).",
+        },
+        "iA": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git add --patch ",
+            "help-msg": "adds file contents to the index interactively.",
+        },
+        "iu": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git add --update ",
+            "help-msg": "adds file contents to the index (updates only known files).",
+        },
+        "id": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git diff --no-ext-diff --cached ",
+            "help-msg": "displays changes between the index and a named commit (diff).",
+        },
+        "iD": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git diff --no-ext-diff --cached --word-diff ",
+            "help-msg": "displays changes between the index and a named commit (word diff).",
+        },
+        "ir": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git reset ",
+            "help-msg": "resets the current HEAD to the specified state.",
+        },
+        "iR": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git reset --patch ",
+            "help-msg": "resets the current index interactively.",
+        },
+        "ix": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git rm --cached -r ",
+            "help-msg": "removes files from the index (recursively).",
+        },
+        "iX": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git rm --cached -rf ",
+            "help-msg": "removes files from the index (recursively and forced).",
+        },
+        # Log(l)
+        "l": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git log --graph --all --decorate ",
+            "help-msg": "displays the log with good format.",
+        },
+        "l1": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git log --graph --all --decorate --oneline ",
+            "help-msg": "",
+        },
+        "ls": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": 'git log --topo-order --stat --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+            "help-msg": "displays the stats log.",
+        },
+        "ld": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": 'git log --topo-order --stat --patch --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+            "help-msg": "displays the diff log.",
+        },
+        "lv": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": 'git log --topo-order --show-signature --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+            "help-msg": "displays the log, verifying the GPG signature of commits.",
+        },
+        "lc": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git shortlog --summary --numbered ",
+            "help-msg": "displays the commit count for each contributor in descending order.",
+        },
+        "lr": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git reflog ",
+            "help-msg": "manages reflog information.",
+        },
+        # Merge(m)
+        "m": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge ",
+            "help-msg": "joins two or more development histories together.",
+        },
+        "ma": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge --abort ",
+            "help-msg": "aborts the conflict resolution, and reconstructs the pre-merge state.",
+        },
+        "mC": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge --no-commit ",
+            "help-msg": "performs the merge but does not commit.",
+        },
+        "mF": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge --no-ff ",
+            "help-msg": "creates a merge commit even if the merge could be resolved as a fast-forward.",
+        },
+        "mS": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge -S ",
+            "help-msg": "performs the merge and GPG-signs the resulting commit.",
+        },
+        "mv": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git merge --verify-signatures ",
+            "help-msg": "verifies the GPG signature of the tip commit of the side branch being merged.",
+        },
+        "mt": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git mergetool ",
+            "help-msg": "runs the merge conflict resolution tools to resolve conflicts.",
+        },
+        # Push(p)
+        "p": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push ",
+            "help-msg": "updates remote refs along with associated objects.",
+        },
+        "pf": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push --force-with-lease ",
+            "help-msg": 'forces a push safely (with "lease").',
+        },
+        "pF": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push --force ",
+            "help-msg": "forces a push. ",
+        },
+        "pa": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push --all ",
+            "help-msg": "pushes all branches.",
+        },
+        "pA": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push --all && git push --tags ",
+            "help-msg": "pushes all branches and tags.",
+        },
+        "pt": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git push --tags ",
+            "help-msg": "pushes all tags.",
+        },
+        "pc": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": 'git push --set-upstream origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" ',
+            "help-msg": "pushes the current branch and adds origin as an upstream reference for it.",
+        },
+        "pp": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": 'git pull origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" && git push origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" ',
+            "help-msg": "pulls and pushes the current branch from origin to origin.",
+        },
+        # Remote(R)
+        "R": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote ",
+            "help-msg": "manages tracked repositories.",
+        },
+        "Rl": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote --verbose ",
+            "help-msg": "lists remote names and their URLs.",
+        },
+        "Ra": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote add ",
+            "help-msg": "adds a new remote.",
+        },
+        "Rx": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote rm ",
+            "help-msg": "removes a remote.",
+        },
+        "Rm": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote rename ",
+            "help-msg": "renames a remote.",
+        },
+        "Ru": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote update ",
+            "help-msg": "fetches remotes updates.",
+        },
+        "Rp": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote prune ",
+            "help-msg": "prunes all stale remote tracking branches.",
+        },
+        "Rs": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote show ",
+            "help-msg": "shows information about a given remote.",
+        },
+        "RS": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git remote set-url ",
+            "help-msg": "changes URLs for a remote.",
+        },
+        # Stash(s)
+        "s": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git stash ",
+            "help-msg": "stashes the changes of the dirty working directory.",
+        },
+        "sp": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git stash pop ",
+            "help-msg": "removes and applies a single stashed state from the stash list.",
+        },
+        "sl": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git stash list ",
+            "help-msg": "lists stashed states.",
+        },
+        "sd": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git stash show",
+            "help-msg": "",
+        },
+        "sD": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git stash show --patch --stat",
+            "help-msg": "",
+        },
+        # 'sr': {
+        #     'state': GitOptionState.STRING | GitOptionState.MULTI,
+        #     'command': '_git_stash_recover ',
+        #     'help-msg': '',
+        # },
+        # 'sc': {
+        #     'state': GitOptionState.STRING | GitOptionState.MULTI,
+        #     'command': '_git_clear_stash_interactive',
+        #     'help-msg': '',
+        # },
+        # Tag (t)
+        "t": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git tag ",
+            "help-msg": "creates, lists, deletes or verifies a tag object signed with GPG.",
+        },
+        "ta": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git tag -a ",
+            "help-msg": "create a new tag.",
+        },
+        "tx": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git tag --delete ",
+            "help-msg": "deletes tags with given names.",
+        },
+        # Working tree(w)
+        "ws": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git status --short ",
+            "help-msg": "displays working-tree status in the short format.",
+        },
+        "wS": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git status ",
+            "help-msg": "displays working-tree status.",
+        },
+        "wd": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git diff --no-ext-diff ",
+            "help-msg": "displays changes between the working tree and the index (diff).",
+        },
+        "wD": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git diff --no-ext-diff --word-diff ",
+            "help-msg": "displays changes between the working tree and the index (word diff).",
+        },
+        "wr": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git reset --soft ",
+            "help-msg": "resets the current HEAD to the specified state, does not touch the index nor the working tree.",
+        },
+        "wR": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git reset --hard ",
+            "help-msg": "resets the current HEAD, index and working tree to the specified state.",
+        },
+        "wc": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git clean --dry-run ",
+            "help-msg": "cleans untracked files from the working tree (dry-run).",
+        },
+        "wC": {
+            "state": GitOptionState.String | GitOptionState.No,
+            "command": "git clean -d --force ",
+            "help-msg": "cleans untracked files from the working tree.",
+        },
+        "wm": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git mv ",
+            "help-msg": "moves or renames files.",
+        },
+        "wM": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git mv -f ",
+            "help-msg": "moves or renames files (forced).",
+        },
+        "wx": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git rm -r ",
+            "help-msg": "removes files from the working tree and from the index (recursively).",
+        },
+        "wX": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git rm -rf ",
+            "help-msg": "removes files from the working tree and from the index (recursively and forced).",
+        },
+        # Setting
+        "savepd": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git config credential.helper store ",
+            "help-msg": "Remember your account and password.",
+        },
+        "ue": {
+            "state": GitOptionState.Func | GitOptionState.Multi,
+            "command": _Function.set_email_and_username,
+            "help-msg": "set email and username interactively.",
+        },
+        "user": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git config user.name ",
+            "help-msg": "set username.",
+        },
+        "email": {
+            "state": GitOptionState.String | GitOptionState.Multi,
+            "command": "git config user.email ",
+            "help-msg": "set user email.",
+        },
+        # 'clear': {
+        #     'state': GitOptionState.STRING | GitOptionState.MULTI,
+        #     'command': '_git_clear ${@:2:$((${#@}))} ',
+        #     'help-msg': '',
+        # },
+        # 'ignore': {
+        #     'state': GitOptionState.STRING | GitOptionState.MULTI,
+        #     'command': '_git_ignore_files ${@:2:$((${#@}))} ',
+        #     'help-msg': '',
+        # },
+    }
+
+    @staticmethod
+    def similar_command(command, all_commands):
+        """Get the most similar command with K-NearestNeighbor.
 
         Args:
-            a (str): need compare string.
-            b (str): need compare string.
+            command (str): command string.
+            all_commands (list): The list of all command.
+
+        Return: (str): most similar command string.
         """
-        i = 0
-        while i < len(a) and i < len(b):
-            if a[i] == b[i]:
-                i += 1
+        #  The dictionary of letter frequency of all commands.
+        words = {word: dict(Counter(word)) for word in all_commands}
+        # Letter frequency of command.
+        fre = dict(Counter(command))
+        # The distance between the frequency of each letter in the command
+        # to be tested and all candidate commands, that is the difference
+        # between the frequency of letters.
+        frequency_difference = {
+            word: [fre[ch] - words[word].get(ch, 0) for ch in command]
+            + [words[word][ch] - fre.get(ch, 0) for ch in word]
+            for word in words
+        }
+        # Square of sum of squares of word frequency difference.
+        frequency_sum_square = list(
+            map(
+                lambda item: [item[0], sqrt(sum(map(lambda i: i ** 2, item[1])))],
+                frequency_difference.items(),
+            )
+        )
+
+        def _comparison_reciprocal(a, b):
+            """
+            Returns how many identical letters
+            are compared from the head. sigmod
+            to 0 ~ 1.
+
+            Args:
+                a (str): need compare string.
+                b (str): need compare string.
+            """
+            i = 0
+            while i < len(a) and i < len(b):
+                if a[i] == b[i]:
+                    i += 1
+                else:
+                    break
+            return 1 / (i + 1)
+
+        # The value of `frequency_sum_square` is multiplied by the weight to find
+        # the minimum.
+        # Distance weight: compensate for the effect of length difference.
+        # Compare Weight: The more similar the beginning, the higher the weight.
+        min_frequency_command = min(
+            frequency_sum_square,
+            key=lambda item: item[1]
+            * (
+                len(command) / len(item[0])
+                if len(command) / len(item[0])
+                else len(item[0]) / len(command)
+            )
+            * _comparison_reciprocal(command, item[0]),
+        )[0]
+        return min_frequency_command
+
+    @staticmethod
+    def color_command(command):
+        """Color the command string.
+        prog: green;
+        short command: yellow;
+        arguments: skyblue;
+        values: white.
+
+        Arg: command(str): valid command string.
+
+        Return: (str): color command string.
+        """
+
+        command_list = command.split(" ")
+        color_command = (
+            Fx.bold
+            + CommandColor.DeepGreen
+            + command_list.pop(0)
+            + " "
+            + CommandColor.Yellow
+            + command_list.pop(0)
+            + " "
+            + Fx.unbold
+            + Fx.italic
+            + CommandColor.SkyBlue
+        )
+        while len(command_list) > 0:
+            temp = command_list.pop(0)
+            if temp.startswith("-"):
+                color_command += temp + " "
             else:
                 break
-        return 1 / (i + 1)
 
-    # The value of `frequency_sum_square` is multiplied by the weight to find
-    # the minimum.
-    # Distance weight: compensate for the effect of length difference.
-    # Compare Weight: The more similar the beginning, the higher the weight.
-    min_frequency_command = min(
-        frequency_sum_square,
-        key=lambda item: item[1]
-        * (
-            len(command) / len(item[0])
-            if len(command) / len(item[0])
-            else len(item[0]) / len(command)
-        )
-        * _comparison_reciprocal(command, item[0]),
-    )[0]
-    return min_frequency_command
+        color_command += Fx.reset
+        if len(command_list) > 0:
+            color_command += " ".join(command_list)
 
+        return color_command
 
-def color_command(command):
-    command_list = command.split(" ")
-    color_command = (
-        Fx.bold
-        + CommandColor.DeepGreen
-        + command_list.pop(0)
-        + " "
-        + CommandColor.Yellow
-        + command_list.pop(0)
-        + " "
-        + Fx.unbold
-        + Fx.italic
-        + CommandColor.SkyBlue
-    )
-    while len(command_list) > 0:
-        temp = command_list.pop(0)
-        if temp.startswith("-"):
-            color_command += temp + " "
+    @classmethod
+    def process_command(cls, c, args=None):
+        """Process command and arguments."""
+        if Git_Version is None:
+            err("Git is not detected. Please install Git first.")
+            raise SystemExit(0)
+
+        option = cls.Git_Options.get(c, None)
+
+        if option is None:
+            echo("Don't support this command, please try ", nl=False)
+            warn("g --show-commands")
+            predicted_command = cls.similar_command(c, cls.Git_Options.keys())
+            echo(
+                "{} The wanted command is %s ?"
+                % (Icon_Thinking, CommandColor.Green + predicted_command + Fx.reset),
+                nl=False,
+            )
+            flag = confirm("[y/n]:")
+            if flag:
+                cls.process_command(predicted_command, args=args)
+
+            raise SystemExit(0)
+
+        state = option.get("state", None)
+        command = option.get("command", None)
+
+        if state & GitOptionState.No:
+            if args:
+                err("The command does not accept parameters. Discard {}.".format(args))
+                args = []
+
+        if state & GitOptionState.Func:
+            command(args)
+        elif state & GitOptionState.String:
+            if args:
+                args_str = " ".join(args)
+                command = " ".join([command, args_str])
+            echo("{}  ".format(Icon_Rainbow), nl=False)
+            echo(cls.color_command(command))
+            run_cmd(command)
         else:
-            break
+            pass
 
-    color_command += Fx.reset
-    if len(command_list) > 0:
-        color_command += " ".join(command_list)
-
-    return color_command
-
-
-def process_command(c, args=None):
-    """Process command and arguments."""
-    if Git_Version is None:
-        err("Git is not detected. Please install Git first.")
-        raise SystemExit(0)
-
-    option = GIT_OPTIONS.get(c, None)
-
-    if option is None:
-        echo("Don't support this command, please try ", nl=False)
-        warn("g --show-commands")
-        predicted_command = similar_command(c, GIT_OPTIONS.keys())
-        echo(
-            "{} The wanted command is %s ?"
-            % (Icon_Thinking, CommandColor.Green + predicted_command + Fx.reset),
-            nl=False,
-        )
-        flag = confirm("[y/n]:")
-        if flag:
-            process_command(predicted_command, args=args)
-
-        raise SystemExit(0)
-
-    state = option.get("state", None)
-    command = option.get("command", None)
-
-    if state & GitOptionState.No:
-        if args:
-            err("The command does not accept parameters. Discard {}.".format(args))
-            args = []
-
-    if state & GitOptionState.Func:
-        command(args)
-    elif state & GitOptionState.String:
-        if args:
-            args_str = " ".join(args)
-            command = " ".join([command, args_str])
-        echo("{}  ".format(Icon_Rainbow), nl=False)
-        echo(color_command(command))
-        run_cmd(command)
-    else:
-        pass
-
-
-#####################################################################
-# Print command help message.                                       #
-#####################################################################
-class HelpMsg(object):
-    @staticmethod
-    def echo_one_help_msg(k):
-        """Print a tip.
-
-        Find the corresponding help information according to the `k` value and
-        print it. If the help information does not exist, print the executed
-        full command.
+    ################################
+    # Print command help message.
+    ################################
+    @classmethod
+    def _generate_help_by_key(cls, _key, use_color=True):
+        """Generate one help by given key.
 
         Args:
-            k: Short command.
+            _key (str): Short command.
+            use_color (bool): Wether color help message, default: True.
         """
-        echo("    " + k, color=CommandColor.Green, nl=False)
-
-        msg = GIT_OPTIONS[k]["help-msg"]
-        command = GIT_OPTIONS[k]["command"]
-
-        if callable(command):
-            command = "Callable: %s" % command.__name__
-
-        if len(command) > 100:
-            command = command[:70] + " ..."
-
-        if msg:
-            echo((9 - len(k)) * " " + str(msg))
-            echo(13 * " " + str(command), color=CommandColor.Gold)
+        _msg = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
+        if use_color:
+            _key_color = CommandColor.Green
+            _command_color = CommandColor.Gold
         else:
-            echo((9 - len(k)) * " " + str(command), color=CommandColor.Gold)
+            _key_color = _command_color = ""
+
+        # Get help message and command.
+        _help = cls.Git_Options[_key]["help-msg"]
+        _command = cls.Git_Options[_key]["command"]
+
+        # Process help.
+        _help = _help + "\n" if _help else ""
+
+        # Process command.
+        if callable(_command):
+            _command = "Callable: %s" % _command.__name__
+
+        _command = shorten(_command, 70, placeholder="...")
+        _command = " " * 13 + _command if _help else _command
+
+        # Splicing and return.
+        return _msg.format(
+            _key,
+            _help,
+            _command,
+            key_color=_key_color,
+            command_color=_command_color,
+            reset=Fx.reset,
+        )
 
     @classmethod
-    def echo_help_msgs(cls):
+    def command_help(cls):
         """Print help message."""
         echo("These are short commands that can replace git operations:")
-        for k in GIT_OPTIONS.keys():
-            cls.echo_one_help_msg(k)
+        for key in cls.Git_Options.keys():
+            msg = cls._generate_help_by_key(key)
+            echo(msg)
 
     @classmethod
-    def echo_tip_with_type(cls, command_type):
+    def command_help_by_type(cls, command_type):
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -1456,21 +1505,20 @@ class HelpMsg(object):
         Args:
             command_type: A command type of `TYPE`.
         """
-        command_type = (
-            command_type[0].upper() + command_type[1:].lower()
-            if len(command_type) > 1
-            else command_type
-        )
-        if command_type not in TYPES:
+
+        # Process received type.
+        command_type = command_type.capitalize().strip()
+
+        if command_type not in cls.Types:
             err("There is no such type.")
             echo("Please use `", nl=False)
             echo("g --types", color=CommandColor.Green, nl=False)
             echo(
                 "` to view the supported types.",
             )
-            predicted_type = similar_command(command_type, TYPES)
+            predicted_type = cls.similar_command(command_type, cls.Types)
             echo(
-                "{} The wanted type is %s ?"
+                "%s The wanted type is %s ?"
                 % (Icon_Thinking, CommandColor.Green + predicted_type + Fx.reset),
                 nl=False,
             )
@@ -1481,20 +1529,21 @@ class HelpMsg(object):
 
         echo("These are the orders of {}".format(command_type))
         prefix = command_type[0].lower()
-        for k in GIT_OPTIONS.keys():
+        for k in cls.Git_Options.keys():
             if k.startswith(prefix):
-                cls.echo_one_help_msg(k)
+                msg = cls._generate_help_by_key(k)
+                echo(msg)
 
-    @staticmethod
-    def echo_types():
+    @classmethod
+    def type_help(cls):
         """Print all command types with random color."""
-        for t in TYPES:
+        for t in cls.Types:
             echo(
                 "{}{}  ".format(
                     Color.fg(
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                        random.randint(0, 255),
+                        random.randint(70, 255),
+                        random.randint(70, 255),
+                        random.randint(70, 255),
                     ),
                     t,
                 ),
@@ -1624,8 +1673,8 @@ class Completion(object):
             def gen_completion():
                 vars = []
 
-                for k in GIT_OPTIONS.keys():
-                    desc = GIT_OPTIONS[k]["help-msg"]
+                for k in GitProcessor.Git_Options.keys():
+                    desc = GitProcessor.Git_Options[k]["help-msg"]
                     if not desc:
                         desc = "no description."
                     vars.append('    {}\\:"{}"\\'.format(k, desc))
@@ -1638,7 +1687,7 @@ class Completion(object):
             config_path = USER_HOME + "/.bashrc"
 
             def gen_completion():
-                return " ".join(GIT_OPTIONS.keys())
+                return " ".join(GitProcessor.Git_Options.keys())
 
         complete_content = gen_completion()
         script_src = template % (complete_content)
@@ -2166,7 +2215,6 @@ class CodeCounter(object):
             else:
                 files_change = files_symbol = lines_change = lines_symbol = ""
 
-            # TODO: You can try adding color.
             print(
                 "| {:<21}| {file_style}{:<11}{reset} {file_change_style}{file_change:>5}{reset}| {lines_style}{:<13}{reset} {line_change_style}{line_change:>6}{reset}|".format(
                     key,
@@ -2468,7 +2516,7 @@ def command_g(custom_commands=None):
         metavar="TYPE",
         dest="command_type",
         help="According to given type(%s) list available short command and wealth and exit."
-        % ", ".join(TYPES),
+        % ", ".join(GitProcessor.Types),
     )
     args.add_argument(
         "-t",
@@ -2546,15 +2594,15 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.show_commands:
-        HelpMsg.echo_help_msgs()
+        GitProcessor.command_help()
         raise SystemExit(0)
 
     if stdargs.command_type:
-        HelpMsg.echo_tip_with_type(stdargs.command_type)
+        GitProcessor.command_help_by_type(stdargs.command_type)
         raise SystemExit(0)
 
     if stdargs.types:
-        HelpMsg.echo_types()
+        GitProcessor.type_help()
         raise SystemExit(0)
 
     if stdargs.config:
@@ -2579,7 +2627,7 @@ def command_g(custom_commands=None):
             introduce()
         else:
             command = stdargs.command
-            process_command(command, stdargs.args)
+            GitProcessor.process_command(command, stdargs.args)
 
 
 if __name__ == "__main__":
