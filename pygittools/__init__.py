@@ -35,7 +35,6 @@ import os
 import re
 import sys
 import subprocess
-import pathlib
 import signal
 import argparse
 import logging
@@ -44,7 +43,6 @@ import textwrap
 import time
 import random
 import json
-import threading
 from math import sqrt, ceil
 from collections import Counter
 from functools import wraps
@@ -82,8 +80,12 @@ if os.name == "nt":
     os.system("")
 
 # For encoding.
+Icon_Supported_Encoding = ["utf-8"]
 System_Encoding = sys.getdefaultencoding().lower()
-if System_Encoding in ["utf-8"]:
+# TODO(zlj-zz): There are some problems with the output emotion on windows.
+# In CMD, encoding is right, but emotion is error.
+# In git bash, encoding is not right, but seem can't detection.
+if not IS_WIN and System_Encoding in Icon_Supported_Encoding:
     Icon_Rainbow = "🌈"
     Icon_Smiler = "😊"
     Icon_Thinking = "🧐"
