@@ -1414,7 +1414,7 @@ class GitProcessor(object):
             warn("g --show-commands")
             predicted_command = cls.similar_command(c, cls.Git_Options.keys())
             echo(
-                "{} The wanted command is %s ?"
+                "%s The wanted command is %s ?"
                 % (Icon_Thinking, CommandColor.Green + predicted_command + Fx.reset),
                 nl=False,
             )
@@ -1859,8 +1859,12 @@ class CodeCounter(object):
     """Class of statistical code.
 
     Attributes:
-        rules (dict): The dictionary for saving filtering rules has
-            stored some general rules in advance.
+        Absolute_Rules (dict): Precompiled rules.
+        Rules (dict): The dictionary for saving filtering rules.
+            >>> one_rule = {
+            ...     'pattern': re.compile(r''),
+            ...     'include': False
+            ... }
         File_Type (dict): Supported file suffix dictionary.
         Level_Color (list): Color list. The levels are calibrated by
             subscript, and the codes of different levels are colored
@@ -1868,12 +1872,13 @@ class CodeCounter(object):
         Result_Saved_Path (str): Directory to save and load results.
     """
 
-    rules = [
-        {"pattern": re.compile(r"\.git"), "include": False},
+    Absolute_Rules = [
+        # Exclude `.git` folder.
+        {"pattern": re.compile(r"\.git$|\.git\/"), "include": False},
         {
             # Exclude all picture formats.
             "pattern": re.compile(
-                r"\.xbm|\.tif|\.pjp|\.svgz|\.jpg|\.jpeg|\.ico|\.icns|\.tiff|\.gif|\.svg|\.jfif|\.webp|\.png|\.bmp|\.jpeg|\.avif$",
+                r"\.xbm$|\.tif$|\.pjp$|\.svgz$|\.jpg$|\.jpeg$|\.ico$|\.icns$|\.tiff$|\.gif$|\.svg$|\.jfif$|\.webp$|\.png$|\.bmp$|\.jpeg$|\.avif$",
                 re.I,
             ),
             "include": False,
@@ -1881,7 +1886,7 @@ class CodeCounter(object):
         {
             # Exclude all video formats.
             "pattern": re.compile(
-                r"\.avi|\.rmvb|\.rm|\.asf|\.divx|\.mpg|\.mpeg|\.mpe|\.wmv|\.mp4|\.mkv|\.vob",
+                r"\.avi$|\.rmvb$|\.rm$|\.asf$|\.divx$|\.mpg$|\.mpeg$|\.mpe$|\.wmv$|\.mp4$|\.mkv$|\.vob$",
                 re.I,
             ),
             "include": False,
@@ -1889,7 +1894,7 @@ class CodeCounter(object):
         {
             # Exclude all audio frequency formats.
             "pattern": re.compile(
-                r"\.mp3|\.wma|\.mid[i]?|\.mpeg|\.cda|\.wav|\.ape|\.flac|\.aiff|\.au",
+                r"\.mp3$|\.wma$|\.mid[i]?$|\.mpeg$|\.cda$|\.wav$|\.ape$|\.flac$|\.aiff$|\.au$",
                 re.I,
             ),
             "include": False,
@@ -1897,12 +1902,14 @@ class CodeCounter(object):
         {
             # Exclude all font formats.
             "pattern": re.compile(
-                r"\.otf|\.woff|\.woff2|\.ttf|\.eot",
+                r"\.otf$|\.woff$|\.woff2$|\.ttf$|\.eot$",
                 re.I,
             ),
             "include": False,
         },
     ]
+
+    Rules = []
 
     File_Types = {
         "": "",
@@ -1979,6 +1986,7 @@ class CodeCounter(object):
             root (str): Absolute or relative path to the directory.
             files (list): The list of all file names under the `root` path.
         """
+
         root = root.replace("\\", "/")
         if ".gitignore" in files:
             with open(os.path.join(root, ".gitignore")) as f:
@@ -2017,7 +2025,7 @@ class CodeCounter(object):
                     item = re.sub(
                         r"\/$", "(([\\\\/].*)|$)", item
                     )  # for trialing with `/`
-                    cls.rules.append(
+                    cls.Rules.append(
                         {"pattern": re.compile(item), "include": is_negative}
                     )
 
@@ -2027,19 +2035,33 @@ class CodeCounter(object):
 
         Judge whether it is the required file according to the rule matching path.
         Returns `True` if the file not needs to be ignored, or `False` if needs.
+
+        Args:
+            full_path (str): File full path for matching.
         """
-        res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.rules))
-        if not res or list(filter(lambda rule: rule["include"] == True, res)):
+
+        # Precompiled rules have the highest priority.
+        if list(
+            filter(lambda rule: rule["pattern"].search(full_path), cls.Absolute_Rules)
+        ):
+            return False
+
+        # Matching the generated rules.
+        res = list(filter(lambda rule: rule["pattern"].search(full_path), cls.Rules))
+        if not res:
             return True
         else:
-            return False
+            # If multiple rules match successfully, we think the last rule added has
+            # the highest priority. Or if just one, this no problem also.
+            return res[-1]["include"]
+            # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
     # @staticmethod
     # def count_file_thread(full_path):
     #     pass
 
     @staticmethod
-    def count_err_callback(e):
+    def _count_err_callback(e):
         """Handle of processing walk error."""
         print(e)
         raise SystemExit(0)
@@ -2079,17 +2101,17 @@ class CodeCounter(object):
         invalid_list = []
         for root, _, files in os.walk(
             root_path,
-            onerror=cls.count_err_callback,
+            onerror=cls._count_err_callback,
         ):
-
-            if use_ignore:
-                cls.process_gitignore(root, files)
 
             # First judge whether the directory is valid. Invalid directories
             # do not traverse files.
             is_effective_dir = cls.matching(root)
             if not is_effective_dir:
                 continue
+
+            if use_ignore:
+                cls.process_gitignore(root, files)
 
             for file in files:
                 full_path = os.path.join(root, file)
@@ -2243,7 +2265,7 @@ class CodeCounter(object):
             print(
                 (
                     "| {:<21}"
-                    "| {file_style}{:<11}{reset} {file_change_style}{file_change:>5}{reset}"
+                    "| {file_style}{:<11,}{reset} {file_change_style}{file_change:>5}{reset}"
                     "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
                 ).format(
                     key,
@@ -2273,6 +2295,7 @@ class CodeCounter(object):
     ):
         result, invalid_list = cls.count(root_path, use_ignore)
         old_result = cls.recorded_result(root_path)
+        # diff print.
         cls.format_print(result, old_result)
         if if_save:
             cls.save_result(result, root_path)
