@@ -1389,26 +1389,17 @@ def process_command(c, args=None):
     if state & GitOptionState.No:
         if args:
             err("The command does not accept parameters. Discard {}.".format(args))
-        if state & GitOptionState.Func:
-            command()
-        elif state & GitOptionState.String:
-            echo("{}  ".format(Icon_Rainbow), nl=False)
-            echo(color_command(command))
-            run_cmd(command)
-        else:
-            pass
-    elif state & GitOptionState.Multi:
-        if state & GitOptionState.Func:
-            command(args)
-        elif state & GitOptionState.String:
-            if args:
-                args_str = " ".join(args)
-                command = " ".join([command, args_str])
-            echo("{} ".format(Icon_Rainbow), nl=False)
-            echo(color_command(command))
-            run_cmd(command)
-        else:
-            pass
+            args = []
+
+    if state & GitOptionState.Func:
+        command(args)
+    elif state & GitOptionState.String:
+        if args:
+            args_str = " ".join(args)
+            command = " ".join([command, args_str])
+        echo("{}  ".format(Icon_Rainbow), nl=False)
+        echo(color_command(command))
+        run_cmd(command)
     else:
         pass
 
@@ -1664,7 +1655,7 @@ class Completion(object):
             exit_(1, e)
 
     @staticmethod
-    def using_completion(file_path, config_path):
+    def inject_into_shell(file_path, config_path):
         """Try using completion script.
 
         Inject the load of completion script into the configuration of shell.
@@ -1711,7 +1702,7 @@ class Completion(object):
         if current_shell in cls.Supported_Shell:
             name, completion_src, config_path = cls.generate_resource(current_shell)
             file_path = cls.write_completion(name, completion_src)
-            cls.using_completion(file_path, config_path)
+            cls.inject_into_shell(file_path, config_path)
         else:
             warn("Don't support completion of %s" % current_shell)
 
@@ -1774,16 +1765,24 @@ def repository_info():
     # Get all branches.
     err, res = run_cmd_with_resp("git branch --all --color")
     if err:
-        branches = error_str
+        branches = "\t" + error_str
     else:
-        branches = "\n".join(["\t" + x for x in res.strip().split("\n")])
+        branches = textwrap.indent(res, "\t")
 
     # Get the lastest log.
     err, res = run_cmd_with_resp("git log --stat --oneline --decorate -1 --color")
     if err:
-        git_log = error_str
+        git_log = "\t" + error_str
     else:
-        git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
+        # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
+        git_log = textwrap.indent(res, "\t")
+
+    # Get git summary.
+    err, res = run_cmd_with_resp("git shortlog --summary --numbered")
+    if err:
+        summary = "\t" + error_str
+    else:
+        summary = textwrap.indent(res, "\t")
 
     echo(
         (
@@ -1791,13 +1790,15 @@ def repository_info():
             "Repository: \n\t%s\n"
             "Remote: \n%s\n"
             "Branches: \n%s\n"
-            "Lastest log:\n%s"
+            "Lastest log:\n%s\n"
+            "Summary:\n%s"
             % (
                 Fx.b + "Info" + Fx.reset,
                 CommandColor.SkyBlue + Repository_Path + Fx.reset,
                 remote,
                 branches,
                 git_log,
+                summary,
             )
         )
     )
@@ -2345,6 +2346,10 @@ class CustomHelpFormatter(argparse.HelpFormatter):
     def __init__(
         self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
     ):
+        import shutil
+
+        width = shutil.get_terminal_size().columns
+        width = 90 if width > 90 else width - 2
         super(CustomHelpFormatter, self).__init__(
             prog, indent_increment, max_help_position, width
         )
