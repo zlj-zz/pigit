@@ -1844,7 +1844,7 @@ def repository_info():
             "Lastest log:\n%s\n"
             "Summary:\n%s"
             % (
-                Fx.b + "Info" + Fx.reset,
+                Fx.b + "Repository Information" + Fx.reset,
                 CommandColor.SkyBlue + Repository_Path + Fx.reset,
                 remote,
                 branches,
@@ -2045,12 +2045,13 @@ class CodeCounter(object):
         raise SystemExit(0)
 
     @classmethod
-    def count(cls, root_path=".", use_ignore=True):
+    def count(cls, root_path=".", use_ignore=True, progress=True):
         """Statistics file and returns the result dictionary.
 
         Args:
             root_path (str): The path is walk needed.
             use_ignore (bool): Wether ignore files in `.gitignore`
+            progress (bool): Wether show processing.
 
         Return:
             result (dict): Dictionary containing statistical results.
@@ -2062,6 +2063,15 @@ class CodeCounter(object):
             ... }
             >>> CodeCounter.count('~/.config', use_ignore=True)
         """
+
+        if progress:
+            import shutil
+
+            width = shutil.get_terminal_size().columns
+            if width > 55:
+                _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
+            else:
+                _msg = "\r:: [{:,} | {:,}]"
 
         result = {}
         valid_counter = 0
@@ -2104,12 +2114,11 @@ class CodeCounter(object):
                         invalid_list.append(file)
                         continue
                     finally:
-                        echo(
-                            "\rValid files found: {}, Invalid files found: {}".format(
-                                valid_counter, invalid_counter
-                            ),
-                            nl=False,
-                        )
+                        if progress:
+                            echo(
+                                _msg.format(valid_counter, invalid_counter),
+                                nl=False,
+                            )
 
         # from pprint import pprint
 
@@ -2166,20 +2175,36 @@ class CodeCounter(object):
     def format_print(cls, new, old=None):
         """Print result with color and diff.
 
+        If the console width is not enough, the output is simple.
+
         Args:
             new (dict): Current statistical results.
             old (dict): The results saved in the past may not exist.
         """
 
+        needed_width = 67
+        import shutil
+
+        width = shutil.get_terminal_size().columns
+        if width < needed_width:
+            for key, value in new.items():
+                line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
+                echo(line)
+            return
+
+        # Print full time.
         echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
-        echo("{}{:^52}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
-        echo("-" * 65)
+        # Print title.
+        echo("{}{:^67}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
+        # Print table header.
+        echo("=" * needed_width)
         echo(
-            "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<20}{unbold}|".format(
+            "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<22}{unbold}|".format(
                 "Language", "Files", "Code lines", bold=Fx.bold, unbold=Fx.unbold
             )
         )
-        echo("-" * 65)
+        echo("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
+        # Print table content.
         sum = 0
         additions = 0
         deletions = 0
@@ -2216,7 +2241,11 @@ class CodeCounter(object):
                 files_change = files_symbol = lines_change = lines_symbol = ""
 
             print(
-                "| {:<21}| {file_style}{:<11}{reset} {file_change_style}{file_change:>5}{reset}| {lines_style}{:<13}{reset} {line_change_style}{line_change:>6}{reset}|".format(
+                (
+                    "| {:<21}"
+                    "| {file_style}{:<11}{reset} {file_change_style}{file_change:>5}{reset}"
+                    "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
+                ).format(
                     key,
                     value["files"],
                     value["lines"],
@@ -2230,7 +2259,8 @@ class CodeCounter(object):
                 )
             )
             sum += value["lines"]
-        echo("-" * 65)
+        echo("-" * needed_width)
+        # Print total and change graph.
         echo(" Total: {}".format(sum))
         if additions > 0 or deletions > 0:
             echo(" Altered: ", nl=False)
