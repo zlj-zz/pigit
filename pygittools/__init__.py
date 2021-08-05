@@ -24,11 +24,14 @@
 
 
 __project__ = "git-tools"
-__license__ = "MIT"
 __version__ = "1.0.5-beta.1"
+__url__ = "https://github.com/zlj-zz/pygittools.git"
+__uri__ = __url__
+
 __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
-__git_url__ = "https://github.com/zlj-zz/pygittools.git"
+
+__license__ = "MIT"
 
 
 import os
@@ -1611,7 +1614,7 @@ class Completion(object):
         typeset -A opt_args
 
         _alternative\\
-        \'args:options arg:((\\
+          \'args:options arg:((\\
             -C\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
             --complete\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
             -s\:"List all available short command and wealth and exit."\\
@@ -1633,8 +1636,8 @@ class Completion(object):
             --count\:"Count the number of codes and output them in tabular form."\\
 
             %s
-        ))\'\\
-        'files:filename:_files'
+          ))\'\\
+          'files:filename:_files'
         return ret
         }
 
@@ -1660,6 +1663,7 @@ class Completion(object):
     """
     )
 
+    # TODO: support fish completion.
     Supported_Shell = ["zsh", "bash"]
 
     @staticmethod
@@ -2526,7 +2530,7 @@ def introduce():
             "  Also you use `g -s` to get the all short command, have fun"
             " and good lucky.\n"
             "  The open source path: %s"
-            % (CommandColor.SkyBlue + Fx.underline + __git_url__)
+            % (CommandColor.SkyBlue + Fx.underline + __url__)
         ),
         style=Fx.italic,
     )
@@ -2550,8 +2554,8 @@ class CustomHelpFormatter(argparse.HelpFormatter):
     ):
         import shutil
 
-        width = shutil.get_terminal_size().columns
-        width = 90 if width > 90 else width - 2
+        max_width = shutil.get_terminal_size().columns
+        width = width if width < max_width else max_width - 2
         super(CustomHelpFormatter, self).__init__(
             prog, indent_increment, max_help_position, width
         )
