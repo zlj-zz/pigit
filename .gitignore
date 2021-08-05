@@ -10,6 +10,8 @@ __pycache__/
 ignore_files/
 log
 
+*.tmp
+
 
 
 test.py

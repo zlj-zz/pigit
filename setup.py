@@ -18,7 +18,7 @@ setup(
     description="Simple terminal tool of Git.",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url=pygittools.__git_url__,
+    url=pygittools.__url__,
     packages=find_packages(),
     include_package_data=True,
     classifiers=[

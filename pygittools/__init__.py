@@ -59,12 +59,22 @@ from functools import wraps
 PYTHON3 = sys.version_info > (3, 0)
 if PYTHON3:
     input = input
+    range = range
+
+    import configparser
+
+    configparser = configparser
 
     import urllib.request
 
     urlopen = urllib.request.urlopen
 else:
     input = raw_input
+    range = xrange
+
+    import ConfigParser
+
+    configparser = ConfigParser
 
     import urllib2
 
@@ -331,6 +341,194 @@ def current_repository():
 
 Repository_Path = current_repository()
 IS_Git_Repository = True if Repository_Path else False
+
+
+class Config(object):
+    """Configuration class.
+
+    Attributes:
+        Conf_Path (str): configuration path.
+        Conf_Template (str): configuration template.
+
+    Functions:
+        create_config_template (classmethod): create a config file use path.
+    """
+
+    Conf_Path = TOOLS_HOME + "/config.cfg"
+
+    Conf_Template = textwrap.dedent(
+        """\
+        # Git-tools configuration.
+        # Configuration language which provides a structure similar to what’s found in Microsoft Windows INI files.
+        # For Boolean value setting, please fill in `yes` or `no`.
+
+
+        # Color settings for informational messages.
+        # Only complete RGB values are accepted, such as: #FF0000
+        [Color]
+        RightColor = #98FB98
+        WarningColor = #FFD700
+        ErrorColor = #FF6347
+
+
+        [CodeCounter]
+        # Whether to use the ignore configuration of the `.gitignore` file.
+        UseGitignore = yes
+
+        # Wether show files that cannot be counted.
+        ShowInvalid = no
+
+        # Output format of statistical results.
+        # Supported: [table, simple]
+        # When the command line width is not enough, the `simple ` format is forced.
+        ResultFormat = table
+
+
+        [GitignoreGenerator]
+        # Timeout for getting `.gitignore` template.
+        Timeout = 60
+
+
+        [RepositoryInfo]
+        ShowPath = yes
+        ShowRemote = yes
+        ShowBranchs = yes
+        ShowLastestLog = yes
+        ShowSummary = no
+
+
+        [Help]
+        UseColor = yes
+        LineWidth = 90
+        """
+    )
+
+    ##########################################
+    # Default values for configuration.
+    ##########################################
+
+    right_color = "#98FB98"  # PaleGreen
+    warning_color = "#FFD700"  # Gold
+    error_color = "#FF6347"  # Tomato
+
+    use_gitignore = True
+    show_invalid = False
+    result_format = "simple"  # table, simple
+    _supported_result_format = ["table", "simple"]
+
+    timeout = 60
+
+    show_path = True
+    show_remote = True
+    show_branchs = True
+    show_lastest_log = True
+    show_summary = True
+
+    use_color = True
+    line_width = 90
+
+    def __init__(self):
+        super(Config, self).__init__()
+        self.conf = configparser.ConfigParser(allow_no_value=True)
+        self.conf.read(self.Conf_Path)
+        sections = self.conf.sections()
+
+        if "Color" in sections:
+            right_color = self.right_color = self.conf["Color"].get("RightColor")
+            if self.is_color(right_color):
+                self.right_color = right_color
+
+            warning_color = self.warning_color = self.conf["Color"].get("WarningColor")
+            if self.is_color(warning_color):
+                self.warning_color = warning_color
+
+            error_color = self.error_color = self.conf["Color"].get("ErrorColor")
+            if self.is_color(error_color):
+                self.error_color = error_color
+
+        if "CodeCounter" in sections:
+            try:
+                self.use_gitignore = self.conf["CodeCounter"].getboolean("UseGitignore")
+            except Exception:
+                pass
+
+            try:
+                self.show_invalid = self.conf["CodeCounter"].getboolean("ShowInvalid")
+            except Exception:
+                pass
+
+            result_format = self.conf["CodeCounter"].get("ResultFormat")
+            if result_format and result_format in self._supported_result_format:
+                self.result_format = result_format
+
+        if "GitignoreGenerator" in sections:
+            try:
+                self.timeout = self.conf["GitignoreGenerator"].getint("Timeout")
+            except Exception:
+                pass
+
+        if "RepositoryInfo" in sections:
+            try:
+                self.show_path = self.conf["RepositoryInfo"].getboolean("ShowPath")
+            except Exception:
+                pass
+
+            try:
+                self.show_remote = self.conf["RepositoryInfo"].getboolean("ShowRemote")
+            except Exception:
+                pass
+
+            try:
+                self.show_branchs = self.conf["RepositoryInfo"].getboolean(
+                    "ShowBranchs"
+                )
+            except Exception:
+                pass
+
+            try:
+                self.show_lastest_log = self.conf["RepositoryInfo"].getboolean(
+                    "ShowLastestLog"
+                )
+            except Exception:
+                pass
+
+            try:
+                self.show_summary = self.conf["RepositoryInfo"].getboolean(
+                    "ShowSummary"
+                )
+            except Exception:
+                pass
+
+        if "Help" in sections:
+            try:
+                self.use_color = self.conf["Help"].getboolean("UseColor")
+            except Exception:
+                pass
+
+            try:
+                self.line_width = self.conf["Help"].getint("LineWidth")
+            except Exception:
+                pass
+
+    def is_color(self, v):
+        return v and v.startswith("#") and len(v) == 7
+
+    @classmethod
+    def create_config_template(cls):
+        ensure_path(TOOLS_HOME)
+        if os.path.exists(cls.Conf_Path) and not confirm(
+            "Configuration exists, overwrite? [y/n]"
+        ):
+            return
+        try:
+            with open(cls.Conf_Path, "w") as f:
+                f.write(cls.Conf_Template)
+            print("Successful.")
+        except Exception:
+            print("Failed, create config.")
+
+
+CONFIG = Config()
 
 
 def time_testing(fn):
@@ -669,17 +867,17 @@ def echo(msg, color="", style="", nl=True):
 
 def okay(msg, nl=True):
     """Print green information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.Green, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.right_color), msg, Fx.reset), nl=nl)
 
 
 def warn(msg, nl=True):
     """Print yellow information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.Gold, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.warning_color), msg, Fx.reset), nl=nl)
 
 
 def err(msg, nl=True):
     """Print red information."""
-    echo("%s%s%s%s" % (Fx.b, CommandColor.Red, msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.error_color), msg, Fx.reset), nl=nl)
 
 
 #####################################################################
@@ -1894,24 +2092,20 @@ def repository_info():
     else:
         summary = textwrap.indent(res, "\t")
 
-    echo(
-        (
-            "\r[%s]        \n"
+    echo("\r[%s]        \n" % (Fx.b + "Repository Information" + Fx.reset,))
+    if CONFIG.show_path:
+        echo(
             "Repository: \n\t%s\n"
-            "Remote: \n%s\n"
-            "Branches: \n%s\n"
-            "Lastest log:\n%s\n"
-            "Summary:\n%s"
-            % (
-                Fx.b + "Repository Information" + Fx.reset,
-                CommandColor.SkyBlue + Repository_Path + Fx.reset,
-                remote,
-                branches,
-                git_log,
-                summary,
-            )
+            % (CommandColor.SkyBlue + Repository_Path + Fx.reset,)
         )
-    )
+    if CONFIG.show_remote:
+        echo("Remote: \n%s\n" % remote)
+    if CONFIG.show_branchs:
+        echo("Branches: \n%s\n" % branches)
+    if CONFIG.show_lastest_log:
+        echo("Lastest log:\n%s\n" % git_log)
+    if CONFIG.show_summary:
+        echo("Summary:\n%s\n" % summary)
 
 
 class CodeCounter(object):
@@ -2158,6 +2352,7 @@ class CodeCounter(object):
             >>> CodeCounter.count('~/.config', use_ignore=True)
         """
 
+        use_ignore = CONFIG.use_gitignore
         if progress:
             import shutil
 
@@ -2189,6 +2384,7 @@ class CodeCounter(object):
                 full_path = os.path.join(root, file)
                 is_effective = cls.matching(full_path)
                 if is_effective:
+                    # TODO: the way of process file type not good.
                     suffix = file.split(".")[-1]
                     suffix = cls.File_Types.get(suffix.lower(), suffix)
                     # TODO: counter, may need use threading.
@@ -2281,86 +2477,87 @@ class CodeCounter(object):
         import shutil
 
         width = shutil.get_terminal_size().columns
-        if width < needed_width:
+        if CONFIG.result_format == "simple" or width < needed_width:
             for key, value in new.items():
                 line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
                 echo(line)
             return
 
-        # Print full time.
-        echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
-        # Print title.
-        echo("{}{:^67}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
-        # Print table header.
-        echo("=" * needed_width)
-        echo(
-            "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<22}{unbold}|".format(
-                "Language", "Files", "Code lines", bold=Fx.bold, unbold=Fx.unbold
-            )
-        )
-        echo("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
-        # Print table content.
-        sum = 0
-        additions = 0
-        deletions = 0
-        for key, value in new.items():
-            # Processing too long name.
-            key = shorten(key, 20, front=True)
-
-            # Set color.
-            lines_color = cls.Level_Color[cls.color_index(value["lines"])]
-
-            # Compare change.
-            if isinstance(old, dict) and old.get(key, None) is not None:
-                old_files = old.get(key).get("files", None)
-                old_lines = old.get(key).get("lines", None)
-
-                if old_files and old_files != value["files"]:
-                    files_change = "{:+}".format(value["files"] - old_files)
-                    files_symbol = files_change[0]
-                else:
-                    files_symbol = files_change = ""
-
-                if old_lines and old_lines != value["lines"]:
-                    _change = value["lines"] - old_lines
-                    lines_change = "{:+}".format(_change)
-                    lines_symbol = lines_change[0]
-                    if _change > 0:
-                        additions += _change
-                    else:
-                        deletions -= _change
-                else:
-                    lines_symbol = lines_change = ""
-
-            else:
-                files_change = files_symbol = lines_change = lines_symbol = ""
-
-            print(
-                (
-                    "| {:<21}"
-                    "| {file_style}{:<11,}{reset} {file_change_style}{file_change:>5}{reset}"
-                    "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
-                ).format(
-                    key,
-                    value["files"],
-                    value["lines"],
-                    file_style=Fx.italic,
-                    file_change_style=CommandColor.Symbol.get(files_symbol, ""),
-                    file_change=files_change,
-                    lines_style=lines_color,
-                    line_change_style=CommandColor.Symbol.get(lines_symbol, ""),
-                    line_change=lines_change,
-                    reset=Fx.reset,
+        elif CONFIG.result_format == "table":
+            # Print full time.
+            echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
+            # Print title.
+            echo("{}{:^67}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
+            # Print table header.
+            echo("=" * needed_width)
+            echo(
+                "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<22}{unbold}|".format(
+                    "Language", "Files", "Code lines", bold=Fx.bold, unbold=Fx.unbold
                 )
             )
-            sum += value["lines"]
-        echo("-" * needed_width)
-        # Print total and change graph.
-        echo(" Total: {}".format(sum))
-        if additions > 0 or deletions > 0:
-            echo(" Altered: ", nl=False)
-            echo("+" * ceil(additions / 10), color=CommandColor.Green, nl=False)
-            echo("-" * ceil(deletions / 10), color=CommandColor.Red)
+            echo("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
+            # Print table content.
+            sum = 0
+            additions = 0
+            deletions = 0
+            for key, value in new.items():
+                # Processing too long name.
+                key = shorten(key, 20, front=True)
+
+                # Set color.
+                lines_color = cls.Level_Color[cls.color_index(value["lines"])]
+
+                # Compare change.
+                if isinstance(old, dict) and old.get(key, None) is not None:
+                    old_files = old.get(key).get("files", None)
+                    old_lines = old.get(key).get("lines", None)
+
+                    if old_files and old_files != value["files"]:
+                        files_change = "{:+}".format(value["files"] - old_files)
+                        files_symbol = files_change[0]
+                    else:
+                        files_symbol = files_change = ""
+
+                    if old_lines and old_lines != value["lines"]:
+                        _change = value["lines"] - old_lines
+                        lines_change = "{:+}".format(_change)
+                        lines_symbol = lines_change[0]
+                        if _change > 0:
+                            additions += _change
+                        else:
+                            deletions -= _change
+                    else:
+                        lines_symbol = lines_change = ""
+
+                else:
+                    files_change = files_symbol = lines_change = lines_symbol = ""
+
+                print(
+                    (
+                        "| {:<21}"
+                        "| {file_style}{:<11,}{reset} {file_change_style}{file_change:>5}{reset}"
+                        "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
+                    ).format(
+                        key,
+                        value["files"],
+                        value["lines"],
+                        file_style=Fx.italic,
+                        file_change_style=CommandColor.Symbol.get(files_symbol, ""),
+                        file_change=files_change,
+                        lines_style=lines_color,
+                        line_change_style=CommandColor.Symbol.get(lines_symbol, ""),
+                        line_change=lines_change,
+                        reset=Fx.reset,
+                    )
+                )
+                sum += value["lines"]
+            echo("-" * needed_width)
+            # Print total and change graph.
+            echo(" Total: {}".format(sum))
+            if additions > 0 or deletions > 0:
+                echo(" Altered: ", nl=False)
+                echo("+" * ceil(additions / 10), color=CommandColor.Green, nl=False)
+                echo("-" * ceil(deletions / 10), color=CommandColor.Red)
 
     @classmethod
     def count_and_format_print(
@@ -2372,8 +2569,10 @@ class CodeCounter(object):
         cls.format_print(result, old_result)
         if if_save:
             cls.save_result(result, root_path)
-        if invalid_list and confirm(
-            "Wether print invalid file list?[y/n]", default=False
+        if (
+            CONFIG.show_invalid
+            and invalid_list
+            and confirm("Wether print invalid file list?[y/n]", default=False)
         ):
             print(invalid_list)
 
@@ -2450,7 +2649,8 @@ class GitignoreGenetor(object):
         """
 
         try:
-            handle = urlopen(url, timeout=60)
+            timeout = CONFIG.timeout
+            handle = urlopen(url, timeout=timeout)
         except Exception:
             err("Failed to get content and will exit.")
             raise SystemExit(0)
@@ -2552,6 +2752,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
     def __init__(
         self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
     ):
+        width = CONFIG.line_width
         import shutil
 
         max_width = shutil.get_terminal_size().columns
@@ -2597,14 +2798,17 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
         # collect the pieces of the action help
         # @Overwrite
-        while True:
-            _index = random.randint(0, self.color_len - 1)
-            if _index == self._old_color:
-                continue
-            else:
-                self._old_color = _index
-                break
-        _color = self.colors[_index]
+        if CONFIG.use_color:
+            while True:
+                _index = random.randint(0, self.color_len - 1)
+                if _index == self._old_color:
+                    continue
+                else:
+                    self._old_color = _index
+                    break
+            _color = self.colors[_index]
+        else:
+            _color = ""
         parts = [_color + action_header + Fx.reset]
 
         # if there was help for the action, add lines of help text
@@ -2713,6 +2917,11 @@ def command_g(custom_commands=None):
         % ", ".join(GitignoreGenetor.Genres.keys()),
     )
     args.add_argument(
+        "--create-config",
+        action="store_true",
+        help="Create a preconfigured file",
+    )
+    args.add_argument(
         "--debug",
         action="store_true",
         help="Run in debug mode.",
@@ -2771,6 +2980,10 @@ def command_g(custom_commands=None):
 
     if stdargs.ignore_type:
         GitignoreGenetor.create_gitignore(stdargs.ignore_type)
+        raise SystemExit(0)
+
+    if stdargs.create_config:
+        Config.create_config_template()
         raise SystemExit(0)
 
     if stdargs.count:
