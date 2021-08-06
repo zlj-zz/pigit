@@ -38,3 +38,5 @@ jobs:
     - name: Test with pytest
       run: |
         pytest -s
+    - name: Test installation from source
+      run: python setup.py install
