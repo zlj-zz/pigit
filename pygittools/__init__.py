@@ -1807,7 +1807,7 @@ class GitProcessor(object):
 
 
 #####################################################################
-# Injection Completion Script.                                      #
+# Completion and Create gitignore.                                  #
 #####################################################################
 class ShellCompletion(object):
     """Implement and inject help classes for completion scripts.
@@ -1925,7 +1925,8 @@ class ShellCompletion(object):
                     self.complete_var[option] = action.help
         # print(self.complete_var)
 
-    def get_current_shell(self):
+    @staticmethod
+    def get_current_shell():
         """Gets the currently used shell.
 
         Returns:
@@ -2076,6 +2077,136 @@ class ShellCompletion(object):
             self.inject_into_shell(file_path, config_path)
         else:
             warn("Don't support completion of %s" % current_shell)
+
+
+class GitignoreGenetor(object):
+    """Generate gitignore template.
+
+    Attributes:
+        Genres (dict): supported type.
+
+    Raises:
+        SystemExit: Can't get template.
+        SystemExit: No name.
+    """
+
+    # Supported type.
+    Supported_Types = {
+        "android": "Android",
+        "c++": "C++",
+        "cpp": "C++",
+        "c": "C",
+        "dart": "Dart",
+        "elisp": "Elisp",
+        "gitbook": "GitBook",
+        "go": "Go",
+        "java": "Java",
+        "kotlin": "Java",
+        "lua": "Lua",
+        "maven": "Maven",
+        "node": "Node",
+        "python": "Python",
+        "qt": "Qt",
+        "r": "R",
+        "ros": "ROS",
+        "ruby": "Ruby",
+        "rust": "Rust",
+        "sass": "Sass",
+        "swift": "Swift",
+        "unity": "Unity",
+    }
+
+    @staticmethod
+    def parse_gitignore_page(content):
+        """Parse html for getting gitignore content.
+
+        Args:
+            content (str): template page html.
+
+        Returns:
+            (str): gitignore template content.
+        """
+
+        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
+        if not text:
+            return ""
+
+        content_re = re.compile(r"<\/?\w+.*?>", re.S)
+        res = content_re.sub("", text[0])
+        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
+        return res
+
+    @staticmethod
+    def get_ignore_from_url(url):
+        """Crawl gitignore template.
+
+        Args:
+            url (str): gitignore template url.
+
+        Raises:
+            SystemExit: Failed to get web page.
+
+        Returns:
+            (str): html string.
+        """
+
+        try:
+            timeout = CONFIG.timeout
+            handle = urlopen(url, timeout=timeout)
+        except Exception:
+            err("Failed to get content and will exit.")
+            raise SystemExit(0)
+
+        content = handle.read().decode("utf-8")
+
+        return content
+
+    @classmethod
+    def create_gitignore(cls, genre):
+        """Try to create gitignore template file.
+
+        Args:
+            genre (str): template type, like: 'python'.
+        """
+
+        name = cls.Supported_Types.get(genre.lower(), None)
+        if name is None:
+            err("Unsupported type: %s" % genre)
+            echo(
+                "Supported type: %s.  Case insensitive."
+                % " ".join(cls.Supported_Types.keys())
+            )
+            raise SystemExit(0)
+
+        ignore_path = Repository_Path + "/.gitignore"
+        whether_write = True
+        if os.path.exists(ignore_path):
+            echo(
+                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
+                nl=False,
+            )
+            whether_write = confirm()
+        if whether_write:
+            base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+
+            target_url = base_url % name
+            echo(
+                "Will get ignore file content from %s"
+                % (Fx.italic + Fx.underline + target_url + Fx.reset)
+            )
+            content = cls.get_ignore_from_url(target_url)
+            ignore_content = cls.parse_gitignore_page(content)
+
+            echo("Got content, trying to write ... ")
+            try:
+                with open(ignore_path, "w") as f:
+                    f.write(ignore_content)
+                echo("Write gitignore file successful. {}".format(Icon_Smiler))
+            except Exception:
+                err("Write gitignore file failed.")
+                echo("You can replace it with the following:")
+                echo("#" * 60)
+                echo(ignore_content)
 
 
 #####################################################################
@@ -2641,133 +2772,6 @@ class CodeCounter(object):
             print(invalid_list)
 
 
-class GitignoreGenetor(object):
-    """Generate gitignore template.
-
-    Attributes:
-        Genres (dict): supported type.
-
-    Raises:
-        SystemExit: Can't get template.
-        SystemExit: No name.
-    """
-
-    # Supported type.
-    Genres = {
-        "android": "Android",
-        "c++": "C++",
-        "cpp": "C++",
-        "c": "C",
-        "dart": "Dart",
-        "elisp": "Elisp",
-        "gitbook": "GitBook",
-        "go": "Go",
-        "java": "Java",
-        "kotlin": "Java",
-        "lua": "Lua",
-        "maven": "Maven",
-        "node": "Node",
-        "python": "Python",
-        "qt": "Qt",
-        "r": "R",
-        "ros": "ROS",
-        "ruby": "Ruby",
-        "rust": "Rust",
-        "sass": "Sass",
-        "swift": "Swift",
-        "unity": "Unity",
-    }
-
-    @staticmethod
-    def parse_gitignore(content):
-        """Parse html for getting gitignore content.
-
-        Args:
-            content (str): template page html.
-
-        Returns:
-            (str): gitignore template content.
-        """
-
-        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
-        if not text:
-            return ""
-
-        content_re = re.compile(r"<\/?\w+.*?>", re.S)
-        res = content_re.sub("", text[0])
-        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
-        return res
-
-    @staticmethod
-    def get_ignore_from_url(url):
-        """Crawl gitignore template.
-
-        Args:
-            url (str): gitignore template url.
-
-        Raises:
-            SystemExit: Failed to get web page.
-
-        Returns:
-            (str): html string.
-        """
-
-        try:
-            timeout = CONFIG.timeout
-            handle = urlopen(url, timeout=timeout)
-        except Exception:
-            err("Failed to get content and will exit.")
-            raise SystemExit(0)
-
-        content = handle.read().decode("utf-8")
-
-        return content
-
-    @classmethod
-    def create_gitignore(cls, genre):
-        """Try to create gitignore template file.
-
-        Args:
-            genre (str): template type, like: 'python'.
-        """
-
-        name = cls.Genres.get(genre.lower(), None)
-        if name is None:
-            err("Unsupported type: %s" % genre)
-            echo("Supported type: %s.  Case insensitive." % " ".join(cls.Genres.keys()))
-            raise SystemExit(0)
-
-        ignore_path = Repository_Path + "/.gitignore"
-        whether_write = True
-        if os.path.exists(ignore_path):
-            echo(
-                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
-                nl=False,
-            )
-            whether_write = confirm()
-        if whether_write:
-            base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-
-            target_url = base_url % name
-            echo(
-                "Will get ignore file content from %s"
-                % (Fx.italic + Fx.underline + target_url + Fx.reset)
-            )
-            content = cls.get_ignore_from_url(target_url)
-            ignore_content = cls.parse_gitignore(content)
-
-            echo("Got content, trying to write ... ")
-            try:
-                with open(ignore_path, "w") as f:
-                    f.write(ignore_content)
-                echo("Write gitignore file successful. {}".format(Icon_Smiler))
-            except Exception:
-                err("Write gitignore file failed.")
-                echo("You can replace it with the following:")
-                echo("#" * 60)
-                echo(ignore_content)
-
-
 def introduce():
     """Print the description information."""
 
@@ -2978,7 +2982,7 @@ def command_g(custom_commands=None):
         metavar="TYPE",
         dest="ignore_type",
         help="Create a demo .gitignore file. Need one argument, support: [%s]"
-        % ", ".join(GitignoreGenetor.Genres.keys()),
+        % ", ".join(GitignoreGenetor.Supported_Types.keys()),
     )
     args.add_argument(
         "--create-config",
@@ -3002,9 +3006,7 @@ def command_g(custom_commands=None):
         help="Show version and exit.",
         version="Version: %s" % __version__,
     )
-    args.add_argument(
-        "command", nargs="?", default="|", type=str, help="Short git command."
-    )
+    args.add_argument("command", nargs="?", type=str, help="Short git command.")
     args.add_argument("args", nargs="*", type=str, help="Command parameter list.")
     stdargs = args.parse_args()
 
@@ -3039,11 +3041,11 @@ def command_g(custom_commands=None):
 
     if stdargs.config:
         git_local_config()
-        raise SystemExit(0)
+        # raise SystemExit(0)
 
     if stdargs.information:
         repository_info()
-        raise SystemExit(0)
+        # raise SystemExit(0)
 
     if stdargs.ignore_type:
         GitignoreGenetor.create_gitignore(stdargs.ignore_type)
@@ -3059,11 +3061,12 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.command:
-        if stdargs.command == "|":
-            introduce()
-        else:
-            command = stdargs.command
-            GitProcessor.process_command(command, stdargs.args)
+        command = stdargs.command
+        GitProcessor.process_command(command, stdargs.args)
+        raise SystemExit(0)
+
+    if not list(filter(lambda x: x, vars(stdargs).values())):
+        introduce()
 
 
 if __name__ == "__main__":

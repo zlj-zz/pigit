@@ -12,5 +12,5 @@ def test_fetch_gitignore():
     name = "Python"
 
     content = GitignoreGenetor.get_ignore_from_url(base_url % name)
-    ignore_content = GitignoreGenetor.parse_gitignore(content)
+    ignore_content = GitignoreGenetor.parse_gitignore_page(content)
     print(ignore_content)
