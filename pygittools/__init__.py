@@ -1809,7 +1809,7 @@ class GitProcessor(object):
 #####################################################################
 # Injection Completion Script.                                      #
 #####################################################################
-class Completion(object):
+class ShellCompletion(object):
     """Implement and inject help classes for completion scripts.
 
     Attributes:
@@ -1818,6 +1818,8 @@ class Completion(object):
         Supported_Shell (list): supported shell list.
     """
 
+    # The completion items each line muse be:
+    #   -C\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
     _TEMPLATE_ZSH = textwrap.dedent(
         """\
         #compdef g
@@ -1828,27 +1830,6 @@ class Completion(object):
 
         _alternative\\
           \'args:options arg:((\\
-            -C\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
-            --complete\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
-            -s\:"List all available short command and wealth and exit."\\
-            --show-commands\:"List all available short command and wealth and exit."\\
-            -S\:"According to given type list available short command and wealth and exit."\\
-            --show-command\:"According to given type list available short command and wealth and exit."\\
-            -t\:"List all command types and exit."\\
-            --types\:"List all command types and exit."\\
-            -f\:"Display the config of current git repository and exit."\\
-            --config\:"Display the config of current git repository and exit."\\
-            -i\:"Show some information about the current git repository."\\
-            --information\:"Show some information about the current git repository."\\
-            -v\:"Show version and exit."\\
-            --version\:"Show version and exit."\\
-            --create-ignore\:"Create a demo .gitignore file. Need one argument"\\
-            --debug\:"Run in debug mode."\\
-            --out-log\:"Print log to console."\\
-            -c\:"Count the number of codes and output them in tabular form."\\
-            --count\:"Count the number of codes and output them in tabular form."\\
-            --create-config\:"Create config."\\
-
             %s
           ))\'\\
           'files:filename:_files'
@@ -1856,7 +1837,7 @@ class Completion(object):
         }
 
         compdef complete_g g
-    """
+        """
     )
 
     _TEMPLATE_BASH = textwrap.dedent(
@@ -1864,24 +1845,87 @@ class Completion(object):
         #!/usr/env bash
 
         _complete_g(){
-        if [[ "${COMP_CWORD}" == "1" ]];then
-            COMP_WORD="-C --complete -s --show-commands -S --show-command -t --types\\
-                -f --config -i --information -v --version --create-ignore\\
-                --debug --out-log -c --count --create-config\\
-                %s"
-            COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
-        fi
+          if [[ "${COMP_CWORD}" == "1" ]];then
+              COMP_WORD="%s"
+              COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
+          fi
         }
 
         complete -F _complete_g g
-    """
+        """
     )
 
-    # TODO: support fish completion.
-    Supported_Shell = ["zsh", "bash"]
+    _TEMPLATE_FISH = textwrap.dedent(
+        """\
+        function complete_g;
+            set -l response;
 
-    @staticmethod
-    def get_current_shell():
+            for value in (env %s=fish_complete COMP_WORDS=(commandline -cp) \
+        COMP_CWORD=(commandline -t) g);
+                set response $response $value;
+            end;
+
+            for completion in $response;
+                set -l metadata (string split "," $completion);
+
+                if test $metadata[1] = "dir";
+                    __fish_complete_directories $metadata[2];
+                else if test $metadata[1] = "file";
+                    __fish_complete_path $metadata[2];
+                else if test $metadata[1] = "plain";
+                    echo $metadata[2];
+                end;
+            end;
+        end;
+
+        complete --no-files --command g --arguments \
+        "(complete_g)";
+        """
+    )
+
+    Supported_Shell = ["zsh", "bash", "fish"]
+
+    def __init__(self, complete_var, shell=None, name=None, argparse_obj=None):
+        """Initialization.
+
+        Args:
+            complete_var (dict): complete variment dict.
+                >>> complete_var = {
+                ...     '-h': 'Display help messages',
+                ...     '-v': 'Show version and exit',
+                ... }
+            shell (str, optional): shell type. Defaults to None.
+            name (str, optional): completion file name. Defaults to None.
+            argparse_obj (ArgumentParser, optional): argparse.ArgumentParser. Defaults to None.
+
+        Raises:
+            TypeError: when `complete_var` is not dict.
+        """
+        super(ShellCompletion, self).__init__()
+        if not isinstance(complete_var, dict):
+            raise TypeError("complete_var muse be dict.")
+        self.complete_var = complete_var
+        if not shell:
+            shell = self.get_current_shell()
+        elif shell.strip() not in self.Supported_Shell:
+            raise ValueError(
+                "shell name '{}' is not supported, see {}".format(
+                    shell, self.Supported_Shell
+                )
+            )
+        self.shell = shell
+        self.name = name
+        if not argparse_obj:
+            pass
+        elif not isinstance(argparse_obj, argparse.ArgumentParser):
+            raise TypeError("_argparse must be [argparse.ArgumentParser]")
+        else:
+            for action in argparse_obj.__dict__["_actions"]:
+                for option in action.option_strings:
+                    self.complete_var[option] = action.help
+        # print(self.complete_var)
+
+    def get_current_shell(self):
         """Gets the currently used shell.
 
         Returns:
@@ -1893,8 +1937,7 @@ class Completion(object):
             current_shell = resp.split("/")[-1].strip()
         return current_shell.lower()
 
-    @staticmethod
-    def ensure_config_path(file_name):
+    def ensure_config_path(self, file_name):
         """Check config path.
 
         Check whether the configuration directory exists, if not, try to create
@@ -1911,8 +1954,7 @@ class Completion(object):
 
         return "{}/{}".format(TOOLS_HOME, file_name)
 
-    @classmethod
-    def generate_resource(cls, shell):
+    def generate_resource(self):
         """Generate completion scirpt.
 
         Generate the completion script of the corresponding shell according to
@@ -1927,58 +1969,65 @@ class Completion(object):
             (str): shell config path.
         """
 
-        if shell == "zsh":
+        if self.shell == "zsh":
             name = "zsh_comp"
-            template = cls._TEMPLATE_ZSH
+            template = self._TEMPLATE_ZSH
             config_path = USER_HOME + "/.zshrc"
 
             def gen_completion():
                 vars = []
 
-                for k in GitProcessor.Git_Options.keys():
-                    desc = GitProcessor.Git_Options[k]["help-msg"]
+                for k, desc in self.complete_var.items():
                     if not desc:
                         desc = "no description."
                     vars.append('    {}\\:"{}"\\'.format(k, desc))
 
                 return ("\n".join(vars)).strip()
 
-        elif shell == "bash":
+        elif self.shell == "bash":
             name = "bash_comp"
-            template = cls._TEMPLATE_BASH
+            template = self._TEMPLATE_BASH
             config_path = USER_HOME + "/.bashrc"
 
             def gen_completion():
-                return " ".join(GitProcessor.Git_Options.keys())
+                return " ".join(self.complete_var.keys())
 
+        elif self.shell == "fish":
+            name = "fish_comp"
+            template = self._TEMPLATE_FISH
+            config_path = USER_HOME + "/.config/fish/config.fish"
+
+            def gen_completion():
+                return " ".join(self.complete_var.keys())
+
+        if self.name:
+            name = self.name
         complete_content = gen_completion()
         script_src = template % (complete_content)
 
         return name, script_src, config_path
 
-    @classmethod
-    def write_completion(cls, name, src):
+    def write_completion(self, name, complete_src):
         """Save completion to config path.
 
         Args:
             name (str): completion name.
-            src (str): completion source.
+            complete_src (str): completion source.
 
         Returns:
             (str): completion full path.
         """
 
-        path = cls.ensure_config_path(name)
+        path = self.ensure_config_path(name)
         try:
             with open(path, "w") as f:
-                for line in src:
+                for line in complete_src:
                     f.write(line)
             return path
         except Exception as e:
             leave(EXIT_ERROR, "Write completion error: {}".format(e))
 
-    @staticmethod
-    def inject_into_shell(file_path, config_path):
+    def inject_into_shell(self, file_path, config_path):
         """Try using completion script.
 
         Inject the load of completion script into the configuration of shell.
@@ -2013,19 +2062,18 @@ class Completion(object):
         else:
             warn("This configuration already exists. {}".format(Icon_Sorry))
 
-    @classmethod
-    def complete_and_use(cls):
+    def complete_and_use(self):
         """Add completion prompt script."""
 
         echo("\nTry to add completion ...")
 
-        current_shell = cls.get_current_shell()
+        current_shell = self.shell
         echo("Detected shell: %s" % current_shell)
 
-        if current_shell in cls.Supported_Shell:
-            name, completion_src, config_path = cls.generate_resource(current_shell)
-            file_path = cls.write_completion(name, completion_src)
-            cls.inject_into_shell(file_path, config_path)
+        if current_shell in self.Supported_Shell:
+            name, completion_src, config_path = self.generate_resource()
+            file_path = self.write_completion(name, completion_src)
+            self.inject_into_shell(file_path, config_path)
         else:
             warn("Don't support completion of %s" % current_shell)
 
@@ -2971,7 +3019,10 @@ def command_g(custom_commands=None):
     )
 
     if stdargs.complete:
-        Completion.complete_and_use()
+        ShellCompletion(
+            {key: value["help-msg"] for key, value in GitProcessor.Git_Options.items()},
+            argparse_obj=args,
+        ).complete_and_use()
         raise SystemExit(0)
 
     if stdargs.show_commands:
