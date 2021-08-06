@@ -49,8 +49,10 @@ import time
 import random
 import json
 from math import sqrt, ceil
-from collections import Counter
 from functools import wraps
+from collections import Counter
+
+from .model import File
 
 
 #####################################################################
@@ -61,6 +63,7 @@ PYTHON3 = sys.version_info > (3, 0)
 if PYTHON3:
     input = input
     range = range
+    B = lambda x: x.encode("iso8859-1")
 
     import configparser
 
@@ -72,6 +75,7 @@ if PYTHON3:
 else:
     input = raw_input
     range = xrange
+    B = lambda x: x
 
     import ConfigParser
 
@@ -110,6 +114,13 @@ else:
     Icon_Smiler = "^_^"
     Icon_Thinking = "-?-"
     Icon_Sorry = "Orz"
+
+try:
+    import select, termios, fcntl, tty
+
+    TERM_CONTROL = True
+except Exception:
+    TERM_CONTROL = False
 
 
 #####################################################################
@@ -564,6 +575,136 @@ def time_testing(fn):
 
 
 #####################################################################
+# KeyBoard event.                                                    #
+#####################################################################
+class KeyEvent(object):
+    """KeyBoard event class.
+
+    Subclass:
+        Raw: Set raw input mode for device.
+        Nonblocking: Set nonblocking mode for device.
+
+    Attributes:
+        escape: Translation dictionary.
+        _resized: windows resize handle.
+
+    Functions:
+        signal_init: Register signal events.
+        signal_restore: Unregister signal events.
+        sync_get_key: get one input value, will wait until get input.
+    """
+
+    class Raw(object):
+        """Set raw input mode for device"""
+
+        def __init__(self, stream):
+            self.stream = stream
+            self.fd = self.stream.fileno()
+
+        def __enter__(self):
+            self.original_stty = termios.tcgetattr(self.stream)
+            tty.setcbreak(self.stream)
+
+        def __exit__(self, type, value, traceback):
+            termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
+
+    class Nonblocking(object):
+        """Set nonblocking mode for device"""
+
+        def __init__(self, stream):
+            self.stream = stream
+            self.fd = self.stream.fileno()
+
+        def __enter__(self):
+            self.orig_fl = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+            fcntl.fcntl(self.fd, fcntl.F_SETFL, self.orig_fl | os.O_NONBLOCK)
+
+        def __exit__(self, *args):
+            fcntl.fcntl(self.fd, fcntl.F_SETFL, self.orig_fl)
+
+    escape = {
+        "\n": "enter",
+        ("\x7f", "\x08"): "backspace",
+        ("[A", "OA"): "up",
+        ("[B", "OB"): "down",
+        ("[D", "OD"): "left",
+        ("[C", "OC"): "right",
+        "[2~": "insert",
+        "[3~": "delete",
+        "[H": "home",
+        "[F": "end",
+        "[5~": "page_up",
+        "[6~": "page_down",
+        "\t": "tab",
+        "[Z": "shift_tab",
+        "OP": "f1",
+        "OQ": "f2",
+        "OR": "f3",
+        "OS": "f4",
+        "[15": "f5",
+        "[17": "f6",
+        "[18": "f7",
+        "[19": "f8",
+        "[20": "f9",
+        "[21": "f10",
+        "[23": "f11",
+        "[24": "f12",
+    }
+
+    _resize_pipe_rd, _resize_pipe_wr = os.pipe()
+    _resized = False
+
+    @classmethod
+    def _sigwinch_handler(cls, signum, frame=None):
+        if not cls._resized:
+            os.write(cls._resize_pipe_wr, B("R"))
+        cls._resized = True
+
+    @classmethod
+    def signal_init(cls):
+        signal.signal(signal.SIGWINCH, cls._sigwinch_handler)
+
+    @classmethod
+    def signal_restore(cls):
+        signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+
+    @classmethod
+    def sync_get_input(cls):
+        while True:
+            with cls.Raw(sys.stdin):
+                if cls._resized:
+                    cls._resized = False
+                    clean_key = "windows resize"
+                    return clean_key
+
+                # * Wait 100ms for input on stdin then restart loop to check for stop flag
+                if not select.select([sys.stdin], [], [], 0.1)[0]:
+                    continue
+                input_key = sys.stdin.read(1)
+                if input_key == "\033":
+                    # * Set non blocking to prevent read stall
+                    with cls.Nonblocking(sys.stdin):
+                        input_key += sys.stdin.read(20)
+                        if input_key.startswith("\033[<"):
+                            _ = sys.stdin.read(1000)
+                # print(repr(input_key))
+                if input_key == "\033":
+                    clean_key = "escape"
+                elif input_key == "\\":
+                    clean_key = "\\"  # * Clean up "\" to not return escaped
+                else:
+                    for code in cls.escape:
+                        if input_key.lstrip("\033").startswith(code):
+                            clean_key = cls.escape[code]
+                            break
+                    else:
+                        clean_key = input_key
+
+                # print(clean_key)
+                return clean_key
+
+
+#####################################################################
 # Part of Style.                                                    #
 # Defines classes that generate colors and styles to beautify the   #
 # output. The method of color printing is also defined.             #
@@ -770,6 +911,18 @@ class Fx(object):
     * uncolor(string: str) : Removes all 24-bit color and returns string .
     """
 
+    hide_cursor = "\033[?25l"  # * Hide terminal cursor
+    show_cursor = "\033[?25h"  # * Show terminal cursor
+    alt_screen = "\033[?1049h"  # * Switch to alternate screen
+    normal_screen = "\033[?1049l"  # * Switch to normal screen
+    clear_ = "\033[2J\033[0;0f"  # * Clear screen and set cursor to position 0,0
+    # * Enable reporting of mouse position on click and release
+    mouse_on = "\033[?1002h\033[?1015h\033[?1006h"
+    mouse_off = "\033[?1002l"  # * Disable mouse reporting
+    # * Enable reporting of mouse position at any movement
+    mouse_direct_on = "\033[?1003h"
+    mouse_direct_off = "\033[?1003l"  # * Disable direct mouse reporting
+
     start = "\033["  # * Escape sequence start
     sep = ";"  # * Escape sequence separator
     end = "m"  # * Escape sequence end
@@ -892,6 +1045,186 @@ def err(msg, nl=True):
 #####################################################################
 # Part of command.                                                  #
 #####################################################################
+class InteractiveAdd(object):
+    """Interactive operation git tree status."""
+
+    def __init__(self, use_color=True, cursor=None, help_wait=1.5):
+        super(InteractiveAdd, self).__init__()
+        self.use_color = use_color
+        if cursor and len(cursor) == 1:
+            self.cursor = cursor
+        else:
+            self.cursor = "→"
+            print("The cursor symbol entered is not supported.")
+        self.help_wait = help_wait
+
+    def get_status(self):
+        """Get the file tree status of GIT for processing and encapsulation.
+
+        Raises:
+            Exception: Can't get tree status.
+
+        Returns:
+            (list[File]): Processed file status list.
+        """
+
+        file_items = []
+        err, files = exec_cmd("git status -s -u --porcelain")
+        if err:
+            raise Exception("Can't get git status.")
+        for file in files.rstrip().split("\n"):
+            change = file[:2]
+            staged_change = file[:1]
+            unstaged_change = file[1:2]
+            name = file[3:]
+            untracked = change in ["??", "A ", "AM"]
+            has_no_staged_change = staged_change in [" ", "U", "?"]
+            has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
+            has_inline_merged_conflicts = change in ["UU", "AA"]
+
+            # color full command.
+            if unstaged_change != " ":
+                if not has_no_staged_change:
+                    display_str = "{}{}{}{} {}{}".format(
+                        CommandColor.Green,
+                        staged_change,
+                        CommandColor.Red,
+                        unstaged_change,
+                        name,
+                        Fx.reset,
+                    )
+                else:
+                    display_str = "{}{} {}{}".format(
+                        CommandColor.Red, change, name, Fx.reset
+                    )
+            else:
+                display_str = "{}{} {}{}".format(
+                    CommandColor.Green, change, name, Fx.reset
+                )
+
+            file_ = File(
+                name=name,
+                display_str=display_str if self.use_color else file,
+                short_status=change,
+                has_staged_change=not has_no_staged_change,
+                has_unstaged_change=unstaged_change != " ",
+                tracked=not untracked,
+                deleted=unstaged_change == "D" or staged_change == "D",
+                added=unstaged_change == "A" or untracked,
+                has_merged_conflicts=has_merged_conflicts,
+                has_inline_merged_conflicts=has_inline_merged_conflicts,
+            )
+            file_items.append(file_)
+
+        return file_items
+
+    def process_file(self, file):
+        """Process file to change the status.
+
+        Args:
+            file (File): One processed file.
+        """
+
+        if file.has_merged_conflicts or file.has_inline_merged_conflicts:
+            pass
+        elif file.has_unstaged_change:
+            run_cmd("git add -- {}".format(file.name))
+        elif file.has_staged_change:
+            if file.tracked:
+                run_cmd("git reset HEAD -- {}".format(file.name))
+            else:
+                run_cmd("git rm --cached --force -- {}".format(file.name))
+
+    def add_interactive(self, *args):
+        """Interactive main method."""
+
+        # Wether can into interactive.
+        if not TERM_CONTROL:
+            raise Exception("This behavior is not supported in the current system.")
+
+        import shutil
+
+        height = shutil.get_terminal_size().lines
+
+        # Initialize.
+        cursor_row = 1
+        cursor_icon = self.cursor
+        display_range = [1, height]
+
+        stopping = False
+
+        # Into new term page.
+        echo(Fx.alt_screen + Fx.hide_cursor)
+
+        try:
+            KeyEvent.signal_init()
+
+            # Start interactive.
+            while not stopping:
+                echo(Fx.clear_)
+                while cursor_row < display_range[0]:
+                    display_range = [i - 1 for i in display_range]
+                while cursor_row > display_range[1]:
+                    display_range = [i + 1 for i in display_range]
+
+                file_items = self.get_status()
+                for index, file in enumerate(file_items, start=1):
+                    if display_range[0] <= index <= display_range[1]:
+                        if index == cursor_row:
+                            print("{} {}".format(cursor_icon, file.display_str))
+                        else:
+                            print("  " + file.display_str)
+
+                input_key = KeyEvent.sync_get_input()
+                if input_key in ["q", "escape"]:
+                    # exit.
+                    stopping = True
+                elif input_key in ["j", "down"]:
+                    # select pre file.
+                    cursor_row += 1
+                    cursor_row = (
+                        cursor_row if cursor_row < len(file_items) else len(file_items)
+                    )
+                elif input_key in ["k", "up"]:
+                    # select next file.
+                    cursor_row -= 1
+                    cursor_row = cursor_row if cursor_row > 1 else 1
+                elif input_key in ["enter", " "]:
+                    self.process_file(file_items[cursor_row - 1])
+                elif input_key == "windows resize":
+                    # get new term height.
+                    new_height = shutil.get_terminal_size().lines
+                    # get diff, reassign.
+                    line_diff = new_height - height
+                    height = new_height
+                    # get new display range.
+                    display_range[1] += line_diff
+                elif input_key == "?":
+                    echo(Fx.clear_)
+                    echo(
+                        (
+                            "k / ↑: select previous file.\n"
+                            "j / ↓: select next file.\n"
+                            "space / ↲: toggle storage or unstorage file.\n"
+                            "? : show help, wait {}s and exit.\n"
+                        ).format(self.help_wait)
+                    )
+                    if self.help_wait == 0:
+                        KeyEvent.sync_get_input()
+                    else:
+                        time.sleep(self.help_wait)
+                else:
+                    continue
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            pass
+        finally:
+            # Whatever, unregister signal event and restore terminal at last.
+            KeyEvent.signal_restore()
+            echo(Fx.normal_screen + Fx.show_cursor)
+
+
 class GitOptionSign:
     """Storage command type."""
 
@@ -1178,6 +1511,11 @@ class GitProcessor(object):
             "help-msg": "fetch other branch to local as same name.",
         },
         # Index(i)
+        "i": {
+            "state": GitOptionSign.Func | GitOptionSign.No,
+            "command": InteractiveAdd().add_interactive,
+            "help-msg": "interactive operation git tree status.",
+        },
         "ia": {
             "state": GitOptionSign.Func | GitOptionSign.Multi,
             "command": _Function.add,
