@@ -32,6 +32,7 @@ __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 
 __license__ = "MIT"
+__copyright__ = "Copyright (c) 2021 Zachary"
 
 
 import os
@@ -400,6 +401,8 @@ class Config(object):
         [Help]
         UseColor = yes
         LineWidth = 90
+        # Is it recommended to correct when entering wrong commands.
+        UseRecommendation = yes
         """
     )
 
@@ -422,10 +425,11 @@ class Config(object):
     show_remote = True
     show_branchs = True
     show_lastest_log = True
-    show_summary = True
+    show_summary = False
 
     use_color = True
     line_width = 90
+    use_recommend = False
 
     def __init__(self):
         super(Config, self).__init__()
@@ -507,6 +511,11 @@ class Config(object):
 
             try:
                 self.line_width = self.conf["Help"].getint("LineWidth")
+            except Exception:
+                pass
+
+            try:
+                self.use_recommend = self.conf["Help"].getboolean("UseRecommendation")
             except Exception:
                 pass
 
@@ -1647,15 +1656,21 @@ class GitProcessor(object):
         if option is None:
             echo("Don't support this command, please try ", nl=False)
             warn("g --show-commands")
-            predicted_command = cls.similar_command(_command, cls.Git_Options.keys())
-            echo(
-                "%s The wanted command is %s ?"
-                % (Icon_Thinking, CommandColor.Green + predicted_command + Fx.reset),
-                nl=False,
-            )
-            flag = confirm("[y/n]:")
-            if flag:
-                cls.process_command(predicted_command, args=args)
+
+            if CONFIG.use_recommend:  # check config.
+                predicted_command = cls.similar_command(
+                    _command, cls.Git_Options.keys()
+                )
+                echo(
+                    "%s The wanted command is %s ?"
+                    % (
+                        Icon_Thinking,
+                        CommandColor.Green + predicted_command + Fx.reset,
+                    ),
+                    nl=False,
+                )
+                if confirm("[y/n]:"):
+                    cls.process_command(predicted_command, args=args)
 
             raise SystemExit(0)
 
@@ -1755,15 +1770,15 @@ class GitProcessor(object):
             echo(
                 "` to view the supported types.",
             )
-            predicted_type = cls.similar_command(command_type, cls.Types)
-            echo(
-                "%s The wanted type is %s ?"
-                % (Icon_Thinking, CommandColor.Green + predicted_type + Fx.reset),
-                nl=False,
-            )
-            flag = confirm("[y/n]:")
-            if flag:
-                command_g(["-S", predicted_type])
+            if CONFIG.use_recommend:
+                predicted_type = cls.similar_command(command_type, cls.Types)
+                echo(
+                    "%s The wanted type is %s ?"
+                    % (Icon_Thinking, CommandColor.Green + predicted_type + Fx.reset),
+                    nl=False,
+                )
+                if confirm("[y/n]:"):
+                    command_g(["-S", predicted_type])
             raise SystemExit(0)
 
         echo("These are the orders of {}".format(command_type))
@@ -1832,6 +1847,7 @@ class Completion(object):
             --out-log\:"Print log to console."\\
             -c\:"Count the number of codes and output them in tabular form."\\
             --count\:"Count the number of codes and output them in tabular form."\\
+            --create-config\:"Create config."\\
 
             %s
           ))\'\\
@@ -1851,7 +1867,7 @@ class Completion(object):
         if [[ "${COMP_CWORD}" == "1" ]];then
             COMP_WORD="-C --complete -s --show-commands -S --show-command -t --types\\
                 -f --config -i --information -v --version --create-ignore\\
-                --debug --out-log -c --count\\
+                --debug --out-log -c --count --create-config\\
                 %s"
             COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
         fi
@@ -2919,7 +2935,7 @@ def command_g(custom_commands=None):
     args.add_argument(
         "--create-config",
         action="store_true",
-        help="Create a preconfigured file",
+        help="Create a preconfigured file of git-tools.",
     )
     args.add_argument(
         "--debug",
