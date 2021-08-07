@@ -1089,9 +1089,15 @@ class InteractiveAdd(object):
             self.cursor = "→"
             print("The cursor symbol entered is not supported.")
         self.help_wait = help_wait
+        self._min_height = 5
+        self._min_width = 60
 
-    def get_status(self):
+    def get_status(self, max_width, ident=2):
         """Get the file tree status of GIT for processing and encapsulation.
+
+        Args:
+            max_width (int): The max length of display string.
+            ident (int, option): Number of reserved blank characters in the header.
 
         Raises:
             Exception: Can't get tree status.
@@ -1114,6 +1120,7 @@ class InteractiveAdd(object):
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
             has_inline_merged_conflicts = change in ["UU", "AA"]
 
+            display_name = shorten(name, max_width - 3 - ident)
             # color full command.
             if unstaged_change != " ":
                 if not has_no_staged_change:
@@ -1122,16 +1129,16 @@ class InteractiveAdd(object):
                         staged_change,
                         CommandColor.Red,
                         unstaged_change,
-                        name,
+                        display_name,
                         Fx.reset,
                     )
                 else:
                     display_str = "{}{} {}{}".format(
-                        CommandColor.Red, change, name, Fx.reset
+                        CommandColor.Red, change, display_name, Fx.reset
                     )
             else:
                 display_str = "{}{} {}{}".format(
-                    CommandColor.Green, change, name, Fx.reset
+                    CommandColor.Green, change, display_name, Fx.reset
                 )
 
             file_ = File(
@@ -1248,7 +1255,10 @@ class InteractiveAdd(object):
 
         # only need get once.
         diff_ = self.diff(
-            file_obj.name, file_obj.tracked, file_obj.has_staged_change
+            file_obj.name,
+            file_obj.tracked,
+            file_obj.has_staged_change,
+            not self.use_color,
         ).split("\n")
         extra = 0  # Extra occupied row.
         while not stopping:
@@ -1292,7 +1302,7 @@ class InteractiveAdd(object):
             elif input_key == "windows resize":
                 # get new term height.
                 new_width, new_height = shutil.get_terminal_size()
-                if new_height < 5 or new_width < 60:
+                if new_height < self._min_height or new_width < self._min_width:
                     raise TermError("The minimum size of terminal should be 60 x 5.")
                 # get size diff, reassign.
                 line_diff = new_height - height
@@ -1328,7 +1338,7 @@ class InteractiveAdd(object):
         import shutil
 
         width, height = shutil.get_terminal_size()
-        if height < 5 or width < 60:
+        if height < self._min_height or width < self._min_width:
             raise TermError("The minimum size of terminal should be 60 x 5.")
 
         # Initialize.
@@ -1341,7 +1351,7 @@ class InteractiveAdd(object):
         # Into new term page.
         echo(Fx.alt_screen + Fx.hide_cursor)
 
-        file_items = self.get_status()
+        file_items = self.get_status(width)
         try:
             KeyEvent.signal_init()
 
@@ -1353,6 +1363,7 @@ class InteractiveAdd(object):
                 while cursor_row > display_range[1]:
                     display_range = [i + 1 for i in display_range]
 
+                # Print needed display part.
                 for index, file in enumerate(file_items, start=1):
                     if display_range[0] <= index <= display_range[1]:
                         if index == cursor_row:
@@ -1376,13 +1387,13 @@ class InteractiveAdd(object):
                     cursor_row = cursor_row if cursor_row > 1 else 1
                 elif input_key in ["a", " "]:
                     self.process_file(file_items[cursor_row - 1])
-                    file_items = self.get_status()
+                    file_items = self.get_status(width)
                 elif input_key == "enter":
                     self.show_diff(file_items[cursor_row - 1])
                 elif input_key == "windows resize":
                     # get new term height.
                     new_width, new_height = shutil.get_terminal_size()
-                    if new_height < 5 or new_width < 60:
+                    if new_height < self._min_height or new_width < self._min_width:
                         raise TermError(
                             "The minimum size of terminal should be 60 x 5."
                         )
@@ -2847,7 +2858,8 @@ class CodeCounter(object):
             ...     'pattern': re.compile(r''),
             ...     'include': False
             ... }
-        File_Type (dict): Supported file suffix dictionary.
+        Suffix_Type (dict): Supported file suffix dictionary.
+        Special_Name (dict): Type dict of special file name.
         Level_Color (list): Color list. The levels are calibrated by
             subscript, and the codes of different levels are colored
             when the results are output.
@@ -2889,11 +2901,19 @@ class CodeCounter(object):
             ),
             "include": False,
         },
+        {
+            # Exclude some binary file.
+            "pattern": re.compile(
+                r"\.exe$|\.bin$",
+                re.I,
+            ),
+            "include": False,
+        },
     ]
 
     Rules = []
 
-    File_Types = {
+    Suffix_Types = {
         "": "",
         "c": "C",
         "conf": "Properties",
@@ -2944,6 +2964,11 @@ class CodeCounter(object):
         "srdf": "YAML",
         "msg": "ROS Message",
         "srv": "ROS Message",
+    }
+
+    Special_Names = {
+        "requirements.txt": "Pip requirement",
+        "license": "LICENSE",
     }
 
     Level_Color = [
@@ -3051,6 +3076,32 @@ class CodeCounter(object):
             return res[-1]["include"]
             # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
+    @classmethod
+    def adjudgment_type(cls, file):
+        """Get file type.
+
+        First, judge whether the file name is special, and then query the
+        file suffix. Otherwise, the suffix or name will be returned as is.
+
+        Args:
+            file (str): file name string.
+
+        Returns:
+            (str): file type.
+        """
+
+        # TODO(zachary): I think can improve this.
+        pre_type = cls.Special_Names.get(file.lower(), None)
+        if pre_type:
+            return pre_type
+
+        suffix = file.split(".")[-1]
+        suffix_type = cls.Suffix_Types.get(suffix.lower(), None)
+        if suffix_type:
+            return suffix_type
+        else:
+            return suffix
+
     # @staticmethod
     # def count_file_thread(full_path):
     #     pass
@@ -3109,24 +3160,23 @@ class CodeCounter(object):
             if use_ignore:
                 cls.process_gitignore(root, files)
 
+            # TODO: Would it be better to use threads?
             for file in files:
                 full_path = os.path.join(root, file)
                 is_effective = cls.matching(full_path)
                 if is_effective:
-                    # TODO: the way of process file type not good.
-                    suffix = file.split(".")[-1]
-                    suffix = cls.File_Types.get(suffix.lower(), suffix)
-                    # TODO: counter, may need use threading.
+                    # Get file type.
+                    type_ = cls.adjudgment_type(file)
                     try:
                         with open(full_path) as f:
                             count = len(f.read().split("\n"))
 
                         # Superposition.
-                        if result.get(suffix, None) is None:
-                            result[suffix] = {"files": 1, "lines": count}
+                        if result.get(type_, None) is None:
+                            result[type_] = {"files": 1, "lines": count}
                         else:
-                            result[suffix]["files"] += 1
-                            result[suffix]["lines"] += count
+                            result[type_]["files"] += 1
+                            result[type_]["lines"] += count
                         valid_counter += 1
                     except Exception as e:
                         invalid_counter += 1
@@ -3139,9 +3189,6 @@ class CodeCounter(object):
                                 nl=False,
                             )
 
-        # from pprint import pprint
-
-        # pprint(cls.rules)
         if progress:
             echo("")
         return result, invalid_list
