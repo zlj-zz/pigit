@@ -4,7 +4,7 @@ sys.path.insert(0, ".")
 
 import os
 from pprint import pprint
-from pygittools import CodeCounter
+from pigit import CodeCounter
 
 
 def test_regular_rule(path: str = os.getcwd()):

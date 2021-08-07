@@ -8,17 +8,17 @@ except Exception:
     LONG_DESCRIPTION = ""
 
 from setuptools import setup, find_packages
-import pygittools
+import pigit
 
 setup(
-    name="pygittools",
-    version=pygittools.__version__,
-    author=pygittools.__author__,
-    author_email=pygittools.__email__,
+    name=pigit.__project__,
+    version=pigit.__version__,
+    author=pigit.__author__,
+    author_email=pigit.__email__,
     description="Simple terminal tool of Git.",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url=pygittools.__url__,
+    url=pigit.__url__,
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
@@ -40,7 +40,7 @@ setup(
     install_requires=[],
     entry_points="""
         [console_scripts]
-        g=pygittools:command_g
+        g=pigit:command_g
     """,
     # python_requires=">=3.7",
 )

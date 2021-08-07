@@ -4,7 +4,7 @@ echo $(pwd)
 PY2=$(whereis python2)
 echo ${PY2}
 
-Project=pygittools
+Project=pigit
 
 ${PY2} ${Project}/__init__.py
 Sleep 2

@@ -3,7 +3,7 @@ from pprint import pprint
 
 sys.path.insert(0, ".")
 
-from pygittools import ShellCompletion, GitProcessor
+from pigit import ShellCompletion, GitProcessor
 
 
 def test_generater():

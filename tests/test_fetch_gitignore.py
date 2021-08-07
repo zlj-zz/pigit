@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pygittools import GitignoreGenetor
+from pigit import GitignoreGenetor
 
 
 def test_fetch_gitignore():

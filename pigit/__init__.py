@@ -23,9 +23,9 @@
 # SOFTWARE.
 
 
-__project__ = "git-tools"
+__project__ = "pigit"
 __version__ = "1.0.5-beta.1"
-__url__ = "https://github.com/zlj-zz/pygittools.git"
+__url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
 __author__ = "Zachary Zhang"

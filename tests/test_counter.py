@@ -2,7 +2,7 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pygittools import CodeCounter
+from pigit import CodeCounter
 
 
 def test_codecounter():
