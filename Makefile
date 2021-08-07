@@ -1,4 +1,4 @@
-Project = pygittools
+Project = pigit
 PY ?= $(shell (python3 -c 'import sys; sys.exit(sys.version < "3.6")' && \
 	      which python3) )
 

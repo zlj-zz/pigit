@@ -2,6 +2,18 @@
 Changelog of pygittools
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.6 (2021-08-08)
+----------
+- Rename project, pygittools -> pigit
+- Added configuration.
+- Added interactive file tree operation.
+- Allowed some command combined use, like: `-if`.
+- Optimized ignore matching algorithm of CodeCounter.
+- Increase the output mode of CodeCounter. [table, simple]
+- Refactor Git command processor.
+- Refactor Completion, support fish shell.
+- Fix emotion error on windows.
+
 v1.0.4 (2021-08-04)
 ----------
 - Optimized recommendation algorithm.

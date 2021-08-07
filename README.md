@@ -1,8 +1,8 @@
-# pygittools
+# pigit
 
 ![Python 2.7](https://img.shields.io/badge/Python-v2.7%5E-green?logo=python)
 ![Python 3](https://img.shields.io/badge/Python-v3%5E-green?logo=python)
-[![pypi_version](https://img.shields.io/pypi/v/pygittools?label=pypi)](https://pypi.org/project/pygittools)
+[![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 A terminal tool for git. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
@@ -14,14 +14,14 @@ A terminal tool for git. When we use git, do you feel very uncomfortable with to
 ### Pip
 
 ```bash
-pip install -U pygittools
+pip install -U pigit
 ```
 
 ### Source
 
 ```bash
-git clone https://github.com/zlj-zz/pygittools.git
-cd pygittools
+git clone https://github.com/zlj-zz/pigit.git
+cd pigit
 make install
 ```
 
@@ -30,17 +30,17 @@ make install
 You can run `g` in terminal, and you will see this:
 
 ```
-[git-tools] version: 1.0.2-beta
+[pigit] version: 1.0.2-beta
 git version 2.30.1 (Apple Git-130)
 
-Path: /opt/homebrew/lib/python3.9/site-packages/pygittools-1.0.2b0-py3.9.egg/pygittools/__init__.py
+Path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.0.2b0-py3.9.egg/pigit/__init__.py
 
 Description:
   Terminal tool, help you use git more simple. Support Linux and MacOS.
   It use short command to replace the original command, like:
   `g ws` -> `git status --short`, `g b` -> `git branch`.
   Also you use `g -s` to get the all short command, have fun and good lucky.
-  The open source path: https://github.com/zlj-zz/pygittools.git
+  The open source path: https://github.com/zlj-zz/pigit.git
 
 You can use -h and --help to get help and more usage.
 

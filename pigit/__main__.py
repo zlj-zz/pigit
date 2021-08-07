@@ -1,3 +1,3 @@
-from pygittools import command_g
+from pigit import command_g
 
 command_g()

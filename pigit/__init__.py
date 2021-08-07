@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.0.5-beta.1"
+__version__ = "1.0.6"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -89,10 +89,10 @@ else:
 IS_WIN = sys.platform.lower().startswith("win")
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
-    TOOLS_HOME = USER_HOME + "/pygittools"
+    TOOLS_HOME = os.path.join(USER_HOME, __project__)
 else:
     USER_HOME = os.environ["HOME"]
-    TOOLS_HOME = USER_HOME + "/.config/pygittools"
+    TOOLS_HOME = os.path.join(USER_HOME, ".config", __project__)
 
 # For windows print color.
 if os.name == "nt":
@@ -144,7 +144,7 @@ def ensure_path(dir_path):
     Args:
         dir_path (str): Directory path, like: "~/.config/xxx"
 
-    >>> ensure_path('~/.config/pygittools')
+    >>> ensure_path('~/.config/pigit')
     """
     if not os.path.isdir(dir_path):
         try:
@@ -2586,7 +2586,7 @@ class ShellCompletion(object):
         try:
             with open(config_path) as f:
                 shell_conf = f.read()
-                _re = re.compile(r"\/\.config\/pygittools/([^\s]+)")
+                _re = re.compile(r"\/\.config\/{}/([^\s]+)".format(__project__))
                 files = _re.findall(shell_conf)
         except Exception as e:
             leave(EXIT_ERROR, "Read shell config error: {}".format(e))
@@ -3598,7 +3598,9 @@ def command_g(custom_commands=None):
     # Setup log handle.
     LogHandle.setup_logging(
         debug=stdargs.debug,
-        log_file=None if stdargs.out_log else TOOLS_HOME + "/log/gittools.log",
+        log_file=None
+        if stdargs.out_log
+        else TOOLS_HOME + "/log/{}.log".format(__project__),
     )
 
     if stdargs.complete:
