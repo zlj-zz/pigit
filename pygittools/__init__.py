@@ -124,6 +124,13 @@ except Exception:
 
 
 #####################################################################
+# Custom error.                                                     #
+#####################################################################
+class TermError(Exception):
+    pass
+
+
+#####################################################################
 # Part of Utils.                                                    #
 # Some tools and methods for global use. Also contains some special #
 # global variables (readonly).                                      #
@@ -143,10 +150,10 @@ def ensure_path(dir_path):
         try:
             os.makedirs(dir_path, exist_ok=True)
         except PermissionError as e:
-            err("Don't have permission to create: %s" % dir_path)
+            err_echo("Don't have permission to create: %s" % dir_path)
             exit(1, e)
         except Exception as e:
-            err("An error occurred while creating %s" % dir_path)
+            err_echo("An error occurred while creating %s" % dir_path)
             exit(1, e)
 
 
@@ -173,6 +180,29 @@ def shorten(text, width, placeholder="...", front=False):
         _text = text
 
     return _text
+
+
+# yapf: disable
+widths = [
+    (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0),
+    (733, 1), (879, 0), (1154, 1), (1161, 0), (4347, 1), (4447, 2),
+    (7467, 1), (7521, 0), (8369, 1), (8426, 0), (9000, 1), (9002, 2),
+    (11021, 1), (12350, 2), (12351, 1), (12438, 2), (12442, 0), (19893, 2),
+    (19967, 1), (55203, 2), (63743, 1), (64106, 2), (65039, 1), (65059, 0),
+    (65131, 2), (65279, 1), (65376, 2), (65500, 1), (65510, 2), (120831, 1),
+    (262141, 2), (1114109, 1),
+]
+# yapf: enable
+
+
+def get_width(r):
+    global widths
+    if r == 0xE or r == 0xF:
+        return 0
+    for num, wid in widths:
+        if r <= num:
+            return wid
+    return 1
 
 
 class LogHandle(object):
@@ -1037,7 +1067,7 @@ def warn(msg, nl=True):
     echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.warning_color), msg, Fx.reset), nl=nl)
 
 
-def err(msg, nl=True):
+def err_echo(msg, nl=True):
     """Print red information."""
     echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.error_color), msg, Fx.reset), nl=nl)
 
@@ -1051,7 +1081,9 @@ class InteractiveAdd(object):
     def __init__(self, use_color=True, cursor=None, help_wait=1.5):
         super(InteractiveAdd, self).__init__()
         self.use_color = use_color
-        if cursor and len(cursor) == 1:
+        if not cursor:
+            self.cursor = "→"
+        elif len(cursor) == 1:
             self.cursor = cursor
         else:
             self.cursor = "→"
@@ -1118,6 +1150,46 @@ class InteractiveAdd(object):
 
         return file_items
 
+    def diff(self, file, tracked=True, cached=False, plain=False):
+        """Gets the modification of the file.
+
+        Args:
+            file (str): file path relative to git.
+            tracked (bool, optional): Defaults to True.
+            cached (bool, optional): Defaults to False.
+            plain (bool, optional): Wether need color. Defaults to False.
+
+        Returns:
+            (str): change string.
+        """
+
+        command = "git diff --submodule --no-ext-diff {plain} {cached} {tracked} {file}"
+
+        if plain:
+            _plain = "--color=never"
+        else:
+            _plain = "--color=always"
+
+        if cached:
+            _cached = "--cached"
+        else:
+            _cached = ""
+
+        if not tracked:
+            _tracked = "--no-index -- /dev/null"
+        else:
+            _tracked = "--"
+
+        if "->" in file:  # rename
+            file = file.split("->")[-1].strip()
+
+        err, res = exec_cmd(
+            command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file)
+        )
+        if err:
+            return "Can't get diff."
+        return res.rstrip()
+
     def process_file(self, file):
         """Process file to change the status.
 
@@ -1135,27 +1207,141 @@ class InteractiveAdd(object):
             else:
                 run_cmd("git rm --cached --force -- {}".format(file.name))
 
+    # def loop(self, display_fn, dispaly_args=[], display_kwargs={}):
+    #     pass
+
+    def extra_occupied_rows(self, text, term_width):
+        """Gets the number of additional lines occupied by a line of text in terminal.
+
+        Args:
+            text (str): text string.
+            term_width (int): terminal width.
+
+        Returns:
+            (int): extra lines. min is 0.
+        """
+
+        count = 0
+        for ch in text:
+            count += get_width(ord(ch))
+        return ceil(count / term_width) - 1
+
+    def show_diff(self, file_obj):
+        """Interactive display file diff.
+
+        Args:
+            file_obj (File): needed file.
+
+        Raises:
+            TermError: terminal size not enough.
+        """
+
+        import shutil
+
+        width, height = shutil.get_terminal_size()
+
+        # Initialize.
+        cursor_row = 1
+        display_range = [1, height - 1]
+
+        stopping = False  # exit signal.
+
+        # only need get once.
+        diff_ = self.diff(
+            file_obj.name, file_obj.tracked, file_obj.has_staged_change
+        ).split("\n")
+        extra = 0  # Extra occupied row.
+        while not stopping:
+            echo(Fx.clear_)
+
+            while cursor_row < display_range[0]:
+                display_range = [i - 1 for i in display_range]
+            while cursor_row + extra > display_range[1]:
+                display_range = [i + 1 for i in display_range]
+
+            extra = 0  # Return to zero and accumulate again.
+            # Terminal outputs the text to be displayed.
+            for index, line in enumerate(diff_, start=1):
+                if display_range[0] <= index <= display_range[1] - extra:
+                    if index == cursor_row:
+                        print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+                    else:
+                        print(line)
+                    extra += self.extra_occupied_rows(Fx.uncolor(line), width)
+
+            input_key = KeyEvent.sync_get_input()
+            if input_key in ["q", "escape"]:
+                # exit.
+                stopping = True
+            elif input_key in ["j", "down"]:
+                # select pre file.
+                cursor_row += 1
+                cursor_row = cursor_row if cursor_row < len(diff_) else len(diff_)
+            elif input_key in ["k", "up"]:
+                # select next file.
+                cursor_row -= 1
+                cursor_row = cursor_row if cursor_row > 1 else 1
+            elif input_key in ["J"]:
+                # scroll down 5 lines.
+                cursor_row += 5
+                cursor_row = cursor_row if cursor_row < len(diff_) else len(diff_)
+            elif input_key in ["K"]:
+                # scroll up 5 line
+                cursor_row -= 5
+                cursor_row = cursor_row if cursor_row > 1 else 1
+            elif input_key == "windows resize":
+                # get new term height.
+                new_width, new_height = shutil.get_terminal_size()
+                if new_height < 5 or new_width < 60:
+                    raise TermError("The minimum size of terminal should be 60 x 5.")
+                # get size diff, reassign.
+                line_diff = new_height - height
+                height = new_height
+                width = new_width
+                # get new display range.
+                display_range[1] += line_diff
+            elif input_key == "?":
+                echo(Fx.clear_)
+                echo(
+                    (
+                        "k / ↑: select previous line.\n"
+                        "j / ↓: select next line.\n"
+                        "J: Scroll down 5 lines.\n"
+                        "K: Scroll down 5 lines.\n"
+                        "? : show help, wait {}s and exit.\n"
+                    ).format(self.help_wait)
+                )
+                if self.help_wait == 0:
+                    KeyEvent.sync_get_input()
+                else:
+                    time.sleep(self.help_wait)
+            else:
+                continue
+
     def add_interactive(self, *args):
         """Interactive main method."""
 
         # Wether can into interactive.
         if not TERM_CONTROL:
-            raise Exception("This behavior is not supported in the current system.")
+            raise TermError("This behavior is not supported in the current system.")
 
         import shutil
 
-        height = shutil.get_terminal_size().lines
+        width, height = shutil.get_terminal_size()
+        if height < 5 or width < 60:
+            raise TermError("The minimum size of terminal should be 60 x 5.")
 
         # Initialize.
         cursor_row = 1
         cursor_icon = self.cursor
-        display_range = [1, height]
+        display_range = [1, height - 1]
 
         stopping = False
 
         # Into new term page.
         echo(Fx.alt_screen + Fx.hide_cursor)
 
+        file_items = self.get_status()
         try:
             KeyEvent.signal_init()
 
@@ -1167,7 +1353,6 @@ class InteractiveAdd(object):
                 while cursor_row > display_range[1]:
                     display_range = [i + 1 for i in display_range]
 
-                file_items = self.get_status()
                 for index, file in enumerate(file_items, start=1):
                     if display_range[0] <= index <= display_range[1]:
                         if index == cursor_row:
@@ -1189,11 +1374,18 @@ class InteractiveAdd(object):
                     # select next file.
                     cursor_row -= 1
                     cursor_row = cursor_row if cursor_row > 1 else 1
-                elif input_key in ["enter", " "]:
+                elif input_key in ["a", " "]:
                     self.process_file(file_items[cursor_row - 1])
+                    file_items = self.get_status()
+                elif input_key == "enter":
+                    self.show_diff(file_items[cursor_row - 1])
                 elif input_key == "windows resize":
                     # get new term height.
-                    new_height = shutil.get_terminal_size().lines
+                    new_width, new_height = shutil.get_terminal_size()
+                    if new_height < 5 or new_width < 60:
+                        raise TermError(
+                            "The minimum size of terminal should be 60 x 5."
+                        )
                     # get diff, reassign.
                     line_diff = new_height - height
                     height = new_height
@@ -1205,7 +1397,8 @@ class InteractiveAdd(object):
                         (
                             "k / ↑: select previous file.\n"
                             "j / ↓: select next file.\n"
-                            "space / ↲: toggle storage or unstorage file.\n"
+                            "a / space: toggle storage or unstorage file.\n"
+                            "↲ : check file diff.\n"
                             "? : show help, wait {}s and exit.\n"
                         ).format(self.help_wait)
                     )
@@ -1216,8 +1409,6 @@ class InteractiveAdd(object):
                 else:
                     continue
         except KeyboardInterrupt:
-            pass
-        except Exception as e:
             pass
         finally:
             # Whatever, unregister signal event and restore terminal at last.
@@ -1298,7 +1489,7 @@ class GitProcessor(object):
             if branch:
                 run_cmd("git fetch origin {}:{} ".format(branch, branch))
             else:
-                err("This option need a branch name.")
+                err_echo("This option need a branch name.")
 
         @staticmethod
         def set_email_and_username(args):
@@ -1317,7 +1508,7 @@ class GitProcessor(object):
             name = input("Please input username:")
             while True:
                 if not name:
-                    err("Name is empty.")
+                    err_echo("Name is empty.")
                     name = input("Please input username again:")
                 else:
                     break
@@ -1328,7 +1519,7 @@ class GitProcessor(object):
             )
             while True:
                 if email_re.match(email) is None:
-                    err("Bad mailbox format.")
+                    err_echo("Bad mailbox format.")
                     email = input("Please input email again:")
                 else:
                     break
@@ -1338,7 +1529,7 @@ class GitProcessor(object):
             ) and run_cmd(GitProcessor.Git_Options["email"]["command"] + other + email):
                 okay("Successfully set.")
             else:
-                err("Failed. Please check log.")
+                err_echo("Failed. Please check log.")
 
     Git_Options = {
         # Branch
@@ -1986,7 +2177,7 @@ class GitProcessor(object):
         """
 
         if Git_Version is None:
-            err("Git is not detected. Please install Git first.")
+            err_echo("Git is not detected. Please install Git first.")
             raise SystemExit(0)
 
         option = cls.Git_Options.get(_command, None)
@@ -2017,11 +2208,16 @@ class GitProcessor(object):
 
         if state & GitOptionSign.No:
             if args:
-                err("The command does not accept parameters. Discard {}.".format(args))
+                err_echo(
+                    "The command does not accept parameters. Discard {}.".format(args)
+                )
                 args = []
 
         if state & GitOptionSign.Func:
-            command(args)
+            try:
+                command(args)
+            except TermError as e:
+                err_echo(e)
         elif state & GitOptionSign.String:
             if args:
                 args_str = " ".join(args)
@@ -2102,7 +2298,7 @@ class GitProcessor(object):
         command_type = command_type.capitalize().strip()
 
         if command_type not in cls.Types:
-            err("There is no such type.")
+            err_echo("There is no such type.")
             echo("Please use `", nl=False)
             echo("g --types", color=CommandColor.Green, nl=False)
             echo(
@@ -2492,7 +2688,7 @@ class GitignoreGenetor(object):
             timeout = CONFIG.timeout
             handle = urlopen(url, timeout=timeout)
         except Exception:
-            err("Failed to get content and will exit.")
+            err_echo("Failed to get content and will exit.")
             raise SystemExit(0)
 
         content = handle.read().decode("utf-8")
@@ -2509,7 +2705,7 @@ class GitignoreGenetor(object):
 
         name = cls.Supported_Types.get(genre.lower(), None)
         if name is None:
-            err("Unsupported type: %s" % genre)
+            err_echo("Unsupported type: %s" % genre)
             echo(
                 "Supported type: %s.  Case insensitive."
                 % " ".join(cls.Supported_Types.keys())
@@ -2541,7 +2737,7 @@ class GitignoreGenetor(object):
                     f.write(ignore_content)
                 echo("Write gitignore file successful. {}".format(Icon_Smiler))
             except Exception:
-                err("Write gitignore file failed.")
+                err_echo("Write gitignore file failed.")
                 echo("You can replace it with the following:")
                 echo("#" * 60)
                 echo(ignore_content)
@@ -2558,7 +2754,7 @@ def git_local_config():
             with open(Repository_Path + "/.git/config", "r") as cf:
                 for line in re.split(r"\r\n|\r|\n", cf.read()):
                     if line.startswith("["):
-                        err(line)
+                        err_echo(line)
                     else:
                         if _re.search(line) is not None:
                             key, value = line.split("=")
@@ -2572,9 +2768,9 @@ def git_local_config():
                             )
         except Exception as e:
             print(e)
-            err("Error reading configuration file.")
+            err_echo("Error reading configuration file.")
     else:
-        err("This directory is not a git repository yet.")
+        err_echo("This directory is not a git repository yet.")
 
 
 def repository_info():
