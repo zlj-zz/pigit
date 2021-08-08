@@ -412,6 +412,19 @@ class Config(object):
         WarningColor = #FFD700
         ErrorColor = #FF6347
 
+        [Git]
+        # Show original git command.
+        ShowOriginal = yes
+
+        # Is it recommended to correct when entering wrong commands.
+        UseRecommendation = yes
+
+        # Whether color is enabled in interactive mode.
+        InteractiveColor = yes
+
+        # Display time of help information in interactive mode, 0 is permanent.
+        InteractiveHelpShowTime = 2
+
 
         [CodeCounter]
         # Whether to use the ignore configuration of the `.gitignore` file.
@@ -442,8 +455,6 @@ class Config(object):
         [Help]
         UseColor = yes
         LineWidth = 90
-        # Is it recommended to correct when entering wrong commands.
-        UseRecommendation = yes
         """
     )
 
@@ -451,9 +462,14 @@ class Config(object):
     # Default values for configuration.
     ##########################################
 
-    right_color = "#98FB98"  # PaleGreen
-    warning_color = "#FFD700"  # Gold
-    error_color = "#FF6347"  # Tomato
+    okay_echo_color = "#98FB98"  # PaleGreen
+    warning_echo_color = "#FFD700"  # Gold
+    error_echo_color = "#FF6347"  # Tomato
+
+    gitprocessor_show_original = False
+    gitprocessor_use_recommend = False
+    gitprocessor_interactive_color = True
+    gitprocessor_interactive_wait_time = 1.5
 
     use_gitignore = True
     show_invalid = False
@@ -462,15 +478,14 @@ class Config(object):
 
     timeout = 60
 
-    show_path = True
-    show_remote = True
-    show_branchs = True
-    show_lastest_log = True
-    show_summary = False
+    repository_show_path = True
+    repository_show_remote = True
+    repository_show_branchs = True
+    repository_show_lastest_log = True
+    repository_show_summary = False
 
     use_color = True
     line_width = 90
-    use_recommend = False
 
     def __init__(self):
         super(Config, self).__init__()
@@ -479,17 +494,52 @@ class Config(object):
         sections = self.conf.sections()
 
         if "Color" in sections:
-            right_color = self.right_color = self.conf["Color"].get("RightColor")
-            if self.is_color(right_color):
-                self.right_color = right_color
+            okay_echo_color = self.okay_echo_color = self.conf["Color"].get(
+                "RightColor"
+            )
+            if self.is_color(okay_echo_color):
+                self.okay_echo_color = okay_echo_color
 
-            warning_color = self.warning_color = self.conf["Color"].get("WarningColor")
-            if self.is_color(warning_color):
-                self.warning_color = warning_color
+            warning_echo_color = self.warning_echo_color = self.conf["Color"].get(
+                "WarningColor"
+            )
+            if self.is_color(warning_echo_color):
+                self.warning_echo_color = warning_echo_color
 
-            error_color = self.error_color = self.conf["Color"].get("ErrorColor")
-            if self.is_color(error_color):
-                self.error_color = error_color
+            error_echo_color = self.error_echo_color = self.conf["Color"].get(
+                "ErrorColor"
+            )
+            if self.is_color(error_echo_color):
+                self.error_echo_color = error_echo_color
+
+        if "Git" in sections:
+            try:
+                self.gitprocessor_show_original = self.conf["Git"].getboolean(
+                    "ShowOriginal"
+                )
+            except Exception:
+                pass
+
+            try:
+                self.gitprocessor_use_recommend = self.conf["Git"].getboolean(
+                    "UseRecommendation"
+                )
+            except Exception:
+                pass
+
+            try:
+                self.gitprocessor_interactive_color = self.conf["Git"].getboolean(
+                    "InteractiveColor"
+                )
+            except Exception:
+                pass
+
+            try:
+                self.gitprocessor_interactive_wait_time = self.conf["Git"].getint(
+                    "InteractiveHelpShowTime"
+                )
+            except Exception:
+                pass
 
         if "CodeCounter" in sections:
             try:
@@ -514,31 +564,36 @@ class Config(object):
 
         if "RepositoryInfo" in sections:
             try:
-                self.show_path = self.conf["RepositoryInfo"].getboolean("ShowPath")
+                self.repository_show_path = self.conf["RepositoryInfo"].getboolean(
+                    "ShowPath"
+                )
             except Exception:
                 pass
 
             try:
-                self.show_remote = self.conf["RepositoryInfo"].getboolean("ShowRemote")
+                self.repository_show_remote = self.conf["RepositoryInfo"].getboolean(
+                    "ShowRemote"
+                )
             except Exception:
                 pass
 
             try:
-                self.show_branchs = self.conf["RepositoryInfo"].getboolean(
+                # TODO: bug.
+                self.repository_show_branchs = self.conf["RepositoryInfo"].getboolean(
                     "ShowBranchs"
                 )
             except Exception:
                 pass
 
             try:
-                self.show_lastest_log = self.conf["RepositoryInfo"].getboolean(
-                    "ShowLastestLog"
-                )
+                self.repository_show_lastest_log = self.conf[
+                    "RepositoryInfo"
+                ].getboolean("ShowLastestLog")
             except Exception:
                 pass
 
             try:
-                self.show_summary = self.conf["RepositoryInfo"].getboolean(
+                self.repository_show_summary = self.conf["RepositoryInfo"].getboolean(
                     "ShowSummary"
                 )
             except Exception:
@@ -552,11 +607,6 @@ class Config(object):
 
             try:
                 self.line_width = self.conf["Help"].getint("LineWidth")
-            except Exception:
-                pass
-
-            try:
-                self.use_recommend = self.conf["Help"].getboolean("UseRecommendation")
             except Exception:
                 pass
 
@@ -579,6 +629,7 @@ class Config(object):
 
 
 CONFIG = Config()
+# print(CONFIG.gitprocessor_interactive_color, CONFIG.gitprocessor_interactive_wait_time)
 
 
 def time_testing(fn):
@@ -632,11 +683,13 @@ class KeyEvent(object):
             self.fd = self.stream.fileno()
 
         def __enter__(self):
-            self.original_stty = termios.tcgetattr(self.stream)
+            # Get original fd descriptor.
+            self.original_descriptor = termios.tcgetattr(self.stream)
+            # Change the mode of the file descriptor fd to cbreak.
             tty.setcbreak(self.stream)
 
         def __exit__(self, type, value, traceback):
-            termios.tcsetattr(self.stream, termios.TCSANOW, self.original_stty)
+            termios.tcsetattr(self.stream, termios.TCSANOW, self.original_descriptor)
 
     class Nonblocking(object):
         """Set nonblocking mode for device"""
@@ -1057,19 +1110,19 @@ def echo(msg, color="", style="", nl=True):
     sys.stdout.flush()
 
 
-def okay(msg, nl=True):
+def okay_echo(msg, nl=True):
     """Print green information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.right_color), msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.okay_echo_color), msg, Fx.reset), nl=nl)
 
 
-def warn(msg, nl=True):
+def warn_echo(msg, nl=True):
     """Print yellow information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.warning_color), msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.warning_echo_color), msg, Fx.reset), nl=nl)
 
 
 def err_echo(msg, nl=True):
     """Print red information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.error_color), msg, Fx.reset), nl=nl)
+    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.error_echo_color), msg, Fx.reset), nl=nl)
 
 
 #####################################################################
@@ -1538,7 +1591,7 @@ class GitProcessor(object):
             if run_cmd(
                 GitProcessor.Git_Options["user"]["command"] + other + name
             ) and run_cmd(GitProcessor.Git_Options["email"]["command"] + other + email):
-                okay("Successfully set.")
+                okay_echo("Successfully set.")
             else:
                 err_echo("Failed. Please check log.")
 
@@ -1715,7 +1768,7 @@ class GitProcessor(object):
         # Index(i)
         "i": {
             "state": GitOptionSign.Func | GitOptionSign.No,
-            "command": InteractiveAdd().add_interactive,
+            "command": InteractiveAdd(use_color=CONFIG.gitprocessor_interactive_color,help_wait=CONFIG.gitprocessor_interactive_wait_time).add_interactive,
             "help-msg": "interactive operation git tree status.",
         },
         "ia": {
@@ -2175,7 +2228,9 @@ class GitProcessor(object):
         return color_command
 
     @classmethod
-    def process_command(cls, _command, args=None):
+    def process_command(
+        cls, _command, args=None, use_recommend=False, show_original=True
+    ):
         """Process command and arguments.
 
         Args:
@@ -2195,9 +2250,9 @@ class GitProcessor(object):
 
         if option is None:
             echo("Don't support this command, please try ", nl=False)
-            warn("g --show-commands")
+            warn_echo("g --show-commands")
 
-            if CONFIG.use_recommend:  # check config.
+            if use_recommend:  # check config.
                 predicted_command = cls.similar_command(
                     _command, cls.Git_Options.keys()
                 )
@@ -2233,8 +2288,9 @@ class GitProcessor(object):
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
-            echo("{}  ".format(Icon_Rainbow), nl=False)
-            echo(cls.color_command(command))
+            if show_original:
+                echo("{}  ".format(Icon_Rainbow), nl=False)
+                echo(cls.color_command(command))
             run_cmd(command)
         else:
             pass
@@ -2294,7 +2350,7 @@ class GitProcessor(object):
             echo(msg)
 
     @classmethod
-    def command_help_by_type(cls, command_type):
+    def command_help_by_type(cls, command_type, use_recommend=False):
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -2315,7 +2371,7 @@ class GitProcessor(object):
             echo(
                 "` to view the supported types.",
             )
-            if CONFIG.use_recommend:
+            if use_recommend:
                 predicted_type = cls.similar_command(command_type, cls.Types)
                 echo(
                     "%s The wanted type is %s ?"
@@ -2604,9 +2660,9 @@ class ShellCompletion(object):
                 run_cmd('echo "source %s" >> %s ' % (file_path, config_path))
             except Exception as e:
                 leave(EXIT_ERROR, "Inject error: {}".format(e))
-            okay("\nPlease run: source {}".format(config_path))
+            okay_echo("\nPlease run: source {}".format(config_path))
         else:
-            warn("This configuration already exists. {}".format(Icon_Sorry))
+            warn_echo("This configuration already exists. {}".format(Icon_Sorry))
 
     def complete_and_use(self):
         """Add completion prompt script."""
@@ -2621,7 +2677,7 @@ class ShellCompletion(object):
             file_path = self.write_completion(name, completion_src)
             self.inject_into_shell(file_path, config_path)
         else:
-            warn("Don't support completion of %s" % current_shell)
+            warn_echo("Don't support completion of %s" % current_shell)
 
 
 class GitignoreGenetor(object):
@@ -2682,7 +2738,7 @@ class GitignoreGenetor(object):
         return res
 
     @staticmethod
-    def get_ignore_from_url(url):
+    def get_ignore_from_url(url, timeout=60):
         """Crawl gitignore template.
 
         Args:
@@ -2696,7 +2752,6 @@ class GitignoreGenetor(object):
         """
 
         try:
-            timeout = CONFIG.timeout
             handle = urlopen(url, timeout=timeout)
         except Exception:
             err_echo("Failed to get content and will exit.")
@@ -2707,7 +2762,7 @@ class GitignoreGenetor(object):
         return content
 
     @classmethod
-    def create_gitignore(cls, genre):
+    def create_gitignore(cls, genre, timeout=60):
         """Try to create gitignore template file.
 
         Args:
@@ -2739,7 +2794,7 @@ class GitignoreGenetor(object):
                 "Will get ignore file content from %s"
                 % (Fx.italic + Fx.underline + target_url + Fx.reset)
             )
-            content = cls.get_ignore_from_url(target_url)
+            content = cls.get_ignore_from_url(target_url, timeout=timeout)
             ignore_content = cls.parse_gitignore_page(content)
 
             echo("Got content, trying to write ... ")
@@ -2784,7 +2839,13 @@ def git_local_config():
         err_echo("This directory is not a git repository yet.")
 
 
-def repository_info():
+def repository_info(
+    show_path=True,
+    show_remote=True,
+    show_branches=True,
+    show_lastest_log=True,
+    show_summary=True,
+):
     """Print some information of the repository.
 
     repository: `Repository_Path`
@@ -2796,55 +2857,53 @@ def repository_info():
     echo("waiting ...", nl=False)
 
     error_str = CommandColor.Red + "Error getting" + Fx.reset
-    # Get remote url.
-    try:
-        with open(Repository_Path + "/.git/config", "r") as cf:
-            config = cf.read()
-            res = re.findall(r"url\s=\s(.*)", config)
-            remote = "\n".join(
-                [
-                    "\t%s%s%s%s" % (Fx.italic, CommandColor.SkyBlue, x, Fx.reset)
-                    for x in res
-                ]
-            )
-    except Exception:
-        remote = error_str
 
-    # Get all branches.
-    err, res = exec_cmd("git branch --all --color")
-    if err:
-        branches = "\t" + error_str
-    else:
-        branches = textwrap.indent(res, "\t")
-
-    # Get the lastest log.
-    err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
-    if err:
-        git_log = "\t" + error_str
-    else:
-        # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
-        git_log = textwrap.indent(res, "\t")
-
-    # Get git summary.
-    err, res = exec_cmd("git shortlog --summary --numbered")
-    if err:
-        summary = "\t" + error_str
-    else:
-        summary = textwrap.indent(res, "\t")
-
+    # Print content.
     echo("\r[%s]        \n" % (Fx.b + "Repository Information" + Fx.reset,))
-    if CONFIG.show_path:
+    if show_path:
         echo(
             "Repository: \n\t%s\n"
             % (CommandColor.SkyBlue + Repository_Path + Fx.reset,)
         )
-    if CONFIG.show_remote:
+    # Get remote url.
+    if show_remote:
+        try:
+            with open(Repository_Path + "/.git/config", "r") as cf:
+                config = cf.read()
+                res = re.findall(r"url\s=\s(.*)", config)
+                remote = "\n".join(
+                    [
+                        "\t%s%s%s%s" % (Fx.italic, CommandColor.SkyBlue, x, Fx.reset)
+                        for x in res
+                    ]
+                )
+        except Exception:
+            remote = error_str
         echo("Remote: \n%s\n" % remote)
-    if CONFIG.show_branchs:
+    # Get all branches.
+    if show_branches:
+        err, res = exec_cmd("git branch --all --color")
+        if err:
+            branches = "\t" + error_str
+        else:
+            branches = textwrap.indent(res, "\t")
         echo("Branches: \n%s\n" % branches)
-    if CONFIG.show_lastest_log:
+    # Get the lastest log.
+    if show_lastest_log:
+        err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
+        if err:
+            git_log = "\t" + error_str
+        else:
+            # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
+            git_log = textwrap.indent(res, "\t")
         echo("Lastest log:\n%s\n" % git_log)
-    if CONFIG.show_summary:
+    # Get git summary.
+    if show_summary:
+        err, res = exec_cmd("git shortlog --summary --numbered")
+        if err:
+            summary = "\t" + error_str
+        else:
+            summary = textwrap.indent(res, "\t")
         echo("Summary:\n%s\n" % summary)
 
 
@@ -3132,7 +3191,6 @@ class CodeCounter(object):
             >>> CodeCounter.count('~/.config', use_ignore=True)
         """
 
-        use_ignore = CONFIG.use_gitignore
         if progress:
             import shutil
 
@@ -3239,7 +3297,7 @@ class CodeCounter(object):
             return _index - 1
 
     @classmethod
-    def format_print(cls, new, old=None):
+    def format_print(cls, new, old=None, result_format="simple"):
         """Print result with color and diff.
 
         If the console width is not enough, the output is simple.
@@ -3253,13 +3311,13 @@ class CodeCounter(object):
         import shutil
 
         width = shutil.get_terminal_size().columns
-        if CONFIG.result_format == "simple" or width < needed_width:
+        if result_format == "simple" or width < needed_width:
             for key, value in new.items():
                 line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
                 echo(line)
             return
 
-        elif CONFIG.result_format == "table":
+        elif result_format == "table":
             # Print full time.
             echo(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
             # Print title.
@@ -3337,16 +3395,21 @@ class CodeCounter(object):
 
     @classmethod
     def count_and_format_print(
-        cls, root_path=os.getcwd(), use_ignore=True, if_save=True
+        cls,
+        root_path=os.getcwd(),
+        use_ignore=True,
+        if_save=True,
+        show_invalid=False,
+        result_format="simple",
     ):
         result, invalid_list = cls.count(root_path, use_ignore)
         old_result = cls.recorded_result(root_path)
         # diff print.
-        cls.format_print(result, old_result)
+        cls.format_print(result, old_result, result_format)
         if if_save:
             cls.save_result(result, root_path)
         if (
-            CONFIG.show_invalid
+            show_invalid
             and invalid_list
             and confirm("Wether print invalid file list?[y/n]", default=False)
         ):
@@ -3361,7 +3424,7 @@ def introduce():
 
     # Print git version.
     if Git_Version is None:
-        warn("Don't found Git, maybe need install.")
+        warn_echo("Don't found Git, maybe need install.")
     else:
         echo(Git_Version)
 
@@ -3615,7 +3678,9 @@ def command_g(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.command_type:
-        GitProcessor.command_help_by_type(stdargs.command_type)
+        GitProcessor.command_help_by_type(
+            stdargs.command_type, use_recommend=CONFIG.gitprocessor_use_recommend
+        )
         raise SystemExit(0)
 
     if stdargs.types:
@@ -3624,14 +3689,18 @@ def command_g(custom_commands=None):
 
     if stdargs.config:
         git_local_config()
-        # raise SystemExit(0)
 
     if stdargs.information:
-        repository_info()
-        # raise SystemExit(0)
+        repository_info(
+            show_path=CONFIG.repository_show_path,
+            show_remote=CONFIG.repository_show_remote,
+            show_branches=CONFIG.repository_show_branchs,
+            show_lastest_log=CONFIG.repository_show_lastest_log,
+            show_summary=CONFIG.repository_show_summary,
+        )
 
     if stdargs.ignore_type:
-        GitignoreGenetor.create_gitignore(stdargs.ignore_type)
+        GitignoreGenetor.create_gitignore(stdargs.ignore_type, timeout=CONFIG.timeout)
         raise SystemExit(0)
 
     if stdargs.create_config:
@@ -3640,12 +3709,22 @@ def command_g(custom_commands=None):
 
     if stdargs.count:
         path = stdargs.count if stdargs.count != "." else os.getcwd()
-        CodeCounter.count_and_format_print(root_path=path)
+        CodeCounter.count_and_format_print(
+            root_path=path,
+            use_ignore=CONFIG.use_gitignore,
+            show_invalid=CONFIG.show_invalid,
+            result_format=CONFIG.result_format,
+        )
         raise SystemExit(0)
 
     if stdargs.command:
         command = stdargs.command
-        GitProcessor.process_command(command, stdargs.args)
+        GitProcessor.process_command(
+            command,
+            stdargs.args,
+            use_recommend=CONFIG.gitprocessor_use_recommend,
+            show_original=CONFIG.gitprocessor_show_original,
+        )
         raise SystemExit(0)
 
     if not list(filter(lambda x: x, vars(stdargs).values())):
