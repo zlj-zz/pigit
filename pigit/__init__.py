@@ -66,10 +66,6 @@ if PYTHON3:
     range = range
     B = lambda x: x.encode("iso8859-1")
 
-    import configparser
-
-    configparser = configparser
-
     import urllib.request
 
     urlopen = urllib.request.urlopen
@@ -77,10 +73,6 @@ else:
     input = raw_input
     range = xrange
     B = lambda x: x
-
-    import ConfigParser
-
-    configparser = ConfigParser
 
     import urllib2
 
@@ -1245,6 +1237,7 @@ class InteractiveAdd(object):
 
     def extra_occupied_rows(self, text, term_width):
         """Gets the number of additional lines occupied by a line of text in terminal.
+        Used by `show_diff`.
 
         Args:
             text (str): text string.
@@ -1303,7 +1296,7 @@ class InteractiveAdd(object):
                         print(line)
                     extra += self.extra_occupied_rows(Fx.uncolor(line), width)
 
-            # TODO(zachary): bug -- scroll with flash.
+            # TODO(zachary): sometime bug -- scroll with flash.
             input_key = KeyEvent.sync_get_input()
             if input_key in ["q", "escape"]:
                 # exit.
@@ -3154,7 +3147,6 @@ class CodeCounter(object):
             (str): file type.
         """
 
-        # TODO(zachary): I think can improve this.
         pre_type = cls.Special_Names.get(file.lower(), None)
         if pre_type:
             return pre_type
