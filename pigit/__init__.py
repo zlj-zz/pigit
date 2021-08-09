@@ -1103,7 +1103,7 @@ class InteractiveAdd(object):
             self.cursor = "→"
             print("The cursor symbol entered is not supported.")
         self.help_wait = help_wait
-        self._min_height = 5
+        self._min_height = 8
         self._min_width = 60
 
     def get_terminal_size(self, fallback=(80, 24)):
@@ -1303,6 +1303,7 @@ class InteractiveAdd(object):
                         print(line)
                     extra += self.extra_occupied_rows(Fx.uncolor(line), width)
 
+            # TODO(zachary): bug -- scroll with flash.
             input_key = KeyEvent.sync_get_input()
             if input_key in ["q", "escape"]:
                 # exit.
@@ -1351,6 +1352,19 @@ class InteractiveAdd(object):
                     time.sleep(self.help_wait)
             else:
                 continue
+
+    def discard_changed(self, file):
+        """Discard file all changed.
+
+        Args:
+            file (File): file object.
+        """
+        echo(Fx.clear_)
+        if confirm("discard all changed? [y/n]:"):
+            if file.tracked:
+                run_cmd("git checkout -- {}".format(file.name))
+            else:
+                os.remove(os.path.join(Repository_Path, file.name))
 
     def add_interactive(self, *args):
         """Interactive main method."""
@@ -1410,6 +1424,23 @@ class InteractiveAdd(object):
                 elif input_key in ["a", " "]:
                     self.process_file(file_items[cursor_row - 1])
                     file_items = self.get_status(width)
+                elif input_key == "d":
+                    self.discard_changed(file_items[cursor_row - 1])
+                    file_items = self.get_status(width)
+                elif input_key == "e":
+                    editor = os.environ.get("EDITOR", None)
+                    if editor:
+                        run_cmd(
+                            '{} "{}"'.format(
+                                editor,
+                                os.path.join(
+                                    Repository_Path, file_items[cursor_row - 1].name
+                                ),
+                            )
+                        )
+                        file_items = self.get_status(width)
+                    else:
+                        pass
                 elif input_key == "enter":
                     self.show_diff(file_items[cursor_row - 1])
                 elif input_key == "windows resize":
@@ -1431,6 +1462,8 @@ class InteractiveAdd(object):
                             "k / ↑: select previous file.\n"
                             "j / ↓: select next file.\n"
                             "a / space: toggle storage or unstorage file.\n"
+                            "d: discard the file changed.\n"
+                            "e: open file with default editor.\n"
                             "↲ : check file diff.\n"
                             "? : show help, wait {}s and exit.\n"
                         ).format(self.help_wait)
@@ -3410,7 +3443,7 @@ def introduce():
 
     # Print git version.
     if Git_Version is None:
-        warn_echo("Don't found Git, maybe need install.")
+        echo("Don't found Git, maybe need install.")
     else:
         echo(Git_Version)
 
@@ -3422,7 +3455,7 @@ def introduce():
     echo(
         (
             "  Terminal tool, help you use git more simple."
-            " Support Linux and MacOS.\n"
+            " Support Linux and MacOS. Partial support for windows.\n"
             "  It use short command to replace the original command, like: \n"
             "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
             "  Also you use `g -s` to get the all short command, have fun"
