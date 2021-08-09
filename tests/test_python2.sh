@@ -4,30 +4,30 @@ echo $(pwd)
 PY2=$(whereis python2)
 echo ${PY2}
 
-Project=pigit
+Project=tests
 
-${PY2} ${Project}/__init__.py
+${PY2} ${Project}/run.py
 Sleep 2
-${PY2} ${Project}/__init__.py -h
+${PY2} ${Project}/run.py -h
 Sleep 2
-${PY2} ${Project}/__init__.py -v
+${PY2} ${Project}/run.py -v
 Sleep 2
-${PY2} ${Project}/__init__.py -s
+${PY2} ${Project}/run.py -s
 Sleep 2
-${PY2} ${Project}/__init__.py -t
+${PY2} ${Project}/run.py -t
 Sleep 2
-${PY2} ${Project}/__init__.py -S Branch
+${PY2} ${Project}/run.py -S Branch
 Sleep 2
-${PY2} ${Project}/__init__.py -f
+${PY2} ${Project}/run.py -f
 Sleep 2
-${PY2} ${Project}/__init__.py -i
+${PY2} ${Project}/run.py -i
 Sleep 2
-${PY2} ${Project}/__init__.py ws
+${PY2} ${Project}/run.py ws
 Sleep 2
-${PY2} ${Project}/__init__.py wS
+${PY2} ${Project}/run.py wS
 Sleep 2
-${PY2} ${Project}/__init__.py --count
+${PY2} ${Project}/run.py --count
 Sleep 2
-${PY2} ${Project}/__init__.py --create-ignore python
+${PY2} ${Project}/run.py --create-ignore python
 cat ./.gitignore
 git checkout -- .gitignore

@@ -1106,6 +1106,18 @@ class InteractiveAdd(object):
         self._min_height = 5
         self._min_width = 60
 
+    def get_terminal_size(self, fallback=(80, 24)):
+        try:
+            width, height = os.get_terminal_size()
+        except AttributeError:
+            try:
+                width = int(os.environ["COLUMNS"])
+                height = int(os.environ["LINES"])
+            except (KeyError, ValueError):
+                width, height = fallback
+
+        return width, height
+
     def get_status(self, max_width, ident=2):
         """Get the file tree status of GIT for processing and encapsulation.
 
@@ -1257,9 +1269,7 @@ class InteractiveAdd(object):
             TermError: terminal size not enough.
         """
 
-        import shutil
-
-        width, height = shutil.get_terminal_size()
+        width, height = self.get_terminal_size()
 
         # Initialize.
         cursor_row = 1
@@ -1315,7 +1325,7 @@ class InteractiveAdd(object):
                 cursor_row = cursor_row if cursor_row > 1 else 1
             elif input_key == "windows resize":
                 # get new term height.
-                new_width, new_height = shutil.get_terminal_size()
+                new_width, new_height = self.get_terminal_size()
                 if new_height < self._min_height or new_width < self._min_width:
                     raise TermError("The minimum size of terminal should be 60 x 5.")
                 # get size diff, reassign.
@@ -1349,9 +1359,7 @@ class InteractiveAdd(object):
         if not TERM_CONTROL:
             raise TermError("This behavior is not supported in the current system.")
 
-        import shutil
-
-        width, height = shutil.get_terminal_size()
+        width, height = self.get_terminal_size()
         if height < self._min_height or width < self._min_width:
             raise TermError("The minimum size of terminal should be 60 x 5.")
 
@@ -1406,7 +1414,7 @@ class InteractiveAdd(object):
                     self.show_diff(file_items[cursor_row - 1])
                 elif input_key == "windows resize":
                     # get new term height.
-                    new_width, new_height = shutil.get_terminal_size()
+                    new_width, new_height = self.get_terminal_size()
                     if new_height < self._min_height or new_width < self._min_width:
                         raise TermError(
                             "The minimum size of terminal should be 60 x 5."
@@ -3156,9 +3164,15 @@ class CodeCounter(object):
         """
 
         if progress:
-            import shutil
+            try:
+                import shutil
 
-            width = shutil.get_terminal_size().columns
+                width = shutil.get_terminal_size().columns
+            except:
+                try:
+                    width = int(os.environ["COLUMNS"])
+                except (KeyError, ValueError):
+                    width = 80
             if width > 55:
                 _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
             else:
@@ -3272,9 +3286,15 @@ class CodeCounter(object):
         """
 
         needed_width = 67
-        import shutil
+        try:
+            import shutil
 
-        width = shutil.get_terminal_size().columns
+            width = shutil.get_terminal_size().columns
+        except:
+            try:
+                width = int(os.environ["COLUMNS"])
+            except (KeyError, ValueError):
+                width = 80
         if result_format == "simple" or width < needed_width:
             for key, value in new.items():
                 line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
@@ -3354,8 +3374,10 @@ class CodeCounter(object):
             echo(" Total: {}".format(sum))
             if additions > 0 or deletions > 0:
                 echo(" Altered: ", nl=False)
-                echo("+" * ceil(additions / 10), color=CommandColor.Green, nl=False)
-                echo("-" * ceil(deletions / 10), color=CommandColor.Red)
+                echo(
+                    "+" * int(ceil(additions / 10)), color=CommandColor.Green, nl=False
+                )
+                echo("-" * int(ceil(deletions / 10)), color=CommandColor.Red)
 
     @classmethod
     def count_and_format_print(
@@ -3429,9 +3451,16 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
     ):
         width = CONFIG.help_max_line_width
-        import shutil
+        try:
+            import shutil
 
-        max_width = shutil.get_terminal_size().columns
+            max_width = shutil.get_terminal_size().columns
+        except:
+            try:
+                max_width = int(os.environ["COLUMNS"])
+            except (KeyError, ValueError):
+                max_width = 90
+
         width = width if width < max_width else max_width - 2
         super(CustomHelpFormatter, self).__init__(
             prog, indent_increment, max_help_position, width
@@ -3507,7 +3536,10 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         return self._join_parts(parts)
 
     def _fill_text(self, text, width, indent):
-        return "".join(indent + line for line in text.splitlines(keepends=True))
+        try:
+            return "".join(indent + line for line in text.splitlines(keepends=True))
+        except TypeError:
+            return "".join(indent + line for line in text.splitlines())
 
     def _get_help_string(self, action):
         help = action.help
