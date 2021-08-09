@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.0.6"
+__version__ = "1.0.7.bate.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -50,6 +50,7 @@ import random
 import json
 from math import sqrt, ceil
 from functools import wraps
+from distutils.util import strtobool
 from collections import Counter
 
 from .model import File
@@ -385,98 +386,96 @@ Repository_Path = current_repository()
 IS_Git_Repository = True if Repository_Path else False
 
 
+class ConfigError(Exception):
+    """Config error. Using by `Config`."""
+
+    pass
+
+
 class Config(object):
-    """Configuration class.
-
-    Attributes:
-        Conf_Path (str): configuration path.
-        Conf_Template (str): configuration template.
-
-    Functions:
-        create_config_template (classmethod): create a config file use path.
-    """
-
-    Conf_Path = TOOLS_HOME + "/config.cfg"
-
-    Conf_Template = textwrap.dedent(
-        """\
-        # Git-tools configuration.
-        # Configuration language which provides a structure similar to what’s found in Microsoft Windows INI files.
-        # For Boolean value setting, please fill in `yes` or `no`.
-
+    Conf_Path = TOOLS_HOME + "/pigit.conf"
+    Config_Template = textwrap.dedent(
+        """
+        #? Config file for pigit v. {version}
+        # Git-tools -- pigit configuration.
 
         # Color settings for informational messages.
         # Only complete RGB values are accepted, such as: #FF0000
-        [Color]
-        RightColor = #98FB98
-        WarningColor = #FFD700
-        ErrorColor = #FF6347
+        okay_echo_color={okay_echo_color}
+        warning_echo_color={warning_echo_color}
+        error_echo_color={error_echo_color}
 
-        [Git]
         # Show original git command.
-        ShowOriginal = yes
+        gitprocessor_show_original={gitprocessor_show_original}
 
         # Is it recommended to correct when entering wrong commands.
-        UseRecommendation = yes
+        gitprocessor_use_recommend={gitprocessor_use_recommend}
 
         # Whether color is enabled in interactive mode.
-        InteractiveColor = yes
+        gitprocessor_interactive_color={gitprocessor_interactive_color}
 
         # Display time of help information in interactive mode, 0 is permanent.
-        InteractiveHelpShowTime = 2
+        gitprocessor_interactive_help_showtime={gitprocessor_interactive_help_showtime}
 
 
-        [CodeCounter]
         # Whether to use the ignore configuration of the `.gitignore` file.
-        UseGitignore = yes
+        codecounter_use_gitignore={codecounter_use_gitignore}
 
         # Wether show files that cannot be counted.
-        ShowInvalid = no
+        codecounter_show_invalid={codecounter_show_invalid}
 
         # Output format of statistical results.
         # Supported: [table, simple]
         # When the command line width is not enough, the `simple ` format is forced.
-        ResultFormat = table
+        codecounter_result_format={codecounter_result_format}
 
 
-        [GitignoreGenerator]
-        # Timeout for getting `.gitignore` template.
-        Timeout = 60
+        # Timeout for getting `.gitignore` template from net.
+        gitignore_generator_timeout={gitignore_generator_timeout}
 
 
-        [RepositoryInfo]
-        ShowPath = yes
-        ShowRemote = yes
-        ShowBranchs = yes
-        ShowLastestLog = yes
-        ShowSummary = no
+        # Control which parts need to be displayed when viewing git repository information.
+        repository_show_path={repository_show_path}
+        repository_show_remote={repository_show_remote}
+        repository_show_branchs={repository_show_branchs}
+        repository_show_lastest_log={repository_show_lastest_log}
+        repository_show_summary={repository_show_summary}
 
+        # Wether with color when use `-h` get help message.
+        help_use_color={help_use_color}
 
-        [Help]
-        UseColor = yes
-        LineWidth = 90
+        # The max line width when use `-h` get help message.
+        help_max_line_width={help_max_line_width}
         """
     )
 
-    ##########################################
-    # Default values for configuration.
-    ##########################################
-
+    # yapf: disable
+    keys = [
+        'okay_echo_color', 'warning_echo_color', 'error_echo_color',
+        'gitprocessor_show_original', 'gitprocessor_use_recommend',
+        'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
+        'codecounter_use_gitignore', 'codecounter_show_invalid', 'codecounter_result_format',
+        'gitignore_generator_timeout',
+        'repository_show_path','repository_show_remote', 'repository_show_branchs',
+        'repository_show_lastest_log','repository_show_summary',
+        'help_use_color', 'help_max_line_width'
+    ]
+    # yapf: enable
     okay_echo_color = "#98FB98"  # PaleGreen
     warning_echo_color = "#FFD700"  # Gold
     error_echo_color = "#FF6347"  # Tomato
 
-    gitprocessor_show_original = False
-    gitprocessor_use_recommend = False
+    gitprocessor_show_original = True
+    gitprocessor_use_recommend = True
     gitprocessor_interactive_color = True
-    gitprocessor_interactive_wait_time = 1.5
+    gitprocessor_interactive_help_showtime = 1.5
 
-    use_gitignore = True
-    show_invalid = False
-    result_format = "simple"  # table, simple
+    codecounter_use_gitignore = True
+    codecounter_show_invalid = False
+    codecounter_result_format = "table"  # table, simple
     _supported_result_format = ["table", "simple"]
 
-    timeout = 60
+    gitignore_generator_timeout = 60
 
     repository_show_path = True
     repository_show_remote = True
@@ -484,131 +483,87 @@ class Config(object):
     repository_show_lastest_log = True
     repository_show_summary = False
 
-    use_color = True
-    line_width = 90
+    help_use_color = True
+    help_max_line_width = 90
 
-    def __init__(self):
+    # Store warning messages.
+    warnings = []
+
+    def __init__(self, path=None):
         super(Config, self).__init__()
-        self.conf = configparser.ConfigParser(allow_no_value=True)
-        self.conf.read(self.Conf_Path)
-        sections = self.conf.sections()
+        if not path:
+            self.config_path = self.Conf_Path
+        else:
+            self.config_path = path
+        conf = self.load_config()
+        # from pprint import pprint
 
-        if "Color" in sections:
-            okay_echo_color = self.okay_echo_color = self.conf["Color"].get(
-                "RightColor"
+        # print(len(conf))
+        # pprint(conf)
+        for key in self.keys:
+            if key in conf.keys() and conf[key] != "==error==":
+                setattr(self, key, conf[key])
+
+    def load_config(self):
+        new_config = {}
+        config_file = self.config_path
+        try:
+            with open(config_file) as cf:
+                for line in cf:
+                    line = line.strip()
+                    if line.startswith("#? Config"):
+                        new_config["version"] = line[line.find("v. ") + 3 :]
+                        continue
+                    if line.startswith("#"):
+                        # comment line.
+                        continue
+                    if not "=" in line:
+                        # invalid line.
+                        continue
+                    key, line = line.split("=", maxsplit=1)
+                    key = key.strip()
+                    line = line.strip().strip('"')
+                    if not key in self.keys:
+                        continue
+                    if type(getattr(self, key)) == int:
+                        try:
+                            new_config[key] = int(line)
+                        except ValueError:
+                            self.warnings.append(
+                                'Config key "{}" should be an integer!'.format(key)
+                            )
+                    if type(getattr(self, key)) == bool:
+                        try:
+                            new_config[key] = bool(strtobool(line))
+                        except ValueError:
+                            self.warnings.append(
+                                'Config key "{}" can only be True or False!'.format(key)
+                            )
+                    if type(getattr(self, key)) == str:
+                        if "color" in key and not self.is_color(line):
+                            self.warnings.append(
+                                'Config key "{}" should be RGB, like: #FF0000'.format(
+                                    key
+                                )
+                            )
+                            continue
+                        new_config[key] = str(line)
+        except Exception as e:
+            Log.error(str(e))
+
+        if (
+            "codecounter_result_format" in new_config
+            and new_config["codecounter_result_format"]
+            not in self._supported_result_format
+        ):
+            new_config["codecounter_result_format"] = "==error=="
+            self.warnings.append(
+                'Config key "{}" support must in {}'.format(
+                    "codecounter_result_format", self._supported_result_format
+                )
             )
-            if self.is_color(okay_echo_color):
-                self.okay_echo_color = okay_echo_color
 
-            warning_echo_color = self.warning_echo_color = self.conf["Color"].get(
-                "WarningColor"
-            )
-            if self.is_color(warning_echo_color):
-                self.warning_echo_color = warning_echo_color
-
-            error_echo_color = self.error_echo_color = self.conf["Color"].get(
-                "ErrorColor"
-            )
-            if self.is_color(error_echo_color):
-                self.error_echo_color = error_echo_color
-
-        if "Git" in sections:
-            try:
-                self.gitprocessor_show_original = self.conf["Git"].getboolean(
-                    "ShowOriginal"
-                )
-            except Exception:
-                pass
-
-            try:
-                self.gitprocessor_use_recommend = self.conf["Git"].getboolean(
-                    "UseRecommendation"
-                )
-            except Exception:
-                pass
-
-            try:
-                self.gitprocessor_interactive_color = self.conf["Git"].getboolean(
-                    "InteractiveColor"
-                )
-            except Exception:
-                pass
-
-            try:
-                self.gitprocessor_interactive_wait_time = self.conf["Git"].getint(
-                    "InteractiveHelpShowTime"
-                )
-            except Exception:
-                pass
-
-        if "CodeCounter" in sections:
-            try:
-                self.use_gitignore = self.conf["CodeCounter"].getboolean("UseGitignore")
-            except Exception:
-                pass
-
-            try:
-                self.show_invalid = self.conf["CodeCounter"].getboolean("ShowInvalid")
-            except Exception:
-                pass
-
-            result_format = self.conf["CodeCounter"].get("ResultFormat")
-            if result_format and result_format in self._supported_result_format:
-                self.result_format = result_format
-
-        if "GitignoreGenerator" in sections:
-            try:
-                self.timeout = self.conf["GitignoreGenerator"].getint("Timeout")
-            except Exception:
-                pass
-
-        if "RepositoryInfo" in sections:
-            try:
-                self.repository_show_path = self.conf["RepositoryInfo"].getboolean(
-                    "ShowPath"
-                )
-            except Exception:
-                pass
-
-            try:
-                self.repository_show_remote = self.conf["RepositoryInfo"].getboolean(
-                    "ShowRemote"
-                )
-            except Exception:
-                pass
-
-            try:
-                # TODO: bug.
-                self.repository_show_branchs = self.conf["RepositoryInfo"].getboolean(
-                    "ShowBranchs"
-                )
-            except Exception:
-                pass
-
-            try:
-                self.repository_show_lastest_log = self.conf[
-                    "RepositoryInfo"
-                ].getboolean("ShowLastestLog")
-            except Exception:
-                pass
-
-            try:
-                self.repository_show_summary = self.conf["RepositoryInfo"].getboolean(
-                    "ShowSummary"
-                )
-            except Exception:
-                pass
-
-        if "Help" in sections:
-            try:
-                self.use_color = self.conf["Help"].getboolean("UseColor")
-            except Exception:
-                pass
-
-            try:
-                self.line_width = self.conf["Help"].getint("LineWidth")
-            except Exception:
-                pass
+        return new_config
 
     def is_color(self, v):
         return v and v.startswith("#") and len(v) == 7
@@ -621,34 +576,40 @@ class Config(object):
         ):
             return
         try:
-            with open(cls.Conf_Path, "w") as f:
-                f.write(cls.Conf_Template)
+            with open(
+                cls.Conf_Path, "w" if os.path.isfile(cls.Conf_Path) else "x"
+            ) as f:
+                f.write(cls.Config_Template.format(version=__version__, **vars(cls)))
             print("Successful.")
-        except Exception:
+        except Exception as e:
+            # print(str(e))
             print("Failed, create config.")
 
 
 CONFIG = Config()
-# print(CONFIG.gitprocessor_interactive_color, CONFIG.gitprocessor_interactive_wait_time)
+if CONFIG.warnings:
+    for warning in CONFIG.warnings:
+        print(warning)
+    CONFIG.warnings = []
 
 
-def time_testing(fn):
+def time_it(fn):
     """Print the overall running time.
     When recursive calls exist, only the outermost layer is printed.
     """
-    time_testing.deep = 0
+    time_it.deep = 0
 
     @wraps(fn)
     def wrap_(*args, **kwargs):
-        time_testing.deep += 1
+        time_it.deep += 1
         start_time = time.time()
         res = None
         try:
             res = fn(*args, **kwargs)
         except SystemExit:
             pass
-        time_testing.deep -= 1
-        if time_testing.deep == 0:
+        time_it.deep -= 1
+        if time_it.deep == 0:
             print("\nruntime: %fs" % (time.time() - start_time))
         return res
 
@@ -1768,7 +1729,10 @@ class GitProcessor(object):
         # Index(i)
         "i": {
             "state": GitOptionSign.Func | GitOptionSign.No,
-            "command": InteractiveAdd(use_color=CONFIG.gitprocessor_interactive_color,help_wait=CONFIG.gitprocessor_interactive_wait_time).add_interactive,
+            "command": InteractiveAdd(
+                use_color=CONFIG.gitprocessor_interactive_color,
+                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+            ).add_interactive,
             "help-msg": "interactive operation git tree status.",
         },
         "ia": {
@@ -3464,7 +3428,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
     def __init__(
         self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
     ):
-        width = CONFIG.line_width
+        width = CONFIG.help_max_line_width
         import shutil
 
         max_width = shutil.get_terminal_size().columns
@@ -3510,7 +3474,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
         # collect the pieces of the action help
         # @Overwrite
-        if CONFIG.use_color:
+        if CONFIG.help_use_color:
             while True:
                 _index = random.randint(0, self.color_len - 1)
                 if _index == self._old_color:
@@ -3556,7 +3520,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         return help
 
 
-@time_testing
+@time_it
 def command_g(custom_commands=None):
     try:
         signal.signal(signal.SIGINT, leave)
@@ -3700,7 +3664,9 @@ def command_g(custom_commands=None):
         )
 
     if stdargs.ignore_type:
-        GitignoreGenetor.create_gitignore(stdargs.ignore_type, timeout=CONFIG.timeout)
+        GitignoreGenetor.create_gitignore(
+            stdargs.ignore_type, timeout=CONFIG.gitignore_generator_timeout
+        )
         raise SystemExit(0)
 
     if stdargs.create_config:
@@ -3711,9 +3677,9 @@ def command_g(custom_commands=None):
         path = stdargs.count if stdargs.count != "." else os.getcwd()
         CodeCounter.count_and_format_print(
             root_path=path,
-            use_ignore=CONFIG.use_gitignore,
-            show_invalid=CONFIG.show_invalid,
-            result_format=CONFIG.result_format,
+            use_ignore=CONFIG.codecounter_use_gitignore,
+            show_invalid=CONFIG.codecounter_show_invalid,
+            result_format=CONFIG.codecounter_result_format,
         )
         raise SystemExit(0)
 

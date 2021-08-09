@@ -25,6 +25,7 @@
 		"pytest",
 		"rmvb",
 		"setcbreak",
+		"strtobool",
 		"svgz",
 		"tcgetattr",
 		"tcsetattr",
