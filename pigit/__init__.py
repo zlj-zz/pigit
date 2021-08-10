@@ -40,7 +40,6 @@ __copyright__ = "Copyright (c) 2021 Zachary"
 import os
 import re
 import sys
-import stat
 import signal
 import argparse
 import logging
@@ -48,12 +47,11 @@ import logging.handlers
 import textwrap
 import time
 import random
-import json
 from math import sqrt, ceil
 from distutils.util import strtobool
 from collections import Counter
 
-from .compat import input, B, urlopen, get_terminal_size
+from .compat import input, B, get_terminal_size
 from .utils import run_cmd, exec_cmd, confirm
 from .str_utils import get_width, shorten
 from .common import Color, Fx
@@ -61,6 +59,7 @@ from .model import File
 from .decorator import time_it
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
+from .gitignore import GitignoreGenetor
 
 
 #####################################################################
@@ -72,14 +71,11 @@ from .shell_completion import ShellCompletion, process_argparse
 IS_WIN = sys.platform.lower().startswith("win")
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
-    TOOLS_HOME = os.path.join(USER_HOME, __project__)
+    PIGIT_HOME = os.path.join(USER_HOME, __project__)
 else:
     USER_HOME = os.environ["HOME"]
-    TOOLS_HOME = os.path.join(USER_HOME, ".config", __project__)
+    PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-# For windows print color.
-if os.name == "nt":
-    os.system("")
 
 # For encoding.
 Icon_Supported_Encoding = ["utf-8"]
@@ -212,7 +208,7 @@ def leave(code, *args):
 
     if code == EXIT_ERROR:
         Log.error(args)
-        print("Please check {}".format(TOOLS_HOME))
+        print("Please check {}".format(PIGIT_HOME))
 
     raise SystemExit(0)
 
@@ -260,7 +256,7 @@ class ConfigError(Exception):
 
 
 class Config(object):
-    Conf_Path = TOOLS_HOME + "/pigit.conf"
+    Conf_Path = PIGIT_HOME + "/pigit.conf"
     Config_Template = textwrap.dedent(
         """
         #? Config file for pigit v. {version}
@@ -440,7 +436,7 @@ class Config(object):
 
     @classmethod
     def create_config_template(cls):
-        ensure_path(TOOLS_HOME)
+        ensure_path(PIGIT_HOME)
         if os.path.exists(cls.Conf_Path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
@@ -1997,138 +1993,6 @@ class GitProcessor(object):
 
 
 #####################################################################
-# Completion and Create gitignore.                                  #
-#####################################################################
-class GitignoreGenetor(object):
-    """Generate gitignore template.
-
-    Attributes:
-        Genres (dict): supported type.
-
-    Raises:
-        SystemExit: Can't get template.
-        SystemExit: No name.
-    """
-
-    # Supported type.
-    Supported_Types = {
-        "android": "Android",
-        "c++": "C++",
-        "cpp": "C++",
-        "c": "C",
-        "dart": "Dart",
-        "elisp": "Elisp",
-        "gitbook": "GitBook",
-        "go": "Go",
-        "java": "Java",
-        "kotlin": "Java",
-        "lua": "Lua",
-        "maven": "Maven",
-        "node": "Node",
-        "python": "Python",
-        "qt": "Qt",
-        "r": "R",
-        "ros": "ROS",
-        "ruby": "Ruby",
-        "rust": "Rust",
-        "sass": "Sass",
-        "swift": "Swift",
-        "unity": "Unity",
-    }
-
-    @staticmethod
-    def parse_gitignore_page(content):
-        """Parse html for getting gitignore content.
-
-        Args:
-            content (str): template page html.
-
-        Returns:
-            (str): gitignore template content.
-        """
-
-        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
-        if not text:
-            return ""
-
-        content_re = re.compile(r"<\/?\w+.*?>", re.S)
-        res = content_re.sub("", text[0])
-        res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
-        return res
-
-    @staticmethod
-    def get_ignore_from_url(url, timeout=60):
-        """Crawl gitignore template.
-
-        Args:
-            url (str): gitignore template url.
-
-        Raises:
-            SystemExit: Failed to get web page.
-
-        Returns:
-            (str): html string.
-        """
-
-        try:
-            handle = urlopen(url, timeout=timeout)
-        except Exception:
-            err_echo("Failed to get content and will exit.")
-            raise SystemExit(0)
-
-        content = handle.read().decode("utf-8")
-
-        return content
-
-    @classmethod
-    def create_gitignore(cls, genre, timeout=60):
-        """Try to create gitignore template file.
-
-        Args:
-            genre (str): template type, like: 'python'.
-        """
-
-        name = cls.Supported_Types.get(genre.lower(), None)
-        if name is None:
-            err_echo("Unsupported type: %s" % genre)
-            echo(
-                "Supported type: %s.  Case insensitive."
-                % " ".join(cls.Supported_Types.keys())
-            )
-            raise SystemExit(0)
-
-        ignore_path = Repository_Path + "/.gitignore"
-        whether_write = True
-        if os.path.exists(ignore_path):
-            echo(
-                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
-                nl=False,
-            )
-            whether_write = confirm()
-        if whether_write:
-            base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-
-            target_url = base_url % name
-            echo(
-                "Will get ignore file content from %s"
-                % (Fx.italic + Fx.underline + target_url + Fx.reset)
-            )
-            content = cls.get_ignore_from_url(target_url, timeout=timeout)
-            ignore_content = cls.parse_gitignore_page(content)
-
-            echo("Got content, trying to write ... ")
-            try:
-                with open(ignore_path, "w") as f:
-                    f.write(ignore_content)
-                echo("Write gitignore file successful. {}".format(Icon_Smiler))
-            except Exception:
-                err_echo("Write gitignore file failed.")
-                echo("You can replace it with the following:")
-                echo("#" * 60)
-                echo(ignore_content)
-
-
-#####################################################################
 # Implementation of additional functions.                           #
 #####################################################################
 def git_local_config():
@@ -2475,7 +2339,7 @@ def command_g(custom_commands=None):
         debug=stdargs.debug,
         log_file=None
         if stdargs.out_log
-        else TOOLS_HOME + "/log/{}.log".format(__project__),
+        else PIGIT_HOME + "/log/{}.log".format(__project__),
     )
 
     if stdargs.complete:
@@ -2483,7 +2347,7 @@ def command_g(custom_commands=None):
             key: value["help-msg"] for key, value in GitProcessor.Git_Options.items()
         }
         completion_vars.update(process_argparse(args))
-        ShellCompletion(completion_vars, TOOLS_HOME).complete_and_use()
+        ShellCompletion(completion_vars, PIGIT_HOME).complete_and_use()
         raise SystemExit(0)
 
     if stdargs.show_commands:
@@ -2513,8 +2377,10 @@ def command_g(custom_commands=None):
         )
 
     if stdargs.ignore_type:
-        GitignoreGenetor.create_gitignore(
-            stdargs.ignore_type, timeout=CONFIG.gitignore_generator_timeout
+        GitignoreGenetor().create_gitignore(
+            stdargs.ignore_type,
+            dir_path=Repository_Path,
+            timeout=CONFIG.gitignore_generator_timeout,
         )
         raise SystemExit(0)
 
@@ -2527,7 +2393,7 @@ def command_g(custom_commands=None):
         CodeCounter(
             count_path=path,
             use_ignore=CONFIG.codecounter_use_gitignore,
-            result_saved_path=TOOLS_HOME + "/Counter",
+            result_saved_path=PIGIT_HOME + "/Counter",
             result_format=CONFIG.codecounter_result_format,
         ).count_and_format_print(
             show_invalid=CONFIG.codecounter_show_invalid,
