@@ -22,6 +22,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from __future__ import print_function, division, absolute_import
+
 
 __project__ = "pigit"
 __version__ = "1.0.7.bate.1"
@@ -69,6 +71,36 @@ if PYTHON3:
     import urllib.request
 
     urlopen = urllib.request.urlopen
+
+    def get_terminal_size(fallback=(80, 24)):
+        # fork from shutil.get_terminal_size()
+        # columns, lines are the working values
+        try:
+            columns = int(os.environ["COLUMNS"])
+        except (KeyError, ValueError):
+            columns = 0
+
+        try:
+            lines = int(os.environ["LINES"])
+        except (KeyError, ValueError):
+            lines = 0
+
+        # only query if necessary
+        if columns <= 0 or lines <= 0:
+            try:
+                size = os.get_terminal_size(sys.__stdout__.fileno())
+            except (AttributeError, ValueError, OSError):
+                # stdout is None, closed, detached, or not a terminal, or
+                # os.get_terminal_size() is unsupported
+                size = fallback
+            if columns <= 0:
+                columns = size[0]
+            if lines <= 0:
+                lines = size[1]
+
+        return columns, lines
+
+
 else:
     input = raw_input
     range = xrange
@@ -77,6 +109,34 @@ else:
     import urllib2
 
     urlopen = urllib2.urlopen
+
+    def get_terminal_size(fallback=(80, 24)):
+        # reason: python2 not support get_terminal_size().
+        # columns, lines are the working values
+        try:
+            columns = int(os.environ["COLUMNS"])
+        except (KeyError, ValueError):
+            columns = 0
+
+        try:
+            lines = int(os.environ["LINES"])
+        except (KeyError, ValueError):
+            lines = 0
+
+        # only query if necessary
+        if columns <= 0 or lines <= 0:
+            try:
+                size = subprocess.check_output(["stty", "size"]).split()
+                size = [int(i) for i in size[::-1]]
+            except (AttributeError, ValueError, OSError):
+                size = fallback
+            if columns <= 0:
+                columns = size[0]
+            if lines <= 0:
+                lines = size[1]
+
+        return columns, lines
+
 
 # For windows.
 IS_WIN = sys.platform.lower().startswith("win")
@@ -526,6 +586,9 @@ class Config(object):
                             )
                     if type(getattr(self, key)) == bool:
                         try:
+                            # True values are y, yes, t, true, on and 1;
+                            # false values are n, no, f, false, off and 0.
+                            # Raises ValueError if val is anything else.
                             new_config[key] = bool(strtobool(line))
                         except ValueError:
                             self.warnings.append(
@@ -1084,7 +1147,7 @@ def err_echo(msg, nl=True):
 class InteractiveAdd(object):
     """Interactive operation git tree status."""
 
-    def __init__(self, use_color=True, cursor=None, help_wait=1.5):
+    def __init__(self, use_color=True, cursor=None, help_wait=1.5, debug=False):
         super(InteractiveAdd, self).__init__()
         self.use_color = use_color
         if not cursor:
@@ -1097,18 +1160,7 @@ class InteractiveAdd(object):
         self.help_wait = help_wait
         self._min_height = 8
         self._min_width = 60
-
-    def get_terminal_size(self, fallback=(80, 24)):
-        try:
-            width, height = os.get_terminal_size()
-        except AttributeError:
-            try:
-                width = int(os.environ["COLUMNS"])
-                height = int(os.environ["LINES"])
-            except (KeyError, ValueError):
-                width, height = fallback
-
-        return width, height
+        self._debug = debug
 
     def get_status(self, max_width, ident=2):
         """Get the file tree status of GIT for processing and encapsulation.
@@ -1262,7 +1314,7 @@ class InteractiveAdd(object):
             TermError: terminal size not enough.
         """
 
-        width, height = self.get_terminal_size()
+        width, height = get_terminal_size()
 
         # Initialize.
         cursor_row = 1
@@ -1270,13 +1322,37 @@ class InteractiveAdd(object):
 
         stopping = False  # exit signal.
 
+        def _process_diff(diff_list, term_width):
+            """Process diff raw list.
+
+            Generate a new list, in which each element is a tuple in the shape of (str, int).
+            The first parameter is the displayed string, and the second is the additional
+            row to be occupied under the current width.
+            """
+            new_list = []
+            for line in diff_list:
+                text = Fx.uncolor(line)
+                count = 0
+                for ch in text:
+                    count += get_width(ord(ch))
+                # [float] is to solve the division of python2 without retaining decimal places.
+                new_list.append((line, ceil(count / term_width) - 1))
+            return new_list
+
         # only need get once.
-        diff_ = self.diff(
+        diff_raw = self.diff(
             file_obj.name,
             file_obj.tracked,
             file_obj.has_staged_change,
             not self.use_color,
         ).split("\n")
+
+        diff_ = _process_diff(diff_raw, width)
+        if self._debug:  # debug mode print all occupied line num.
+            echo(Fx.clear_)
+            print(str([i[1] for i in diff_]))
+            input()
+
         extra = 0  # Extra occupied row.
         while not stopping:
             echo(Fx.clear_)
@@ -1288,13 +1364,14 @@ class InteractiveAdd(object):
 
             extra = 0  # Return to zero and accumulate again.
             # Terminal outputs the text to be displayed.
-            for index, line in enumerate(diff_, start=1):
+            for index, data in enumerate(diff_, start=1):
+                line, each_extra = data
                 if display_range[0] <= index <= display_range[1] - extra:
                     if index == cursor_row:
                         print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
                     else:
                         print(line)
-                    extra += self.extra_occupied_rows(Fx.uncolor(line), width)
+                    extra += each_extra
 
             # TODO(zachary): sometime bug -- scroll with flash.
             input_key = KeyEvent.sync_get_input()
@@ -1319,16 +1396,17 @@ class InteractiveAdd(object):
                 cursor_row = cursor_row if cursor_row > 1 else 1
             elif input_key == "windows resize":
                 # get new term height.
-                new_width, new_height = self.get_terminal_size()
+                new_width, new_height = get_terminal_size()
                 if new_height < self._min_height or new_width < self._min_width:
                     raise TermError("The minimum size of terminal should be 60 x 5.")
                 # get size diff, reassign.
                 line_diff = new_height - height
-                height = new_height
-                width = new_width
+                width, height = new_width, new_height
                 # get new display range.
                 display_range[1] += line_diff
+                diff_ = _process_diff(diff_raw, width)
             elif input_key == "?":
+                # show help messages.
                 echo(Fx.clear_)
                 echo(
                     (
@@ -1366,9 +1444,14 @@ class InteractiveAdd(object):
         if not TERM_CONTROL:
             raise TermError("This behavior is not supported in the current system.")
 
-        width, height = self.get_terminal_size()
+        width, height = get_terminal_size()
         if height < self._min_height or width < self._min_width:
             raise TermError("The minimum size of terminal should be 60 x 5.")
+
+        if self._debug:  # debug show.
+            echo(Fx.clear_)
+            print(width, height)
+            time.sleep(1.5)
 
         # Initialize.
         cursor_row = 1
@@ -1438,7 +1521,7 @@ class InteractiveAdd(object):
                     self.show_diff(file_items[cursor_row - 1])
                 elif input_key == "windows resize":
                     # get new term height.
-                    new_width, new_height = self.get_terminal_size()
+                    new_width, new_height = get_terminal_size()
                     if new_height < self._min_height or new_width < self._min_width:
                         raise TermError(
                             "The minimum size of terminal should be 60 x 5."
@@ -3189,15 +3272,7 @@ class CodeCounter(object):
         """
 
         if progress:
-            try:
-                import shutil
-
-                width = shutil.get_terminal_size().columns
-            except:
-                try:
-                    width = int(os.environ["COLUMNS"])
-                except (KeyError, ValueError):
-                    width = 80
+            width, _ = get_terminal_size()
             if width > 55:
                 _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
             else:
@@ -3311,15 +3386,7 @@ class CodeCounter(object):
         """
 
         needed_width = 67
-        try:
-            import shutil
-
-            width = shutil.get_terminal_size().columns
-        except:
-            try:
-                width = int(os.environ["COLUMNS"])
-            except (KeyError, ValueError):
-                width = 80
+        width, _ = get_terminal_size()
         if result_format == "simple" or width < needed_width:
             for key, value in new.items():
                 line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
@@ -3399,10 +3466,8 @@ class CodeCounter(object):
             echo(" Total: {}".format(sum))
             if additions > 0 or deletions > 0:
                 echo(" Altered: ", nl=False)
-                echo(
-                    "+" * int(ceil(additions / 10)), color=CommandColor.Green, nl=False
-                )
-                echo("-" * int(ceil(deletions / 10)), color=CommandColor.Red)
+                echo("+" * ceil(additions / 10), color=CommandColor.Green, nl=False)
+                echo("-" * ceil(deletions / 10), color=CommandColor.Red)
 
     @classmethod
     def count_and_format_print(
@@ -3476,15 +3541,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
     ):
         width = CONFIG.help_max_line_width
-        try:
-            import shutil
-
-            max_width = shutil.get_terminal_size().columns
-        except:
-            try:
-                max_width = int(os.environ["COLUMNS"])
-            except (KeyError, ValueError):
-                max_width = 90
+        max_width, _ = get_terminal_size()
 
         width = width if width < max_width else max_width - 2
         super(CustomHelpFormatter, self).__init__(
