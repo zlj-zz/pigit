@@ -50,6 +50,7 @@ import random
 from math import ceil
 from distutils.util import strtobool
 
+from .log import LogHandle
 from .compat import input, B, get_terminal_size
 from .utils import run_cmd, exec_cmd, confirm, similar_command
 from .str_utils import get_width, shorten
@@ -66,6 +67,13 @@ from .gitignore import GitignoreGenetor
 # Handled the incompatibility between python2 and python3.          #
 #####################################################################
 
+try:
+    import select, termios, fcntl, tty
+
+    TERM_CONTROL = True
+except Exception:
+    TERM_CONTROL = False
+
 # For windows.
 IS_WIN = sys.platform.lower().startswith("win")
 if IS_WIN:
@@ -75,14 +83,8 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-
-try:
-    import select, termios, fcntl, tty
-
-    TERM_CONTROL = True
-except Exception:
-    TERM_CONTROL = False
-
+LOG_PATH = PIGIT_HOME + "/log/{}.log".format(__project__)
+COUNTER_PATH = PIGIT_HOME + "/Counter"
 
 #####################################################################
 # Custom error.                                                     #
@@ -116,59 +118,6 @@ def ensure_path(dir_path):
         except Exception as e:
             err_echo("An error occurred while creating %s" % dir_path)
             exit(1, e)
-
-
-class LogHandle(object):
-    """Set log handle.
-    Attributes:
-        FMT_NORMAL: Log style in normal mode.
-        FMT_DEBUG: Log style in debug mode.
-
-    Functions:
-        setup_logging: setup log handle setting.
-
-    Raises:
-        SystemExit: When the log file cannot be written.
-    """
-
-    FMT_NORMAL = logging.Formatter(
-        fmt="%(asctime)s %(levelname).4s %(message)s", datefmt="%H:%M:%S"
-    )
-    FMT_DEBUG = logging.Formatter(
-        fmt="%(asctime)s.%(msecs)03d %(levelname).4s [%(name)s] %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    @classmethod
-    def setup_logging(cls, debug=False, log_file=None):
-        root_logger = logging.getLogger()
-
-        if debug:
-            log_level = logging.DEBUG
-            formatter = cls.FMT_DEBUG
-        else:
-            log_level = logging.INFO
-            formatter = cls.FMT_NORMAL
-
-        if log_file:
-            if log_file is None:
-                log_handle = logging.StreamHandler()
-            else:
-                dir_path = os.path.dirname(log_file)
-                ensure_path(dir_path)
-                try:
-                    log_handle = logging.handlers.RotatingFileHandler(
-                        log_file, maxBytes=1048576, backupCount=4
-                    )
-                except PermissionError:
-                    print('No permission to write to "{}" directory!'.format(log_file))
-                    raise SystemExit(1)
-
-        log_handle.setFormatter(formatter)
-        log_handle.setLevel(log_level)
-
-        root_logger.addHandler(log_handle)
-        root_logger.setLevel(0)
 
 
 # Exit code.
@@ -2255,9 +2204,7 @@ def main(custom_commands=None):
     # Setup log handle.
     LogHandle.setup_logging(
         debug=stdargs.debug,
-        log_file=None
-        if stdargs.out_log
-        else PIGIT_HOME + "/log/{}.log".format(__project__),
+        log_file=None if stdargs.out_log else LOG_PATH,
     )
 
     if stdargs.complete:
@@ -2311,7 +2258,7 @@ def main(custom_commands=None):
         CodeCounter(
             count_path=path,
             use_ignore=CONFIG.codecounter_use_gitignore,
-            result_saved_path=PIGIT_HOME + "/Counter",
+            result_saved_path=COUNTER_PATH,
             result_format=CONFIG.codecounter_result_format,
         ).count_and_format_print(
             show_invalid=CONFIG.codecounter_show_invalid,
