@@ -3,9 +3,8 @@ import sys
 sys.path.insert(0, ".")
 
 from pigit.codecounter import CodeCounter
-from pigit import PIGIT_HOME
+from pigit import COUNTER_PATH
 
 
 def test_codecounter():
-    saved_path = PIGIT_HOME + "/Counter"
-    CodeCounter(result_saved_path=saved_path).count_and_format_print()
+    CodeCounter(result_saved_path=COUNTER_PATH).count_and_format_print()
