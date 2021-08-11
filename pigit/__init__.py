@@ -38,24 +38,18 @@ __copyright__ = "Copyright (c) 2021 Zachary"
 
 
 import os
-import re
 import sys
 import signal
 import argparse
 import logging
 import logging.handlers
 import textwrap
-import time
-import random
-from math import ceil
 from distutils.util import strtobool
 
 from .log import LogHandle
-from .compat import input, B, get_terminal_size
-from .utils import run_cmd, exec_cmd, confirm, similar_command, color_print
-from .str_utils import get_width, shorten
-from .common import Color, Fx, Emotion, TermColor
-# from .model import File
+from .compat import get_terminal_size
+from .utils import confirm, color_print
+from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
 from .codecounter import CodeCounter
@@ -68,13 +62,6 @@ from .command_processor import GitProcessor
 # Part of compatibility.                                            #
 # Handled the incompatibility between python2 and python3.          #
 #####################################################################
-
-try:
-    import select, termios, fcntl, tty
-
-    TERM_CONTROL = True
-except Exception:
-    TERM_CONTROL = False
 
 # For windows.
 IS_WIN = sys.platform.lower().startswith("win")
@@ -338,7 +325,6 @@ if CONFIG.warnings:
     for warning in CONFIG.warnings:
         print(warning)
     CONFIG.warnings = []
-
 
 
 #####################################################################

@@ -147,7 +147,7 @@ def similar_command(command, all_commands):
     return min_frequency_command
 
 
-def color_print(msg, end="\n", *styles):
+def color_print(value, *styles, **options):
     """Print to terminal.
 
     Print special information with color and style according to the
@@ -158,8 +158,9 @@ def color_print(msg, end="\n", *styles):
         style: Message style, like: [bold, underline].
     """
     _style = "".join(styles)
-    msg = "%s%s\033[0m" % (_style, msg)
-    print(msg, end=end)
+    end = options.get("end", "\n")
+    value = "%s%s\033[0m" % (_style, value)
+    print(value, end=end)
 
 
 if __name__ == "__main__":
