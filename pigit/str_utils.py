@@ -12,6 +12,14 @@ widths = [
 
 
 def get_width(r):
+    """
+    >>> get_width(ord('a'))
+    1
+    >>> get_width(ord('中'))
+    2
+    >>> get_width(ord('Ç'))
+    1
+    """
     global widths
     if r == 0xE or r == 0xF:
         return 0
@@ -33,7 +41,10 @@ def shorten(text, width, placeholder="...", front=False):
     Returns:
         (str): shorten string.
 
-    >>> shorten('Hello world!', 5, placeholder='^-')
+    >>> shorten('Hello world!', 9, placeholder='^-^')
+    'Hello ^-^'
+    >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
+    '^-^world!'
     """
     if len(text) > width:
         if front:
@@ -44,3 +55,9 @@ def shorten(text, width, placeholder="...", front=False):
         _text = text
 
     return _text
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

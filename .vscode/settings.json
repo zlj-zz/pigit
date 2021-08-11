@@ -26,6 +26,7 @@
 		"rmvb",
 		"setcbreak",
 		"strtobool",
+		"stty",
 		"svgz",
 		"tcgetattr",
 		"tcsetattr",

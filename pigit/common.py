@@ -2,6 +2,7 @@ import os
 import sys
 import re
 
+
 # For windows print color.
 if os.name == "nt":
     os.system("")
@@ -11,7 +12,7 @@ Icon_Supported_Encoding = ["utf-8"]
 
 
 class Emotion(object):
-    # TODO(zlj-zz): There are some problems with the output emotion on windows.
+    # TODO(zachary): There are some problems with the output emotion on windows.
     # ? In CMD, encoding is right, but emotion is error.
     # ? In git bash, encoding is not right, but seem can't detection.
     if (

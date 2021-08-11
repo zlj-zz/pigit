@@ -47,14 +47,13 @@ import logging.handlers
 import textwrap
 import time
 import random
-from math import sqrt, ceil
+from math import ceil
 from distutils.util import strtobool
-from collections import Counter
 
 from .compat import input, B, get_terminal_size
-from .utils import run_cmd, exec_cmd, confirm
+from .utils import run_cmd, exec_cmd, confirm, similar_command
 from .str_utils import get_width, shorten
-from .common import Color, Fx
+from .common import Color, Fx, Emotion
 from .model import File
 from .decorator import time_it
 from .codecounter import CodeCounter
@@ -76,23 +75,6 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-
-# For encoding.
-Icon_Supported_Encoding = ["utf-8"]
-System_Encoding = sys.getdefaultencoding().lower()
-# TODO(zlj-zz): There are some problems with the output emotion on windows.
-# ? In CMD, encoding is right, but emotion is error.
-# ? In git bash, encoding is not right, but seem can't detection.
-if not IS_WIN and System_Encoding in Icon_Supported_Encoding:
-    Icon_Rainbow = "🌈"
-    Icon_Smiler = "😊"
-    Icon_Thinking = "🧐"
-    Icon_Sorry = "😅"
-else:
-    Icon_Rainbow = "::"
-    Icon_Smiler = "^_^"
-    Icon_Thinking = "-?-"
-    Icon_Sorry = "Orz"
 
 try:
     import select, termios, fcntl, tty
@@ -1123,7 +1105,7 @@ class GitProcessor(object):
 
             echo(
                 "{} Storage file: {}".format(
-                    Icon_Rainbow, "all" if args_str.strip() == "." else args_str
+                    Emotion.Icon_Rainbow, "all" if args_str.strip() == "." else args_str
                 )
             )
             run_cmd("git add " + args_str)
@@ -1707,71 +1689,6 @@ class GitProcessor(object):
     }
 
     @staticmethod
-    def similar_command(command, all_commands):
-        """Get the most similar command with K-NearestNeighbor.
-
-        Args:
-            command (str): command string.
-            all_commands (list): The list of all command.
-
-        Returns:
-            (str): most similar command string.
-        """
-        #  The dictionary of letter frequency of all commands.
-        words = {word: dict(Counter(word)) for word in all_commands}
-        # Letter frequency of command.
-        fre = dict(Counter(command))
-        # The distance between the frequency of each letter in the command
-        # to be tested and all candidate commands, that is the difference
-        # between the frequency of letters.
-        frequency_difference = {
-            word: [fre[ch] - words[word].get(ch, 0) for ch in command]
-            + [words[word][ch] - fre.get(ch, 0) for ch in word]
-            for word in words
-        }
-        # Square of sum of squares of word frequency difference.
-        frequency_sum_square = list(
-            map(
-                lambda item: [item[0], sqrt(sum(map(lambda i: i ** 2, item[1])))],
-                frequency_difference.items(),
-            )
-        )
-
-        def _comparison_reciprocal(a, b):
-            """
-            Returns how many identical letters
-            are compared from the head. sigmod
-            to 0 ~ 1.
-
-            Args:
-                a (str): need compare string.
-                b (str): need compare string.
-            """
-            i = 0
-            while i < len(a) and i < len(b):
-                if a[i] == b[i]:
-                    i += 1
-                else:
-                    break
-            return 1 / (i + 1)
-
-        # The value of `frequency_sum_square` is multiplied by the weight to find
-        # the minimum.
-        # Distance weight: compensate for the effect of length difference.
-        # Compare Weight: The more similar the beginning, the higher the weight.
-        min_frequency_command = min(
-            frequency_sum_square,
-            key=lambda item: item[1]
-            * (
-                len(command) / len(item[0])
-                if len(command) / len(item[0])
-                else len(item[0]) / len(command)
-            )
-            * _comparison_reciprocal(command, item[0]),
-        )[0]
-        return min_frequency_command
-
-    @staticmethod
     def color_command(command):
         """Color the command string.
         prog: green;
@@ -1838,13 +1755,11 @@ class GitProcessor(object):
             warn_echo("g --show-commands")
 
             if use_recommend:  # check config.
-                predicted_command = cls.similar_command(
-                    _command, cls.Git_Options.keys()
-                )
+                predicted_command = similar_command(_command, cls.Git_Options.keys())
                 echo(
                     "%s The wanted command is %s ?"
                     % (
-                        Icon_Thinking,
+                        Emotion.Icon_Thinking,
                         CommandColor.Green + predicted_command + Fx.reset,
                     ),
                     nl=False,
@@ -1874,7 +1789,7 @@ class GitProcessor(object):
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
             if show_original:
-                echo("{}  ".format(Icon_Rainbow), nl=False)
+                echo("{}  ".format(Emotion.Icon_Rainbow), nl=False)
                 echo(cls.color_command(command))
             run_cmd(command)
         else:
@@ -1957,10 +1872,13 @@ class GitProcessor(object):
                 "` to view the supported types.",
             )
             if use_recommend:
-                predicted_type = cls.similar_command(command_type, cls.Types)
+                predicted_type = similar_command(command_type, cls.Types)
                 echo(
                     "%s The wanted type is %s ?"
-                    % (Icon_Thinking, CommandColor.Green + predicted_type + Fx.reset),
+                    % (
+                        Emotion.Icon_Thinking,
+                        CommandColor.Green + predicted_type + Fx.reset,
+                    ),
                     nl=False,
                 )
                 if confirm("[y/n]:"):
