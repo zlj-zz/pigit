@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.0.7.bate.1"
+__version__ = "1.0.8.bate.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -1882,7 +1882,7 @@ class GitProcessor(object):
                     nl=False,
                 )
                 if confirm("[y/n]:"):
-                    command_g(["-S", predicted_type])
+                    main(["-S", predicted_type])
             raise SystemExit(0)
 
         echo("These are the orders of {}".format(command_type))
@@ -2151,7 +2151,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
 
 @time_it
-def command_g(custom_commands=None):
+def main(custom_commands=None):
     try:
         signal.signal(signal.SIGINT, leave)
     except Exception:
@@ -2333,4 +2333,4 @@ def command_g(custom_commands=None):
 
 
 if __name__ == "__main__":
-    command_g()
+    main()
