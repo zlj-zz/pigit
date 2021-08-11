@@ -130,7 +130,7 @@ class GitProcessor(object):
             )
             raise SystemExit(0)
 
-        if option.get("has_arguments", False):
+        if not option.get("has_arguments", False):
             if args:
                 color_print(
                     "The command does not accept parameters. Discard {}.".format(args),
