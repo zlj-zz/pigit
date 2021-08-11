@@ -1,4 +1,6 @@
-from __future__ import print_function
+# -*- coding:utf-8 -*-
+
+from __future__ import print_function, absolute_import
 import subprocess
 import logging
 from math import sqrt
@@ -143,6 +145,21 @@ def similar_command(command, all_commands):
         * _comparison_reciprocal(command, item[0]),
     )[0]
     return min_frequency_command
+
+
+def color_print(msg, end="\n", *styles):
+    """Print to terminal.
+
+    Print special information with color and style according to the
+    incoming parameters.
+
+    Args:
+        msg: A special message.
+        style: Message style, like: [bold, underline].
+    """
+    _style = "".join(styles)
+    msg = "%s%s\033[0m" % (_style, msg)
+    print(msg, end=end)
 
 
 if __name__ == "__main__":

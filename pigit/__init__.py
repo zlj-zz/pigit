@@ -52,10 +52,11 @@ from distutils.util import strtobool
 
 from .log import LogHandle
 from .compat import input, B, get_terminal_size
-from .utils import run_cmd, exec_cmd, confirm, similar_command
+from .utils import run_cmd, exec_cmd, confirm, similar_command, color_print
 from .str_utils import get_width, shorten
-from .common import Color, Fx, Emotion
+from .common import Color, Fx, Emotion, TermColor
 from .model import File
+from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
@@ -113,10 +114,10 @@ def ensure_path(dir_path):
         try:
             os.makedirs(dir_path, exist_ok=True)
         except PermissionError as e:
-            err_echo("Don't have permission to create: %s" % dir_path)
+            color_print("Don't have permission to create: %s" % dir_path)
             exit(1, e)
         except Exception as e:
-            err_echo("An error occurred while creating %s" % dir_path)
+            color_print("An error occurred while creating %s" % dir_path)
             exit(1, e)
 
 
@@ -144,42 +145,6 @@ def leave(code, *args):
     raise SystemExit(0)
 
 
-def git_version():
-    """Get Git version."""
-    try:
-        _, git_version_ = exec_cmd("git --version")
-        if git_version_:
-            return git_version_
-        else:
-            return None
-    except Exception:
-        Log.warning("Can not found Git in environment.")
-        return None
-
-
-# Not detected, the result is None
-Git_Version = git_version()
-
-
-def current_repository():
-    """Get the current git repository path. If not, the path is empty."""
-    err, path = exec_cmd("git rev-parse --git-dir")
-
-    if err:
-        return ""
-
-    path = path.strip()
-    if path == ".git":
-        repository_path = os.getcwd()
-    else:
-        repository_path = path[:-5]
-    return repository_path
-
-
-Repository_Path = current_repository()
-IS_Git_Repository = True if Repository_Path else False
-
-
 class ConfigError(Exception):
     """Config error. Using by `Config`."""
 
@@ -192,12 +157,6 @@ class Config(object):
         """
         #? Config file for pigit v. {version}
         # Git-tools -- pigit configuration.
-
-        # Color settings for informational messages.
-        # Only complete RGB values are accepted, such as: #FF0000
-        okay_echo_color={okay_echo_color}
-        warning_echo_color={warning_echo_color}
-        error_echo_color={error_echo_color}
 
         # Show original git command.
         gitprocessor_show_original={gitprocessor_show_original}
@@ -245,7 +204,6 @@ class Config(object):
 
     # yapf: disable
     keys = [
-        'okay_echo_color', 'warning_echo_color', 'error_echo_color',
         'gitprocessor_show_original', 'gitprocessor_use_recommend',
         'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
         'codecounter_use_gitignore', 'codecounter_show_invalid', 'codecounter_result_format',
@@ -255,9 +213,6 @@ class Config(object):
         'help_use_color', 'help_max_line_width'
     ]
     # yapf: enable
-    okay_echo_color = "#98FB98"  # PaleGreen
-    warning_echo_color = "#FFD700"  # Gold
-    error_echo_color = "#FF6347"  # Tomato
 
     gitprocessor_show_original = True
     gitprocessor_use_recommend = True
@@ -523,60 +478,6 @@ class KeyEvent(object):
 
 
 #####################################################################
-# Part of Style.                                                    #
-# Defines classes that generate colors and styles to beautify the   #
-# output. The method of color printing is also defined.             #
-#####################################################################
-
-
-class CommandColor:
-    """Terminal print color class."""
-
-    Red = Color.fg("#FF6347")  # Tomato
-    Green = Color.fg("#98FB98")  # PaleGreen
-    DeepGreen = Color.fg("#A4BE8C")  # PaleGreen
-    Yellow = Color.fg("#EBCB8C")
-    Gold = Color.fg("#FFD700")  # Gold
-    SkyBlue = Color.fg("#87CEFA")
-    MediumVioletRed = Color.fg("#C71585")
-    Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
-
-
-def echo(msg, color="", style="", nl=True):
-    """Print to terminal.
-
-    Print special information with color and style according to the
-    incoming parameters.
-
-    Args:
-        msg: A special message.
-        color: Message color.
-        style: Message style, like: [bold, underline].
-        nl: Is there a line feed.
-    """
-    msg = "%s%s%s%s" % (style, color, msg, Fx.reset)
-    if nl:
-        msg += "\n"
-    sys.stdout.write(msg)
-    sys.stdout.flush()
-
-
-def okay_echo(msg, nl=True):
-    """Print green information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.okay_echo_color), msg, Fx.reset), nl=nl)
-
-
-def warn_echo(msg, nl=True):
-    """Print yellow information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.warning_echo_color), msg, Fx.reset), nl=nl)
-
-
-def err_echo(msg, nl=True):
-    """Print red information."""
-    echo("%s%s%s%s" % (Fx.b, Color.fg(CONFIG.error_echo_color), msg, Fx.reset), nl=nl)
-
-
-#####################################################################
 # Part of command.                                                  #
 #####################################################################
 class InteractiveAdd(object):
@@ -630,20 +531,20 @@ class InteractiveAdd(object):
             if unstaged_change != " ":
                 if not has_no_staged_change:
                     display_str = "{}{}{}{} {}{}".format(
-                        CommandColor.Green,
+                        TermColor.Green,
                         staged_change,
-                        CommandColor.Red,
+                        TermColor.Red,
                         unstaged_change,
                         display_name,
                         Fx.reset,
                     )
                 else:
                     display_str = "{}{} {}{}".format(
-                        CommandColor.Red, change, display_name, Fx.reset
+                        TermColor.Red, change, display_name, Fx.reset
                     )
             else:
                 display_str = "{}{} {}{}".format(
-                    CommandColor.Green, change, display_name, Fx.reset
+                    TermColor.Green, change, display_name, Fx.reset
                 )
 
             file_ = File(
@@ -784,13 +685,13 @@ class InteractiveAdd(object):
 
         diff_ = _process_diff(diff_raw, width)
         if self._debug:  # debug mode print all occupied line num.
-            echo(Fx.clear_)
+            print(Fx.clear_)
             print(str([i[1] for i in diff_]))
             input()
 
         extra = 0  # Extra occupied row.
         while not stopping:
-            echo(Fx.clear_)
+            print(Fx.clear_)
 
             while cursor_row < display_range[0]:
                 display_range = [i - 1 for i in display_range]
@@ -842,8 +743,8 @@ class InteractiveAdd(object):
                 diff_ = _process_diff(diff_raw, width)
             elif input_key == "?":
                 # show help messages.
-                echo(Fx.clear_)
-                echo(
+                print(Fx.clear_)
+                print(
                     (
                         "k / ↑: select previous line.\n"
                         "j / ↓: select next line.\n"
@@ -865,7 +766,7 @@ class InteractiveAdd(object):
         Args:
             file (File): file object.
         """
-        echo(Fx.clear_)
+        print(Fx.clear_)
         if confirm("discard all changed? [y/n]:"):
             if file.tracked:
                 run_cmd("git checkout -- {}".format(file.name))
@@ -884,7 +785,7 @@ class InteractiveAdd(object):
             raise TermError("The minimum size of terminal should be 60 x 5.")
 
         if self._debug:  # debug show.
-            echo(Fx.clear_)
+            print(Fx.clear_)
             print(width, height)
             time.sleep(1.5)
 
@@ -896,7 +797,7 @@ class InteractiveAdd(object):
         stopping = False
 
         # Into new term page.
-        echo(Fx.alt_screen + Fx.hide_cursor)
+        print(Fx.alt_screen + Fx.hide_cursor)
 
         file_items = self.get_status(width)
         try:
@@ -904,7 +805,7 @@ class InteractiveAdd(object):
 
             # Start interactive.
             while not stopping:
-                echo(Fx.clear_)
+                print(Fx.clear_)
                 while cursor_row < display_range[0]:
                     display_range = [i - 1 for i in display_range]
                 while cursor_row > display_range[1]:
@@ -967,8 +868,8 @@ class InteractiveAdd(object):
                     # get new display range.
                     display_range[1] += line_diff
                 elif input_key == "?":
-                    echo(Fx.clear_)
-                    echo(
+                    print(Fx.clear_)
+                    print(
                         (
                             "k / ↑: select previous file.\n"
                             "j / ↓: select next file.\n"
@@ -990,7 +891,7 @@ class InteractiveAdd(object):
         finally:
             # Whatever, unregister signal event and restore terminal at last.
             KeyEvent.signal_restore()
-            echo(Fx.normal_screen + Fx.show_cursor)
+            print(Fx.normal_screen + Fx.show_cursor)
 
 
 class GitOptionSign:
@@ -1052,7 +953,7 @@ class GitProcessor(object):
             if args:
                 args_str = " ".join(args)
 
-            echo(
+            print(
                 "{} Storage file: {}".format(
                     Emotion.Icon_Rainbow, "all" if args_str.strip() == "." else args_str
                 )
@@ -1066,7 +967,7 @@ class GitProcessor(object):
             if branch:
                 run_cmd("git fetch origin {}:{} ".format(branch, branch))
             else:
-                err_echo("This option need a branch name.")
+                color_print("This option need a branch name.", TermColor.Red)
 
         @staticmethod
         def set_email_and_username(args):
@@ -1085,7 +986,7 @@ class GitProcessor(object):
             name = input("Please input username:")
             while True:
                 if not name:
-                    err_echo("Name is empty.")
+                    color_print("Name is empty.", TermColor.Red)
                     name = input("Please input username again:")
                 else:
                     break
@@ -1096,7 +997,7 @@ class GitProcessor(object):
             )
             while True:
                 if email_re.match(email) is None:
-                    err_echo("Bad mailbox format.")
+                    color_print("Bad mailbox format.", TermColor.Red)
                     email = input("Please input email again:")
                 else:
                     break
@@ -1104,9 +1005,9 @@ class GitProcessor(object):
             if run_cmd(
                 GitProcessor.Git_Options["user"]["command"] + other + name
             ) and run_cmd(GitProcessor.Git_Options["email"]["command"] + other + email):
-                okay_echo("Successfully set.")
+                color_print("Successfully set.", TermColor.Green)
             else:
-                err_echo("Failed. Please check log.")
+                color_print("Failed. Please check log.", TermColor.Red)
 
     Git_Options = {
         # Branch
@@ -1655,15 +1556,15 @@ class GitProcessor(object):
         command_list = command.split(" ")
         color_command = (
             Fx.bold
-            + CommandColor.DeepGreen
+            + TermColor.DeepGreen
             + command_list.pop(0)
             + " "
-            + CommandColor.Yellow
+            + TermColor.Yellow
             + command_list.pop(0)
             + " "
             + Fx.unbold
             + Fx.italic
-            + CommandColor.SkyBlue
+            + TermColor.SkyBlue
         )
         while len(command_list) > 0:
             temp = command_list.pop(0)
@@ -1694,24 +1595,24 @@ class GitProcessor(object):
         """
 
         if Git_Version is None:
-            err_echo("Git is not detected. Please install Git first.")
+            color_print("Git is not detected. Please install Git first.", TermColor.Red)
             raise SystemExit(0)
 
         option = cls.Git_Options.get(_command, None)
 
         if option is None:
-            echo("Don't support this command, please try ", nl=False)
-            warn_echo("g --show-commands")
+            print("Don't support this command, please try ", end="")
+            color_print("g --show-commands", TermColor.Gold)
 
             if use_recommend:  # check config.
                 predicted_command = similar_command(_command, cls.Git_Options.keys())
-                echo(
+                print(
                     "%s The wanted command is %s ?"
                     % (
                         Emotion.Icon_Thinking,
-                        CommandColor.Green + predicted_command + Fx.reset,
+                        TermColor.Green + predicted_command + Fx.reset,
                     ),
-                    nl=False,
+                    end="",
                 )
                 if confirm("[y/n]:"):
                     cls.process_command(predicted_command, args=args)
@@ -1723,8 +1624,9 @@ class GitProcessor(object):
 
         if state & GitOptionSign.No:
             if args:
-                err_echo(
-                    "The command does not accept parameters. Discard {}.".format(args)
+                color_print(
+                    "The command does not accept parameters. Discard {}.".format(args),
+                    TermColor.Red,
                 )
                 args = []
 
@@ -1732,14 +1634,14 @@ class GitProcessor(object):
             try:
                 command(args)
             except TermError as e:
-                err_echo(e)
+                color_print(str(e), TermColor.Red)
         elif state & GitOptionSign.String:
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
             if show_original:
-                echo("{}  ".format(Emotion.Icon_Rainbow), nl=False)
-                echo(cls.color_command(command))
+                print("{}  ".format(Emotion.Icon_Rainbow), end="")
+                print(cls.color_command(command))
             run_cmd(command)
         else:
             pass
@@ -1761,8 +1663,8 @@ class GitProcessor(object):
 
         _msg = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
         if use_color:
-            _key_color = CommandColor.Green
-            _command_color = CommandColor.Gold
+            _key_color = TermColor.Green
+            _command_color = TermColor.Gold
         else:
             _key_color = _command_color = ""
 
@@ -1793,10 +1695,10 @@ class GitProcessor(object):
     @classmethod
     def command_help(cls):
         """Print help message."""
-        echo("These are short commands that can replace git operations:")
+        print("These are short commands that can replace git operations:")
         for key in cls.Git_Options.keys():
             msg = cls._generate_help_by_key(key)
-            echo(msg)
+            print(msg)
 
     @classmethod
     def command_help_by_type(cls, command_type, use_recommend=False):
@@ -1814,38 +1716,38 @@ class GitProcessor(object):
         command_type = command_type.capitalize().strip()
 
         if command_type not in cls.Types:
-            err_echo("There is no such type.")
-            echo("Please use `", nl=False)
-            echo("g --types", color=CommandColor.Green, nl=False)
-            echo(
+            color_print("There is no such type.", TermColor.Red)
+            print("Please use `", end="")
+            print("g --types", TermColor.Green, end="")
+            print(
                 "` to view the supported types.",
             )
             if use_recommend:
                 predicted_type = similar_command(command_type, cls.Types)
-                echo(
+                print(
                     "%s The wanted type is %s ?"
                     % (
                         Emotion.Icon_Thinking,
-                        CommandColor.Green + predicted_type + Fx.reset,
+                        TermColor.Green + predicted_type + Fx.reset,
                     ),
-                    nl=False,
+                    end="",
                 )
                 if confirm("[y/n]:"):
                     main(["-S", predicted_type])
             raise SystemExit(0)
 
-        echo("These are the orders of {}".format(command_type))
+        print("These are the orders of {}".format(command_type))
         prefix = command_type[0].lower()
         for k in cls.Git_Options.keys():
             if k.startswith(prefix):
                 msg = cls._generate_help_by_key(k)
-                echo(msg)
+                print(msg)
 
     @classmethod
     def type_help(cls):
         """Print all command types with random color."""
         for t in cls.Types:
-            echo(
+            print(
                 "{}{}  ".format(
                     Color.fg(
                         random.randint(70, 255),
@@ -1854,127 +1756,32 @@ class GitProcessor(object):
                     ),
                     t,
                 ),
-                nl=False,
+                end="",
             )
-        echo(Fx.reset)
+        print(Fx.reset)
 
 
 #####################################################################
 # Implementation of additional functions.                           #
 #####################################################################
-def git_local_config():
-    """Print the local config of current git repository."""
-    if IS_Git_Repository:
-        _re = re.compile(r"\w+\s=\s.*?")
-        try:
-            with open(Repository_Path + "/.git/config", "r") as cf:
-                for line in re.split(r"\r\n|\r|\n", cf.read()):
-                    if line.startswith("["):
-                        err_echo(line)
-                    else:
-                        if _re.search(line) is not None:
-                            key, value = line.split("=")
-                            echo(key, color=CommandColor.SkyBlue, nl=False)
-                            print(
-                                "="
-                                + Fx.italic
-                                + CommandColor.MediumVioletRed
-                                + value
-                                + Fx.reset
-                            )
-        except Exception as e:
-            print(e)
-            err_echo("Error reading configuration file.")
-    else:
-        err_echo("This directory is not a git repository yet.")
-
-
-def repository_info(
-    show_path=True,
-    show_remote=True,
-    show_branches=True,
-    show_lastest_log=True,
-    show_summary=True,
-):
-    """Print some information of the repository.
-
-    repository: `Repository_Path`
-    remote: read from '.git/conf'
-    >>> all_branch = run_cmd_with_resp('git branch --all --color')
-    >>> lastest_log = run_cmd_with_resp('git log -1')
-    """
-
-    echo("waiting ...", nl=False)
-
-    error_str = CommandColor.Red + "Error getting" + Fx.reset
-
-    # Print content.
-    echo("\r[%s]        \n" % (Fx.b + "Repository Information" + Fx.reset,))
-    if show_path:
-        echo(
-            "Repository: \n\t%s\n"
-            % (CommandColor.SkyBlue + Repository_Path + Fx.reset,)
-        )
-    # Get remote url.
-    if show_remote:
-        try:
-            with open(Repository_Path + "/.git/config", "r") as cf:
-                config = cf.read()
-                res = re.findall(r"url\s=\s(.*)", config)
-                remote = "\n".join(
-                    [
-                        "\t%s%s%s%s" % (Fx.italic, CommandColor.SkyBlue, x, Fx.reset)
-                        for x in res
-                    ]
-                )
-        except Exception:
-            remote = error_str
-        echo("Remote: \n%s\n" % remote)
-    # Get all branches.
-    if show_branches:
-        err, res = exec_cmd("git branch --all --color")
-        if err:
-            branches = "\t" + error_str
-        else:
-            branches = textwrap.indent(res, "\t")
-        echo("Branches: \n%s\n" % branches)
-    # Get the lastest log.
-    if show_lastest_log:
-        err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
-        if err:
-            git_log = "\t" + error_str
-        else:
-            # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
-            git_log = textwrap.indent(res, "\t")
-        echo("Lastest log:\n%s\n" % git_log)
-    # Get git summary.
-    if show_summary:
-        err, res = exec_cmd("git shortlog --summary --numbered")
-        if err:
-            summary = "\t" + error_str
-        else:
-            summary = textwrap.indent(res, "\t")
-        echo("Summary:\n%s\n" % summary)
-
-
 def introduce():
     """Print the description information."""
 
     # Print tools version and path.
-    echo("[%s] version: %s" % (__project__, __version__), style=Fx.b)
+    color_print("[%s] version: %s" % (__project__, __version__), Fx.b)
 
     # Print git version.
     if Git_Version is None:
-        echo("Don't found Git, maybe need install.")
+        print("Don't found Git, maybe need install.")
     else:
-        echo(Git_Version)
+        print(Git_Version)
 
     # Print package path.
-    echo("Path: ", style=Fx.b, nl=False)
-    echo("%s\n" % __file__, color=CommandColor.SkyBlue, style=Fx.underline)
+    color_print("Path: ", Fx.b, end="")
+    color_print("%s\n" % __file__, TermColor.SkyBlue, Fx.underline)
 
-    echo("Description:", style=Fx.b)
-    echo(
+    color_print("Description:", Fx.b)
+    color_print(
         (
             "  Terminal tool, help you use git more simple."
             " Support Linux and MacOS. Partial support for windows.\n"
@@ -1982,17 +1789,16 @@ def introduce():
             "  `g ws` -> `git status --short`, `g b` -> `git branch`.\n"
             "  Also you use `g -s` to get the all short command, have fun"
             " and good lucky.\n"
-            "  The open source path: %s"
-            % (CommandColor.SkyBlue + Fx.underline + __url__)
+            "  The open source path: %s" % (TermColor.SkyBlue + Fx.underline + __url__)
         ),
-        style=Fx.italic,
+        Fx.italic,
     )
 
-    echo("\nYou can use ", nl=False)
-    echo("-h", color=CommandColor.Green, nl=False)
-    echo(" and ", nl=False)
-    echo("--help", color=CommandColor.Green, nl=False)
-    echo(" to get help and more usage.\n")
+    print("\nYou can use ", end="")
+    color_print("-h", TermColor.Green, end="")
+    print(" and ", end="")
+    color_print("--help", TermColor.Green, end="")
+    print(" to get help and more usage.\n")
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -2013,13 +1819,13 @@ class CustomHelpFormatter(argparse.HelpFormatter):
             prog, indent_increment, max_help_position, width
         )
         if not colors or not isinstance(colors, list):
-            colors = [
-                Color.fg("#FF6347"),  # Tomato
-                Color.fg("#98FB98"),  # PaleGreen
-                Color.fg("#EBCB8C"),  # Yellow
-                Color.fg("#87CEFA"),  # SkyBlue
+            colors = {
+                "red": Color.fg("#FF6347"),  # Tomato
+                "green": Color.fg("#98FB98"),  # PaleGreen
+                "yellow": Color.fg("#EBCB8C"),  # Yellow
+                "blue": Color.fg("#87CEFA"),  # SkyBlue
                 # Color.fg("#FFC0CB"),  # Pink
-            ]
+            }
         self.colors = colors
         self.color_len = len(colors)
         self._old_color = None
@@ -2051,14 +1857,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         # collect the pieces of the action help
         # @Overwrite
         if CONFIG.help_use_color:
-            while True:
-                _index = random.randint(0, self.color_len - 1)
-                if _index == self._old_color:
-                    continue
-                else:
-                    self._old_color = _index
-                    break
-            _color = self.colors[_index]
+            _color = self.colors["green"]
         else:
             _color = ""
         parts = [_color + action_header + Fx.reset]
@@ -2099,6 +1898,109 @@ class CustomHelpFormatter(argparse.HelpFormatter):
         return help
 
 
+class Parser(object):
+    def __init__(self):
+        super(Parser, self).__init__()
+        self._parser = argparse.ArgumentParser(
+            prog="pigit",
+            description="If you want to use some original git commands, please use -- to indicate.",
+            prefix_chars="-",
+            formatter_class=CustomHelpFormatter,
+        )
+        self._parser.add_argument(
+            "-C",
+            "--complete",
+            action="store_true",
+            help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
+        )
+        self._parser.add_argument(
+            "-s",
+            "--show-commands",
+            action="store_true",
+            help="List all available short command and wealth and exit.",
+        )
+        self._parser.add_argument(
+            "-S",
+            "--show-command",
+            type=str,
+            metavar="TYPE",
+            dest="command_type",
+            help="According to given type(%s) list available short command and wealth and exit."
+            % ", ".join(GitProcessor.Types),
+        )
+        self._parser.add_argument(
+            "-t",
+            "--types",
+            action="store_true",
+            help="List all command types and exit.",
+        )
+        self._parser.add_argument(
+            "-f",
+            "--config",
+            action="store_true",
+            help="Display the config of current git repository and exit.",
+        )
+        self._parser.add_argument(
+            "-i",
+            "--information",
+            action="store_true",
+            help="Show some information about the current git repository.",
+        )
+        self._parser.add_argument(
+            "-c",
+            "--count",
+            nargs="?",
+            const=".",
+            type=str,
+            metavar="PATH",
+            help=(
+                "Count the number of codes and output them in tabular form.\n"
+                "A given path can be accepted, and the default is the current directory."
+            ),
+        )
+        self._parser.add_argument(
+            "--create-ignore",
+            type=str,
+            metavar="TYPE",
+            dest="ignore_type",
+            help="Create a demo .gitignore file. Need one argument, support: [%s]"
+            % ", ".join(GitignoreGenetor.Supported_Types.keys()),
+        )
+        self._parser.add_argument(
+            "--create-config",
+            action="store_true",
+            help="Create a preconfigured file of git-tools.",
+        )
+        self._parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Run in debug mode.",
+        )
+        self._parser.add_argument(
+            "--out-log",
+            action="store_true",
+            help="Print log to console.",
+        )
+        self._parser.add_argument(
+            "-v",
+            "--version",
+            action="version",
+            help="Show version and exit.",
+            version="Version: %s" % __version__,
+        )
+        self._parser.add_argument(
+            "command", nargs="?", type=str, help="Short git command."
+        )
+        self._parser.add_argument(
+            "args", nargs="*", type=str, help="Command parameter list."
+        )
+
+    def parse(self, custom_commands=None):
+        if custom_commands:
+            return self._parser.parse_args(custom_commands)
+        return self._parser.parse_args()
+
+
 @time_it
 def main(custom_commands=None):
     try:
@@ -2106,99 +2008,11 @@ def main(custom_commands=None):
     except Exception:
         pass
 
-    args = argparse.ArgumentParser(
-        prog="g",
-        description="If you want to use some original git commands, please use -- to indicate.",
-        prefix_chars="-",
-        formatter_class=CustomHelpFormatter,
-    )
-    args.add_argument(
-        "-C",
-        "--complete",
-        action="store_true",
-        help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
-    )
-    args.add_argument(
-        "-s",
-        "--show-commands",
-        action="store_true",
-        help="List all available short command and wealth and exit.",
-    )
-    args.add_argument(
-        "-S",
-        "--show-command",
-        type=str,
-        metavar="TYPE",
-        dest="command_type",
-        help="According to given type(%s) list available short command and wealth and exit."
-        % ", ".join(GitProcessor.Types),
-    )
-    args.add_argument(
-        "-t",
-        "--types",
-        action="store_true",
-        help="List all command types and exit.",
-    )
-    args.add_argument(
-        "-f",
-        "--config",
-        action="store_true",
-        help="Display the config of current git repository and exit.",
-    )
-    args.add_argument(
-        "-i",
-        "--information",
-        action="store_true",
-        help="Show some information about the current git repository.",
-    )
-    args.add_argument(
-        "-c",
-        "--count",
-        nargs="?",
-        const=".",
-        type=str,
-        metavar="PATH",
-        help=(
-            "Count the number of codes and output them in tabular form.\n"
-            "A given path can be accepted, and the default is the current directory."
-        ),
-    )
-    args.add_argument(
-        "--create-ignore",
-        type=str,
-        metavar="TYPE",
-        dest="ignore_type",
-        help="Create a demo .gitignore file. Need one argument, support: [%s]"
-        % ", ".join(GitignoreGenetor.Supported_Types.keys()),
-    )
-    args.add_argument(
-        "--create-config",
-        action="store_true",
-        help="Create a preconfigured file of git-tools.",
-    )
-    args.add_argument(
-        "--debug",
-        action="store_true",
-        help="Run in debug mode.",
-    )
-    args.add_argument(
-        "--out-log",
-        action="store_true",
-        help="Print log to console.",
-    )
-    args.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        help="Show version and exit.",
-        version="Version: %s" % __version__,
-    )
-    args.add_argument("command", nargs="?", type=str, help="Short git command.")
-    args.add_argument("args", nargs="*", type=str, help="Command parameter list.")
-    stdargs = args.parse_args()
-
+    parser = Parser()
     if custom_commands is not None:
-        stdargs = args.parse_args(custom_commands)
+        stdargs = parser.parse(custom_commands)
+    stdargs = parser.parse()
+
     # print(stdargs)
 
     # Setup log handle.
@@ -2211,7 +2025,7 @@ def main(custom_commands=None):
         completion_vars = {
             key: value["help-msg"] for key, value in GitProcessor.Git_Options.items()
         }
-        completion_vars.update(process_argparse(args))
+        completion_vars.update(process_argparse(parser._parser))
         ShellCompletion(completion_vars, PIGIT_HOME).complete_and_use()
         raise SystemExit(0)
 

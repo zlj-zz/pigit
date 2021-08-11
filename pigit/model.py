@@ -1,3 +1,7 @@
+# -*- coding:utf-8 -*-
+
+"""This file save some model class of git info class."""
+
 # yapf: disable
 class File:
     """Model class of git file."""

@@ -1,3 +1,7 @@
+# -*- coding:utf-8 -*-
+
+"""This file support some str util method."""
+
 # yapf: disable
 widths = [
     (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0),
