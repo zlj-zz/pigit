@@ -6,6 +6,8 @@ import logging
 from math import sqrt
 from collections import Counter
 
+from .compat import input
+
 Log = logging.getLogger(__name__)
 
 

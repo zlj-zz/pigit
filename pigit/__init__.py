@@ -55,7 +55,7 @@ from .decorator import time_it
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
-from .command_processor import GitProcessor
+from .command_processor import GitProcessor, Git_Cmds
 
 
 #####################################################################
@@ -578,7 +578,6 @@ def main(custom_commands=None):
     if custom_commands is not None:
         stdargs = parser.parse(custom_commands)
     stdargs = parser.parse()
-
     # print(stdargs)
 
     # Setup log handle.
@@ -589,24 +588,10 @@ def main(custom_commands=None):
 
     if stdargs.complete:
         completion_vars = {
-            key: value["help-msg"] for key, value in GitProcessor.Git_Options.items()
+            key: value.get("help", "") for key, value in Git_Cmds.items()
         }
         completion_vars.update(process_argparse(parser._parser))
         ShellCompletion(completion_vars, PIGIT_HOME).complete_and_use()
-        raise SystemExit(0)
-
-    if stdargs.show_commands:
-        GitProcessor.command_help()
-        raise SystemExit(0)
-
-    if stdargs.command_type:
-        GitProcessor.command_help_by_type(
-            stdargs.command_type, use_recommend=CONFIG.gitprocessor_use_recommend
-        )
-        raise SystemExit(0)
-
-    if stdargs.types:
-        GitProcessor.type_help()
         raise SystemExit(0)
 
     if stdargs.config:
@@ -621,16 +606,16 @@ def main(custom_commands=None):
             show_summary=CONFIG.repository_show_summary,
         )
 
+    if stdargs.create_config:
+        Config.create_config_template()
+        raise SystemExit(0)
+
     if stdargs.ignore_type:
         GitignoreGenetor().create_gitignore(
             stdargs.ignore_type,
             dir_path=Repository_Path,
             timeout=CONFIG.gitignore_generator_timeout,
         )
-        raise SystemExit(0)
-
-    if stdargs.create_config:
-        Config.create_config_template()
         raise SystemExit(0)
 
     if stdargs.count:
@@ -645,14 +630,25 @@ def main(custom_commands=None):
         )
         raise SystemExit(0)
 
+    git_processor = GitProcessor(
+        use_recommend=CONFIG.gitprocessor_use_recommend,
+        show_original=CONFIG.gitprocessor_show_original,
+    )
+    if stdargs.show_commands:
+        git_processor.command_help()
+        raise SystemExit(0)
+
+    if stdargs.command_type:
+        git_processor.command_help_by_type(stdargs.command_type)
+        raise SystemExit(0)
+
+    if stdargs.types:
+        git_processor.type_help()
+        raise SystemExit(0)
+
     if stdargs.command:
         command = stdargs.command
-        GitProcessor.process_command(
-            command,
-            stdargs.args,
-            use_recommend=CONFIG.gitprocessor_use_recommend,
-            show_original=CONFIG.gitprocessor_show_original,
-        )
+        git_processor.process_command(command, stdargs.args)
         raise SystemExit(0)
 
     if not list(filter(lambda x: x, vars(stdargs).values())):
