@@ -3,6 +3,7 @@
 	"editor.tabSize": 4,
 	"cSpell.words": [
 		"CWORD",
+		"Cmds",
 		"Popen",
 		"RRGGBB",
 		"Unregister",
@@ -26,6 +27,7 @@
 		"rmvb",
 		"setcbreak",
 		"strtobool",
+		"stty",
 		"svgz",
 		"tcgetattr",
 		"tcsetattr",

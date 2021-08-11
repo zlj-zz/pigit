@@ -2,6 +2,6 @@ import sys
 
 sys.path.insert(0, ".")
 
-from pigit import command_g
+from pigit import main
 
-command_g()
+main()

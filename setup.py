@@ -40,7 +40,7 @@ setup(
     install_requires=[],
     entry_points="""
         [console_scripts]
-        g=pigit:command_g
+        pigit=pigit:main
     """,
     # python_requires=">=3.7",
 )

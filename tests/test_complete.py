@@ -3,7 +3,8 @@ from pprint import pprint
 
 sys.path.insert(0, ".")
 
-from pigit import ShellCompletion, GitProcessor
+from pigit import GitProcessor
+from pigit.shell_completion import ShellCompletion
 
 
 def test_generater():
@@ -11,6 +12,7 @@ def test_generater():
         print(item)
         s = ShellCompletion(
             {key: value["help-msg"] for key, value in GitProcessor.Git_Options.items()},
-            shell=item
+            shell=item,
+            script_dir=".",
         )
         pprint(s.generate_resource())
