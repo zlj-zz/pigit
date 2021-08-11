@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^
-Changelog of pygittools
+Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+v1.0.7 (2021-08-11)
+----------
+- Refactor config.
+- Compat with python2 of interactive mode.
+- Add delete and editor in interactive.
 
 v1.0.6 (2021-08-08)
 ----------
