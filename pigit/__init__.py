@@ -591,7 +591,7 @@ def main(custom_commands=None):
             key: value.get("help", "") for key, value in Git_Cmds.items()
         }
         completion_vars.update(process_argparse(parser._parser))
-        ShellCompletion(completion_vars, PIGIT_HOME).complete_and_use()
+        ShellCompletion(__project__, completion_vars, PIGIT_HOME).complete_and_use()
         raise SystemExit(0)
 
     if stdargs.config:

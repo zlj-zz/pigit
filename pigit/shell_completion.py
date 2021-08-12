@@ -28,21 +28,21 @@ class ShellCompletion(object):
     #   -C\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
     _TEMPLATE_ZSH = textwrap.dedent(
         """\
-        #compdef g
+        #compdef %(prop)s
 
-        complete_g(){
+        complete_%(prop)s(){
         local curcontext="$curcontext" state line ret=1
         typeset -A opt_args
 
         _alternative\\
           \'args:options arg:((\\
-            %s
+            %(complete_vars)s
           ))\'\\
           'files:filename:_files'
         return ret
         }
 
-        compdef complete_g g
+        compdef complete_%(prop)s %(prop)s
         """
     )
 
@@ -50,24 +50,24 @@ class ShellCompletion(object):
         """\
         #!/usr/env bash
 
-        _complete_g(){
+        _complete_%(prop)s(){
           if [[ "${COMP_CWORD}" == "1" ]];then
-              COMP_WORD="%s"
+              COMP_WORD="%(complete_vars)s"
               COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
           fi
         }
 
-        complete -F _complete_g g
+        complete -F _complete_%(prop)s %(prop)s
         """
     )
 
     _TEMPLATE_FISH = textwrap.dedent(
         """\
-        function complete_g;
+        function complete_%(prop)s;
             set -l response;
 
-            for value in (env %s=fish_complete COMP_WORDS=(commandline -cp) \
-        COMP_CWORD=(commandline -t) g);
+            for value in (env %(complete_vars)s=fish_complete COMP_WORDS=(commandline -cp) \
+        COMP_CWORD=(commandline -t) %(prop)s);
                 set response $response $value;
             end;
 
@@ -84,14 +84,14 @@ class ShellCompletion(object):
             end;
         end;
 
-        complete --no-files --command g --arguments \
-        "(complete_g)";
+        complete --no-files --command %(prop)s --arguments \
+        "(complete_%(prop)s)";
         """
     )
 
     Supported_Shell = ["zsh", "bash", "fish"]
 
-    def __init__(self, complete_vars, script_dir, shell=None, script_name=None):
+    def __init__(self, prop, complete_vars, script_dir, shell=None, script_name=None):
         """Initialization.
 
         Args:
@@ -109,6 +109,8 @@ class ShellCompletion(object):
             TypeError: when `complete_var` is not dict.
         """
         super(ShellCompletion, self).__init__()
+
+        self.prop = prop
         if not isinstance(complete_vars, dict):
             raise TypeError("complete_var muse be dict.")
         self.complete_vars = complete_vars
@@ -184,7 +186,7 @@ class ShellCompletion(object):
         if self.scirpt_name:
             script_name = self.scirpt_name
         complete_content = gen_completion()
-        script_src = template % (complete_content)
+        script_src = template % {"prop": self.prop, "complete_vars": complete_content}
 
         return script_name, script_src
 
@@ -235,7 +237,7 @@ class ShellCompletion(object):
             raise ShellCompletionError("Read shell config error: {}".format(e))
 
         has_injected = False
-        print(files)
+        # print(files)
         if files:
             has_injected = True
 
