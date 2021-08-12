@@ -5,7 +5,7 @@ import random
 
 from ..utils import run_cmd, color_print, confirm, similar_command
 from ..str_utils import shorten
-from ..common import Emotion, Color, TermColor, Fx
+from ..common import Fx, Color, TermColor, Emotion
 from .interaction import InteractiveAdd, TermError
 from .cmds import Git_Cmds
 
@@ -29,7 +29,7 @@ class GitProcessor(object):
         "Setting",
     ]
 
-    def __init__(self, use_recommend=True, show_original=True):
+    def __init__(self, extra_cmds=None, use_recommend=True, show_original=True):
         super(GitProcessor, self).__init__()
 
         self.use_recommend = use_recommend
@@ -48,6 +48,10 @@ class GitProcessor(object):
                 },
             }
         )
+        if extra_cmds:
+            if not isinstance(extra_cmds, dict):
+                raise TypeError("Custom cmds must be dict.")
+            self.cmds.update(extra_cmds)
 
     @staticmethod
     def color_command(command):

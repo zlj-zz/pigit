@@ -367,6 +367,22 @@ def introduce():
     print(" to get help and more usage.\n")
 
 
+def get_extra_cmds():
+    import imp
+
+    extra_cmd_path = PIGIT_HOME + "/extra_cmds.py"
+    # print(extra_cmd_path)
+    extra_cmds = {}
+    if os.path.isfile(extra_cmd_path):
+        try:
+            extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
+            extra_cmds = extra_cmd.extra_cmds
+        except Exception:
+            pass
+    # print(extra_cmds)
+    return extra_cmds
+
+
 class CustomHelpFormatter(argparse.HelpFormatter):
     """Formatter for generating usage messages and argument help strings.
 
@@ -631,6 +647,7 @@ def main(custom_commands=None):
         raise SystemExit(0)
 
     git_processor = GitProcessor(
+        extra_cmds=get_extra_cmds(),
         use_recommend=CONFIG.gitprocessor_use_recommend,
         show_original=CONFIG.gitprocessor_show_original,
     )
