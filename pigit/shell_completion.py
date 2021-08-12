@@ -96,12 +96,13 @@ class ShellCompletion(object):
 
         Args:
             complete_var (dict): complete arguments dict.
-                >>> complete_var = {
+                >>> complete_vars = {
                 ...     '-h': 'Display help messages',
                 ...     '-v': 'Show version and exit',
                 ... }
+            script_dir (str): where is the completion file save.
             shell (str, optional): shell type. Defaults to None.
-            name (str, optional): completion file name. Defaults to None.
+            script_name (str, optional): completion file name. Defaults to None.
             argparse_obj (ArgumentParser, optional): argparse.ArgumentParser. Defaults to None.
 
         Raises:
