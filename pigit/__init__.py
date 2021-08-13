@@ -48,7 +48,7 @@ from distutils.util import strtobool
 
 from .log import LogHandle
 from .compat import get_terminal_size
-from .utils import confirm, color_print
+from .utils import confirm, color_print, leave
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
@@ -57,6 +57,8 @@ from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
 from .command_processor import GitProcessor, Git_Cmds
 
+
+Log = logging.getLogger(__name__)
 
 #####################################################################
 # Part of compatibility.                                            #
@@ -74,57 +76,6 @@ else:
 
 LOG_PATH = PIGIT_HOME + "/log/{}.log".format(__project__)
 COUNTER_PATH = PIGIT_HOME + "/Counter"
-
-
-#####################################################################
-# Part of Utils.                                                    #
-# Some tools and methods for global use. Also contains some special #
-# global variables (readonly).                                      #
-#####################################################################
-Log = logging.getLogger(__name__)
-
-
-def ensure_path(dir_path):
-    """Determine whether the file path exists. If not, create a directory.
-
-    Args:
-        dir_path (str): Directory path, like: "~/.config/xxx"
-
-    >>> ensure_path('~/.config/pigit')
-    """
-    if not os.path.isdir(dir_path):
-        try:
-            os.makedirs(dir_path, exist_ok=True)
-        except PermissionError as e:
-            color_print("Don't have permission to create: %s" % dir_path)
-            exit(1, e)
-        except Exception as e:
-            color_print("An error occurred while creating %s" % dir_path)
-            exit(1, e)
-
-
-# Exit code.
-EXIT_NORMAL = 0
-EXIT_ERROR = 1
-
-
-def leave(code, *args):
-    """Exit program.
-
-    Receive error code, error message. If the error code matches, print the
-    error information to the log. Then the command line output prompt, and
-    finally exit.
-
-    Args:
-        code: Exit code.
-        *args: Other messages.
-    """
-
-    if code == EXIT_ERROR:
-        Log.error(args)
-        print("Please check {}".format(PIGIT_HOME))
-
-    raise SystemExit(0)
 
 
 class ConfigError(Exception):
@@ -304,7 +255,9 @@ class Config(object):
 
     @classmethod
     def create_config_template(cls):
-        ensure_path(PIGIT_HOME)
+        if not os.path.isdir(PIGIT_HOME):
+            os.makedirs(PIGIT_HOME, exist_ok=True)
+
         if os.path.exists(cls.Conf_Path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
@@ -365,6 +318,13 @@ def introduce():
     print(" and ", end="")
     color_print("--help", TermColor.Green, end="")
     print(" to get help and more usage.\n")
+
+
+def init_hook():
+    try:
+        signal.signal(signal.SIGINT, leave)
+    except Exception as e:
+        print(str(e))
 
 
 def get_extra_cmds():
@@ -585,12 +545,10 @@ class Parser(object):
 
 @time_it
 def main(custom_commands=None):
-    try:
-        signal.signal(signal.SIGINT, leave)
-    except Exception:
-        pass
+    init_hook()
 
     parser = Parser()
+    # parse custom comand, if has.
     if custom_commands is not None:
         stdargs = parser.parse(custom_commands)
     stdargs = parser.parse()

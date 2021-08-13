@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
 from __future__ import print_function, absolute_import
+import os
 import subprocess
 import logging
 from math import sqrt
@@ -9,6 +10,28 @@ from collections import Counter
 from .compat import input
 
 Log = logging.getLogger(__name__)
+
+# Exit code.
+EXIT_NORMAL = 0
+EXIT_ERROR = 1
+
+
+def leave(code, *args):
+    """Exit program.
+
+    Receive error code, error message. If the error code matches, print the
+    error information to the log. Then the command line output prompt, and
+    finally exit.
+
+    Args:
+        code: Exit code.
+        *args: Other messages.
+    """
+
+    if code == EXIT_ERROR:
+        Log.error(args)
+
+    raise SystemExit(0)
 
 
 def run_cmd(*args):
@@ -163,6 +186,23 @@ def color_print(value, *styles, **options):
     end = options.get("end", "\n")
     value = "%s%s\033[0m" % (_style, value)
     print(value, end=end)
+
+
+def dir_wether_ok(dir_path):
+    """Determine whether the dir path exists. If not, create a directory.
+
+    Args:
+        dir_path (str): Directory path, like: "~/.config/xxx"
+
+    >>> ensure_path('~/.config/pigit')
+    """
+    if os.path.isdir(dir_path):
+        return True
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+        return True
+    except Exception as e:
+        return False
 
 
 if __name__ == "__main__":
