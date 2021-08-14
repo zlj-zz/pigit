@@ -8,7 +8,7 @@ PYTHON3 = sys.version_info > (3, 0)
 if PYTHON3:
     input = input
     range = range
-    B = lambda x: x.encode("iso8859-1")
+    B = lambda x: x.encode("iso8859-1")  # noqa: E731
 
     import urllib.request
 
@@ -46,7 +46,7 @@ if PYTHON3:
 else:
     input = raw_input
     range = xrange
-    B = lambda x: x
+    B = lambda x: x  # noqa: E731
 
     import urllib2
 

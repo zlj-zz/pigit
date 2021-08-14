@@ -141,8 +141,8 @@ class Config(object):
         'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
         'codecounter_use_gitignore', 'codecounter_show_invalid', 'codecounter_result_format',
         'gitignore_generator_timeout',
-        'repository_show_path','repository_show_remote', 'repository_show_branchs',
-        'repository_show_lastest_log','repository_show_summary',
+        'repository_show_path', 'repository_show_remote', 'repository_show_branchs',
+        'repository_show_lastest_log', 'repository_show_summary',
         'help_use_color', 'help_max_line_width'
     ]
     # yapf: enable
@@ -199,13 +199,13 @@ class Config(object):
                     if line.startswith("#"):
                         # comment line.
                         continue
-                    if not "=" in line:
+                    if "=" not in line:
                         # invalid line.
                         continue
                     key, line = line.split("=", maxsplit=1)
                     key = key.strip()
                     line = line.strip().strip('"')
-                    if not key in self.keys:
+                    if key not in self.keys:
                         continue
                     if type(getattr(self, key)) == int:
                         try:

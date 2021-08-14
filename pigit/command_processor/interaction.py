@@ -10,7 +10,7 @@ from math import ceil
 # try to import needed pkg.
 # If import failed, set `TERM_CONTROL` is False.
 try:
-    import select, termios, fcntl, tty
+    import select, termios, fcntl, tty  # noqa: E401
 
     TERM_CONTROL = True
 except Exception:

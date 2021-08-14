@@ -21,6 +21,7 @@
 		"jfif",
 		"msecs",
 		"nargs",
+		"noqa",
 		"pigit",
 		"pygittools",
 		"pytest",
