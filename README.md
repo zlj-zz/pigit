@@ -23,11 +23,13 @@ pip install -U pigit
 git clone https://github.com/zlj-zz/pigit.git
 cd pigit
 make install
+# or
+python setup.py install
 ```
 
 ## Usage
 
-You can run `g` in terminal, and you will see this:
+You can run `pigit` in terminal, and you will see this:
 
 ```
 [pigit] version: 1.0.2-beta
@@ -46,10 +48,12 @@ You can use -h and --help to get help and more usage.
 
 ```
 
-You can run `g -h` or `g --help` to get the help message.
+You can run `pigit -h` or `pigit --help` to get the help message.
 
 ```bash
-usage: g [-h] [-c] [-s] [-S TYPE] [-t] [-f] [-i] [-v] [--create-ignore TYPE] [--debug] [--out-log] [command] [args ...]
+usage: pigit [-h] [-C] [-s] [-S TYPE] [-t] [-f] [-i] [-c [PATH]] [--create-ignore TYPE]
+             [--create-config] [--debug] [--out-log] [-v]
+             [command] [args ...]
 
 If you want to use some original git commands, please use -- to indicate.
 
@@ -59,19 +63,83 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -c, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`)
+  -C, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`)
   -s, --show-commands   List all available short command and wealth and exit.
   -S TYPE, --show-command TYPE
-                        According to given type(Branch, Commit, Conflict, Fetch, Index, Log, Merge, Push, Remote, Stash, Tag, Working
-                        tree, Setting) list available short command and wealth and exit.
+                        According to given type(Branch, Commit, Conflict, Fetch, Index,
+                        Log, Merge, Push, Remote, Stash, Tag, Working tree, Setting) list
+                        available short command and wealth and exit.
   -t, --types           List all command types and exit.
   -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
-  -v, --version         Show version and exit.
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c, dart, elisp, gitbook, go,
-                        java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity]
+  -c [PATH], --count [PATH]
+                        Count the number of codes and output them in tabular form. A given
+                        path can be accepted, and the default is the current directory.
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support:
+                        [android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin,
+                        lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift,
+                        unity]
+  --create-config       Create a preconfigured file of git-tools.
   --debug               Run in debug mode.
   --out-log             Print log to console.
+  -v, --version         Show version and exit.
 
-runtime: 0.001976s
+runtime: 0.001540s
 ```
+
+## Interaction
+
+You can use `pigit i` into the interactive mode. like this:
+
+![](./interaction.gif)
+
+And in the interaction mode, you can use `?` to see the help message.
+
+## Alias
+
+Alias is recommended for faster use. Open your shell profile and append:
+
+```bash
+alias g=pigit
+```
+
+Then, you can use `g` to call pigit.
+
+## Configuration
+
+You can use `pigit --create-config` to create a demo configuration at **pigit** home path.
+
+On Linux: `~/.config/pigit`
+
+[here](./docs/pigit.conf) is a configuration demo.
+
+### Extra cmds
+
+You can setting your custom cmds. Need create a `extra_cmds.py` file at the pigit home. And writing like this:
+
+```python
+import os
+
+def print_user(args):
+    print(os.system('whoami'))
+
+extra_cmds = {
+    'echo': {
+        'command': 'echo 123',
+    },
+    'print-user': {
+        'command': print_user,
+        'type': 'func',
+        'help': 'print system user name.'
+    }
+}
+```
+
+The `extra_cmds` dict is must. And the structure is command key and command info.
+
+The command info has some options:
+
+- `command`: (Must have) Short life corresponds to the complete command or a method. If it is a method, it must receive a parameter tuple.
+- `type`: (Option) Mark the type of command, support ['func', 'string'], and the default is 'string'.
+- `help`: (Option) Command help message.
+- `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.

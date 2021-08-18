@@ -2,6 +2,12 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.8 (2021-08-18)
+----------
+- Split package.
+- Fixed shell completion.
+- Allow setting custom cmds.
+
 v1.0.7 (2021-08-11)
 ----------
 - Refactor config.
