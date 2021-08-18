@@ -464,7 +464,11 @@ class InteractiveAdd(object):
 
         width, height = get_terminal_size()
         if height < self._min_height or width < self._min_width:
-            raise TermError("The minimum size of terminal should be 60 x 5.")
+            raise TermError(
+                "The minimum size of terminal should be {0} x {1}.".format(
+                    self._min_width, self._min_height
+                )
+            )
 
         if self._debug:  # debug show.
             print(Fx.clear_)
@@ -537,7 +541,9 @@ class InteractiveAdd(object):
                     new_width, new_height = get_terminal_size()
                     if new_height < self._min_height or new_width < self._min_width:
                         raise TermError(
-                            "The minimum size of terminal should be 60 x 5."
+                            "The minimum size of terminal should be {0} x {1}.".format(
+                                self._min_width, self._min_height
+                            )
                         )
                     # get diff, reassign.
                     line_diff = new_height - height
