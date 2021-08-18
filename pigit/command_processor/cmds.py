@@ -50,6 +50,11 @@ Git_Cmds = {
         "help": "renames a branch even if the new branch name already exists.",
         "has_arguments": True,
     },
+    "bd": {
+        "command": "git branch -d ",
+        "help": "delete a local branch by name.",
+        "has_arguments": True,
+    },
     # Commit
     "c": {
         "command": "git commit --verbose ",

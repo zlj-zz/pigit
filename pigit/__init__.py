@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.0.8"
+__version__ = "1.0.9.beta.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -78,6 +78,9 @@ LOG_PATH = PIGIT_HOME + "/log/{}.log".format(__project__)
 COUNTER_PATH = PIGIT_HOME + "/Counter"
 
 
+#####################################################################
+# Configuration.                                                    #
+#####################################################################
 class ConfigError(Exception):
     """Config error. Using by `Config`."""
 
@@ -328,6 +331,14 @@ def init_hook():
 
 
 def get_extra_cmds():
+    """Get custom cmds.
+
+    Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
+    exists, and return it. If not have, return a empty dict.
+
+    Returns:
+        (dict[str,str]): extra cmds dict.
+    """
     import imp
 
     extra_cmd_path = PIGIT_HOME + "/extra_cmds.py"
