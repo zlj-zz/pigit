@@ -10,6 +10,7 @@ if PYTHON3:
     range = range
     B = lambda x: x.encode("iso8859-1")  # noqa: E731
 
+    import queue as queue
     import urllib.request
 
     urlopen = urllib.request.urlopen
@@ -48,6 +49,7 @@ else:
     range = xrange
     B = lambda x: x  # noqa: E731
 
+    import Queue as queue
     import urllib2
 
     urlopen = urllib2.urlopen

@@ -16,7 +16,9 @@ try:
 except Exception:
     try:
         from pynput import keyboard
-        import queue
+
+        # import queue
+        from ..compat import queue
 
         NEED_EXTRA_KEYBOARD_EVENT_PKG = True
     except ModuleNotFoundError:
