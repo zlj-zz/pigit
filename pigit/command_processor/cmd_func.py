@@ -9,7 +9,7 @@ of parameters to be processed.
 
 import re
 
-from ..utils import run_cmd, color_print
+from ..utils import exec_cmd, run_cmd, color_print
 from ..common import Emotion, TermColor
 
 
@@ -71,3 +71,86 @@ def set_email_and_username(args):
         color_print("Successfully set.", TermColor.Green)
     else:
         color_print("Failed. Please check log.", TermColor.Red)
+
+
+def open_remote_url(args):
+    """Open remote.
+
+    Open the remote repository through the browser. Support additional parameter list.
+    When multiple parameters exist at the same time, only one will take effect.
+
+    -i, --issue:
+        open given issue of the repository.
+        pigit open -- -i 20
+        pigit open -- --issue=20
+    -c, --commit:
+        open the current commit in the repo website.
+        pigit open -- --commit
+    -p, --print:
+        only print the url at the terminal, but don't open it.
+    <branch>:
+        open the page for this branch on the repo website.
+    """
+
+    err, branches = exec_cmd("git branch")
+
+    branch = issue = commit = ""
+    if args:
+        i = 0
+        while i < len(args):
+            # -i 29 or --issue 29
+            if args[i].strip() in ["-i", "--issue"]:
+                try:
+                    issue_number = args[i + 1]
+                    int(issue_number)
+                    issue = "/issues/{0}".format(issue_number)
+                    i += 2
+                except:
+                    i += 1
+            # -i=29 or --issue=29
+            elif ("-i" in args[i] or "--issue" in args[i]) and "=" in args[i]:
+                issue_number = args[i].split("=")[-1]
+                try:
+                    int(issue_number)
+                    issue = "/issues/{0}".format(issue_number)
+                finally:
+                    i += 1
+            elif args[i].strip() in ["-c", "--commit"]:
+                err, commit_hash = exec_cmd("git log -n1 --format=format:'%H'")
+                if len(commit_hash.strip()) == 40:
+                    commit = "/commit/{0}".format(commit_hash.strip())
+                i += 1
+            else:
+                if re.search(args[i], branches):
+                    branch = "/tree/{0}".format(args[i])
+                i += 1
+
+    # Get remote name, exit when error.
+    err, remote = exec_cmd("git remote show")
+    if err:
+        print(err)
+        raise SystemExit(0)
+    remote = remote.strip().split("\n")[0]
+
+    # Get remote url, exit when error.
+    err, remote_url = exec_cmd("git ls-remote --get-url {0}".format(remote))
+    if err:
+        print(err)
+        raise SystemExit(0)
+    remote_url = remote_url[:-5]
+
+    # Splice URL, priority: branch > commit > issue
+    if branch:
+        remote_url += branch
+    elif commit:
+        remote_url += commit
+    elif issue:
+        remote_url += issue
+
+    # Adjust wether just need print.
+    if "-p" in args or "--print" in args:
+        print(remote_url)
+    else:
+        import webbrowser
+
+        webbrowser.open(remote_url + branch)
