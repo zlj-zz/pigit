@@ -24,6 +24,7 @@
 		"noqa",
 		"pigit",
 		"pygittools",
+		"pynput",
 		"pytest",
 		"rmvb",
 		"setcbreak",

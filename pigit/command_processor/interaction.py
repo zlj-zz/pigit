@@ -26,10 +26,11 @@ except Exception:
         print("Please install `pynput` to supported keyboard event.")
 
 from ..compat import get_terminal_size, B
-from ..utils import exec_cmd, run_cmd, confirm
+from ..utils import color_print, exec_cmd, run_cmd, confirm
 from ..str_utils import shorten, get_width
 from ..common import Fx, Color, TermColor
 from .model import File
+from ..git_utils import IS_Git_Repository
 
 
 #####################################################################
@@ -246,6 +247,9 @@ class InteractiveAdd(object):
         if err:
             raise Exception("Can't get git status.")
         for file in files.rstrip().split("\n"):
+            if not file.strip():
+                # skip blank line.
+                continue
             change = file[:2]
             staged_change = file[:1]
             unstaged_change = file[1:2]
@@ -322,7 +326,7 @@ class InteractiveAdd(object):
         else:
             _tracked = "--"
 
-        if "->" in file:  # rename
+        if "->" in file:  # rename status.
             file = file.split("->")[-1].strip()
 
         err, res = exec_cmd(
@@ -509,6 +513,10 @@ class InteractiveAdd(object):
     def add_interactive(self, *args):
         """Interactive main method."""
 
+        if not IS_Git_Repository:
+            color_print("Current path is not a git repository.", TermColor.Red)
+            raise SystemExit(-1)
+
         width, height = get_terminal_size()
         if height < self._min_height or width < self._min_width:
             raise TermError(
@@ -529,10 +537,13 @@ class InteractiveAdd(object):
 
         stopping = False
 
+        file_items = self.get_status(width)
+        if not file_items:
+            print("The work tree is clean and there is nothing to operate.")
+            raise SystemExit(0)
+
         # Into new term page.
         print(Fx.alt_screen + Fx.hide_cursor)
-
-        file_items = self.get_status(width)
         try:
             try:
                 #  try hook window resize event.
@@ -619,6 +630,7 @@ class InteractiveAdd(object):
                     else:
                         time.sleep(self.help_wait)
                 else:
+                    # If not needed input key, skip and wait.
                     continue
         except KeyboardInterrupt:
             pass
