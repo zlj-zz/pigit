@@ -9,12 +9,19 @@ from math import ceil
 
 # try to import needed pkg.
 # If import failed, set `TERM_CONTROL` is False.
+TERM_CONTROL = True
+NEED_EXTRA_KEYBOARD_EVENT_PKG = False
 try:
     import select, termios, fcntl, tty  # noqa: E401
-
-    TERM_CONTROL = True
 except Exception:
-    TERM_CONTROL = False
+    try:
+        from pynput import keyboard
+        import queue
+
+        NEED_EXTRA_KEYBOARD_EVENT_PKG = True
+    except ModuleNotFoundError:
+        TERM_CONTROL = False
+        print("Please install `pynput` to supported keyboard event.")
 
 from ..compat import get_terminal_size, B
 from ..utils import exec_cmd, run_cmd, confirm
@@ -100,6 +107,7 @@ class KeyEvent(object):
         "[21": "f10",
         "[23": "f11",
         "[24": "f12",
+        " ": "space",
     }
 
     _resize_pipe_rd, _resize_pipe_wr = os.pipe()
@@ -155,6 +163,34 @@ class KeyEvent(object):
                 return clean_key
 
 
+class WinKeyEvent(object):
+    _special_keys = {
+        "Key.space": "space",
+        "Key.up": "up",
+        "Key.down": "down",
+        "Key.esc": "escape",
+        "Key.enter": "enter",
+    }
+
+    def __init__(self):
+        super(WinKeyEvent, self).__init__()
+        self._queue = queue.Queue(maxsize=1)
+        self.listener = keyboard.Listener(on_press=self._on_press, suppress=True)
+        self.listener.start()
+
+    def _on_press(self, key):
+        # process and push to queue
+
+        self._queue.put(key)
+
+    def sync_get_input(self):
+        resp = str(self._queue.get(block=True, timeout=None)).strip("'")
+        if resp in self._special_keys:
+            return self._special_keys[resp]
+        else:
+            return resp
+
+
 #####################################################################
 # Part of command.                                                  #
 #####################################################################
@@ -166,6 +202,10 @@ class InteractiveAdd(object):
     """Interactive operation git tree status."""
 
     def __init__(self, use_color=True, cursor=None, help_wait=1.5, debug=False):
+        # Wether can into interactive.
+        if not TERM_CONTROL:
+            raise TermError("This behavior is not supported in the current system.")
+
         super(InteractiveAdd, self).__init__()
         self.use_color = use_color
         if not cursor:
@@ -179,6 +219,11 @@ class InteractiveAdd(object):
         self._min_height = 8
         self._min_width = 60
         self._debug = debug
+
+        if not NEED_EXTRA_KEYBOARD_EVENT_PKG:
+            self._keyevent = KeyEvent()
+        else:
+            self._keyevent = WinKeyEvent()
 
     def get_status(self, max_width, ident=2):
         """Get the file tree status of GIT for processing and encapsulation.
@@ -392,7 +437,7 @@ class InteractiveAdd(object):
                     extra += each_extra
 
             # TODO(zachary): sometime bug -- scroll with flash.
-            input_key = KeyEvent.sync_get_input()
+            input_key = self._keyevent.sync_get_input()
             if input_key in ["q", "escape"]:
                 # exit.
                 stopping = True
@@ -416,14 +461,18 @@ class InteractiveAdd(object):
                 # get new term height.
                 new_width, new_height = get_terminal_size()
                 if new_height < self._min_height or new_width < self._min_width:
-                    raise TermError("The minimum size of terminal should be 60 x 5.")
+                    raise TermError(
+                        "The minimum size of terminal should be {0} x {1}.".format(
+                            self._min_width, self._min_height
+                        )
+                    )
                 # get size diff, reassign.
                 line_diff = new_height - height
                 width, height = new_width, new_height
                 # get new display range.
                 display_range[1] += line_diff
                 diff_ = _process_diff(diff_raw, width)
-            elif input_key == "?":
+            elif input_key in ["?", "h"]:
                 # show help messages.
                 print(Fx.clear_)
                 print(
@@ -436,7 +485,7 @@ class InteractiveAdd(object):
                     ).format(self.help_wait)
                 )
                 if self.help_wait == 0:
-                    KeyEvent.sync_get_input()
+                    self._keyevent.sync_get_input()
                 else:
                     time.sleep(self.help_wait)
             else:
@@ -457,10 +506,6 @@ class InteractiveAdd(object):
 
     def add_interactive(self, *args):
         """Interactive main method."""
-
-        # Wether can into interactive.
-        if not TERM_CONTROL:
-            raise TermError("This behavior is not supported in the current system.")
 
         width, height = get_terminal_size()
         if height < self._min_height or width < self._min_width:
@@ -487,7 +532,11 @@ class InteractiveAdd(object):
 
         file_items = self.get_status(width)
         try:
-            KeyEvent.signal_init()
+            try:
+                #  try hook window resize event.
+                self._keyevent.signal_init()
+            except AttributeError:
+                pass
 
             # Start interactive.
             while not stopping:
@@ -505,7 +554,7 @@ class InteractiveAdd(object):
                         else:
                             print("  " + file.display_str)
 
-                input_key = KeyEvent.sync_get_input()
+                input_key = self._keyevent.sync_get_input()
                 if input_key in ["q", "escape"]:
                     # exit.
                     stopping = True
@@ -519,7 +568,7 @@ class InteractiveAdd(object):
                     # select next file.
                     cursor_row -= 1
                     cursor_row = cursor_row if cursor_row > 1 else 1
-                elif input_key in ["a", " "]:
+                elif input_key in ["a", "space"]:
                     self.process_file(file_items[cursor_row - 1])
                     file_items = self.get_status(width)
                 elif input_key == "d":
@@ -564,7 +613,7 @@ class InteractiveAdd(object):
                         ).format(self.help_wait)
                     )
                     if self.help_wait == 0:
-                        KeyEvent.sync_get_input()
+                        self._keyevent.sync_get_input()
                     else:
                         time.sleep(self.help_wait)
                 else:
@@ -573,5 +622,8 @@ class InteractiveAdd(object):
             pass
         finally:
             # Whatever, unregister signal event and restore terminal at last.
-            KeyEvent.signal_restore()
+            try:
+                self._keyevent.signal_restore()
+            except AttributeError:
+                pass
             print(Fx.normal_screen + Fx.show_cursor)
