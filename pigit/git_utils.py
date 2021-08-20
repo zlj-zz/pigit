@@ -69,7 +69,7 @@ def git_local_config():
                                 + Fx.reset
                             )
         except Exception as e:
-            color_print("Error reading configuration file. {}".format(e), TermColor.Red)
+            color_print("Error reading configuration file. {0}".format(e), TermColor.Red)
     else:
         color_print("This directory is not a git repository yet.", TermColor.Red)
 

@@ -14,12 +14,20 @@ from ..common import Emotion, TermColor
 
 
 def add(args):
+    """git add option.
+
+    Args:
+        args (list): arguments list, maybe empty. need file string.
+    """
+
+    # default add all.
     args_str = " ."
+    # process arguments if has.
     if args:
         args_str = " ".join(args)
 
     print(
-        "{} Storage file: {}".format(
+        "{0} Storage file: {1}".format(
             Emotion.Icon_Rainbow, "all" if args_str.strip() == "." else args_str
         )
     )
@@ -30,12 +38,18 @@ def fetch_remote_branch(args):
     branch = args[0] if len(args) > 1 else None
 
     if branch:
-        run_cmd("git fetch origin {}:{} ".format(branch, branch))
+        run_cmd("git fetch origin {0}:{0} ".format(branch))
     else:
         color_print("This option need a branch name.", TermColor.Red)
 
 
 def set_email_and_username(args):
+    """Set git username and email with interaction.
+
+    Args:
+        args (list): arguments list, maybe empty.
+    """
+
     print("Set the interactive environment of user name and email ...")
     __global = re.compile(r"\-\-global")
     for i in args:

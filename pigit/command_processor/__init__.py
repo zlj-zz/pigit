@@ -137,7 +137,7 @@ class GitProcessor(object):
         if not option.get("has_arguments", False):
             if args:
                 color_print(
-                    "The command does not accept parameters. Discard {}.".format(args),
+                    "The command does not accept parameters. Discard {0}.".format(args),
                     TermColor.Red,
                 )
                 args = []
@@ -153,8 +153,12 @@ class GitProcessor(object):
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
             if self.show_original:
-                print("{}  ".format(Emotion.Icon_Rainbow), end="")
-                print(self.color_command(command))
+                print(
+                    "{0}  {1}".format(
+                        Emotion.Icon_Rainbow, self.color_command(command)
+                    ),
+                    end="",
+                )
             run_cmd(command)
 
     ################################
@@ -244,7 +248,7 @@ class GitProcessor(object):
                     self.command_help_by_type(predicted_type)
             raise SystemExit(0)
 
-        print("These are the orders of {}".format(command_type))
+        print("These are the orders of {0}".format(command_type))
         prefix = command_type[0].lower()
         for k in self.cmds.keys():
             if k.startswith(prefix):
@@ -256,7 +260,7 @@ class GitProcessor(object):
         """Print all command types with random color."""
         for t in cls.Types:
             print(
-                "{}{}  ".format(
+                "{0}{1}  ".format(
                     Color.fg(
                         random.randint(70, 255),
                         random.randint(70, 255),

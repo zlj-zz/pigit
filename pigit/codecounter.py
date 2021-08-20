@@ -168,7 +168,7 @@ class CodeCounter(object):
         self.result_saved_path = result_saved_path
         if result_format not in self._support_format:
             raise CodeCounterError(
-                "Unsupported format, choice in {}".format(self._support_format)
+                "Unsupported format, choice in {0}".format(self._support_format)
             )
         self.result_format = result_format
 
@@ -227,13 +227,13 @@ class CodeCounter(object):
                         )
             except PermissionError:
                 if confirm(
-                    "Can't read {}, wether get jurisdiction[y/n]:".format(ignore_path)
+                    "Can't read {0}, wether get jurisdiction[y/n]:".format(ignore_path)
                 ):
                     os.chmod(ignore_path, stat.S_IXGRP)
                     os.chmod(ignore_path, stat.S_IWGRP)
                     self.process_gitignore(root, files)
             except Exception as e:
-                print("Read gitignore error: {}".format(e))
+                print("Read gitignore error: {0}".format(e))
 
     def matching(self, full_path):
         """Matching rules.
@@ -293,7 +293,7 @@ class CodeCounter(object):
     @staticmethod
     def _count_err_callback(e):
         """Handle of processing walk error."""
-        print("Walk error: {}".format(e))
+        print("Walk error: {0}".format(e))
         raise SystemExit(0)
 
     def count(self, root_path=".", use_ignore=True, progress=False):
@@ -505,15 +505,15 @@ class CodeCounter(object):
                 sum += value["lines"]
             print("-" * needed_width)
             # Print total and change graph.
-            print(" Total: {}".format(sum))
+            print(" Total: {0}".format(sum))
             if additions > 0 or deletions > 0:
                 print(" Altered: ", end="")
                 print(
-                    "{}{}".format(self.Symbol["+"], "+" * ceil(additions / 10)),
+                    "{0}{1}".format(self.Symbol["+"], "+" * ceil(additions / 10)),
                     end="",
                 )
                 print(
-                    "{}{}{}".format(
+                    "{0}{1}{2}".format(
                         self.Symbol["-"], "-" * ceil(deletions / 10), Fx.reset
                     )
                 )

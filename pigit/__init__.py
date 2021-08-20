@@ -74,7 +74,7 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-LOG_PATH = PIGIT_HOME + "/log/{}.log".format(__project__)
+LOG_PATH = PIGIT_HOME + "/log/{0}.log".format(__project__)
 COUNTER_PATH = PIGIT_HOME + "/Counter"
 
 
@@ -215,7 +215,7 @@ class Config(object):
                             new_config[key] = int(line)
                         except ValueError:
                             self.warnings.append(
-                                'Config key "{}" should be an integer!'.format(key)
+                                'Config key "{0}" should be an integer!'.format(key)
                             )
                     if type(getattr(self, key)) == bool:
                         try:
@@ -225,12 +225,14 @@ class Config(object):
                             new_config[key] = bool(strtobool(line))
                         except ValueError:
                             self.warnings.append(
-                                'Config key "{}" can only be True or False!'.format(key)
+                                'Config key "{0}" can only be True or False!'.format(
+                                    key
+                                )
                             )
                     if type(getattr(self, key)) == str:
                         if "color" in key and not self.is_color(line):
                             self.warnings.append(
-                                'Config key "{}" should be RGB, like: #FF0000'.format(
+                                'Config key "{0}" should be RGB, like: #FF0000'.format(
                                     key
                                 )
                             )
@@ -246,7 +248,7 @@ class Config(object):
         ):
             new_config["codecounter_result_format"] = "==error=="
             self.warnings.append(
-                'Config key "{}" support must in {}'.format(
+                'Config key "{0}" support must in {1}'.format(
                     "codecounter_result_format", self._supported_result_format
                 )
             )

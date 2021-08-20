@@ -119,7 +119,7 @@ class ShellCompletion(object):
             shell = self.get_current_shell()
         elif shell.strip() not in self.Supported_Shell:
             raise ValueError(
-                "shell name '{}' is not supported, see {}".format(
+                "shell name '{0}' is not supported, see {1}".format(
                     shell, self.Supported_Shell
                 )
             )
@@ -165,7 +165,7 @@ class ShellCompletion(object):
                 for k, desc in self.complete_vars.items():
                     if not desc:
                         desc = "no description."
-                    vars.append('    {}\\:"{}"\\'.format(k, desc))
+                    vars.append('    {0}\\:"{1}"\\'.format(k, desc))
 
                 return ("\n".join(vars)).strip()
 
@@ -234,7 +234,7 @@ class ShellCompletion(object):
                 _re = re.compile(r"{}[^\s]*".format(full_script_path))
                 files = _re.findall(shell_conf)
         except Exception as e:
-            raise ShellCompletionError("Read shell config error: {}".format(e))
+            raise ShellCompletionError("Read shell config error: {0}".format(e))
 
         has_injected = False
         # print(files)
@@ -245,7 +245,7 @@ class ShellCompletion(object):
             try:
                 run_cmd('echo "source %s" >> %s ' % (full_script_path, config_path))
             except Exception as e:
-                raise ShellCompletionError("Inject error: {}".format(e))
+                raise ShellCompletionError("Inject error: {0}".format(e))
             return True
         else:
             return False

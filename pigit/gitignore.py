@@ -132,7 +132,7 @@ class GitignoreGenetor(object):
             try:
                 with open(ignore_path, "w") as f:
                     f.write(ignore_content)
-                print("Write gitignore file successful. {}".format(Emotion.Icon_Smiler))
+                print("Write gitignore file successful. {0}".format(Emotion.Icon_Smiler))
             except Exception:
                 print("Write gitignore file failed.")
                 print("You can replace it with the following:")
