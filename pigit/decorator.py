@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function
+from __future__ import print_function, division
 import time
 from functools import wraps
 
@@ -10,6 +10,7 @@ def time_it(fn):
     When recursive calls exist, only the outermost layer is printed.
     """
     time_it.deep = 0
+    time_unit = ["second", "mintue", "hour"]
 
     @wraps(fn)
     def wrap_(*args, **kwargs):
@@ -22,7 +23,17 @@ def time_it(fn):
             pass
         time_it.deep -= 1
         if time_it.deep == 0:
-            print("\nruntime: %fs" % (time.time() - start_time))
+            used_time = time.time() - start_time
+
+            # Do unit optimization.
+            for i in range(2):
+                if used_time >= 60:
+                    used_time /= 60
+                else:
+                    break
+            else:
+                i = 2
+            print("\nruntime: {0:.2f} {1}".format(used_time, time_unit[i]))
         return res
 
     return wrap_

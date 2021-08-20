@@ -51,7 +51,7 @@ def run_cmd(*args):
             proc.wait()
         return True
     except Exception as e:
-        Log.warning(e)
+        Log.error(str(e))
         return False
 
 
@@ -63,17 +63,18 @@ def exec_cmd(*args):
     """
 
     try:
+        # Take over the input stream and get the return information.
         proc = subprocess.Popen(
             " ".join(args), stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
         )
+        # Get normal output and error output.
         res = proc.stdout.read().decode()
         err = proc.stderr.read().decode()
         proc.kill()
         return err, res
     except Exception as e:
-        Log.warning(e)
-        print(e)
-        return e, ""
+        Log.error(str(e))
+        return str(e), ""
 
 
 def confirm(text="", default=True):
@@ -137,24 +138,6 @@ def similar_command(command, all_commands):
         )
     )
 
-    def _comparison_reciprocal(a, b):
-        """
-        Returns how many identical letters
-        are compared from the head. sigmod
-        to 0 ~ 1.
-
-        Args:
-            a (str): need compare string.
-            b (str): need compare string.
-        """
-        i = 0
-        while i < len(a) and i < len(b):
-            if a[i] == b[i]:
-                i += 1
-            else:
-                break
-        return 1 / (i + 1)
-
     # The value of `frequency_sum_square` is multiplied by the weight to find
     # the minimum.
     # Distance weight: compensate for the effect of length difference.
@@ -167,7 +150,8 @@ def similar_command(command, all_commands):
             if len(command) / len(item[0])
             else len(item[0]) / len(command)
         )
-        * _comparison_reciprocal(command, item[0]),
+        # Returns how many identical letters are compared from the head. sigmod to 0 ~ 1.
+        * (1 / (len(list(filter(lambda i: i[0] == i[1], zip(command, item[0])))) + 1)),
     )[0]
     return min_frequency_command
 

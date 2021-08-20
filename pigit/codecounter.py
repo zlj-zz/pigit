@@ -296,7 +296,7 @@ class CodeCounter(object):
         print("Walk error: {0}".format(e))
         raise SystemExit(0)
 
-    def count(self, root_path=".", use_ignore=True, progress=False):
+    def count(self, root_path=".", use_ignore=True, progress=True):
         """Statistics file and returns the result dictionary.
 
         Args:
@@ -313,6 +313,8 @@ class CodeCounter(object):
             ...     }
             ... }
             >>> CodeCounter.count('~/.config', use_ignore=True)
+            invalid_list (list): invalid file list.
+            total_size (int): the sum size of all valid files.
         """
 
         if progress:
@@ -326,6 +328,7 @@ class CodeCounter(object):
         valid_counter = 0
         invalid_counter = 0
         invalid_list = []
+        total_size = 0
         for root, _, files in os.walk(
             root_path,
             onerror=self._count_err_callback,
@@ -345,6 +348,13 @@ class CodeCounter(object):
                 full_path = os.path.join(root, file)
                 is_effective = self.matching(full_path)
                 if is_effective:
+                    try:
+                        # Try read size of the valid file. Then do sum calc.
+                        size_ = os.path.getsize(full_path)
+                        total_size += size_
+                    except:
+                        pass
+
                     # Get file type.
                     type_ = self.adjudgment_type(file)
                     try:
@@ -358,7 +368,7 @@ class CodeCounter(object):
                             result[type_]["files"] += 1
                             result[type_]["lines"] += count
                         valid_counter += 1
-                    except Exception as e:
+                    except Exception:
                         invalid_counter += 1
                         invalid_list.append(file)
                         continue
@@ -371,7 +381,7 @@ class CodeCounter(object):
 
         if progress:
             print("")
-        return result, invalid_list
+        return result, invalid_list, total_size
 
     def load_recorded_result(self, root_path):
         """Load count result."""
@@ -519,7 +529,7 @@ class CodeCounter(object):
                 )
 
     def count_and_format_print(self, if_save=True, show_invalid=False):
-        result, invalid_list = self.count(self.count_path, self.use_ignore)
+        result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
         old_result = self.load_recorded_result(self.count_path)
         # diff print.
         self.format_print(result, old_result)
@@ -531,3 +541,14 @@ class CodeCounter(object):
             and confirm("Wether print invalid file list?[y/n]", default=False)
         ):
             print(invalid_list)
+
+        # optimize size unit.
+        size_unit = ["byte", "KB", "MB", "GB"]
+        for i in range(3):
+            if total_size >= 1024:
+                total_size /= 1024
+            else:
+                break
+        else:
+            i = 3
+        print(" Files total size: {0:.2f}{1}".format(total_size, size_unit[i]))
