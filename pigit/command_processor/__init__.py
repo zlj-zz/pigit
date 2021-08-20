@@ -7,27 +7,11 @@ from ..utils import run_cmd, color_print, confirm, similar_command
 from ..str_utils import shorten
 from ..common import Fx, Color, TermColor, Emotion
 from .interaction import InteractiveAdd, TermError
-from .cmds import Git_Cmds
+from .cmds import Git_Cmds, CommandType
 
 
 class GitProcessor(object):
     """Git short command processor."""
-
-    Types = [
-        "Branch",
-        "Commit",
-        "Conflict",
-        "Fetch",
-        "Index",
-        "Log",
-        "Merge",
-        "Push",
-        "Remote",
-        "Stash",
-        "Tag",
-        "Working tree",
-        "Setting",
-    ]
 
     def __init__(self, extra_cmds=None, use_recommend=True, show_original=True):
         super(GitProcessor, self).__init__()
@@ -39,6 +23,7 @@ class GitProcessor(object):
         self.cmds.update(
             {
                 "i": {
+                    "belong": CommandType.Index,
                     "command": InteractiveAdd(
                         # use_color=CONFIG.gitprocessor_interactive_color,
                         # help_wait=CONFIG.gitprocessor_interactive_help_showtime,
@@ -227,7 +212,8 @@ class GitProcessor(object):
         # Process received type.
         command_type = command_type.capitalize().strip()
 
-        if command_type not in self.Types:
+        # Checking the type wether right.
+        if command_type not in CommandType.__members__:
             color_print("There is no such type.", TermColor.Red)
             print("Please use `", end="")
             color_print("g --types", TermColor.Green, end="")
@@ -235,7 +221,9 @@ class GitProcessor(object):
                 "` to view the supported types.",
             )
             if self.use_recommend:
-                predicted_type = similar_command(command_type, self.Types)
+                predicted_type = similar_command(
+                    command_type, CommandType.__members__.keys()
+                )
                 print(
                     "%s The wanted type is %s ?"
                     % (
@@ -248,17 +236,19 @@ class GitProcessor(object):
                     self.command_help_by_type(predicted_type)
             raise SystemExit(0)
 
+        # Print help.
         print("These are the orders of {0}".format(command_type))
-        prefix = command_type[0].lower()
-        for k in self.cmds.keys():
-            if k.startswith(prefix):
+        for k, v in self.cmds.items():
+            belong = v.get("belong", CommandType.Extra)
+            # Prevent the `belong` attribute from being set in the custom command.
+            if isinstance(belong, CommandType) and belong.value == command_type:
                 msg = self._generate_help_by_key(k)
                 print(msg)
 
     @classmethod
     def type_help(cls):
         """Print all command types with random color."""
-        for t in cls.Types:
+        for member in CommandType:
             print(
                 "{0}{1}  ".format(
                     Color.fg(
@@ -266,7 +256,7 @@ class GitProcessor(object):
                         random.randint(70, 255),
                         random.randint(70, 255),
                     ),
-                    t,
+                    member.value,
                 ),
                 end="",
             )

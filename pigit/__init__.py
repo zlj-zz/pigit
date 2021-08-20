@@ -55,7 +55,7 @@ from .decorator import time_it
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
-from .command_processor import GitProcessor, Git_Cmds
+from .command_processor import GitProcessor, Git_Cmds, CommandType
 
 
 Log = logging.getLogger(__name__)
@@ -481,7 +481,7 @@ class Parser(object):
             metavar="TYPE",
             dest="command_type",
             help="According to given type(%s) list available short command and wealth and exit."
-            % ", ".join(GitProcessor.Types),
+            % ", ".join(CommandType.__members__.keys()),
         )
         self._parser.add_argument(
             "-t",
