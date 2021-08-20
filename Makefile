@@ -37,4 +37,7 @@ install: del
 todo:
 	@grep --color -Ion '\(TODO\|XXX\).*' -r $(Project)
 
-.PHONY: run lint clean del install release todo test
+uml:
+	pyreverse -ASmy -o png pigit -d docs
+
+.PHONY: run lint clean del install release todo test uml
