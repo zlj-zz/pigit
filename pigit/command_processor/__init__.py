@@ -13,7 +13,9 @@ from .cmds import Git_Cmds, CommandType
 class GitProcessor(object):
     """Git short command processor."""
 
-    def __init__(self, extra_cmds=None, use_recommend=True, show_original=True):
+    def __init__(
+        self, extra_cmds=None, use_recommend=True, show_original=True, **kwargs
+    ):
         super(GitProcessor, self).__init__()
 
         self.use_recommend = use_recommend
@@ -25,8 +27,8 @@ class GitProcessor(object):
                 "i": {
                     "belong": CommandType.Index,
                     "command": InteractiveAdd(
-                        # use_color=CONFIG.gitprocessor_interactive_color,
-                        # help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+                        use_color=kwargs.get("use_color", True),
+                        help_wait=kwargs.get("help_wait", 1.5),
                     ).add_interactive,
                     "help": "interactive operation git tree status.",
                     "type": "func",

@@ -621,6 +621,8 @@ def main(custom_commands=None):
         extra_cmds=get_extra_cmds(),
         use_recommend=CONFIG.gitprocessor_use_recommend,
         show_original=CONFIG.gitprocessor_show_original,
+        use_color=CONFIG.gitprocessor_interactive_color,
+        help_wait=CONFIG.gitprocessor_interactive_help_showtime,
     )
     if stdargs.show_commands:
         git_processor.command_help()
