@@ -16,7 +16,8 @@ widths = [
 
 
 def get_width(r):
-    """
+    """Gets the width occupied by characters on the command line.
+
     >>> get_width(ord('a'))
     1
     >>> get_width(ord('中'))
@@ -50,15 +51,14 @@ def shorten(text, width, placeholder="...", front=False):
     >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
     '^-^world!'
     """
+
     if len(text) > width:
         if front:
-            _text = placeholder + text[-width + len(placeholder) :]
+            text = placeholder + text[-width + len(placeholder) :]
         else:
-            _text = text[: width - len(placeholder)] + placeholder
-    else:
-        _text = text
+            text = text[: width - len(placeholder)] + placeholder
 
-    return _text
+    return text
 
 
 if __name__ == "__main__":

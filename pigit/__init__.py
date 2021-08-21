@@ -598,10 +598,9 @@ def main(custom_commands=None):
         raise SystemExit(0)
 
     if stdargs.ignore_type:
-        GitignoreGenetor().create_gitignore(
+        GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).create_gitignore(
             stdargs.ignore_type,
             dir_path=Repository_Path,
-            timeout=CONFIG.gitignore_generator_timeout,
         )
         raise SystemExit(0)
 

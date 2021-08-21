@@ -15,6 +15,8 @@ from .common import Color, Fx
 
 
 class CodeCounterError(Exception):
+    """CodeCounter error class."""
+
     pass
 
 
@@ -81,7 +83,7 @@ class CodeCounter(object):
         },
     ]
 
-    Rules = []
+    Rules = []  # Store the rules obtained after processing.
 
     Suffix_Types = {
         "": "",
@@ -141,6 +143,7 @@ class CodeCounter(object):
         "license": "LICENSE",
     }
 
+    # Colors displayed for different code quantities.
     Level_Color = [
         "",
         Color.fg("#EBCB8C"),  # yelllow

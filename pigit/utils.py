@@ -166,9 +166,8 @@ def color_print(value, *styles, **options):
         msg: A special message.
         style: Message style, like: [bold, underline].
     """
-    _style = "".join(styles)
+    value = "{0}{1}\033[0m".format("".join(styles), value)
     end = options.get("end", "\n")
-    value = "%s%s\033[0m" % (_style, value)
     print(value, end=end)
 
 

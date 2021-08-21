@@ -6,14 +6,15 @@ import subprocess
 
 PYTHON3 = sys.version_info > (3, 0)
 if PYTHON3:
+    import queue
+    import urllib.request
+
+    queue = queue
+    urlopen = urllib.request.urlopen
+
     input = input
     range = range
     B = lambda x: x.encode("iso8859-1")  # noqa: E731
-
-    import queue as queue
-    import urllib.request
-
-    urlopen = urllib.request.urlopen
 
     def get_terminal_size(fallback=(80, 24)):
         # fork from shutil.get_terminal_size()
@@ -45,14 +46,15 @@ if PYTHON3:
 
 
 else:
+    import Queue
+    import urllib2
+
+    queue = Queue
+    urlopen = urllib2.urlopen
+
     input = raw_input
     range = xrange
     B = lambda x: x  # noqa: E731
-
-    import Queue as queue
-    import urllib2
-
-    urlopen = urllib2.urlopen
 
     def get_terminal_size(fallback=(80, 24)):
         # reason: python2 not support get_terminal_size().

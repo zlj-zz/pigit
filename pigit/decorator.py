@@ -9,7 +9,7 @@ def time_it(fn):
     """Print the overall running time.
     When recursive calls exist, only the outermost layer is printed.
     """
-    time_it.deep = 0
+    time_it.deep = 0  # Mark recursion levels.
     time_unit = ["second", "mintue", "hour"]
 
     @wraps(fn)
@@ -22,6 +22,8 @@ def time_it(fn):
         except SystemExit:
             pass
         time_it.deep -= 1
+
+        # Indicates that the decorated method does not or end a recursive call.
         if time_it.deep == 0:
             used_time = time.time() - start_time
 

@@ -20,7 +20,7 @@ class GitignoreGenetor(object):
         SystemExit: No name.
     """
 
-    # Supported type.
+    # Supported type. https://github.com/github/gitignore
     Supported_Types = {
         "android": "Android",
         "c++": "C++",
@@ -46,11 +46,12 @@ class GitignoreGenetor(object):
         "unity": "Unity",
     }
 
-    def __init__(self):
+    def __init__(self, timeout=60):
         super(GitignoreGenetor, self).__init__()
 
-    @staticmethod
-    def parse_gitignore_page(content):
+        self.timeout = timeout
+
+    def parse_gitignore_page(self, content):
         """Parse html for getting gitignore content.
 
         Args:
@@ -60,17 +61,19 @@ class GitignoreGenetor(object):
             (str): gitignore template content.
         """
 
+        # findall table tag, should only one.
         text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
         if not text:
             return ""
 
+        # remove all html tag.
         content_re = re.compile(r"<\/?\w+.*?>", re.S)
         res = content_re.sub("", text[0])
+        # replace multi empty line to one line.
         res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
         return res
 
-    @staticmethod
-    def get_ignore_from_url(url, timeout=60):
+    def get_ignore_from_url(self, url):
         """Crawl gitignore template.
 
         Args:
@@ -84,8 +87,9 @@ class GitignoreGenetor(object):
         """
 
         try:
-            handle = urlopen(url, timeout=timeout)
+            handle = urlopen(url, timeout=self.timeout)
         except Exception:
+            # Exit once an error occurs.
             print("Failed to get content and will exit.")
             raise SystemExit(0)
 
@@ -93,13 +97,15 @@ class GitignoreGenetor(object):
 
         return content
 
-    def create_gitignore(self, genre, dir_path, timeout=60):
+    def create_gitignore(self, genre, dir_path):
         """Try to create gitignore template file.
 
         Args:
             genre (str): template type, like: 'python'.
+            dir_path (str): .gitignore file save path.
         """
 
+        # Process and check the type, and exit in case of any accident.
         name = self.Supported_Types.get(genre.lower(), None)
         if name is None:
             print("Unsupported type: %s" % genre)
@@ -125,14 +131,16 @@ class GitignoreGenetor(object):
                 "Will get ignore file content from %s"
                 % (Fx.italic + Fx.underline + target_url + Fx.reset)
             )
-            content = self.get_ignore_from_url(target_url, timeout=timeout)
+            content = self.get_ignore_from_url(target_url)
             ignore_content = self.parse_gitignore_page(content)
 
             print("Got content, trying to write ... ")
             try:
-                with open(ignore_path, "w") as f:
-                    f.write(ignore_content)
-                print("Write gitignore file successful. {0}".format(Emotion.Icon_Smiler))
+                with open(ignore_path, "w") as fd:
+                    fd.write(ignore_content)
+                print(
+                    "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
+                )
             except Exception:
                 print("Write gitignore file failed.")
                 print("You can replace it with the following:")

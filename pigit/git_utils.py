@@ -20,8 +20,8 @@ def git_version():
             return git_version_
         else:
             return None
-    except Exception:
-        Log.warning("Can not found Git in environment.")
+    except Exception as e:
+        Log.warning("Can not found Git in environment. [{0}]".format(str(e)))
         return None
 
 
@@ -69,7 +69,9 @@ def git_local_config():
                                 + Fx.reset
                             )
         except Exception as e:
-            color_print("Error reading configuration file. {0}".format(e), TermColor.Red)
+            color_print(
+                "Error reading configuration file. {0}".format(str(e)), TermColor.Red
+            )
     else:
         color_print("This directory is not a git repository yet.", TermColor.Red)
 
