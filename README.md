@@ -24,7 +24,7 @@ git clone https://github.com/zlj-zz/pigit.git
 cd pigit
 make install
 # or
-python setup.py install
+python setup.py install  # On windows
 ```
 
 ## Usage
@@ -32,20 +32,22 @@ python setup.py install
 You can run `pigit` in terminal, and you will see this:
 
 ```
-[pigit] version: 1.0.2-beta
+[pigit] version: 1.0.9
 git version 2.30.1 (Apple Git-130)
 
-Path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.0.2b0-py3.9.egg/pigit/__init__.py
+Path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.0.9-py3.9.egg/pigit/__init__.py
 
 Description:
-  Terminal tool, help you use git more simple. Support Linux and MacOS.
+  Terminal tool, help you use git more simple. Support Linux and MacOS. Partial support for windows.
   It use short command to replace the original command, like:
-  `g ws` -> `git status --short`, `g b` -> `git branch`.
+  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.
   Also you use `g -s` to get the all short command, have fun and good lucky.
   The open source path: https://github.com/zlj-zz/pigit.git
 
 You can use -h and --help to get help and more usage.
 
+
+runtime: 0.00 second
 ```
 
 You can run `pigit -h` or `pigit --help` to get the help message.
@@ -67,8 +69,8 @@ optional arguments:
   -s, --show-commands   List all available short command and wealth and exit.
   -S TYPE, --show-command TYPE
                         According to given type(Branch, Commit, Conflict, Fetch, Index,
-                        Log, Merge, Push, Remote, Stash, Tag, Working tree, Setting) list
-                        available short command and wealth and exit.
+                        Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Setting, Extra)
+                        list available short command and wealth and exit.
   -t, --types           List all command types and exit.
   -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
@@ -84,16 +86,34 @@ optional arguments:
   --out-log             Print log to console.
   -v, --version         Show version and exit.
 
-runtime: 0.001540s
+runtime: 0.00 second
 ```
 
-## Interaction
+### Interaction
 
-You can use `pigit i` into the interactive mode. like this:
+It support a simple interactive mode. You can use `pigit i` into the interactive mode. like this:
 
-![](./interaction.gif)
+![interaction demo](./interaction.gif)
 
 And in the interaction mode, you can use `?` to see the help message.
+
+### Open remote
+
+You can use `pigit open` to open your remote website (just support **github**). These are some other parameters supported:
+
+```bash
+  -i, --issue:
+      open given issue of the repository.
+      # pigit open -- -i 20
+      # pigit open -- --issue=20
+  -c, --commit:
+      open the current commit in the repo website.
+      # pigit open -- --commit
+  -p, --print:
+      only print the url at the terminal, but don't open it.
+  <branch>:
+      open the page for this branch on the repo website.
+```
 
 ## Alias
 
@@ -109,11 +129,11 @@ Then, you can use `g` to call pigit.
 
 You can use `pigit --create-config` to create a demo configuration at **pigit** home path.
 
-On Linux: `~/.config/pigit`
+On Linux or MacOS: `~/.config/pigit`
 
-[here](./docs/pigit.conf) is a configuration demo.
+[here](./docs/pigit.conf) is a configuration template.
 
-### Extra cmds
+## Extra cmds
 
 You can setting your custom cmds. Need create a `extra_cmds.py` file at the pigit home. And writing like this:
 

@@ -2,6 +2,14 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.0.9 (2021-08-24)
+----------
+- Update owned commands.
+- Supported interaction of windows.
+- Improved CodeCounter.
+- Fixed some error.
+- Update documents.
+
 v1.0.8 (2021-08-18)
 ----------
 - Split package.
