@@ -29,7 +29,7 @@ python setup.py install  # On windows
 
 ## Usage
 
-You can run `pigit` in terminal, and you will see this:
+You can run `pigit` in terminal, and you will see this intro:
 
 ```
 [pigit] version: 1.0.9
@@ -46,11 +46,10 @@ Description:
 
 You can use -h and --help to get help and more usage.
 
-
 runtime: 0.00 second
 ```
 
-You can run `pigit -h` or `pigit --help` to get the help message.
+You can run `pigit -h` or `pigit --help` to get the help message. Like this:
 
 ```bash
 usage: pigit [-h] [-C] [-s] [-S TYPE] [-t] [-f] [-i] [-c [PATH]] [--create-ignore TYPE]
@@ -89,17 +88,46 @@ optional arguments:
 runtime: 0.00 second
 ```
 
+**For example**
+
+You can use `pigit -s` to check what short command it suppored, it will display the corresponding help information and the original command, like this:
+
+```
+These are short commands that can replace git operations:
+    b        lists, creates, renames, and deletes branches.
+             git branch 
+    bc       creates a new branch.
+             git checkout -b 
+    bl       lists branches and their commits.
+             git branch -vv 
+    bL       lists local and remote branches and their commits.
+             git branch --all -vv 
+    bs       lists branches and their commits with ancestry graphs.
+             git show-branch 
+    bS       lists local and remote branches and their commits with ancestry graphs.
+             git show-branch --all 
+    bm       renames a branch.
+             git branch --move 
+    bM       renames a branch even if the new branch name already exists.
+             git branch --move --force 
+    bd       delete a local branch by name.
+             git branch -d 
+    c        records changes to the repository.
+             git commit --verbose 
+......
+```
+
 ### Interaction
 
-It support a simple interactive mode. You can use `pigit i` into the interactive mode. like this:
+It support a simple interactive mode. You can use `pigit i` into the interactive mode and it let control the working tree simpler. like this:
 
 ![interaction demo](./interaction.gif)
 
-And in the interaction mode, you can use `?` to see the help message.
+And in the interaction mode, you can use `?` or `h` to see the help message.
 
 ### Open remote
 
-You can use `pigit open` to open your remote website (just support **github**). These are some other parameters supported:
+You can use `pigit open` to open your remote website (just support **github**). These are some other parameters this command supported:
 
 ```bash
   -i, --issue:
@@ -117,7 +145,7 @@ You can use `pigit open` to open your remote website (just support **github**). 
 
 ## Alias
 
-Alias is recommended for faster use. Open your shell profile and append:
+Alias is recommended for faster use *pigit*. Open your shell profile and append:
 
 ```bash
 alias g=pigit
@@ -127,15 +155,17 @@ Then, you can use `g` to call pigit.
 
 ## Configuration
 
-You can use `pigit --create-config` to create a demo configuration at **pigit** home path.
+You can use `pigit --create-config` to create a template configuration at **pigit** home path.
 
 On Linux or MacOS: `~/.config/pigit`
+
+On windows should be: `C:\\User\\<your username>`
 
 [here](./docs/pigit.conf) is a configuration template.
 
 ## Extra cmds
 
-You can setting your custom cmds. Need create a `extra_cmds.py` file at the pigit home. And writing like this:
+You can setting your custom cmds. It need create a `extra_cmds.py` file at the **pigit** home. And writing like this:
 
 ```python
 import os
