@@ -3,9 +3,32 @@ import sys
 PYTHON_VERSION = sys.version_info[:2]
 
 try:
-    LONG_DESCRIPTION = open("README.md").read()
+    LONG_DESCRIPTION = open("README.md", encoding="utf-8").read()
 except Exception:
-    LONG_DESCRIPTION = ""
+    LONG_DESCRIPTION = """# pigit
+
+A terminal tool for git. When we use git, do you feel very uncomfortable with too long commands.
+For example: `git status --short`, this project can help you improve it. This project is written in Python.
+Now most UNIX like systems come with Python. So you can easily install and use it.
+
+## Installation
+
+### Pip
+
+```bash
+pip install -U pigit
+```
+
+### Source
+
+```bash
+git clone https://github.com/zlj-zz/pigit.git
+cd pigit
+make install
+# or
+python setup.py install  # On windows
+```
+    """
 
 from setuptools import setup, find_packages
 import pigit
@@ -23,6 +46,7 @@ setup(
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",

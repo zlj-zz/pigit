@@ -1,4 +1,4 @@
-# pigit
+# PIGIT
 
 ![Python 2.7](https://img.shields.io/badge/Python-v2.7%5E-green?logo=python)
 ![Python 3](https://img.shields.io/badge/Python-v3%5E-green?logo=python)
@@ -95,25 +95,25 @@ You can use `pigit -s` to check what short command it suppored, it will display 
 ```
 These are short commands that can replace git operations:
     b        lists, creates, renames, and deletes branches.
-             git branch 
+             git branch
     bc       creates a new branch.
-             git checkout -b 
+             git checkout -b
     bl       lists branches and their commits.
-             git branch -vv 
+             git branch -vv
     bL       lists local and remote branches and their commits.
-             git branch --all -vv 
+             git branch --all -vv
     bs       lists branches and their commits with ancestry graphs.
-             git show-branch 
+             git show-branch
     bS       lists local and remote branches and their commits with ancestry graphs.
-             git show-branch --all 
+             git show-branch --all
     bm       renames a branch.
-             git branch --move 
+             git branch --move
     bM       renames a branch even if the new branch name already exists.
-             git branch --move --force 
+             git branch --move --force
     bd       delete a local branch by name.
-             git branch -d 
+             git branch -d
     c        records changes to the repository.
-             git commit --verbose 
+             git commit --verbose
 ......
 ```
 
@@ -145,7 +145,7 @@ You can use `pigit open` to open your remote website (just support **github**). 
 
 ## Alias
 
-Alias is recommended for faster use *pigit*. Open your shell profile and append:
+Alias is recommended for faster use _pigit_. Open your shell profile and append:
 
 ```bash
 alias g=pigit
@@ -193,3 +193,5 @@ The command info has some options:
 - `type`: (Option) Mark the type of command, support ['func', 'string'], and the default is 'string'.
 - `help`: (Option) Command help message.
 - `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
+
+---
