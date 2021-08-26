@@ -3,10 +3,13 @@
 from __future__ import print_function
 import os
 import re
+import logging
 
 from .compat import urlopen
 from .utils import confirm
 from .common import Fx, Emotion
+
+Log = logging.getLogger(__name__)
 
 
 class GitignoreGenetor(object):
@@ -88,7 +91,8 @@ class GitignoreGenetor(object):
 
         try:
             handle = urlopen(url, timeout=self.timeout)
-        except Exception:
+        except Exception as e:
+            Log.error(str(e))
             # Exit once an error occurs.
             print("Failed to get content and will exit.")
             raise SystemExit(0)
@@ -141,7 +145,8 @@ class GitignoreGenetor(object):
                 print(
                     "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
                 )
-            except Exception:
+            except Exception as e:
+                Log.error(str(e))
                 print("Write gitignore file failed.")
                 print("You can replace it with the following:")
                 print("#" * 60)

@@ -2,6 +2,7 @@
 
 from __future__ import print_function, absolute_import
 import os
+import signal
 import subprocess
 import logging
 from math import sqrt
@@ -185,7 +186,15 @@ def dir_wether_ok(dir_path):
         os.makedirs(dir_path, exist_ok=True)
         return True
     except Exception as e:
+        Log.error(str(e))
         return False
+
+
+def init_hook():
+    try:
+        signal.signal(signal.SIGINT, leave)
+    except Exception as e:
+        print(str(e))
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ __copyright__ = "Copyright (c) 2021 Zachary"
 
 import os
 import sys
-import signal
+import re
 import argparse
 import logging
 import logging.handlers
@@ -48,7 +48,7 @@ from distutils.util import strtobool
 
 from .log import LogHandle
 from .compat import get_terminal_size
-from .utils import confirm, color_print, leave
+from .utils import confirm, color_print, init_hook
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
@@ -67,6 +67,7 @@ Log = logging.getLogger(__name__)
 
 # For windows.
 IS_WIN = sys.platform.lower().startswith("win")
+Log.debug("Runtime platform is windows: {0}".format(IS_WIN))
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
     PIGIT_HOME = os.path.join(USER_HOME, __project__)
@@ -81,6 +82,9 @@ COUNTER_PATH = PIGIT_HOME + "/Counter"
 #####################################################################
 # Configuration.                                                    #
 #####################################################################
+Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
+
+
 class ConfigError(Exception):
     """Config error. Using by `Config`."""
 
@@ -88,9 +92,12 @@ class ConfigError(Exception):
 
 
 class Config(object):
+    """PIGIT configuration class."""
+
     Conf_Path = PIGIT_HOME + "/pigit.conf"
+
     Config_Template = textwrap.dedent(
-        """
+        """\
         #? Config file for pigit v. {version}
         # Git-tools -- pigit configuration.
 
@@ -135,11 +142,15 @@ class Config(object):
 
         # The max line width when use `-h` get help message.
         help_max_line_width={help_max_line_width}
+
+        # Wether run PIGIT in debug mode.
+        debug_mode={debug_mode}
+
         """
     )
 
     # yapf: disable
-    keys = [
+    _keys = [
         'gitprocessor_show_original', 'gitprocessor_use_recommend',
         'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
         'codecounter_use_gitignore', 'codecounter_show_invalid', 'codecounter_result_format',
@@ -150,6 +161,7 @@ class Config(object):
     ]
     # yapf: enable
 
+    # config default values.
     gitprocessor_show_original = True
     gitprocessor_use_recommend = True
     gitprocessor_interactive_color = True
@@ -171,6 +183,8 @@ class Config(object):
     help_use_color = True
     help_max_line_width = 90
 
+    debug_mode = False
+
     # Store warning messages.
     warnings = []
 
@@ -181,11 +195,8 @@ class Config(object):
         else:
             self.config_path = path
         conf = self.load_config()
-        # from pprint import pprint
 
-        # print(len(conf))
-        # pprint(conf)
-        for key in self.keys:
+        for key in self._keys:
             if key in conf.keys() and conf[key] != "==error==":
                 setattr(self, key, conf[key])
 
@@ -206,18 +217,21 @@ class Config(object):
                         # invalid line.
                         continue
                     key, line = line.split("=", maxsplit=1)
+                    # processing.
                     key = key.strip()
                     line = line.strip().strip('"')
-                    if key not in self.keys:
+                    # checking.
+                    if key not in self._keys:
+                        self.warnings.append("'{0}' is not be supported!".format(key))
                         continue
-                    if type(getattr(self, key)) == int:
+                    elif type(getattr(self, key)) == int:
                         try:
                             new_config[key] = int(line)
                         except ValueError:
                             self.warnings.append(
                                 'Config key "{0}" should be an integer!'.format(key)
                             )
-                    if type(getattr(self, key)) == bool:
+                    elif type(getattr(self, key)) == bool:
                         try:
                             # True values are y, yes, t, true, on and 1;
                             # false values are n, no, f, false, off and 0.
@@ -229,10 +243,10 @@ class Config(object):
                                     key
                                 )
                             )
-                    if type(getattr(self, key)) == str:
+                    elif type(getattr(self, key)) == str:
                         if "color" in key and not self.is_color(line):
                             self.warnings.append(
-                                'Config key "{0}" should be RGB, like: #FF0000'.format(
+                                'Config key "{0}" should be RGB string, like: #FF0000'.format(
                                     key
                                 )
                             )
@@ -241,7 +255,7 @@ class Config(object):
         except Exception as e:
             Log.error(str(e))
 
-        if (
+        if (  # check codecounter output format wether supported.
             "codecounter_result_format" in new_config
             and new_config["codecounter_result_format"]
             not in self._supported_result_format
@@ -253,10 +267,16 @@ class Config(object):
                 )
             )
 
+        if "version" not in new_config or new_config["version"] != __version__:
+            self.warnings.append(
+                "The current configuration file is not up-to-date."
+                "You'd better recreate it."
+            )
+
         return new_config
 
-    def is_color(self, v):
-        return v and v.startswith("#") and len(v) == 7
+    def is_color(self, s):
+        return s and Color_Re.match(s)
 
     @classmethod
     def create_config_template(cls):
@@ -274,7 +294,7 @@ class Config(object):
                 f.write(cls.Config_Template.format(version=__version__, **vars(cls)))
             print("Successful.")
         except Exception as e:
-            # print(str(e))
+            Log.error(str(e))
             print("Failed, create config.")
 
 
@@ -311,7 +331,7 @@ def introduce():
             " Support Linux and MacOS. Partial support for windows.\n"
             "  It use short command to replace the original command, like: \n"
             "  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.\n"
-            "  Also you use `g -s` to get the all short command, have fun"
+            "  Also you use `pigit -s` to get the all short command, have fun"
             " and good lucky.\n"
             "  The open source path: %s" % (TermColor.SkyBlue + Fx.underline + __url__)
         ),
@@ -323,13 +343,6 @@ def introduce():
     print(" and ", end="")
     color_print("--help", TermColor.Green, end="")
     print(" to get help and more usage.\n")
-
-
-def init_hook():
-    try:
-        signal.signal(signal.SIGINT, leave)
-    except Exception as e:
-        print(str(e))
 
 
 def get_extra_cmds():
@@ -509,7 +522,7 @@ class Parser(object):
             type=str,
             metavar="PATH",
             help=(
-                "Count the number of codes and output them in tabular form.\n"
+                "Count the number of codes and output them in tabular form."
                 "A given path can be accepted, and the default is the current directory."
             ),
         )
@@ -529,7 +542,7 @@ class Parser(object):
         self._parser.add_argument(
             "--debug",
             action="store_true",
-            help="Run in debug mode.",
+            help="Current runtime in debug mode.",
         )
         self._parser.add_argument(
             "--out-log",
@@ -569,7 +582,7 @@ def main(custom_commands=None):
 
     # Setup log handle.
     LogHandle.setup_logging(
-        debug=stdargs.debug,
+        debug=stdargs.debug or CONFIG.debug_mode,
         log_file=None if stdargs.out_log else LOG_PATH,
     )
 
@@ -640,6 +653,7 @@ def main(custom_commands=None):
         git_processor.process_command(command, stdargs.args)
         raise SystemExit(0)
 
+    # Don't have invalid command list.
     if not list(filter(lambda x: x, vars(stdargs).values())):
         introduce()
 

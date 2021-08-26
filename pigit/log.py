@@ -49,7 +49,7 @@ class LogHandle(object):
                         log_file, maxBytes=1048576, backupCount=4
                     )
                 except PermissionError:
-                    print('No permission to write to "{}" directory!'.format(log_file))
+                    print("No permission to write to '{0}' directory!".format(log_file))
                     raise SystemExit(1)
 
         log_handle.setFormatter(formatter)
