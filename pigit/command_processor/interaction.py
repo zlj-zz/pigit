@@ -2,196 +2,16 @@
 
 from __future__ import division, print_function
 import os
-import sys
-import signal
 import time
 from math import ceil
 
-# try to import needed pkg.
-# If import failed, set `TERM_CONTROL` is False.
-TERM_CONTROL = True
-NEED_EXTRA_KEYBOARD_EVENT_PKG = False
-try:
-    import select, termios, fcntl, tty  # noqa: E401
-except Exception:
-    try:
-        from pynput import keyboard
-
-        # import queue
-        from ..compat import queue
-
-        NEED_EXTRA_KEYBOARD_EVENT_PKG = True
-    except ModuleNotFoundError:
-        TERM_CONTROL = False
-        print("Please install `pynput` to supported keyboard event.")
-
-from ..compat import get_terminal_size, B
+from ..compat import get_terminal_size
 from ..utils import color_print, exec_cmd, run_cmd, confirm
 from ..str_utils import shorten, get_width
 from ..common import Fx, Color, TermColor
+from ..keyevent import get_keyevent_obj
 from .model import File
 from ..git_utils import IS_Git_Repository
-
-
-#####################################################################
-# KeyBoard event.                                                    #
-#####################################################################
-class KeyEvent(object):
-    """KeyBoard event class.
-
-    Subclass:
-        Raw: Set raw input mode for device.
-        Nonblocking: Set nonblocking mode for device.
-
-    Attributes:
-        escape: Translation dictionary.
-        _resized: windows resize handle.
-
-    Functions:
-        signal_init: Register signal events.
-        signal_restore: Unregister signal events.
-        sync_get_key: get one input value, will wait until get input.
-    """
-
-    class Raw(object):
-        """Set raw input mode for device"""
-
-        def __init__(self, stream):
-            self.stream = stream
-            self.fd = self.stream.fileno()
-
-        def __enter__(self):
-            # Get original fd descriptor.
-            self.original_descriptor = termios.tcgetattr(self.stream)
-            # Change the mode of the file descriptor fd to cbreak.
-            tty.setcbreak(self.stream)
-
-        def __exit__(self, type, value, traceback):
-            termios.tcsetattr(self.stream, termios.TCSANOW, self.original_descriptor)
-
-    class Nonblocking(object):
-        """Set nonblocking mode for device"""
-
-        def __init__(self, stream):
-            self.stream = stream
-            self.fd = self.stream.fileno()
-
-        def __enter__(self):
-            self.orig_fl = fcntl.fcntl(self.fd, fcntl.F_GETFL)
-            fcntl.fcntl(self.fd, fcntl.F_SETFL, self.orig_fl | os.O_NONBLOCK)
-
-        def __exit__(self, *args):
-            fcntl.fcntl(self.fd, fcntl.F_SETFL, self.orig_fl)
-
-    escape = {
-        "\n": "enter",
-        ("\x7f", "\x08"): "backspace",
-        ("[A", "OA"): "up",
-        ("[B", "OB"): "down",
-        ("[D", "OD"): "left",
-        ("[C", "OC"): "right",
-        "[2~": "insert",
-        "[3~": "delete",
-        "[H": "home",
-        "[F": "end",
-        "[5~": "page_up",
-        "[6~": "page_down",
-        "\t": "tab",
-        "[Z": "shift_tab",
-        "OP": "f1",
-        "OQ": "f2",
-        "OR": "f3",
-        "OS": "f4",
-        "[15": "f5",
-        "[17": "f6",
-        "[18": "f7",
-        "[19": "f8",
-        "[20": "f9",
-        "[21": "f10",
-        "[23": "f11",
-        "[24": "f12",
-        " ": "space",
-    }
-
-    _resize_pipe_rd, _resize_pipe_wr = os.pipe()
-    _resized = False
-
-    @classmethod
-    def _sigwinch_handler(cls, signum, frame=None):
-        if not cls._resized:
-            os.write(cls._resize_pipe_wr, B("R"))
-        cls._resized = True
-
-    @classmethod
-    def signal_init(cls):
-        signal.signal(signal.SIGWINCH, cls._sigwinch_handler)
-
-    @classmethod
-    def signal_restore(cls):
-        signal.signal(signal.SIGWINCH, signal.SIG_DFL)
-
-    @classmethod
-    def sync_get_input(cls):
-        while True:
-            with cls.Raw(sys.stdin):
-                if cls._resized:
-                    cls._resized = False
-                    clean_key = "windows resize"
-                    return clean_key
-
-                # * Wait 100ms for input on stdin then restart loop to check for stop flag
-                if not select.select([sys.stdin], [], [], 0.1)[0]:
-                    continue
-                input_key = sys.stdin.read(1)
-                if input_key == "\033":
-                    # * Set non blocking to prevent read stall
-                    with cls.Nonblocking(sys.stdin):
-                        input_key += sys.stdin.read(20)
-                        if input_key.startswith("\033[<"):
-                            _ = sys.stdin.read(1000)
-                # print(repr(input_key))
-                if input_key == "\033":
-                    clean_key = "escape"
-                elif input_key == "\\":
-                    clean_key = "\\"  # * Clean up "\" to not return escaped
-                else:
-                    for code in cls.escape:
-                        if input_key.lstrip("\033").startswith(code):
-                            clean_key = cls.escape[code]
-                            break
-                    else:
-                        clean_key = input_key
-
-                # print(clean_key)
-                return clean_key
-
-
-class WinKeyEvent(object):
-    _special_keys = {
-        "Key.space": "space",
-        "Key.up": "up",
-        "Key.down": "down",
-        "Key.esc": "escape",
-        "Key.enter": "enter",
-    }
-
-    def __init__(self):
-        super(WinKeyEvent, self).__init__()
-        self._queue = queue.Queue(maxsize=1)
-        self.listener = keyboard.Listener(on_press=self._on_press, suppress=True)
-        self.listener.start()
-
-    def _on_press(self, key):
-        # process and push to queue
-
-        self._queue.put(key)
-
-    def sync_get_input(self):
-        resp = str(self._queue.get(block=True, timeout=None)).strip("'")
-        if resp in self._special_keys:
-            return self._special_keys[resp]
-        else:
-            return resp
 
 
 #####################################################################
@@ -201,32 +21,9 @@ class TermError(Exception):
     pass
 
 
-class InteractiveAdd(object):
-    """Interactive operation git tree status."""
-
-    def __init__(self, use_color=True, cursor=None, help_wait=1.5, debug=False):
-        # Wether can into interactive.
-        if not TERM_CONTROL:
-            raise TermError("This behavior is not supported in the current system.")
-
-        super(InteractiveAdd, self).__init__()
+class DataHandle(object):
+    def __init__(self, use_color):
         self.use_color = use_color
-        if not cursor:
-            self.cursor = "→"
-        elif len(cursor) == 1:
-            self.cursor = cursor
-        else:
-            self.cursor = "→"
-            print("The cursor symbol entered is not supported.")
-        self.help_wait = help_wait
-        self._min_height = 8
-        self._min_width = 60
-        self._debug = debug
-
-        if not NEED_EXTRA_KEYBOARD_EVENT_PKG:
-            self._keyevent = KeyEvent()
-        else:
-            self._keyevent = WinKeyEvent()
 
     def get_status(self, max_width, ident=2):
         """Get the file tree status of GIT for processing and encapsulation.
@@ -296,7 +93,7 @@ class InteractiveAdd(object):
 
         return file_items
 
-    def diff(self, file, tracked=True, cached=False, plain=False):
+    def get_file_diff(self, file, tracked=True, cached=False, plain=False):
         """Gets the modification of the file.
 
         Args:
@@ -336,6 +133,32 @@ class InteractiveAdd(object):
             return "Can't get diff."
         return res.rstrip()
 
+
+class InteractiveAdd(object):
+    """Interactive operation git tree status."""
+
+    def __init__(self, use_color=True, cursor=None, help_wait=1.5, debug=False):
+        super(InteractiveAdd, self).__init__()
+        self.use_color = use_color
+        if not cursor:
+            self.cursor = "→"
+        elif len(cursor) == 1:
+            self.cursor = cursor
+        else:
+            self.cursor = "→"
+            print("The cursor symbol entered is not supported.")
+        self.help_wait = help_wait
+        self._min_height = 8
+        self._min_width = 60
+        self._debug = debug
+
+        self._keyevent = get_keyevent_obj()
+        # Wether can into interactive.
+        if not self._keyevent:
+            raise TermError("This behavior is not supported in the current system.")
+
+        self._data_handle = DataHandle(use_color)
+
     def process_file(self, file):
         """Process file to change the status.
 
@@ -355,23 +178,6 @@ class InteractiveAdd(object):
 
     # def loop(self, display_fn, dispaly_args=[], display_kwargs={}):
     #     pass
-
-    def extra_occupied_rows(self, text, term_width):
-        """Gets the number of additional lines occupied by a line of text in terminal.
-        Used by `show_diff`.
-
-        Args:
-            text (str): text string.
-            term_width (int): terminal width.
-
-        Returns:
-            (int): extra lines. min is 0.
-        """
-
-        count = 0
-        for ch in text:
-            count += get_width(ord(ch))
-        return ceil(count / term_width) - 1
 
     def show_diff(self, file_obj):
         """Interactive display file diff.
@@ -409,7 +215,7 @@ class InteractiveAdd(object):
             return new_list
 
         # only need get once.
-        diff_raw = self.diff(
+        diff_raw = self._data_handle.get_file_diff(
             file_obj.name,
             file_obj.tracked,
             file_obj.has_staged_change,
@@ -537,7 +343,7 @@ class InteractiveAdd(object):
 
         stopping = False
 
-        file_items = self.get_status(width)
+        file_items = self._data_handle.get_status(width)
         if not file_items:
             print("The work tree is clean and there is nothing to operate.")
             raise SystemExit(0)
@@ -583,17 +389,17 @@ class InteractiveAdd(object):
                     cursor_row = cursor_row if cursor_row > 1 else 1
                 elif input_key in ["a", "space"]:
                     self.process_file(file_items[cursor_row - 1])
-                    file_items = self.get_status(width)
+                    file_items = self._data_handle.get_status(width)
                 elif input_key == "d":
                     self.discard_changed(file_items[cursor_row - 1])
-                    file_items = self.get_status(width)
+                    file_items = self._data_handle.get_status(width)
                 elif input_key == "e":
                     editor = os.environ.get("EDITOR", None)
                     if editor:
                         run_cmd(
                             '{} "{}"'.format(editor, file_items[cursor_row - 1].name)
                         )
-                        file_items = self.get_status(width)
+                        file_items = self._data_handle.get_status(width)
                     else:
                         pass
                 elif input_key == "enter":

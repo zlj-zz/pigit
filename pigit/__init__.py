@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.0.9"
+__version__ = "1.0.10.beta.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -278,20 +278,27 @@ class Config(object):
     def is_color(self, s):
         return s and Color_Re.match(s)
 
-    @classmethod
-    def create_config_template(cls):
+    def create_config_template(self):
         if not os.path.isdir(PIGIT_HOME):
             os.makedirs(PIGIT_HOME, exist_ok=True)
 
-        if os.path.exists(cls.Conf_Path) and not confirm(
+        if os.path.exists(self.Conf_Path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
             return
+
+        # Try to load already has config.
+        conf = self.load_config()
+        for key in self._keys:
+            if key in conf.keys() and conf[key] != "==error==":
+                setattr(self, key, conf[key])
+
+        # Write config. Will save before custom setting.
         try:
             with open(
-                cls.Conf_Path, "w" if os.path.isfile(cls.Conf_Path) else "x"
+                self.Conf_Path, "w" if os.path.isfile(self.Conf_Path) else "x"
             ) as f:
-                f.write(cls.Config_Template.format(version=__version__, **vars(cls)))
+                f.write(self.Config_Template.format(version=__version__, **vars(self)))
             print("Successful.")
         except Exception as e:
             Log.error(str(e))
@@ -607,7 +614,7 @@ def main(custom_commands=None):
         )
 
     if stdargs.create_config:
-        Config.create_config_template()
+        CONFIG.create_config_template()
         raise SystemExit(0)
 
     if stdargs.ignore_type:
