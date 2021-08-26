@@ -99,6 +99,14 @@ class Config(object):
     Config_Template = textwrap.dedent(
         """\
         #? Config file for pigit v. {version}
+
+        #  ____ ___ ____ ___ _____                            __ _                       _   _
+        # |  _ \_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _ _   _ _ __ __ _| |_(_) ___  _ __
+        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \| '_ \| |_| |/ _` | | | | '__/ _` | __| |/ _ \| '_ \\
+        # |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| | |_| | | | (_| | |_| | (_) | | | |
+        # |_|  |___\____|___| |_|            \___\___/|_| |_|_| |_|\__, |\__,_|_|  \__,_|\__|_|\___/|_| |_|
+
+
         # Git-tools -- pigit configuration.
 
         # Show original git command.
@@ -119,6 +127,9 @@ class Config(object):
 
         # Wether show files that cannot be counted.
         codecounter_show_invalid={codecounter_show_invalid}
+
+        # Wether show files icons. Font support required, like: 'Nerd Font'
+        codecounter_show_icon={codecounter_show_icon}
 
         # Output format of statistical results.
         # Supported: [table, simple]
@@ -153,11 +164,13 @@ class Config(object):
     _keys = [
         'gitprocessor_show_original', 'gitprocessor_use_recommend',
         'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
-        'codecounter_use_gitignore', 'codecounter_show_invalid', 'codecounter_result_format',
+        'codecounter_use_gitignore', 'codecounter_show_invalid',
+        'codecounter_result_format', 'codecounter_show_icon',
         'gitignore_generator_timeout',
         'repository_show_path', 'repository_show_remote', 'repository_show_branchs',
         'repository_show_lastest_log', 'repository_show_summary',
-        'help_use_color', 'help_max_line_width'
+        'help_use_color', 'help_max_line_width',
+        'debug_mode'
     ]
     # yapf: enable
 
@@ -169,6 +182,7 @@ class Config(object):
 
     codecounter_use_gitignore = True
     codecounter_show_invalid = False
+    codecounter_show_icon = False
     codecounter_result_format = "table"  # table, simple
     _supported_result_format = ["table", "simple"]
 
@@ -267,7 +281,7 @@ class Config(object):
                 )
             )
 
-        if "version" not in new_config or new_config["version"] != __version__:
+        if "version" in new_config and new_config["version"] != __version__:
             self.warnings.append(
                 "The current configuration file is not up-to-date."
                 "You'd better recreate it."
@@ -290,15 +304,16 @@ class Config(object):
         # Try to load already has config.
         conf = self.load_config()
         for key in self._keys:
-            if key in conf.keys() and conf[key] != "==error==":
-                setattr(self, key, conf[key])
+            if not conf.get(key, None) or conf[key] == "==error==":
+                conf[key] = getattr(self, key)
+        conf["version"] = __version__
 
         # Write config. Will save before custom setting.
         try:
             with open(
                 self.Conf_Path, "w" if os.path.isfile(self.Conf_Path) else "x"
             ) as f:
-                f.write(self.Config_Template.format(version=__version__, **vars(self)))
+                f.write(self.Config_Template.format(**conf))
             print("Successful.")
         except Exception as e:
             Log.error(str(e))
@@ -631,6 +646,7 @@ def main(custom_commands=None):
             use_ignore=CONFIG.codecounter_use_gitignore,
             result_saved_path=COUNTER_PATH,
             result_format=CONFIG.codecounter_result_format,
+            use_icon=CONFIG.codecounter_show_icon,
         ).count_and_format_print(
             show_invalid=CONFIG.codecounter_show_invalid,
         )

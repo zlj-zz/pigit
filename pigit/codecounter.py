@@ -87,18 +87,19 @@ class CodeCounter(object):
 
     Suffix_Types = {
         "": "",
+        "bat": "Batch",
         "c": "C",
         "conf": "Properties",
         "cfg": "Properties",
-        "hpp": "C++",
         "cpp": "C++",
         "cs": "C#",
         "css": "CSS",
-        "bat": "Batch",
         "dart": "Dart",
+        "dea": "XML",
         "go": "Go",
         "gradle": "Groovy",
         "h": "C",
+        "hpp": "C++",
         "htm": "HTML",
         "html": "HTML",
         "java": "Java",
@@ -106,47 +107,87 @@ class CodeCounter(object):
         "jsx": "React",
         "json": "Json",
         "kt": "Kotlin",
+        "launch": "XML",
         "less": "CSS",
         "lua": "Lua",
-        "md": "Markdown",
         "markdown": "Markdown",
+        "md": "Markdown",
+        "msg": "ROS Message",
         "php": "PHP",
         "py": "Python",
         "plist": "XML",
         "properties": "Propertie",
+        "r": "R",
+        "rc": "Properties",
+        "rb": "Ruby",
+        "rs": "Rust",
+        "rst": "reStructuredText",
+        "rviz": "YAML",
         "ts": "Type Script",
         "tsx": "React",
-        "rst": "reStructuredText",
         "sass": "CSS",
         "scss": "CSS",
         "sh": "Shell",
+        "sql": "SQL",
         "swift": "Swift",
-        "vue": "Vue",
+        "srdf": "YAML",
+        "srv": "ROS Message",
+        "toml": "Properties",
+        "urdf": "XML",
         "vim": "Vim Scirpt",
+        "vue": "Vue",
+        "xhtml": "HTML",
         "xml": "XML",
         "yaml": "YAML",
         "yml": "YAML",
         "zsh": "Shell",
-        "dea": "XML",
-        "urdf": "XML",
-        "launch": "XML",
-        "rb": "Ruby",
-        "rs": "Rust",
-        "rviz": "YAML",
-        "srdf": "YAML",
-        "msg": "ROS Message",
-        "srv": "ROS Message",
     }
 
     Special_Names = {
         "requirements.txt": "Pip requirement",
         "license": "LICENSE",
+        "vimrc": "Vim Scirpt",
+    }
+
+    File_Icons = {
+        "": "",
+        "Batch": "",
+        "C": "",
+        "C#": "",
+        "C++": "",
+        "CSS": "",
+        "Dart": "",
+        "Groovy": "",
+        "Go": "",
+        "HTML": "",
+        "Java": "",
+        "Java Scirpt": "",
+        "Lua": "",
+        "Kotlin": "",
+        "Markdown": "",
+        "PHP": "",
+        "Propertie": "",
+        "Python": "",
+        "R": "ﳒ",
+        "React": "",
+        "Ruby": "",
+        "Rust": "",
+        "ROS Message": "",
+        "reStructuredText": "",
+        "Shell": "",
+        "Swift": "",
+        "SQL": "",
+        "Type Scirpt": "",
+        "Vim Scirpt": "",
+        "Vue": "﵂",
+        "YAML": "",
+        "XML": "",
     }
 
     # Colors displayed for different code quantities.
     Level_Color = [
         "",
-        Color.fg("#EBCB8C"),  # yelllow
+        Color.fg("#EBCB8C"),  # yellow
         Color.fg("#FF6347"),  # tomato
         Color.fg("#C71585"),  # middle violet red
         Color.fg("#87CEFA"),  # skyblue
@@ -164,6 +205,7 @@ class CodeCounter(object):
         use_ignore=True,
         result_saved_path="",
         result_format="table",
+        use_icon=False,
     ):
         super(CodeCounter, self).__init__()
         self.count_path = count_path
@@ -174,6 +216,7 @@ class CodeCounter(object):
                 "Unsupported format, choice in {0}".format(self._support_format)
             )
         self.result_format = result_format
+        self.use_icon = use_icon
 
     def process_gitignore(self, root, files):
         """Process `.gitignore` files and add matching rules.
@@ -185,8 +228,8 @@ class CodeCounter(object):
 
         root = root.replace("\\", "/")
         if ".gitignore" in files:
+            ignore_path = os.path.join(root, ".gitignore")
             try:
-                ignore_path = os.path.join(root, ".gitignore")
                 with open(ignore_path) as f:
                     ignore_content = filter(
                         # Filter out comment lines.
@@ -466,8 +509,10 @@ class CodeCounter(object):
             additions = 0
             deletions = 0
             for key, value in new.items():
+                if self.use_icon:
+                    key = "{0} {1}".format(self.File_Icons.get(key, ""), key)
                 # Processing too long name.
-                key = shorten(key, 20, front=True)
+                key = shorten(key, 20, front=False)
 
                 # Set color.
                 lines_color = self.Level_Color[self.color_index(value["lines"])]
