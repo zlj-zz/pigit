@@ -26,6 +26,7 @@ class DataHandle(object):
         self.use_color = use_color
 
     def get_status(self, max_width, ident=2):
+        # type:(int, int) -> list[File]
         """Get the file tree status of GIT for processing and encapsulation.
 
         Args:
@@ -160,6 +161,7 @@ class InteractiveAdd(object):
         self._data_handle = DataHandle(use_color)
 
     def process_file(self, file):
+        # type:(File) -> None
         """Process file to change the status.
 
         Args:
@@ -304,6 +306,7 @@ class InteractiveAdd(object):
                 continue
 
     def discard_changed(self, file):
+        # type:(File) -> None
         """Discard file all changed.
 
         Args:

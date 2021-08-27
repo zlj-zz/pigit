@@ -79,6 +79,7 @@ def repository_info(
     show_lastest_log=True,
     show_summary=True,
 ):
+    # type:(bool, bool, bool, bool, bool) -> None
     """Print some information of the repository.
 
     repository: `Repository_Path`

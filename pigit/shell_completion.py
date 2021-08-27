@@ -92,6 +92,7 @@ class ShellCompletion(object):
     Supported_Shell = ["zsh", "bash", "fish"]
 
     def __init__(self, prop, complete_vars, script_dir, shell=None, script_name=None):
+        # type:(str, dict, str, bool|None, bool|None) -> None
         """Initialization.
 
         Args:
@@ -258,21 +259,26 @@ class ShellCompletion(object):
         current_shell = self.shell
         print("Detected shell: %s" % current_shell)
 
+        # check shell validable.
         if current_shell in self.Supported_Shell:
-            script_name, completion_src = self.generate_resource()
-            if self.write_completion(script_name, completion_src):
-                try:
-                    injected = self.inject_into_shell(script_name)
-                    if injected:
-                        print("Source your shell configuration.")
-                    else:
-                        print("Command already exist.")
-                except Exception as e:
-                    print(e)
-            else:
-                print("Write completion script failed.")
-        else:
             print("Don't support completion of %s" % current_shell)
+            return
+
+        # try create completion file.
+        script_name, completion_src = self.generate_resource()
+        if self.write_completion(script_name, completion_src):
+            print("Write completion script failed.")
+            return
+
+        # try inject to shell config.
+        try:
+            injected = self.inject_into_shell(script_name)
+            if injected:
+                print("Source your shell configuration.")
+            else:
+                print("Command already exist.")
+        except Exception as e:
+            print(e)
 
 
 def process_argparse(argparse_obj):

@@ -610,4 +610,4 @@ Git_Cmds = {
         "type": "func",
         "has_arguments": True,
     },
-}
+}  # type: dict[str,dict]

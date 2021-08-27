@@ -35,6 +35,7 @@ def get_width(r):
 
 
 def shorten(text, width, placeholder="...", front=False):
+    # type:(str, int, str, bool) -> str
     """Truncate exceeded characters.
 
     Args:

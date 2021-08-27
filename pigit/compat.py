@@ -46,14 +46,14 @@ if PYTHON3:
 
 
 else:
-    import Queue
-    import urllib2
+    import Queue  # type: ignore
+    import urllib2  # type: ignore
 
     queue = Queue
     urlopen = urllib2.urlopen
 
-    input = raw_input
-    range = xrange
+    input = raw_input  # type: ignore
+    range = xrange  # type: ignore
     B = lambda x: x  # noqa: E731
 
     def get_terminal_size(fallback=(80, 24)):

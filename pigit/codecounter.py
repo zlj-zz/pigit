@@ -207,6 +207,7 @@ class CodeCounter(object):
         result_format="table",
         use_icon=False,
     ):
+        # type:(str, bool, str, str, bool) -> None
         super(CodeCounter, self).__init__()
         self.count_path = count_path
         self.use_ignore = use_ignore
@@ -364,7 +365,7 @@ class CodeCounter(object):
             else:
                 _msg = "\r:: [{:,} | {:,}]"
 
-        result = {}
+        result = {}  # type: dict[str,dict]
         valid_counter = invalid_counter = 0
         invalid_list = []
         total_size = 0
@@ -504,9 +505,13 @@ class CodeCounter(object):
             for key, value in new.items():
                 if self.use_icon:
                     #     
-                    key = "{0} {1}".format(self.File_Icons.get(key, ""), key)
+                    key_display_str = "{0} {1}".format(
+                        self.File_Icons.get(key, ""), key
+                    )
+                else:
+                    key_display_str = key
                 # Processing too long name.
-                key = shorten(key, 20, front=False)
+                key_display_str = shorten(key_display_str, 20, front=False)
 
                 # Set color.
                 lines_color = self.Level_Color[self.color_index(value["lines"])]
@@ -542,7 +547,7 @@ class CodeCounter(object):
                         "| {file_style}{:<11,}{reset} {file_change_style}{file_change:>5}{reset}"
                         "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
                     ).format(
-                        key,
+                        key_display_str,
                         value["files"],
                         value["lines"],
                         file_style=Fx.italic,
