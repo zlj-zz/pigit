@@ -14,14 +14,10 @@ Log = logging.getLogger(__name__)
 
 def git_version():
     """Get Git version."""
-    try:
-        _, git_version_ = exec_cmd("git --version")
-        if git_version_:
-            return git_version_
-        else:
-            return None
-    except Exception as e:
-        Log.warning("Can not found Git in environment. [{0}]".format(str(e)))
+    _, git_version_ = exec_cmd("git --version")
+    if git_version_:
+        return git_version_
+    else:
         return None
 
 
@@ -106,15 +102,16 @@ def repository_info(
         try:
             with open(Repository_Path + "/.git/config", "r") as cf:
                 config = cf.read()
-                res = re.findall(r"url\s=\s(.*)", config)
-                remote = "\n".join(
-                    [
-                        "\t%s%s%s%s" % (Fx.italic, TermColor.SkyBlue, x, Fx.reset)
-                        for x in res
-                    ]
-                )
         except Exception:
             remote = error_str
+        else:
+            res = re.findall(r"url\s=\s(.*)", config)
+            remote = "\n".join(
+                [
+                    "\t%s%s%s%s" % (Fx.italic, TermColor.SkyBlue, x, Fx.reset)
+                    for x in res
+                ]
+            )
         print("Remote: \n%s\n" % remote)
     # Get all branches.
     if show_branches:

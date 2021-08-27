@@ -218,7 +218,7 @@ class CodeCounter(object):
         self.result_format = result_format
         self.use_icon = use_icon
 
-    def process_gitignore(self, root, files):
+    def process_gitignore(self, root):
         """Process `.gitignore` files and add matching rules.
 
         Args:
@@ -226,60 +226,53 @@ class CodeCounter(object):
             files (list): The list of all file names under the `root` path.
         """
 
-        root = root.replace("\\", "/")
-        if ".gitignore" in files:
-            ignore_path = os.path.join(root, ".gitignore")
-            try:
-                with open(ignore_path) as f:
-                    ignore_content = filter(
-                        # Filter out comment lines.
-                        lambda x: x and not x.startswith("#"),
-                        map(
-                            # Filter out white space lines.
-                            # Replace `\` to `/` for windows.
-                            lambda x: x.strip().replace("\\", "/"),
-                            # Read the file and split the lines.
-                            f.read().split("\n"),
-                        ),
-                    )
+        root = root.replace("\\", "/")  # Unified symbol.
+        ignore_path = os.path.join(root, ".gitignore")
+        try:
+            with open(ignore_path) as f:
+                ignore_content = filter(
+                    # Filter out comment lines.
+                    lambda x: x and not x.startswith("#"),
+                    map(
+                        # Filter out white space lines.
+                        # Replace `\` to `/` for windows.
+                        lambda x: x.strip().replace("\\", "/"),
+                        # Read the file and split the lines.
+                        f.read().split("\n"),
+                    ),
+                )
+        except PermissionError:
+            if confirm(
+                "Can't read {0}, wether get jurisdiction[y/n]:".format(ignore_path)
+            ):
+                os.chmod(ignore_path, stat.S_IXGRP)
+                os.chmod(ignore_path, stat.S_IWGRP)
+                self.process_gitignore(root)
+        except Exception as e:
+            print("Read gitignore error: {0}".format(e))
+        else:
+            for item in ignore_content:
+                is_negative = item[0] == "!"
+                if is_negative:
+                    item = item[1:]
 
-                    for item in ignore_content:
-                        is_negative = item[0] == "!"
-                        if is_negative:
-                            item = item[1:]
+                slash_index = item.find("/")
+                if slash_index == 0:
+                    item = root + item
+                elif slash_index == -1 or slash_index == len(item) - 1:
+                    item = "/".join([root, "**", item])
+                else:
+                    item = "/".join([root, item])
 
-                        slash_index = item.find("/")
-                        if slash_index == 0:
-                            item = root + item
-                        elif slash_index == -1 or slash_index == len(item) - 1:
-                            item = "/".join([root, "**", item])
-                        else:
-                            item = "/".join([root, item])
-
-                        item = re.sub(
-                            r"([\{\}\(\)\+\.\^\$\|])", r"\1", item
-                        )  # escape char
-                        item = re.sub(r"(^|[^\\])\?", ".", item)
-                        item = re.sub(r"\/\*\*", "([\\\\/][^\\\\/]+)?", item)  # /**
-                        item = re.sub(r"\*\*\/", "([^\\\\/]+[\\\\/])?", item)  # **/
-                        item = re.sub(r"\*", "([^\\\\/]+)", item)  # for `*`
-                        item = re.sub(r"\?", "*", item)  # for `?``
-                        item = re.sub(r"([^\/])$", r"\1(([\\\\/].*)|$)", item)
-                        item = re.sub(
-                            r"\/$", "(([\\\\/].*)|$)", item
-                        )  # for trialing with `/`
-                        self.Rules.append(
-                            {"pattern": re.compile(item), "include": is_negative}
-                        )
-            except PermissionError:
-                if confirm(
-                    "Can't read {0}, wether get jurisdiction[y/n]:".format(ignore_path)
-                ):
-                    os.chmod(ignore_path, stat.S_IXGRP)
-                    os.chmod(ignore_path, stat.S_IWGRP)
-                    self.process_gitignore(root, files)
-            except Exception as e:
-                print("Read gitignore error: {0}".format(e))
+                item = re.sub(r"([\{\}\(\)\+\.\^\$\|])", r"\1", item)  # escape char
+                item = re.sub(r"(^|[^\\])\?", ".", item)
+                item = re.sub(r"\/\*\*", "([\\\\/][^\\\\/]+)?", item)  # /**
+                item = re.sub(r"\*\*\/", "([^\\\\/]+[\\\\/])?", item)  # **/
+                item = re.sub(r"\*", "([^\\\\/]+)", item)  # for `*`
+                item = re.sub(r"\?", "*", item)  # for `?``
+                item = re.sub(r"([^\/])$", r"\1(([\\\\/].*)|$)", item)
+                item = re.sub(r"\/$", "(([\\\\/].*)|$)", item)  # for trialing with `/`
+                self.Rules.append({"pattern": re.compile(item), "include": is_negative})
 
     def matching(self, full_path):
         """Matching rules.
@@ -342,7 +335,7 @@ class CodeCounter(object):
         print("Walk error: {0}".format(e))
         raise SystemExit(0)
 
-    def count(self, root_path=".", use_ignore=True, progress=True):
+    def count(self, root_path, use_ignore=True, progress=True):
         """Statistics file and returns the result dictionary.
 
         Args:
@@ -352,15 +345,16 @@ class CodeCounter(object):
 
         Return:
             result (dict): Dictionary containing statistical results.
-            >>> result = {
-            ...     'py': {
-            ...         'files': 5,
-            ...         'lines': 2124,
-            ...     }
-            ... }
-            >>> CodeCounter.count('~/.config', use_ignore=True)
             invalid_list (list): invalid file list.
             total_size (int): the sum size of all valid files.
+
+        >>> result = {
+        ...     'py': {
+        ...         'files': 5,
+        ...         'lines': 2124,
+        ...     }
+        ... }
+        >>> CodeCounter().count('~/.config', use_ignore=True)
         """
 
         if progress:
@@ -371,8 +365,7 @@ class CodeCounter(object):
                 _msg = "\r:: [{:,} | {:,}]"
 
         result = {}
-        valid_counter = 0
-        invalid_counter = 0
+        valid_counter = invalid_counter = 0
         invalid_list = []
         total_size = 0
         for root, _, files in os.walk(
@@ -386,8 +379,8 @@ class CodeCounter(object):
             if not is_effective_dir:
                 continue
 
-            if use_ignore:
-                self.process_gitignore(root, files)
+            if use_ignore and ".gitignore" in files:
+                self.process_gitignore(root)
 
             # TODO: Would it be better to use threads?
             for file in files:
@@ -406,7 +399,11 @@ class CodeCounter(object):
                     try:
                         with open(full_path) as f:
                             count = len(f.read().split("\n"))
-
+                    except Exception:
+                        invalid_counter += 1
+                        invalid_list.append(file)
+                        continue
+                    else:
                         # Superposition.
                         if result.get(type_, None) is None:
                             result[type_] = {"files": 1, "lines": count}
@@ -414,10 +411,6 @@ class CodeCounter(object):
                             result[type_]["files"] += 1
                             result[type_]["lines"] += count
                         valid_counter += 1
-                    except Exception:
-                        invalid_counter += 1
-                        invalid_list.append(file)
-                        continue
                     finally:
                         if progress:
                             print(
@@ -510,7 +503,8 @@ class CodeCounter(object):
             deletions = 0
             for key, value in new.items():
                 if self.use_icon:
-                    key = "{0} {1}".format(self.File_Icons.get(key, ""), key)
+                    #     
+                    key = "{0} {1}".format(self.File_Icons.get(key, ""), key)
                 # Processing too long name.
                 key = shorten(key, 20, front=False)
 

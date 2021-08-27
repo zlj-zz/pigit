@@ -119,6 +119,7 @@ def similar_command(command, all_commands):
     >>> similar_command('com', commands)
     'commit'
     """
+
     #  The dictionary of letter frequency of all commands.
     words = {word: dict(Counter(word)) for word in all_commands}
     # Letter frequency of command.
@@ -167,6 +168,7 @@ def color_print(value, *styles, **options):
         msg: A special message.
         style: Message style, like: [bold, underline].
     """
+
     value = "{0}{1}\033[0m".format("".join(styles), value)
     end = options.get("end", "\n")
     print(value, end=end)
@@ -180,6 +182,7 @@ def dir_wether_ok(dir_path):
 
     >>> ensure_path('~/.config/pigit')
     """
+
     if os.path.isdir(dir_path):
         return True
     try:
@@ -191,6 +194,7 @@ def dir_wether_ok(dir_path):
 
 
 def init_hook():
+    """Take over some system signals, which are used at the beginning of PIGIT."""
     try:
         signal.signal(signal.SIGINT, leave)
     except Exception as e:

@@ -18,7 +18,8 @@ def test_regular_rule(path: str = os.getcwd()):
     for root, dirs, files in os.walk(path):
 
         # Process .gitignore to add new rule.
-        counter.process_gitignore(root, files)
+        if '.gitignore' in files:
+            counter.process_gitignore(root)
 
         # First, filter folder.
         is_effective_dir: bool = counter.matching(root)
