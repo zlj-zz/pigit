@@ -194,4 +194,17 @@ The command info has some options:
 - `help`: (Option) Command help message.
 - `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
 
+## Feature
+
+- Short command for quick use Git.
+- Support custom your short command.
+- Support command correction.
+- Support simple command line GUI interaction.
+- Support generate shell completion script.
+- Support create `.gitignore` template from internet.
+- Support code counter.
+- Have log output and help message tips.
+
 ---
+
+LICENSE: [MIT](./LICENSE)
