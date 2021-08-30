@@ -20,7 +20,7 @@ pip install -U pigit
 ### Source
 
 ```bash
-git clone https://github.com/zlj-zz/pigit.git
+git clone https://github.com/zlj-zz/pigit.git --depth=1
 cd pigit
 make install
 # or

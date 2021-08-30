@@ -10,6 +10,7 @@
 # ./tomato.py -h      # help
 
 
+from __future__ import print_function, division, absolute_import
 import sys
 import time
 import subprocess
@@ -25,19 +26,19 @@ def main(command_str=[]):
         args = command_str
     try:
         if len(args) <= 1:
-            print(f"🍅 tomato {WORK_MINUTES} minutes. Ctrl+C to exit")
+            print("🍅 tomato {} minutes. Ctrl+C to exit".format(WORK_MINUTES))
             tomato(WORK_MINUTES, "It is time to take a break")
-            print(f"🛀 break {BREAK_MINUTES} minutes. Ctrl+C to exit")
+            print("🛀 break {} minutes. Ctrl+C to exit".format(BREAK_MINUTES))
             tomato(BREAK_MINUTES, "It is time to work")
 
         elif args[1] == "-t":
             minutes = int(args[2]) if len(args) > 2 else WORK_MINUTES
-            print(f"🍅 tomato {minutes} minutes. Ctrl+C to exit")
+            print("🍅 tomato {} minutes. Ctrl+C to exit".format(minutes))
             tomato(minutes, "It is time to take a break")
 
         elif args[1] == "-b":
             minutes = int(args[2]) if len(args) > 2 else BREAK_MINUTES
-            print(f"🛀 break {minutes} minutes. Ctrl+C to exit")
+            print("🛀 break {} minutes. Ctrl+C to exit".format(minutes))
             tomato(minutes, "It is time to work")
 
         elif args[1] == "-h":
@@ -50,13 +51,12 @@ def main(command_str=[]):
         print("\n👋 goodbye")
     except Exception as ex:
         print(ex)
-        exit(1)
 
 
 def tomato(minutes, notify_msg):
-    start_time = time.perf_counter()
+    start_time = time.time()
     while True:
-        diff_seconds = int(round(time.perf_counter() - start_time))
+        diff_seconds = int(round(time.time() - start_time))
         left_seconds = minutes * 60 - diff_seconds
         if left_seconds <= 0:
             print("")
@@ -72,7 +72,7 @@ def tomato(minutes, notify_msg):
 
 def progressbar(curr, total, duration=10, extra=""):
     frac = curr / total
-    filled = round(frac * duration)
+    filled = int(round(frac * duration))
     print(
         "\r",
         "🍅" * filled + "--" * (duration - filled),
@@ -80,6 +80,7 @@ def progressbar(curr, total, duration=10, extra=""):
         extra,
         end="",
     )
+    sys.stdout.flush()
 
 
 def notify_me(msg):
@@ -120,13 +121,17 @@ def help(appname):
     appname = appname if appname.endswith(".py") else "tomato"  # tomato is pypi package
     print("====== 🍅 Tomato Clock =======")
     print(
-        f"{appname}         # start a {WORK_MINUTES} minutes tomato clock + {BREAK_MINUTES} minutes break"
+        "{0}         # start a {1} minutes tomato clock + {2} minutes break".format(
+            appname, WORK_MINUTES, BREAK_MINUTES
+        )
     )
-    print(f"{appname} -t      # start a {WORK_MINUTES} minutes tomato clock")
-    print(f"{appname} -t <n>  # start a <n> minutes tomato clock")
-    print(f"{appname} -b      # take a {BREAK_MINUTES} minutes break")
-    print(f"{appname} -b <n>  # take a <n> minutes break")
-    print(f"{appname} -h      # help")
+    print(
+        "{0} -t      # start a {1} minutes tomato clock".format(appname, WORK_MINUTES)
+    )
+    print("{0} -t <n>  # start a <n> minutes tomato clock".format(appname))
+    print("{0} -b      # take a {1} minutes break".format(appname, BREAK_MINUTES))
+    print("{0} -b <n>  # take a <n> minutes break".format(appname))
+    print("{0} -h      # help".format(appname))
 
 
 if __name__ == "__main__":

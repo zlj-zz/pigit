@@ -48,8 +48,9 @@ def run_cmd(*args):
     """
 
     try:
-        with subprocess.Popen(" ".join(args), shell=True) as proc:
-            proc.wait()
+        # ? In python2, `subprocess` not support `with` sentence.
+        proc = subprocess.Popen(" ".join(args), shell=True)
+        proc.wait()
         return True
     except Exception as e:
         Log.error(str(e))
@@ -66,7 +67,10 @@ def exec_cmd(*args):
     try:
         # Take over the input stream and get the return information.
         proc = subprocess.Popen(
-            " ".join(args), stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
+            " ".join(args),
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            shell=True,
         )
         # Get normal output and error output.
         res = proc.stdout.read().decode()

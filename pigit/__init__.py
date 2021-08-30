@@ -47,7 +47,7 @@ import textwrap
 from distutils.util import strtobool
 
 from .log import LogHandle
-from .compat import get_terminal_size
+from .compat import get_terminal_size, input
 from .utils import confirm, color_print
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
