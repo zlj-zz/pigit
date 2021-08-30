@@ -31,6 +31,14 @@ class CommandType(enum.Enum):
     Extra = "Extra"  # default
 
 
+# git ... --pretty={0}.format(GIT_PRINT_FORMAT)
+GIT_PRINT_FORMAT = (
+    'format:"%C(bold yellow)commit %H%C(auto)%d%n'
+    "%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n"
+    '%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"'
+)
+
+
 Git_Cmds = {
     # Branch
     "b": {
@@ -140,7 +148,7 @@ Git_Cmds = {
     },
     "cs": {
         "belong": CommandType.Commit,
-        "command": 'git show --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"',
+        "command": "git show --pretty={0}".format(GIT_PRINT_FORMAT),
         "help": "shows one or more objects (blobs, trees, tags and commits).",
         "has_arguments": True,
     },
@@ -293,17 +301,21 @@ Git_Cmds = {
     },
     "ls": {
         "belong": CommandType.Log,
-        "command": 'git log --topo-order --stat --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+        "command": "git log --topo-order --stat --pretty={0}".format(GIT_PRINT_FORMAT),
         "help": "displays the stats log.",
     },
     "ld": {
         "belong": CommandType.Log,
-        "command": 'git log --topo-order --stat --patch --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+        "command": "git log --topo-order --stat --patch --pretty={0}".format(
+            GIT_PRINT_FORMAT
+        ),
         "help": "displays the diff log.",
     },
     "lv": {
         "belong": CommandType.Log,
-        "command": 'git log --topo-order --show-signature --pretty=format:"%C(bold yellow)commit %H%C(auto)%d%n%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B" ',
+        "command": "git log --topo-order --show-signature --pretty={0}".format(
+            GIT_PRINT_FORMAT
+        ),
         "help": "displays the log, verifying the GPG signature of commits.",
     },
     "lc": {
@@ -401,7 +413,10 @@ Git_Cmds = {
     },
     "pp": {
         "belong": CommandType.Push,
-        "command": 'git pull origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" && git push origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" ',
+        "command": (
+            'git pull origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" && '
+            'git push origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)" '
+        ),
         "help": "pulls and pushes the current branch from origin to origin.",
     },
     # Remote(R)

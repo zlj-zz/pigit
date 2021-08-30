@@ -35,6 +35,7 @@
 		"tcsetattr",
 		"termios",
 		"texit",
+		"topo",
 		"unblink",
 		"unbold",
 		"uncolor",

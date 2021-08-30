@@ -324,7 +324,7 @@ class InteractiveAdd(object):
 
         if not IS_Git_Repository:
             color_print("Current path is not a git repository.", TermColor.Red)
-            raise SystemExit(-1)
+            return
 
         width, height = get_terminal_size()
         if height < self._min_height or width < self._min_width:
@@ -349,7 +349,7 @@ class InteractiveAdd(object):
         file_items = self._data_handle.get_status(width)
         if not file_items:
             print("The work tree is clean and there is nothing to operate.")
-            raise SystemExit(0)
+            return
 
         # Into new term page.
         print(Fx.alt_screen + Fx.hide_cursor)
@@ -363,6 +363,13 @@ class InteractiveAdd(object):
             # Start interactive.
             while not stopping:
                 print(Fx.clear_)
+
+                # check wether have status.
+                if not file_items:
+                    print("The work tree is clean and there is nothing to operate.")
+                    time.sleep(1)
+                    return
+
                 while cursor_row < display_range[0]:
                     display_range = [i - 1 for i in display_range]
                 while cursor_row > display_range[1]:

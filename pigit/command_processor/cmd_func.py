@@ -143,14 +143,14 @@ def open_remote_url(args):
     err, remote = exec_cmd("git remote show")
     if err:
         print(err)
-        raise SystemExit(0)
+        return
     remote = remote.strip().split("\n")[0]
 
     # Get remote url, exit when error.
     err, remote_url = exec_cmd("git ls-remote --get-url {0}".format(remote))
     if err:
         print(err)
-        raise SystemExit(0)
+        return
     remote_url = remote_url[:-5]
 
     # Splice URL, priority: branch > commit > issue

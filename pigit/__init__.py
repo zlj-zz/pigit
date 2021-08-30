@@ -48,7 +48,7 @@ from distutils.util import strtobool
 
 from .log import LogHandle
 from .compat import get_terminal_size
-from .utils import confirm, color_print, init_hook
+from .utils import confirm, color_print
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
@@ -497,12 +497,9 @@ class Parser(object):
             prefix_chars="-",
             formatter_class=CustomHelpFormatter,
         )
-        self._parser.add_argument(
-            "-C",
-            "--complete",
-            action="store_true",
-            help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
-        )
+        self.add_arguments()
+
+    def add_arguments(self):
         self._parser.add_argument(
             "-s",
             "--show-commands",
@@ -549,6 +546,12 @@ class Parser(object):
             ),
         )
         self._parser.add_argument(
+            "-C",
+            "--complete",
+            action="store_true",
+            help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
+        )
+        self._parser.add_argument(
             "--create-ignore",
             type=str,
             metavar="TYPE",
@@ -560,6 +563,11 @@ class Parser(object):
             "--create-config",
             action="store_true",
             help="Create a preconfigured file of git-tools.",
+        )
+        self._parser.add_argument(
+            "--shell",
+            action="store_true",
+            help="Go to the pigit shell mode.",
         )
         self._parser.add_argument(
             "--debug",
@@ -587,20 +595,20 @@ class Parser(object):
 
     def parse(self, custom_commands=None):
         if custom_commands:
-            return self._parser.parse_args(custom_commands)
-        return self._parser.parse_args()
+            return self._parser.parse_known_args(custom_commands)
+        return self._parser.parse_known_args()
 
 
 @time_it
 def main(custom_commands=None):
-    init_hook()
+    # init_hook()
 
     parser = Parser()
     # parse custom comand, if has.
     if custom_commands is not None:
         stdargs = parser.parse(custom_commands)
-    stdargs = parser.parse()
-    # print(stdargs)
+    stdargs, extra_unknown = parser.parse()
+    # print(stdargs, extra_unknown)
 
     # Setup log handle.
     LogHandle.setup_logging(
@@ -608,77 +616,124 @@ def main(custom_commands=None):
         log_file=None if stdargs.out_log else LOG_PATH,
     )
 
-    if stdargs.complete:
-        completion_vars = {
-            key: value.get("help", "") for key, value in Git_Cmds.items()
-        }
-        completion_vars.update(process_argparse(parser._parser))
-        ShellCompletion(__project__, completion_vars, PIGIT_HOME).complete_and_use()
-        raise SystemExit(0)
+    try:
+        if stdargs.complete:
+            completion_vars = {
+                key: value.get("help", "") for key, value in Git_Cmds.items()
+            }
+            completion_vars.update(process_argparse(parser._parser))
+            ShellCompletion(__project__, completion_vars, PIGIT_HOME).complete_and_use()
+            return
 
-    if stdargs.config:
-        git_local_config()
+        if stdargs.config:
+            git_local_config()
 
-    if stdargs.information:
-        repository_info(
-            show_path=CONFIG.repository_show_path,
-            show_remote=CONFIG.repository_show_remote,
-            show_branches=CONFIG.repository_show_branchs,
-            show_lastest_log=CONFIG.repository_show_lastest_log,
-            show_summary=CONFIG.repository_show_summary,
+        if stdargs.information:
+            repository_info(
+                show_path=CONFIG.repository_show_path,
+                show_remote=CONFIG.repository_show_remote,
+                show_branches=CONFIG.repository_show_branchs,
+                show_lastest_log=CONFIG.repository_show_lastest_log,
+                show_summary=CONFIG.repository_show_summary,
+            )
+
+        if stdargs.create_config:
+            CONFIG.create_config_template()
+            return
+
+        if stdargs.ignore_type:
+            GitignoreGenetor(
+                timeout=CONFIG.gitignore_generator_timeout,
+            ).create_gitignore(
+                stdargs.ignore_type,
+                dir_path=Repository_Path,
+            )
+            return
+
+        if stdargs.count:
+            path = stdargs.count if stdargs.count != "." else os.getcwd()
+            CodeCounter(
+                count_path=path,
+                use_ignore=CONFIG.codecounter_use_gitignore,
+                result_saved_path=COUNTER_PATH,
+                result_format=CONFIG.codecounter_result_format,
+                use_icon=CONFIG.codecounter_show_icon,
+            ).count_and_format_print(
+                show_invalid=CONFIG.codecounter_show_invalid,
+            )
+            return
+
+        git_processor = GitProcessor(
+            extra_cmds=get_extra_cmds(),
+            use_recommend=CONFIG.gitprocessor_use_recommend,
+            show_original=CONFIG.gitprocessor_show_original,
+            use_color=CONFIG.gitprocessor_interactive_color,
+            help_wait=CONFIG.gitprocessor_interactive_help_showtime,
         )
 
-    if stdargs.create_config:
-        CONFIG.create_config_template()
-        raise SystemExit(0)
+        def _shell_mode():
+            import pigit.tomato
 
-    if stdargs.ignore_type:
-        GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).create_gitignore(
-            stdargs.ignore_type,
-            dir_path=Repository_Path,
-        )
-        raise SystemExit(0)
+            print(
+                "Welcome come PIGIT shell.\n"
+                "You can use short commands directly. Input '?' to get help.\n"
+            )
+            while True:
+                command = input("(pigit)> ").strip()
+                if not command:
+                    continue
 
-    if stdargs.count:
-        path = stdargs.count if stdargs.count != "." else os.getcwd()
-        CodeCounter(
-            count_path=path,
-            use_ignore=CONFIG.codecounter_use_gitignore,
-            result_saved_path=COUNTER_PATH,
-            result_format=CONFIG.codecounter_result_format,
-            use_icon=CONFIG.codecounter_show_icon,
-        ).count_and_format_print(
-            show_invalid=CONFIG.codecounter_show_invalid,
-        )
-        raise SystemExit(0)
+                command_args = command.split()
+                head_command = command_args[0]
 
-    git_processor = GitProcessor(
-        extra_cmds=get_extra_cmds(),
-        use_recommend=CONFIG.gitprocessor_use_recommend,
-        show_original=CONFIG.gitprocessor_show_original,
-        use_color=CONFIG.gitprocessor_interactive_color,
-        help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-    )
-    if stdargs.show_commands:
-        git_processor.command_help()
-        raise SystemExit(0)
+                if head_command in ["quit", "exit"]:  # ctrl+c
+                    break
+                elif head_command in git_processor.cmds.keys():
+                    git_processor.process_command(head_command, command_args[1:])
+                elif head_command == "tomato":
+                    # Tomato clock.
+                    pigit.tomato.main(command_args)
+                elif head_command == "?":
+                    other_ = command_args[1:]
+                    if not other_:
+                        git_processor.command_help()
+                    else:
+                        print(other_)
+                        for item in other_:
+                            if item in git_processor.cmds.keys():
+                                print(git_processor._generate_help_by_key(item))
+                            elif item == "tomato":
+                                pigit.tomato.help("tomato")
+                else:
+                    os.system(command)
+            return
 
-    if stdargs.command_type:
-        git_processor.command_help_by_type(stdargs.command_type)
-        raise SystemExit(0)
+        if stdargs.shell:
+            _shell_mode()
 
-    if stdargs.types:
-        git_processor.type_help()
-        raise SystemExit(0)
+        if stdargs.show_commands:
+            return git_processor.command_help()
 
-    if stdargs.command:
-        command = stdargs.command
-        git_processor.process_command(command, stdargs.args)
-        raise SystemExit(0)
+        if stdargs.command_type:
+            return git_processor.command_help_by_type(stdargs.command_type)
 
-    # Don't have invalid command list.
-    if not list(filter(lambda x: x, vars(stdargs).values())):
-        introduce()
+        if stdargs.types:
+            return git_processor.type_help()
+
+        if stdargs.command:
+            if stdargs.command == "shell":
+                return _shell_mode()
+            else:
+                command = stdargs.command
+                stdargs.args.extend(extra_unknown)  # type: list
+                git_processor.process_command(command, stdargs.args)
+                return
+
+        # Don't have invalid command list.
+        if not list(filter(lambda x: x, vars(stdargs).values())):
+            introduce()
+    except (KeyboardInterrupt, EOFError):
+        raise SystemExit(0)
 
 
 if __name__ == "__main__":

@@ -33,8 +33,13 @@ class GitProcessor(object):
                     "help": "interactive operation git tree status.",
                     "type": "func",
                 },
+                "shell": {
+                    "command": "",
+                    "help": "Into PIGIT shell mode.",
+                },  # only for tips.
             }
         )
+
         if extra_cmds:
             if not isinstance(extra_cmds, dict):
                 raise TypeError("Custom cmds must be dict.")
@@ -42,6 +47,7 @@ class GitProcessor(object):
 
     @staticmethod
     def color_command(command):
+        # type:(str) -> str
         """Color the command string.
         prog: green;
         short command: yellow;
@@ -82,6 +88,7 @@ class GitProcessor(object):
         return color_command
 
     def process_command(self, _command, args=None):
+        # type:(str, list|tuple) -> None
         """Process command and arguments.
 
         Args:
@@ -95,31 +102,31 @@ class GitProcessor(object):
 
         option = self.cmds.get(_command, None)
 
+        # Invalid, if need suggest.
         if option is None:
             print("Don't support this command, please try ", end="")
             color_print("g --show-commands", TermColor.Gold)
 
             if self.use_recommend:  # check config.
                 predicted_command = similar_command(_command, self.cmds.keys())
-                print(
-                    "%s The wanted command is %s ?"
+                if confirm(
+                    "%s The wanted command is %s ?[y/n]:"
                     % (
                         Emotion.Icon_Thinking,
                         TermColor.Green + predicted_command + Fx.reset,
-                    ),
-                    end="",
-                )
-                if confirm("[y/n]:"):
+                    )
+                ):
                     self.process_command(predicted_command, args=args)
 
-            raise SystemExit(0)
+            return
 
         command = option.get("command", None)
+        # Has no command can be executed.
         if not command:
             color_print(
                 "Invalid custom short command, nothing can to exec.", TermColor.Red
             )
-            raise SystemExit(0)
+            return
 
         if not option.get("has_arguments", False):
             if args:
@@ -144,7 +151,6 @@ class GitProcessor(object):
                     "{0}  {1}".format(
                         Emotion.Icon_Rainbow, self.color_command(command)
                     ),
-                    end="",
                 )
             run_cmd(command)
 
@@ -152,6 +158,7 @@ class GitProcessor(object):
     # Print command help message.
     ################################
     def _generate_help_by_key(self, _key, use_color=True):
+        # type:(str, bool) -> str
         """Generate one help by given key.
 
         Args:
@@ -226,17 +233,15 @@ class GitProcessor(object):
                 predicted_type = similar_command(
                     command_type, CommandType.__members__.keys()
                 )
-                print(
-                    "%s The wanted type is %s ?"
+                if confirm(
+                    "%s The wanted type is %s ?[y/n]:"
                     % (
                         Emotion.Icon_Thinking,
                         TermColor.Green + predicted_type + Fx.reset,
-                    ),
-                    end="",
-                )
-                if confirm("[y/n]:"):
+                    )
+                ):
                     self.command_help_by_type(predicted_type)
-            raise SystemExit(0)
+            return
 
         # Print help.
         print("These are the orders of {0}".format(command_type))
