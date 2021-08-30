@@ -171,12 +171,12 @@ class InteractiveAdd(object):
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
         elif file.has_unstaged_change:
-            run_cmd("git add -- {}".format(file.name))
+            exec_cmd("git add -- {}".format(file.name))
         elif file.has_staged_change:
             if file.tracked:
-                run_cmd("git reset HEAD -- {}".format(file.name))
+                exec_cmd("git reset HEAD -- {}".format(file.name))
             else:
-                run_cmd("git rm --cached --force -- {}".format(file.name))
+                exec_cmd("git rm --cached --force -- {}".format(file.name))
 
     # def loop(self, display_fn, dispaly_args=[], display_kwargs={}):
     #     pass
@@ -250,7 +250,6 @@ class InteractiveAdd(object):
                         print(line)
                     extra += each_extra
 
-            # TODO(zachary): sometime bug -- scroll with flash.
             input_key = self._keyevent.sync_get_input()
             if input_key in ["q", "escape"]:
                 # exit.
@@ -315,7 +314,7 @@ class InteractiveAdd(object):
         print(Fx.clear_)
         if confirm("discard all changed? [y/n]:"):
             if file.tracked:
-                run_cmd("git checkout -- {}".format(file.name))
+                exec_cmd("git checkout -- {}".format(file.name))
             else:
                 os.remove(os.path.join(file.name))
 

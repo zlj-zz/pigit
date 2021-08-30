@@ -313,6 +313,14 @@ class Cursor:
     u = up
     d = down
 
+    @staticmethod
+    def hide_cursor():
+        print("\033[?25l")  # * Hide terminal cursor
+
+    @staticmethod
+    def show_cursor():
+        print("\033[?25h")  # * Show terminal cursor
+
 
 class TermColor:
     """Terminal print color class."""
