@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function
 import os
 import re
 import textwrap
+from typing import Optional
 
 from .utils import run_cmd, exec_cmd
 
@@ -91,8 +91,14 @@ class ShellCompletion(object):
 
     Supported_Shell = ["zsh", "bash", "fish"]
 
-    def __init__(self, prop, complete_vars, script_dir, shell=None, script_name=None):
-        # type:(str, dict, str, bool|None, bool|None) -> None
+    def __init__(
+        self,
+        prop: str,
+        complete_vars: dict,
+        script_dir: str,
+        shell: Optional[str] = None,
+        script_name: Optional[str] = None,
+    ) -> None:
         """Initialization.
 
         Args:
@@ -281,7 +287,10 @@ class ShellCompletion(object):
             print(e)
 
 
-def process_argparse(argparse_obj):
+def process_argparse(argparse_obj: object):
+    if not argparse_obj.__dict__.get("_actions", None):
+        raise TypeError("Need a argparse.ArgumentParser object.")
+
     arguments = {}
     for action in argparse_obj.__dict__["_actions"]:
         for option in action.option_strings:

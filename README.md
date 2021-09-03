@@ -1,7 +1,6 @@
 # PIGIT
 
-![Python 2.7](https://img.shields.io/badge/Python-v2.7%5E-green?logo=python)
-![Python 3](https://img.shields.io/badge/Python-v3%5E-green?logo=python)
+![Python 3](https://img.shields.io/badge/Python-v3.6%5E-green?logo=python)
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 

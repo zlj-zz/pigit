@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import division, print_function
 import os
 import sys
 import signal
@@ -11,13 +10,13 @@ TERM_CONTROL = True
 NEED_EXTRA_KEYBOARD_EVENT_PKG = False
 try:
     import select, termios, fcntl, tty  # noqa: E401
-    from .compat import B
+
+    B = lambda x: x.encode("iso8859-1")  # noqa: E731
 except Exception:
     try:
         from pynput import keyboard
 
-        # import queue
-        from .compat import queue
+        import queue
 
         NEED_EXTRA_KEYBOARD_EVENT_PKG = True
     except ModuleNotFoundError:

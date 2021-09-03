@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function, absolute_import
 import os
 import signal
 import subprocess
@@ -8,7 +7,6 @@ import logging
 from math import sqrt
 from collections import Counter
 
-from .compat import input
 
 Log = logging.getLogger(__name__)
 
@@ -17,7 +15,7 @@ EXIT_NORMAL = 0
 EXIT_ERROR = 1
 
 
-def leave(code, *args):
+def leave(code: int, *args) -> None:
     """Exit program.
 
     Receive error code, error message. If the error code matches, print the
@@ -35,7 +33,7 @@ def leave(code, *args):
     raise SystemExit(0)
 
 
-def run_cmd(*args):
+def run_cmd(*args) -> bool:
     """Run system command.
 
     Returns:
@@ -57,7 +55,7 @@ def run_cmd(*args):
         return False
 
 
-def exec_cmd(*args):
+def exec_cmd(*args) -> tuple[str, str]:
     """Run system command and get result.
 
     Returns:
@@ -82,7 +80,7 @@ def exec_cmd(*args):
         return str(e), ""
 
 
-def confirm(text="", default=True):
+def confirm(text: str = "", default: bool = True) -> bool:
     """Obtain confirmation results.
     Args:
         text (str): Confirmation prompt.
@@ -96,7 +94,7 @@ def confirm(text="", default=True):
     >>> confirm(default=False)
     False
     """
-    input_command = input(text).strip().lower()
+    input_command: str = input(text).strip().lower()
     if input_command in ["n", "no", "N", "No"]:
         return False
     elif input_command in ["y", "yes", "Y", "Yes"]:
@@ -105,7 +103,7 @@ def confirm(text="", default=True):
         return default
 
 
-def similar_command(command, all_commands):
+def similar_command(command: str, all_commands: list) -> str:
     """Get the most similar command with K-NearestNeighbor.
 
     Args:
@@ -125,7 +123,7 @@ def similar_command(command, all_commands):
     """
 
     #  The dictionary of letter frequency of all commands.
-    words = {word: dict(Counter(word)) for word in all_commands}
+    words: dict = {word: dict(Counter(word)) for word in all_commands}
     # Letter frequency of command.
     fre = dict(Counter(command))
     # The distance between the frequency of each letter in the command
@@ -148,7 +146,7 @@ def similar_command(command, all_commands):
     # the minimum.
     # Distance weight: compensate for the effect of length difference.
     # Compare Weight: The more similar the beginning, the higher the weight.
-    min_frequency_command = min(
+    min_frequency_command: str = min(
         frequency_sum_square,
         key=lambda item: item[1]
         * (
@@ -162,7 +160,7 @@ def similar_command(command, all_commands):
     return min_frequency_command
 
 
-def color_print(value, *styles, **options):
+def color_print(value: str, *styles, **options) -> None:
     """Print to terminal.
 
     Print special information with color and style according to the
@@ -178,7 +176,7 @@ def color_print(value, *styles, **options):
     print(value, end=end)
 
 
-def dir_wether_ok(dir_path):
+def dir_wether_ok(dir_path: str) -> bool:
     """Determine whether the dir path exists. If not, create a directory.
 
     Args:
@@ -198,7 +196,9 @@ def dir_wether_ok(dir_path):
 
 
 def init_hook():
-    """Take over some system signals, which are used at the beginning of PIGIT."""
+    """Take over some system signals, which are used at
+    the beginning of PIGIT.
+    """
     try:
         signal.signal(signal.SIGINT, leave)
     except Exception as e:

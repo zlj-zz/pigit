@@ -1,6 +1,12 @@
 import sys
 
 PYTHON_VERSION = sys.version_info[:2]
+if PYTHON_VERSION < (3, 5):
+    print(
+        "The current version of pigit does not support less "
+        "than Python3.6, please install 1.0.9"
+    )
+    exit(0)
 
 try:
     LONG_DESCRIPTION = open("README.md", encoding="utf-8").read()
@@ -45,9 +51,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
@@ -66,5 +70,5 @@ setup(
         [console_scripts]
         pigit=pigit:main
     """,
-    # python_requires=">=3.7",
+    python_requires=">=3.6",
 )

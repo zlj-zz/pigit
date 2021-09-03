@@ -1,10 +1,10 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function
 import os
 import re
 import textwrap
 import logging
+from typing import Optional
 
 from .utils import exec_cmd, color_print
 from .common import Fx, TermColor
@@ -12,7 +12,7 @@ from .common import Fx, TermColor
 Log = logging.getLogger(__name__)
 
 
-def git_version():
+def git_version() -> Optional[str]:
     """Get Git version."""
     _, git_version_ = exec_cmd("git --version")
     if git_version_:
@@ -22,10 +22,10 @@ def git_version():
 
 
 # Not detected, the result is None
-Git_Version = git_version()
+Git_Version: Optional[str] = git_version()
 
 
-def current_repository():
+def current_repository() -> str:
     """Get the current git repository path. If not, the path is empty."""
     err, path = exec_cmd("git rev-parse --git-dir")
 
@@ -40,11 +40,11 @@ def current_repository():
     return repository_path
 
 
-Repository_Path = current_repository()
-IS_Git_Repository = True if Repository_Path else False
+Repository_Path: str = current_repository()
+IS_Git_Repository: bool = True if Repository_Path else False
 
 
-def git_local_config():
+def git_local_config() -> None:
     """Print the local config of current git repository."""
     if IS_Git_Repository:
         _re = re.compile(r"\w+\s=\s.*?")
@@ -73,12 +73,12 @@ def git_local_config():
 
 
 def repository_info(
-    show_path=True,
-    show_remote=True,
-    show_branches=True,
-    show_lastest_log=True,
-    show_summary=True,
-):
+    show_path: bool = True,
+    show_remote: bool = True,
+    show_branches: bool = True,
+    show_lastest_log: bool = True,
+    show_summary: bool = True,
+) -> None:
     # type:(bool, bool, bool, bool, bool) -> None
     """Print some information of the repository.
 

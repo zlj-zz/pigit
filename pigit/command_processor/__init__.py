@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function
 import random
+from typing import Optional, Union
 
 from ..utils import run_cmd, color_print, confirm, similar_command
 from ..str_utils import shorten
@@ -14,8 +14,12 @@ class GitProcessor(object):
     """Git short command processor."""
 
     def __init__(
-        self, extra_cmds=None, use_recommend=True, show_original=True, **kwargs
-    ):
+        self,
+        extra_cmds: Optional[dict] = None,
+        use_recommend: bool = True,
+        show_original: bool = True,
+        **kwargs
+    ) -> None:
         super(GitProcessor, self).__init__()
 
         self.use_recommend = use_recommend
@@ -46,7 +50,7 @@ class GitProcessor(object):
             self.cmds.update(extra_cmds)
 
     @staticmethod
-    def color_command(command):
+    def color_command(command: str) -> str:
         # type:(str) -> str
         """Color the command string.
         prog: green;
@@ -87,8 +91,9 @@ class GitProcessor(object):
 
         return color_command
 
-    def process_command(self, _command, args=None):
-        # type:(str, list|tuple) -> None
+    def process_command(
+        self, _command: str, args: Optional[Union[list, tuple]] = None
+    ) -> None:
         """Process command and arguments.
 
         Args:
@@ -100,7 +105,7 @@ class GitProcessor(object):
             SystemExit: short command not right.
         """
 
-        option = self.cmds.get(_command, None)
+        option: Optional[dict] = self.cmds.get(_command, None)
 
         # Invalid, if need suggest.
         if option is None:
@@ -157,7 +162,7 @@ class GitProcessor(object):
     ################################
     # Print command help message.
     ################################
-    def _generate_help_by_key(self, _key, use_color=True):
+    def _generate_help_by_key(self, _key: str, use_color: bool = True) -> str:
         # type:(str, bool) -> str
         """Generate one help by given key.
 
@@ -200,14 +205,14 @@ class GitProcessor(object):
             reset=Fx.reset,
         )
 
-    def command_help(self):
+    def command_help(self) -> None:
         """Print help message."""
         print("These are short commands that can replace git operations:")
         for key in self.cmds.keys():
             msg = self._generate_help_by_key(key)
             print(msg)
 
-    def command_help_by_type(self, command_type):
+    def command_help_by_type(self, command_type: str) -> None:
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -253,7 +258,7 @@ class GitProcessor(object):
                 print(msg)
 
     @classmethod
-    def type_help(cls):
+    def type_help(cls) -> None:
         """Print all command types with random color."""
         for member in CommandType:
             print(

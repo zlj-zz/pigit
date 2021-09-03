@@ -3,7 +3,7 @@
 """This file support some str util method."""
 
 # yapf: disable
-widths = [
+widths:list[tuple] = [
     (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0), (733, 1), (879, 0),
     (1154, 1), (1161, 0), (4347, 1), (4447, 2), (7467, 1),
     (7521, 0), (8369, 1), (8426, 0), (9000, 1), (9002, 2),
@@ -15,7 +15,7 @@ widths = [
 # yapf: enable
 
 
-def get_width(r):
+def get_width(r: int) -> int:
     """Gets the width occupied by characters on the command line.
 
     >>> get_width(ord('a'))
@@ -34,7 +34,50 @@ def get_width(r):
     return 1
 
 
-def shorten(text, width, placeholder="...", front=False):
+File_Icons: dict[str, str] = {
+    "": "",
+    "Batch": "",
+    "C": "",
+    "C#": "",
+    "C++": "",
+    "CSS": "",
+    "Dart": "",
+    "Groovy": "",
+    "Go": "",
+    "HTML": "",
+    "Java": "",
+    "Java Scirpt": "",
+    "Lua": "",
+    "Kotlin": "",
+    "Markdown": "",
+    "PHP": "",
+    "Propertie": "",
+    "Python": "",
+    "R": "ﳒ",
+    "React": "",
+    "Ruby": "",
+    "Rust": "",
+    "ROS Message": "",
+    "reStructuredText": "",
+    "Shell": "",
+    "Swift": "",
+    "SQL": "",
+    "Type Scirpt": "",
+    "Vim Scirpt": "",
+    "Vue": "﵂",
+    "YAML": "",
+    "XML": "",
+}
+
+
+def get_file_icon(file_type: str) -> str:
+    #     
+    return File_Icons.get(file_type, "")
+
+
+def shorten(
+    text: str, width: int, placeholder: str = "...", front: bool = False
+) -> str:
     # type:(str, int, str, bool) -> str
     """Truncate exceeded characters.
 

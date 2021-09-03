@@ -1,11 +1,10 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function
 import os
 import re
 import logging
+from urllib.request import urlopen
 
-from .compat import urlopen
 from .utils import confirm
 from .common import Fx, Emotion
 
@@ -24,7 +23,7 @@ class GitignoreGenetor(object):
     """
 
     # Supported type. https://github.com/github/gitignore
-    Supported_Types = {
+    Supported_Types: dict[str, str] = {
         "android": "Android",
         "c++": "C++",
         "cpp": "C++",
@@ -49,12 +48,12 @@ class GitignoreGenetor(object):
         "unity": "Unity",
     }
 
-    def __init__(self, timeout=60):
+    def __init__(self, timeout=60) -> None:
         super(GitignoreGenetor, self).__init__()
 
         self.timeout = timeout
 
-    def parse_gitignore_page(self, content):
+    def parse_gitignore_page(self, content: str) -> str:
         """Parse html for getting gitignore content.
 
         Args:
@@ -76,7 +75,7 @@ class GitignoreGenetor(object):
         res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
         return res
 
-    def get_ignore_from_url(self, url):
+    def get_ignore_from_url(self, url: str) -> str:
         """Crawl gitignore template.
 
         Args:
@@ -101,7 +100,7 @@ class GitignoreGenetor(object):
 
         return content
 
-    def create_gitignore(self, genre, dir_path):
+    def launch(self, genre: str, dir_path: str) -> None:
         """Try to create gitignore template file.
 
         Args:

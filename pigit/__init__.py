@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.0.10.beta.1"
+__version__ = "1.3.1.beta.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -45,9 +45,10 @@ import logging
 import logging.handlers
 import textwrap
 from distutils.util import strtobool
+from shutil import get_terminal_size
+from typing import Optional
 
 from .log import LogHandle
-from .compat import get_terminal_size, input
 from .utils import confirm, color_print
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
@@ -160,7 +161,7 @@ class Config(object):
     )
 
     # yapf: disable
-    _keys = [
+    _keys :list[str]= [
         'gitprocessor_show_original', 'gitprocessor_use_recommend',
         'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
         'codecounter_use_gitignore', 'codecounter_show_invalid',
@@ -174,34 +175,34 @@ class Config(object):
     # yapf: enable
 
     # config default values.
-    gitprocessor_show_original = True
-    gitprocessor_use_recommend = True
-    gitprocessor_interactive_color = True
-    gitprocessor_interactive_help_showtime = 1.5
+    gitprocessor_show_original: bool = True
+    gitprocessor_use_recommend: bool = True
+    gitprocessor_interactive_color: bool = True
+    gitprocessor_interactive_help_showtime: float = 1.5
 
-    codecounter_use_gitignore = True
-    codecounter_show_invalid = False
-    codecounter_show_icon = False
-    codecounter_result_format = "table"  # table, simple
-    _supported_result_format = ["table", "simple"]
+    codecounter_use_gitignore: bool = True
+    codecounter_show_invalid: bool = False
+    codecounter_show_icon: bool = False
+    codecounter_result_format: str = "table"  # table, simple
+    _supported_result_format: list = ["table", "simple"]
 
-    gitignore_generator_timeout = 60
+    gitignore_generator_timeout: int = 60
 
-    repository_show_path = True
-    repository_show_remote = True
-    repository_show_branchs = True
-    repository_show_lastest_log = True
-    repository_show_summary = False
+    repository_show_path: bool = True
+    repository_show_remote: bool = True
+    repository_show_branchs: bool = True
+    repository_show_lastest_log: bool = True
+    repository_show_summary: bool = False
 
-    help_use_color = True
-    help_max_line_width = 90
+    help_use_color: bool = True
+    help_max_line_width: int = 90
 
-    debug_mode = False
+    debug_mode: str = False
 
     # Store warning messages.
-    warnings = []
+    warnings: list = []
 
-    def __init__(self, path=None):
+    def __init__(self, path: Optional[str] = None) -> None:
         super(Config, self).__init__()
         if not path:
             self.config_path = self.Conf_Path
@@ -213,7 +214,7 @@ class Config(object):
             if key in conf.keys() and conf[key] != "==error==":
                 setattr(self, key, conf[key])
 
-    def load_config(self):
+    def load_config(self) -> dict:
         new_config = {}
         config_file = self.config_path
         try:
@@ -288,10 +289,10 @@ class Config(object):
 
         return new_config
 
-    def is_color(self, s):
+    def is_color(self, s: str) -> bool:
         return s and Color_Re.match(s)
 
-    def create_config_template(self):
+    def create_config_template(self) -> None:
         if not os.path.isdir(PIGIT_HOME):
             os.makedirs(PIGIT_HOME, exist_ok=True)
 
@@ -329,7 +330,7 @@ if CONFIG.warnings:
 #####################################################################
 # Implementation of additional functions.                           #
 #####################################################################
-def introduce():
+def introduce() -> None:
     """Print the description information."""
 
     # Print tools version and path.
@@ -366,7 +367,7 @@ def introduce():
     print(" to get help and more usage.\n")
 
 
-def get_extra_cmds():
+def get_extra_cmds() -> dict:
     """Get custom cmds.
 
     Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
@@ -641,9 +642,7 @@ def main(custom_commands=None):
             return
 
         if stdargs.ignore_type:
-            GitignoreGenetor(
-                timeout=CONFIG.gitignore_generator_timeout,
-            ).create_gitignore(
+            GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
                 stdargs.ignore_type,
                 dir_path=Repository_Path,
             )

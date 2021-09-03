@@ -1,7 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from __future__ import print_function, division
-import sys
 import os
 import stat
 import re
@@ -9,10 +7,11 @@ import json
 import threading
 import time
 from math import ceil
+import concurrent.futures
+from shutil import get_terminal_size
 
-from .compat import get_terminal_size
 from .utils import confirm
-from .str_utils import shorten
+from .str_utils import shorten, get_file_icon
 from .common import Color, Fx
 
 
@@ -40,7 +39,7 @@ class CodeCounter(object):
         Result_Saved_Path (str): Directory to save and load results.
     """
 
-    Absolute_Rules = [
+    Absolute_Rules: list[dict] = [
         # Exclude `.git` folder.
         {"pattern": re.compile(r"\.git$|\.git\/"), "include": False},
         {
@@ -85,7 +84,7 @@ class CodeCounter(object):
         },
     ]
 
-    Suffix_Types = {
+    Suffix_Types: dict[str, str] = {
         "": "",
         "bat": "Batch",
         "c": "C",
@@ -143,49 +142,14 @@ class CodeCounter(object):
         "zsh": "Shell",
     }
 
-    Special_Names = {
+    Special_Names: dict[str, str] = {
         "requirements.txt": "Pip requirement",
         "license": "LICENSE",
         "vimrc": "Vim Scirpt",
     }
 
-    File_Icons = {
-        "": "",
-        "Batch": "",
-        "C": "",
-        "C#": "",
-        "C++": "",
-        "CSS": "",
-        "Dart": "",
-        "Groovy": "",
-        "Go": "",
-        "HTML": "",
-        "Java": "",
-        "Java Scirpt": "",
-        "Lua": "",
-        "Kotlin": "",
-        "Markdown": "",
-        "PHP": "",
-        "Propertie": "",
-        "Python": "",
-        "R": "ﳒ",
-        "React": "",
-        "Ruby": "",
-        "Rust": "",
-        "ROS Message": "",
-        "reStructuredText": "",
-        "Shell": "",
-        "Swift": "",
-        "SQL": "",
-        "Type Scirpt": "",
-        "Vim Scirpt": "",
-        "Vue": "﵂",
-        "YAML": "",
-        "XML": "",
-    }
-
     # Colors displayed for different code quantities.
-    Level_Color = [
+    Level_Color: list[str] = [
         "",
         Color.fg("#EBCB8C"),  # yellow
         Color.fg("#FF6347"),  # tomato
@@ -197,21 +161,22 @@ class CodeCounter(object):
     # Max_Thread = 10
     # Current_Thread = 0
     # Thread_Lock = threading.Lock()
-    _support_format = ["table", "simple"]
+    _support_format: list = ["table", "simple"]
 
     _Lock = threading.Lock()
 
     def __init__(
         self,
-        count_path=os.getcwd(),
-        use_ignore=True,
-        result_saved_path="",
-        result_format="table",
-        use_icon=False,
-    ):
-        # type:(str, bool, str, str, bool) -> None
+        count_path: str = os.getcwd(),
+        use_ignore: bool = True,
+        result_saved_path: str = "",
+        result_format: str = "table",
+        use_icon: bool = False,
+    ) -> None:
         super(CodeCounter, self).__init__()
-        self.Rules = []  # Store the rules obtained after processing.
+
+        # Store the rules obtained after processing.
+        self.Rules: list = []
 
         self.count_path = count_path
         self.use_ignore = use_ignore
@@ -223,7 +188,7 @@ class CodeCounter(object):
         self.result_format = result_format
         self.use_icon = use_icon
 
-    def process_gitignore(self, root):
+    def process_gitignore(self, root: str) -> None:
         """Process `.gitignore` files and add matching rules.
 
         Args:
@@ -279,7 +244,7 @@ class CodeCounter(object):
                 item = re.sub(r"\/$", "(([\\\\/].*)|$)", item)  # for trialing with `/`
                 self.Rules.append({"pattern": re.compile(item), "include": is_negative})
 
-    def matching(self, full_path):
+    def matching(self, full_path: str) -> bool:
         """Matching rules.
 
         Judge whether it is the required file according to the rule matching path.
@@ -306,7 +271,7 @@ class CodeCounter(object):
             # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
     @classmethod
-    def adjudgment_type(cls, file):
+    def adjudgment_type(cls, file: str) -> str:
         """Get file type.
 
         First, judge whether the file name is special, and then query the
@@ -330,7 +295,7 @@ class CodeCounter(object):
         else:
             return suffix
 
-    def _sub_count(self, root, files):
+    def _sub_count(self, root: str, files: list) -> tuple:
         """Process handle use by `self.count`."""
         result = {}  # type: dict[str,dict]
         valid_counter = invalid_counter = 0
@@ -376,7 +341,9 @@ class CodeCounter(object):
         print("Walk error: {0}".format(e))
         raise SystemExit(0)
 
-    def count(self, root_path, use_ignore=True, progress=True):
+    def count(
+        self, root_path: str, use_ignore: bool = True, progress: bool = True
+    ) -> tuple[dict, list, int]:
         """Statistics file and returns the result dictionary for Python3.
 
         Args:
@@ -397,7 +364,6 @@ class CodeCounter(object):
         ... }
         >>> CodeCounter().count('~/.config', use_ignore=True)
         """
-        import concurrent.futures
 
         if progress:
             width, _msg = self._get_ready()
@@ -435,7 +401,7 @@ class CodeCounter(object):
                 #     end="",
                 # )
 
-        cpu = os.cpu_count() or 1
+        cpu: int = os.cpu_count() or 1
         max_queue = cpu * 200
         print("Detect CPU count: {0}, start record ...".format(cpu))
 
@@ -504,69 +470,7 @@ class CodeCounter(object):
             print("")
         return result, invalid_list, data_count[0]
 
-    def count_2(self, root_path, use_ignore=True, progress=True):
-        """Statistics file and returns the result dictionary for Python2."""
-
-        if progress:
-            width, _msg = self._get_ready()
-
-        result = {}  # type: dict[str,dict]
-        total_size = valid_counter = invalid_counter = 0
-        invalid_list = []
-
-        for root, _, files in os.walk(root_path, onerror=self._walk_err_callback):
-
-            # First judge whether the directory is valid. Invalid directories
-            # do not traverse files.
-            is_effective_dir = self.matching(root)
-            if not is_effective_dir:
-                continue
-
-            # Process .gitignore file, add custom rules.
-            if use_ignore and ".gitignore" in files:
-                self.process_gitignore(root)
-
-            if not files:
-                continue
-            for file in files:
-                full_path = os.path.join(root, file)
-                is_effective = self.matching(full_path)
-                if is_effective:
-                    try:
-                        # Try read size of the valid file. Then do sum calc.
-                        size_ = os.path.getsize(full_path)
-                        total_size += size_
-                    except:
-                        pass
-
-                    # Get file type.
-                    type_ = self.adjudgment_type(file)
-                    try:
-                        with open(full_path) as f:
-                            count = len(f.read().split("\n"))
-                    except Exception:
-                        invalid_counter += 1
-                        invalid_list.append(file)
-                        continue
-                    else:
-                        # Superposition.
-                        if result.get(type_, None) is None:
-                            result[type_] = {"files": 1, "lines": count}
-                        else:
-                            result[type_]["files"] += 1
-                            result[type_]["lines"] += count
-                        valid_counter += 1
-                    finally:
-                        if progress:
-                            print(
-                                _msg.format(valid_counter, invalid_counter),
-                                end="",
-                            )
-        if progress:
-            print("")
-        return result, invalid_list, total_size
-
-    def _get_ready(self):
+    def _get_ready(self) -> tuple[int, str]:
         width, _ = get_terminal_size()
         if width > 55:
             _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
@@ -574,7 +478,7 @@ class CodeCounter(object):
             _msg = "\r:: [{:,} | {:,}]"
         return width, _msg
 
-    def load_recorded_result(self, root_path):
+    def load_recorded_result(self, root_path: str) -> dict:
         """Load count result."""
         file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
         file_path = os.path.join(self.result_saved_path, file_name)
@@ -585,7 +489,7 @@ class CodeCounter(object):
         except Exception:
             return None
 
-    def save_result(self, result, root_path):
+    def save_result(self, result: dict, root_path: str) -> None:
         """Save count result.
 
         Generate name according to `root_path`, then try save the record
@@ -655,10 +559,7 @@ class CodeCounter(object):
             deletions = 0
             for key, value in new.items():
                 if self.use_icon:
-                    #     
-                    key_display_str = "{0} {1}".format(
-                        self.File_Icons.get(key, ""), key
-                    )
+                    key_display_str = "{0} {1}".format(get_file_icon(key), key)
                 else:
                     key_display_str = key
                 # Processing too long name.
@@ -727,14 +628,7 @@ class CodeCounter(object):
                 )
 
     def count_and_format_print(self, if_save=True, show_invalid=False):
-        if sys.version_info[:2] > (2, 7):
-            result, invalid_list, total_size = self.count(
-                self.count_path, self.use_ignore
-            )
-        else:
-            result, invalid_list, total_size = self.count_2(
-                self.count_path, self.use_ignore
-            )
+        result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
 
         old_result = self.load_recorded_result(self.count_path)
         # diff print.

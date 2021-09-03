@@ -10,7 +10,7 @@ if os.name == "nt":
     os.system("")
 
 # For encoding.
-Icon_Supported_Encoding = ["utf-8"]
+Icon_Supported_Encoding: list = ["utf-8"]
 
 
 class Emotion(object):
