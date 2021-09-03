@@ -1,10 +1,12 @@
 # -*- coding:utf-8 -*-
 
 from __future__ import print_function, division
+import sys
 import os
 import stat
 import re
 import json
+import threading
 import time
 from math import ceil
 
@@ -82,8 +84,6 @@ class CodeCounter(object):
             "include": False,
         },
     ]
-
-    Rules = []  # Store the rules obtained after processing.
 
     Suffix_Types = {
         "": "",
@@ -199,6 +199,8 @@ class CodeCounter(object):
     # Thread_Lock = threading.Lock()
     _support_format = ["table", "simple"]
 
+    _Lock = threading.Lock()
+
     def __init__(
         self,
         count_path=os.getcwd(),
@@ -209,6 +211,8 @@ class CodeCounter(object):
     ):
         # type:(str, bool, str, str, bool) -> None
         super(CodeCounter, self).__init__()
+        self.Rules = []  # Store the rules obtained after processing.
+
         self.count_path = count_path
         self.use_ignore = use_ignore
         self.result_saved_path = result_saved_path
@@ -326,18 +330,54 @@ class CodeCounter(object):
         else:
             return suffix
 
-    # @staticmethod
-    # def count_file_thread(full_path):
-    #     pass
+    def _sub_count(self, root, files):
+        """Process handle use by `self.count`."""
+        result = {}  # type: dict[str,dict]
+        valid_counter = invalid_counter = 0
+        invalid_list = []
+        total_size = 0
+
+        for file in files:
+            full_path = os.path.join(root, file)
+            is_effective = self.matching(full_path)
+            if is_effective:
+                try:
+                    # Try read size of the valid file. Then do sum calc.
+                    size_ = os.path.getsize(full_path)
+                    total_size += size_
+                except:
+                    pass
+
+                # Get file type.
+                type_ = self.adjudgment_type(file)
+                try:
+                    with open(full_path) as f:
+                        count = len(f.read().split("\n"))
+                except Exception:
+                    invalid_counter += 1
+                    invalid_list.append(file)
+                    continue
+                else:
+                    # Superposition.
+                    if result.get(type_, None) is None:
+                        result[type_] = {"files": 1, "lines": count}
+                    else:
+                        result[type_]["files"] += 1
+                        result[type_]["lines"] += count
+                    valid_counter += 1
+                finally:
+                    pass
+
+        return result, total_size, valid_counter, invalid_counter, invalid_list
 
     @staticmethod
-    def _count_err_callback(e):
+    def _walk_err_callback(e):
         """Handle of processing walk error."""
         print("Walk error: {0}".format(e))
         raise SystemExit(0)
 
     def count(self, root_path, use_ignore=True, progress=True):
-        """Statistics file and returns the result dictionary.
+        """Statistics file and returns the result dictionary for Python3.
 
         Args:
             root_path (str): The path is walk needed.
@@ -357,22 +397,124 @@ class CodeCounter(object):
         ... }
         >>> CodeCounter().count('~/.config', use_ignore=True)
         """
+        import concurrent.futures
 
         if progress:
-            width, _ = get_terminal_size()
-            if width > 55:
-                _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
-            else:
-                _msg = "\r:: [{:,} | {:,}]"
+            width, _msg = self._get_ready()
 
         result = {}  # type: dict[str,dict]
-        valid_counter = invalid_counter = 0
+        data_count = [0, 0, 0]  # [total_size, valid_count, invalid_count]
         invalid_list = []
-        total_size = 0
-        for root, _, files in os.walk(
-            root_path,
-            onerror=self._count_err_callback,
-        ):
+
+        def _callback(r):
+            (
+                _result,
+                _total_size,
+                _valid_counter,
+                _invalid_counter,
+                _invalid_list,
+            ) = r.result()
+
+            with self._Lock:
+                for key, values in _result.items():
+                    if result.get(key, None) is None:
+                        result[key] = values
+                    else:
+                        result[key]["files"] += _result[key]["files"]
+                        result[key]["lines"] += _result[key]["lines"]
+
+                data_count[0] += _total_size
+                data_count[1] += _valid_counter
+                data_count[2] += _invalid_counter
+                invalid_list.extend(_invalid_list)
+
+            if progress:
+                pass
+                # print(
+                #     _msg.format(data_count[1], data_count[2]),
+                #     end="",
+                # )
+
+        cpu = os.cpu_count() or 1
+        max_queue = cpu * 200
+        print("Detect CPU count: {0}, start record ...".format(cpu))
+
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            for root, _, files in os.walk(root_path, onerror=self._walk_err_callback):
+
+                # First judge whether the directory is valid. Invalid directories
+                # do not traverse files.
+                is_effective_dir = self.matching(root)
+                if not is_effective_dir:
+                    continue
+
+                # Process .gitignore file, add custom rules.
+                if use_ignore and ".gitignore" in files:
+                    self.process_gitignore(root)
+
+                if not files:
+                    continue
+                # print(pool._queue_count)
+                if len(files) >= 15 and pool._queue_count < max_queue:
+                    # Calling process.
+                    future_result = pool.submit(self._sub_count, root, files)
+                    future_result.add_done_callback(_callback)
+                else:
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        is_effective = self.matching(full_path)
+                        if is_effective:
+                            try:
+                                # Try read size of the valid file. Then do sum calc.
+                                size_ = os.path.getsize(full_path)
+                                with self._Lock:
+                                    data_count[0] += size_
+                            except:
+                                pass
+
+                            # Get file type.
+                            type_ = self.adjudgment_type(file)
+                            try:
+                                with open(full_path) as f:
+                                    count = len(f.read().split("\n"))
+                            except Exception:
+                                with self._Lock:
+                                    data_count[2] += 1
+                                    invalid_list.append(file)
+                                continue
+                            else:
+                                # Superposition.
+                                with self._Lock:
+                                    if result.get(type_, None) is None:
+                                        result[type_] = {"files": 1, "lines": count}
+                                    else:
+                                        result[type_]["files"] += 1
+                                        result[type_]["lines"] += count
+                                    data_count[1] += 1
+                            finally:
+                                if progress:
+                                    # print(
+                                    #     _msg.format(data_count[1], data_count[2]),
+                                    #     end="",
+                                    # )
+                                    pass
+            print("\nPlease wait calculate ...")
+
+        if progress:
+            print("")
+        return result, invalid_list, data_count[0]
+
+    def count_2(self, root_path, use_ignore=True, progress=True):
+        """Statistics file and returns the result dictionary for Python2."""
+
+        if progress:
+            width, _msg = self._get_ready()
+
+        result = {}  # type: dict[str,dict]
+        total_size = valid_counter = invalid_counter = 0
+        invalid_list = []
+
+        for root, _, files in os.walk(root_path, onerror=self._walk_err_callback):
 
             # First judge whether the directory is valid. Invalid directories
             # do not traverse files.
@@ -380,10 +522,12 @@ class CodeCounter(object):
             if not is_effective_dir:
                 continue
 
+            # Process .gitignore file, add custom rules.
             if use_ignore and ".gitignore" in files:
                 self.process_gitignore(root)
 
-            # TODO: Would it be better to use threads?
+            if not files:
+                continue
             for file in files:
                 full_path = os.path.join(root, file)
                 is_effective = self.matching(full_path)
@@ -418,10 +562,17 @@ class CodeCounter(object):
                                 _msg.format(valid_counter, invalid_counter),
                                 end="",
                             )
-
         if progress:
             print("")
         return result, invalid_list, total_size
+
+    def _get_ready(self):
+        width, _ = get_terminal_size()
+        if width > 55:
+            _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
+        else:
+            _msg = "\r:: [{:,} | {:,}]"
+        return width, _msg
 
     def load_recorded_result(self, root_path):
         """Load count result."""
@@ -566,17 +717,25 @@ class CodeCounter(object):
             if additions > 0 or deletions > 0:
                 print(" Altered: ", end="")
                 print(
-                    "{0}{1}".format(self.Symbol["+"], "+" * ceil(additions / 10)),
+                    "{0}{1}".format(self.Symbol["+"], "+" * int(ceil(additions / 10))),
                     end="",
                 )
                 print(
                     "{0}{1}{2}".format(
-                        self.Symbol["-"], "-" * ceil(deletions / 10), Fx.reset
+                        self.Symbol["-"], "-" * int(ceil(deletions / 10)), Fx.reset
                     )
                 )
 
     def count_and_format_print(self, if_save=True, show_invalid=False):
-        result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
+        if sys.version_info[:2] > (2, 7):
+            result, invalid_list, total_size = self.count(
+                self.count_path, self.use_ignore
+            )
+        else:
+            result, invalid_list, total_size = self.count_2(
+                self.count_path, self.use_ignore
+            )
+
         old_result = self.load_recorded_result(self.count_path)
         # diff print.
         self.format_print(result, old_result)
