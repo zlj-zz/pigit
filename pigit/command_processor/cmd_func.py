@@ -8,12 +8,13 @@ of parameters to be processed.
 """
 
 import re
+from typing import Union
 
 from ..utils import exec_cmd, run_cmd, color_print
 from ..common import Emotion, TermColor
 
 
-def add(args):
+def add(args: Union[list, tuple, None]) -> None:
     """git add option.
 
     Args:
@@ -34,7 +35,7 @@ def add(args):
     run_cmd("git add " + args_str)
 
 
-def fetch_remote_branch(args):
+def fetch_remote_branch(args: Union[list, tuple, None]):
     branch = args[0] if len(args) > 1 else None
 
     if branch:
@@ -43,7 +44,7 @@ def fetch_remote_branch(args):
         color_print("This option need a branch name.", TermColor.Red)
 
 
-def set_email_and_username(args):
+def set_email_and_username(args: Union[list, tuple, None]):
     """Set git username and email with interaction.
 
     Args:
@@ -51,9 +52,9 @@ def set_email_and_username(args):
     """
 
     print("Set the interactive environment of user name and email ...")
-    __global = re.compile(r"\-\-global")
+    _global = re.compile(r"\-\-global")
     for i in args:
-        r = __global.search(i)
+        r = _global.search(i)
         if r is not None:
             other = " --global "
             print("Now set for global.")
@@ -62,7 +63,7 @@ def set_email_and_username(args):
         print("Now set for local.")
         other = " "
 
-    name = input("Please input username:")
+    name = input("Please input username:").strip()
     while True:
         if not name:
             color_print("Name is empty.", TermColor.Red)
@@ -87,7 +88,7 @@ def set_email_and_username(args):
         color_print("Failed. Please check log.", TermColor.Red)
 
 
-def open_remote_url(args):
+def open_remote_url(args: Union[list, tuple, None]):
     """Open remote.
 
     Open the remote repository through the browser. Support additional parameter list.

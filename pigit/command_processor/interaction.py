@@ -4,6 +4,7 @@ import os
 import time
 from math import ceil
 from shutil import get_terminal_size
+from typing import Optional
 
 from ..utils import color_print, exec_cmd, run_cmd, confirm
 from ..str_utils import shorten, get_width
@@ -21,10 +22,10 @@ class TermError(Exception):
 
 
 class DataHandle(object):
-    def __init__(self, use_color):
+    def __init__(self, use_color: bool):
         self.use_color = use_color
 
-    def get_status(self, max_width, ident=2):
+    def get_status(self, max_width: int, ident: int = 2) -> list[File]:
         # type:(int, int) -> list[File]
         """Get the file tree status of GIT for processing and encapsulation.
 
@@ -93,7 +94,9 @@ class DataHandle(object):
 
         return file_items
 
-    def get_file_diff(self, file, tracked=True, cached=False, plain=False):
+    def get_file_diff(
+        self, file: str, tracked: bool = True, cached: bool = False, plain: bool = False
+    ) -> str:
         """Gets the modification of the file.
 
         Args:
@@ -137,16 +140,28 @@ class DataHandle(object):
 class InteractiveAdd(object):
     """Interactive operation git tree status."""
 
-    def __init__(self, use_color=True, cursor=None, help_wait=1.5, debug=False):
+    def __init__(
+        self,
+        use_color: bool = True,
+        cursor: Optional[str] = None,
+        help_wait: float = 1.5,
+        debug: bool = False,
+    ) -> None:
         super(InteractiveAdd, self).__init__()
         self.use_color = use_color
+
         if not cursor:
             self.cursor = "→"
         elif len(cursor) == 1:
-            self.cursor = cursor
+            if get_width(ord(cursor)) == 1:
+                self.cursor = cursor
+            else:
+                self.cursor = "→"
+                print("When displayed, it will occupy more than one character.")
         else:
             self.cursor = "→"
             print("The cursor symbol entered is not supported.")
+
         self.help_wait = help_wait
         self._min_height = 8
         self._min_width = 60
@@ -159,7 +174,7 @@ class InteractiveAdd(object):
 
         self._data_handle = DataHandle(use_color)
 
-    def process_file(self, file):
+    def process_file(self, file: str) -> None:
         # type:(File) -> None
         """Process file to change the status.
 
@@ -177,10 +192,7 @@ class InteractiveAdd(object):
             else:
                 exec_cmd("git rm --cached --force -- {}".format(file.name))
 
-    # def loop(self, display_fn, dispaly_args=[], display_kwargs={}):
-    #     pass
-
-    def show_diff(self, file_obj):
+    def show_diff(self, file_obj: File) -> None:
         """Interactive display file diff.
 
         Args:
@@ -303,8 +315,7 @@ class InteractiveAdd(object):
             else:
                 continue
 
-    def discard_changed(self, file):
-        # type:(File) -> None
+    def discard_changed(self, file: File) -> None:
         """Discard file all changed.
 
         Args:
@@ -338,11 +349,11 @@ class InteractiveAdd(object):
             time.sleep(1.5)
 
         # Initialize.
-        cursor_row = 1
-        cursor_icon = self.cursor
-        display_range = [1, height - 1]
+        cursor_row: int = 1
+        cursor_icon: str = self.cursor
+        display_range: list = [1, height - 1]
 
-        stopping = False
+        stopping: bool = False
 
         file_items = self._data_handle.get_status(width)
         if not file_items:

@@ -57,7 +57,7 @@ File_Icons: dict[str, str] = {
     "React": "",
     "Ruby": "",
     "Rust": "",
-    "ROS Message": "",
+    "ROS Message": "",
     "reStructuredText": "",
     "Shell": "",
     "Swift": "",
@@ -71,6 +71,21 @@ File_Icons: dict[str, str] = {
 
 
 def get_file_icon(file_type: str) -> str:
+    """According file type return icon.
+
+    Args:
+        file_type (str): type string.
+
+    Returns:
+        str: icon.
+
+    >>> get_file_icon('Python')
+    ''
+    >>> get_file_icon('Lua')
+    ''
+    >>> get_file_icon('xxxxxxxxxx')
+    ''
+    """
     #     
     return File_Icons.get(file_type, "")
 

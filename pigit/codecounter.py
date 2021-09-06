@@ -9,6 +9,7 @@ import time
 from math import ceil
 import concurrent.futures
 from shutil import get_terminal_size
+from typing import Optional
 
 from .utils import confirm
 from .str_utils import shorten, get_file_icon
@@ -157,7 +158,7 @@ class CodeCounter(object):
         Color.fg("#87CEFA"),  # skyblue
     ]
 
-    Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
+    Symbol: dict = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
     # Max_Thread = 10
     # Current_Thread = 0
     # Thread_Lock = threading.Lock()
@@ -478,10 +479,15 @@ class CodeCounter(object):
             _msg = "\r:: [{:,} | {:,}]"
         return width, _msg
 
-    def load_recorded_result(self, root_path: str) -> dict:
+    def _get_file_path(self, root_path: str) -> str:
+        file_name: str = (
+            root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
+        )
+        return os.path.join(self.result_saved_path, file_name)
+
+    def load_recorded_result(self, root_path: str) -> Optional[dict]:
         """Load count result."""
-        file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
-        file_path = os.path.join(self.result_saved_path, file_name)
+        file_path = self._get_file_path(root_path)
         try:
             with open(file_path) as rf:
                 res = json.load(rf)
@@ -503,8 +509,7 @@ class CodeCounter(object):
             (bool): Wether saving successful.
         """
 
-        file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
-        file_path = os.path.join(self.result_saved_path, file_name)
+        file_path = self._get_file_path(root_path)
         # ensure_path(CodeCounter.Result_Saved_Path)
         try:
             with open(file_path, "w" if os.path.isfile(file_path) else "x") as wf:
@@ -514,14 +519,14 @@ class CodeCounter(object):
             return False
 
     @classmethod
-    def color_index(cls, _count):
+    def color_index(cls, _count: int) -> int:
         _index = len(str(_count // 1000))
         if _index > len(cls.Level_Color):
             return -1
         else:
             return _index - 1
 
-    def format_print(self, new, old=None):
+    def format_print(self, new: dict, old: Optional[dict] = None) -> None:
         """Print result with color and diff.
 
         If the console width is not enough, the output is simple.
@@ -531,8 +536,8 @@ class CodeCounter(object):
             old (dict|None): The results saved in the past may not exist.
         """
 
-        result_format = self.result_format
-        needed_width = 67
+        result_format: str = self.result_format
+        needed_width: int = 67
         width, _ = get_terminal_size()
         if result_format == "simple" or width < needed_width:
             for key, value in new.items():
@@ -627,7 +632,7 @@ class CodeCounter(object):
                     )
                 )
 
-    def count_and_format_print(self, if_save=True, show_invalid=False):
+    def count_and_format_print(self, if_save=True, show_invalid=False) -> None:
         result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
 
         old_result = self.load_recorded_result(self.count_path)

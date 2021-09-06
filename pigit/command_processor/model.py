@@ -3,22 +3,27 @@
 """This file save some model class of git info class."""
 
 # flake8: noqa
-# yapf: disable
 class File:
     """Model class of git file."""
 
-    def __init__(self,
-        name, display_str, short_status,
-        has_staged_change, has_unstaged_change,
-        tracked, deleted, added,
-        has_merged_conflicts,
-        has_inline_merged_conflicts,
+    def __init__(
+        self,
+        name: str,
+        display_str: str,
+        short_status: str,
+        has_staged_change: bool,
+        has_unstaged_change: bool,
+        tracked: bool,
+        deleted: bool,
+        added: bool,
+        has_merged_conflicts: bool,
+        has_inline_merged_conflicts: bool,
     ):
         """
         Args:
             name (str): File path relative to Git.
             display_str (str): Display string, may has color.
-            short_status ():
+            short_status (str): status string, like: 'MM'
             has_staged_change (bool): file wether has staged change.
             has_unstaged_change (bool): file wether has unstaged change.
             tracked (bool): Is the file on the tracking tree.

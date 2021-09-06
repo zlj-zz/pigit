@@ -26,7 +26,7 @@ class ShellCompletion(object):
 
     # The completion items each line muse be:
     #   -C\:"Add shell prompt script and exit.(Supported `bash`, `zsh`)"\\
-    _TEMPLATE_ZSH = textwrap.dedent(
+    _TEMPLATE_ZSH: str = textwrap.dedent(
         """\
         #compdef %(prop)s
 
@@ -46,7 +46,7 @@ class ShellCompletion(object):
         """
     )
 
-    _TEMPLATE_BASH = textwrap.dedent(
+    _TEMPLATE_BASH: str = textwrap.dedent(
         """\
         #!/usr/env bash
 
@@ -61,7 +61,7 @@ class ShellCompletion(object):
         """
     )
 
-    _TEMPLATE_FISH = textwrap.dedent(
+    _TEMPLATE_FISH: str = textwrap.dedent(
         """\
         function complete_%(prop)s;
             set -l response;
@@ -89,7 +89,7 @@ class ShellCompletion(object):
         """
     )
 
-    Supported_Shell = ["zsh", "bash", "fish"]
+    Supported_Shell: list = ["zsh", "bash", "fish"]
 
     def __init__(
         self,
@@ -135,7 +135,7 @@ class ShellCompletion(object):
         # print(self.complete_var)
 
     @staticmethod
-    def get_current_shell():
+    def get_current_shell() -> str:
         """Gets the currently used shell.
 
         Returns:
@@ -147,7 +147,7 @@ class ShellCompletion(object):
             current_shell = resp.split("/")[-1].strip()
         return current_shell.lower()
 
-    def generate_resource(self):
+    def generate_resource(self) -> tuple[str, str]:
         """Generate completion scirpt.
 
         Generate the completion script of the corresponding shell according to
@@ -197,7 +197,7 @@ class ShellCompletion(object):
 
         return script_name, script_src
 
-    def write_completion(self, script_name, complete_src):
+    def write_completion(self, script_name: str, complete_src: str) -> None:
         """Save completion to config path.
 
         Args:
@@ -219,7 +219,7 @@ class ShellCompletion(object):
         except Exception:
             return None
 
-    def inject_into_shell(self, script_name):
+    def inject_into_shell(self, script_name: str) -> bool:
         """Try using completion script.
 
         Inject the load of completion script into the configuration of shell.
@@ -257,7 +257,7 @@ class ShellCompletion(object):
         else:
             return False
 
-    def complete_and_use(self):
+    def complete_and_use(self) -> None:
         """Add completion prompt script."""
 
         print("\nTry to add completion ...")
@@ -287,7 +287,7 @@ class ShellCompletion(object):
             print(e)
 
 
-def process_argparse(argparse_obj: object):
+def process_argparse(argparse_obj: object) -> dict:
     if not argparse_obj.__dict__.get("_actions", None):
         raise TypeError("Need a argparse.ArgumentParser object.")
 

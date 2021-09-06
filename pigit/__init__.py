@@ -39,7 +39,6 @@ __copyright__ = "Copyright (c) 2021 Zachary"
 
 import os
 import sys
-import re
 import argparse
 import logging
 import logging.handlers
@@ -49,7 +48,7 @@ from shutil import get_terminal_size
 from typing import Optional
 
 from .log import LogHandle
-from .utils import confirm, color_print
+from .utils import confirm, color_print, is_color
 from .common import Color, Fx, TermColor
 from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
 from .decorator import time_it
@@ -67,7 +66,7 @@ Log = logging.getLogger(__name__)
 #####################################################################
 
 # For windows.
-IS_WIN = sys.platform.lower().startswith("win")
+IS_WIN: bool = sys.platform.lower().startswith("win")
 Log.debug("Runtime platform is windows: {0}".format(IS_WIN))
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
@@ -83,9 +82,6 @@ COUNTER_PATH = PIGIT_HOME + "/Counter"
 #####################################################################
 # Configuration.                                                    #
 #####################################################################
-Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
-
-
 class ConfigError(Exception):
     """Config error. Using by `Config`."""
 
@@ -95,9 +91,9 @@ class ConfigError(Exception):
 class Config(object):
     """PIGIT configuration class."""
 
-    Conf_Path = PIGIT_HOME + "/pigit.conf"
+    Conf_Path: str = PIGIT_HOME + "/pigit.conf"  # default config path.
 
-    Config_Template = textwrap.dedent(
+    Config_Template: str = textwrap.dedent(
         """\
         #? Config file for pigit v. {version}
 
@@ -258,7 +254,7 @@ class Config(object):
                                 )
                             )
                     elif type(getattr(self, key)) == str:
-                        if "color" in key and not self.is_color(line):
+                        if "color" in key and not is_color(line):
                             self.warnings.append(
                                 'Config key "{0}" should be RGB string, like: #FF0000'.format(
                                     key
@@ -288,9 +284,6 @@ class Config(object):
             )
 
         return new_config
-
-    def is_color(self, s: str) -> bool:
-        return s and Color_Re.match(s)
 
     def create_config_template(self) -> None:
         if not os.path.isdir(PIGIT_HOME):
@@ -378,9 +371,9 @@ def get_extra_cmds() -> dict:
     """
     import imp
 
-    extra_cmd_path = PIGIT_HOME + "/extra_cmds.py"
-    # print(extra_cmd_path)
+    extra_cmd_path: str = PIGIT_HOME + "/extra_cmds.py"
     extra_cmds = {}
+
     if os.path.isfile(extra_cmd_path):
         try:
             extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
@@ -489,7 +482,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
 
 class Parser(object):
-    def __init__(self):
+    def __init__(self) -> None:
         super(Parser, self).__init__()
         self._parser = argparse.ArgumentParser(
             prog="pigit",
@@ -499,7 +492,7 @@ class Parser(object):
         )
         self.add_arguments()
 
-    def add_arguments(self):
+    def add_arguments(self) -> None:
         self._parser.add_argument(
             "-s",
             "--show-commands",

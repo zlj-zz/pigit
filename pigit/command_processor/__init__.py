@@ -174,7 +174,7 @@ class GitProcessor(object):
             (str): Help message of one command.
         """
 
-        _msg = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
+        _msg: str = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
         if use_color:
             _key_color = TermColor.Green
             _command_color = TermColor.Gold
@@ -182,8 +182,12 @@ class GitProcessor(object):
             _key_color = _command_color = ""
 
         # Get help message and command.
-        _help = self.cmds[_key].get("help", "")
-        _command = self.cmds[_key]["command"]
+        _help: str = self.cmds[_key].get("help", "")
+        try:
+            # must have key `command`.
+            _command = self.cmds[_key]["command"]
+        except:
+            raise ValueError("The `command` key can not be empty.")
 
         # Process help.
         _help = _help + "\n" if _help else ""

@@ -3,6 +3,7 @@
 """Git optional short command dictionary.
 The key is a short command, and the value is the information dictionary of the
 short command.
+[belong] is the type of command. The default is `Extra`.
 [command] is the execution content of the short command.
 [help] is help information, optional.
 [type] indicates the type of command. It supports (func, string). The default is string.
@@ -31,7 +32,8 @@ class CommandType(enum.Enum):
     Extra = "Extra"  # default
 
 
-# git ... --pretty={0}.format(GIT_PRINT_FORMAT)
+# The custom git output format string.
+#   git ... --pretty={0}.format(GIT_PRINT_FORMAT)
 GIT_PRINT_FORMAT = (
     'format:"%C(bold yellow)commit %H%C(auto)%d%n'
     "%C(bold)Author: %C(blue)%an <%ae> %C(reset)%C(cyan)%ai (%ar)%n"

@@ -1,11 +1,13 @@
 # -*- coding:utf-8 -*-
 
 import os
+import re
 import signal
 import subprocess
 import logging
 from math import sqrt
 from collections import Counter
+from typing import Union
 
 
 Log = logging.getLogger(__name__)
@@ -176,13 +178,48 @@ def color_print(value: str, *styles, **options) -> None:
     print(value, end=end)
 
 
+Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
+
+
+def is_color(s: Union[str, list, tuple, None]) -> bool:
+    """Adjust `s` wether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
+
+    >>> is_color('#FF0000')
+    True
+    >>> is_color([255, 0, 0])
+    True
+    >>> is_color((0, 255, 0))
+    True
+    >>> is_color(None)
+    False
+    >>> is_color(12345)
+    False
+    """
+    if not s:
+        return False
+    elif type(s) == str:
+        return True if Color_Re.match(s) else False
+    elif isinstance(s, list) or isinstance(s, tuple):
+        if len(s) != 3:
+            return False
+        else:
+            for i in s:
+                if i < 0 or i > 255:
+                    return False
+            else:
+                return True
+    else:
+        return False
+
+
 def dir_wether_ok(dir_path: str) -> bool:
     """Determine whether the dir path exists. If not, create a directory.
 
     Args:
         dir_path (str): Directory path, like: "~/.config/xxx"
 
-    >>> ensure_path('~/.config/pigit')
+    >>> dir_wether_ok('.')
+    True
     """
 
     if os.path.isdir(dir_path):
