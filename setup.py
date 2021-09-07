@@ -1,7 +1,7 @@
 import sys
 
 PYTHON_VERSION = sys.version_info[:2]
-if PYTHON_VERSION < (3, 5):
+if PYTHON_VERSION < (3, 6):
     print(
         "The current version of pigit does not support less "
         "than Python3.6, please install 1.0.9"

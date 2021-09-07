@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.3.1.beta.1"
+__version__ = "1.3.0.beta.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -91,9 +91,9 @@ class ConfigError(Exception):
 class Config(object):
     """PIGIT configuration class."""
 
-    Conf_Path: str = PIGIT_HOME + "/pigit.conf"  # default config path.
+    _conf_path: str = PIGIT_HOME + "/pigit.conf"  # default config path.
 
-    Config_Template: str = textwrap.dedent(
+    CONFIG_TEMPLATE: str = textwrap.dedent(
         """\
         #? Config file for pigit v. {version}
 
@@ -201,7 +201,7 @@ class Config(object):
     def __init__(self, path: Optional[str] = None) -> None:
         super(Config, self).__init__()
         if not path:
-            self.config_path = self.Conf_Path
+            self.config_path = self._conf_path
         else:
             self.config_path = path
         conf = self.load_config()
@@ -289,7 +289,7 @@ class Config(object):
         if not os.path.isdir(PIGIT_HOME):
             os.makedirs(PIGIT_HOME, exist_ok=True)
 
-        if os.path.exists(self.Conf_Path) and not confirm(
+        if os.path.exists(self.config_path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
             return
@@ -304,9 +304,9 @@ class Config(object):
         # Write config. Will save before custom setting.
         try:
             with open(
-                self.Conf_Path, "w" if os.path.isfile(self.Conf_Path) else "x"
+                self.config_path, "w" if os.path.isfile(self.config_path) else "x"
             ) as f:
-                f.write(self.Config_Template.format(**conf))
+                f.write(self.CONFIG_TEMPLATE.format(**conf))
             print("Successful.")
         except Exception as e:
             Log.error(str(e))
@@ -339,6 +339,7 @@ def introduce() -> None:
     color_print("Path: ", Fx.b, end="")
     color_print("%s\n" % __file__, TermColor.SkyBlue, Fx.underline)
 
+    # Print description.
     color_print("Description:", Fx.b)
     color_print(
         (
@@ -355,7 +356,7 @@ def introduce() -> None:
 
     print("\nYou can use ", end="")
     color_print("-h", TermColor.Green, end="")
-    print(" and ", end="")
+    print(" or ", end="")
     color_print("--help", TermColor.Green, end="")
     print(" to get help and more usage.\n")
 
@@ -490,9 +491,9 @@ class Parser(object):
             prefix_chars="-",
             formatter_class=CustomHelpFormatter,
         )
-        self.add_arguments()
+        self._add_arguments()
 
-    def add_arguments(self) -> None:
+    def _add_arguments(self) -> None:
         self._parser.add_argument(
             "-s",
             "--show-commands",
@@ -533,29 +534,28 @@ class Parser(object):
             const=".",
             type=str,
             metavar="PATH",
-            help=(
-                "Count the number of codes and output them in tabular form."
-                "A given path can be accepted, and the default is the current directory."
-            ),
+            help="Count the number of codes and output them in tabular form."
+            "A given path can be accepted, and the default is the current directory.",
         )
         self._parser.add_argument(
             "-C",
             "--complete",
             action="store_true",
-            help="Add shell prompt script and exit.(Supported `bash`, `zsh`)",
+            help="Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)",
         )
         self._parser.add_argument(
             "--create-ignore",
             type=str,
             metavar="TYPE",
             dest="ignore_type",
-            help="Create a demo .gitignore file. Need one argument, support: [%s]"
+            help="Create a demo `.gitignore` file. Need one argument, support: [%s]"
             % ", ".join(GitignoreGenetor.Supported_Types.keys()),
         )
         self._parser.add_argument(
             "--create-config",
             action="store_true",
-            help="Create a preconfigured file of git-tools.",
+            help="Create a preconfigured file of PIGIT."
+            "(If a profile exists, the values available in it are used)",
         )
         self._parser.add_argument(
             "--shell",
@@ -586,14 +586,135 @@ class Parser(object):
             "args", nargs="*", type=str, help="Command parameter list."
         )
 
-    def parse(self, custom_commands=None):
+    def parse(self, custom_commands: Optional[list] = None):
         if custom_commands:
             return self._parser.parse_known_args(custom_commands)
         return self._parser.parse_known_args()
 
+    def process(self, known_args, extra_unknown: Optional[list] = None):
+        try:
+            if known_args.complete:
+                completion_vars = {
+                    key: value.get("help", "") for key, value in Git_Cmds.items()
+                }
+                completion_vars.update(process_argparse(self._parser))
+                ShellCompletion(
+                    __project__, completion_vars, PIGIT_HOME
+                ).complete_and_use()
+                return
+
+            if known_args.config:
+                git_local_config()
+
+            if known_args.information:
+                repository_info(
+                    show_path=CONFIG.repository_show_path,
+                    show_remote=CONFIG.repository_show_remote,
+                    show_branches=CONFIG.repository_show_branchs,
+                    show_lastest_log=CONFIG.repository_show_lastest_log,
+                    show_summary=CONFIG.repository_show_summary,
+                )
+
+            if known_args.create_config:
+                CONFIG.create_config_template()
+                return
+
+            if known_args.ignore_type:
+                GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
+                    known_args.ignore_type,
+                    dir_path=Repository_Path,
+                )
+                return
+
+            if known_args.count:
+                path = known_args.count if known_args.count != "." else os.getcwd()
+                CodeCounter(
+                    count_path=path,
+                    use_ignore=CONFIG.codecounter_use_gitignore,
+                    result_saved_path=COUNTER_PATH,
+                    result_format=CONFIG.codecounter_result_format,
+                    use_icon=CONFIG.codecounter_show_icon,
+                ).count_and_format_print(
+                    show_invalid=CONFIG.codecounter_show_invalid,
+                )
+                return
+
+            git_processor = GitProcessor(
+                extra_cmds=get_extra_cmds(),
+                use_recommend=CONFIG.gitprocessor_use_recommend,
+                show_original=CONFIG.gitprocessor_show_original,
+                use_color=CONFIG.gitprocessor_interactive_color,
+                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+            )
+
+            def _shell_mode():
+                import pigit.tomato
+
+                print(
+                    "Welcome come PIGIT shell.\n"
+                    "You can use short commands directly. Input '?' to get help.\n"
+                )
+                while True:
+                    command = input("(pigit)> ").strip()
+                    if not command:
+                        continue
+
+                    command_args = command.split()
+                    head_command = command_args[0]
+
+                    if head_command in ["quit", "exit"]:  # ctrl+c
+                        break
+                    elif head_command in git_processor.cmds.keys():
+                        git_processor.process_command(head_command, command_args[1:])
+                    elif head_command == "tomato":
+                        # Tomato clock.
+                        pigit.tomato.main(command_args)
+                    elif head_command == "?":
+                        other_ = command_args[1:]
+                        if not other_:
+                            git_processor.command_help()
+                        else:
+                            print(other_)
+                            for item in other_:
+                                if item in git_processor.cmds.keys():
+                                    print(git_processor._generate_help_by_key(item))
+                                elif item == "tomato":
+                                    pigit.tomato.help("tomato")
+                    else:
+                        os.system(command)
+                return
+
+            if known_args.shell:
+                _shell_mode()
+
+            if known_args.show_commands:
+                return git_processor.command_help()
+
+            if known_args.command_type:
+                return git_processor.command_help_by_type(known_args.command_type)
+
+            if known_args.types:
+                return git_processor.type_help()
+
+            if known_args.command:
+                if known_args.command == "shell":
+                    return _shell_mode()
+                else:
+                    command = known_args.command
+                    known_args.args.extend(extra_unknown)  # type: list
+                    git_processor.process_command(command, known_args.args)
+                    return
+
+            # Don't have invalid command list.
+            if not list(filter(lambda x: x, vars(known_args).values())):
+                introduce()
+        except (KeyboardInterrupt, EOFError):
+            raise SystemExit(0)
+            pass
+
 
 @time_it
-def main(custom_commands=None):
+def main(custom_commands: Optional[list] = None):
     # init_hook()
 
     parser = Parser()
@@ -609,122 +730,8 @@ def main(custom_commands=None):
         log_file=None if stdargs.out_log else LOG_PATH,
     )
 
-    try:
-        if stdargs.complete:
-            completion_vars = {
-                key: value.get("help", "") for key, value in Git_Cmds.items()
-            }
-            completion_vars.update(process_argparse(parser._parser))
-            ShellCompletion(__project__, completion_vars, PIGIT_HOME).complete_and_use()
-            return
-
-        if stdargs.config:
-            git_local_config()
-
-        if stdargs.information:
-            repository_info(
-                show_path=CONFIG.repository_show_path,
-                show_remote=CONFIG.repository_show_remote,
-                show_branches=CONFIG.repository_show_branchs,
-                show_lastest_log=CONFIG.repository_show_lastest_log,
-                show_summary=CONFIG.repository_show_summary,
-            )
-
-        if stdargs.create_config:
-            CONFIG.create_config_template()
-            return
-
-        if stdargs.ignore_type:
-            GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
-                stdargs.ignore_type,
-                dir_path=Repository_Path,
-            )
-            return
-
-        if stdargs.count:
-            path = stdargs.count if stdargs.count != "." else os.getcwd()
-            CodeCounter(
-                count_path=path,
-                use_ignore=CONFIG.codecounter_use_gitignore,
-                result_saved_path=COUNTER_PATH,
-                result_format=CONFIG.codecounter_result_format,
-                use_icon=CONFIG.codecounter_show_icon,
-            ).count_and_format_print(
-                show_invalid=CONFIG.codecounter_show_invalid,
-            )
-            return
-
-        git_processor = GitProcessor(
-            extra_cmds=get_extra_cmds(),
-            use_recommend=CONFIG.gitprocessor_use_recommend,
-            show_original=CONFIG.gitprocessor_show_original,
-            use_color=CONFIG.gitprocessor_interactive_color,
-            help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-        )
-
-        def _shell_mode():
-            import pigit.tomato
-
-            print(
-                "Welcome come PIGIT shell.\n"
-                "You can use short commands directly. Input '?' to get help.\n"
-            )
-            while True:
-                command = input("(pigit)> ").strip()
-                if not command:
-                    continue
-
-                command_args = command.split()
-                head_command = command_args[0]
-
-                if head_command in ["quit", "exit"]:  # ctrl+c
-                    break
-                elif head_command in git_processor.cmds.keys():
-                    git_processor.process_command(head_command, command_args[1:])
-                elif head_command == "tomato":
-                    # Tomato clock.
-                    pigit.tomato.main(command_args)
-                elif head_command == "?":
-                    other_ = command_args[1:]
-                    if not other_:
-                        git_processor.command_help()
-                    else:
-                        print(other_)
-                        for item in other_:
-                            if item in git_processor.cmds.keys():
-                                print(git_processor._generate_help_by_key(item))
-                            elif item == "tomato":
-                                pigit.tomato.help("tomato")
-                else:
-                    os.system(command)
-            return
-
-        if stdargs.shell:
-            _shell_mode()
-
-        if stdargs.show_commands:
-            return git_processor.command_help()
-
-        if stdargs.command_type:
-            return git_processor.command_help_by_type(stdargs.command_type)
-
-        if stdargs.types:
-            return git_processor.type_help()
-
-        if stdargs.command:
-            if stdargs.command == "shell":
-                return _shell_mode()
-            else:
-                command = stdargs.command
-                stdargs.args.extend(extra_unknown)  # type: list
-                git_processor.process_command(command, stdargs.args)
-                return
-
-        # Don't have invalid command list.
-        if not list(filter(lambda x: x, vars(stdargs).values())):
-            introduce()
-    except (KeyboardInterrupt, EOFError):
-        raise SystemExit(0)
+    # process result.
+    parser.process(stdargs, extra_unknown)
 
 
 if __name__ == "__main__":

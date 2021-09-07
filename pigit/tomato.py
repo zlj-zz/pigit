@@ -10,7 +10,6 @@
 # ./tomato.py -h      # help
 
 
-from __future__ import print_function, division, absolute_import
 import sys
 import time
 import subprocess
@@ -49,8 +48,8 @@ def main(command_str=[]):
 
     except KeyboardInterrupt:
         print("\n👋 goodbye")
-    except Exception as ex:
-        print(ex)
+    except Exception as e:
+        print(str(e), str(e.__traceback__))
 
 
 def tomato(minutes, notify_msg):
@@ -70,8 +69,8 @@ def tomato(minutes, notify_msg):
     notify_me(notify_msg)
 
 
-def progressbar(curr, total, duration=10, extra=""):
-    frac = curr / total
+def progressbar(current, total, duration=10, extra=""):
+    frac = current / total
     filled = int(round(frac * duration))
     print(
         "\r",

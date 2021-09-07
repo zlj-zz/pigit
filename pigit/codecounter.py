@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from functools import reduce
 import os
 import stat
 import re
@@ -27,19 +28,16 @@ class CodeCounter(object):
 
     Attributes:
         Absolute_Rules (dict): Precompiled rules.
-        Rules (dict): The dictionary for saving filtering rules.
-            >>> one_rule = {
-            ...     'pattern': re.compile(r''),
-            ...     'include': False
-            ... }
         Suffix_Type (dict): Supported file suffix dictionary.
         Special_Name (dict): Type dict of special file name.
-        Level_Color (list): Color list. The levels are calibrated by
+        level_color (list): Color list. The levels are calibrated by
             subscript, and the codes of different levels are colored
             when the results are output.
-        Result_Saved_Path (str): Directory to save and load results.
+        symbol (dict):
+        _support_format (list):
     """
 
+    # The default rule is to count only files. Ignore all video, audio, fonts, binaries.
     Absolute_Rules: list[dict] = [
         # Exclude `.git` folder.
         {"pattern": re.compile(r"\.git$|\.git\/"), "include": False},
@@ -85,6 +83,7 @@ class CodeCounter(object):
         },
     ]
 
+    # Mark the type corresponding to the file suffix.
     Suffix_Types: dict[str, str] = {
         "": "",
         "bat": "Batch",
@@ -143,6 +142,7 @@ class CodeCounter(object):
         "zsh": "Shell",
     }
 
+    # Mark the type of some special files.
     Special_Names: dict[str, str] = {
         "requirements.txt": "Pip requirement",
         "license": "LICENSE",
@@ -150,7 +150,7 @@ class CodeCounter(object):
     }
 
     # Colors displayed for different code quantities.
-    Level_Color: list[str] = [
+    level_color: list[str] = [
         "",
         Color.fg("#EBCB8C"),  # yellow
         Color.fg("#FF6347"),  # tomato
@@ -158,10 +158,10 @@ class CodeCounter(object):
         Color.fg("#87CEFA"),  # skyblue
     ]
 
-    Symbol: dict = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
-    # Max_Thread = 10
-    # Current_Thread = 0
-    # Thread_Lock = threading.Lock()
+    # Symbol corresponds to the desired color.
+    symbol_color: dict = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
+
+    # Supported output format.
     _support_format: list = ["table", "simple"]
 
     _Lock = threading.Lock()
@@ -174,6 +174,17 @@ class CodeCounter(object):
         result_format: str = "table",
         use_icon: bool = False,
     ) -> None:
+        """
+        Args:
+            count_path (str, optional): The path of needed count. Defaults to os.getcwd().
+            use_ignore (bool, optional): Wether detect `.gitignore` file. Defaults to True.
+            result_saved_path (str, optional): Result save path. Defaults to "".
+            result_format (str, optional): Output format string. Defaults to "table".
+            use_icon (bool, optional): Wether output with icon. Defaults to False.
+
+        Raises:
+            CodeCounterError: when format string not right.
+        """
         super(CodeCounter, self).__init__()
 
         # Store the rules obtained after processing.
@@ -521,7 +532,7 @@ class CodeCounter(object):
     @classmethod
     def color_index(cls, _count: int) -> int:
         _index = len(str(_count // 1000))
-        if _index > len(cls.Level_Color):
+        if _index > len(cls.level_color):
             return -1
         else:
             return _index - 1
@@ -559,7 +570,7 @@ class CodeCounter(object):
             )
             print("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
             # Print table content.
-            sum = 0
+            sum_ = 0
             additions = 0
             deletions = 0
             for key, value in new.items():
@@ -571,7 +582,7 @@ class CodeCounter(object):
                 key_display_str = shorten(key_display_str, 20, front=False)
 
                 # Set color.
-                lines_color = self.Level_Color[self.color_index(value["lines"])]
+                lines_color = self.level_color[self.color_index(value["lines"])]
 
                 # Compare change.
                 if isinstance(old, dict) and old.get(key, None) is not None:
@@ -608,27 +619,37 @@ class CodeCounter(object):
                         value["files"],
                         value["lines"],
                         file_style=Fx.italic,
-                        file_change_style=self.Symbol.get(files_symbol, ""),
+                        file_change_style=self.symbol_color.get(files_symbol, ""),
                         file_change=files_change,
                         lines_style=lines_color,
-                        line_change_style=self.Symbol.get(lines_symbol, ""),
+                        line_change_style=self.symbol_color.get(lines_symbol, ""),
                         line_change=lines_change,
                         reset=Fx.reset,
                     )
                 )
-                sum += value["lines"]
+                sum_ += value["lines"]
             print("-" * needed_width)
             # Print total and change graph.
-            print(" Total: {0}".format(sum))
+            print(" Total: {0}".format(sum_))
+
+            # Additions and deletions are calculated by percentage,
+            # and the base is the total number of last statistics.
             if additions > 0 or deletions > 0:
+                # Get prev count sum.
+                old_sum = sum([i["lines"] for i in old.values()])
+
                 print(" Altered: ", end="")
                 print(
-                    "{0}{1}".format(self.Symbol["+"], "+" * int(ceil(additions / 10))),
+                    "{0}{1}".format(
+                        self.symbol_color["+"], "+" * ceil(additions / old_sum * 100)
+                    ),
                     end="",
                 )
                 print(
                     "{0}{1}{2}".format(
-                        self.Symbol["-"], "-" * int(ceil(deletions / 10)), Fx.reset
+                        self.symbol_color["-"],
+                        "-" * ceil(deletions / old_sum * 100),
+                        Fx.reset,
                     )
                 )
 
