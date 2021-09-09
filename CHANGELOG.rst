@@ -2,6 +2,15 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.0 (2021-09-09)
+----------
+- Not continue support Python2.
+- Update config and config template.
+- Improve code counter running speed.
+- Code counter output support icon.
+- Fix color command error.
+- Add simple shell mode.
+
 v1.0.9 (2021-08-24)
 ----------
 - Update owned commands.

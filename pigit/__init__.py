@@ -26,7 +26,7 @@ from __future__ import print_function, division, absolute_import
 
 
 __project__ = "pigit"
-__version__ = "1.3.0.beta.1"
+__version__ = "1.3.0"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
