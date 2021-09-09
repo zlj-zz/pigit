@@ -288,6 +288,9 @@ class ShellCompletion(object):
 
 
 def process_argparse(argparse_obj: object) -> dict:
+    if isinstance(argparse_obj, object):
+        raise TypeError("Need a argparse.ArgumentParser object.")
+
     if not argparse_obj.__dict__.get("_actions", None):
         raise TypeError("Need a argparse.ArgumentParser object.")
 

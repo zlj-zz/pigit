@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, ".")
 
 import time
+import textwrap
 import pytest
 
 from pigit.command_processor.interaction import InteractiveAdd, DataHandle
@@ -15,15 +16,28 @@ def setup():
 
 def test_files_time(setup):
     ia, dh = setup
-    sum_time = 0
+
+    status = dh.get_status(100)
+    assert type(status) == list
+
+    print("\nWill get 1000 times data.")
+    sum_time = max_time = 0
     min_time = float("inf")
     for _ in range(1000):
         start = time.time()
         dh.get_status(100)
         used_time = time.time() - start
         min_time = min(used_time, min_time)
+        max_time = max(used_time, max_time)
         sum_time += used_time
 
     print(
-        f"test [get_status] 1000 times, Total time spent: {sum_time}, min time: {min_time} "
+        textwrap.dedent(
+            f"""
+            test [get_status] 1000 times:
+                Total spend time: {sum_time}
+                Min spend time: {min_time}
+                Max spend time: {max_time}
+            """
+        )
     )

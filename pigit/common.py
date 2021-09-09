@@ -262,6 +262,7 @@ class Fx(object):
 
     # * Precompiled regex for finding a 24-bit color escape sequence in a string
     color_re = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m")
+    style_re = re.compile(r"\033\[\d+m")
 
     @staticmethod
     def trans(string):
@@ -270,6 +271,10 @@ class Fx(object):
     @classmethod
     def uncolor(cls, string):
         return cls.color_re.sub("", string)
+
+    @classmethod
+    def pure(cls, string):
+        return cls.style_re.sub("", cls.uncolor(string))
 
 
 class Cursor:

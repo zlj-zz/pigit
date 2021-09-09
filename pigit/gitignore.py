@@ -75,14 +75,11 @@ class GitignoreGenetor(object):
         res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
         return res
 
-    def get_ignore_from_url(self, url: str) -> str:
+    def get_html_from_url(self, url: str) -> str:
         """Crawl gitignore template.
 
         Args:
             url (str): gitignore template url.
-
-        Raises:
-            SystemExit: Failed to get web page.
 
         Returns:
             (str): html string.
@@ -93,12 +90,11 @@ class GitignoreGenetor(object):
         except Exception as e:
             Log.error(str(e))
             # Exit once an error occurs.
-            print("Failed to get content and will exit.")
-            raise SystemExit(0)
+            return None
+        else:
+            content = handle.read().decode("utf-8")
 
-        content = handle.read().decode("utf-8")
-
-        return content
+            return content
 
     def launch(self, genre: str, dir_path: str) -> None:
         """Try to create gitignore template file.
@@ -113,28 +109,34 @@ class GitignoreGenetor(object):
         if name is None:
             print("Unsupported type: %s" % genre)
             print(
-                "Supported type: %s.  Case insensitive."
-                % " ".join(self.Supported_Types.keys())
+                "Supported type: [{}]. Case insensitive.".format(
+                    " ".join(self.Supported_Types.keys())
+                )
             )
-            raise SystemExit(0)
+            return
 
         ignore_path = dir_path + "/.gitignore"
         whether_write = True
+
+        # Adjust `.gitignore` wether exist.
         if os.path.exists(ignore_path):
-            print(
-                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:",
-                end="",
+            whether_write = confirm(
+                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:"
             )
-            whether_write = confirm()
+
         if whether_write:
             base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
-
             target_url = base_url % name
+
             print(
                 "Will get ignore file content from %s"
                 % (Fx.italic + Fx.underline + target_url + Fx.reset)
             )
-            content = self.get_ignore_from_url(target_url)
+            content = self.get_html_from_url(target_url)
+            if not content:
+                print("Failed to get content and will exit.")
+                return
+
             ignore_content = self.parse_gitignore_page(content)
 
             print("Got content, trying to write ... ")
@@ -147,6 +149,6 @@ class GitignoreGenetor(object):
             except Exception as e:
                 Log.error(str(e))
                 print("Write gitignore file failed.")
-                print("You can replace it with the following:")
+                print("You can copy it with the following:")
                 print("#" * 60)
                 print(ignore_content)

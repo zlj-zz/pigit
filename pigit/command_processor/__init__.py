@@ -75,19 +75,25 @@ class GitProcessor(object):
             + command_list.pop(0)
             + " "
             + Fx.unbold
-            + Fx.italic
-            + TermColor.SkyBlue
+            # + Fx.italic
+            # + TermColor.SkyBlue
         )
-        while len(command_list) > 0:
-            temp = command_list.pop(0)
-            if temp.startswith("-"):
-                color_command += temp + " "
+
+        less_len = len(command_list)
+        idx = 0
+        while idx < less_len:
+            if command_list[idx].startswith("-"):
+                color_command += "{}{}".format(Fx.italic, TermColor.SkyBlue)
+                while idx < less_len and command_list[idx].startswith("-"):
+                    color_command += command_list[idx] + " "
+                    idx += 1
             else:
-                break
+                color_command += Fx.reset
+                while idx < less_len and not command_list[idx].startswith("-"):
+                    color_command += command_list[idx] + " "
+                    idx += 1
 
         color_command += Fx.reset
-        if len(command_list) > 0:
-            color_command += " ".join(command_list)
 
         return color_command
 

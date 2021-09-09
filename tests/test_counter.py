@@ -6,21 +6,62 @@ sys.path.insert(0, ".")
 import os
 import time
 import threading
+import pytest
 
 import concurrent.futures
 from pprint import pprint
 from functools import wraps
 
-from pigit.codecounter import CodeCounter
+from pigit.codecounter import CodeCounter, CodeCounterError
 from pigit import COUNTER_PATH
 
 
 def test_codecounter(path=os.getcwd()):
+    with pytest.raises(CodeCounterError):
+        CodeCounter(result_format="xxx")
+
     start_t = time.time()
     CodeCounter(
         result_saved_path=COUNTER_PATH, count_path=path
     ).count_and_format_print()
     print(time.time() - start_t)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        os.getcwd(),
+        *os.environ.values(),
+    ],
+)
+def test_pure_walk(path):
+    print(f"\n===Test pure walk ({path})===")
+    count = 0
+    start_t = time.time()
+    for root, dirs, files in os.walk(path):
+        for _ in files:
+            count += 1
+            print("\rFound files: {0}".format(count), end="")
+        # print(root, dirs, files)
+    print("")
+    print(f"Result spend time: {time.time() - start_t}")
+
+
+"""
+[just match root]
+13.6025s
+
+[record lines count]
+use thread: 65.19s
+no thread:  77.51s
+
+[print content]
+use thread: 570.698s
+no thread:  569.579s
+
+877.2
+954.35
+"""
 
 
 def _read_handle(root, files, counter):
@@ -53,7 +94,8 @@ def _read_handle(root, files, counter):
     return result_count
 
 
-def test_regular_rule(path=os.getcwd()):
+def test_mutliprocess_walk(path=os.getcwd()):
+    print("\n===Test use mutliprocess walk===")
     progress = 0
 
     ignore_dir = []
@@ -74,7 +116,6 @@ def test_regular_rule(path=os.getcwd()):
             # Flag for large dir.
             progress += 1
             print("\r{0}".format(progress), end="")
-            # print(threading.active_count())
 
             # Process .gitignore to add new rule.
             if ".gitignore" in files:
@@ -119,35 +160,6 @@ def test_regular_rule(path=os.getcwd()):
     # print(ignore_dir)
     print(time.time() - start_t)
     print("total:", res_count)
-
-
-"""
-[just match root]
-13.6025s
-
-[record lines count]
-use thread: 65.19s
-no thread:  77.51s
-
-[print content]
-use thread: 570.698s
-no thread:  569.579s
-
-877.2
-954.35
-"""
-
-
-def test_pure_walk(path=os.getcwd()):
-    count = 0
-    start_t = time.time()
-    for root, dirs, files in os.walk(path):
-        for _ in files:
-            count += 1
-            print("\r{0}".format(count), end="")
-        # print(root, dirs, files)
-    print("")
-    print(time.time() - start_t)
 
 
 if __name__ == "__main__":
