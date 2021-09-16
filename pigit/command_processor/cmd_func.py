@@ -88,7 +88,7 @@ def set_email_and_username(args: Union[list, tuple, None]):
         color_print("Failed. Please check log.", TermColor.Red)
 
 
-def open_remote_url(args: Union[list, tuple, None]):
+def open_remote_url(args: Union[list, tuple, None]) -> None:
     """Open remote.
 
     Open the remote repository through the browser. Support additional parameter list.
@@ -144,14 +144,14 @@ def open_remote_url(args: Union[list, tuple, None]):
     err, remote = exec_cmd("git remote show")
     if err:
         print(err)
-        return
+        return None
     remote = remote.strip().split("\n")[0]
 
     # Get remote url, exit when error.
     err, remote_url = exec_cmd("git ls-remote --get-url {0}".format(remote))
     if err:
         print(err)
-        return
+        return None
     remote_url = remote_url[:-5]
 
     # Splice URL, priority: branch > commit > issue

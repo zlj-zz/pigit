@@ -292,7 +292,7 @@ class Config(object):
         if os.path.exists(self.config_path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
-            return
+            return None
 
         # Try to load already has config.
         conf = self.load_config()
@@ -591,7 +591,7 @@ class Parser(object):
             return self._parser.parse_known_args(custom_commands)
         return self._parser.parse_known_args()
 
-    def process(self, known_args, extra_unknown: Optional[list] = None):
+    def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
         try:
             if known_args.complete:
                 completion_vars = {
@@ -601,7 +601,7 @@ class Parser(object):
                 ShellCompletion(
                     __project__, completion_vars, PIGIT_HOME
                 ).complete_and_use()
-                return
+                return None
 
             if known_args.config:
                 git_local_config()
@@ -616,15 +616,14 @@ class Parser(object):
                 )
 
             if known_args.create_config:
-                CONFIG.create_config_template()
-                return
+                return CONFIG.create_config_template()
 
             if known_args.ignore_type:
                 GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
                     known_args.ignore_type,
                     dir_path=Repository_Path,
                 )
-                return
+                return None
 
             if known_args.count:
                 path = known_args.count if known_args.count != "." else os.getcwd()
@@ -637,7 +636,7 @@ class Parser(object):
                 ).count_and_format_print(
                     show_invalid=CONFIG.codecounter_show_invalid,
                 )
-                return
+                return None
 
             git_processor = GitProcessor(
                 extra_cmds=get_extra_cmds(),
@@ -682,7 +681,7 @@ class Parser(object):
                                     pigit.tomato.help("tomato")
                     else:
                         os.system(command)
-                return
+                return None
 
             if known_args.shell:
                 _shell_mode()
@@ -703,14 +702,13 @@ class Parser(object):
                     command = known_args.command
                     known_args.args.extend(extra_unknown)  # type: list
                     git_processor.process_command(command, known_args.args)
-                    return
+                    return None
 
             # Don't have invalid command list.
             if not list(filter(lambda x: x, vars(known_args).values())):
                 introduce()
         except (KeyboardInterrupt, EOFError):
             raise SystemExit(0)
-            pass
 
 
 @time_it

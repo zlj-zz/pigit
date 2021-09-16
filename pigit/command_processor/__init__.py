@@ -129,7 +129,7 @@ class GitProcessor(object):
                 ):
                     self.process_command(predicted_command, args=args)
 
-            return
+            return None
 
         command = option.get("command", None)
         # Has no command can be executed.
@@ -137,7 +137,7 @@ class GitProcessor(object):
             color_print(
                 "Invalid custom short command, nothing can to exec.", TermColor.Red
             )
-            return
+            return None
 
         if not option.get("has_arguments", False):
             if args:
@@ -256,7 +256,7 @@ class GitProcessor(object):
                     )
                 ):
                     self.command_help_by_type(predicted_type)
-            return
+            return None
 
         # Print help.
         print("These are the orders of {0}".format(command_type))

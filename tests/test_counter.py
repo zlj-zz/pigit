@@ -71,7 +71,7 @@ def _read_handle(root, files, counter):
     # First, filter folder.
     is_effective_dir = counter.matching(root)
     if not is_effective_dir:
-        return
+        return None
 
     for file in files:
         full_path = os.path.join(root, file)

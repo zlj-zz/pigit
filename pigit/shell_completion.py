@@ -268,13 +268,13 @@ class ShellCompletion(object):
         # check shell validable.
         if current_shell in self.Supported_Shell:
             print("Don't support completion of %s" % current_shell)
-            return
+            return None
 
         # try create completion file.
         script_name, completion_src = self.generate_resource()
         if self.write_completion(script_name, completion_src):
             print("Write completion script failed.")
-            return
+            return None
 
         # try inject to shell config.
         try:
@@ -284,7 +284,7 @@ class ShellCompletion(object):
             else:
                 print("Command already exist.")
         except Exception as e:
-            print(e)
+            print(str(e))
 
 
 def process_argparse(argparse_obj: object) -> dict:

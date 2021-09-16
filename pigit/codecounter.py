@@ -554,7 +554,7 @@ class CodeCounter(object):
             for key, value in new.items():
                 line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
                 print(line)
-            return
+            return None
 
         elif result_format == "table":
             # Print full time.

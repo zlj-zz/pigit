@@ -113,7 +113,7 @@ class GitignoreGenetor(object):
                     " ".join(self.Supported_Types.keys())
                 )
             )
-            return
+            return None
 
         ignore_path = dir_path + "/.gitignore"
         whether_write = True
@@ -135,7 +135,7 @@ class GitignoreGenetor(object):
             content = self.get_html_from_url(target_url)
             if not content:
                 print("Failed to get content and will exit.")
-                return
+                return None
 
             ignore_content = self.parse_gitignore_page(content)
 
