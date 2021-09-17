@@ -2,10 +2,14 @@
 
 import os
 import re
+import logging
 import textwrap
 from typing import Optional
 
 from .utils import run_cmd, exec_cmd
+
+
+Log = logging.getLogger(__name__)
 
 
 class ShellCompletionError(Exception):
@@ -207,6 +211,7 @@ class ShellCompletion(object):
         Returns:
             (str): completion full path.
         """
+        # print("\n\n", script_name, "\n\n", complete_src)
 
         if not os.path.isdir(self.script_dir):
             os.makedirs(self.script_dir, exist_ok=True)
@@ -216,8 +221,9 @@ class ShellCompletion(object):
                 for line in complete_src:
                     f.write(line)
             return True
-        except Exception:
-            return None
+        except Exception as e:
+            Log.error(str(e) + str(e.__traceback__))
+            return False
 
     def inject_into_shell(self, script_name: str) -> bool:
         """Try using completion script.
@@ -260,42 +266,47 @@ class ShellCompletion(object):
     def complete_and_use(self) -> None:
         """Add completion prompt script."""
 
-        print("\nTry to add completion ...")
+        print("\n===Try to add completion ...")
 
         current_shell = self.shell
-        print("Detected shell: %s" % current_shell)
+        print(":: Detected shell: %s" % repr(current_shell))
 
         # check shell validable.
-        if current_shell in self.Supported_Shell:
-            print("Don't support completion of %s" % current_shell)
+        if current_shell not in self.Supported_Shell:
+            print(":: Don't support completion of %s" % current_shell)
             return None
 
         # try create completion file.
         script_name, completion_src = self.generate_resource()
-        if self.write_completion(script_name, completion_src):
-            print("Write completion script failed.")
+        if not self.write_completion(script_name, completion_src):
+            print(":: Write completion script failed.")
             return None
 
         # try inject to shell config.
         try:
             injected = self.inject_into_shell(script_name)
             if injected:
-                print("Source your shell configuration.")
+                print(":: Source your shell configuration.")
             else:
-                print("Command already exist.")
+                print(":: Command already exist.")
         except Exception as e:
             print(str(e))
 
 
 def process_argparse(argparse_obj: object) -> dict:
-    if isinstance(argparse_obj, object):
+    if not isinstance(argparse_obj, object):
         raise TypeError("Need a argparse.ArgumentParser object.")
 
-    if not argparse_obj.__dict__.get("_actions", None):
+    try:
+        if not argparse_obj.__dict__.get("_actions", None):
+            raise TypeError("Need a argparse.ArgumentParser object.")
+    except AttributeError:
         raise TypeError("Need a argparse.ArgumentParser object.")
 
     arguments = {}
+
     for action in argparse_obj.__dict__["_actions"]:
         for option in action.option_strings:
             arguments[option] = action.help
+
     return arguments

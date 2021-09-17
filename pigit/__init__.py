@@ -594,10 +594,14 @@ class Parser(object):
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
         try:
             if known_args.complete:
+                # Generate competion vars dict.
                 completion_vars = {
                     key: value.get("help", "") for key, value in Git_Cmds.items()
                 }
+
+                # Update var dict with shell command.
                 completion_vars.update(process_argparse(self._parser))
+
                 ShellCompletion(
                     __project__, completion_vars, PIGIT_HOME
                 ).complete_and_use()
