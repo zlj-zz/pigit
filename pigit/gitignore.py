@@ -3,6 +3,7 @@
 import os
 import re
 import logging
+from typing import Optional
 from urllib.request import urlopen
 
 from .utils import confirm
@@ -75,7 +76,7 @@ class GitignoreGenetor(object):
         res = re.sub(r"(\n[^\S\r\n]+)+", "\n", res)
         return res
 
-    def get_html_from_url(self, url: str) -> str:
+    def get_html_from_url(self, url: str) -> Optional[str]:
         """Crawl gitignore template.
 
         Args:
@@ -88,7 +89,7 @@ class GitignoreGenetor(object):
         try:
             handle = urlopen(url, timeout=self.timeout)
         except Exception as e:
-            Log.error(str(e))
+            Log.error(str(e) + str(e.__traceback__))
             # Exit once an error occurs.
             return None
         else:
@@ -147,7 +148,7 @@ class GitignoreGenetor(object):
                     "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
                 )
             except Exception as e:
-                Log.error(str(e))
+                Log.error(str(e) + str(e.__traceback__))
                 print("Write gitignore file failed.")
                 print("You can copy it with the following:")
                 print("#" * 60)

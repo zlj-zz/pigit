@@ -53,7 +53,7 @@ def run_cmd(*args) -> bool:
         proc.wait()
         return True
     except Exception as e:
-        Log.error(str(e))
+        Log.error(str(e) + str(e.__traceback__))
         return False
 
 
@@ -78,7 +78,7 @@ def exec_cmd(*args) -> tuple[str, str]:
         proc.kill()
         return err, res
     except Exception as e:
-        Log.error(str(e))
+        Log.error(str(e) + str(e.__traceback__))
         return str(e), ""
 
 
@@ -228,7 +228,7 @@ def dir_wether_ok(dir_path: str) -> bool:
         os.makedirs(dir_path, exist_ok=True)
         return True
     except Exception as e:
-        Log.error(str(e))
+        Log.error(str(e) + str(e.__traceback__))
         return False
 
 

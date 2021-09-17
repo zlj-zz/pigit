@@ -263,7 +263,7 @@ class Config(object):
                             continue
                         new_config[key] = str(line)
         except Exception as e:
-            Log.error(str(e))
+            Log.error(str(e) + str(e.__traceback__))
 
         if (  # check codecounter output format wether supported.
             "codecounter_result_format" in new_config
@@ -309,7 +309,7 @@ class Config(object):
                 f.write(self.CONFIG_TEMPLATE.format(**conf))
             print("Successful.")
         except Exception as e:
-            Log.error(str(e))
+            Log.error(str(e) + str(e.__traceback__))
             print("Failed, create config.")
 
 
