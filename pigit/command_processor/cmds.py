@@ -28,6 +28,7 @@ class CommandType(enum.Enum):
     Stash = "Stash"
     Tag = "Tag"
     WorkingTree = "Working tree"
+    Submodule = "Submodule"
     Setting = "Setting"
     Extra = "Extra"  # default
 
@@ -593,6 +594,28 @@ Git_Cmds = {
         "command": "git rm -rf ",
         "help": "removes files from the working tree and from the index (recursively and forced).",
         "has_arguments": True,
+    },
+    # Submodule
+    "sc": {
+        "belong": CommandType.Submodule,
+        "command": "git clone --recursive ",
+        "help": "Clone a repository as a submodule.",
+        "has_arguments": True,
+    },
+    "si": {
+        "belong": CommandType.Submodule,
+        "command": "git submodule update --init --recursive",
+        "help": "Pull the submodule for the first time.",
+    },
+    # For above git 1.8.2
+    #   `git submodule update --recursive --remote`
+    # For above git 1.7.3
+    #   `git submodule update --recursive`
+    #   `git pull --reccurse-submodules`
+    "su": {
+        "belong": CommandType.Submodule,
+        "command": "git submodule update --recursive --remote",
+        "help": "Update git submodule.",
     },
     # Setting
     "savepd": {

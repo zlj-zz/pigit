@@ -115,7 +115,7 @@ def test_mutliprocess_walk(path=os.getcwd()):
         for root, dirs, files in os.walk(path):
             # Flag for large dir.
             progress += 1
-            print("\r{0}".format(progress), end="")
+            # print("\r{0}".format(progress), end="")
 
             # Process .gitignore to add new rule.
             if ".gitignore" in files:
@@ -124,11 +124,8 @@ def test_mutliprocess_walk(path=os.getcwd()):
             future_result = pool.submit(_read_handle, root, files, counter)
             future_result.add_done_callback(_callback)
 
-            # r = future_result.result()
-            # if r:
-            #     res_count += r
+        print("{0}".format(progress), end="")
 
-        # threading.Thread(target=_read_handle, args=(root, files)).start()
 
         """
         # First, filter folder.
