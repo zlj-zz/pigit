@@ -22,8 +22,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import print_function, division, absolute_import
-
 
 __project__ = "pigit"
 __version__ = "1.3.1.beta.1"
@@ -307,10 +305,11 @@ class Config(object):
                 self.config_path, "w" if os.path.isfile(self.config_path) else "x"
             ) as f:
                 f.write(self.CONFIG_TEMPLATE.format(**conf))
-            print("Successful.")
         except Exception as e:
             Log.error(str(e) + str(e.__traceback__))
             print("Failed, create config.")
+        else:
+            print("Successful.")
 
 
 CONFIG = Config()
@@ -378,9 +377,17 @@ def get_extra_cmds() -> dict:
     if os.path.isfile(extra_cmd_path):
         try:
             extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
-            extra_cmds = extra_cmd.extra_cmds
-        except Exception:
-            pass
+        except Exception as e:
+            Log.error(
+                "Can't load file '{0}';{1};{2}".format(
+                    extra_cmd_path, str(e), str(e.__traceback__)
+                )
+            )
+        else:
+            try:
+                extra_cmds = extra_cmd.extra_cmds
+            except AttributeError:
+                Log.error("Can't found dict name is 'extra_cmds'.")
     # print(extra_cmds)
     return extra_cmds
 

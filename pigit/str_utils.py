@@ -93,7 +93,6 @@ def get_file_icon(file_type: str) -> str:
 def shorten(
     text: str, width: int, placeholder: str = "...", front: bool = False
 ) -> str:
-    # type:(str, int, str, bool) -> str
     """Truncate exceeded characters.
 
     Args:

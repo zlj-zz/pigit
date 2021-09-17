@@ -51,7 +51,6 @@ class GitProcessor(object):
 
     @staticmethod
     def color_command(command: str) -> str:
-        # type:(str) -> str
         """Color the command string.
         prog: green;
         short command: yellow;
@@ -169,7 +168,6 @@ class GitProcessor(object):
     # Print command help message.
     ################################
     def _generate_help_by_key(self, _key: str, use_color: bool = True) -> str:
-        # type:(str, bool) -> str
         """Generate one help by given key.
 
         Args:

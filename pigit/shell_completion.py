@@ -220,10 +220,11 @@ class ShellCompletion(object):
             with open(full_path, "w" if os.path.isfile(full_path) else "x") as f:
                 for line in complete_src:
                     f.write(line)
-            return True
         except Exception as e:
             Log.error(str(e) + str(e.__traceback__))
             return False
+        else:
+            return True
 
     def inject_into_shell(self, script_name: str) -> bool:
         """Try using completion script.
@@ -244,10 +245,11 @@ class ShellCompletion(object):
         try:
             with open(config_path) as f:
                 shell_conf = f.read()
-                _re = re.compile(r"{}[^\s]*".format(full_script_path))
-                files = _re.findall(shell_conf)
         except Exception as e:
             raise ShellCompletionError("Read shell config error: {0}".format(e))
+        else:
+            _re = re.compile(r"{}[^\s]*".format(full_script_path))
+            files = _re.findall(shell_conf)
 
         has_injected = False
         # print(files)
@@ -258,7 +260,7 @@ class ShellCompletion(object):
             try:
                 run_cmd('echo "source %s" >> %s ' % (full_script_path, config_path))
             except Exception as e:
-                raise ShellCompletionError("Inject error: {0}".format(e))
+                raise ShellCompletionError(f"Inject error: {str(e)}")
             return True
         else:
             return False

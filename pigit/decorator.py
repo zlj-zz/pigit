@@ -18,7 +18,7 @@ def time_it(fn):
         res = None
         try:
             res = fn(*args, **kwargs)
-        except SystemExit:
+        except (SystemExit, EOFError):
             pass
         time_it.deep -= 1
 

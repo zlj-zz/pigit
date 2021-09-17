@@ -79,7 +79,6 @@ def repository_info(
     show_lastest_log: bool = True,
     show_summary: bool = True,
 ) -> None:
-    # type:(bool, bool, bool, bool, bool) -> None
     """Print some information of the repository.
 
     repository: `Repository_Path`
@@ -98,6 +97,7 @@ def repository_info(
         print(
             "Repository: \n\t%s\n" % (TermColor.SkyBlue + Repository_Path + Fx.reset,)
         )
+
     # Get remote url.
     if show_remote:
         try:
@@ -114,6 +114,7 @@ def repository_info(
                 ]
             )
         print("Remote: \n%s\n" % remote)
+
     # Get all branches.
     if show_branches:
         err, res = exec_cmd("git branch --all --color")
@@ -122,6 +123,7 @@ def repository_info(
         else:
             branches = textwrap.indent(res, "\t")
         print("Branches: \n%s\n" % branches)
+
     # Get the lastest log.
     if show_lastest_log:
         err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
@@ -131,6 +133,7 @@ def repository_info(
             # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
             git_log = textwrap.indent(res, "\t")
         print("Lastest log:\n%s\n" % git_log)
+
     # Get git summary.
     if show_summary:
         err, res = exec_cmd("git shortlog --summary --numbered")

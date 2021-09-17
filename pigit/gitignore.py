@@ -94,7 +94,6 @@ class GitignoreGenetor(object):
             return None
         else:
             content = handle.read().decode("utf-8")
-
             return content
 
     def launch(self, genre: str, dir_path: str) -> None:
@@ -144,12 +143,13 @@ class GitignoreGenetor(object):
             try:
                 with open(ignore_path, "w") as fd:
                     fd.write(ignore_content)
-                print(
-                    "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
-                )
             except Exception as e:
                 Log.error(str(e) + str(e.__traceback__))
                 print("Write gitignore file failed.")
                 print("You can copy it with the following:")
                 print("#" * 60)
                 print(ignore_content)
+            else:
+                print(
+                    "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
+                )

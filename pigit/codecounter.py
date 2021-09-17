@@ -5,8 +5,9 @@ import os
 import stat
 import re
 import json
-import threading
 import time
+import logging
+import threading
 from math import ceil
 import concurrent.futures
 from shutil import get_terminal_size
@@ -15,6 +16,9 @@ from typing import Optional
 from .utils import confirm
 from .str_utils import shorten, get_file_icon
 from .common import Color, Fx
+
+
+Log = logging.getLogger(__name__)
 
 
 class CodeCounterError(Exception):
@@ -323,7 +327,7 @@ class CodeCounter(object):
                     size_ = os.path.getsize(full_path)
                     total_size += size_
                 except:
-                    pass
+                    Log.debug(f"Can't read size of '{full_path}'")
 
                 # Get file type.
                 type_ = self.adjudgment_type(file)
@@ -448,7 +452,7 @@ class CodeCounter(object):
                                 with self._Lock:
                                     data_count[0] += size_
                             except:
-                                pass
+                                Log.debug(f"Can't read size of '{full_path}'")
 
                             # Get file type.
                             type_ = self.adjudgment_type(file)
@@ -502,9 +506,10 @@ class CodeCounter(object):
         try:
             with open(file_path) as rf:
                 res = json.load(rf)
-                return res
         except Exception:
             return None
+        else:
+            return res
 
     def save_result(self, result: dict, root_path: str) -> None:
         """Save count result.
@@ -525,9 +530,10 @@ class CodeCounter(object):
         try:
             with open(file_path, "w" if os.path.isfile(file_path) else "x") as wf:
                 json.dump(result, wf, indent=2)
-                return True
         except Exception:
             return False
+        else:
+            return True
 
     @classmethod
     def color_index(cls, _count: int) -> int:

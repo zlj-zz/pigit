@@ -122,6 +122,7 @@ def open_remote_url(args: Union[list, tuple, None]) -> None:
                     i += 2
                 except:
                     i += 1
+
             # -i=29 or --issue=29
             elif ("-i" in args[i] or "--issue" in args[i]) and "=" in args[i]:
                 issue_number = args[i].split("=")[-1]

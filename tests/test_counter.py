@@ -1,4 +1,3 @@
-from __future__ import print_function
 import sys
 
 sys.path.insert(0, ".")
@@ -125,7 +124,6 @@ def test_mutliprocess_walk(path=os.getcwd()):
             future_result.add_done_callback(_callback)
 
         print("{0}".format(progress), end="")
-
 
         """
         # First, filter folder.

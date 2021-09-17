@@ -51,10 +51,11 @@ def run_cmd(*args) -> bool:
         # ? In python2, `subprocess` not support `with` sentence.
         proc = subprocess.Popen(" ".join(args), shell=True)
         proc.wait()
-        return True
     except Exception as e:
         Log.error(str(e) + str(e.__traceback__))
         return False
+    else:
+        return True
 
 
 def exec_cmd(*args) -> tuple[str, str]:
@@ -76,10 +77,11 @@ def exec_cmd(*args) -> tuple[str, str]:
         res = proc.stdout.read().decode()
         err = proc.stderr.read().decode()
         proc.kill()
-        return err, res
     except Exception as e:
         Log.error(str(e) + str(e.__traceback__))
         return str(e), ""
+    else:
+        return err, res
 
 
 def confirm(text: str = "", default: bool = True) -> bool:
@@ -226,10 +228,11 @@ def dir_wether_ok(dir_path: str) -> bool:
         return True
     try:
         os.makedirs(dir_path, exist_ok=True)
-        return True
     except Exception as e:
         Log.error(str(e) + str(e.__traceback__))
         return False
+    else:
+        return True
 
 
 def init_hook():
