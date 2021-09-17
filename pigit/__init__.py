@@ -225,9 +225,11 @@ class Config(object):
                         # invalid line.
                         continue
                     key, line = line.split("=", maxsplit=1)
+
                     # processing.
                     key = key.strip()
                     line = line.strip().strip('"')
+
                     # checking.
                     if key not in self._keys:
                         self.warnings.append("'{0}' is not be supported!".format(key))
@@ -275,7 +277,12 @@ class Config(object):
                 )
             )
 
-        if "version" in new_config and new_config["version"] != __version__:
+        if "version" in new_config and (
+            # If current version is a [beta] verstion then will not tip.
+            # Else if version is not right will tip.
+            new_config["version"] != __version__
+            or "beta" not in __version__
+        ):
             self.warnings.append(
                 "The current configuration file is not up-to-date."
                 "You'd better recreate it."
@@ -388,6 +395,7 @@ def get_extra_cmds() -> dict:
                 extra_cmds = extra_cmd.extra_cmds
             except AttributeError:
                 Log.error("Can't found dict name is 'extra_cmds'.")
+
     # print(extra_cmds)
     return extra_cmds
 
@@ -724,9 +732,8 @@ class Parser(object):
 
 @time_it
 def main(custom_commands: Optional[list] = None):
-    # init_hook()
-
     parser = Parser()
+
     # parse custom comand, if has.
     if custom_commands is not None:
         stdargs = parser.parse(custom_commands)

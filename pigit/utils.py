@@ -73,6 +73,7 @@ def exec_cmd(*args) -> tuple[str, str]:
             stdout=subprocess.PIPE,
             shell=True,
         )
+
         # Get normal output and error output.
         res = proc.stdout.read().decode()
         err = proc.stderr.read().decode()

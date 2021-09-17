@@ -436,6 +436,7 @@ class CodeCounter(object):
 
                 if not files:
                     continue
+
                 # print(pool._queue_count)
                 if len(files) >= 15 and pool._queue_count < max_queue:
                     # Calling process.
@@ -565,8 +566,10 @@ class CodeCounter(object):
         elif result_format == "table":
             # Print full time.
             print(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
+
             # Print title.
             print("{}{:^67}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
+
             # Print table header.
             print("=" * needed_width)
             print(
@@ -575,6 +578,7 @@ class CodeCounter(object):
                 )
             )
             print("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
+
             # Print table content.
             sum_ = 0
             additions = 0
@@ -584,6 +588,7 @@ class CodeCounter(object):
                     key_display_str = "{0} {1}".format(get_file_icon(key), key)
                 else:
                     key_display_str = key
+
                 # Processing too long name.
                 key_display_str = shorten(key_display_str, 20, front=False)
 
@@ -663,6 +668,7 @@ class CodeCounter(object):
         result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
 
         old_result = self.load_recorded_result(self.count_path)
+
         # diff print.
         self.format_print(result, old_result)
         if if_save:

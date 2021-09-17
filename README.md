@@ -202,6 +202,7 @@ The command info has some options:
 - Support generate shell completion script.
 - Support create `.gitignore` template from internet.
 - Support code counter.
+- Support quick open remote url (only support github).
 - Have log output and help message tips.
 
 ---

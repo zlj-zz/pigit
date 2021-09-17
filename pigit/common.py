@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+from typing import Tuple
 
 
 # For windows print color.
@@ -53,14 +54,14 @@ class Color(object):
         .escape: str
     """
 
-    # hexa: str
-    # dec: Tuple[int, int, int]
-    # red: int
-    # green: int
-    # blue: int
-    # depth: str
-    # escape: str
-    # default: bool
+    hexa: str
+    dec: Tuple[int, int, int]
+    red: int
+    green: int
+    blue: int
+    depth: str
+    escape: str
+    default: bool
 
     TRUE_COLOR = sys.version_info < (3, 0)
 
