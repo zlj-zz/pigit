@@ -9,7 +9,7 @@ import pytest
 
 import concurrent.futures
 from pprint import pprint
-from functools import wraps
+from pyinstrument import Profiler
 
 from pigit.codecounter import CodeCounter, CodeCounterError
 from pigit import COUNTER_PATH
@@ -19,11 +19,15 @@ def test_codecounter(path=os.getcwd()):
     with pytest.raises(CodeCounterError):
         CodeCounter(result_format="xxx")
 
+    profiler = Profiler()
+
     start_t = time.time()
-    CodeCounter(
-        result_saved_path=COUNTER_PATH, count_path=path
-    ).count_and_format_print()
+    with profiler:
+        CodeCounter(
+            result_saved_path=COUNTER_PATH, count_path=path
+        ).count_and_format_print()
     print(time.time() - start_t)
+    profiler.print()
 
 
 @pytest.mark.parametrize(
