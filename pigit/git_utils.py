@@ -40,16 +40,16 @@ def current_repository() -> str:
     return repository_path
 
 
-Repository_Path: str = current_repository()
-IS_Git_Repository: bool = True if Repository_Path else False
+REPOSITORY_PATH: str = current_repository()
+IS_GIT_REOSITORY: bool = True if REPOSITORY_PATH else False
 
 
-def git_local_config() -> None:
+def output_git_local_config() -> None:
     """Print the local config of current git repository."""
-    if IS_Git_Repository:
+    if IS_GIT_REOSITORY:
         _re = re.compile(r"\w+\s=\s.*?")
         try:
-            with open(Repository_Path + "/.git/config", "r") as cf:
+            with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
                 for line in re.split(r"\r\n|\r|\n", cf.read()):
                     if line.startswith("["):
                         print(TermColor.Red + line)
@@ -72,7 +72,7 @@ def git_local_config() -> None:
         color_print("This directory is not a git repository yet.", TermColor.Red)
 
 
-def repository_info(
+def output_repository_info(
     show_path: bool = True,
     show_remote: bool = True,
     show_branches: bool = True,
@@ -95,13 +95,13 @@ def repository_info(
     print("\r[%s]        \n" % (Fx.b + "Repository Information" + Fx.reset,))
     if show_path:
         print(
-            "Repository: \n\t%s\n" % (TermColor.SkyBlue + Repository_Path + Fx.reset,)
+            "Repository: \n\t%s\n" % (TermColor.SkyBlue + REPOSITORY_PATH + Fx.reset,)
         )
 
     # Get remote url.
     if show_remote:
         try:
-            with open(Repository_Path + "/.git/config", "r") as cf:
+            with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
                 config = cf.read()
         except Exception:
             remote = error_str

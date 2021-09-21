@@ -3,6 +3,7 @@
 import os
 import sys
 import signal
+from typing import Optional, Type
 
 # try to import needed pkg.
 # If import failed, set `TERM_CONTROL` is False.
@@ -24,10 +25,23 @@ except Exception:
         print("Please install `pynput` to supported keyboard event.")
 
 
+class _baseKeyEvent(object):
+    def signal_init(self) -> ...:
+        """Take over the system signal, which is implemented by subclasses."""
+        raise NotImplementedError()
+
+    def signal_restore(self) -> ...:
+        """Reply signal, implemented by subclass."""
+        raise NotImplementedError()
+
+    def sync_get_input(self) -> ...:
+        raise NotImplementedError()
+
+
 #####################################################################
 # KeyBoard event classes.                                           #
 #####################################################################
-class _PosixKeyEvent(object):
+class _PosixKeyEvent(_baseKeyEvent):
     """KeyBoard event class.
 
     Subclass:
@@ -157,7 +171,7 @@ class _PosixKeyEvent(object):
                 return clean_key
 
 
-class _WinKeyEvent(object):
+class _WinKeyEvent(_baseKeyEvent):
     _special_keys = {
         "Key.space": "space",
         "Key.up": "up",
@@ -177,6 +191,12 @@ class _WinKeyEvent(object):
 
         self._queue.put(key)
 
+    def signal_init(self) -> ...:
+        pass
+
+    def signal_restore(self) -> ...:
+        pass
+
     def sync_get_input(self):
         resp = str(self._queue.get(block=True, timeout=None)).strip("'")
         if resp in self._special_keys:
@@ -185,12 +205,12 @@ class _WinKeyEvent(object):
             return resp
 
 
-def get_keyevent_obj():
+def get_keyevent_obj() -> Type[_baseKeyEvent]:
     """Keyevent Object Factory."""
     if not TERM_CONTROL:
-        return None
+        raise NameError("Can't get right class.")
     if not NEED_EXTRA_KEYBOARD_EVENT_PKG:
         keyevent = _PosixKeyEvent
     else:
         keyevent = _WinKeyEvent
-    return keyevent()
+    return keyevent

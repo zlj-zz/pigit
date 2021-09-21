@@ -10,7 +10,7 @@ from ..utils import color_print, exec_cmd, run_cmd, confirm
 from ..str_utils import shorten, get_width
 from ..common import Fx, Color, TermColor
 from ..keyevent import get_keyevent_obj
-from ..git_utils import IS_Git_Repository
+from ..git_utils import REPOSITORY_PATH
 from .model import File
 
 
@@ -166,14 +166,16 @@ class InteractiveAdd(object):
         self._min_width = 60
         self._debug = debug
 
-        self._keyevent = get_keyevent_obj()
         # Wether can into interactive.
-        if not self._keyevent:
+        try:
+            _keyevent_class = get_keyevent_obj()
+        except NameError:
             raise TermError("This behavior is not supported in the current system.")
+        self._keyevent = _keyevent_class()
 
         self._data_handle = DataHandle(use_color)
 
-    def process_file(self, file: str) -> None:
+    def process_file(self, file: File) -> None:
         """Process file to change the status.
 
         Args:
@@ -329,7 +331,7 @@ class InteractiveAdd(object):
     def add_interactive(self, *args):
         """Interactive main method."""
 
-        if not IS_Git_Repository:
+        if not REPOSITORY_PATH:
             color_print("Current path is not a git repository.", TermColor.Red)
             return
 
@@ -361,11 +363,8 @@ class InteractiveAdd(object):
         # Into new term page.
         print(Fx.alt_screen + Fx.hide_cursor)
         try:
-            try:
-                #  try hook window resize event.
-                self._keyevent.signal_init()
-            except AttributeError:
-                pass
+            #  try hook window resize event.
+            self._keyevent.signal_init()
 
             # Start interactive.
             while not stopping:
@@ -459,8 +458,5 @@ class InteractiveAdd(object):
             pass
         finally:
             # Whatever, unregister signal event and restore terminal at last.
-            try:
-                self._keyevent.signal_restore()
-            except AttributeError:
-                pass
+            self._keyevent.signal_restore()
             print(Fx.normal_screen + Fx.show_cursor)

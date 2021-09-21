@@ -39,7 +39,6 @@ import os
 import sys
 import argparse
 import logging
-import logging.handlers
 import textwrap
 from distutils.util import strtobool
 from shutil import get_terminal_size
@@ -48,7 +47,12 @@ from typing import Optional
 from .log import LogHandle
 from .utils import confirm, color_print, is_color
 from .common import Color, Fx, TermColor
-from .git_utils import Git_Version, Repository_Path, repository_info, git_local_config
+from .git_utils import (
+    Git_Version,
+    REPOSITORY_PATH,
+    output_repository_info,
+    output_git_local_config,
+)
 from .decorator import time_it
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
@@ -95,11 +99,11 @@ class Config(object):
         """\
         #? Config file for pigit v. {version}
 
-        #  ____ ___ ____ ___ _____                            __ _                       _   _
-        # |  _ \_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _ _   _ _ __ __ _| |_(_) ___  _ __
-        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \| '_ \| |_| |/ _` | | | | '__/ _` | __| |/ _ \| '_ \\
-        # |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| | |_| | | | (_| | |_| | (_) | | | |
-        # |_|  |___\____|___| |_|            \___\___/|_| |_|_| |_|\__, |\__,_|_|  \__,_|\__|_|\___/|_| |_|
+        #  ____ ___ ____ ___ _____                            __ _
+        # |  _ \_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _
+        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \| '_ \| |_| |/ _` |
+        # |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| |
+        # |_|  |___\____|___| |_|            \___\___/|_| |_|_| |_|\__, |
         #                                                          |___/
         # Git-tools -- pigit configuration.
 
@@ -623,10 +627,10 @@ class Parser(object):
                 return None
 
             if known_args.config:
-                git_local_config()
+                output_git_local_config()
 
             if known_args.information:
-                repository_info(
+                output_repository_info(
                     show_path=CONFIG.repository_show_path,
                     show_remote=CONFIG.repository_show_remote,
                     show_branches=CONFIG.repository_show_branchs,
@@ -640,7 +644,7 @@ class Parser(object):
             if known_args.ignore_type:
                 GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
                     known_args.ignore_type,
-                    dir_path=Repository_Path,
+                    dir_path=REPOSITORY_PATH,
                 )
                 return None
 
