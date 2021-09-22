@@ -512,7 +512,7 @@ class CodeCounter(object):
         else:
             return res
 
-    def save_result(self, result: dict, root_path: str) -> None:
+    def save_result(self, result: dict, root_path: str) -> bool:
         """Save count result.
 
         Generate name according to `root_path`, then try save the record
@@ -559,7 +559,7 @@ class CodeCounter(object):
         width, _ = get_terminal_size()
         if result_format == "simple" or width < needed_width:
             for key, value in new.items():
-                line = "{}: {:,} | {:,}".format(key, value["files"], value["lines"])
+                line = "::{} -> {:,} | {:,}".format(key, value["files"], value["lines"])
                 print(line)
             return None
 

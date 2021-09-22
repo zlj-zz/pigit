@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import textwrap
 import logging
 from typing import Optional
@@ -12,17 +13,17 @@ from .common import Fx, TermColor
 Log = logging.getLogger(__name__)
 
 
-def git_version() -> Optional[str]:
+def git_version() -> str:
     """Get Git version."""
     _, git_version_ = exec_cmd("git --version")
     if git_version_:
         return git_version_
     else:
-        return None
+        return ""
 
 
 # Not detected, the result is None
-Git_Version: Optional[str] = git_version()
+Git_Version: str = git_version()
 
 
 def current_repository() -> str:
@@ -44,32 +45,88 @@ REPOSITORY_PATH: str = current_repository()
 IS_GIT_REOSITORY: bool = True if REPOSITORY_PATH else False
 
 
-def output_git_local_config() -> None:
+_header = (
+    "========================================================================\n"
+    "|{bold}{:^70}{unbold}|\n"
+    "========================================================================"
+)
+
+_item = "| {:<25} | {value_color}{:<40}{reset} |"
+
+
+def _config_normal_head_output(head: str):
+    print(TermColor.Red + head)
+
+
+def _config_normal_item_output(key: str, value: str):
+    print(TermColor.SkyBlue + key, end="")
+    print("=" + Fx.italic + TermColor.MediumVioletRed + value + Fx.reset)
+
+
+def _config_normal_output_end():
+    pass
+
+
+def _config_table_head_output(head: str):
+    print(_header.format(head[1:-1], bold=Fx.bold, unbold=Fx.unbold))
+
+
+def _config_table_item_output(key: str, value: str):
+    print(
+        _item.format(
+            key.strip(),
+            value.strip(),
+            value_color=TermColor.Green,
+            reset=Fx.reset,
+        )
+    )
+
+
+def _config_table_output_end():
+    print("-" * 72)
+
+
+def output_git_local_config(style: str = "table") -> None:
     """Print the local config of current git repository."""
-    if IS_GIT_REOSITORY:
-        _re = re.compile(r"\w+\s=\s.*?")
-        try:
-            with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
-                for line in re.split(r"\r\n|\r|\n", cf.read()):
-                    if line.startswith("["):
-                        print(TermColor.Red + line)
-                    else:
-                        if _re.search(line) is not None:
-                            key, value = line.split("=")
-                            print(TermColor.SkyBlue + key, end="")
-                            print(
-                                "="
-                                + Fx.italic
-                                + TermColor.MediumVioletRed
-                                + value
-                                + Fx.reset
-                            )
-        except Exception as e:
-            color_print(
-                "Error reading configuration file. {0}".format(str(e)), TermColor.Red
-            )
-    else:
+
+    if not IS_GIT_REOSITORY:
         color_print("This directory is not a git repository yet.", TermColor.Red)
+        return None
+
+    _re = re.compile(r"\w+\s=\s.*?")
+    width, _ = shutil.get_terminal_size()
+    if width < 72:
+        style = "normal"
+
+    try:
+        with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
+            context = cf.read()
+    except Exception as e:
+        color_print(
+            "Error reading configuration file. {0}".format(str(e)), TermColor.Red
+        )
+    else:
+        if style == "normal":
+            _head_output = _config_normal_head_output
+            _item_output = _config_normal_item_output
+            _output_end = _config_normal_output_end
+        elif style == "table":
+            _head_output = _config_table_head_output
+            _item_output = _config_table_item_output
+            _output_end = _config_table_output_end
+        else:
+            _head_output = _config_normal_head_output
+            _item_output = _config_normal_item_output
+            _output_end = _config_normal_output_end
+
+        for line in re.split(r"\r\n|\r|\n", context):
+            if line.startswith("["):
+                _head_output(line)
+            else:
+                if _re.search(line) is not None:
+                    key, value = line.split("=")
+                    _item_output(key, value)
+        _output_end()
 
 
 def output_repository_info(
