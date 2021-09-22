@@ -328,6 +328,11 @@ class Cursor:
         print("\033[?25h")  # * Show terminal cursor
 
 
+class Symbol(object):
+    fine_rune: list[str] = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]
+    bold_rune: list[str] = ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]
+
+
 class TermColor:
     """Terminal print color class."""
 

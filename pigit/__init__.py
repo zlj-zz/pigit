@@ -100,10 +100,10 @@ class Config(object):
         #? Config file for pigit v. {version}
 
         #  ____ ___ ____ ___ _____                            __ _
-        # |  _ \_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _
-        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \| '_ \| |_| |/ _` |
+        # |  _ \\_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _
+        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \\| '_ \\| |_| |/ _` |
         # |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| |
-        # |_|  |___\____|___| |_|            \___\___/|_| |_|_| |_|\__, |
+        # |_|  |___\\____|___| |_|            \\___\\___/|_| |_|_| |_|\\__, |
         #                                                          |___/
         # Git-tools -- pigit configuration.
 
@@ -119,7 +119,6 @@ class Config(object):
         # Display time of help information in interactive mode, 0 is permanent.
         gitprocessor_interactive_help_showtime={gitprocessor_interactive_help_showtime}
 
-
         # Whether to use the ignore configuration of the `.gitignore` file.
         codecounter_use_gitignore={codecounter_use_gitignore}
 
@@ -134,10 +133,12 @@ class Config(object):
         # When the command line width is not enough, the `simple ` format is forced.
         codecounter_result_format={codecounter_result_format}
 
-
         # Timeout for getting `.gitignore` template from net.
         gitignore_generator_timeout={gitignore_generator_timeout}
 
+        # Git local config print format.
+        # Supported: [table, normal]
+        git_config_format={git_config_format}
 
         # Control which parts need to be displayed when viewing git repository information.
         repository_show_path={repository_show_path}
@@ -165,6 +166,7 @@ class Config(object):
         'codecounter_use_gitignore', 'codecounter_show_invalid',
         'codecounter_result_format', 'codecounter_show_icon',
         'gitignore_generator_timeout',
+        'git_config_format',
         'repository_show_path', 'repository_show_remote', 'repository_show_branchs',
         'repository_show_lastest_log', 'repository_show_summary',
         'help_use_color', 'help_max_line_width',
@@ -186,6 +188,9 @@ class Config(object):
 
     gitignore_generator_timeout: int = 60
 
+    git_config_format: str = "table"
+    _supported_git_config_format: list = ["normal", "table"]
+
     repository_show_path: bool = True
     repository_show_remote: bool = True
     repository_show_branchs: bool = True
@@ -195,7 +200,7 @@ class Config(object):
     help_use_color: bool = True
     help_max_line_width: int = 90
 
-    debug_mode: str = False
+    debug_mode: bool = False
 
     # Store warning messages.
     warnings: list = []
@@ -278,6 +283,17 @@ class Config(object):
             self.warnings.append(
                 'Config key "{0}" support must in {1}'.format(
                     "codecounter_result_format", self._supported_result_format
+                )
+            )
+
+        if (
+            "git_config_format" in new_config
+            and new_config["git_config_format"] not in self._supported_git_config_format
+        ):
+            new_config["git_config_format"] = "==error=="
+            self.warnings.append(
+                'Config key "{0}" support must in {1}'.format(
+                    "git_config_format", self._supported_git_config_format
                 )
             )
 
@@ -627,7 +643,7 @@ class Parser(object):
                 return None
 
             if known_args.config:
-                output_git_local_config()
+                output_git_local_config(CONFIG.git_config_format)
 
             if known_args.information:
                 output_repository_info(

@@ -8,7 +8,7 @@ import logging
 from typing import Optional
 
 from .utils import exec_cmd, color_print
-from .common import Fx, TermColor
+from .common import Fx, TermColor, Symbol
 
 Log = logging.getLogger(__name__)
 
@@ -42,54 +42,52 @@ def current_repository() -> str:
 
 
 REPOSITORY_PATH: str = current_repository()
-IS_GIT_REOSITORY: bool = True if REPOSITORY_PATH else False
+IS_GIT_REPOSITORY: bool = True if REPOSITORY_PATH else False
 
 
-_header = (
-    "========================================================================\n"
-    "|{bold}{:^70}{unbold}|\n"
-    "========================================================================"
-)
-
-_item = "| {:<25} | {value_color}{:<40}{reset} |"
-
-
-def _config_normal_head_output(head: str):
-    print(TermColor.Red + head)
+def _config_normal_output(conf: dict[str, dict]):
+    for t, d in conf.items():
+        print(TermColor.Red + f"[{t}]")
+        for k, v in d.items():
+            print(" " * 4 + TermColor.SkyBlue + k, end="")
+            print("=" + Fx.italic + TermColor.MediumVioletRed + v + Fx.reset)
 
 
-def _config_normal_item_output(key: str, value: str):
-    print(TermColor.SkyBlue + key, end="")
-    print("=" + Fx.italic + TermColor.MediumVioletRed + value + Fx.reset)
+def _config_table_output(conf: dict[str, dict]):
+    print(Symbol.bold_rune[2], Symbol.bold_rune[0] * 70, Symbol.bold_rune[3], sep="")
 
-
-def _config_normal_output_end():
-    pass
-
-
-def _config_table_head_output(head: str):
-    print(_header.format(head[1:-1], bold=Fx.bold, unbold=Fx.unbold))
-
-
-def _config_table_item_output(key: str, value: str):
-    print(
-        _item.format(
-            key.strip(),
-            value.strip(),
-            value_color=TermColor.Green,
-            reset=Fx.reset,
+    for t, d in conf.items():
+        print(f"{Symbol.bold_rune[1]}{Fx.b}{t:^70}{Fx.ub}{Symbol.bold_rune[1]}")
+        print(
+            Symbol.bold_rune[6],
+            Symbol.bold_rune[0] * 27,
+            Symbol.bold_rune[-3],
+            Symbol.bold_rune[0] * 42,
+            Symbol.bold_rune[7],
+            sep="",
         )
-    )
 
+        for k, v in d.items():
+            print(
+                f"{Symbol.bold_rune[1]} {k:<25} {Symbol.bold_rune[1]} {TermColor.Green}{v:<40}{Fx.rs} {Symbol.bold_rune[1]}"
+            )
 
-def _config_table_output_end():
-    print("-" * 72)
+        print(
+            Symbol.bold_rune[6],
+            Symbol.bold_rune[0] * 27,
+            Symbol.bold_rune[-2],
+            Symbol.bold_rune[0] * 42,
+            Symbol.bold_rune[7],
+            sep="",
+        )
+
+    print(Symbol.bold_rune[4], Symbol.bold_rune[0] * 70, Symbol.bold_rune[5], sep="")
 
 
 def output_git_local_config(style: str = "table") -> None:
     """Print the local config of current git repository."""
 
-    if not IS_GIT_REOSITORY:
+    if not IS_GIT_REPOSITORY:
         color_print("This directory is not a git repository yet.", TermColor.Red)
         return None
 
@@ -106,27 +104,32 @@ def output_git_local_config(style: str = "table") -> None:
             "Error reading configuration file. {0}".format(str(e)), TermColor.Red
         )
     else:
-        if style == "normal":
-            _head_output = _config_normal_head_output
-            _item_output = _config_normal_item_output
-            _output_end = _config_normal_output_end
-        elif style == "table":
-            _head_output = _config_table_head_output
-            _item_output = _config_table_item_output
-            _output_end = _config_table_output_end
-        else:
-            _head_output = _config_normal_head_output
-            _item_output = _config_normal_item_output
-            _output_end = _config_normal_output_end
+        l = re.split(r"\r\n|\r|\n", context)
+        l_len = len(l)
+        config_dict = {}
+        idx = 0
 
-        for line in re.split(r"\r\n|\r|\n", context):
-            if line.startswith("["):
-                _head_output(line)
-            else:
-                if _re.search(line) is not None:
-                    key, value = line.split("=", 1)
-                    _item_output(key, value)
-        _output_end()
+        while idx < l_len:
+            if l[idx].startswith("["):
+                config_type = l[idx][1:-1]
+                if not config_dict.get(config_type):
+                    config_dict[config_type] = {}
+                    idx += 1
+                    while idx < l_len and not l[idx].startswith("["):
+                        if "=" not in l[idx]:
+                            idx += 1
+                            continue
+                        key, value = l[idx].split("=", 1)
+                        config_dict[config_type][key.strip()] = value.strip()
+                        idx += 1
+        print(config_dict)
+
+        if style == "normal":
+            _config_normal_output(config_dict)
+        elif style == "table":
+            _config_table_output(config_dict)
+        else:
+            _config_normal_output(config_dict)
 
 
 def output_repository_info(
