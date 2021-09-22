@@ -11,8 +11,8 @@ import concurrent.futures
 from pprint import pprint
 from pyinstrument import Profiler
 
-from pigit.codecounter import CodeCounter, CodeCounterError
 from pigit import COUNTER_PATH
+from pigit.codecounter import CodeCounter, CodeCounterError
 
 
 def test_codecounter(path=os.getcwd()):
@@ -44,8 +44,7 @@ def test_pure_walk(path):
     for root, dirs, files in os.walk(path):
         for _ in files:
             count += 1
-            print("\rFound files: {0}".format(count), end="")
-        # print(root, dirs, files)
+            # print("\rFound files: {0}".format(count), end="")
     print("")
     print(f"Result spend time: {time.time() - start_t}")
 

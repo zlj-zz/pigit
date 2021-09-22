@@ -124,7 +124,7 @@ def output_git_local_config(style: str = "table") -> None:
                 _head_output(line)
             else:
                 if _re.search(line) is not None:
-                    key, value = line.split("=")
+                    key, value = line.split("=", 1)
                     _item_output(key, value)
         _output_end()
 
