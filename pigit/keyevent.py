@@ -15,7 +15,7 @@ try:
     B = lambda x: x.encode("iso8859-1")  # noqa: E731
 except Exception:
     try:
-        from pynput import keyboard
+        from pynput import keyboard  # type: ignore
 
         import queue
 

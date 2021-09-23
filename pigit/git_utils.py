@@ -54,36 +54,24 @@ def _config_normal_output(conf: dict[str, dict]):
 
 
 def _config_table_output(conf: dict[str, dict]):
-    print(Symbol.bold_rune[2], Symbol.bold_rune[0] * 70, Symbol.bold_rune[3], sep="")
+    _rune = Symbol.rune["bold"]
+
+    print(_rune[2], _rune[0] * 70, _rune[3], sep="")
 
     for t, d in conf.items():
-        print(f"{Symbol.bold_rune[1]}{Fx.b}{t:^70}{Fx.ub}{Symbol.bold_rune[1]}")
-        print(
-            Symbol.bold_rune[6],
-            Symbol.bold_rune[0] * 27,
-            Symbol.bold_rune[-3],
-            Symbol.bold_rune[0] * 42,
-            Symbol.bold_rune[7],
-            sep="",
-        )
+        print(f"{_rune[1]}{Fx.b}{t:^70}{Fx.ub}{_rune[1]}")
+        print(_rune[6], _rune[0] * 27, _rune[-3], _rune[0] * 42, _rune[7], sep="")
 
         for k, v in d.items():
             print(
-                f"{Symbol.bold_rune[1]} {k:<25} {Symbol.bold_rune[1]} {TermColor.Green}{v:<40}{Fx.rs} {Symbol.bold_rune[1]}"
+                f"{_rune[1]} {k:<25} {_rune[1]} {TermColor.Green}{v:<40}{Fx.rs} {_rune[1]}"
             )
 
-        print(
-            Symbol.bold_rune[6],
-            Symbol.bold_rune[0] * 27,
-            Symbol.bold_rune[-2],
-            Symbol.bold_rune[0] * 42,
-            Symbol.bold_rune[7],
-            sep="",
-        )
+        print(_rune[6], _rune[0] * 27, _rune[-2], _rune[0] * 42, _rune[7], sep="")
 
     _end = "────END"
-    print(Symbol.bold_rune[1], f"{_end:>69} ", Symbol.bold_rune[1], sep="")
-    print(Symbol.bold_rune[4], Symbol.bold_rune[0] * 70, Symbol.bold_rune[5], sep="")
+    print(_rune[1], f"{_end:>69} ", _rune[1], sep="")
+    print(_rune[4], _rune[0] * 70, _rune[5], sep="")
 
 
 def output_git_local_config(style: str = "table") -> None:
