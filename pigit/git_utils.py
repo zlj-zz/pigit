@@ -81,6 +81,8 @@ def _config_table_output(conf: dict[str, dict]):
             sep="",
         )
 
+    _end = "────END"
+    print(Symbol.bold_rune[1], f"{_end:>69} ", Symbol.bold_rune[1], sep="")
     print(Symbol.bold_rune[4], Symbol.bold_rune[0] * 70, Symbol.bold_rune[5], sep="")
 
 
@@ -122,7 +124,7 @@ def output_git_local_config(style: str = "table") -> None:
                         key, value = l[idx].split("=", 1)
                         config_dict[config_type][key.strip()] = value.strip()
                         idx += 1
-        print(config_dict)
+        # print(config_dict)
 
         if style == "normal":
             _config_normal_output(config_dict)
