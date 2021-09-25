@@ -62,6 +62,7 @@ File_Icons: dict[str, str] = {
     "Shell": "",
     "Swift": "",
     "SQL": "",
+    "snippets": "",
     "Type Scirpt": "",
     "Vim Scirpt": "",
     "Vue": "﵂",

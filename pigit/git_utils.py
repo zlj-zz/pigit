@@ -9,6 +9,7 @@ from typing import Optional
 
 from .utils import exec_cmd, color_print
 from .common import Fx, TermColor, Symbol
+from .common.str_table import dTable
 
 Log = logging.getLogger(__name__)
 
@@ -54,24 +55,12 @@ def _config_normal_output(conf: dict[str, dict]):
 
 
 def _config_table_output(conf: dict[str, dict]):
-    _rune = Symbol.rune["bold"]
+    for sub in conf.values():
+        for k, v in sub.items():
+            sub[k] = f"{TermColor.Green}{v:<40}{Fx.rs}"
 
-    print(_rune[2], _rune[0] * 70, _rune[3], sep="")
-
-    for t, d in conf.items():
-        print(f"{_rune[1]}{Fx.b}{t:^70}{Fx.ub}{_rune[1]}")
-        print(_rune[6], _rune[0] * 27, _rune[-3], _rune[0] * 42, _rune[7], sep="")
-
-        for k, v in d.items():
-            print(
-                f"{_rune[1]} {k:<25} {_rune[1]} {TermColor.Green}{v:<40}{Fx.rs} {_rune[1]}"
-            )
-
-        print(_rune[6], _rune[0] * 27, _rune[-2], _rune[0] * 42, _rune[7], sep="")
-
-    _end = "────END"
-    print(_rune[1], f"{_end:>69} ", _rune[1], sep="")
-    print(_rune[4], _rune[0] * 70, _rune[5], sep="")
+    tb = dTable(conf, title='Git Local Config')
+    tb.print()
 
 
 def output_git_local_config(style: str = "table") -> None:
@@ -101,7 +90,7 @@ def output_git_local_config(style: str = "table") -> None:
 
         while idx < l_len:
             if l[idx].startswith("["):
-                config_type = l[idx][1:-1]
+                config_type = l[idx][1:-1].strip()
                 if not config_dict.get(config_type):
                     config_dict[config_type] = {}
                     idx += 1

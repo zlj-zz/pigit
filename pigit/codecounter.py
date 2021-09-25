@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from functools import reduce
 import os
 import stat
 import re
@@ -8,14 +7,15 @@ import json
 import time
 import logging
 import threading
-from math import ceil
 import concurrent.futures
-from shutil import get_terminal_size
+from math import ceil
+from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
 from .utils import confirm
 from .str_utils import shorten, get_file_icon
-from .common import Color, Fx
+from .common import Color, Fx, Symbol
+from .common.str_table import Table
 
 
 Log = logging.getLogger(__name__)
@@ -203,6 +203,7 @@ class CodeCounter(object):
             )
         self.result_format = result_format
         self.use_icon = use_icon
+        self.rune = Symbol.rune["bold"]
 
     def process_gitignore(self, root: str) -> None:
         """Process `.gitignore` files and add matching rules.
@@ -564,25 +565,17 @@ class CodeCounter(object):
             return None
 
         elif result_format == "table":
+            title = "[Code Counter Result]"
+            header = ["Language", "Files", "Code lines"]
+
             # Print full time.
             print(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
 
-            # Print title.
-            print("{}{:^67}{}".format(Fx.bold, "[Code Counter Result]", Fx.unbold))
-
-            # Print table header.
-            print("=" * needed_width)
-            print(
-                "| {bold}{:<21}{unbold}| {bold}{:<17}{unbold}| {bold}{:<22}{unbold}|".format(
-                    "Language", "Files", "Code lines", bold=Fx.bold, unbold=Fx.unbold
-                )
-            )
-            print("|{sep:-<22}|{sep:-<18}|{sep:-<23}|".format(sep="-"))
-
-            # Print table content.
+            # Diff
             sum_ = 0
             additions = 0
             deletions = 0
+            tb_data = []
             for key, value in new.items():
                 if self.use_icon:
                     key_display_str = "{0} {1}".format(get_file_icon(key), key)
@@ -620,26 +613,23 @@ class CodeCounter(object):
                 else:
                     files_change = files_symbol = lines_change = lines_symbol = ""
 
-                print(
-                    (
-                        "| {:<21}"
-                        "| {file_style}{:<11,}{reset} {file_change_style}{file_change:>5}{reset}"
-                        "| {lines_style}{:<15,}{reset} {line_change_style}{line_change:>6}{reset}|"
-                    ).format(
-                        key_display_str,
-                        value["files"],
-                        value["lines"],
-                        file_style=Fx.italic,
-                        file_change_style=self.symbol_color.get(files_symbol, ""),
-                        file_change=files_change,
-                        lines_style=lines_color,
-                        line_change_style=self.symbol_color.get(lines_symbol, ""),
-                        line_change=lines_change,
-                        reset=Fx.reset,
-                    )
+                file_symbol = self.symbol_color.get(files_symbol, "")
+                line_symbol = self.symbol_color.get(lines_symbol, "")
+                tb_data.append(
+                    [
+                        f" {key_display_str:<21}",
+                        f" {Fx.i}{value['files']:<11}{Fx.rs} {file_symbol}{files_change:>5}{Fx.rs}",
+                        f" {Fx.i}{value['lines']:<15}{Fx.rs} {line_symbol}{lines_change:>6}{Fx.rs}",
+                    ]
                 )
+
+                # Clac sum code line.
                 sum_ += value["lines"]
-            print("-" * needed_width)
+
+            # Print table.
+            tb = Table(header, tb_data, title=title)
+            tb.print()
+
             # Print total and change graph.
             print(" Total: {0}".format(sum_))
 
