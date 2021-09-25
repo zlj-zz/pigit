@@ -24,13 +24,13 @@ class File:
             name (str): File path relative to Git.
             display_str (str): Display string, may has color.
             short_status (str): status string, like: 'MM'
-            has_staged_change (bool): file wether has staged change.
-            has_unstaged_change (bool): file wether has unstaged change.
+            has_staged_change (bool): file whether has staged change.
+            has_unstaged_change (bool): file whether has unstaged change.
             tracked (bool): Is the file on the tracking tree.
-            deleted (bool): file wether deleted.
-            added (bool): file wether added.
-            has_merged_conflicts (bool): file wether has merged conflict.
-            has_inline_merged_conflicts (bool): file wether has inline merged conflict.
+            deleted (bool): file whether deleted.
+            added (bool): file whether added.
+            has_merged_conflicts (bool): file whether has merged conflict.
+            has_inline_merged_conflicts (bool): file whether has inline merged conflict.
         """
 
         self.name = name

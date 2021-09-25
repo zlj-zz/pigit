@@ -7,7 +7,7 @@ import subprocess
 import logging
 from math import sqrt
 from collections import Counter
-from typing import Union
+from typing import Union, Iterable
 
 
 Log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def run_cmd(*args) -> bool:
     """Run system command.
 
     Returns:
-        (bool): Wether run successful.
+        (bool): Whether run successful.
 
     >>> run_cmd('pwd')
     True
@@ -108,7 +108,7 @@ def confirm(text: str = "", default: bool = True) -> bool:
         return default
 
 
-def similar_command(command: str, all_commands: list) -> str:
+def similar_command(command: str, all_commands: Iterable) -> str:
     """Get the most similar command with K-NearestNeighbor.
 
     Args:
@@ -185,7 +185,7 @@ Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
 
 
 def is_color(s: Union[str, list, tuple, None]) -> bool:
-    """Adjust `s` wether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
+    """Adjust `s` whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
 
     >>> is_color('#FF0000')
     True
@@ -215,13 +215,13 @@ def is_color(s: Union[str, list, tuple, None]) -> bool:
         return False
 
 
-def dir_wether_ok(dir_path: str) -> bool:
+def dir_whether_ok(dir_path: str) -> bool:
     """Determine whether the dir path exists. If not, create a directory.
 
     Args:
         dir_path (str): Directory path, like: "~/.config/xxx"
 
-    >>> dir_wether_ok('.')
+    >>> dir_whether_ok('.')
     True
     """
 

@@ -157,7 +157,7 @@ class dTable(baseTable):
     def __init__(
         self, d_data: dict, title: str = "", frame_format: str = "bold", nil: str = ""
     ):
-        # check data wether right.
+        # check data whether right.
         if not isinstance(d_data, dict):
             raise TypeError("d_data need is a dict.")
         for item in d_data.values():
@@ -171,10 +171,19 @@ class dTable(baseTable):
     def fix_data(self):
         self.each_max = each_max = [0, 0]
 
-        for sub_dict in self.data.values():
+        max_core_len = 0
+
+        for core, sub_dict in self.data.items():
+            max_core_len = max(max_core_len, len(core))
             for k, v in sub_dict.items():
                 each_max[0] = max(each_max[0], len(Fx.pure(k)))
                 each_max[1] = max(each_max[1], len(Fx.pure(v)))
+
+        # for Ensure that the table is output correctly when the len of sub title 
+        # bigger than the len of item.
+        sum_each_max = sum(each_max)
+        if max_core_len > sum_each_max:
+            each_max[1] += max_core_len - sum_each_max
 
         self.line_max = sum(each_max) + len(each_max) + 1
 

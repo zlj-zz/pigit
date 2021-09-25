@@ -47,6 +47,14 @@ def test_table1(title, data):
                 "sheep": "white",
             },
         },
+        {
+            "File suffixes for some languages": {
+                "C": "c",
+                "C#": "csharp",
+                "Python": "py",
+                "JavaScript": "js",
+            },
+        },
     ],
 )
 def test_table2(d_data):

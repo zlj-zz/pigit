@@ -102,7 +102,7 @@ class DataHandle(object):
             file (str): file path relative to git.
             tracked (bool, optional): Defaults to True.
             cached (bool, optional): Defaults to False.
-            plain (bool, optional): Wether need color. Defaults to False.
+            plain (bool, optional): Whether need color. Defaults to False.
 
         Returns:
             (str): change string.
@@ -166,7 +166,7 @@ class InteractiveAdd(object):
         self._min_width = 60
         self._debug = debug
 
-        # Wether can into interactive.
+        # Whether can into interactive.
         try:
             _keyevent_class = get_keyevent_obj()
         except NameError:
@@ -370,7 +370,7 @@ class InteractiveAdd(object):
             while not stopping:
                 print(Fx.clear_)
 
-                # check wether have status.
+                # check whether have status.
                 if not file_items:
                     print("The work tree is clean and there is nothing to operate.")
                     time.sleep(1)

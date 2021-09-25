@@ -122,10 +122,10 @@ class Config(object):
         # Whether to use the ignore configuration of the `.gitignore` file.
         codecounter_use_gitignore={codecounter_use_gitignore}
 
-        # Wether show files that cannot be counted.
+        # Whether show files that cannot be counted.
         codecounter_show_invalid={codecounter_show_invalid}
 
-        # Wether show files icons. Font support required, like: 'Nerd Font'
+        # Whether show files icons. Font support required, like: 'Nerd Font'
         codecounter_show_icon={codecounter_show_icon}
 
         # Output format of statistical results.
@@ -147,13 +147,13 @@ class Config(object):
         repository_show_lastest_log={repository_show_lastest_log}
         repository_show_summary={repository_show_summary}
 
-        # Wether with color when use `-h` get help message.
+        # Whether with color when use `-h` get help message.
         help_use_color={help_use_color}
 
         # The max line width when use `-h` get help message.
         help_max_line_width={help_max_line_width}
 
-        # Wether run PIGIT in debug mode.
+        # Whether run PIGIT in debug mode.
         debug_mode={debug_mode}
 
         """
@@ -274,7 +274,7 @@ class Config(object):
         except Exception as e:
             Log.error(str(e) + str(e.__traceback__))
 
-        if (  # check codecounter output format wether supported.
+        if (  # check codecounter output format whether supported.
             "codecounter_result_format" in new_config
             and new_config["codecounter_result_format"]
             not in self._supported_result_format

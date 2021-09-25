@@ -181,10 +181,10 @@ class CodeCounter(object):
         """
         Args:
             count_path (str, optional): The path of needed count. Defaults to os.getcwd().
-            use_ignore (bool, optional): Wether detect `.gitignore` file. Defaults to True.
+            use_ignore (bool, optional): Whether detect `.gitignore` file. Defaults to True.
             result_saved_path (str, optional): Result save path. Defaults to "".
             result_format (str, optional): Output format string. Defaults to "table".
-            use_icon (bool, optional): Wether output with icon. Defaults to False.
+            use_icon (bool, optional): Whether output with icon. Defaults to False.
 
         Raises:
             CodeCounterError: when format string not right.
@@ -230,7 +230,7 @@ class CodeCounter(object):
                 )
         except PermissionError:
             if confirm(
-                "Can't read {0}, wether get jurisdiction[y/n]:".format(ignore_path)
+                "Can't read {0}, whether get jurisdiction[y/n]:".format(ignore_path)
             ):
                 os.chmod(ignore_path, stat.S_IXGRP)
                 os.chmod(ignore_path, stat.S_IWGRP)
@@ -365,8 +365,8 @@ class CodeCounter(object):
 
         Args:
             root_path (str): The path is walk needed.
-            use_ignore (bool): Wether ignore files in `.gitignore`. Defaults to True.
-            progress (bool): Wether show processing. Defaults to True.
+            use_ignore (bool): Whether ignore files in `.gitignore`. Defaults to True.
+            progress (bool): Whether show processing. Defaults to True.
 
         Return:
             result (dict): Dictionary containing statistical results.
@@ -524,7 +524,7 @@ class CodeCounter(object):
             root_path (str): Traversal directory.
 
         Return:
-            (bool): Wether saving successful.
+            (bool): Whether saving successful.
         """
 
         file_path = self._get_file_path(root_path)
@@ -666,7 +666,7 @@ class CodeCounter(object):
         if (
             show_invalid
             and invalid_list
-            and confirm("Wether print invalid file list?[y/n]", default=False)
+            and confirm("Whether print invalid file list?[y/n]", default=False)
         ):
             print(invalid_list)
 

@@ -118,7 +118,7 @@ class GitignoreGenetor(object):
         ignore_path = dir_path + "/.gitignore"
         whether_write = True
 
-        # Adjust `.gitignore` wether exist.
+        # Adjust `.gitignore` whether exist.
         if os.path.exists(ignore_path):
             whether_write = confirm(
                 "`.gitignore` existed, overwrite this file? (default: y) [y/n]:"

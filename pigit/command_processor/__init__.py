@@ -172,7 +172,7 @@ class GitProcessor(object):
 
         Args:
             _key (str): Short command string.
-            use_color (bool, optional): Wether color help message. Defaults to True.
+            use_color (bool, optional): Whether color help message. Defaults to True.
 
         Returns:
             (str): Help message of one command.
@@ -234,7 +234,7 @@ class GitProcessor(object):
         # Process received type.
         command_type = command_type.capitalize().strip()
 
-        # Checking the type wether right.
+        # Checking the type whether right.
         if command_type not in CommandType.__members__:
             color_print("There is no such type.", TermColor.Red)
             print("Please use `", end="")

@@ -3,8 +3,8 @@
 """Command methods.
 
 This file encapsulates some methods corresponding to command.
-All methods are must and only accept an `args` parameter -- a list
-of parameters to be processed.
+All methods are must and only accept an `args` parameter -- a list or tuple
+of parameters to be processed. If don't need will get a empty list or tuple.
 """
 
 import re
@@ -14,7 +14,7 @@ from ..utils import exec_cmd, run_cmd, color_print
 from ..common import Emotion, TermColor
 
 
-def add(args: Union[list, tuple, None]) -> None:
+def add(args: Union[list, tuple]) -> None:
     """git add option.
 
     Args:
@@ -35,7 +35,7 @@ def add(args: Union[list, tuple, None]) -> None:
     run_cmd("git add " + args_str)
 
 
-def fetch_remote_branch(args: Union[list, tuple, None]):
+def fetch_remote_branch(args: Union[list, tuple]):
     branch = args[0] if len(args) > 1 else None
 
     if branch:
@@ -44,7 +44,7 @@ def fetch_remote_branch(args: Union[list, tuple, None]):
         color_print("This option need a branch name.", TermColor.Red)
 
 
-def set_email_and_username(args: Union[list, tuple, None]):
+def set_email_and_username(args: Union[list, tuple]):
     """Set git username and email with interaction.
 
     Args:
@@ -88,7 +88,7 @@ def set_email_and_username(args: Union[list, tuple, None]):
         color_print("Failed. Please check log.", TermColor.Red)
 
 
-def open_remote_url(args: Union[list, tuple, None]) -> None:
+def open_remote_url(args: Union[list, tuple]) -> None:
     """Open remote.
 
     Open the remote repository through the browser. Support additional parameter list.
@@ -163,7 +163,7 @@ def open_remote_url(args: Union[list, tuple, None]) -> None:
     elif issue:
         remote_url += issue
 
-    # Adjust wether just need print.
+    # Adjust whether just need print.
     if "-p" in args or "--print" in args:
         print(remote_url)
     else:
