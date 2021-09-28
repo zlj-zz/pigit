@@ -1,19 +1,10 @@
-import sys
-
-sys.path.insert(0, ".")
-
-from pyinstrument import Profiler
-
+from .utils import analyze_it
 from pigit.git_utils import output_repository_info, output_git_local_config
 
 
+@analyze_it
 def test_info():
-    profiler = Profiler()
 
-    with profiler:
-        output_repository_info()
-    profiler.print()
+    output_repository_info()
 
-    with profiler:
-        output_git_local_config()
-    profiler.print()
+    output_git_local_config()

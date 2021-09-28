@@ -1,7 +1,3 @@
-import sys
-
-sys.path.insert(0, ".")
-
 import os
 import time
 import threading
@@ -9,32 +5,29 @@ import pytest
 
 import concurrent.futures
 from pprint import pprint
-from pyinstrument import Profiler
+from .utils import analyze_it
 
 from pigit import COUNTER_PATH
 from pigit.codecounter import CodeCounter, CodeCounterError
 
 
+@analyze_it
 def test_codecounter(path=os.getcwd()):
     with pytest.raises(CodeCounterError):
         CodeCounter(result_format="xxx")
 
-    profiler = Profiler()
-
     start_t = time.time()
-    with profiler:
-        CodeCounter(
-            result_saved_path=COUNTER_PATH, count_path=path
-        ).count_and_format_print()
+    CodeCounter(
+        result_saved_path=COUNTER_PATH, count_path=path
+    ).count_and_format_print()
     print(time.time() - start_t)
-    profiler.print()
 
 
 @pytest.mark.parametrize(
     "path",
     [
         os.getcwd(),
-        *os.environ.values(),
+        # *os.environ.values(),
     ],
 )
 def test_pure_walk(path):

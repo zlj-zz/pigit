@@ -8,7 +8,7 @@ endif
 
 test:
 	@if [ ! -f pytest ]; then $(PY) -m pip install pytest; fi
-	pytest -s ./tests
+	pytest ./tests
 
 run:
 	$(PY) ./tests/test_run.py
