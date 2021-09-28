@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.1"
+__version__ = "1.3.2.dev"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -303,6 +303,7 @@ class Config(object):
             new_config["version"] == __version__
             or "beta" in __version__
             or "alpha" in __version__
+            or "dev" in __version__
         ):
             print(new_config["version"])
             self.warnings.append(

@@ -10,7 +10,7 @@ from pigit.common.str_table import Table, dTable
 
 
 @pytest.mark.parametrize(
-    "title, data",
+    "header, data, title",
     [
         (
             ["name", "age", "gender"],
@@ -18,6 +18,15 @@ from pigit.common.str_table import Table, dTable
                 ["bob", "20", "f"],
                 ["tom", "19", "f"],
             ],
+            "Student",
+        ),
+        (
+            ["name", "age", "gender"],
+            [
+                ["bob", "20", "\033[31;1mf\033[0m"],
+                ["tom", "19", "f"],
+            ],
+            "Has missing",
         ),
         (
             ["name", "age", "gender"],
@@ -25,13 +34,24 @@ from pigit.common.str_table import Table, dTable
                 ["bob", "20", "f"],
                 ["tom", "19"],
             ],
+            "",
+        ),
+        (
+            ["名字", "年龄", "性别"],
+            [
+                ["张三", "20", "f"],
+                ["李四", "19", "f"],
+            ],
+            "",
         ),
     ],
 )
-def test_table1(title, data):
+def test_table1(header, data, title):
     print()
-    table = Table(title, data)
+    table = Table(header, data, title)
     table.print()
+    print(table.each_max)
+    # print(table)
 
 
 @pytest.mark.parametrize(
@@ -59,6 +79,12 @@ def test_table1(title, data):
             "Fruit color": {
                 "apple": "\033[31mred\033[0m",
                 "grape": "purple",
+            },
+        },
+        {
+            "水果颜色": {
+                "苹果": "红色",
+                "葡萄": "紫色",
             },
         },
     ],
