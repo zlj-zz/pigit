@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.1.beta.1"
+__version__ = "1.3.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -297,12 +297,14 @@ class Config(object):
                 )
             )
 
-        if "version" in new_config and (
+        if "version" in new_config and not (
             # If current version is a [beta] verstion then will not tip.
             # Else if version is not right will tip.
-            new_config["version"] != __version__
-            or "beta" not in __version__
+            new_config["version"] == __version__
+            or "beta" in __version__
+            or "alpha" in __version__
         ):
+            print(new_config["version"])
             self.warnings.append(
                 "The current configuration file is not up-to-date."
                 "You'd better recreate it."

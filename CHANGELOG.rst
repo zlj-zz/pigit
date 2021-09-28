@@ -2,6 +2,13 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.1 (2021-09-28)
+----------
+- Add new git short command (submodule).
+- Add new config option.
+- Add table class.
+- Improve code logic and format.
+
 v1.3.0 (2021-09-09)
 ----------
 - Not continue support Python2.
