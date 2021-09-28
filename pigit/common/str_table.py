@@ -8,12 +8,14 @@ from .escape import Fx
 
 class baseTable(object):
 
-    """Docstring for baseTabe. """
+    """Docstring for baseTable."""
 
     table_str_list: list
     each_max: list
 
     def __init__(self, frame_format: str, nil: str, title: str = ""):
+        if frame_format not in Symbol.rune.keys():
+            frame_format = "bold"
         self.rune = Symbol.rune[frame_format]
         self.nil = nil
         self.title = title
@@ -21,6 +23,12 @@ class baseTable(object):
         # create table when init.
         self.fix_data()
         self.create_table()
+
+    def __str__(self):
+        if getattr(self, "table_str_list"):
+            return "\n".join(self.table_str_list)
+        else:
+            return ""
 
     def _try_append_title(self):
         if self.title:
@@ -179,7 +187,7 @@ class dTable(baseTable):
                 each_max[0] = max(each_max[0], len(Fx.pure(k)))
                 each_max[1] = max(each_max[1], len(Fx.pure(v)))
 
-        # for Ensure that the table is output correctly when the len of sub title 
+        # for Ensure that the table is output correctly when the len of sub title
         # bigger than the len of item.
         sum_each_max = sum(each_max)
         if max_core_len > sum_each_max:

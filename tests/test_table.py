@@ -55,6 +55,12 @@ def test_table1(title, data):
                 "JavaScript": "js",
             },
         },
+        {
+            "Fruit color": {
+                "apple": "\033[31mred\033[0m",
+                "grape": "purple",
+            },
+        },
     ],
 )
 def test_table2(d_data):

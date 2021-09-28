@@ -7,8 +7,8 @@ from shutil import get_terminal_size
 from typing import Optional
 
 from ..utils import color_print, exec_cmd, run_cmd, confirm
-from ..str_utils import shorten, get_width
 from ..common import Fx, Color, TermColor
+from ..common.str_utils import shorten, get_width
 from ..keyevent import get_keyevent_obj
 from ..git_utils import REPOSITORY_PATH
 from .model import File

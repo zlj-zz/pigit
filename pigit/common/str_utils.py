@@ -3,7 +3,7 @@
 """This file support some str util method."""
 
 # yapf: disable
-widths:list[tuple] = [
+WIDTHS:list[tuple[int,int]] = [
     (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0), (733, 1), (879, 0),
     (1154, 1), (1161, 0), (4347, 1), (4447, 2), (7467, 1),
     (7521, 0), (8369, 1), (8426, 0), (9000, 1), (9002, 2),
@@ -25,16 +25,117 @@ def get_width(r: int) -> int:
     >>> get_width(ord('Ç'))
     1
     """
-    global widths
+    global WIDTHS
     if r == 0xE or r == 0xF:
         return 0
-    for num, wid in widths:
+    for num, wid in WIDTHS:
         if r <= num:
             return wid
     return 1
 
 
-File_Icons: dict[str, str] = {
+# Mark the type corresponding to the file suffix.
+# abcdefg hijklmn opq rst uvw xyz
+SUFFIX_TYPE: dict[str, str] = {
+    "": "",
+    "bat": "Batch",
+    "c": "C",
+    "cfg": "Properties",
+    "conf": "Properties",
+    "cpp": "C++",
+    "cs": "C#",
+    "css": "CSS",
+    "dart": "Dart",
+    "dea": "XML",
+    "go": "Go",
+    "gradle": "Groovy",
+    "h": "C",
+    "hpp": "C++",
+    "htm": "HTML",
+    "html": "HTML",
+    "java": "Java",
+    "js": "Java Script",
+    "json": "Json",
+    "jsx": "React",
+    "kt": "Kotlin",
+    "launch": "XML",
+    "less": "CSS",
+    "lua": "Lua",
+    "markdown": "Markdown",
+    "md": "Markdown",
+    "msg": "ROS Message",
+    "php": "PHP",
+    "plist": "XML",
+    "properties": "Propertie",
+    "py": "Python",
+    "r": "R",
+    "rb": "Ruby",
+    "rc": "Properties",
+    "rs": "Rust",
+    "rst": "reStructuredText",
+    "rviz": "YAML",
+    "ts": "Type Script",
+    "tsx": "React",
+    "sass": "CSS",
+    "scss": "CSS",
+    "sh": "Shell",
+    "sql": "SQL",
+    "srdf": "YAML",
+    "srv": "ROS Message",
+    "swift": "Swift",
+    "toml": "Properties",
+    "urdf": "XML",
+    "vim": "Vim Scirpt",
+    "vue": "Vue",
+    "xhtml": "HTML",
+    "xml": "XML",
+    "yaml": "YAML",
+    "yml": "YAML",
+    "zsh": "Shell",
+}
+
+# Mark the type of some special files.
+SPECIAL_NAMES: dict[str, str] = {
+    "license": "LICENSE",
+    "requirements.txt": "Pip requirement",
+    "vimrc": "Vim Scirpt",
+}
+
+
+def adjudgment_type(file: str, original: bool = False) -> str:
+    """Get file type.
+
+    First, judge whether the file name is special, and then query the
+    file suffix. Otherwise, the suffix or name will be returned as is.
+
+    Args:
+        file (str): file name string.
+        original (bool, option): whether return origin when match failed.
+
+    Returns:
+        (str): file type.
+
+    >>> adjudgment_type('test.py')
+    'Python'
+    >>> adjudgment_type('xxxxx')
+    'unknown'
+    >>> adjudgment_type('xxxxx', True)
+    'xxxxx'
+    """
+
+    pre_type = SPECIAL_NAMES.get(file.lower(), None)
+    if pre_type:
+        return pre_type
+
+    suffix = file.split(".")[-1]
+    suffix_type = SUFFIX_TYPE.get(suffix.lower(), None)
+    if suffix_type:
+        return suffix_type
+    else:
+        return suffix if original else "unknown"
+
+
+FILE_ICONS: dict[str, str] = {
     "": "",
     "Batch": "",
     "C": "",
@@ -87,8 +188,9 @@ def get_file_icon(file_type: str) -> str:
     >>> get_file_icon('xxxxxxxxxx')
     ''
     """
+
     #     
-    return File_Icons.get(file_type, "")
+    return FILE_ICONS.get(file_type, "")
 
 
 def shorten(

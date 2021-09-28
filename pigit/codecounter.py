@@ -13,8 +13,8 @@ from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
 from .utils import confirm
-from .str_utils import shorten, get_file_icon
 from .common import Color, Fx, Symbol
+from .common.str_utils import shorten, get_file_icon, adjudgment_type
 from .common.str_table import Table
 
 
@@ -86,72 +86,6 @@ class CodeCounter(object):
             "include": False,
         },
     ]
-
-    # Mark the type corresponding to the file suffix.
-    Suffix_Types: dict[str, str] = {
-        "": "",
-        "bat": "Batch",
-        "c": "C",
-        "conf": "Properties",
-        "cfg": "Properties",
-        "cpp": "C++",
-        "cs": "C#",
-        "css": "CSS",
-        "dart": "Dart",
-        "dea": "XML",
-        "go": "Go",
-        "gradle": "Groovy",
-        "h": "C",
-        "hpp": "C++",
-        "htm": "HTML",
-        "html": "HTML",
-        "java": "Java",
-        "js": "Java Script",
-        "jsx": "React",
-        "json": "Json",
-        "kt": "Kotlin",
-        "launch": "XML",
-        "less": "CSS",
-        "lua": "Lua",
-        "markdown": "Markdown",
-        "md": "Markdown",
-        "msg": "ROS Message",
-        "php": "PHP",
-        "py": "Python",
-        "plist": "XML",
-        "properties": "Propertie",
-        "r": "R",
-        "rc": "Properties",
-        "rb": "Ruby",
-        "rs": "Rust",
-        "rst": "reStructuredText",
-        "rviz": "YAML",
-        "ts": "Type Script",
-        "tsx": "React",
-        "sass": "CSS",
-        "scss": "CSS",
-        "sh": "Shell",
-        "sql": "SQL",
-        "swift": "Swift",
-        "srdf": "YAML",
-        "srv": "ROS Message",
-        "toml": "Properties",
-        "urdf": "XML",
-        "vim": "Vim Scirpt",
-        "vue": "Vue",
-        "xhtml": "HTML",
-        "xml": "XML",
-        "yaml": "YAML",
-        "yml": "YAML",
-        "zsh": "Shell",
-    }
-
-    # Mark the type of some special files.
-    Special_Names: dict[str, str] = {
-        "requirements.txt": "Pip requirement",
-        "license": "LICENSE",
-        "vimrc": "Vim Scirpt",
-    }
 
     # Colors displayed for different code quantities.
     level_color: list[str] = [
@@ -287,31 +221,6 @@ class CodeCounter(object):
             return res[-1]["include"]
             # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
-    @classmethod
-    def adjudgment_type(cls, file: str) -> str:
-        """Get file type.
-
-        First, judge whether the file name is special, and then query the
-        file suffix. Otherwise, the suffix or name will be returned as is.
-
-        Args:
-            file (str): file name string.
-
-        Returns:
-            (str): file type.
-        """
-
-        pre_type = cls.Special_Names.get(file.lower(), None)
-        if pre_type:
-            return pre_type
-
-        suffix = file.split(".")[-1]
-        suffix_type = cls.Suffix_Types.get(suffix.lower(), None)
-        if suffix_type:
-            return suffix_type
-        else:
-            return suffix
-
     def _sub_count(self, root: str, files: list) -> tuple:
         """Process handle use by `self.count`."""
         result = {}  # type: dict[str,dict]
@@ -331,7 +240,7 @@ class CodeCounter(object):
                     Log.debug(f"Can't read size of '{full_path}'")
 
                 # Get file type.
-                type_ = self.adjudgment_type(file)
+                type_ = adjudgment_type(file, original=True)
                 try:
                     with open(full_path) as f:
                         count = len(f.read().split("\n"))
@@ -457,7 +366,7 @@ class CodeCounter(object):
                                 Log.debug(f"Can't read size of '{full_path}'")
 
                             # Get file type.
-                            type_ = self.adjudgment_type(file)
+                            type_ = adjudgment_type(file, original=True)
                             try:
                                 with open(full_path) as f:
                                     count = len(f.read().split("\n"))
