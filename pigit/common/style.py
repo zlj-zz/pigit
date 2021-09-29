@@ -195,7 +195,7 @@ class Color(object):
             return cls.escape_color(hexa=args[0], depth="bg")
 
 
-class Symbol(object):
+class BoxSymbol(object):
     # yapf: disable
     rune:dict[str,list[str]] = {
         "normal":        ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"],

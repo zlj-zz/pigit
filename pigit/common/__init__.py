@@ -6,7 +6,7 @@ if os.name == "nt":
     os.system("")
 
 from .emotion import Emotion
-from .style import Color, Symbol
+from .style import Color, BoxSymbol
 from .escape import Fx, Cursor
 
 __all__ = ["Emotion", "Color", "Symbol", "Fx", "Cursor"]

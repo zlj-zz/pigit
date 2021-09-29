@@ -47,6 +47,7 @@ from typing import Optional
 from .log import LogHandle
 from .utils import confirm, color_print, is_color
 from .common import Color, Fx, TermColor
+from .common.singleton import Singleton
 from .git_utils import (
     Git_Version,
     REPOSITORY_PATH,
@@ -90,7 +91,7 @@ class ConfigError(Exception):
     pass
 
 
-class Config(object):
+class Config(object, metaclass=Singleton):
     """PIGIT configuration class."""
 
     _conf_path: str = PIGIT_HOME + "/pigit.conf"  # default config path.

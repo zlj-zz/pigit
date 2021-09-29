@@ -2,14 +2,13 @@
 
 import os
 import re
-import shutil
 import textwrap
 import logging
 from typing import Optional
 
 from .utils import exec_cmd, color_print
-from .common import Fx, TermColor, Symbol
-from .common.str_table import dTable
+from .common import Fx, TermColor
+from .common.str_table import dTable, TableTooWideError
 
 Log = logging.getLogger(__name__)
 
@@ -59,8 +58,14 @@ def _config_table_output(conf: dict[str, dict]):
         for k, v in sub.items():
             sub[k] = f"{TermColor.Green}{v:<40}{Fx.rs}"
 
-    tb = dTable(conf, title='Git Local Config')
+    tb = dTable(conf, title="Git Local Config")
     tb.print()
+
+
+output_way = {
+    "normal": _config_normal_output,
+    "table": _config_table_output,
+}
 
 
 def output_git_local_config(style: str = "table") -> None:
@@ -69,11 +74,6 @@ def output_git_local_config(style: str = "table") -> None:
     if not IS_GIT_REPOSITORY:
         color_print("This directory is not a git repository yet.", TermColor.Red)
         return None
-
-    _re = re.compile(r"\w+\s=\s.*?")
-    width, _ = shutil.get_terminal_size()
-    if width < 72:
-        style = "normal"
 
     try:
         with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
@@ -103,11 +103,10 @@ def output_git_local_config(style: str = "table") -> None:
                         idx += 1
         # print(config_dict)
 
-        if style == "normal":
-            _config_normal_output(config_dict)
-        elif style == "table":
-            _config_table_output(config_dict)
-        else:
+        try:
+            output_way[style](config_dict)
+        except (KeyError, TableTooWideError) as e:
+            Log.error(str(e) + str(e.__traceback__))
             _config_normal_output(config_dict)
 
 

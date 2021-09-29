@@ -46,7 +46,7 @@ def test_table1(header, data, title):
     print()
     table = Table(header, data, title)
     table.print()
-    print(table.each_max)
+    print(table.each_column_width)
     # print(table)
 
 

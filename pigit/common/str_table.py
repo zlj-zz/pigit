@@ -1,25 +1,28 @@
 # -*- coding:utf-8 -*-
 
+from shutil import get_terminal_size
 from copy import deepcopy
 from typing import Generator
 
-from .style import Symbol
+from .style import BoxSymbol
 from .escape import Fx
 from .str_utils import get_width
 
 
-# XXX: Contains non-string data <zlj-zz>
+class TableTooWideError(Exception):
+    pass
+
+
 class _baseTable(object):
 
     """Docstring for baseTable."""
 
-    table_str_list: list
-    each_max: list
+    each_column_width: list
 
     def __init__(self, frame_format: str, nil: str, title: str = ""):
-        if frame_format not in Symbol.rune.keys():
+        if frame_format not in BoxSymbol.rune.keys():
             frame_format = "bold"
-        self.rune = Symbol.rune[frame_format]
+        self.rune = BoxSymbol.rune[frame_format]
         self.nil = nil
         self.title = title
 
@@ -28,24 +31,57 @@ class _baseTable(object):
 
     def _append_title(self) -> str:
         if self.title:
-            line_max = sum(self.each_max) + len(self.each_max) + 1
+            line_max = sum(self.each_column_width) + len(self.each_column_width) + 1
             _t = "{}{:^%s}{}" % line_max
             return _t.format(Fx.b, self.title, Fx.ub)
         return "\r"
+
+    @property
+    def row_width(self):
+        return sum(self.each_column_width) + len(self.each_column_width) + 1
 
     def real_len(self, text: str):
         return sum([get_width(ord(ch)) for ch in text])
 
     def fix_data(self):
+        """
+        Calculate the width of each column in the table, and realize
+        ``each_column_width`` in the real sense.
+        There may be different calculation methods for different forms
+        of tables, so this method has subclass implementation.
+
+        Raises:
+            NotImplementedError
+        """
+
         raise NotImplementedError()
 
-    def generate_table(self) -> Generator:
+    def table_generator(self) -> Generator:
+        """
+        Returns a table generator that is used to effectively generate
+        a table by row instead of returning all at once.
+        There may be different calculation methods for different forms
+        of tables, so this method has subclass implementation.
+
+        Raises:
+            NotImplementedError
+
+        Yields:
+            Generator
+        """
+
         raise NotImplementedError()
 
     def print(self) -> None:
+        """Output the table."""
+
+        term_width, _ = get_terminal_size()
+        if term_width < self.row_width:
+            raise TableTooWideError("Terminal is not wide enough.")
+
         print(self._append_title())
 
-        g = self.generate_table()
+        g = self.table_generator()
         for i in g:
             print(i, end="")
 
@@ -94,7 +130,7 @@ class Table(_baseTable):
         self.data = deepcopy(data)
 
         self.header_len = len(self.header)
-        self.each_max = [self.real_len(i) for i in self.header]
+        self.each_column_width = [self.real_len(i) for i in self.header]
 
         super().__init__(frame_format, nil, title=title)
 
@@ -125,36 +161,38 @@ class Table(_baseTable):
     def _adjust_each_max(self, cells: list) -> None:
         for i, x in enumerate(cells):
             x_len = self.real_len(Fx.pure(x))
-            self.each_max[i] = max(self.each_max[i], x_len)
+            self.each_column_width[i] = max(self.each_column_width[i], x_len)
 
-    def generate_table(self) -> Generator:
-        each_max = self.each_max
+    def table_generator(self) -> Generator:
+        each_column_width = self.each_column_width
         rune = self.rune
         indexes = range(self.header_len)
 
         # top and title line.
-        yield rune[2] + rune[-3].join([rune[0] * i for i in each_max]) + rune[3] + "\n"
+        yield f"{rune[2]}{rune[-3].join([rune[0] * i for i in each_column_width])}{rune[3]}\n"
         yield rune[1]
         for idx in indexes:
-            width = each_max[idx]
+            width = each_column_width[idx]
             cell = self.header[idx]
             cell_len = self.real_len(Fx.pure(cell))
             yield cell + " " * (width - cell_len) + rune[1]
         yield "\n"
-        yield rune[6] + rune[-1].join([rune[0] * i for i in each_max]) + rune[7] + "\n"
+        yield f"{rune[6]}{rune[-1].join([rune[0] * i for i in each_column_width])}{rune[7]}\n"
 
         # all rows.
         for cells in self.data:
             yield rune[1]
             for idx in indexes:
-                width = each_max[idx]
+                width = each_column_width[idx]
                 cell = cells[idx]
                 cell_len = self.real_len(Fx.pure(cell))
                 yield cell + " " * (width - cell_len) + rune[1]
             yield "\n"
 
         # bottom
-        yield rune[4] + rune[-2].join([rune[0] * i for i in each_max]) + rune[5] + "\n"
+        yield rune[4] + rune[-2].join([rune[0] * i for i in each_column_width]) + rune[
+            5
+        ] + "\n"
 
 
 class dTable(_baseTable):
@@ -204,61 +242,55 @@ class dTable(_baseTable):
         super().__init__(frame_format, nil, title=title)
 
     def fix_data(self):
-        self.each_max = each_max = [0, 0]
+        self.each_column_width = each_column_width = [0, 0]
         max_subtitle_len = 0
         r_len = self.real_len
 
         for subtitle, sub_dict in self.data.items():
             max_subtitle_len = max(max_subtitle_len, r_len(subtitle))
             for k, v in sub_dict.items():
-                each_max[0] = max(each_max[0], r_len(Fx.pure(k)))
-                each_max[1] = max(each_max[1], r_len(Fx.pure(v)))
+                each_column_width[0] = max(each_column_width[0], r_len(Fx.pure(k)))
+                each_column_width[1] = max(each_column_width[1], r_len(Fx.pure(v)))
 
-        # for Ensure that the table is output correctly when the len of sub title
+        # For ensure that the table is output correctly when the len of sub title
         # bigger than the len of item.
-        sum_each_max = sum(each_max)
+        sum_each_max = sum(each_column_width)
         if max_subtitle_len > sum_each_max:
-            each_max[1] += max_subtitle_len - sum_each_max
+            each_column_width[1] += max_subtitle_len - sum_each_max
 
-        self.line_max = sum(each_max) + len(each_max) + 1
-
-    def generate_table(self) -> Generator:
+    def table_generator(self) -> Generator:
         rune = self.rune
-        each_max = self.each_max
-        line_max = self.line_max
+        each_column_width = self.each_column_width
+        row_width = self.row_width
         r_len = self.real_len
 
         _end_template = "%(flag)s{:>%(number)s}%(flag)s\n" % {
             "flag": rune[1],
-            "number": line_max - 2,
+            "number": row_width - 2,
         }
 
-        sub_top = (
-            f"{rune[6]}{rune[-3].join([rune[0] * i for i in each_max])}{rune[7]}\n"
-        )
-        sub_bottom = (
-            f"{rune[6]}{rune[-2].join([rune[0] * i for i in each_max])}{rune[7]}\n"
-        )
+        sub_top = f"{rune[6]}{rune[-3].join([rune[0] * i for i in each_column_width])}{rune[7]}\n"
+        sub_bottom = f"{rune[6]}{rune[-2].join([rune[0] * i for i in each_column_width])}{rune[7]}\n"
 
         # top
-        yield f"{rune[2]}{rune[0]*(line_max-2)}{rune[3]}\n"
+        yield f"{rune[2]}{rune[0] * (row_width - 2)}{rune[3]}\n"
 
         for subtitle, sub_dict in self.data.items():
             # subtitle part
             yield rune[1]
             subtitle_len = r_len(Fx.pure(subtitle))
-            _div, _mod = divmod(line_max - 2 - subtitle_len, 2)
+            _div, _mod = divmod(row_width - 2 - subtitle_len, 2)
             yield f"{_div * ' '}{subtitle}{(_div + _mod) * ' '}{rune[1]}\n"
 
             # sub dict
             yield sub_top
             for k, v in sub_dict.items():
                 k_len = r_len(Fx.pure(k))
-                yield rune[1] + k + (each_max[0] - k_len) * " " + rune[1]
+                yield rune[1] + k + (each_column_width[0] - k_len) * " " + rune[1]
                 v_len = r_len(Fx.pure(v))
-                yield v + (each_max[1] - v_len) * " " + rune[1] + "\n"
+                yield v + (each_column_width[1] - v_len) * " " + rune[1] + "\n"
             yield sub_bottom
 
         # bottom
         yield _end_template.format("────END")
-        yield f"{rune[4]}{rune[0] * (line_max - 2)}{rune[5]}\n"
+        yield f"{rune[4]}{rune[0] * (row_width - 2)}{rune[5]}\n"

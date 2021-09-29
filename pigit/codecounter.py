@@ -13,7 +13,7 @@ from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
 from .utils import confirm
-from .common import Color, Fx, Symbol
+from .common import Color, Fx
 from .common.str_utils import shorten, get_file_icon, adjudgment_type
 from .common.str_table import Table
 
@@ -137,7 +137,6 @@ class CodeCounter(object):
             )
         self.result_format = result_format
         self.use_icon = use_icon
-        self.rune = Symbol.rune["bold"]
 
     def process_gitignore(self, root: str) -> None:
         """Process `.gitignore` files and add matching rules.
@@ -532,7 +531,7 @@ class CodeCounter(object):
                     ]
                 )
 
-                # Clac sum code line.
+                # Calc sum code line.
                 sum_ += value["lines"]
 
             # Print table.
