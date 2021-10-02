@@ -37,20 +37,19 @@ class LogHandle(object):
             log_level = logging.INFO
             formatter = cls.FMT_NORMAL
 
-        if log_file:
-            if log_file is None:
-                log_handle = logging.StreamHandler()
-            else:
-                dir_path = os.path.dirname(log_file)
-                if not os.path.isdir(dir_path):
-                    os.makedirs(dir_path, exist_ok=True)
-                try:
-                    log_handle = logging.handlers.RotatingFileHandler(
-                        log_file, maxBytes=1048576, backupCount=4
-                    )
-                except PermissionError:
-                    print("No permission to write to '{0}' directory!".format(log_file))
-                    raise SystemExit(1)
+        if log_file is None:
+            log_handle = logging.StreamHandler()
+        else:
+            dir_path = os.path.dirname(log_file)
+            if not os.path.isdir(dir_path):
+                os.makedirs(dir_path, exist_ok=True)
+            try:
+                log_handle = logging.handlers.RotatingFileHandler(
+                    log_file, maxBytes=1048576, backupCount=4
+                )
+            except PermissionError:
+                print("No permission to write to '{0}' directory!".format(log_file))
+                raise SystemExit(1)
 
         log_handle.setFormatter(formatter)
         log_handle.setLevel(log_level)

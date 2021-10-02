@@ -39,14 +39,11 @@ import os
 import sys
 import argparse
 import logging
-import textwrap
-from distutils.util import strtobool
 from shutil import get_terminal_size
 from typing import Optional
 
 from .log import LogHandle
-from .common import Color, Fx, TermColor, confirm, color_print, is_color
-from .common.singleton import Singleton
+from .common import Color, Fx, TermColor, color_print
 from .gitinfo import (
     Git_Version,
     REPOSITORY_PATH,
@@ -54,6 +51,7 @@ from .gitinfo import (
     output_git_local_config,
 )
 from .decorator import time_it
+from .config import Config
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
@@ -68,8 +66,11 @@ Log = logging.getLogger(__name__)
 #####################################################################
 
 # For windows.
+USER_HOME: str = ""
+PIGIT_HOME: str = ""
 IS_WIN: bool = sys.platform.lower().startswith("win")
 Log.debug("Runtime platform is windows: {0}".format(IS_WIN))
+
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
     PIGIT_HOME = os.path.join(USER_HOME, __project__)
@@ -77,272 +78,15 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-LOG_PATH = PIGIT_HOME + "/log/{0}.log".format(__project__)
-COUNTER_PATH = PIGIT_HOME + "/Counter"
+LOG_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
+CONFIG_PATH: str = PIGIT_HOME + "/pigit.conf"
+COUNTER_PATH: str = PIGIT_HOME + "/Counter"
 
 
 #####################################################################
 # Configuration.                                                    #
 #####################################################################
-class ConfigError(Exception):
-    """Config error. Using by `Config`."""
-
-    pass
-
-
-class Config(object, metaclass=Singleton):
-    """PIGIT configuration class."""
-
-    _conf_path: str = PIGIT_HOME + "/pigit.conf"  # default config path.
-
-    CONFIG_TEMPLATE: str = textwrap.dedent(
-        """\
-        #? Config file for pigit v. {version}
-
-        #  ____ ___ ____ ___ _____                            __ _
-        # |  _ \\_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _
-        # | |_) | | |  _ | |  | |_____ _____ / __/ _ \\| '_ \\| |_| |/ _` |
-        # |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| |
-        # |_|  |___\\____|___| |_|            \\___\\___/|_| |_|_| |_|\\__, |
-        #                                     {version:>20} |___/
-        # Git-tools -- pigit configuration.
-
-        # Show original git command.
-        gitprocessor_show_original={gitprocessor_show_original}
-
-        # Is it recommended to correct when entering wrong commands.
-        gitprocessor_use_recommend={gitprocessor_use_recommend}
-
-        # Whether color is enabled in interactive mode.
-        gitprocessor_interactive_color={gitprocessor_interactive_color}
-
-        # Display time of help information in interactive mode, 0 is permanent.
-        gitprocessor_interactive_help_showtime={gitprocessor_interactive_help_showtime}
-
-        # Whether to use the ignore configuration of the `.gitignore` file.
-        codecounter_use_gitignore={codecounter_use_gitignore}
-
-        # Whether show files that cannot be counted.
-        codecounter_show_invalid={codecounter_show_invalid}
-
-        # Whether show files icons. Font support required, like: 'Nerd Font'
-        codecounter_show_icon={codecounter_show_icon}
-
-        # Output format of statistical results.
-        # Supported: [table, simple]
-        # When the command line width is not enough, the `simple ` format is forced.
-        codecounter_result_format={codecounter_result_format}
-
-        # Timeout for getting `.gitignore` template from net.
-        gitignore_generator_timeout={gitignore_generator_timeout}
-
-        # Git local config print format.
-        # Supported: [table, normal]
-        git_config_format={git_config_format}
-
-        # Control which parts need to be displayed when viewing git repository information.
-        repository_show_path={repository_show_path}
-        repository_show_remote={repository_show_remote}
-        repository_show_branchs={repository_show_branchs}
-        repository_show_lastest_log={repository_show_lastest_log}
-        repository_show_summary={repository_show_summary}
-
-        # Whether with color when use `-h` get help message.
-        help_use_color={help_use_color}
-
-        # The max line width when use `-h` get help message.
-        help_max_line_width={help_max_line_width}
-
-        # Whether run PIGIT in debug mode.
-        debug_mode={debug_mode}
-
-        """
-    )
-
-    # yapf: disable
-    _keys :list[str]= [
-        'gitprocessor_show_original', 'gitprocessor_use_recommend',
-        'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
-        'codecounter_use_gitignore', 'codecounter_show_invalid',
-        'codecounter_result_format', 'codecounter_show_icon',
-        'gitignore_generator_timeout',
-        'git_config_format',
-        'repository_show_path', 'repository_show_remote', 'repository_show_branchs',
-        'repository_show_lastest_log', 'repository_show_summary',
-        'help_use_color', 'help_max_line_width',
-        'debug_mode'
-    ]
-    # yapf: enable
-
-    # config default values.
-    gitprocessor_show_original: bool = True
-    gitprocessor_use_recommend: bool = True
-    gitprocessor_interactive_color: bool = True
-    gitprocessor_interactive_help_showtime: float = 1.5
-
-    codecounter_use_gitignore: bool = True
-    codecounter_show_invalid: bool = False
-    codecounter_show_icon: bool = False
-    codecounter_result_format: str = "table"  # table, simple
-    _supported_result_format: list = ["table", "simple"]
-
-    gitignore_generator_timeout: int = 60
-
-    git_config_format: str = "table"
-    _supported_git_config_format: list = ["normal", "table"]
-
-    repository_show_path: bool = True
-    repository_show_remote: bool = True
-    repository_show_branchs: bool = True
-    repository_show_lastest_log: bool = True
-    repository_show_summary: bool = False
-
-    help_use_color: bool = True
-    help_max_line_width: int = 90
-
-    debug_mode: bool = False
-
-    # Store warning messages.
-    warnings: list = []
-
-    def __init__(self, path: Optional[str] = None) -> None:
-        super(Config, self).__init__()
-        if not path:
-            self.config_path = self._conf_path
-        else:
-            self.config_path = path
-        conf = self.load_config()
-
-        for key in self._keys:
-            if key in conf.keys() and conf[key] != "==error==":
-                setattr(self, key, conf[key])
-
-    def load_config(self) -> dict:
-        new_config = {}
-        config_file = self.config_path
-        try:
-            with open(config_file) as cf:
-                for line in cf:
-                    line = line.strip()
-                    if line.startswith("#? Config"):
-                        new_config["version"] = line[line.find("v. ") + 3 :]
-                        continue
-                    if line.startswith("#"):
-                        # comment line.
-                        continue
-                    if "=" not in line:
-                        # invalid line.
-                        continue
-                    key, line = line.split("=", maxsplit=1)
-
-                    # processing.
-                    key = key.strip()
-                    line = line.strip().strip('"')
-
-                    # checking.
-                    if key not in self._keys:
-                        self.warnings.append("'{0}' is not be supported!".format(key))
-                        continue
-                    elif type(getattr(self, key)) == int:
-                        try:
-                            new_config[key] = int(line)
-                        except ValueError:
-                            self.warnings.append(
-                                'Config key "{0}" should be an integer!'.format(key)
-                            )
-                    elif type(getattr(self, key)) == bool:
-                        try:
-                            # True values are y, yes, t, true, on and 1;
-                            # false values are n, no, f, false, off and 0.
-                            # Raises ValueError if val is anything else.
-                            new_config[key] = bool(strtobool(line))
-                        except ValueError:
-                            self.warnings.append(
-                                'Config key "{0}" can only be True or False!'.format(
-                                    key
-                                )
-                            )
-                    elif type(getattr(self, key)) == str:
-                        if "color" in key and not is_color(line):
-                            self.warnings.append(
-                                'Config key "{0}" should be RGB string, like: #FF0000'.format(
-                                    key
-                                )
-                            )
-                            continue
-                        new_config[key] = str(line)
-        except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
-
-        if (  # check codecounter output format whether supported.
-            "codecounter_result_format" in new_config
-            and new_config["codecounter_result_format"]
-            not in self._supported_result_format
-        ):
-            new_config["codecounter_result_format"] = "==error=="
-            self.warnings.append(
-                'Config key "{0}" support must in {1}'.format(
-                    "codecounter_result_format", self._supported_result_format
-                )
-            )
-
-        if (
-            "git_config_format" in new_config
-            and new_config["git_config_format"] not in self._supported_git_config_format
-        ):
-            new_config["git_config_format"] = "==error=="
-            self.warnings.append(
-                'Config key "{0}" support must in {1}'.format(
-                    "git_config_format", self._supported_git_config_format
-                )
-            )
-
-        if "version" in new_config and not (
-            # If current version is a [beta] verstion then will not tip.
-            # Else if version is not right will tip.
-            new_config["version"] == __version__
-            or "beta" in __version__
-            or "alpha" in __version__
-            or "dev" in __version__
-        ):
-            print(new_config["version"])
-            self.warnings.append(
-                "The current configuration file is not up-to-date."
-                "You'd better recreate it."
-            )
-
-        return new_config
-
-    def create_config_template(self) -> None:
-        if not os.path.isdir(PIGIT_HOME):
-            os.makedirs(PIGIT_HOME, exist_ok=True)
-
-        if os.path.exists(self.config_path) and not confirm(
-            "Configuration exists, overwrite? [y/n]"
-        ):
-            return None
-
-        # Try to load already has config.
-        conf = self.load_config()
-        for key in self._keys:
-            if not conf.get(key, None) or conf[key] == "==error==":
-                conf[key] = getattr(self, key)
-        conf["version"] = __version__
-
-        # Write config. Will save before custom setting.
-        try:
-            with open(
-                self.config_path, "w" if os.path.isfile(self.config_path) else "x"
-            ) as f:
-                f.write(self.CONFIG_TEMPLATE.format(**conf))
-        except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
-            print("Failed, create config.")
-        else:
-            print("Successful.")
-
-
-CONFIG = Config()
+CONFIG = Config(path=CONFIG_PATH, current_version=__version__)
 if CONFIG.warnings:
     for warning in CONFIG.warnings:
         print(warning)
@@ -360,34 +104,37 @@ def introduce() -> None:
 
     # Print git version.
     if Git_Version is None:
-        print("Don't found Git, maybe need install.")
+        color_print("Don't found Git, maybe need install.", TermColor.Red)
     else:
         print(Git_Version)
 
     # Print package path.
-    color_print("Path: ", Fx.b, end="")
-    color_print("%s\n" % __file__, TermColor.SkyBlue, Fx.underline)
+    color_print("Local path: ", Fx.b, end="")
+    f_p = __file__.replace("./", "")  # f_p -> file path
+    color_print("%s\n" % f_p, TermColor.SkyBlue, Fx.underline)
 
     # Print description.
     color_print("Description:", Fx.b)
     color_print(
-        (
-            "  Terminal tool, help you use git more simple."
-            " Support Linux and MacOS. Partial support for windows.\n"
-            "  It use short command to replace the original command, like: \n"
-            "  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.\n"
-            "  Also you use `pigit -s` to get the all short command, have fun"
-            " and good lucky.\n"
-            "  The open source path: %s" % (TermColor.SkyBlue + Fx.underline + __url__)
+        "  Terminal tool, help you use git more simple."
+        " Support Linux, MacOS and Windows.\n"
+        "  It use short command to replace the original command, like: \n"
+        "  ``{green}pigit ws{rs}`` -> ``{green}git status --short{rs}``,"
+        " ``{green}pigit b{rs}`` -> ``{green}git branch{rs}``.\n"
+        "  Also you use ``{green}pigit -s{rs}`` to get the all short command,"
+        " have fun and good lucky.\n"
+        "  The open source path on github: {url}".format(
+            url=TermColor.SkyBlue + Fx.underline + __url__,
+            green=TermColor.Green,
+            rs=Fx.reset,
         ),
         Fx.italic,
     )
 
-    print("\nYou can use ", end="")
-    color_print("-h", TermColor.Green, end="")
-    print(" or ", end="")
-    color_print("--help", TermColor.Green, end="")
-    print(" to get help and more usage.\n")
+    print(
+        "\nYou can use {green}-h{rs} or {green}--help{rs} "
+        "to get help and more useage.".format(green=TermColor.Green, rs=Fx.reset)
+    )
 
 
 def get_extra_cmds() -> dict:
@@ -757,19 +504,16 @@ class Parser(object):
 def main(custom_commands: Optional[list] = None):
     parser = Parser()
 
-    # parse custom comand, if has.
+    # Parse custom comand or parse input command.
     if custom_commands is not None:
-        stdargs = parser.parse(custom_commands)
+        stdargs, extra_unknown = parser.parse(custom_commands)
     stdargs, extra_unknown = parser.parse()
-    # print(stdargs, extra_unknown)
 
     # Setup log handle.
-    LogHandle.setup_logging(
-        debug=stdargs.debug or CONFIG.debug_mode,
-        log_file=None if stdargs.out_log else LOG_PATH,
-    )
+    log_file = LOG_PATH if stdargs.out_log or CONFIG.stream_output_log else None
+    LogHandle.setup_logging(debug=stdargs.debug or CONFIG.debug_mode, log_file=log_file)
 
-    # process result.
+    # Process result.
     parser.process(stdargs, extra_unknown)
 
 
