@@ -6,7 +6,7 @@ import logging
 import textwrap
 from typing import Optional
 
-from .utils import run_cmd, exec_cmd
+from .common import run_cmd, exec_cmd
 
 
 Log = logging.getLogger(__name__)

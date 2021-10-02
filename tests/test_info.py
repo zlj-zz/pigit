@@ -1,5 +1,5 @@
 from .utils import analyze_it
-from pigit.git_utils import output_repository_info, output_git_local_config
+from pigit.gitinfo import output_repository_info, output_git_local_config
 
 
 @analyze_it

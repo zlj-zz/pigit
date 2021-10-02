@@ -6,8 +6,7 @@ import logging
 from typing import Optional
 from urllib.request import urlopen
 
-from .utils import confirm
-from .common import Fx, Emotion
+from .common import Fx, Emotion, confirm
 
 Log = logging.getLogger(__name__)
 

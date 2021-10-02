@@ -3,9 +3,17 @@
 import random
 from typing import Optional, Union
 
-from ..utils import run_cmd, color_print, confirm, similar_command
-from ..common import Fx, Color, TermColor, Emotion
-from ..common.str_utils import shorten
+from ..common import (
+    Fx,
+    Color,
+    TermColor,
+    Emotion,
+    run_cmd,
+    color_print,
+    confirm,
+    similar_command,
+    shorten,
+)
 from .interaction import InteractiveAdd, TermError
 from .cmds import Git_Cmds, CommandType
 

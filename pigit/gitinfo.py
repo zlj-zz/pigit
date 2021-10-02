@@ -1,48 +1,22 @@
 # -*- coding:utf-8 -*-
 
-import os
 import re
 import textwrap
 import logging
 from typing import Optional
 
-from .utils import exec_cmd, color_print
-from .common import Fx, TermColor
+from .common import Fx, TermColor, exec_cmd, color_print
+from .common.git_utils import parse_git_config, git_version, current_repository
 from .common.str_table import dTable, TableTooWideError
 
 Log = logging.getLogger(__name__)
 
 
-def git_version() -> str:
-    """Get Git version."""
-    _, git_version_ = exec_cmd("git --version")
-    if git_version_:
-        return git_version_
-    else:
-        return ""
-
-
-# Not detected, the result is None
+# Not detected, the result is empty str.
 Git_Version: str = git_version()
 
-
-def current_repository() -> str:
-    """Get the current git repository path. If not, the path is empty."""
-    err, path = exec_cmd("git rev-parse --git-dir")
-
-    if err:
-        return ""
-
-    path = path.strip()
-    if path == ".git":
-        repository_path = os.getcwd()
-    else:
-        repository_path = path[:-5]
-    return repository_path
-
-
+# Not a repository, the path is empty str.
 REPOSITORY_PATH: str = current_repository()
-IS_GIT_REPOSITORY: bool = True if REPOSITORY_PATH else False
 
 
 def _config_normal_output(conf: dict[str, dict]):
@@ -71,7 +45,7 @@ output_way = {
 def output_git_local_config(style: str = "table") -> None:
     """Print the local config of current git repository."""
 
-    if not IS_GIT_REPOSITORY:
+    if not REPOSITORY_PATH:
         color_print("This directory is not a git repository yet.", TermColor.Red)
         return None
 
@@ -83,25 +57,7 @@ def output_git_local_config(style: str = "table") -> None:
             "Error reading configuration file. {0}".format(str(e)), TermColor.Red
         )
     else:
-        l = re.split(r"\r\n|\r|\n", context)
-        l_len = len(l)
-        config_dict = {}
-        idx = 0
-
-        while idx < l_len:
-            if l[idx].startswith("["):
-                config_type = l[idx][1:-1].strip()
-                if not config_dict.get(config_type):
-                    config_dict[config_type] = {}
-                    idx += 1
-                    while idx < l_len and not l[idx].startswith("["):
-                        if "=" not in l[idx]:
-                            idx += 1
-                            continue
-                        key, value = l[idx].split("=", 1)
-                        config_dict[config_type][key.strip()] = value.strip()
-                        idx += 1
-        # print(config_dict)
+        config_dict = parse_git_config(context)
 
         try:
             output_way[style](config_dict)

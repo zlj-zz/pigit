@@ -45,10 +45,9 @@ from shutil import get_terminal_size
 from typing import Optional
 
 from .log import LogHandle
-from .utils import confirm, color_print, is_color
-from .common import Color, Fx, TermColor
+from .common import Color, Fx, TermColor, confirm, color_print, is_color
 from .common.singleton import Singleton
-from .git_utils import (
+from .gitinfo import (
     Git_Version,
     REPOSITORY_PATH,
     output_repository_info,

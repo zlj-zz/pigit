@@ -10,8 +10,7 @@ of parameters to be processed. If don't need will get a empty list or tuple.
 import re
 from typing import Union
 
-from ..utils import exec_cmd, run_cmd, color_print
-from ..common import Emotion, TermColor
+from ..common import Emotion, TermColor, exec_cmd, run_cmd, color_print
 
 
 def add(args: Union[list, tuple]) -> None:

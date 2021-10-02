@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-import os
 import re
 import signal
 import subprocess
@@ -213,27 +212,6 @@ def is_color(s: Union[str, list, tuple, None]) -> bool:
                 return True
     else:
         return False
-
-
-def dir_whether_ok(dir_path: str) -> bool:
-    """Determine whether the dir path exists. If not, create a directory.
-
-    Args:
-        dir_path (str): Directory path, like: "~/.config/xxx"
-
-    >>> dir_whether_ok('.')
-    True
-    """
-
-    if os.path.isdir(dir_path):
-        return True
-    try:
-        os.makedirs(dir_path, exist_ok=True)
-    except Exception as e:
-        Log.error(str(e) + str(e.__traceback__))
-        return False
-    else:
-        return True
 
 
 def init_hook():

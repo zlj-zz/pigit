@@ -12,9 +12,7 @@ from math import ceil
 from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
-from .utils import confirm
-from .common import Color, Fx
-from .common.str_utils import shorten, get_file_icon, adjudgment_type
+from .common import Color, Fx, confirm, shorten, get_file_icon, adjudgment_type
 from .common.str_table import Table
 
 
