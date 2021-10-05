@@ -12,6 +12,10 @@ on:
       - '**.pdf'
       - '**.png'
       - '**.rst'
+      - '**.gif'
+      - '**.yml'
+      - '/docs'
+      - '/.github'
 
 jobs:
   build:
