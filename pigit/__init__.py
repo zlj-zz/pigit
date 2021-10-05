@@ -79,7 +79,7 @@ else:
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
 LOG_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
-CONFIG_PATH: str = PIGIT_HOME + "/pigit.conf"
+CONFIG_PATH:str = PIGIT_HOME + "/pigit.conf"
 COUNTER_PATH: str = PIGIT_HOME + "/Counter"
 
 

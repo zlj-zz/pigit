@@ -11,27 +11,43 @@ Log = logging.getLogger(__name__)
 
 def git_version() -> str:
     """Get Git version."""
+
     _, git_version_ = exec_cmd("git --version")
-    if git_version_:
-        return git_version_
-    else:
-        return ""
+    return git_version_ or ""
 
 
-def current_repository() -> str:
-    # TODO: submodule how to solve <zlj-zz>.
-    """Get the current git repository path. If not, the path is empty."""
+def current_repository() -> tuple[str, str]:
+    """
+    Get the current git repository path. If not, the path is empty.
+    Get the local git config path. If not, the path is empty.
+
+    Return:
+        tuple(str, str): repository path, git config path.
+    """
+
     err, path = exec_cmd("git rev-parse --git-dir")
 
-    if err:
-        return ""
+    repo_path: str = ""
+    git_conf_path: str = ""
 
+    if err:
+        return repo_path, git_conf_path
+
+    # remove useless space.
     path = path.strip()
+
+    if ".git/submodule/" in path:
+        # this repo is submodule.
+        git_conf_path = path
+        repo_path = path.replace(".git/submodule/", "")
     if path == ".git":
-        repository_path = os.getcwd()
+        repo_path = os.getcwd()
+        git_conf_path = os.path.join(repo_path, ".git")
     else:
-        repository_path = path[:-5]
-    return repository_path
+        git_conf_path = path
+        repo_path = path[:-5]
+
+    return repo_path, git_conf_path
 
 
 def parse_git_config(conf: str) -> dict:

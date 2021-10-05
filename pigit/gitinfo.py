@@ -15,11 +15,11 @@ Log = logging.getLogger(__name__)
 # Not detected, the result is empty str.
 Git_Version: str = git_version()
 
-# Not a repository, the path is empty str.
-REPOSITORY_PATH: str = current_repository()
+# Not a repository, the all path is empty str.
+REPOSITORY_PATH, GIT_CONF_PATH = current_repository()
 
 
-def _config_normal_output(conf: dict[str, dict]):
+def _config_normal_output(conf: dict[str, dict]) -> None:
     for t, d in conf.items():
         print(TermColor.Red + f"[{t}]")
         for k, v in d.items():
@@ -27,7 +27,7 @@ def _config_normal_output(conf: dict[str, dict]):
             print("=" + Fx.italic + TermColor.MediumVioletRed + v + Fx.reset)
 
 
-def _config_table_output(conf: dict[str, dict]):
+def _config_table_output(conf: dict[str, dict]) -> None:
     for sub in conf.values():
         for k, v in sub.items():
             sub[k] = f"{TermColor.Green}{v:<40}{Fx.rs}"
@@ -50,7 +50,7 @@ def output_git_local_config(style: str = "table") -> None:
         return None
 
     try:
-        with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
+        with open(GIT_CONF_PATH + "/config", "r") as cf:
             context = cf.read()
     except Exception as e:
         color_print(
@@ -62,8 +62,13 @@ def output_git_local_config(style: str = "table") -> None:
         try:
             output_way[style](config_dict)
         except (KeyError, TableTooWideError) as e:
+            # There are two different causes of errors that can be triggered here.
+            # First, a non-existent format string is passed in (theoretically impossible),
+            # but terminal does not have enough width to display the table.
+            output_way["normal"](config_dict)
+
+            # log error info.
             Log.error(str(e) + str(e.__traceback__))
-            _config_normal_output(config_dict)
 
 
 def output_repository_info(
