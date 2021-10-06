@@ -17,7 +17,7 @@ from ..common import (
 from .cmds import Git_Cmds, CommandType
 
 
-class GitProcessor(object):
+class CmdProcessor(object):
     """Git short command processor."""
 
     def __init__(
@@ -27,7 +27,7 @@ class GitProcessor(object):
         show_original: bool = True,
         **kwargs
     ) -> None:
-        super(GitProcessor, self).__init__()
+        super(CmdProcessor, self).__init__()
 
         self.use_recommend = use_recommend
         self.show_original = show_original
@@ -133,13 +133,13 @@ class GitProcessor(object):
                 )
                 args = []
 
-        _type = option.get("type", "string")
+        _type = option.get("type", "command")
         if _type == "func":
             try:
                 command(args)
             except Exception as e:
                 color_print(str(e), TermColor.Red)
-        else:  # is string.
+        else:  # is command.
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])

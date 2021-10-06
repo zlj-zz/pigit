@@ -56,7 +56,7 @@ from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
 from .interaction import InteractiveAdd
-from .processor import GitProcessor, Git_Cmds, CommandType
+from .processor import CmdProcessor, Git_Cmds, CommandType
 
 
 Log = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ def get_extra_cmds() -> dict:
     return extra_cmds
 
 
-def shell_mode(git_processor: GitProcessor):
+def shell_mode(git_processor: CmdProcessor):
     import pigit.tomato
 
     print(
@@ -322,6 +322,19 @@ class Parser(object):
         p = self._parser
 
         p.add_argument(
+            "-v",
+            "--version",
+            action="version",
+            help="Show version and exit.",
+            version="Version: %s" % __version__,
+        )
+        p.add_argument(
+            "-C",
+            "--complete",
+            action="store_true",
+            help="Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)",
+        )
+        p.add_argument(
             "-s",
             "--show-commands",
             action="store_true",
@@ -343,18 +356,34 @@ class Parser(object):
             help="List all command types and exit.",
         )
         p.add_argument(
+            "-d",
+            "--debug",
+            action="store_true",
+            help="Current runtime in debug mode.",
+        )
+        p.add_argument(
+            "--out-log",
+            action="store_true",
+            help="Print log to console.",
+        )
+
+        tool_group = p.add_argument_group(
+            title="tools arguments",
+            description="Auxiliary type commands.",
+        )
+        tool_group.add_argument(
             "-f",
             "--config",
             action="store_true",
             help="Display the config of current git repository and exit.",
         )
-        p.add_argument(
+        tool_group.add_argument(
             "-i",
             "--information",
             action="store_true",
             help="Show some information about the current git repository.",
         )
-        p.add_argument(
+        tool_group.add_argument(
             "-c",
             "--count",
             nargs="?",
@@ -364,13 +393,7 @@ class Parser(object):
             help="Count the number of codes and output them in tabular form."
             "A given path can be accepted, and the default is the current directory.",
         )
-        p.add_argument(
-            "-C",
-            "--complete",
-            action="store_true",
-            help="Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)",
-        )
-        p.add_argument(
+        tool_group.add_argument(
             "--create-ignore",
             type=str,
             metavar="TYPE",
@@ -384,29 +407,12 @@ class Parser(object):
             help="Create a preconfigured file of PIGIT."
             "(If a profile exists, the values available in it are used)",
         )
-        p.add_argument(
+        tool_group.add_argument(
             "--shell",
             action="store_true",
             help="Go to the pigit shell mode.",
         )
-        p.add_argument(
-            "-d",
-            "--debug",
-            action="store_true",
-            help="Current runtime in debug mode.",
-        )
-        p.add_argument(
-            "--out-log",
-            action="store_true",
-            help="Print log to console.",
-        )
-        p.add_argument(
-            "-v",
-            "--version",
-            action="version",
-            help="Show version and exit.",
-            version="Version: %s" % __version__,
-        )
+
         p.add_argument(
             "command", nargs="?", type=str, help="Short git command or other."
         )
@@ -496,7 +502,7 @@ class Parser(object):
             }
             extra_cmd.update(get_extra_cmds())
 
-            git_processor = GitProcessor(
+            git_processor = CmdProcessor(
                 extra_cmds=extra_cmd,
                 use_recommend=CONFIG.gitprocessor_use_recommend,
                 show_original=CONFIG.gitprocessor_show_original,

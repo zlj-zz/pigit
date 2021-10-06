@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from copy import deepcopy
 from typing import Generator
@@ -13,7 +14,7 @@ class TableTooWideError(Exception):
     pass
 
 
-class _baseTable(object):
+class _baseTable(ABC):
 
     """Docstring for baseTable."""
 
@@ -29,7 +30,8 @@ class _baseTable(object):
         # create table when init.
         self.fix_data()
 
-    def _append_title(self) -> str:
+    @property
+    def display_title(self) -> str:
         if self.title:
             line_max = sum(self.each_column_width) + len(self.each_column_width) + 1
             _t = "{}{:^%s}{}" % line_max
@@ -37,25 +39,24 @@ class _baseTable(object):
         return "\r"
 
     @property
-    def row_width(self):
+    def row_width(self) -> int:
+        """Gets the width of table."""
         return sum(self.each_column_width) + len(self.each_column_width) + 1
 
     def real_len(self, text: str):
+        """Gets the true width of the element on the command line."""
         return sum([get_width(ord(ch)) for ch in text])
 
+    @abstractmethod
     def fix_data(self):
         """
         Calculate the width of each column in the table, and realize
         ``each_column_width`` in the real sense.
         There may be different calculation methods for different forms
         of tables, so this method has subclass implementation.
-
-        Raises:
-            NotImplementedError
         """
 
-        raise NotImplementedError()
-
+    @abstractmethod
     def table_generator(self) -> Generator:
         """
         Returns a table generator that is used to effectively generate
@@ -63,14 +64,9 @@ class _baseTable(object):
         There may be different calculation methods for different forms
         of tables, so this method has subclass implementation.
 
-        Raises:
-            NotImplementedError
-
         Yields:
             Generator
         """
-
-        raise NotImplementedError()
 
     def print(self) -> None:
         """Output the table."""
@@ -79,7 +75,7 @@ class _baseTable(object):
         if term_width < self.row_width:
             raise TableTooWideError("Terminal is not wide enough.")
 
-        print(self._append_title())
+        print(self.display_title)
 
         g = self.table_generator()
         for i in g:

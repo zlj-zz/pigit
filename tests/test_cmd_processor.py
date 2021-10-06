@@ -1,19 +1,19 @@
 import pytest
 from .utils import analyze_it
 
-from pigit.processor import GitProcessor
+from pigit.processor import CmdProcessor
 from pigit.common import Fx
 
 
 def test_init():
     with pytest.raises(TypeError):
-        GitProcessor(extra_cmds="xxx")
+        CmdProcessor(extra_cmds="xxx")
 
 
 @pytest.fixture(scope="module")
 def setup():
     extra = {"aa": {"help": "print system user name."}}
-    return GitProcessor(extra_cmds=extra)
+    return CmdProcessor(extra_cmds=extra)
 
 
 def test_process_error(setup):

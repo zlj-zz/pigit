@@ -6,7 +6,7 @@ short command.
 [belong] is the type of command. The default is `Extra`.
 [command] is the execution content of the short command.
 [help] is help information, optional.
-[type] indicates the type of command. It supports (func, string). The default is string.
+[type] indicates the type of command. It supports (func, command). The default is command.
 [has_arguments] indicates whether the short command receives parameters. The default is False.
 """
 
@@ -48,7 +48,7 @@ Git_Cmds = {
         "belong": CommandType.Branch,
         "command": "git branch ",
         "help": "lists, creates, renames, and deletes branches.",
-        "type": "string",
+        "type": "command",
         "has_arguments": True,
     },
     "bc": {
