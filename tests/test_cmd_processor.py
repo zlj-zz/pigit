@@ -1,7 +1,7 @@
 import pytest
 from .utils import analyze_it
 
-from pigit.command_processor import GitProcessor
+from pigit.processor import GitProcessor
 from pigit.common import Fx
 
 

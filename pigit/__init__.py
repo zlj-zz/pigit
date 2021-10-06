@@ -40,7 +40,7 @@ import sys
 import argparse
 import logging
 from shutil import get_terminal_size
-from typing import Optional
+from typing import Optional, Union
 
 from .log import LogHandle
 from .common import Color, Fx, TermColor, color_print
@@ -55,7 +55,8 @@ from .config import Config
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
-from .command_processor import GitProcessor, Git_Cmds, CommandType
+from .interaction import InteractiveAdd
+from .processor import GitProcessor, Git_Cmds, CommandType
 
 
 Log = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ else:
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
 LOG_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
-CONFIG_PATH:str = PIGIT_HOME + "/pigit.conf"
+CONFIG_PATH: str = PIGIT_HOME + "/pigit.conf"
 COUNTER_PATH: str = PIGIT_HOME + "/Counter"
 
 
@@ -168,6 +169,44 @@ def get_extra_cmds() -> dict:
 
     # print(extra_cmds)
     return extra_cmds
+
+
+def shell_mode(git_processor: GitProcessor):
+    import pigit.tomato
+
+    print(
+        "Welcome come PIGIT shell.\n"
+        "You can use short commands directly. Input '?' to get help.\n"
+    )
+    while True:
+        command = input("(pigit)> ").strip()
+        if not command:
+            continue
+
+        command_args = command.split()
+        head_command = command_args[0]
+
+        if head_command in ["quit", "exit"]:  # ctrl+c
+            break
+        elif head_command in git_processor.cmds.keys():
+            git_processor.process_command(head_command, command_args[1:])
+        elif head_command == "tomato":
+            # Tomato clock.
+            pigit.tomato.main(command_args)
+        elif head_command == "?":
+            other_ = command_args[1:]
+            if not other_:
+                git_processor.command_help()
+            else:
+                print(other_)
+                for item in other_:
+                    if item in git_processor.cmds.keys():
+                        print(git_processor._generate_help_by_key(item))
+                    elif item == "tomato":
+                        pigit.tomato.help("tomato")
+        else:
+            os.system(command)
+    return None
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -272,47 +311,50 @@ class Parser(object):
         super(Parser, self).__init__()
         self._parser = argparse.ArgumentParser(
             prog="pigit",
-            description="If you want to use some original git commands, please use -- to indicate.",
+            description="If you want to use some original git commands, "
+            "please use -- to indicate.",
             prefix_chars="-",
             formatter_class=CustomHelpFormatter,
         )
         self._add_arguments()
 
     def _add_arguments(self) -> None:
-        self._parser.add_argument(
+        p = self._parser
+
+        p.add_argument(
             "-s",
             "--show-commands",
             action="store_true",
             help="List all available short command and wealth and exit.",
         )
-        self._parser.add_argument(
-            "-S",
-            "--show-command",
+        p.add_argument(
+            "-p",
+            "--show-part-command",
             type=str,
             metavar="TYPE",
             dest="command_type",
-            help="According to given type(%s) list available short command and wealth and exit."
-            % ", ".join(CommandType.__members__.keys()),
+            help="According to given type [%s] list available short command and "
+            "wealth and exit." % ", ".join(CommandType.__members__.keys()),
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-t",
             "--types",
             action="store_true",
             help="List all command types and exit.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-f",
             "--config",
             action="store_true",
             help="Display the config of current git repository and exit.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-i",
             "--information",
             action="store_true",
             help="Show some information about the current git repository.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-c",
             "--count",
             nargs="?",
@@ -322,13 +364,13 @@ class Parser(object):
             help="Count the number of codes and output them in tabular form."
             "A given path can be accepted, and the default is the current directory.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-C",
             "--complete",
             action="store_true",
             help="Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "--create-ignore",
             type=str,
             metavar="TYPE",
@@ -336,48 +378,70 @@ class Parser(object):
             help="Create a demo `.gitignore` file. Need one argument, support: [%s]"
             % ", ".join(GitignoreGenetor.Supported_Types.keys()),
         )
-        self._parser.add_argument(
+        p.add_argument(
             "--create-config",
             action="store_true",
             help="Create a preconfigured file of PIGIT."
             "(If a profile exists, the values available in it are used)",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "--shell",
             action="store_true",
             help="Go to the pigit shell mode.",
         )
-        self._parser.add_argument(
+        p.add_argument(
+            "-d",
             "--debug",
             action="store_true",
             help="Current runtime in debug mode.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "--out-log",
             action="store_true",
             help="Print log to console.",
         )
-        self._parser.add_argument(
+        p.add_argument(
             "-v",
             "--version",
             action="version",
             help="Show version and exit.",
             version="Version: %s" % __version__,
         )
-        self._parser.add_argument(
-            "command", nargs="?", type=str, help="Short git command."
+        p.add_argument(
+            "command", nargs="?", type=str, help="Short git command or other."
         )
-        self._parser.add_argument(
-            "args", nargs="*", type=str, help="Command parameter list."
-        )
+        p.add_argument("args", nargs="*", type=str, help="Command parameter list.")
 
-    def parse(self, custom_commands: Optional[list] = None):
+    def parse(
+        self, custom_commands: Union[list, str, None] = None
+    ) -> tuple[argparse.Namespace, list]:
         if custom_commands:
-            return self._parser.parse_known_args(custom_commands)
-        return self._parser.parse_known_args()
+            if isinstance(custom_commands, list):
+                args, unknown = self._parser.parse_known_args(custom_commands)
+            elif isinstance(custom_commands, str):
+                args, unknown = self._parser.parse_known_args(custom_commands.split())
+            else:
+                raise AttributeError("custom_commands need be list or str.")
+        else:
+            args, unknown = self._parser.parse_known_args()
+
+        Log.debug("Parser result: {0}, {1}".format(args, unknown))
+        return args, unknown
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
         try:
+            if known_args.config:
+                output_git_local_config(CONFIG.git_config_format)
+
+            if known_args.information:
+                output_repository_info(
+                    show_path=CONFIG.repository_show_path,
+                    show_remote=CONFIG.repository_show_remote,
+                    show_branches=CONFIG.repository_show_branchs,
+                    show_lastest_log=CONFIG.repository_show_lastest_log,
+                    show_summary=CONFIG.repository_show_summary,
+                )
+
             if known_args.complete:
                 # Generate competion vars dict.
                 completion_vars = {
@@ -391,18 +455,6 @@ class Parser(object):
                     __project__, completion_vars, PIGIT_HOME
                 ).complete_and_use()
                 return None
-
-            if known_args.config:
-                output_git_local_config(CONFIG.git_config_format)
-
-            if known_args.information:
-                output_repository_info(
-                    show_path=CONFIG.repository_show_path,
-                    show_remote=CONFIG.repository_show_remote,
-                    show_branches=CONFIG.repository_show_branchs,
-                    show_lastest_log=CONFIG.repository_show_lastest_log,
-                    show_summary=CONFIG.repository_show_summary,
-                )
 
             if known_args.create_config:
                 return CONFIG.create_config_template()
@@ -427,53 +479,33 @@ class Parser(object):
                 )
                 return None
 
+            extra_cmd = {
+                "i": {
+                    "belong": CommandType.Index,
+                    "command": InteractiveAdd(
+                        use_color=CONFIG.gitprocessor_interactive_color,
+                        help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+                    ).add_interactive,
+                    "help": "interactive operation git tree status.",
+                    "type": "func",
+                },
+                "shell": {
+                    "command": "",
+                    "help": "Into PIGIT shell mode.",
+                },  # only for tips.
+            }
+            extra_cmd.update(get_extra_cmds())
+
             git_processor = GitProcessor(
-                extra_cmds=get_extra_cmds(),
+                extra_cmds=extra_cmd,
                 use_recommend=CONFIG.gitprocessor_use_recommend,
                 show_original=CONFIG.gitprocessor_show_original,
                 use_color=CONFIG.gitprocessor_interactive_color,
                 help_wait=CONFIG.gitprocessor_interactive_help_showtime,
             )
 
-            def _shell_mode():
-                import pigit.tomato
-
-                print(
-                    "Welcome come PIGIT shell.\n"
-                    "You can use short commands directly. Input '?' to get help.\n"
-                )
-                while True:
-                    command = input("(pigit)> ").strip()
-                    if not command:
-                        continue
-
-                    command_args = command.split()
-                    head_command = command_args[0]
-
-                    if head_command in ["quit", "exit"]:  # ctrl+c
-                        break
-                    elif head_command in git_processor.cmds.keys():
-                        git_processor.process_command(head_command, command_args[1:])
-                    elif head_command == "tomato":
-                        # Tomato clock.
-                        pigit.tomato.main(command_args)
-                    elif head_command == "?":
-                        other_ = command_args[1:]
-                        if not other_:
-                            git_processor.command_help()
-                        else:
-                            print(other_)
-                            for item in other_:
-                                if item in git_processor.cmds.keys():
-                                    print(git_processor._generate_help_by_key(item))
-                                elif item == "tomato":
-                                    pigit.tomato.help("tomato")
-                    else:
-                        os.system(command)
-                return None
-
             if known_args.shell:
-                _shell_mode()
+                shell_mode(git_processor)
 
             if known_args.show_commands:
                 return git_processor.command_help()
@@ -486,7 +518,7 @@ class Parser(object):
 
             if known_args.command:
                 if known_args.command == "shell":
-                    return _shell_mode()
+                    return shell_mode(git_processor)
                 else:
                     command = known_args.command
                     known_args.args.extend(extra_unknown)  # type: list

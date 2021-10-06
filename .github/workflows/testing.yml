@@ -14,8 +14,6 @@ on:
       - '**.rst'
       - '**.gif'
       - '**.yml'
-      - '/docs'
-      - '/.github'
 
 jobs:
   build:

@@ -14,7 +14,6 @@ from ..common import (
     similar_command,
     shorten,
 )
-from .interaction import InteractiveAdd, TermError
 from .cmds import Git_Cmds, CommandType
 
 
@@ -34,24 +33,6 @@ class GitProcessor(object):
         self.show_original = show_original
 
         self.cmds = Git_Cmds
-        self.cmds.update(
-            {
-                "i": {
-                    "belong": CommandType.Index,
-                    "command": InteractiveAdd(
-                        use_color=kwargs.get("use_color", True),
-                        help_wait=kwargs.get("help_wait", 1.5),
-                    ).add_interactive,
-                    "help": "interactive operation git tree status.",
-                    "type": "func",
-                },
-                "shell": {
-                    "command": "",
-                    "help": "Into PIGIT shell mode.",
-                },  # only for tips.
-            }
-        )
-
         if extra_cmds:
             if not isinstance(extra_cmds, dict):
                 raise TypeError("Custom cmds must be dict.")
@@ -82,8 +63,6 @@ class GitProcessor(object):
             + command_list.pop(0)
             + " "
             + Fx.unbold
-            # + Fx.italic
-            # + TermColor.SkyBlue
         )
 
         less_len = len(command_list)
@@ -158,7 +137,7 @@ class GitProcessor(object):
         if _type == "func":
             try:
                 command(args)
-            except TermError as e:
+            except Exception as e:
                 color_print(str(e), TermColor.Red)
         else:  # is string.
             if args:

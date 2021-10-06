@@ -2,7 +2,7 @@ import time
 import textwrap
 import pytest
 
-from pigit.command_processor.interaction import InteractiveAdd, DataHandle
+from pigit.interaction.status_interaction import InteractiveAdd, DataHandle
 
 
 @pytest.fixture(scope="module")

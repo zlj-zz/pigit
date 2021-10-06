@@ -13,6 +13,7 @@ def git_version() -> str:
     """Get Git version."""
 
     _, git_version_ = exec_cmd("git --version")
+    Log.debug("Detect git version:" + str(git_version_))
     return git_version_ or ""
 
 
@@ -22,7 +23,7 @@ def current_repository() -> tuple[str, str]:
     Get the local git config path. If not, the path is empty.
 
     Return:
-        tuple(str, str): repository path, git config path.
+        (tuple[str, str]): repository path, git config path.
     """
 
     err, path = exec_cmd("git rev-parse --git-dir")
@@ -47,6 +48,7 @@ def current_repository() -> tuple[str, str]:
         git_conf_path = path
         repo_path = path[:-5]
 
+    Log.debug("Final repo: {0}, {1}".format(repo_path, git_conf_path))
     return repo_path, git_conf_path
 
 
