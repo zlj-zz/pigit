@@ -7,4 +7,6 @@ def test_info():
 
     output_repository_info()
 
-    output_git_local_config()
+    output_git_local_config("xxx")
+    output_git_local_config("normal")
+    output_git_local_config("table")

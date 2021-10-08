@@ -1,5 +1,7 @@
 .DS_Store
 .VSCodeCounter
+
+# vim
 .vim
 
 # Python
@@ -13,6 +15,10 @@ log
 *.pyc
 
 *.tmp
+
+# pytest
+.coverage*
+htmlcov/
 
 
 

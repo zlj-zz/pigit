@@ -4,6 +4,7 @@ import os
 import re
 import logging
 import textwrap
+from argparse import ArgumentParser
 from typing import Optional
 
 from .common import run_cmd, exec_cmd
@@ -295,8 +296,10 @@ class ShellCompletion(object):
             print(str(e))
 
 
-def process_argparse(argparse_obj: object) -> dict:
-    if not isinstance(argparse_obj, object):
+def process_argparse(argparse_obj: ArgumentParser) -> dict:
+    """Parse arguments from a ``ArgumentParser`` object."""
+
+    if not isinstance(argparse_obj, ArgumentParser):
         raise TypeError("Need a argparse.ArgumentParser object.")
 
     try:
