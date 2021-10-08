@@ -261,7 +261,6 @@ class Config(object, metaclass=Singleton):
             if not conf.get(key, None) or conf[key] == "==error==":
                 conf[key] = getattr(self, key)
         conf["version"] = self.current_version
-        print(conf)
 
         # Write config. Will save before custom setting.
         try:

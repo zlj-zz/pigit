@@ -6,14 +6,14 @@ import subprocess
 import logging
 from math import sqrt
 from collections import Counter
-from typing import Union, Iterable
+from typing import Union, Iterable, Tuple
 
 
 Log = logging.getLogger(__name__)
 
 # Exit code.
-EXIT_NORMAL = 0
-EXIT_ERROR = 1
+EXIT_NORMAL: int = 0
+EXIT_ERROR: int = 1
 
 
 def leave(code: int, *args) -> None:
@@ -133,15 +133,15 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     # The distance between the frequency of each letter in the command
     # to be tested and all candidate commands, that is the difference
     # between the frequency of letters.
-    frequency_difference = {
+    frequency_difference: dict[str, list[int]] = {
         word: [fre[ch] - words[word].get(ch, 0) for ch in command]
         + [words[word][ch] - fre.get(ch, 0) for ch in word]
         for word in words
     }
     # Square of sum of squares of word frequency difference.
-    frequency_sum_square = list(
+    frequency_sum_square: list[Tuple[str, int]] = list(
         map(
-            lambda item: [item[0], sqrt(sum(map(lambda i: i ** 2, item[1])))],
+            lambda item: (item[0], int(sqrt(sum(map(lambda i: i ** 2, item[1]))))),
             frequency_difference.items(),
         )
     )
@@ -183,7 +183,7 @@ def color_print(value: str, *styles, **options) -> None:
 Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
 
 
-def is_color(s: Union[str, list, tuple, None]) -> bool:
+def is_color(var_: Union[str, list, tuple, None]) -> bool:
     """Adjust `s` whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
 
     >>> is_color('#FF0000')
@@ -197,15 +197,15 @@ def is_color(s: Union[str, list, tuple, None]) -> bool:
     >>> is_color(12345)
     False
     """
-    if not s:
+    if not var_:
         return False
-    elif type(s) == str:
-        return True if Color_Re.match(s) else False
-    elif isinstance(s, list) or isinstance(s, tuple):
-        if len(s) != 3:
+    elif type(var_) == str:
+        return True if Color_Re.match(str(var_)) else False
+    elif isinstance(var_, list) or isinstance(var_, tuple):
+        if len(var_) != 3:
             return False
         else:
-            for i in s:
+            for i in var_:
                 if i < 0 or i > 255:
                     return False
             else:

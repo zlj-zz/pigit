@@ -2,8 +2,10 @@
 
 """This file support some str util method."""
 
+# from typing import Final # python3.8
+
 # yapf: disable
-WIDTHS:list[tuple[int,int]] = [
+WIDTHS: list[tuple[int,int]] = [
     (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0), (733, 1), (879, 0),
     (1154, 1), (1161, 0), (4347, 1), (4447, 2), (7467, 1),
     (7521, 0), (8369, 1), (8426, 0), (9000, 1), (9002, 2),
@@ -25,7 +27,6 @@ def get_width(r: int) -> int:
     >>> get_width(ord('Ç'))
     1
     """
-    global WIDTHS
     if r == 0xE or r == 0xF:
         return 0
     for num, wid in WIDTHS:

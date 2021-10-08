@@ -75,7 +75,8 @@ Git_Cmds = {
     "bS": {
         "belong": CommandType.Branch,
         "command": "git show-branch --all ",
-        "help": "lists local and remote branches and their commits with ancestry graphs.",
+        "help": "lists local and remote branches and their commits with "
+        "ancestry graphs.",
     },
     "bm": {
         "belong": CommandType.Branch,
@@ -131,7 +132,8 @@ Git_Cmds = {
     "cf": {
         "belong": CommandType.Commit,
         "command": "git commit --amend --reuse-message HEAD ",
-        "help": "amends the tip of the current branch reusing the same log message as HEAD.",
+        "help": "amends the tip of the current branch reusing the same log "
+        "message as HEAD.",
     },
     "cF": {
         "belong": CommandType.Commit,
@@ -141,7 +143,8 @@ Git_Cmds = {
     "cr": {
         "belong": CommandType.Commit,
         "command": "git revert ",
-        "help": "reverts existing commits by reverting patches and recording new commits.",
+        "help": "reverts existing commits by reverting patches and recording "
+        "new commits.",
         "has_arguments": True,
     },
     "cR": {
@@ -226,7 +229,8 @@ Git_Cmds = {
     "fu": {
         "belong": CommandType.Fetch,
         "command": "git fetch --all --prune && git merge --ff-only @{u} ",
-        "help": "removes un-existing remote-tracking references, fetches all remotes and merges.",
+        "help": "removes un-existing remote-tracking references, fetches all remotes "
+        "and merges.",
         "has_arguments": True,
     },
     "fb": {
@@ -354,7 +358,8 @@ Git_Cmds = {
     "mF": {
         "belong": CommandType.Merge,
         "command": "git merge --no-ff ",
-        "help": "creates a merge commit even if the merge could be resolved as a fast-forward.",
+        "help": "creates a merge commit even if the merge could be resolved as a "
+        "fast-forward.",
         "has_arguments": True,
     },
     "mS": {
@@ -366,7 +371,8 @@ Git_Cmds = {
     "mv": {
         "belong": CommandType.Merge,
         "command": "git merge --verify-signatures ",
-        "help": "verifies the GPG signature of the tip commit of the side branch being merged.",
+        "help": "verifies the GPG signature of the tip commit of the side branch "
+        "being merged.",
         "has_arguments": True,
     },
     "mt": {
@@ -550,7 +556,8 @@ Git_Cmds = {
     "wr": {
         "belong": CommandType.WorkingTree,
         "command": "git reset --soft ",
-        "help": "resets the current HEAD to the specified state, does not touch the index nor the working tree.",
+        "help": "resets the current HEAD to the specified state, does not touch the "
+        "index nor the working tree.",
         "has_arguments": True,
     },
     "wR": {
@@ -592,7 +599,8 @@ Git_Cmds = {
     "wX": {
         "belong": CommandType.WorkingTree,
         "command": "git rm -rf ",
-        "help": "removes files from the working tree and from the index (recursively and forced).",
+        "help": "removes files from the working tree and from the index (recursively "
+        "and forced).",
         "has_arguments": True,
     },
     # Submodule
