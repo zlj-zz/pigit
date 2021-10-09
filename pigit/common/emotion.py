@@ -13,12 +13,12 @@ class Emotion(object):
         not sys.platform.lower().startswith("win")
         and sys.getdefaultencoding().lower() in Icon_Supported_Encoding
     ):
-        Icon_Rainbow = "🌈"
-        Icon_Smiler = "😊"
-        Icon_Thinking = "🧐"
-        Icon_Sorry = "😅"
+        rainbow = "🌈"
+        smiler = "😊"
+        thinking = "🧐"
+        sorry = "😅"
     else:
-        Icon_Rainbow = "::"
-        Icon_Smiler = "^_^"
-        Icon_Thinking = "-?-"
-        Icon_Sorry = "Orz"
+        rainbow = "::"
+        smiler = "^_^"
+        thinking = "-?-"
+        sorry = "Orz"

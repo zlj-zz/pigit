@@ -84,12 +84,12 @@ class CmdProcessor(object):
         return color_command
 
     def process_command(
-        self, _command: str, args: Optional[Union[list, tuple]] = None
+        self, command_: str, args: Optional[Union[list, tuple]] = None
     ) -> None:
         """Process command and arguments.
 
         Args:
-            _command (str): short command string
+            command_ (str): short command string
             args (list|None, optional): command arguments. Defaults to None.
 
         Raises:
@@ -97,7 +97,7 @@ class CmdProcessor(object):
             SystemExit: short command not right.
         """
 
-        option: Optional[dict] = self.cmds.get(_command, None)
+        option: Optional[dict] = self.cmds.get(command_, None)
 
         # Invalid, if need suggest.
         if option is None:
@@ -105,11 +105,11 @@ class CmdProcessor(object):
             color_print("g --show-commands", TermColor.Gold)
 
             if self.use_recommend:  # check config.
-                predicted_command = similar_command(_command, self.cmds.keys())
+                predicted_command = similar_command(command_, self.cmds.keys())
                 if confirm(
                     "%s The wanted command is %s ?[y/n]:"
                     % (
-                        Emotion.Icon_Thinking,
+                        Emotion.thinking,
                         TermColor.Green + predicted_command + Fx.reset,
                     )
                 ):
@@ -145,9 +145,7 @@ class CmdProcessor(object):
                 command = " ".join([command, args_str])
             if self.show_original:
                 print(
-                    "{0}  {1}".format(
-                        Emotion.Icon_Rainbow, self.color_command(command)
-                    ),
+                    "{0}  {1}".format(Emotion.rainbow, self.color_command(command)),
                 )
             run_cmd(command)
 
@@ -236,7 +234,7 @@ class CmdProcessor(object):
                 if confirm(
                     "%s The wanted type is %s ?[y/n]:"
                     % (
-                        Emotion.Icon_Thinking,
+                        Emotion.thinking,
                         TermColor.Green + predicted_type + Fx.reset,
                     )
                 ):

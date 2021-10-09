@@ -149,6 +149,4 @@ class GitignoreGenetor(object):
                 print("#" * 60)
                 print(ignore_content)
             else:
-                print(
-                    "Write gitignore file successful. {0}".format(Emotion.Icon_Smiler)
-                )
+                print("Write gitignore file successful. {0}".format(Emotion.smiler))

@@ -5,6 +5,11 @@
 This file encapsulates some methods corresponding to command.
 All methods are must and only accept an `args` parameter -- a list or tuple
 of parameters to be processed. If don't need will get a empty list or tuple.
+
+Like this:
+>>> def func(args: Union[list, tuple]) -> None:
+>>>     # your code.
+>>>     pass 
 """
 
 import re
@@ -28,13 +33,15 @@ def add(args: Union[list, tuple]) -> None:
 
     print(
         "{0} Storage file: {1}".format(
-            Emotion.Icon_Rainbow, "all" if args_str.strip() == "." else args_str
+            Emotion.rainbow, "all" if args_str.strip() == "." else args_str
         )
     )
     run_cmd("git add " + args_str)
 
 
-def fetch_remote_branch(args: Union[list, tuple]):
+def fetch_remote_branch(args: Union[list, tuple]) -> None:
+    "Fetch a remote branch to local and with the same name."
+
     branch = args[0] if len(args) > 1 else None
 
     if branch:
@@ -43,7 +50,7 @@ def fetch_remote_branch(args: Union[list, tuple]):
         color_print("This option need a branch name.", TermColor.Red)
 
 
-def set_email_and_username(args: Union[list, tuple]):
+def set_email_and_username(args: Union[list, tuple]) -> None:
     """Set git username and email with interaction.
 
     Args:
