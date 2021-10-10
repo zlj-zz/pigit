@@ -149,7 +149,7 @@ class InteractiveShowFile(_Interaction):
         pass
 
 
-class InteractiveAdd(_Interaction):
+class InteractiveStatus(_Interaction):
     """Interactive operation git tree status."""
 
     def process(self, file: File, flag: str) -> None:
@@ -267,6 +267,7 @@ class InteractiveAdd(_Interaction):
                         )
                         file_items = self._data_handle.get_status(width)
                     else:
+                        # No default editor to open file.
                         pass
                 elif input_key == "enter":
                     InteractiveShowFile(

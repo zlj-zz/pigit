@@ -3,12 +3,12 @@ import textwrap
 import pytest
 
 from pigit.interaction.base import DataHandle
-from pigit.interaction.status_interaction import InteractiveAdd
+from pigit.interaction.status_interaction import InteractiveStatus
 
 
 @pytest.fixture(scope="module")
 def setup():
-    return InteractiveAdd(), DataHandle(use_color=True)
+    return InteractiveStatus(), DataHandle(use_color=True)
 
 
 def test_files_time(setup):

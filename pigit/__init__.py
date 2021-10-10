@@ -55,7 +55,7 @@ from .config import Config
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
-from .interaction import InteractiveAdd
+from .interaction import InteractiveStatus
 from .processor import CmdProcessor, Git_Cmds, CommandType
 
 
@@ -134,7 +134,7 @@ def introduce() -> None:
 
     print(
         "\nYou can use {green}-h{rs} or {green}--help{rs} "
-        "to get help and more useage.".format(green=TermColor.Green, rs=Fx.reset)
+        "to get help and more usage.".format(green=TermColor.Green, rs=Fx.reset)
     )
 
 
@@ -488,7 +488,7 @@ class Parser(object):
             extra_cmd = {
                 "i": {
                     "belong": CommandType.Index,
-                    "command": InteractiveAdd(
+                    "command": InteractiveStatus(
                         use_color=CONFIG.gitprocessor_interactive_color,
                         help_wait=CONFIG.gitprocessor_interactive_help_showtime,
                     ).run,

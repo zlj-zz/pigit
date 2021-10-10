@@ -31,60 +31,64 @@ python setup.py install  # On windows
 You can run `pigit` in terminal, and you will see this intro:
 
 ```
-[pigit] version: 1.0.9
+[pigit] version: 1.3.2.dev
 git version 2.30.1 (Apple Git-130)
 
-Path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.0.9-py3.9.egg/pigit/__init__.py
+Local path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.3.2.dev0-py3.9.egg/pigit/__init__.py
 
 Description:
-  Terminal tool, help you use git more simple. Support Linux and MacOS. Partial support for windows.
+  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
   It use short command to replace the original command, like:
-  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.
-  Also you use `g -s` to get the all short command, have fun and good lucky.
-  The open source path: https://github.com/zlj-zz/pigit.git
+  ``pigit ws`` -> ``git status --short``, ``pigit b`` -> ``git branch``.
+  Also you use ``pigit -s`` to get the all short command, have fun and good lucky.
+  The open source path on github: https://github.com/zlj-zz/pigit.git
 
-You can use -h and --help to get help and more usage.
+You can use -h or --help to get help and more usage.
 
-runtime: 0.00 second
 ```
 
 You can run `pigit -h` or `pigit --help` to get the help message. Like this:
 
 ```bash
-usage: pigit [-h] [-C] [-s] [-S TYPE] [-t] [-f] [-i] [-c [PATH]] [--create-ignore TYPE]
-             [--create-config] [--debug] [--out-log] [-v]
+usage: pigit [-h] [-v] [-C] [-s] [-p TYPE] [-t] [-d] [--out-log] [-f] [-i] [-c [PATH]]
+             [--create-ignore TYPE] [--create-config] [--shell]
              [command] [args ...]
 
 If you want to use some original git commands, please use -- to indicate.
 
 positional arguments:
-  command               Short git command.
+  command               Short git command or other.
   args                  Command parameter list.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -C, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`)
+  -v, --version         Show version and exit.
+  -C, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)
   -s, --show-commands   List all available short command and wealth and exit.
-  -S TYPE, --show-command TYPE
-                        According to given type(Branch, Commit, Conflict, Fetch, Index,
-                        Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Setting, Extra)
-                        list available short command and wealth and exit.
+  -p TYPE, --show-part-command TYPE
+                        According to given type [Branch, Commit, Conflict, Fetch, Index,
+                        Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Submodule,
+                        Setting, Extra] list available short command and wealth and exit.
   -t, --types           List all command types and exit.
+  -d, --debug           Current runtime in debug mode.
+  --out-log             Print log to console.
+  --create-config       Create a preconfigured file of PIGIT.(If a profile exists, the
+                        values available in it are used)
+
+tools arguments:
+  Auxiliary type commands.
+
   -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
   -c [PATH], --count [PATH]
-                        Count the number of codes and output them in tabular form. A given
+                        Count the number of codes and output them in tabular form.A given
                         path can be accepted, and the default is the current directory.
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support:
+  --create-ignore TYPE  Create a demo `.gitignore` file. Need one argument, support:
                         [android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin,
                         lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift,
                         unity]
-  --create-config       Create a preconfigured file of git-tools.
-  --debug               Run in debug mode.
-  --out-log             Print log to console.
-  -v, --version         Show version and exit.
+  --shell               Go to the pigit shell mode.
 
-runtime: 0.00 second
 ```
 
 **For example**
@@ -189,7 +193,7 @@ The `extra_cmds` dict is must. And the structure is command key and command info
 The command info has some options:
 
 - `command`: (Must have) Short life corresponds to the complete command or a method. If it is a method, it must receive a parameter tuple.
-- `type`: (Option) Mark the type of command, support ['func', 'string'], and the default is 'string'.
+- `type`: (Option) Mark the type of command, support ['func', 'command'], and the default is 'command'.
 - `help`: (Option) Command help message.
 - `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
 
@@ -204,6 +208,7 @@ The command info has some options:
 - Support code counter.
 - Support quick open remote url (only support github).
 - Have log output and help message tips.
+- Support beautiful output.
 
 ---
 
