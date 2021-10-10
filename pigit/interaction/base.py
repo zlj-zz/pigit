@@ -1,11 +1,15 @@
 # -*- coding:utf-8 -*-
 
+import time
+from math import ceil
 from abc import ABC, abstractmethod
-from typing import Optional
+from shutil import get_terminal_size
+from typing import Optional, Any
 
-from ..common import Fx, TermColor, exec_cmd, shorten, get_width
+from ..common import Fx, TermColor, exec_cmd, shorten, get_width, color_print
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
+from ..gitinfo import REPOSITORY_PATH
 from .model import File
 
 
@@ -128,15 +132,22 @@ class DataHandle(object, metaclass=Singleton):
         return res.rstrip()
 
 
+# whether already in interactive mode.
+_Interaction_Starting = False
+
+
 class _Interaction(ABC):
     def __init__(
         self,
         use_color: bool = True,
         cursor: Optional[str] = None,
         help_wait: float = 1.5,
+        is_sub: bool = False,  # whether is sub page.
         debug: bool = False,
+        **kwargs,
     ) -> None:
         self.use_color = use_color
+        self._is_sub = is_sub
 
         if not cursor:
             self.cursor = "→"
@@ -166,10 +177,193 @@ class _Interaction(ABC):
 
         self._data_handle = DataHandle(use_color)
 
-    @abstractmethod
-    def process(self):
-        """Processing data, and subclasses determine how to behave."""
+        for key, value in kwargs.items():
+            setattr(self, "_ex_{}".format(key), value)
 
     @abstractmethod
-    def run(self):
+    def process_keyevent(self, input_key: str, cursor_row: int, data: Any) -> bool:
+        """Handles keyboard events other than movement.
+
+        Args:
+            input_key (str): keyboard string.
+            cursor_row (int): current line.
+            data (Any): raw data.
+
+        Returns:
+            bool: whether need refresh data.
+        """
+
+    @abstractmethod
+    def keyevent_help(self) -> str:
+        """Get extra keyevent help message.
+
+        Returns:
+            str: help message string.
+        """
+
+    @abstractmethod
+    def get_raw_data(self) -> list[Any]:
+        """How to get the raw data."""
+
+    def process_raw_data(
+        self, raw_data: list[str], width: int
+    ) -> list[tuple[str, int]]:
+        new_list = []
+        for line in raw_data:
+            text = Fx.uncolor(line)
+            count = 0
+            for ch in text:
+                count += get_width(ord(ch))
+            # [float] is to solve the division of python2 without
+            # retaining decimal places.
+            new_list.append((line, ceil(count / width) - 1))
+        return new_list
+
+    @abstractmethod
+    def print_line(self, line: str, is_cursor_row: bool) -> None:
+        """How to output one line.
+
+        May has some different when current line is cursor line.
+        Support to process cursor line specially.
+        """
+
+    def run(self, *args):
         """Run method."""
+        global _Interaction_Starting
+
+        # Make sure run at a git repo dir.
+        if not REPOSITORY_PATH:
+            color_print("Current path is not a git repository.", TermColor.Red)
+            return
+
+        self.width, self.height = width, height = get_terminal_size()
+
+        # Make sure have enough space.
+        if height < self._min_height or width < self._min_width:
+            raise InteractionError(
+                "The minimum size of terminal should be {0} x {1}.".format(
+                    self._min_width, self._min_height
+                )
+            )
+
+        if self._debug:  # debug show.
+            print(Fx.clear_)
+            print(width, height)
+            time.sleep(1.5)
+
+        # Initialize.
+        cursor_row: int = 1
+        display_range: list = [1, height - 1]  # allow display row range.
+
+        stopping: bool = False  # Stop flag.
+        refresh: bool = False  # refresh data flag.
+
+        raw_data: list[Any] = self.get_raw_data()
+        self.raw_data = raw_data
+        if not raw_data:
+            print("The work tree is clean and there is nothing to operate.")
+            return
+        show_data = self.process_raw_data(raw_data, width)
+
+        extra = 0  # Extra occupied row.
+
+        # Into new term page.
+        try:
+            if not _Interaction_Starting:
+                _Interaction_Starting = True
+                print(Fx.alt_screen + Fx.hide_cursor)
+                #  try hook window resize event.
+                self._keyevent.signal_init()
+
+            # Start interactive.
+            while not stopping:
+                if refresh:
+                    refresh = False
+                    raw_data: list[Any] = self.get_raw_data()
+                    self.raw_data = raw_data
+                    show_data = self.process_raw_data(raw_data, width)
+
+                print(Fx.clear_)
+
+                # check whether have status.
+                if not raw_data:
+                    print("The work tree is clean and there is nothing to operate.")
+                    time.sleep(1)
+                    return
+
+                while cursor_row < display_range[0]:
+                    display_range = [i - 1 for i in display_range]
+                while cursor_row + extra > display_range[1]:
+                    display_range = [i + 1 for i in display_range]
+
+                extra = 0  # Return to zero and accumulate again.
+
+                # Print needed display part.
+                for index, item in enumerate(show_data, start=1):
+                    line, each_extra = item
+                    if display_range[0] <= index <= display_range[1] - extra:
+                        self.print_line(line, index == cursor_row)
+                        extra += each_extra
+
+                input_key = self._keyevent.sync_get_input()
+                if input_key in ["q", "escape"]:
+                    # exit.
+                    stopping = True
+                elif input_key in ["j", "down"]:
+                    # select pre file.
+                    cursor_row += 1
+                    cursor_row = min(cursor_row, len(show_data))
+                elif input_key in ["k", "up"]:
+                    # select next file.
+                    cursor_row -= 1
+                    cursor_row = max(cursor_row, 1)
+                elif input_key in ["J"]:
+                    # scroll down 5 lines.
+                    cursor_row += 5
+                    cursor_row = min(cursor_row, len(show_data))
+                elif input_key in ["K"]:
+                    # scroll up 5 line
+                    cursor_row -= 5
+                    cursor_row = max(cursor_row, 1)
+                elif input_key == "windows resize":
+                    # get new term height.
+                    new_width, new_height = get_terminal_size()
+                    if new_height < self._min_height or new_width < self._min_width:
+                        raise InteractionError(
+                            "The minimum size of terminal should be {0} x {1}.".format(
+                                self._min_width, self._min_height
+                            )
+                        )
+                    # get diff, reassign.
+                    line_diff = new_height - height
+                    width, height = new_width, new_height
+                    # get new display range.
+                    display_range[1] += line_diff
+                    show_data = self.process_raw_data(raw_data, width)
+                elif input_key in ["?", "h"]:
+                    print(Fx.clear_)
+                    print(
+                        (
+                            "k / ↑: select previous line.\n"
+                            "j / ↓: select next line.\n"
+                            "J: Scroll down 5 lines.\n"
+                            "K: Scroll down 5 lines.\n"
+                            "? / h : show help, wait {}s and exit.\n"
+                            + self.keyevent_help()
+                        ).format(self.help_wait)
+                    )
+                    if self.help_wait == 0:
+                        self._keyevent.sync_get_input()
+                    else:
+                        time.sleep(self.help_wait)
+                else:
+                    refresh = self.process_keyevent(input_key, cursor_row, raw_data)
+
+        except KeyboardInterrupt:
+            pass
+        finally:
+            # Whatever, unregister signal event and restore terminal at last.
+            if _Interaction_Starting and not self._is_sub:
+                _Interaction_Starting = False
+                self._keyevent.signal_restore()
+                print(Fx.normal_screen + Fx.show_cursor)
