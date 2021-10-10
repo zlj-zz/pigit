@@ -491,7 +491,7 @@ class Parser(object):
                     "command": InteractiveAdd(
                         use_color=CONFIG.gitprocessor_interactive_color,
                         help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-                    ).add_interactive,
+                    ).run,
                     "help": "interactive operation git tree status.",
                     "type": "func",
                 },

@@ -180,7 +180,8 @@ def color_print(value: str, *styles, **options) -> None:
     print(value, end=end)
 
 
-Color_Re = re.compile(r"^#[0-9A-Za-z]{6}")
+# color hexa string reg.
+_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
 
 
 def is_color(var_: Union[str, list, tuple, None]) -> bool:
@@ -200,7 +201,7 @@ def is_color(var_: Union[str, list, tuple, None]) -> bool:
     if not var_:
         return False
     elif type(var_) == str:
-        return True if Color_Re.match(str(var_)) else False
+        return True if _color_re.match(str(var_)) else False
     elif isinstance(var_, list) or isinstance(var_, tuple):
         if len(var_) != 3:
             return False
