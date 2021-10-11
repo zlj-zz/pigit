@@ -54,6 +54,7 @@ SUFFIX_TYPE: dict[str, str] = {
     "hpp": "C++",
     "htm": "HTML",
     "html": "HTML",
+    "ini": "Ini",
     "java": "Java",
     "js": "Java Script",
     "json": "Json",
@@ -62,6 +63,9 @@ SUFFIX_TYPE: dict[str, str] = {
     "launch": "XML",
     "less": "CSS",
     "lua": "Lua",
+    "log": "Log",
+    "m": "Object-C",
+    "mm": "Object-C++",
     "markdown": "Markdown",
     "md": "Markdown",
     "msg": "ROS Message",
@@ -86,6 +90,7 @@ SUFFIX_TYPE: dict[str, str] = {
     "swift": "Swift",
     "toml": "Properties",
     "urdf": "XML",
+    "vb": "Visual Basic",
     "vim": "Vim Scirpt",
     "vue": "Vue",
     "xhtml": "HTML",
@@ -100,6 +105,7 @@ SPECIAL_NAMES: dict[str, str] = {
     "license": "LICENSE",
     "requirements.txt": "Pip requirement",
     "vimrc": "Vim Scirpt",
+    "dockerfile": "Docker",
 }
 
 

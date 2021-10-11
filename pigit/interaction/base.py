@@ -143,6 +143,14 @@ class DataHandle(object, metaclass=Singleton):
     def load_commits(
         self, branch_name: str, limit: bool = True, filter_path: str = ""
     ) -> list[Commit]:
+        """Get the all commit of a given branch.
+
+        Args:
+            branch_name (str): want branch name.
+            limit (bool): Whether to get only the latest 300.
+            filter_path (str): filter dir path, default is empty.
+        """
+
         passed_first_pushed_commit = False
         command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
         _, resp = exec_cmd(command)
@@ -208,6 +216,7 @@ class DataHandle(object, metaclass=Singleton):
             file_name: file name(include full path).
             plain: whether has color.
         """
+
         color_str = "never" if plain else "always"
 
         command = "git show --color=%s %s %s" % (color_str, commit_sha, file_name)

@@ -163,7 +163,7 @@ def get_extra_cmds() -> dict:
             )
         else:
             try:
-                extra_cmds = extra_cmd.extra_cmds
+                extra_cmds = extra_cmd.extra_cmds  # type: ignore
             except AttributeError:
                 Log.error("Can't found dict name is 'extra_cmds'.")
 
@@ -240,7 +240,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
     """
 
     def __init__(
-        self, prog, indent_increment=2, max_help_position=24, width=90, colors=[]
+        self, prog, indent_increment=2, max_help_position=24, width=90, colors=None
     ):
         width = CONFIG.help_max_line_width
         max_width, _ = get_terminal_size()
@@ -509,7 +509,7 @@ class Parser(object):
                 return None
 
             extra_cmd = {
-                "i": {
+                "ui": {
                     "belong": CommandType.Index,
                     "command": interactive_interface,
                     "help": "interactive operation git tree status.",
