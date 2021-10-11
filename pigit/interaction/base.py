@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import re
 import time
 from math import ceil
 from abc import ABC, abstractmethod
@@ -10,7 +11,7 @@ from ..common import Fx, TermColor, exec_cmd, shorten, get_width, color_print
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
 from ..gitinfo import REPOSITORY_PATH
-from .model import File
+from .model import File, Commit
 
 
 class InteractionError(Exception):
@@ -21,7 +22,15 @@ class DataHandle(object, metaclass=Singleton):
     def __init__(self, use_color: bool):
         self.use_color = use_color
 
-    def get_status(self, max_width: int, ident: int = 2) -> list[File]:
+    def current_head(self):
+        """Get current repo head.
+
+        return a branch name or a commit sha string.
+        """
+        _, res = exec_cmd("git symbolic-ref -q --short HEAD")
+        return res.rstrip()
+
+    def load_status(self, max_width: int, ident: int = 2) -> list[File]:
         """Get the file tree status of GIT for processing and encapsulation.
 
         Args:
@@ -89,7 +98,7 @@ class DataHandle(object, metaclass=Singleton):
 
         return file_items
 
-    def get_file_diff(
+    def load_file_diff(
         self, file: str, tracked: bool = True, cached: bool = False, plain: bool = False
     ) -> str:
         """Gets the modification of the file.
@@ -130,6 +139,80 @@ class DataHandle(object, metaclass=Singleton):
         if err:
             return "Can't get diff."
         return res.rstrip()
+
+    def load_commits(
+        self, branch_name: str, limit: bool = True, filter_path: str = ""
+    ) -> list[Commit]:
+        passed_first_pushed_commit = False
+        command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
+        _, resp = exec_cmd(command)
+        first_pushed_commit = resp.strip()
+
+        if not first_pushed_commit:
+            passed_first_pushed_commit = True
+
+        commits: list[Commit] = []
+
+        # Generate git command.
+        limit_flag = "-300" if limit else ""
+        filter_flag = f"--follow -- {filter_path}" if filter_path else ""
+        command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
+        err, resp = exec_cmd(command)
+
+        # Process data.
+        lines = resp.split("\n")
+        if not err:
+            for line in lines:
+                split_ = line.split("|")
+
+                sha = split_[0]
+                unix_timestamp = int(split_[1])
+                author = split_[2]
+                extra_info = (split_[3]).strip()
+                # parent_hashes = split_[4]
+                message = "|".join(split_[5:])
+
+                tag = []
+                if extra_info:
+                    _re = re.compile(r"tag: ([^,\\]+)")
+                    match = _re.search(extra_info)
+                    if match:
+                        tag.append(match[1])
+
+                if sha == first_pushed_commit:
+                    passed_first_pushed_commit = True
+                status = {True: "unpushed", False: "pushed"}[
+                    not passed_first_pushed_commit
+                ]
+
+                commit_ = Commit(
+                    sha=sha,
+                    msg=message,
+                    author=author,
+                    unix_timestamp=unix_timestamp,
+                    status=status,
+                    extra_info=extra_info,
+                    tag=tag,
+                )
+                commits.append(commit_)
+
+        return commits
+
+    def load_commit_info(
+        self, commit_sha: str, file_name: str = "", plain: bool = False
+    ) -> str:
+        """Gets the change of a file or all in a given commit.
+
+        Args:
+            commit_sha: commit id.
+            file_name: file name(include full path).
+            plain: whether has color.
+        """
+        color_str = "never" if plain else "always"
+
+        command = "git show --color=%s %s %s" % (color_str, commit_sha, file_name)
+        _, resp = exec_cmd(command)
+        return resp.rstrip()
 
 
 # whether already in interactive mode.
@@ -325,6 +408,9 @@ class _Interaction(ABC):
                     # scroll up 5 line
                     cursor_row -= 5
                     cursor_row = max(cursor_row, 1)
+
+                elif input_key in "0123456789":
+                    return int(input_key)
                 elif input_key == "windows resize":
                     # get new term height.
                     new_width, new_height = get_terminal_size()
@@ -366,4 +452,4 @@ class _Interaction(ABC):
             if _Interaction_Starting and not self._is_sub:
                 _Interaction_Starting = False
                 self._keyevent.signal_restore()
-                print(Fx.normal_screen + Fx.show_cursor)
+                print(Fx.normal_screen + Fx.show_cursor, end="")

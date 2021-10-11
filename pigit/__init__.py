@@ -55,7 +55,7 @@ from .config import Config
 from .codecounter import CodeCounter
 from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
-from .interaction import InteractiveStatus
+from .interaction import InteractiveStatus, InteractiveCommit
 from .processor import CmdProcessor, Git_Cmds, CommandType
 
 
@@ -207,6 +207,29 @@ def shell_mode(git_processor: CmdProcessor):
         else:
             os.system(command)
     return None
+
+
+def interactive_interface(args):
+    flag: int = 1
+
+    if args:
+        ready_flag = args[0]
+        if ready_flag in "0123456789":
+            flag = int(ready_flag)
+
+    while flag and flag > 0:
+        if flag == 1:
+            flag = InteractiveStatus(
+                use_color=CONFIG.gitprocessor_interactive_color,
+                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+            ).run()
+        elif flag == 2:
+            flag = InteractiveCommit(
+                use_color=CONFIG.gitprocessor_interactive_color,
+                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+            ).run()
+        else:
+            flag = 1
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -488,12 +511,10 @@ class Parser(object):
             extra_cmd = {
                 "i": {
                     "belong": CommandType.Index,
-                    "command": InteractiveStatus(
-                        use_color=CONFIG.gitprocessor_interactive_color,
-                        help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-                    ).run,
+                    "command": interactive_interface,
                     "help": "interactive operation git tree status.",
                     "type": "func",
+                    "has_arguments": True,
                 },
                 "shell": {
                     "command": "",

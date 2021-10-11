@@ -15,7 +15,7 @@ class InteractiveShowFile(_Interaction):
         pass
 
     def get_raw_data(self) -> list[str]:
-        return self._data_handle.get_file_diff(
+        return self._data_handle.load_file_diff(
             self._ex_file.name,
             self._ex_file.tracked,
             self._ex_file.has_staged_change,
@@ -97,7 +97,7 @@ class InteractiveStatus(_Interaction):
                     os.remove(os.path.join(file.name))
 
     def get_raw_data(self) -> list[File]:
-        return self._data_handle.get_status(self.width)
+        return self._data_handle.load_status(self.width)
 
     def process_raw_data(
         self, raw_data: list[File], width: int

@@ -14,7 +14,7 @@ def setup():
 def test_files_time(setup):
     ia, dh = setup
 
-    status = dh.get_status(100)
+    status = dh.load_status(100)
     assert type(status) == list
 
     print("\nWill get 1000 times data.")
@@ -22,7 +22,7 @@ def test_files_time(setup):
     min_time = float("inf")
     for _ in range(1000):
         start = time.time()
-        dh.get_status(100)
+        dh.load_status(100)
         used_time = time.time() - start
         min_time = min(used_time, min_time)
         max_time = max(used_time, max_time)
