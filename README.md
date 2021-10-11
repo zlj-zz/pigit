@@ -122,7 +122,7 @@ These are short commands that can replace git operations:
 
 ### Interaction
 
-It support a simple interactive mode. You can use `pigit i` into the interactive mode and it let control the working tree simpler. like this:
+It support a simple interactive mode. You can use `pigit ui` into the interactive mode and it let control the working tree simpler. like this:
 
 ![interaction demo](./interaction.gif)
 

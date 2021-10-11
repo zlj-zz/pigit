@@ -2,6 +2,13 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.2 (2021-10-11)
+----------
+- Fix table class for chinese and color.
+- Fix get repo path error when in submodule repo.
+- Adjust the command line parameters, ``pigit -h`` to view.
+- Simple interactive interface support commit part.
+
 v1.3.1 (2021-09-28)
 ----------
 - Add new git short command (submodule).

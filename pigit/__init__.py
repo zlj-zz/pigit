@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.2.dev"
+__version__ = "1.3.2"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -100,8 +100,18 @@ if CONFIG.warnings:
 def introduce() -> None:
     """Print the description information."""
 
-    # Print tools version and path.
-    color_print("[%s] version: %s" % (__project__, __version__), Fx.b)
+    # Print version.
+    print(
+        """
+ ____ ___ ____ ___ _____
+|  _ \\_ _/ ___|_ _|_   _|
+| |_) | | |  _ | |  | |
+|  __/| | |_| || |  | |
+|_|  |___\\____|___| |_| version: {}
+""".format(
+            __version__
+        )
+    )
 
     # Print git version.
     if Git_Version is None:
