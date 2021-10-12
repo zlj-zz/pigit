@@ -48,7 +48,7 @@ class GitignoreGenetor(object):
         "unity": "Unity",
     }
 
-    def __init__(self, timeout=60) -> None:
+    def __init__(self, timeout: int = 60) -> None:
         super(GitignoreGenetor, self).__init__()
 
         self.timeout = timeout

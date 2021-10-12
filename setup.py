@@ -1,10 +1,10 @@
 import sys
 
 PYTHON_VERSION = sys.version_info[:2]
-if PYTHON_VERSION < (3, 6):
+if PYTHON_VERSION < (3, 8):
     print(
         "The current version of pigit does not support less "
-        "than Python3.6, please install 1.0.9"
+        "than Python3.8, more version please check https://pypi.org/project/pigit/"
     )
     exit(0)
 
@@ -52,10 +52,9 @@ setup(
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: System :: Shells",
         "Topic :: Software Development",
         "Intended Audience :: Developers",
@@ -70,5 +69,5 @@ setup(
         [console_scripts]
         pigit=pigit:main
     """,
-    python_requires=">=3.6",
+    python_requires=">=3.8",
 )

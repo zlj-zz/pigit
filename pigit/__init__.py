@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.2"
+__version__ = "1.3.3.dev"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -42,7 +42,7 @@ import logging
 from shutil import get_terminal_size
 from typing import Optional, Union
 
-from .log import LogHandle
+from .log import setup_logging
 from .common import Color, Fx, TermColor, color_print
 from .gitinfo import (
     Git_Version,
@@ -580,7 +580,7 @@ def main(custom_commands: Optional[list] = None):
 
     # Setup log handle.
     log_file = LOG_PATH if stdargs.out_log or CONFIG.stream_output_log else None
-    LogHandle.setup_logging(debug=stdargs.debug or CONFIG.debug_mode, log_file=log_file)
+    setup_logging(debug=stdargs.debug or CONFIG.debug_mode, log_file=log_file)
 
     # Process result.
     parser.process(stdargs, extra_unknown)

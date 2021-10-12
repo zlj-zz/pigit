@@ -560,7 +560,9 @@ class CodeCounter(object):
                     )
                 )
 
-    def count_and_format_print(self, if_save=True, show_invalid=False) -> None:
+    def count_and_format_print(
+        self, if_save: bool = True, show_invalid: bool = False
+    ) -> None:
         result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
 
         old_result = self.load_recorded_result(self.count_path)

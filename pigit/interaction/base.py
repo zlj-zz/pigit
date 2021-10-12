@@ -115,20 +115,11 @@ class DataHandle(object, metaclass=Singleton):
 
         command = "git diff --submodule --no-ext-diff {plain} {cached} {tracked} {file}"
 
-        if plain:
-            _plain = "--color=never"
-        else:
-            _plain = "--color=always"
+        _plain = "--color=never" if plain else "--color=always"
 
-        if cached:
-            _cached = "--cached"
-        else:
-            _cached = ""
+        _cached = "--cached" if cached else ""
 
-        if not tracked:
-            _tracked = "--no-index -- /dev/null"
-        else:
-            _tracked = "--"
+        _tracked = "--no-index -- /dev/null" if not tracked else "--"
 
         if "->" in file:  # rename status.
             file = file.split("->")[-1].strip()
@@ -167,42 +158,40 @@ class DataHandle(object, metaclass=Singleton):
         command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
         err, resp = exec_cmd(command)
 
+        if err:
+            return commits  # current is empty list.
+
         # Process data.
-        lines = resp.split("\n")
-        if not err:
-            for line in lines:
-                split_ = line.split("|")
+        for line in resp.split("\n"):
+            split_ = line.split("|")
 
-                sha = split_[0]
-                unix_timestamp = int(split_[1])
-                author = split_[2]
-                extra_info = (split_[3]).strip()
-                # parent_hashes = split_[4]
-                message = "|".join(split_[5:])
+            sha = split_[0]
+            unix_timestamp = int(split_[1])
+            author = split_[2]
+            extra_info = (split_[3]).strip()
+            # parent_hashes = split_[4]
+            message = "|".join(split_[5:])
 
-                tag = []
-                if extra_info:
-                    _re = re.compile(r"tag: ([^,\\]+)")
-                    match = _re.search(extra_info)
-                    if match:
-                        tag.append(match[1])
+            tag = []
+            if extra_info:
+                _re = re.compile(r"tag: ([^,\\]+)")
+                if match := _re.search(extra_info):
+                    tag.append(match[1])
 
-                if sha == first_pushed_commit:
-                    passed_first_pushed_commit = True
-                status = {True: "unpushed", False: "pushed"}[
-                    not passed_first_pushed_commit
-                ]
+            if sha == first_pushed_commit:
+                passed_first_pushed_commit = True
+            status = {True: "unpushed", False: "pushed"}[not passed_first_pushed_commit]
 
-                commit_ = Commit(
-                    sha=sha,
-                    msg=message,
-                    author=author,
-                    unix_timestamp=unix_timestamp,
-                    status=status,
-                    extra_info=extra_info,
-                    tag=tag,
-                )
-                commits.append(commit_)
+            commit_ = Commit(
+                sha=sha,
+                msg=message,
+                author=author,
+                unix_timestamp=unix_timestamp,
+                status=status,
+                extra_info=extra_info,
+                tag=tag,
+            )
+            commits.append(commit_)
 
         return commits
 
@@ -300,6 +289,11 @@ class _Interaction(ABC):
     def process_raw_data(
         self, raw_data: list[str], width: int
     ) -> list[tuple[str, int]]:
+        """
+        Process the raw data, and indicate the number of additional
+        rows that need to be occupied when each piece of data is displayed.
+        """
+
         new_list = []
         for line in raw_data:
             text = Fx.uncolor(line)
@@ -447,7 +441,7 @@ class _Interaction(ABC):
                             + self.keyevent_help()
                         ).format(self.help_wait)
                     )
-                    if self.help_wait == 0:
+                    if not self.help_wait or self.help_wait == 0:
                         self._keyevent.sync_get_input()
                     else:
                         time.sleep(self.help_wait)

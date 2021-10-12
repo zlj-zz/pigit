@@ -51,8 +51,8 @@ class InteractiveStatus(_Interaction):
             self.process_f(data[cursor_row - 1], "discard")
             refresh = True
         elif input_key == "e":
-            editor = os.environ.get("EDITOR", None)
-            if editor:
+            # editor = os.environ.get("EDITOR", None)
+            if editor := os.environ.get("EDITOR", None):
                 run_cmd('{} "{}"'.format(editor, data[cursor_row - 1].name))
                 refresh = True
             else:
