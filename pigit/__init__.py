@@ -193,33 +193,70 @@ def shell_mode(git_processor: CmdProcessor):
         if not command:
             continue
 
-        command_args = command.split()
-        head_command = command_args[0]
+        argv = command.split(maxsplit=1)
+        command = argv[0]
+        args_str = argv[1] if len(argv) == 2 else ""
 
-        if head_command in ["quit", "exit"]:  # ctrl+c
+        if command in ["quit", "exit"]:  # ctrl+c
             break
-        elif head_command in git_processor.cmds.keys():
-            git_processor.process_command(head_command, command_args[1:])
-        elif head_command == "tomato":
+        elif command in git_processor.cmds.keys():
+            git_processor.process_command(command, args_str.split())
+        elif command == "tomato":
             # Tomato clock.
-            pigit.tomato.main(command_args)
-        elif head_command == "?":
-            other_ = command_args[1:]
-            if not other_:
-                git_processor.command_help()
+            pigit.tomato.main(command)
+        elif command in ["sh", "shell"]:
+            if args_str:
+                os.system(args_str)
             else:
-                print(other_)
-                for item in other_:
-                    if item in git_processor.cmds.keys():
-                        print(git_processor._generate_help_by_key(item))
-                    elif item == "tomato":
-                        pigit.tomato.help("tomato")
+                print("pigit shell: Please input shell command.")
+        elif command == "?":
+            if not args_str:
+                print(
+                    "Options:\n"
+                    "  quit, exit      Exit the pigit shell mode.\n"
+                    "  sh, shell       Run a shell command.\n"
+                    "  tomato          It's a terminal tomato clock.\n"
+                    "  ? [comand...]   Show help message. Use `? ?` to look detail.\n"
+                )
+            else:
+                invalid = []
+
+                if "?" in args_str:
+                    print(
+                        "? is a tip command."
+                        "Use `?` to look pigit shell options."
+                        "Use `? [command...]` to look option help message.\n"
+                        "Like:\n"
+                        "`? sh` to get the help of sh command.\n"
+                        "`? all` to get all support git quick command help.\n"
+                        "Or `? ws ls` to get the help you want.\n"
+                    )
+                elif "all" in args_str:
+                    git_processor.command_help()
+                elif "tomato" in args_str:
+                    pigit.tomato.help("tomato")
+                elif "sh" in args_str or "shell" in args_str:
+                    print("sh, shell      run a shell command.")
+                else:
+
+                    for item in args_str.split():
+                        if item in git_processor.cmds.keys():
+                            print(git_processor._generate_help_by_key(item))
+                        else:
+                            invalid.append(item)
+
+                if invalid:
+                    print("Cannot find command: {0}".format(",".join(invalid)))
         else:
-            os.system(command)
+            print(
+                "pigit shell: Invalid command `{0}`, please select from "
+                "[shell, tomato, quit] or git short command.".format(command)
+            )
     return None
 
 
 def interactive_interface(args):
+    cache_flag: int = 1  # prevent range out, caches the last selection.
     flag: int = 1
 
     if args:
@@ -229,17 +266,19 @@ def interactive_interface(args):
 
     while flag and flag > 0:
         if flag == 1:
+            cache_flag = flag
             flag = InteractiveStatus(
                 use_color=CONFIG.gitprocessor_interactive_color,
                 help_wait=CONFIG.gitprocessor_interactive_help_showtime,
             ).run()
         elif flag == 2:
+            cache_flag = flag
             flag = InteractiveCommit(
                 use_color=CONFIG.gitprocessor_interactive_color,
                 help_wait=CONFIG.gitprocessor_interactive_help_showtime,
             ).run()
         else:
-            flag = 1
+            flag = cache_flag
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -469,17 +508,15 @@ class Parser(object):
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
         try:
-            if known_args.config:
-                output_git_local_config(CONFIG.git_config_format)
+            known_args.config and output_git_local_config(CONFIG.git_config_format)
 
-            if known_args.information:
-                output_repository_info(
-                    show_path=CONFIG.repository_show_path,
-                    show_remote=CONFIG.repository_show_remote,
-                    show_branches=CONFIG.repository_show_branchs,
-                    show_lastest_log=CONFIG.repository_show_lastest_log,
-                    show_summary=CONFIG.repository_show_summary,
-                )
+            known_args.information and output_repository_info(
+                show_path=CONFIG.repository_show_path,
+                show_remote=CONFIG.repository_show_remote,
+                show_branches=CONFIG.repository_show_branchs,
+                show_lastest_log=CONFIG.repository_show_lastest_log,
+                show_summary=CONFIG.repository_show_summary,
+            )
 
             if known_args.complete:
                 # Generate competion vars dict.
@@ -499,11 +536,12 @@ class Parser(object):
                 return CONFIG.create_config_template()
 
             if known_args.ignore_type:
-                GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
+                return GitignoreGenetor(
+                    timeout=CONFIG.gitignore_generator_timeout,
+                ).launch(
                     known_args.ignore_type,
                     dir_path=REPOSITORY_PATH,
                 )
-                return None
 
             if known_args.count:
                 path = known_args.count if known_args.count != "." else os.getcwd()
@@ -527,7 +565,8 @@ class Parser(object):
                     "has_arguments": True,
                 },
                 "shell": {
-                    "command": "",
+                    "command": lambda _: shell_mode(git_processor),
+                    "type": "func",
                     "help": "Into PIGIT shell mode.",
                 },  # only for tips.
             }
@@ -554,13 +593,10 @@ class Parser(object):
                 return git_processor.type_help()
 
             if known_args.command:
-                if known_args.command == "shell":
-                    return shell_mode(git_processor)
-                else:
-                    command = known_args.command
-                    known_args.args.extend(extra_unknown)  # type: list
-                    git_processor.process_command(command, known_args.args)
-                    return None
+                command = known_args.command
+                known_args.args.extend(extra_unknown)
+                git_processor.process_command(command, known_args.args)
+                return None
 
             # Don't have invalid command list.
             if not list(filter(lambda x: x, vars(known_args).values())):
