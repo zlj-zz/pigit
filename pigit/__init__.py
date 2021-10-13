@@ -188,27 +188,35 @@ def shell_mode(git_processor: CmdProcessor):
         "Welcome come PIGIT shell.\n"
         "You can use short commands directly. Input '?' to get help.\n"
     )
-    while True:
-        command = input("(pigit)> ").strip()
-        if not command:
+
+    stopping: bool = False
+
+    while not stopping:
+        if not (input_argv_str := input("(pigit)> ").strip()):
             continue
 
-        argv = command.split(maxsplit=1)
+        # Explode command string.
+        argv = input_argv_str.split(maxsplit=1)
         command = argv[0]
         args_str = argv[1] if len(argv) == 2 else ""
 
+        # Process.
         if command in ["quit", "exit"]:  # ctrl+c
-            break
+            stopping = True
+
         elif command in git_processor.cmds.keys():
             git_processor.process_command(command, args_str.split())
+
         elif command == "tomato":
             # Tomato clock.
-            pigit.tomato.main(command)
+            pigit.tomato.main(input_argv_str.split())
+
         elif command in ["sh", "shell"]:
             if args_str:
                 os.system(args_str)
             else:
                 print("pigit shell: Please input shell command.")
+
         elif command == "?":
             if not args_str:
                 print(
@@ -218,40 +226,48 @@ def shell_mode(git_processor: CmdProcessor):
                     "  tomato          It's a terminal tomato clock.\n"
                     "  ? [comand...]   Show help message. Use `? ?` to look detail.\n"
                 )
+
+            elif "?" in args_str:
+                print(
+                    "? is a tip command."
+                    "Use `?` to look pigit shell options."
+                    "Use `? [command...]` to look option help message.\n"
+                    "Like:\n"
+                    "`? sh` to get the help of sh command.\n"
+                    "`? all` to get all support git quick command help.\n"
+                    "Or `? ws ls` to get the help you want.\n"
+                )
+
+            elif "all" in args_str:
+                git_processor.command_help()
+
+            elif "tomato" in args_str:
+                pigit.tomato.help("tomato")
+
+            elif "sh" in args_str or "shell" in args_str:
+                print(
+                    "This command is help you to run a normal terminal command in pigit shell.\n"
+                    "For example, you can use `sh ls` to check the files of current dir.\n"
+                )
+
             else:
                 invalid = []
 
-                if "?" in args_str:
-                    print(
-                        "? is a tip command."
-                        "Use `?` to look pigit shell options."
-                        "Use `? [command...]` to look option help message.\n"
-                        "Like:\n"
-                        "`? sh` to get the help of sh command.\n"
-                        "`? all` to get all support git quick command help.\n"
-                        "Or `? ws ls` to get the help you want.\n"
-                    )
-                elif "all" in args_str:
-                    git_processor.command_help()
-                elif "tomato" in args_str:
-                    pigit.tomato.help("tomato")
-                elif "sh" in args_str or "shell" in args_str:
-                    print("sh, shell      run a shell command.")
-                else:
-
-                    for item in args_str.split():
-                        if item in git_processor.cmds.keys():
-                            print(git_processor._generate_help_by_key(item))
-                        else:
-                            invalid.append(item)
+                for item in args_str.split():
+                    if item in git_processor.cmds.keys():
+                        print(git_processor._generate_help_by_key(item))
+                    else:
+                        invalid.append(item)
 
                 if invalid:
                     print("Cannot find command: {0}".format(",".join(invalid)))
+
         else:
             print(
                 "pigit shell: Invalid command `{0}`, please select from "
                 "[shell, tomato, quit] or git short command.".format(command)
             )
+
     return None
 
 
