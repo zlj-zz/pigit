@@ -7,7 +7,7 @@ from ..common import (
     Fx,
     Color,
     TermColor,
-    Emotion,
+    Emoji,
     run_cmd,
     color_print,
     confirm,
@@ -109,7 +109,7 @@ class CmdProcessor(object):
                 if confirm(
                     "%s The wanted command is %s ?[y/n]:"
                     % (
-                        Emotion.thinking,
+                        Emoji.thinking,
                         TermColor.Green + predicted_command + Fx.reset,
                     )
                 ):
@@ -145,7 +145,7 @@ class CmdProcessor(object):
                 command = " ".join([command, args_str])
             if self.show_original:
                 print(
-                    "{0}  {1}".format(Emotion.rainbow, self.color_command(command)),
+                    "{0}  {1}".format(Emoji.rainbow, self.color_command(command)),
                 )
             run_cmd(command)
 
@@ -234,7 +234,7 @@ class CmdProcessor(object):
                 if confirm(
                     "%s The wanted type is %s ?[y/n]:"
                     % (
-                        Emotion.thinking,
+                        Emoji.thinking,
                         TermColor.Green + predicted_type + Fx.reset,
                     )
                 ):

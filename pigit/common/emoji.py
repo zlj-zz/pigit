@@ -12,7 +12,7 @@ _EmojiSubMethod = Callable[[_ReSubCallable, str], str]  # Sub method of a compil
 # https://github.com/willmcgugan/rich/blob/master/rich/_emoji_replace.py
 
 
-class Emotion(object):
+class Emoji(object):
     _EMOTION: dict[str, str] = {
         "rainbow": "🌈",
         "smiler": "😊",
@@ -29,8 +29,8 @@ class Emotion(object):
 
     EMOTION: dict[str, str]
 
-    # XXX(zachary): There are some problems with the output emotion on windows.
-    # ? In CMD, encoding is right, but emotion is error.
+    # XXX(zachary): There are some problems with the output emoji on windows.
+    # ? In CMD, encoding is right, but emoji is error.
     # ? In git bash, encoding is not right, but seem can't detection.
     if (
         not sys.platform.lower().startswith("win")
@@ -80,5 +80,5 @@ class Emotion(object):
 
 
 if __name__ == "__main__":
-    print(Emotion.render("Today is a nice day :smiler:."))
-    Emotion.print("Today is a nice day :smiler:.")
+    print(Emoji.render("Today is a nice day :smiler:."))
+    Emoji.print("Today is a nice day :smiler:.")

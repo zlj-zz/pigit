@@ -9,13 +9,13 @@ of parameters to be processed. If don't need will get a empty list or tuple.
 Like this:
 >>> def func(args: Union[list, tuple]) -> None:
 >>>     # your code.
->>>     pass 
+>>>     pass
 """
 
 import re
 from typing import Union
 
-from ..common import Emotion, TermColor, exec_cmd, run_cmd, color_print
+from ..common import Emoji, TermColor, exec_cmd, run_cmd, color_print
 
 
 def add(args: Union[list, tuple]) -> None:
@@ -33,7 +33,7 @@ def add(args: Union[list, tuple]) -> None:
 
     print(
         "{0} Storage file: {1}".format(
-            Emotion.rainbow, "all" if args_str.strip() == "." else args_str
+            Emoji.rainbow, "all" if args_str.strip() == "." else args_str
         )
     )
     run_cmd("git add " + args_str)

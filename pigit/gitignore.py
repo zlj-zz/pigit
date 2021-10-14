@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 from urllib.request import urlopen
 
-from .common import Fx, Emotion, confirm
+from .common import Fx, Emoji, confirm
 
 Log = logging.getLogger(__name__)
 
@@ -149,4 +149,4 @@ class GitignoreGenetor(object):
                 print("#" * 60)
                 print(ignore_content)
             else:
-                print("Write gitignore file successful. {0}".format(Emotion.smiler))
+                print("Write gitignore file successful. {0}".format(Emoji.smiler))

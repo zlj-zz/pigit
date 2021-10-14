@@ -55,7 +55,7 @@ v1.0.6 (2021-08-08)
 - Increase the output mode of CodeCounter. [table, simple]
 - Refactor Git command processor.
 - Refactor Completion, support fish shell.
-- Fix emotion error on windows.
+- Fix emoji error on windows.
 
 v1.0.4 (2021-08-04)
 ----------

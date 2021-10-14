@@ -5,7 +5,7 @@ import os
 if os.name == "nt":
     os.system("")
 
-from .emotion import Emotion
+from .emoji import Emoji
 from .style import Color, BoxSymbol
 from .escape import Fx, Cursor
 from .utils import run_cmd, exec_cmd, confirm, color_print, is_color, similar_command
@@ -14,7 +14,7 @@ from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
 # yapf: disable
 __all__ = [
-    "Emotion", "Color", "BoxSymbol", "Fx", "Cursor",
+    "Emoji", "Color", "BoxSymbol", "Fx", "Cursor",
     "run_cmd", "exec_cmd", "confirm", "color_print", "is_color", "similar_command",
     "get_width", "shorten", "adjudgment_type", "get_file_icon",
 ]
@@ -32,3 +32,15 @@ class TermColor:
     SkyBlue = Color.fg("#87CEFA")
     MediumVioletRed = Color.fg("#C71585")
     Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
+
+
+def render_str(
+    _msg: str, /, *, hightlight: bool = True, allow_emoji: bool = True
+) -> str:
+    if hightlight:
+        _msg = Color.render(_msg)
+
+    if allow_emoji:
+        _msg = Emoji.render(_msg)
+
+    return _msg
