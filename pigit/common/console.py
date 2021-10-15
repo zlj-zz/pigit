@@ -1,6 +1,24 @@
 # -*- coding:utf-8 -*-
 
 
+class Term:
+    """Terminal console."""
+
+    hide_cursor = "\033[?25l"  # * Hide terminal cursor
+    show_cursor = "\033[?25h"  # * Show terminal cursor
+    alt_screen = "\033[?1049h"  # * Switch to alternate screen
+    normal_screen = "\033[?1049l"  # * Switch to normal screen
+    clear_screen = "\033[2J\033[0;0f"  # * Clear screen and set cursor to position 0,0
+
+    # * Enable reporting of mouse position on click and release
+    mouse_on = "\033[?1002h\033[?1015h\033[?1006h"
+    mouse_off = "\033[?1002l"  # * Disable mouse reporting
+
+    # * Enable reporting of mouse position at any movement
+    mouse_direct_on = "\033[?1003h"
+    mouse_direct_off = "\033[?1003l"  # * Disable direct mouse reporting
+
+
 class Cursor:
     """Class with collection of cursor movement functions:
     Functions:

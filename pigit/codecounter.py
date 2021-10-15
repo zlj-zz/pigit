@@ -556,7 +556,7 @@ class CodeCounter(object):
                     "{0}{1}{2}".format(
                         self.symbol_color["-"],
                         "-" * ceil(deletions / old_sum * 100),
-                        Fx.reset,
+                        Fx.rs,
                     )
                 )
 

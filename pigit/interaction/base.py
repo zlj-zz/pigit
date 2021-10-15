@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from typing import Optional, Any
 
-from ..common import Fx, TermColor, exec_cmd, shorten, get_width, color_print
+from ..common import Term, Fx, TermColor, exec_cmd, shorten, get_width, color_print
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
 from ..gitinfo import REPOSITORY_PATH
@@ -333,7 +333,7 @@ class _Interaction(ABC):
             )
 
         if self._debug:  # debug show.
-            print(Fx.clear_)
+            print(Term.clear_screen)
             print(width, height)
             time.sleep(1.5)
 
@@ -357,7 +357,7 @@ class _Interaction(ABC):
         try:
             if not _Interaction_Starting:
                 _Interaction_Starting = True
-                print(Fx.alt_screen + Fx.hide_cursor)
+                print(Term.alt_screen + Term.hide_cursor)
                 #  try hook window resize event.
                 self._keyevent.signal_init()
 
@@ -369,7 +369,7 @@ class _Interaction(ABC):
                     self.raw_data = raw_data
                     show_data = self.process_raw_data(raw_data, width)
 
-                print(Fx.clear_)
+                print(Term.clear_screen)
 
                 # check whether have status.
                 if not raw_data:
@@ -430,7 +430,7 @@ class _Interaction(ABC):
                     display_range[1] += line_diff
                     show_data = self.process_raw_data(raw_data, width)
                 elif input_key in ["?", "h"]:
-                    print(Fx.clear_)
+                    print(Term.clear_screen)
                     print(
                         (
                             "k / ↑: select previous line.\n"
@@ -455,4 +455,4 @@ class _Interaction(ABC):
             if _Interaction_Starting and not self._is_sub:
                 _Interaction_Starting = False
                 self._keyevent.signal_restore()
-                print(Fx.normal_screen + Fx.show_cursor, end="")
+                print(Term.normal_screen + Term.show_cursor, end="")
