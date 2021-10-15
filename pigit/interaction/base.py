@@ -7,7 +7,15 @@ from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from typing import Optional, Any
 
-from ..common import Term, Fx, Color, exec_cmd, shorten, get_width, color_print
+from ..common import (
+    Term,
+    Fx,
+    Color,
+    exec_cmd,
+    shorten,
+    get_width,
+    render_str,
+)
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
 from ..gitinfo import REPOSITORY_PATH
@@ -16,19 +24,6 @@ from .model import File, Commit
 
 class InteractionError(Exception):
     pass
-
-
-class TermColor:
-    """Terminal print color class."""
-
-    Red = Color.fg("#FF6347")  # Tomato
-    Green = Color.fg("#98FB98")  # PaleGreen
-    DeepGreen = Color.fg("#A4BE8C")  # PaleGreen
-    Yellow = Color.fg("#EBCB8C")
-    Gold = Color.fg("#FFD700")  # Gold
-    SkyBlue = Color.fg("#87CEFA")
-    MediumVioletRed = Color.fg("#C71585")
-    Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
 
 
 class DataHandle(object, metaclass=Singleton):
@@ -76,24 +71,9 @@ class DataHandle(object, metaclass=Singleton):
 
             display_name = shorten(name, max_width - 3 - ident)
             # color full command.
-            if unstaged_change != " ":
-                if not has_no_staged_change:
-                    display_str = "{}{}{}{} {}{}".format(
-                        TermColor.Green,
-                        staged_change,
-                        TermColor.Red,
-                        unstaged_change,
-                        display_name,
-                        Fx.reset,
-                    )
-                else:
-                    display_str = "{}{} {}{}".format(
-                        TermColor.Red, change, display_name, Fx.reset
-                    )
-            else:
-                display_str = "{}{} {}{}".format(
-                    TermColor.Green, change, display_name, Fx.reset
-                )
+            display_str = render_str(
+                f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {display_name}"
+            )
 
             file_ = File(
                 name=name,
@@ -332,7 +312,7 @@ class _Interaction(ABC):
 
         # Make sure run at a git repo dir.
         if not REPOSITORY_PATH:
-            color_print("Current path is not a git repository.", TermColor.Red)
+            print(render_str("`Current path is not a git repository.`<error>"))
             return
 
         self.width, self.height = width, height = get_terminal_size()

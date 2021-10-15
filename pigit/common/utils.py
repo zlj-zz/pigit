@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 
 import re
-import signal
 import subprocess
 import logging
 from math import sqrt
@@ -10,28 +9,6 @@ from typing import Union, Iterable, Tuple
 
 
 Log = logging.getLogger(__name__)
-
-# Exit code.
-EXIT_NORMAL: int = 0
-EXIT_ERROR: int = 1
-
-
-def leave(code: int, *args) -> None:
-    """Exit program.
-
-    Receive error code, error message. If the error code matches, print the
-    error information to the log. Then the command line output prompt, and
-    finally exit.
-
-    Args:
-        code: Exit code.
-        *args: Other messages.
-    """
-
-    if code == EXIT_ERROR:
-        Log.error(args)
-
-    raise SystemExit(0)
 
 
 def run_cmd(*args) -> bool:
@@ -164,22 +141,6 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     return min_frequency_command
 
 
-def color_print(value: str, *styles, **options) -> None:
-    """Print to terminal.
-
-    Print special information with color and style according to the
-    incoming parameters.
-
-    Args:
-        msg: A special message.
-        style: Message style, like: [bold, underline].
-    """
-
-    value = "{0}{1}\033[0m".format("".join(styles), value)
-    end = options.get("end", "\n")
-    print(value, end=end)
-
-
 # color hexa string reg.
 _color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
 
@@ -213,16 +174,6 @@ def is_color(var_: Union[str, list, tuple, None]) -> bool:
                 return True
     else:
         return False
-
-
-def init_hook():
-    """Take over some system signals, which are used at
-    the beginning of PIGIT.
-    """
-    try:
-        signal.signal(signal.SIGINT, leave)
-    except Exception as e:
-        print(str(e))
 
 
 if __name__ == "__main__":
