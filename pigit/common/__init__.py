@@ -6,8 +6,8 @@ if os.name == "nt":
     os.system("")
 
 from .emoji import Emoji
-from .style import Color, BoxSymbol
-from .escape import Fx, Cursor
+from .style import Fx, Color, BoxSymbol, render_style
+from .escape import Cursor
 from .utils import run_cmd, exec_cmd, confirm, color_print, is_color, similar_command
 from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
@@ -38,7 +38,7 @@ def render_str(
     _msg: str, /, *, hightlight: bool = True, allow_emoji: bool = True
 ) -> str:
     if hightlight:
-        _msg = Color.render(_msg)
+        _msg = render_style(_msg)
 
     if allow_emoji:
         _msg = Emoji.render(_msg)

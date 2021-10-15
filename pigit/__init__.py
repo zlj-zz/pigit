@@ -43,7 +43,7 @@ from shutil import get_terminal_size
 from typing import Optional, Union
 
 from .log import setup_logging
-from .common import Color, Fx, TermColor, color_print
+from .common import Color, render_str
 from .gitinfo import (
     Git_Version,
     REPOSITORY_PATH,
@@ -115,36 +115,38 @@ def introduce() -> None:
 
     # Print git version.
     if Git_Version is None:
-        color_print("Don't found Git, maybe need install.", TermColor.Red)
+        print(render_str("`Don't found Git, maybe need install.`<red>"))
     else:
         print(Git_Version)
 
     # Print package path.
-    color_print("Local path: ", Fx.b, end="")
-    f_p = __file__.replace("./", "")  # f_p -> file path
-    color_print("%s\n" % f_p, TermColor.SkyBlue, Fx.underline)
+    print(
+        render_str(
+            "b`Local path`: u`{}`<sky_blue>\n".format(__file__.replace("./", ""))
+        )
+    )
 
     # Print description.
-    color_print("Description:", Fx.b)
-    color_print(
-        "  Terminal tool, help you use git more simple."
-        " Support Linux, MacOS and Windows.\n"
-        "  It use short command to replace the original command, like: \n"
-        "  ``{green}pigit ws{rs}`` -> ``{green}git status --short{rs}``,"
-        " ``{green}pigit b{rs}`` -> ``{green}git branch{rs}``.\n"
-        "  Also you use ``{green}pigit -s{rs}`` to get the all short command,"
-        " have fun and good lucky.\n"
-        "  The open source path on github: {url}".format(
-            url=TermColor.SkyBlue + Fx.underline + __url__,
-            green=TermColor.Green,
-            rs=Fx.reset,
-        ),
-        Fx.italic,
+    print(
+        render_str(
+            "b`Description:`\n"
+            "  Terminal tool, help you use git more simple."
+            " Support Linux, MacOS and Windows.\n"
+            "  It use short command to replace the original command, like: \n"
+            "  ``pigit ws``<pale_green> -> ``git status --short``<pale_green>,"
+            " ``pigit b``<pale_green> -> ``git branch``<pale_green>.\n"
+            "  Also you use ``pigit -s``<pale_green> to get the all short command,"
+            " have fun and good lucky.\n"
+            "  The open source path on github: u`{url}`<sky_blue>".format(
+                url=__url__,
+            )
+        )
     )
 
     print(
-        "\nYou can use {green}-h{rs} or {green}--help{rs} "
-        "to get help and more usage.".format(green=TermColor.Green, rs=Fx.reset)
+        render_str(
+            "\nYou can use `-h`<pale_green> or `--help`<pale_green> to get help and more usage."
+        )
     )
 
 
@@ -356,7 +358,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
             _color = self.colors["green"]
         else:
             _color = ""
-        parts = [_color + action_header + Fx.reset]
+        parts = [_color + action_header + "\033[0m"]
 
         # if there was help for the action, add lines of help text
         if action.help:

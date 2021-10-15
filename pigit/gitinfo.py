@@ -5,7 +5,7 @@ import textwrap
 import logging
 from typing import Optional
 
-from .common import Fx, TermColor, exec_cmd, color_print
+from .common import Fx, TermColor, exec_cmd, render_str
 from .common.git_utils import parse_git_config, git_version, current_repository
 from .common.str_table import dTable, TableTooWideError
 
@@ -46,15 +46,15 @@ def output_git_local_config(style: str = "table") -> None:
     """Print the local config of current git repository."""
 
     if not REPOSITORY_PATH:
-        color_print("This directory is not a git repository yet.", TermColor.Red)
+        print(render_str("`This directory is not a git repository yet.`<tomato>"))
         return None
 
     try:
         with open(GIT_CONF_PATH + "/config", "r") as cf:
             context = cf.read()
     except Exception as e:
-        color_print(
-            "Error reading configuration file. {0}".format(str(e)), TermColor.Red
+        print(
+            render_str("`Error reading configuration file. {0}`<tomato>").format(str(e))
         )
     else:
         config_dict = parse_git_config(context)
