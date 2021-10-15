@@ -115,7 +115,7 @@ def introduce() -> None:
 
     # Print git version.
     if Git_Version is None:
-        print(render_str("`Don't found Git, maybe need install.`<red>"))
+        print(render_str("`Don't found Git, maybe need install.`<error>"))
     else:
         print(Git_Version)
 
@@ -133,20 +133,16 @@ def introduce() -> None:
             "  Terminal tool, help you use git more simple."
             " Support Linux, MacOS and Windows.\n"
             "  It use short command to replace the original command, like: \n"
-            "  ``pigit ws``<pale_green> -> ``git status --short``<pale_green>,"
-            " ``pigit b``<pale_green> -> ``git branch``<pale_green>.\n"
-            "  Also you use ``pigit -s``<pale_green> to get the all short command,"
+            "  ``pigit ws``<ok> -> ``git status --short``<ok>,"
+            " ``pigit b``<ok> -> ``git branch``<ok>.\n"
+            "  Also you use ``pigit -s``<ok> to get the all short command,"
             " have fun and good lucky.\n"
-            "  The open source path on github: u`{url}`<sky_blue>".format(
-                url=__url__,
-            )
+            f"  The open source path on github: u`{__url__}`<sky_blue>"
         )
     )
 
     print(
-        render_str(
-            "\nYou can use `-h`<pale_green> or `--help`<pale_green> to get help and more usage."
-        )
+        render_str("\nYou can use `-h`<ok> or `--help`<ok> to get help and more usage.")
     )
 
 

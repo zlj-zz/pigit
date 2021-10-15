@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from typing import Optional, Any
 
-from ..common import Term, Fx, TermColor, exec_cmd, shorten, get_width, color_print
+from ..common import Term, Fx, Color, exec_cmd, shorten, get_width, color_print
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
 from ..gitinfo import REPOSITORY_PATH
@@ -16,6 +16,19 @@ from .model import File, Commit
 
 class InteractionError(Exception):
     pass
+
+
+class TermColor:
+    """Terminal print color class."""
+
+    Red = Color.fg("#FF6347")  # Tomato
+    Green = Color.fg("#98FB98")  # PaleGreen
+    DeepGreen = Color.fg("#A4BE8C")  # PaleGreen
+    Yellow = Color.fg("#EBCB8C")
+    Gold = Color.fg("#FFD700")  # Gold
+    SkyBlue = Color.fg("#87CEFA")
+    MediumVioletRed = Color.fg("#C71585")
+    Symbol = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
 
 
 class DataHandle(object, metaclass=Singleton):

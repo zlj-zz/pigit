@@ -2,7 +2,7 @@
 
 import os
 
-from ..common import Fx, Color, exec_cmd, run_cmd, confirm
+from ..common import Fx, Color, exec_cmd, run_cmd, confirm, Term
 from .base import _Interaction, InteractionError
 from .model import File
 
@@ -89,7 +89,7 @@ class InteractiveStatus(_Interaction):
                     exec_cmd("git rm --cached --force -- {}".format(file.name))
 
         elif flag == "discard":
-            print(Fx.clear_)
+            print(Term.clear_screen)
             if confirm("discard all changed? [y/n]:"):
                 if file.tracked:
                     exec_cmd("git checkout -- {}".format(file.name))

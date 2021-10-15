@@ -5,4 +5,3 @@ from .commit_interaction import InteractiveCommit
 
 
 __all__ = ["InteractiveStatus", "InteractiveCommit"]
-

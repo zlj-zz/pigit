@@ -5,7 +5,7 @@ import textwrap
 import logging
 from typing import Optional
 
-from .common import Fx, TermColor, exec_cmd, render_str
+from .common import exec_cmd, render_str
 from .common.git_utils import parse_git_config, git_version, current_repository
 from .common.str_table import dTable, TableTooWideError
 
@@ -21,16 +21,15 @@ REPOSITORY_PATH, GIT_CONF_PATH = current_repository()
 
 def _config_normal_output(conf: dict[str, dict]) -> None:
     for t, d in conf.items():
-        print(TermColor.Red + f"[{t}]")
+        print(render_str(f"`[{t}]`<tomato>"))
         for k, v in d.items():
-            print(" " * 4 + TermColor.SkyBlue + k, end="")
-            print("=" + Fx.italic + TermColor.MediumVioletRed + v + Fx.reset)
+            print(render_str(f"\t`{k}`<sky_blue>=`{v}`<medium_violet_red>"))
 
 
 def _config_table_output(conf: dict[str, dict]) -> None:
     for sub in conf.values():
         for k, v in sub.items():
-            sub[k] = f"{TermColor.Green}{v:<40}{Fx.rs}"
+            sub[k] = render_str(f"`{v:40}`<pale_green>")
 
     tb = dTable(conf, title="Git Local Config")
     tb.print()
@@ -46,7 +45,7 @@ def output_git_local_config(style: str = "table") -> None:
     """Print the local config of current git repository."""
 
     if not REPOSITORY_PATH:
-        print(render_str("`This directory is not a git repository yet.`<tomato>"))
+        print(render_str("`This directory is not a git repository yet.`<error>"))
         return None
 
     try:
@@ -54,7 +53,7 @@ def output_git_local_config(style: str = "table") -> None:
             context = cf.read()
     except Exception as e:
         print(
-            render_str("`Error reading configuration file. {0}`<tomato>").format(str(e))
+            render_str("`Error reading configuration file. {0}`<error>").format(str(e))
         )
     else:
         config_dict = parse_git_config(context)
@@ -88,14 +87,12 @@ def output_repository_info(
 
     print("waiting ...", end="")
 
-    error_str = TermColor.Red + "Error getting" + Fx.reset
+    error_str = render_str("`Error getting.`<error>")
 
     # Print content.
-    print("\r[%s]        \n" % (Fx.b + "Repository Information" + Fx.reset,))
+    print(render_str("\r[b`Repository Information`]\n"))
     if show_path:
-        print(
-            "Repository: \n\t%s\n" % (TermColor.SkyBlue + REPOSITORY_PATH + Fx.reset,)
-        )
+        print(render_str(f"Repository: \n\t`{REPOSITORY_PATH}`<sky_blue>\n"))
 
     # Get remote url.
     if show_remote:
@@ -106,12 +103,7 @@ def output_repository_info(
             remote = error_str
         else:
             res = re.findall(r"url\s=\s(.*)", config)
-            remote = "\n".join(
-                [
-                    "\t%s%s%s%s" % (Fx.italic, TermColor.SkyBlue, x, Fx.reset)
-                    for x in res
-                ]
-            )
+            remote = "\n".join([render_str(f"\ti`{x}`<sky_blue>") for x in res])
         print("Remote: \n%s\n" % remote)
 
     # Get all branches.

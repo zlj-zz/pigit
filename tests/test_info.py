@@ -1,3 +1,4 @@
+import pytest
 from .utils import analyze_it
 
 from pigit import Parser, introduce
@@ -10,8 +11,16 @@ def test_info():
 
     output_repository_info()
 
+
+def test_output_config_error():
     output_git_local_config("xxx")
+
+
+def test_normal():
     output_git_local_config("normal")
+
+
+def test_table():
     output_git_local_config("table")
 
 

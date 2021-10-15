@@ -15,7 +15,7 @@ Like this:
 import re
 from typing import Union
 
-from ..common import Emoji, TermColor, exec_cmd, run_cmd, color_print
+from ..common import Emoji, exec_cmd, run_cmd, render_str
 
 
 def add(args: Union[list, tuple]) -> None:
@@ -47,7 +47,7 @@ def fetch_remote_branch(args: Union[list, tuple]) -> None:
     if branch:
         run_cmd("git fetch origin {0}:{0} ".format(branch))
     else:
-        color_print("This option need a branch name.", TermColor.Red)
+        print(render_str("`This option need a branch name.`<error>"))
 
 
 def set_email_and_username(args: Union[list, tuple]) -> None:
@@ -72,7 +72,7 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     name = input("Please input username:").strip()
     while True:
         if not name:
-            color_print("Name is empty.", TermColor.Red)
+            print(render_str("`Name is empty.`<error>"))
             name = input("Please input username again:")
         else:
             break
@@ -81,7 +81,7 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:
         if email_re.match(email) is None:
-            color_print("Bad mailbox format.", TermColor.Red)
+            print(render_str("`Bad mailbox format.`<error>"))
             email = input("Please input email again:")
         else:
             break
@@ -89,9 +89,9 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     if run_cmd("git config user.name" + other + name) and run_cmd(
         "git config user.email" + other + email
     ):
-        color_print("Successfully set.", TermColor.Green)
+        print(render_str("`Successfully set.`<ok>"))
     else:
-        color_print("Failed. Please check log.", TermColor.Red)
+        print(render_str("`Failed. Please check log.`<error>"))
 
 
 def open_remote_url(args: Union[list, tuple]) -> None:

@@ -75,6 +75,9 @@ COLOR_CODE = {
     "honeydew": "#F0FFF0",
     "light_green": "#90EE90",
     "pale_green": "#98FB98",
+    "ok": "#98FB98",
+    "good": "#98FB98",
+    "right": "#98FB98",
     "dark_sea_green": "#8FBC8F",
     "lime_green": "#32CD32",
     "lime": "#00FF00",
@@ -124,6 +127,8 @@ COLOR_CODE = {
     "orange_red": "#FF4500",
     "dark_salmon": "#E9967A",
     "tomato": "#FF6347",
+    "bad": "#FF6347",
+    "error": "#FF6347",
     "misty_rose": "#FFE4E1",
     "salmon": "#FA8072",
     "snow": "#FFFAFA",
@@ -396,6 +401,22 @@ class Color(object):
             return cls.escape_color(r=args[0], g=args[1], b=args[2], depth="bg")
         else:
             return cls.escape_color(hexa=args[0], depth="bg")
+
+    @classmethod
+    def by_name(cls, name: str, depth: str = "fg"):
+        """Get color ascii code by support color name."""
+
+        color_hexa = COLOR_CODE.get(name, "")
+
+        if not color_hexa:
+            return color_hexa
+
+        if depth == "fg":
+            return cls.fg(color_hexa)
+        elif depth == "bg":
+            return cls.bg(color_hexa)
+        else:
+            return ""
 
 
 # If has special format string, will try to render the color and font style.

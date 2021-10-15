@@ -6,10 +6,9 @@ from typing import Optional, Union
 from ..common import (
     Fx,
     Color,
-    TermColor,
     Emoji,
+    render_str,
     run_cmd,
-    color_print,
     confirm,
     similar_command,
     shorten,
@@ -25,7 +24,7 @@ class CmdProcessor(object):
         extra_cmds: Optional[dict] = None,
         use_recommend: bool = True,
         show_original: bool = True,
-        **kwargs
+        **kwargs,
     ) -> None:
         super(CmdProcessor, self).__init__()
 
@@ -54,32 +53,23 @@ class CmdProcessor(object):
         """
 
         command_list = command.split(" ")
-        color_command = (
-            Fx.bold
-            + TermColor.DeepGreen
-            + command_list.pop(0)
-            + " "
-            + TermColor.Yellow
-            + command_list.pop(0)
-            + " "
-            + Fx.unbold
+        color_command = render_str(
+            f"b`{command_list.pop(0)}`<ok> b`{command_list.pop(0)}`<goldenrod> "
         )
 
         less_len = len(command_list)
         idx = 0
         while idx < less_len:
             if command_list[idx].startswith("-"):
-                color_command += "{}{}".format(Fx.italic, TermColor.SkyBlue)
+                temp = []
                 while idx < less_len and command_list[idx].startswith("-"):
-                    color_command += command_list[idx] + " "
+                    temp.append(command_list[idx])
                     idx += 1
+                color_command += render_str(f"`{' '.join(temp)}`<sky_blue> ")
             else:
-                color_command += Fx.reset
                 while idx < less_len and not command_list[idx].startswith("-"):
                     color_command += command_list[idx] + " "
                     idx += 1
-
-        color_command += Fx.reset
 
         return color_command
 
@@ -101,16 +91,17 @@ class CmdProcessor(object):
 
         # Invalid, if need suggest.
         if option is None:
-            print("Don't support this command, please try ", end="")
-            color_print("g --show-commands", TermColor.Gold)
+            print(
+                render_str(
+                    "Don't support this command, please try `g --show-commands`<gold>"
+                )
+            )
 
             if self.use_recommend:  # check config.
                 predicted_command = similar_command(command_, self.cmds.keys())
                 if confirm(
-                    "%s The wanted command is %s ?[y/n]:"
-                    % (
-                        Emoji.thinking,
-                        TermColor.Green + predicted_command + Fx.reset,
+                    render_str(
+                        f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
                     )
                 ):
                     self.process_command(predicted_command, args=args)
@@ -120,16 +111,19 @@ class CmdProcessor(object):
         command = option.get("command", None)
         # Has no command can be executed.
         if not command:
-            color_print(
-                "Invalid custom short command, nothing can to exec.", TermColor.Red
+            print(
+                render_str(
+                    "`Invalid custom short command, nothing can to exec.`<error>"
+                )
             )
             return None
 
         if not option.get("has_arguments", False):
             if args:
-                color_print(
-                    "The command does not accept parameters. Discard {0}.".format(args),
-                    TermColor.Red,
+                print(
+                    render_str(
+                        f"`The command does not accept parameters. Discard {args}.`<error>"
+                    )
                 )
                 args = []
 
@@ -138,7 +132,7 @@ class CmdProcessor(object):
             try:
                 command(args)
             except Exception as e:
-                color_print(str(e), TermColor.Red)
+                print(render_str(f"`{e}`<error>"))
         else:  # is command.
             if args:
                 args_str = " ".join(args)
@@ -165,8 +159,8 @@ class CmdProcessor(object):
 
         _msg: str = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
         if use_color:
-            _key_color = TermColor.Green
-            _command_color = TermColor.Gold
+            _key_color = Color.by_name("ok")
+            _command_color = Color.by_name("gold")
         else:
             _key_color = _command_color = ""
 
@@ -221,21 +215,20 @@ class CmdProcessor(object):
 
         # Checking the type whether right.
         if command_type not in CommandType.__members__:
-            color_print("There is no such type.", TermColor.Red)
-            print("Please use `", end="")
-            color_print("g --types", TermColor.Green, end="")
             print(
-                "` to view the supported types.",
+                render_str(
+                    "`There is no such type.`<error>\n"
+                    "Please use `git --types`<ok> to view the supported types."
+                )
             )
+
             if self.use_recommend:
                 predicted_type = similar_command(
                     command_type, CommandType.__members__.keys()
                 )
                 if confirm(
-                    "%s The wanted type is %s ?[y/n]:"
-                    % (
-                        Emoji.thinking,
-                        TermColor.Green + predicted_type + Fx.reset,
+                    render_str(
+                        f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
                     )
                 ):
                     self.command_help_by_type(predicted_type)
