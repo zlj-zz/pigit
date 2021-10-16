@@ -141,7 +141,22 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     return min_frequency_command
 
 
+def get_current_shell() -> str:
+    """Gets the currently used shell.
+
+    Returns:
+            (str): Current shell string.
+    """
+    current_shell = ""
+    _, resp = exec_cmd("echo $SHELL")
+    if resp:
+        current_shell = resp.split("/")[-1].strip()
+    return current_shell.lower()
+
+
 if __name__ == "__main__":
     import doctest
 
     doctest.testmod(verbose=True)
+
+    print(get_current_shell())

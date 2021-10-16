@@ -1,0 +1,21 @@
+function complete_pigit;
+    set -l response;
+
+    for value in (env b bc bl bL bs bS bm bM bd c ca cA cm co cO cf cF cr cR cs Cl Ca Ce Co CO Ct CT f fc fC fm fr fu fb ia iA iu id iD ir iR ix iX l l1 ls ld lv lc lr m ma mC mF mS mv mt p pf pF pa pA pt pc pp R Rl Ra Rx Rm Ru Rp Rs RS s sp sl sd sD t ta tx ws wS wd wD wr wR wc wC wm wM wx wX sc si su savepd ue user email open=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
+        set response $response $value;
+    end;
+
+    for completion in $response;
+        set -l metadata (string split "," $completion);
+
+        if test $metadata[1] = "dir";
+            __fish_complete_directories $metadata[2];
+        else if test $metadata[1] = "file";
+            __fish_complete_path $metadata[2];
+        else if test $metadata[1] = "plain";
+            print $metadata[2];
+        end;
+    end;
+end;
+
+complete --no-files --command pigit --arguments         "(complete_pigit)";

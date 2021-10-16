@@ -43,7 +43,7 @@ from shutil import get_terminal_size
 from typing import Optional, Union
 
 from .log import setup_logging
-from .common import Color, render_str
+from .common import Color, render_str, get_current_shell
 from .gitinfo import (
     Git_Version,
     REPOSITORY_PATH,
@@ -53,8 +53,8 @@ from .gitinfo import (
 from .decorator import time_it
 from .config import Config
 from .codecounter import CodeCounter
-from .shell_completion import ShellCompletion, process_argparse
 from .gitignore import GitignoreGenetor
+from .shellcompletion import shell_compele, process_argparse
 from .interaction import InteractiveStatus, InteractiveCommit
 from .processor import CmdProcessor, Git_Cmds, CommandType
 
@@ -418,7 +418,7 @@ class Parser(object):
             "-C",
             "--complete",
             action="store_true",
-            help="Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)",
+            help="Add shell prompt script and exit.(Supported bash, zsh, fish)",
         )
         p.add_argument(
             "-s",
@@ -484,7 +484,7 @@ class Parser(object):
             type=str,
             metavar="TYPE",
             dest="ignore_type",
-            help="Create a demo `.gitignore` file. Need one argument, support: [%s]"
+            help="Create a demo .gitignore file. Need one argument, support: [%s]"
             % ", ".join(GitignoreGenetor.Supported_Types.keys()),
         )
         p.add_argument(
@@ -541,9 +541,9 @@ class Parser(object):
                 # Update var dict with shell command.
                 completion_vars.update(process_argparse(self._parser))
 
-                ShellCompletion(
-                    __project__, completion_vars, PIGIT_HOME
-                ).complete_and_use()
+                shell_compele(
+                    get_current_shell(), __project__, completion_vars, PIGIT_HOME
+                )
                 return None
 
             if known_args.create_config:
