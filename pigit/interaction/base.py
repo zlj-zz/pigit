@@ -7,15 +7,7 @@ from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from typing import Optional, Any
 
-from ..common import (
-    Term,
-    Fx,
-    Color,
-    exec_cmd,
-    shorten,
-    get_width,
-    render_str,
-)
+from ..common import Term, Fx, exec_cmd, shorten, get_width, render_str
 from ..common.singleton import Singleton
 from ..keyevent import get_keyevent_obj
 from ..gitinfo import REPOSITORY_PATH
@@ -207,9 +199,60 @@ class DataHandle(object, metaclass=Singleton):
 
 
 # whether already in interactive mode.
-_Interaction_Starting = False
+_Interaction_Starting: bool = False
 
-
+# ``_Interaction`` is the basic class of an interactive page. When a subclass wants to
+# implement a page, it inherits it and needs to implement the reserved interface.
+#
+# Interface:
+#   process_keyevent()
+#   keyevent_help()
+#   get_raw_data()
+#   print_line()
+#
+# Can overwrite:
+#   process_raw_data()
+#
+# `run` structure:
+# =========================================================================================
+#         Main flow                           Loop flow
+# +--------------------------+
+# | checking                 |
+# +--------------------------|
+# | whether git repo         |
+# | whether has enough space |
+# +--------------------------+
+#              |
+#              |                        +----------------------+
+#     +----------------+                | get data             |
+#     | init hook      |             +->+----------------------+
+#     |                |             |  | `get_raw_data()`     |<----------------------+
+#     +----------------+             |  | `process_raw_data()` |                       |
+#              |                     |  +----------------------+                       |
+#              |                     |             |                                   |
+#              |                     |             |                                   |
+#     +----------------+             |   +------------------+                          |
+#     |                |             |   | refresh display  |<--------+                |
+#     |                |--first into-+   +------------------+         |                |
+#     |    loop        |                           |                  |                |
+#     |                |                           |                  |                |
+#     |                |<--------+      +---------------------+       |                |
+#     +----------------+         |      |                     |       |                |
+#              |                 |      | wait keyboard input |       |                |
+#              |                 |      |                     |       |                |
+#              |                 |      +---------------------+       |                |
+#              |                 |                 |                  |      +----------------------+
+#     +----------------+         |                 |                  |      | process custom event |
+#     | unhook         |         |      +-------------------------+   |      +----------------------+
+#     +----------------+         |      | process input key       |   |      | `process_keyevent()` |
+#              |                 |      +-------------------------+   |      +----------------------+
+#              |                 |      | Predefined cursor event |->-+                |
+#         +--------+             |      |                         |                    |
+#         | finish |             |      | custom event            |---------->---------+
+#         +--------+             |      |                         |
+#                                +--<---| quit  event             |
+#                                       +-------------------------+
+#
 class _Interaction(ABC):
     def __init__(
         self,
@@ -306,51 +349,26 @@ class _Interaction(ABC):
         Support to process cursor line specially.
         """
 
-    def run(self, *args):
-        """Run method."""
+    def _loop(self):
         global _Interaction_Starting
 
-        # Make sure run at a git repo dir.
-        if not REPOSITORY_PATH:
-            print(render_str("`Current path is not a git repository.`<error>"))
-            return
-
-        self.width, self.height = width, height = get_terminal_size()
-
-        # Make sure have enough space.
-        if height < self._min_height or width < self._min_width:
-            raise InteractionError(
-                "The minimum size of terminal should be {0} x {1}.".format(
-                    self._min_width, self._min_height
-                )
-            )
-
-        if self._debug:  # debug show.
-            print(Term.clear_screen)
-            print(width, height)
-            time.sleep(1.5)
+        width, height = self.width, self.height
 
         # Initialize.
         cursor_row: int = 1
-        display_range: list = [1, height - 1]  # allow display row range.
+        display_range: list = [1, height - 1]  # Allow display row range.
 
         stopping: bool = False  # Stop flag.
-        refresh: bool = False  # refresh data flag.
-
-        raw_data: list[Any] = self.get_raw_data()
-        self.raw_data = raw_data
-        if not raw_data:
-            print("The work tree is clean and there is nothing to operate.")
-            return
-        show_data = self.process_raw_data(raw_data, width)
-
+        refresh: bool = True  # Refresh flag. First into need refresh.
         extra = 0  # Extra occupied row.
 
-        # Into new term page.
         try:
             if not _Interaction_Starting:
                 _Interaction_Starting = True
+
+                # Into new term page.
                 print(Term.alt_screen + Term.hide_cursor)
+
                 #  try hook window resize event.
                 self._keyevent.signal_init()
 
@@ -358,24 +376,26 @@ class _Interaction(ABC):
             while not stopping:
                 if refresh:
                     refresh = False
+
                     raw_data: list[Any] = self.get_raw_data()
                     self.raw_data = raw_data
+                    if not raw_data:
+                        print("The work tree is clean and there is nothing to operate.")
+                        time.sleep(1)
+                        return
                     show_data = self.process_raw_data(raw_data, width)
 
-                print(Term.clear_screen)
+                print(Term.clear_screen)  # Clear full screen.
 
-                # check whether have status.
-                if not raw_data:
-                    print("The work tree is clean and there is nothing to operate.")
-                    time.sleep(1)
-                    return
-
+                # Adjust display row range.
                 while cursor_row < display_range[0]:
                     display_range = [i - 1 for i in display_range]
                 while cursor_row + extra > display_range[1]:
                     display_range = [i + 1 for i in display_range]
 
-                extra = 0  # Return to zero and accumulate again.
+                # Every time refresh the output, need to recalculate the
+                # number of additional rows, so need to reset to zero.
+                extra = 0
 
                 # Print needed display part.
                 for index, item in enumerate(show_data, start=1):
@@ -384,7 +404,10 @@ class _Interaction(ABC):
                         self.print_line(line, index == cursor_row)
                         extra += each_extra
 
+                # Wait keyboard input.
                 input_key = self._keyevent.sync_get_input()
+
+                # Process key.
                 if input_key in ["q", "escape"]:
                     # exit.
                     stopping = True
@@ -449,3 +472,28 @@ class _Interaction(ABC):
                 _Interaction_Starting = False
                 self._keyevent.signal_restore()
                 print(Term.normal_screen + Term.show_cursor, end="")
+
+    def run(self, *args):
+        """Run method."""
+
+        # Make sure run at a git repo dir.
+        if not REPOSITORY_PATH:
+            print(render_str("`Current path is not a git repository.`<error>"))
+            return
+
+        self.width, self.height = width, height = get_terminal_size()
+
+        # Make sure have enough space.
+        if height < self._min_height or width < self._min_width:
+            raise InteractionError(
+                "The minimum size of terminal should be {0} x {1}.".format(
+                    self._min_width, self._min_height
+                )
+            )
+
+        if self._debug:  # debug show.
+            print(Term.clear_screen)
+            print(width, height)
+            time.sleep(1.5)
+
+        return self._loop()  # Goto inner loop.

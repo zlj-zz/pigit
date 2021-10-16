@@ -1,6 +1,34 @@
 # -*- coding:utf-8 -*-
 
-"""This file support some str util method."""
+"""This file support some str util method.
+
+Docs Test
+
+    The width occupied by a given character when displayed.
+
+        >>> get_width(ord('a'))
+        1
+        >>> get_width(ord('中'))
+        2
+        >>> get_width(ord('Ç'))
+        1
+
+    Determine the type of file by file name.
+
+        >>> adjudgment_type('test.py')
+        'Python'
+        >>> adjudgment_type('xxxxx')
+        'unknown'
+        >>> adjudgment_type('xxxxx', True)
+        'xxxxx'
+
+    Intercepts a string by a given length.
+
+        >>> shorten('Hello world!', 9, placeholder='^-^')
+        'Hello ^-^'
+        >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
+        '^-^world!'
+"""
 
 # from typing import Final # python3.8
 
@@ -47,15 +75,8 @@ WIDTHS: list[tuple[int, int]] = [
 
 
 def get_width(r: int) -> int:
-    """Gets the width occupied by characters on the command line.
+    """Gets the width occupied by characters on the command line."""
 
-    >>> get_width(ord('a'))
-    1
-    >>> get_width(ord('中'))
-    2
-    >>> get_width(ord('Ç'))
-    1
-    """
     if r == 0xE or r == 0xF:
         return 0
     for num, wid in WIDTHS:
@@ -147,13 +168,6 @@ def adjudgment_type(file: str, original: bool = False) -> str:
 
     Returns:
         (str): file type.
-
-    >>> adjudgment_type('test.py')
-    'Python'
-    >>> adjudgment_type('xxxxx')
-    'unknown'
-    >>> adjudgment_type('xxxxx', True)
-    'xxxxx'
     """
 
     pre_type = SPECIAL_NAMES.get(file.lower(), None)
@@ -213,13 +227,6 @@ def get_file_icon(file_type: str) -> str:
 
     Returns:
         str: icon.
-
-    >>> get_file_icon('Python')
-    ''
-    >>> get_file_icon('Lua')
-    ''
-    >>> get_file_icon('xxxxxxxxxx')
-    ''
     """
 
     #     
@@ -239,11 +246,6 @@ def shorten(
 
     Returns:
         (str): shorten string.
-
-    >>> shorten('Hello world!', 9, placeholder='^-^')
-    'Hello ^-^'
-    >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
-    '^-^world!'
     """
 
     if len(text) > width:

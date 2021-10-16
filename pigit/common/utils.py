@@ -1,11 +1,10 @@
 # -*- coding:utf-8 -*-
 
-import re
 import subprocess
 import logging
 from math import sqrt
 from collections import Counter
-from typing import Union, Iterable, Tuple
+from typing import Iterable, Tuple
 
 
 Log = logging.getLogger(__name__)
@@ -17,10 +16,11 @@ def run_cmd(*args) -> bool:
     Returns:
         (bool): Whether run successful.
 
-    >>> run_cmd('pwd')
-    True
-    >>> run_cmd('which', 'python')
-    True
+    Docs test
+        >>> run_cmd('pwd')
+        True
+        >>> run_cmd('which', 'python')
+        True
     """
 
     try:
@@ -69,12 +69,8 @@ def confirm(text: str = "", default: bool = True) -> bool:
 
     Returns:
         (bool): Confirm result.
-
-    >>> confirm()
-    True
-    >>> confirm(default=False)
-    False
     """
+
     input_command: str = input(text).strip().lower()
     if input_command in ["n", "no", "N", "No"]:
         return False
@@ -94,13 +90,17 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     Returns:
         (str): most similar command string.
 
-    >>> commands = ['branch', 'working tree', 'index', 'log', 'push', 'pull', 'tag','commit','conflict']
-    >>> similar_command('br', commands)
-    'branch'
-    >>> similar_command('wo', commands)
-    'working tree'
-    >>> similar_command('com', commands)
-    'commit'
+    Docs test
+        >>> commands = [
+        ...     'branch', 'working tree', 'index', 'log', 'push',
+        ...     'pull', 'tag','commit','conflict'
+        ... ]
+        >>> similar_command('br', commands)
+        'branch'
+        >>> similar_command('wo', commands)
+        'working tree'
+        >>> similar_command('com', commands)
+        'commit'
     """
 
     #  The dictionary of letter frequency of all commands.
@@ -139,41 +139,6 @@ def similar_command(command: str, all_commands: Iterable) -> str:
         * (1 / (len(list(filter(lambda i: i[0] == i[1], zip(command, item[0])))) + 1)),
     )[0]
     return min_frequency_command
-
-
-# color hexa string reg.
-_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
-
-
-def is_color(var_: Union[str, list, tuple, None]) -> bool:
-    """Adjust `s` whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
-
-    >>> is_color('#FF0000')
-    True
-    >>> is_color([255, 0, 0])
-    True
-    >>> is_color((0, 255, 0))
-    True
-    >>> is_color(None)
-    False
-    >>> is_color(12345)
-    False
-    """
-    if not var_:
-        return False
-    elif type(var_) == str:
-        return True if _color_re.match(str(var_)) else False
-    elif isinstance(var_, list) or isinstance(var_, tuple):
-        if len(var_) != 3:
-            return False
-        else:
-            for i in var_:
-                if i < 0 or i > 255:
-                    return False
-            else:
-                return True
-    else:
-        return False
 
 
 if __name__ == "__main__":

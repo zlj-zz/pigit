@@ -5,6 +5,7 @@
 from dataclasses import dataclass
 
 # flake8: noqa
+# yapf: disable
 @dataclass
 class File:
     """Model class of git file."""
@@ -23,6 +24,8 @@ class File:
 
 @dataclass
 class Commit:
+    """Model class of git commit info."""
+
     sha: str
     msg: str
     author: str

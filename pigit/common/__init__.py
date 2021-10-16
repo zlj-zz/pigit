@@ -6,9 +6,9 @@ if os.name == "nt":
     os.system("")
 
 from .emoji import Emoji
-from .style import Fx, Color, BoxSymbol, render_style
 from .console import Cursor, Term
-from .utils import run_cmd, exec_cmd, confirm, is_color, similar_command
+from .style import Fx, Color, BoxSymbol, render_style, is_color
+from .utils import run_cmd, exec_cmd, confirm, similar_command
 from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
 
@@ -22,12 +22,23 @@ __all__ = [
 
 
 def render_str(
-    _msg: str, /, *, hightlight: bool = True, allow_emoji: bool = True
+    text: str, /, *, hightlight: bool = True, allow_emoji: bool = True
 ) -> str:
+    """Render color, font and emoji code in string.
+
+    Args:
+        text (str): The text string that need be rendered.
+        hightlight (bool, optional): whether render color and font. Defaults to True.
+        allow_emoji (bool, optional): whether render emoji. Defaults to True.
+
+    Returns:
+        str: the rendered text string.
+    """
+
     if hightlight:
-        _msg = render_style(_msg)
+        text = render_style(text)
 
     if allow_emoji:
-        _msg = Emoji.render(_msg)
+        text = Emoji.render(text)
 
-    return _msg
+    return text

@@ -3,7 +3,7 @@
 import sys
 import re
 import logging
-from typing import Tuple, Match
+from typing import Tuple, Union, Match
 
 Log = logging.getLogger(__name__)
 
@@ -170,6 +170,12 @@ class Fx(object):
         overwrite background behind whitespace.
     * uncolor(string: str) : Removes all 24-bit color and returns string .
     * pure(string: str): Removes all style string.
+
+    Docs test
+        >>> txt = '\033[49;1;20m\033[1mhello word!\033[0m'
+        >>> Fx.pure(txt)
+        'hello word!'
+
     """
 
     start = "\033["  # * Escape sequence start
@@ -420,6 +426,41 @@ class Color(object):
             return ""
 
 
+# color hexa string reg.
+_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
+
+
+def is_color(code: Union[str, list, tuple]) -> bool:
+    """Adjust whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
+
+    Test `is_color()` whether can right adjust.
+
+        >>> is_color('#FF0000')
+        True
+        >>> is_color('sky_blue')
+        True
+        >>> is_color([255, 0, 0])
+        True
+        >>> is_color((0, 256, 0))
+        False
+        >>> is_color(None)
+        False
+        >>> is_color(12345)
+        False
+
+    """
+
+    if type(code) == str:
+        return (
+            _color_re.match(str(code)) is not None
+            or COLOR_CODE.get(code, None) is not None
+        )
+    elif isinstance(code, list) or isinstance(code, tuple):
+        return len(code) == 3 and not bool([i for i in code if i < 0 or i > 255])
+    else:
+        return False
+
+
 # If has special format string, will try to render the color and font style.
 # If cannot to render the string will keep it.
 #
@@ -494,6 +535,10 @@ class BoxSymbol(object):
 
 
 if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod(verbose=True)
+
     txt1 = "Today is a b`nice` `day`<green>."
     print(render_style(txt1))
 
