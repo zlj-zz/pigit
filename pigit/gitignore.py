@@ -15,7 +15,7 @@ class GitignoreGenetor(object):
     """Generate gitignore template.
 
     Attributes:
-        Genres (dict): supported type.
+        Supported_Types (dict): supported type.
 
     Raises:
         SystemExit: Can't get template.
@@ -144,8 +144,9 @@ class GitignoreGenetor(object):
                     fd.write(ignore_content)
             except Exception as e:
                 Log.error(str(e) + str(e.__traceback__))
-                print("Write gitignore file failed.")
-                print("You can copy it with the following:")
+                print(
+                    "Write gitignore file failed. You can copy it with the following:"
+                )
                 print("#" * 60)
                 print(ignore_content)
             else:

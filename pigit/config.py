@@ -133,7 +133,7 @@ class Config(object, metaclass=Singleton):
     # Store warning messages.
     warnings: list = []
 
-    def __init__(self, path, current_version: str = "unknown") -> None:
+    def __init__(self, path: str, current_version: str = "unknown") -> None:
         super(Config, self).__init__()
 
         self.config_path = path

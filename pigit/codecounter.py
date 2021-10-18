@@ -262,11 +262,11 @@ class CodeCounter(object):
     def _walk_err_callback(e):
         """Handle of processing walk error."""
         print("Walk error: {0}".format(e))
-        raise SystemExit(0)
+        return
 
     def count(
         self, root_path: str, use_ignore: bool = True, progress: bool = True
-    ) -> tuple[dict, list, int]:
+    ) -> tuple[dict, list, list]:
         """Statistics file and returns the result dictionary for Python3.
 
         Args:
@@ -293,7 +293,7 @@ class CodeCounter(object):
 
         result = {}  # type: dict[str,dict]
         data_count = [0, 0, 0]  # [total_size, valid_count, invalid_count]
-        invalid_list = []
+        invalid_list = []  # Invalid file list.
 
         def _callback(r):
             (
@@ -317,13 +317,6 @@ class CodeCounter(object):
                 data_count[2] += _invalid_counter
                 invalid_list.extend(_invalid_list)
 
-            if progress:
-                pass
-                # print(
-                #     _msg.format(data_count[1], data_count[2]),
-                #     end="",
-                # )
-
         cpu: int = os.cpu_count() or 1
         max_queue = cpu * 200
         print("Detect CPU count: {0}, start record ...".format(cpu))
@@ -344,54 +337,38 @@ class CodeCounter(object):
                 if not files:
                     continue
 
-                # print(pool._queue_count)
+                # If the number of files(exclude sub dir) in the directory is greater
+                # than 15 and the number of enabled processes does not exceed the upper
+                # limit, enable process traversal.
                 if len(files) >= 15 and pool._queue_count < max_queue:
                     # Calling process.
                     future_result = pool.submit(self._sub_count, root, files)
                     future_result.add_done_callback(_callback)
                 else:
-                    for file in files:
-                        full_path = os.path.join(root, file)
-                        is_effective = self.matching(full_path)
-                        if is_effective:
-                            try:
-                                # Try read size of the valid file. Then do sum calc.
-                                size_ = os.path.getsize(full_path)
-                                with self._Lock:
-                                    data_count[0] += size_
-                            except:
-                                Log.debug(f"Can't read size of '{full_path}'")
+                    (
+                        _result,
+                        _total_size,
+                        _valid_counter,
+                        _invalid_counter,
+                        _invalid_list,
+                    ) = self._sub_count(root, files)
 
-                            # Get file type.
-                            type_ = adjudgment_type(file, original=True)
-                            try:
-                                with open(full_path) as f:
-                                    count = len(f.read().split("\n"))
-                            except Exception:
-                                with self._Lock:
-                                    data_count[2] += 1
-                                    invalid_list.append(file)
-                                continue
+                    with self._Lock:
+                        for key, values in _result.items():
+                            if result.get(key, None) is None:
+                                result[key] = values
                             else:
-                                # Superposition.
-                                with self._Lock:
-                                    if result.get(type_, None) is None:
-                                        result[type_] = {"files": 1, "lines": count}
-                                    else:
-                                        result[type_]["files"] += 1
-                                        result[type_]["lines"] += count
-                                    data_count[1] += 1
-                            finally:
-                                if progress:
-                                    # print(
-                                    #     _msg.format(data_count[1], data_count[2]),
-                                    #     end="",
-                                    # )
-                                    pass
-            print("\nPlease wait calculate ...")
+                                result[key]["files"] += _result[key]["files"]
+                                result[key]["lines"] += _result[key]["lines"]
 
-        if progress:
-            print("")
+                        data_count[0] += _total_size
+                        data_count[1] += _valid_counter
+                        data_count[2] += _invalid_counter
+                        invalid_list.extend(_invalid_list)
+
+        # Some processes may not be finished after synchronization.
+        print("\nPlease wait calculate ...")
+
         return result, invalid_list, data_count[0]
 
     def _get_ready(self) -> tuple[int, str]:
@@ -402,7 +379,7 @@ class CodeCounter(object):
             _msg = "\r:: [{:,} | {:,}]"
         return width, _msg
 
-    def _get_file_path(self, root_path: str) -> str:
+    def _get_saved_path(self, root_path: str) -> str:
         file_name: str = (
             root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
         )
@@ -410,9 +387,9 @@ class CodeCounter(object):
 
     def load_recorded_result(self, root_path: str) -> Optional[dict]:
         """Load count result."""
-        file_path = self._get_file_path(root_path)
+        file_path = self._get_saved_path(root_path)
         try:
-            with open(file_path) as rf:
+            with open(file_path,'r') as rf:
                 res = json.load(rf)
         except Exception:
             return None
@@ -433,8 +410,7 @@ class CodeCounter(object):
             (bool): Whether saving successful.
         """
 
-        file_path = self._get_file_path(root_path)
-        # ensure_path(CodeCounter.Result_Saved_Path)
+        file_path = self._get_saved_path(root_path)
         try:
             with open(file_path, "w" if os.path.isfile(file_path) else "x") as wf:
                 json.dump(result, wf, indent=2)
