@@ -31,16 +31,21 @@ python setup.py install  # On windows
 You can run `pigit` in terminal, and you will see this intro:
 
 ```
-[pigit] version: 1.3.2.dev
+ ____ ___ ____ ___ _____
+|  _ \_ _/ ___|_ _|_   _|
+| |_) | | |  _ | |  | |
+|  __/| | |_| || |  | |
+|_|  |___\____|___| |_| version: 1.3.3.dev
+
 git version 2.30.1 (Apple Git-130)
 
-Local path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.3.2.dev0-py3.9.egg/pigit/__init__.py
+Local path: /usr/local/lib/python3.9/site-packages/pigit-1.3.3.dev0-py3.9.egg/pigit/__init__.py
 
 Description:
   Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
   It use short command to replace the original command, like:
-  ``pigit ws`` -> ``git status --short``, ``pigit b`` -> ``git branch``.
-  Also you use ``pigit -s`` to get the all short command, have fun and good lucky.
+  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.
+  Also you use `pigit -s` to get the all short command, have fun and good lucky.
   The open source path on github: https://github.com/zlj-zz/pigit.git
 
 You can use -h or --help to get help and more usage.
@@ -63,7 +68,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -v, --version         Show version and exit.
-  -C, --complete        Add shell prompt script and exit.(Supported `bash`, `zsh`, `fish`)
+  -C, --complete        Add shell prompt script and exit.(Supported bash, zsh, fish)
   -s, --show-commands   List all available short command and wealth and exit.
   -p TYPE, --show-part-command TYPE
                         According to given type [Branch, Commit, Conflict, Fetch, Index,
@@ -72,7 +77,7 @@ optional arguments:
   -t, --types           List all command types and exit.
   -d, --debug           Current runtime in debug mode.
   --out-log             Print log to console.
-  --create-config       Create a preconfigured file of PIGIT.(If a profile exists, the
+  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the
                         values available in it are used)
 
 tools arguments:
@@ -83,7 +88,7 @@ tools arguments:
   -c [PATH], --count [PATH]
                         Count the number of codes and output them in tabular form.A given
                         path can be accepted, and the default is the current directory.
-  --create-ignore TYPE  Create a demo `.gitignore` file. Need one argument, support:
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support:
                         [android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin,
                         lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift,
                         unity]
@@ -93,7 +98,7 @@ tools arguments:
 
 **For example**
 
-You can use `pigit -s` to check what short command it suppored, it will display the corresponding help information and the original command, like this:
+You can use `pigit -s` to check what short command it supported, it will display the corresponding help information and the original command, like this:
 
 ```
 These are short commands that can replace git operations:
@@ -202,10 +207,10 @@ The command info has some options:
 - Short command for quick use Git.
 - Support custom your short command.
 - Support command correction.
-- Support simple command line GUI interaction.
-- Support generate shell completion script.
+- Support simple terminal TUI interaction.
+- Support generate and use shell completion script.
 - Support create `.gitignore` template from internet.
-- Support code counter.
+- Support code counter and classification output.
 - Support quick open remote url (only support github).
 - Have log output and help message tips.
 - Support beautiful output.

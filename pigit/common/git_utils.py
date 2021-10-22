@@ -53,11 +53,11 @@ def current_repository() -> tuple[str, str]:
 
 
 def parse_git_config(conf: str) -> dict:
-    conf = re.split(r"\r\n|\r|\n", conf)
+    conf_list = re.split(r"\r\n|\r|\n", conf)
     config_dict: dict[str, dict[str, str]] = {}
     config_type: str = ""
 
-    for line in conf:
+    for line in conf_list:
         line = line.strip()
 
         if not line:

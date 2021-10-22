@@ -490,7 +490,7 @@ class Parser(object):
         p.add_argument(
             "--create-config",
             action="store_true",
-            help="Create a preconfigured file of PIGIT."
+            help="Create a pre-configured file of PIGIT."
             "(If a profile exists, the values available in it are used)",
         )
         tool_group.add_argument(
