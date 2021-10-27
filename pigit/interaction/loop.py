@@ -28,14 +28,13 @@ class Loop(object):
     def _loop(self):
         stopping: bool = False
 
+        # self._screen.init()
+
         while not stopping:
 
             input_key = self._keyevent.sync_get_input()
 
-            if input_key == "window resize":
-                self._screen.render(True)
-            else:
-                self._screen.process_key(input_key)
+            self._screen.process_event(input_key)
 
     def run(self):
         with self._screen:

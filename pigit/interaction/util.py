@@ -1,3 +1,6 @@
+# -*- coding:utf-8 -*-
+
+
 class TermSize(object):
     width: int = 0
     height: int = 0

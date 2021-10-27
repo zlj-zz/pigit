@@ -8,16 +8,54 @@ from .util import TermSize
 
 
 class Widget(object):
-    pass
+    def _process_event(self):
+        raise NotImplementedError()
+
+    def _render(self):
+        raise NotImplementedError()
 
 
-class SwtichWidget(Widget):
-    def set_size(self, width: int, height: int):
-        self.width = width
-        self.height = height
+class SwitchWidget(Widget):
+    def __init__(self, sub_widgets: list = None, start_idx: int = 0):
+        self.idx = start_idx
+
+        if not sub_widgets:
+            self.sub_widgets = []
+            self.sub_widgets_count = 0
+        else:
+            self.sub_widgets = sub_widgets
+            self.sub_widgets_count = len(sub_widgets)
+
+    def add(self, widget):
+        """Add new sub widget."""
+        self.sub_widgets.append(widget)
+        self.sub_widgets_count += 1
+
+    def set_current(self, idx: int):
+        """Set the top sub widget, if index is valid."""
+        if 0 <= idx < self.sub_widgets_count:
+            self.idx = idx
+
+    def process_keyevent(self, key: str) -> Optional[int]:
+        raise NotImplementedError()
+
+    def _process_event(self, key: str):
+        next_idx = self.process_keyevent(key)
+        if isinstance(next_idx, int):
+            self.set_current(next_idx)
+        else:
+            current_sub_widget = self.sub_widgets[self.idx]
+            current_sub_widget._process_event(key)
+
+    def _render(self):
+        """
+        This widget cannot render any, call current sub widget ``_render``
+        """
+        current_sub_widget = self.sub_widgets[self.idx]
+        current_sub_widget._render()
 
 
-class RowPanel(object):
+class RowPanelWidget(Widget):
     def __init__(
         self,
         cursor: Optional[str] = None,
@@ -36,33 +74,17 @@ class RowPanel(object):
 
         # Initialize.
         self.cursor_row: int = 1
-        self.display_range: list = [1, TermSize.height - 1]  # Allow display row range.
+        self.display_range: list = None  # Allow display row range.
 
         self.extra = 0  # Extra occupied row.
 
+        self.raw_data: list = None
+        self.show_data: list = None
+
+        self.update_raw: bool = False
+
         for key, value in kwargs.items():
             setattr(self, "_ex_{}".format(key), value)
-
-    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
-        """Handles keyboard events other than movement.
-
-        Args:
-            input_key (str): keyboard string.
-            cursor_row (int): current line.
-            data (Any): raw data.
-
-        Returns:
-            bool: whether need refresh data.
-        """
-        raise NotImplementedError()
-
-    def keyevent_help(self) -> str:
-        """Get extra keyevent help message.
-
-        Returns:
-            str: help message string.
-        """
-        raise NotImplementedError()
 
     def get_raw_data(self) -> list[Any]:
         """How to get the raw data."""
@@ -95,7 +117,20 @@ class RowPanel(object):
         """
         raise NotImplementedError()
 
-    def render(self):
+    def _render_check(self):
+        if not self.display_range:
+            self.display_range = [
+                1,
+                TermSize.height - 1,
+            ]
+        if not self.raw_data or self.update_raw:
+            self.raw_data: list[Any] = self.get_raw_data()
+        # TODO: detect and process resize.
+        if not self.show_data or self.update_raw:
+            self.show_data = self.process_raw_data(self.raw_data, TermSize.width)
+
+    def _render(self):
+        self._render_check()
 
         # Adjust display row range.
         while self.cursor_row < self.display_range[0]:
@@ -107,7 +142,6 @@ class RowPanel(object):
         # number of additional rows, so need to reset to zero.
         self.extra = 0
 
-        print(Term.clear_screen)  # Clear full screen.
         # Print needed display part.
         for index, item in enumerate(self.show_data, start=1):
             line, each_extra = item
@@ -115,35 +149,29 @@ class RowPanel(object):
                 self.print_line(line, index == self.cursor_row)
                 self.extra += each_extra
 
-    def do(self, input_key: str):
-
-        raw_data: list[Any] = self.get_raw_data()
-        self.raw_data = raw_data
-        show_data = self.process_raw_data(raw_data, TermSize.width)
-
+    def _process_event(self, key: str):
         # Process key.
-        if input_key in ["j", "down"]:
+        if key in ["j", "down"]:
             # select pre file.
             self.cursor_row += 1
-            cursor_row = min(self.cursor_row, len(show_data))
-        elif input_key in ["k", "up"]:
+            self.cursor_row = min(self.cursor_row, len(self.show_data))
+
+        elif key in ["k", "up"]:
             # select next file.
             self.cursor_row -= 1
-            cursor_row = max(self.cursor_row, 1)
-        elif input_key in ["J"]:
+            self.cursor_row = max(self.cursor_row, 1)
+
+        elif key in ["J"]:
             # scroll down 5 lines.
             self.cursor_row += 5
-            cursor_row = min(self.cursor_row, len(show_data))
-        elif input_key in ["K"]:
+            self.cursor_row = min(self.cursor_row, len(self.show_data))
+
+        elif key in ["K"]:
             # scroll up 5 line
             self.cursor_row -= 5
-            cursor_row = max(self.cursor_row, 1)
+            self.cursor_row = max(self.cursor_row, 1)
 
-        elif input_key == "windows resize":
-            line_diff = 0
-            self.display_range[1] += line_diff
-            show_data = self.process_raw_data(raw_data, TermSize.width)
-        elif input_key in ["?", "h"]:
+        elif key in ["?", "h"]:
             print(Term.clear_screen)
             print(
                 (
@@ -155,5 +183,27 @@ class RowPanel(object):
                 ).format(self.help_wait)
             )
             time.sleep(self.help_wait)
+
         else:
-            refresh = self.process_keyevent(input_key, self.cursor_row)
+            self.process_keyevent(key, self.cursor_row)
+
+    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+        """Handles keyboard events other than movement.
+
+        Args:
+            input_key (str): keyboard string.
+            cursor_row (int): current line.
+            data (Any): raw data.
+
+        Returns:
+            bool: whether need refresh data.
+        """
+        raise NotImplementedError()
+
+    def keyevent_help(self) -> str:
+        """Get extra keyevent help message.
+
+        Returns:
+            str: help message string.
+        """
+        raise NotImplementedError()
