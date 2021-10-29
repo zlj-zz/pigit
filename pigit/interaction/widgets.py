@@ -8,6 +8,9 @@ from .util import TermSize
 
 
 class Widget(object):
+    def notify(self):
+        raise NotImplementedError()
+
     def _process_event(self):
         raise NotImplementedError()
 
@@ -35,6 +38,9 @@ class SwitchWidget(Widget):
         """Set the top sub widget, if index is valid."""
         if 0 <= idx < self.sub_widgets_count:
             self.idx = idx
+
+    def notify(self):
+        self.sub_widgets[self.idx].notify()
 
     def process_keyevent(self, key: str) -> Optional[int]:
         raise NotImplementedError()
@@ -117,12 +123,14 @@ class RowPanelWidget(Widget):
         """
         raise NotImplementedError()
 
+    def notify(self):
+        self.display_range = [1, TermSize.height - 1]
+        self.raw_data: list[Any] = self.get_raw_data()
+        self.show_data = self.process_raw_data(self.raw_data, TermSize.width)
+
     def _render_check(self):
         if not self.display_range:
-            self.display_range = [
-                1,
-                TermSize.height - 1,
-            ]
+            self.display_range = [1, TermSize.height - 1]
         if not self.raw_data or self.update_raw:
             self.raw_data: list[Any] = self.get_raw_data()
         # TODO: detect and process resize.

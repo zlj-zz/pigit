@@ -25,6 +25,10 @@ except Exception:
         print("Please install `pynput` to supported keyboard event.")
 
 
+class KeyEventHookError(Exception):
+    pass
+
+
 class _baseKeyEvent(object):
     def signal_init(self) -> ...:
         """Take over the system signal, which is implemented by subclasses."""
@@ -129,11 +133,17 @@ class _PosixKeyEvent(_baseKeyEvent):
 
     @classmethod
     def signal_init(cls):
-        signal.signal(signal.SIGWINCH, cls._sigwinch_handler)
+        try:
+            signal.signal(signal.SIGWINCH, cls._sigwinch_handler)
+        except Exception as e:
+            raise KeyEventHookError(e)
 
     @classmethod
     def signal_restore(cls):
-        signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+        try:
+            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+        except Exception as e:
+            raise KeyEventHookError(e)
 
     @classmethod
     def sync_get_input(cls):

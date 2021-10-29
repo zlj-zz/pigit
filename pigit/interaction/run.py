@@ -76,8 +76,10 @@ class StatusModel(RowPanelWidget):
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key in ["a", "space"]:
             self.process_f(self.raw_data[cursor_row - 1], "switch")
+            self.notify()
         elif input_key == "d":
             self.process_f(self.raw_data[cursor_row - 1], "discard")
+            self.notify()
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
@@ -85,6 +87,7 @@ class StatusModel(RowPanelWidget):
             else:
                 # No default editor to open file.
                 pass
+            self.notify()
 
     def process_f(self, file: File, flag: str) -> None:
         """Process file to change the status.

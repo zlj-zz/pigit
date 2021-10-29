@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 from typing import Callable
-from ..keyevent import get_keyevent_obj
+from ..keyevent import get_keyevent_obj, KeyEventHookError
 
 
 class LoopError(Exception):
@@ -41,7 +41,7 @@ class Loop(object):
             try:
                 self._keyevent.signal_init()
                 self._loop()
-            except Exception:
+            except KeyEventHookError:
                 pass
             finally:
                 self._keyevent.signal_restore()

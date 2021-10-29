@@ -13,15 +13,13 @@ class Screen(object):
 
     def update_size(self):
         self.width, self.height = get_terminal_size()
-        print(self.width)
         TermSize.set(self.width, self.height)
         # TermSize.width = self.width
         # TermSize.height = self.height
-        print(TermSize.width)
 
     def start(self):
         print(Term.alt_screen + Term.hide_cursor)
-        self.render()  # frist render.
+        self.render()  # first render.
 
     def end(self):
         print(Term.normal_screen + Term.show_cursor, end="")
@@ -36,8 +34,9 @@ class Screen(object):
         self.render()
 
     def process_event(self, key: str):
-        if key == "window resize":
+        if key == "windows resize":
             self.update_size()
+            self._widget.notify()
         else:
             self._widget._process_event(key)
 
