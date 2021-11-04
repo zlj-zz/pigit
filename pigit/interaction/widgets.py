@@ -4,17 +4,13 @@ from math import ceil
 from typing import Any, Optional
 
 from ..common import Term, Fx, exec_cmd, shorten, get_width, render_str
-from .util import TermSize
 
 
 class Widget(object):
-    def notify(self):
-        raise NotImplementedError()
-
     def _process_event(self):
         raise NotImplementedError()
 
-    def _render(self):
+    def _render(self, size):
         raise NotImplementedError()
 
 
@@ -39,9 +35,6 @@ class SwitchWidget(Widget):
         if 0 <= idx < self.sub_widgets_count:
             self.idx = idx
 
-    def notify(self):
-        self.sub_widgets[self.idx].notify()
-
     def process_keyevent(self, key: str) -> Optional[int]:
         raise NotImplementedError()
 
@@ -53,12 +46,12 @@ class SwitchWidget(Widget):
             current_sub_widget = self.sub_widgets[self.idx]
             current_sub_widget._process_event(key)
 
-    def _render(self):
+    def _render(self, size):
         """
         This widget cannot render any, call current sub widget ``_render``
         """
         current_sub_widget = self.sub_widgets[self.idx]
-        current_sub_widget._render()
+        current_sub_widget._render(size)
 
 
 class RowPanelWidget(Widget):
@@ -69,6 +62,8 @@ class RowPanelWidget(Widget):
         is_sub: bool = False,  # whether is sub page.
         **kwargs,
     ) -> None:
+        self._size = None
+
         self._is_sub = is_sub
 
         if not cursor or get_width(ord(cursor)) != 1:
@@ -123,22 +118,15 @@ class RowPanelWidget(Widget):
         """
         raise NotImplementedError()
 
-    def notify(self):
-        self.display_range = [1, TermSize.height - 1]
+    def update(self):
+        self.display_range = [1, self._size[1] - 1]
         self.raw_data: list[Any] = self.get_raw_data()
-        self.show_data = self.process_raw_data(self.raw_data, TermSize.width)
+        self.show_data = self.process_raw_data(self.raw_data, self._size[0])
 
-    def _render_check(self):
-        if not self.display_range:
-            self.display_range = [1, TermSize.height - 1]
-        if not self.raw_data or self.update_raw:
-            self.raw_data: list[Any] = self.get_raw_data()
-        # TODO: detect and process resize.
-        if not self.show_data or self.update_raw:
-            self.show_data = self.process_raw_data(self.raw_data, TermSize.width)
-
-    def _render(self):
-        self._render_check()
+    def _render(self, size):
+        if self._size != size:
+            self._size = size
+            self.update()
 
         # Adjust display row range.
         while self.cursor_row < self.display_range[0]:

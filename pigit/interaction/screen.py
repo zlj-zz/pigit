@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 from shutil import get_terminal_size
+from webbrowser import get
 
 from ..common import Term
 from .util import TermSize
@@ -9,13 +10,7 @@ class Screen(object):
     def __init__(self, widget=None):
         self._widget = widget
 
-        self.update_size()
-
-    def update_size(self):
-        self.width, self.height = get_terminal_size()
-        TermSize.set(self.width, self.height)
-        # TermSize.width = self.width
-        # TermSize.height = self.height
+        self._size = None
 
     def start(self):
         print(Term.alt_screen + Term.hide_cursor)
@@ -35,13 +30,15 @@ class Screen(object):
 
     def process_event(self, key: str):
         if key == "windows resize":
-            self.update_size()
-            self._widget.notify()
+            self._size = None
         else:
             self._widget._process_event(key)
 
         self.render()
 
     def render(self, resize: bool = False):
+        if not self._size:
+            self._size = get_terminal_size()
+
         print(Term.clear_screen)  # Clear full screen and cursor goto top.
-        self._widget._render()
+        self._widget._render(self._size)
