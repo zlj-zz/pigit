@@ -1,25 +1,16 @@
 import os
 import re
-from typing import Optional
+from typing import Optional, Any
 
 from .loop import Loop
 from .screen import Screen
 from .widgets import SwitchWidget, RowPanelWidget
 from .model import File, Commit
-from .util import TermSize
 
 from ..common import shorten, render_str, exec_cmd, run_cmd, confirm, Color, Fx
 
 
-class StatusModel(RowPanelWidget):
-    def keyevent_help(self) -> str:
-        return (
-            "a / space: toggle storage or unstorage file.\n"
-            "d: discard the file changed.\n"
-            "e: open file with default editor.\n"
-            "↲ : check file diff.\n"
-        )
-
+class StatusPanel(RowPanelWidget):
     def get_raw_data(self) -> list[File]:
         file_items = []
         err, files = exec_cmd("git status -s -u --porcelain")
@@ -39,7 +30,7 @@ class StatusModel(RowPanelWidget):
             has_inline_merged_conflicts = change in ["UU", "AA"]
 
             ident = 2
-            display_name = shorten(name, TermSize.width - 3 - ident)
+            display_name = shorten(name, self.size[0] - 3 - ident)
             # color full command.
             display_str = render_str(
                 f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {display_name}"
@@ -61,11 +52,9 @@ class StatusModel(RowPanelWidget):
 
         return file_items
 
-    def process_raw_data(
-        self, raw_data: list[str], width: int
-    ) -> list[tuple[str, int]]:
+    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
         l = [file.display_str for file in raw_data]
-        return super().process_raw_data(l, width)
+        return l
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
@@ -73,13 +62,21 @@ class StatusModel(RowPanelWidget):
         else:
             print("  " + line)
 
+    def keyevent_help(self) -> str:
+        return (
+            "a / space: toggle storage or unstorage file.\n"
+            "d: discard the file changed.\n"
+            "e: open file with default editor.\n"
+            "↲ : check file diff.\n"
+        )
+
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key in ["a", "space"]:
-            self.process_f(self.raw_data[cursor_row - 1], "switch")
-            self.notify()
+            self.modify_file_status(self.raw_data[cursor_row - 1], "switch")
+            self.emit("update")
         elif input_key == "d":
-            self.process_f(self.raw_data[cursor_row - 1], "discard")
-            self.notify()
+            self.modify_file_status(self.raw_data[cursor_row - 1], "discard")
+            self.emit("update")
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
@@ -87,9 +84,11 @@ class StatusModel(RowPanelWidget):
             else:
                 # No default editor to open file.
                 pass
-            self.notify()
+        elif input_key == "enter":
+            # TODO: how to do ?
+            pass
 
-    def process_f(self, file: File, flag: str) -> None:
+    def modify_file_status(self, file: File, flag: str) -> None:
         """Process file to change the status.
 
         Args:
@@ -116,10 +115,58 @@ class StatusModel(RowPanelWidget):
                     os.remove(os.path.join(file.name))
 
 
-class CommitModel(RowPanelWidget):
-    def keyevent_help(self) -> str:
-        return "↲ : check commit diff.\n"
+class FilePanel(RowPanelWidget):
+    _file = None
 
+    def set_file(self, file: File):
+        self._file = file
+
+    def get_raw_data(self) -> list[Any]:
+        """Gets the modification of the file.
+
+        Args:
+            file (str): file path relative to git.
+            tracked (bool, optional): Defaults to True.
+            cached (bool, optional): Defaults to False.
+            plain (bool, optional): Whether need color. Defaults to False.
+
+        Returns:
+            (str): change string.
+        """
+        if not self._file:
+            raise
+
+        name = self._file.name
+        tracked = self._file.tracked
+        cached = self._file.has_staged_change
+        plain = False
+
+        command = "git diff --submodule --no-ext-diff {plain} {cached} {tracked} {name}"
+
+        _plain = "--color=never" if plain else "--color=always"
+
+        _cached = "--cached" if cached else ""
+
+        _tracked = "--no-index -- /dev/null" if not tracked else "--"
+
+        if "->" in name:  # rename status.
+            name = name.split("->")[-1].strip()
+
+        err, res = exec_cmd(
+            command.format(plain=_plain, cached=_cached, tracked=_tracked, name=name)
+        )
+        if err:
+            return "Can't get diff."
+        return res.rstrip().split("\n")
+
+    def print_line(self, line: str, is_cursor_row: bool) -> None:
+        if is_cursor_row:
+            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+        else:
+            print(line)
+
+
+class CommitPanel(RowPanelWidget):
     def get_raw_data(self) -> list[Commit]:
         _, res = exec_cmd("git symbolic-ref -q --short HEAD")
         branch_name = res.rstrip()
@@ -170,7 +217,7 @@ class CommitModel(RowPanelWidget):
 
             commit_ = Commit(
                 sha=sha,
-                msg=message,
+                msg=shorten(message, self.size[0] - 2),
                 author=author,
                 unix_timestamp=unix_timestamp,
                 status=status,
@@ -181,25 +228,57 @@ class CommitModel(RowPanelWidget):
 
         return commits
 
-    def process_raw_data(
-        self, raw_data: list[Commit], width: int
-    ) -> list[tuple[str, int]]:
+    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
         color_data = []
         pushed_c = Color.fg("#F0E68C")
         unpushed_c = Color.fg("#F08080")
         for commit in raw_data:
             c = pushed_c if commit.is_pushed() else unpushed_c
             sha = commit.sha[:7]
-            msg = shorten(commit.msg, width - 2)
+            msg = commit.msg
             color_data.append(f"{c}{sha} {msg}{Fx.rs}")
 
-        return super().process_raw_data(color_data, width)
+        return color_data
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
             print("{} {}".format(self.cursor, line))
         else:
             print("  " + line)
+
+    def keyevent_help(self) -> str:
+        return "↲ : check commit diff.\n"
+
+
+class CommitStatusPanel(RowPanelWidget):
+    _commit = None
+
+    def set_commit(self, commit: Commit):
+        self._commit = commit
+
+    def get_raw_data(self) -> list[Any]:
+        """Gets the change of a file or all in a given commit.
+
+        Args:
+            commit_sha: commit id.
+            file_name: file name(include full path).
+            plain: whether has color.
+        """
+        commit_sha = self._commit.sha
+        plain = False
+        file_name = ""
+
+        color_str = "never" if plain else "always"
+
+        command = "git show --color=%s %s %s" % (color_str, commit_sha, file_name)
+        _, resp = exec_cmd(command)
+        return resp.rstrip()
+
+    def print_line(self, line: str, is_cursor_row: bool) -> None:
+        if is_cursor_row:
+            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+        else:
+            print(line)
 
 
 class ModelSwitcher(SwitchWidget):
@@ -209,8 +288,8 @@ class ModelSwitcher(SwitchWidget):
 
 
 def main():
-    status = StatusModel()
-    commit = CommitModel()
+    status = StatusPanel()
+    commit = CommitPanel()
     switcher = ModelSwitcher(sub_widgets=[status, commit])
 
     screen = Screen(switcher)

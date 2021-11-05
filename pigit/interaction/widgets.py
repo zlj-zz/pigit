@@ -62,7 +62,7 @@ class RowPanelWidget(Widget):
         is_sub: bool = False,  # whether is sub page.
         **kwargs,
     ) -> None:
-        self._size = None
+        self.size = None
 
         self._is_sub = is_sub
 
@@ -91,7 +91,10 @@ class RowPanelWidget(Widget):
         """How to get the raw data."""
         raise NotImplementedError()
 
-    def process_raw_data(
+    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
+        return raw_data
+
+    def generate_show_data(
         self, raw_data: list[str], width: int
     ) -> list[tuple[str, int]]:
         """
@@ -119,13 +122,19 @@ class RowPanelWidget(Widget):
         raise NotImplementedError()
 
     def update(self):
-        self.display_range = [1, self._size[1] - 1]
+        self.display_range = [1, self.size[1] - 1]
         self.raw_data: list[Any] = self.get_raw_data()
-        self.show_data = self.process_raw_data(self.raw_data, self._size[0])
+        self.show_data = self.generate_show_data(
+            self.process_raw_data(self.raw_data), self.size[0]
+        )
+
+    def emit(self, name, cb=None):
+        if name == "update":
+            self.update()
 
     def _render(self, size):
-        if self._size != size:
-            self._size = size
+        if self.size != size:
+            self.size = size
             self.update()
 
         # Adjust display row range.

@@ -3,7 +3,6 @@ from shutil import get_terminal_size
 from webbrowser import get
 
 from ..common import Term
-from .util import TermSize
 
 
 class Screen(object):

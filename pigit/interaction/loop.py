@@ -30,6 +30,7 @@ class Loop(object):
 
     def _loop(self):
         input_key = self._keyevent.sync_get_input()
+        # XXX:split keypress and mouse (current only has keypress)
 
         self._screen.process_event(input_key)
 
