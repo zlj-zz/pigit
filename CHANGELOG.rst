@@ -2,6 +2,13 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.3 (2021-11-05)
+----------
+- Optimize CodeCounter.
+- Refactor shell completion.
+- Dep update to Python3.8
+- Optimize shell mode.
+
 v1.3.2 (2021-10-11)
 ----------
 - Fix table class for chinese and color.
