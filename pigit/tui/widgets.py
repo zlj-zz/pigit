@@ -65,7 +65,10 @@ class SwitchWidget(Widget):
         """
         This widget cannot render any, call current sub widget ``_render``
         """
+
         current_sub_widget = self.sub_widgets[self.idx]
+        if not current_sub_widget.is_activation():
+            current_sub_widget.activate()
         current_sub_widget._render(size)
 
 

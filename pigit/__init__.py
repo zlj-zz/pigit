@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.3"
+__version__ = "1.3.4.dev"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -55,7 +55,7 @@ from .config import Config
 from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse
-from .interaction import InteractiveStatus, InteractiveCommit
+from .interaction import main as interactive_interface
 from .processor import CmdProcessor, Git_Cmds, CommandType
 
 
@@ -267,32 +267,6 @@ def shell_mode(git_processor: CmdProcessor):
             )
 
     return None
-
-
-def interactive_interface(args):
-    cache_flag: int = 1  # prevent range out, caches the last selection.
-    flag: int = 1
-
-    if args:
-        ready_flag = args[0]
-        if ready_flag in "0123456789":
-            flag = int(ready_flag)
-
-    while flag and flag > 0:
-        if flag == 1:
-            cache_flag = flag
-            flag = InteractiveStatus(
-                use_color=CONFIG.gitprocessor_interactive_color,
-                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-            ).run()
-        elif flag == 2:
-            cache_flag = flag
-            flag = InteractiveCommit(
-                use_color=CONFIG.gitprocessor_interactive_color,
-                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-            ).run()
-        else:
-            flag = cache_flag
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):

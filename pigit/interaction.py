@@ -1,14 +1,14 @@
+# -*- coding:utf-8 -*-
 import os
 import re
-from turtle import width
 from typing import Optional, Any
 
-from .loop import Loop, ExitLoop
-from .screen import Screen
-from .widgets import SwitchWidget, RowPanelWidget
-from .model import File, Commit
+from .tui.loop import Loop, ExitLoop
+from .tui.screen import Screen
+from .tui.widgets import SwitchWidget, RowPanelWidget
+from .tui.model import File, Commit
 
-from ..common import shorten, render_str, exec_cmd, run_cmd, confirm, Color, Fx
+from .common import shorten, render_str, exec_cmd, run_cmd, confirm, Color, Fx
 
 
 class StatusPanel(RowPanelWidget):
@@ -316,11 +316,14 @@ class ModelSwitcher(SwitchWidget):
             return int(key) - 1
 
 
-def main():
+def main(args=None):
     status = StatusPanel(widget=FilePanel())
-    status.activate()
     commit = CommitPanel(widget=CommitStatusPanel())
     switcher = ModelSwitcher(sub_widgets=[status, commit])
+
+    if args:
+        start_idx = args[0]
+        switcher.set_current(int(start_idx) - 1)
 
     screen = Screen(switcher)
     Loop(screen).run()
