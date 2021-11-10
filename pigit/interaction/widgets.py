@@ -1,12 +1,24 @@
 # -*- coding:utf-8 -*-
 import time
 from math import ceil
+from turtle import width
 from typing import Any, Optional
 
 from ..common import Term, Fx, exec_cmd, shorten, get_width, render_str
 
 
 class Widget(object):
+    _activation = False
+
+    def activate(self):
+        self._activation = True
+
+    def deactivate(self):
+        self._activation = False
+
+    def is_activation(self):
+        return self._activation
+
     def _process_event(self):
         raise NotImplementedError()
 
@@ -15,11 +27,13 @@ class Widget(object):
 
 
 class SwitchWidget(Widget):
+    _activity = True
+
     def __init__(self, sub_widgets: list = None, start_idx: int = 0):
         self.idx = start_idx
 
         if not sub_widgets:
-            self.sub_widgets = []
+            self.sub_widgets: list[Widget] = []
             self.sub_widgets_count = 0
         else:
             self.sub_widgets = sub_widgets
@@ -32,8 +46,10 @@ class SwitchWidget(Widget):
 
     def set_current(self, idx: int):
         """Set the top sub widget, if index is valid."""
-        if 0 <= idx < self.sub_widgets_count:
+        if self.idx != idx and 0 <= idx < self.sub_widgets_count:
+            self.sub_widgets[self.idx].deactivate()
             self.idx = idx
+            self.sub_widgets[self.idx].activate()
 
     def process_keyevent(self, key: str) -> Optional[int]:
         raise NotImplementedError()
@@ -43,8 +59,7 @@ class SwitchWidget(Widget):
         if isinstance(next_idx, int):
             self.set_current(next_idx)
         else:
-            current_sub_widget = self.sub_widgets[self.idx]
-            current_sub_widget._process_event(key)
+            self.sub_widgets[self.idx]._process_event(key)
 
     def _render(self, size):
         """
@@ -59,12 +74,11 @@ class RowPanelWidget(Widget):
         self,
         cursor: Optional[str] = None,
         help_wait: float = 1.5,
-        is_sub: bool = False,  # whether is sub page.
+        widget: Widget = None,
         **kwargs,
     ) -> None:
+        self.widget = widget
         self.size = None
-
-        self._is_sub = is_sub
 
         if not cursor or get_width(ord(cursor)) != 1:
             self.cursor = "→"
@@ -133,6 +147,9 @@ class RowPanelWidget(Widget):
             self.update()
 
     def _render(self, size):
+        if self.widget and self.widget.is_activation():
+            self.widget._render(self.size)
+            return
         if self.size != size:
             self.size = size
             self.update()
@@ -155,42 +172,46 @@ class RowPanelWidget(Widget):
                 self.extra += each_extra
 
     def _process_event(self, key: str):
-        # Process key.
-        if key in ["j", "down"]:
-            # select pre file.
-            self.cursor_row += 1
-            self.cursor_row = min(self.cursor_row, len(self.show_data))
+        if self.widget and self.widget.is_activation():
+            # If has sub widget and it's activation.
+            self.widget._process_event(key)
+        elif self.is_activation():
+            # Process key.
+            if key in ["j", "down"]:
+                # select pre file.
+                self.cursor_row += 1
+                self.cursor_row = min(self.cursor_row, len(self.show_data))
 
-        elif key in ["k", "up"]:
-            # select next file.
-            self.cursor_row -= 1
-            self.cursor_row = max(self.cursor_row, 1)
+            elif key in ["k", "up"]:
+                # select next file.
+                self.cursor_row -= 1
+                self.cursor_row = max(self.cursor_row, 1)
 
-        elif key in ["J"]:
-            # scroll down 5 lines.
-            self.cursor_row += 5
-            self.cursor_row = min(self.cursor_row, len(self.show_data))
+            elif key in ["J"]:
+                # scroll down 5 lines.
+                self.cursor_row += 5
+                self.cursor_row = min(self.cursor_row, len(self.show_data))
 
-        elif key in ["K"]:
-            # scroll up 5 line
-            self.cursor_row -= 5
-            self.cursor_row = max(self.cursor_row, 1)
+            elif key in ["K"]:
+                # scroll up 5 line
+                self.cursor_row -= 5
+                self.cursor_row = max(self.cursor_row, 1)
 
-        elif key in ["?", "h"]:
-            print(Term.clear_screen)
-            print(
-                (
-                    "k / ↑: select previous line.\n"
-                    "j / ↓: select next line.\n"
-                    "J: Scroll down 5 lines.\n"
-                    "K: Scroll down 5 lines.\n"
-                    "? / h : show help, wait {}s and exit.\n" + self.keyevent_help()
-                ).format(self.help_wait)
-            )
-            time.sleep(self.help_wait)
+            elif key in ["?", "h"]:
+                print(Term.clear_screen)
+                print(
+                    (
+                        "k / ↑: select previous line.\n"
+                        "j / ↓: select next line.\n"
+                        "J: Scroll down 5 lines.\n"
+                        "K: Scroll down 5 lines.\n"
+                        "? / h : show help, wait {}s and exit.\n" + self.keyevent_help()
+                    ).format(self.help_wait)
+                )
+                time.sleep(self.help_wait)
 
-        else:
-            self.process_keyevent(key, self.cursor_row)
+            else:
+                self.process_keyevent(key, self.cursor_row)
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         """Handles keyboard events other than movement.
@@ -203,7 +224,7 @@ class RowPanelWidget(Widget):
         Returns:
             bool: whether need refresh data.
         """
-        raise NotImplementedError()
+        pass
 
     def keyevent_help(self) -> str:
         """Get extra keyevent help message.
@@ -211,4 +232,4 @@ class RowPanelWidget(Widget):
         Returns:
             str: help message string.
         """
-        raise NotImplementedError()
+        pass

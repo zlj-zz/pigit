@@ -1,8 +1,9 @@
 import os
 import re
+from turtle import width
 from typing import Optional, Any
 
-from .loop import Loop
+from .loop import Loop, ExitLoop
 from .screen import Screen
 from .widgets import SwitchWidget, RowPanelWidget
 from .model import File, Commit
@@ -53,6 +54,8 @@ class StatusPanel(RowPanelWidget):
         return file_items
 
     def process_raw_data(self, raw_data: list[Any]) -> list[str]:
+        if not raw_data:
+            return ["No status changed."]
         l = [file.display_str for file in raw_data]
         return l
 
@@ -86,7 +89,11 @@ class StatusPanel(RowPanelWidget):
                 pass
         elif input_key == "enter":
             # TODO: how to do ?
+            self.widget.set_file(self.raw_data[cursor_row - 1])
+            self.widget.activate()
             pass
+        elif input_key == "q":
+            raise ExitLoop
 
     def modify_file_status(self, file: File, flag: str) -> None:
         """Process file to change the status.
@@ -119,7 +126,10 @@ class FilePanel(RowPanelWidget):
     _file = None
 
     def set_file(self, file: File):
-        self._file = file
+        if self._file != file:
+            self.size = None
+            self.cursor_row = 1
+            self._file = file
 
     def get_raw_data(self) -> list[Any]:
         """Gets the modification of the file.
@@ -158,6 +168,10 @@ class FilePanel(RowPanelWidget):
         if err:
             return "Can't get diff."
         return res.rstrip().split("\n")
+
+    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+        if input_key == "q":
+            self.deactivate()
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
@@ -246,6 +260,14 @@ class CommitPanel(RowPanelWidget):
         else:
             print("  " + line)
 
+    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+        if input_key == "q":
+            raise ExitLoop
+
+        elif input_key == "enter":
+            self.widget.set_commit(self.raw_data[cursor_row - 1])
+            self.widget.activate()
+
     def keyevent_help(self) -> str:
         return "↲ : check commit diff.\n"
 
@@ -254,7 +276,10 @@ class CommitStatusPanel(RowPanelWidget):
     _commit = None
 
     def set_commit(self, commit: Commit):
-        self._commit = commit
+        if self._commit != commit:
+            self.size = None
+            self.cursor_row = 1
+            self._commit = commit
 
     def get_raw_data(self) -> list[Any]:
         """Gets the change of a file or all in a given commit.
@@ -272,13 +297,17 @@ class CommitStatusPanel(RowPanelWidget):
 
         command = "git show --color=%s %s %s" % (color_str, commit_sha, file_name)
         _, resp = exec_cmd(command)
-        return resp.rstrip()
+        return resp.rstrip().split("\n")
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
             print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
         else:
             print(line)
+
+    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+        if input_key == "q":
+            self.deactivate()
 
 
 class ModelSwitcher(SwitchWidget):
@@ -288,8 +317,9 @@ class ModelSwitcher(SwitchWidget):
 
 
 def main():
-    status = StatusPanel()
-    commit = CommitPanel()
+    status = StatusPanel(widget=FilePanel())
+    status.activate()
+    commit = CommitPanel(widget=CommitStatusPanel())
     switcher = ModelSwitcher(sub_widgets=[status, commit])
 
     screen = Screen(switcher)
