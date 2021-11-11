@@ -6,7 +6,6 @@ if os.name == "nt":
     os.system("")
 
 from .emoji import Emoji
-from .console import Cursor, Term
 from .style import Fx, Color, BoxSymbol, render_style, is_color
 from .utils import run_cmd, exec_cmd, confirm, similar_command, get_current_shell
 from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
@@ -14,7 +13,7 @@ from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
 # yapf: disable
 __all__ = [
-    "Emoji", "Color", "BoxSymbol", "Fx", "Cursor", "Term",
+    "Emoji", "Color", "BoxSymbol", "Fx",
     "run_cmd", "exec_cmd", "confirm", "is_color", "similar_command", "get_current_shell",
     "get_width", "shorten", "adjudgment_type", "get_file_icon",
 ]

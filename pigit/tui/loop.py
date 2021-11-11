@@ -11,12 +11,14 @@ class Loop(object):
     def __init__(self, screen=None, key_handle=None, debug: bool = False):
         self.debug = debug
 
+        # Init screen object.
         if not screen:
             from .screen import Screen
 
             screen = Screen()
         self._screen = screen
 
+        # Init keyboard handle object.
         if not key_handle:
             from ..keyevent import get_keyevent_obj, KeyEventHookError
 

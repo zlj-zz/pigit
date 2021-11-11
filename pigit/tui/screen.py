@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
 from shutil import get_terminal_size
-from webbrowser import get
 
-from ..common import Term
+from .console import Term
 
 
 class Screen(object):
@@ -15,14 +14,14 @@ class Screen(object):
         print(Term.alt_screen + Term.hide_cursor)
         self.render()  # first render.
 
-    def end(self):
+    def stop(self):
         print(Term.normal_screen + Term.show_cursor, end="")
 
     def __enter__(self):
         self.start()
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        self.end()
+        self.stop()
 
     def init(self):
         self.render()

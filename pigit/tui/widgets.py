@@ -1,10 +1,10 @@
 # -*- coding:utf-8 -*-
 import time
 from math import ceil
-from turtle import width
 from typing import Any, Optional
 
-from ..common import Term, Fx, exec_cmd, shorten, get_width, render_str
+from .console import Term
+from ..common import Fx, get_width, render_str
 
 
 class Widget(object):
