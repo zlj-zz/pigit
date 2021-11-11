@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 from typing import Callable
-from ..keyevent import KeyEventHookError
+from .keyevent import KeyEventHookError
 
 
 class ExitLoop(Exception):
@@ -20,7 +20,7 @@ class Loop(object):
 
         # Init keyboard handle object.
         if not key_handle:
-            from ..keyevent import get_keyevent_obj, KeyEventHookError
+            from .keyevent import get_keyevent_obj, KeyEventHookError
 
             try:
                 _keyevent_class = get_keyevent_obj()

@@ -23,9 +23,6 @@ class Screen(object):
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.stop()
 
-    def init(self):
-        self.render()
-
     def process_event(self, key: str):
         if key == "windows resize":
             self._size = None
