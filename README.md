@@ -35,11 +35,11 @@ You can run `pigit` in terminal, and you will see this intro:
 |  _ \_ _/ ___|_ _|_   _|
 | |_) | | |  _ | |  | |
 |  __/| | |_| || |  | |
-|_|  |___\____|___| |_| version: 1.3.3.dev
+|_|  |___\____|___| |_| version: 1.3.4.dev
 
 git version 2.30.1 (Apple Git-130)
 
-Local path: /usr/local/lib/python3.9/site-packages/pigit-1.3.3.dev0-py3.9.egg/pigit/__init__.py
+Local path: /usr/local/lib/python3.9/site-packages/pigit-1.3.4.dev0-py3.9.egg/pigit/__init__.py
 
 Description:
   Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
@@ -204,16 +204,14 @@ The command info has some options:
 
 ## Feature
 
-- Short command for quick use Git.
-- Support custom your short command.
-- Support command correction.
-- Support simple terminal TUI interaction.
+- Short command for quick use Git, and custom your short command.
+- Provides command correction, when the command is wrong.
+- Have a simple tui interaction, complete very troublesome operations.
+- Code statistics and can be beautifully displayed.
 - Support generate and use shell completion script.
 - Support create `.gitignore` template from internet.
-- Support code counter and classification output.
 - Support quick open remote url (only support github).
 - Have log output and help message tips.
-- Support beautiful output.
 
 ---
 

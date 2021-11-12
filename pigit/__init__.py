@@ -55,8 +55,14 @@ from .config import Config
 from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse
-from .interaction import main as interactive_interface
 from .processor import CmdProcessor, Git_Cmds, CommandType
+
+if not sys.platform.lower().startswith("win"):
+    from .interaction import main as interactive_interface
+else:
+
+    def interactive_interface(args=None):
+        print(render_str("`Windows not support this.`<#FF0000>"))
 
 
 Log = logging.getLogger(__name__)
@@ -102,7 +108,7 @@ def introduce() -> None:
 
     # Print version.
     print(
-        """
+        """\
  ____ ___ ____ ___ _____
 |  _ \\_ _/ ___|_ _|_   _|
 | |_) | | |  _ | |  | |
