@@ -4,10 +4,16 @@ import tty, termios, select, fcntl
 import signal
 from subprocess import Popen, PIPE
 
+
+#############
+# Predefined
+#############
 ord2 = lambda x: x
 B = lambda x: x.encode("iso8859-1")  # noqa: E731
-########################################################################################################################################################
 
+####################
+# Terminal encoding
+####################
 _byte_encoding = None
 
 
@@ -102,6 +108,9 @@ def set_encoding(encoding):
         pass
 
 
+################
+# Util function
+################
 def within_double_byte(text, line_start, pos):
     """Return whether pos is within a double-byte encoded character.
     text -- byte string in question
@@ -145,9 +154,6 @@ def is_mouse_event(ev):
 
 def is_mouse_press(ev):
     return ev.find("press") >= 0
-
-
-########################################################################################################################################################
 
 
 ###################
@@ -497,7 +503,6 @@ def process_keyqueue(codes, more_available):
         will attempt to send more key codes on the next call.
     returns (list of input, list of remaining key codes).
     """
-    print(codes)
     code = codes[0]
     if code >= 32 and code <= 126:
         key = chr(code)
@@ -510,7 +515,6 @@ def process_keyqueue(codes, more_available):
         return ["ctrl %s" % chr(ord("A") + code - 1)], codes[1:]
 
     em = get_byte_encoding()
-    print(em)
 
     if em == "wide" and code < 256 and within_double_byte(chr(code), 0, 0):
         if not codes[1:]:
@@ -668,7 +672,10 @@ class PosixInput(RealTerminal):
         fcntl.fcntl(self._resize_pipe_rd, fcntl.F_SETFL, os.O_NONBLOCK)
 
     def _input_fileno(self):
-        """Returns the fileno of the input stream, or None if it doesn't have one.  A stream without a fileno can't participate in whatever."""
+        """
+        Returns the fileno of the input stream, or None if it doesn't have one.
+        A stream without a fileno can't participate in whatever.
+        """
         if hasattr(self._term_input_file, "fileno"):
             return self._term_input_file.fileno()
         else:
@@ -774,7 +781,6 @@ class PosixInput(RealTerminal):
 
         self.signal_init()
         self._next_timeout = self.max_wait
-        print(self._next_timeout)
 
         if not self._signal_keys_set:
             self._old_signal_keys = self.tty_signal_keys(fileno=fd)
@@ -979,6 +985,13 @@ class PosixInput(RealTerminal):
                 self._input_timeout = event_loop.alarm(
                     self.complete_wait, _parse_incomplete_input
                 )
+            else:
+                # When there is no `eventloop`, and turn on `wait more`.
+                run, codes = self.parse_input(
+                    event_loop, callback, codes, wait_for_more=False
+                )
+                processed.extend(run)
+                processed_codes = original_codes
 
         else:
             processed_codes = original_codes
@@ -1076,6 +1089,7 @@ if __name__ == "__main__":
     handle = PosixInput()
     # handle.set_input_timeouts(0.125)
     handle.start()
+    handle.set_mouse_tracking()
     while True:
         res = handle.get_input(raw_keys=True)
         print(res)

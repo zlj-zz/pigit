@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 from typing import Callable
-from .keyevent import KeyEventHookError
 
 
 class ExitLoop(Exception):
@@ -8,7 +7,7 @@ class ExitLoop(Exception):
 
 
 class Loop(object):
-    def __init__(self, screen=None, key_handle=None, debug: bool = False):
+    def __init__(self, screen=None, input_handle=None, debug: bool = False):
         self.debug = debug
 
         # Init screen object.
@@ -19,7 +18,8 @@ class Loop(object):
         self._screen = screen
 
         # Init keyboard handle object.
-        if not key_handle:
+        if not input_handle:
+            """
             from .keyevent import get_keyevent_obj, KeyEventHookError
 
             try:
@@ -27,29 +27,36 @@ class Loop(object):
             except Exception:
                 raise ExitLoop("This behavior is not supported in the current system.")
             else:
-                key_handle = _keyevent_class()
-        self._keyevent = key_handle
+                input_handle = _keyevent_class()
+            """
+            from .input import PosixInput, is_mouse_event
+
+            self.is_mouse_event = is_mouse_event
+            input_handle = PosixInput()
+        self._input_handle = input_handle
 
     def _loop(self):
-        input_key = self._keyevent.sync_get_input()
-        # XXX:split keypress and mouse (current only has keypress)
+        input_key = self._input_handle.get_input()
 
-        self._screen.process_event(input_key)
+        if input_key:
+            first_one = input_key[0]
+            if hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
+                # XXX:split keypress and mouse (current only has keypress)
+                pass
+            else:
+                self._screen.process_event(first_one)
+        else:
+            self._screen.render()
 
     def _run(self):
         with self._screen:
+            self._input_handle.start()
+            self._did_something = True
             try:
-                self._keyevent.signal_init()
-                self._did_something = True
                 while True:
                     self._loop()
-            except KeyEventHookError:
-                pass
-            finally:
-                self._keyevent.signal_restore()
+            except (ExitLoop, KeyboardInterrupt):
+                self._input_handle.stop()
 
     def run(self):
-        try:
-            self._run()
-        except ExitLoop:
-            pass
+        self._run()

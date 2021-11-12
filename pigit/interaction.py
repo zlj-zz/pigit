@@ -74,7 +74,7 @@ class StatusPanel(RowPanelWidget):
         )
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
-        if input_key in ["a", "space"]:
+        if input_key in ["a", " "]:
             self.modify_file_status(self.raw_data[cursor_row - 1], "switch")
             self.emit("update")
         elif input_key == "d":
