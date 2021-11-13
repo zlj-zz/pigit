@@ -5,17 +5,20 @@ from .console import Term
 
 
 class Screen(object):
-    def __init__(self, widget=None):
+    def __init__(self, widget=None, alt_screen: bool = True):
         self._widget = widget
+        self._alt_screen = alt_screen
 
         self._size = None
 
     def start(self):
-        print(Term.alt_screen + Term.hide_cursor)
+        if self._alt_screen:
+            print(Term.alt_screen + Term.hide_cursor, end="")
         self.render()  # first render.
 
     def stop(self):
-        print(Term.normal_screen + Term.show_cursor, end="")
+        if self._alt_screen:
+            print(Term.normal_screen + Term.show_cursor, end="")
 
     def __enter__(self):
         self.start()
@@ -23,13 +26,17 @@ class Screen(object):
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.stop()
 
-    def process_event(self, key: str):
-        if key == "windows resize":
-            self._size = None
-        else:
-            self._widget._process_event(key)
-
+    def resize(self):
+        self._size = None
         self.render()
+
+    def process_input(self, key: str):
+        self._widget._process_event(key)
+        self.render()
+
+    def process_mouse(self, mouse):
+        # TODO: need finish.
+        pass
 
     def render(self, resize: bool = False):
         if not self._size:

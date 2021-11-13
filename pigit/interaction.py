@@ -326,4 +326,6 @@ def main(args=None):
         switcher.set_current(int(start_idx) - 1)
 
     screen = Screen(switcher)
-    Loop(screen).run()
+    main_loop = Loop(screen)
+    main_loop.set_input_timeouts(0.125)
+    main_loop.run()

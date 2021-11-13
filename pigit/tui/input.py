@@ -712,7 +712,6 @@ class PosixInput(RealTerminal):
         if not self._resized:
             os.write(self._resize_pipe_wr, B("R"))
         self._resized = True
-        self.screen_buf = None
 
     def signal_init(self):
         """
@@ -1090,6 +1089,7 @@ if __name__ == "__main__":
     # handle.set_input_timeouts(0.125)
     handle.start()
     handle.set_mouse_tracking()
+    handle.set_input_timeouts(0.125)
     while True:
         res = handle.get_input(raw_keys=True)
         print(res)

@@ -7,7 +7,14 @@ class ExitLoop(Exception):
 
 
 class Loop(object):
-    def __init__(self, screen=None, input_handle=None, debug: bool = False):
+    def __init__(
+        self,
+        screen=None,
+        input_handle=None,
+        real_time: bool = False,
+        debug: bool = False,
+    ):
+        self._real_time = real_time
         self.debug = debug
 
         # Init screen object.
@@ -35,23 +42,28 @@ class Loop(object):
             input_handle = PosixInput()
         self._input_handle = input_handle
 
+    def set_input_timeouts(self, timeout):
+        self._input_handle.set_input_timeouts(timeout)
+
     def _loop(self):
         input_key = self._input_handle.get_input()
 
         if input_key:
             first_one = input_key[0]
-            if hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
-                # XXX:split keypress and mouse (current only has keypress)
-                pass
+
+            if first_one == "window resize":
+                self._screen.resize()
+            elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
+                self._screen.process_mouse(first_one)
             else:
-                self._screen.process_event(first_one)
+                self._screen.process_input(first_one)
         else:
-            self._screen.render()
+            if self._real_time:
+                self._screen.render()
 
     def _run(self):
         with self._screen:
             self._input_handle.start()
-            self._did_something = True
             try:
                 while True:
                     self._loop()
