@@ -27,7 +27,7 @@ class Widget(object):
 
 
 class SwitchWidget(Widget):
-    _activity = True
+    _activation = True
 
     def __init__(self, sub_widgets: list = None, start_idx: int = 0):
         self.idx = start_idx

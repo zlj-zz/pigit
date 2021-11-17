@@ -13,8 +13,8 @@ from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
 # yapf: disable
 __all__ = [
-    "Emoji", "Color", "BoxSymbol", "Fx",
-    "run_cmd", "exec_cmd", "confirm", "is_color", "similar_command", "get_current_shell",
+    "Emoji", "Color", "BoxSymbol", "Fx", "render_style", "is_color",
+    "run_cmd", "exec_cmd", "confirm", "similar_command", "get_current_shell",
     "get_width", "shorten", "adjudgment_type", "get_file_icon",
 ]
 # yapf: enable
