@@ -7,6 +7,13 @@ class ExitLoop(Exception):
 
 
 class Loop(object):
+    """
+    Params:
+        screen (Screen): screen to use, default is a new :class:`.screen.Screen`.
+        input_handle (Input): input handle to use, default is a new :class:`.input:PosixInput`.
+        real_time (bool): whether refresh screen real time.
+    """
+
     def __init__(
         self,
         screen=None,
@@ -26,26 +33,19 @@ class Loop(object):
 
         # Init keyboard handle object.
         if not input_handle:
-            """
-            from .keyevent import get_keyevent_obj, KeyEventHookError
-
-            try:
-                _keyevent_class = get_keyevent_obj()
-            except Exception:
-                raise ExitLoop("This behavior is not supported in the current system.")
-            else:
-                input_handle = _keyevent_class()
-            """
+            # XXX: now not support windows.
             from .input import PosixInput, is_mouse_event
 
-            self.is_mouse_event = is_mouse_event
             input_handle = PosixInput()
+            # adjust the input whether is a mouse event.
+            self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
 
     def set_input_timeouts(self, timeout):
         self._input_handle.set_input_timeouts(timeout)
 
     def _loop(self):
+        """Main loop"""
         input_key = self._input_handle.get_input()
 
         if input_key:
@@ -62,13 +62,13 @@ class Loop(object):
                 self._screen.render()
 
     def _run(self):
-        with self._screen:
-            self._input_handle.start()
-            try:
-                while True:
-                    self._loop()
-            except (ExitLoop, KeyboardInterrupt):
-                self._input_handle.stop()
+        try:
+            while True:
+                self._loop()
+        except (ExitLoop, KeyboardInterrupt):
+            self._input_handle.stop()
 
     def run(self):
-        self._run()
+        with self._screen:
+            self._input_handle.start()
+            self._run()

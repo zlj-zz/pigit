@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
-import os
+import os, sys
 from typing import Optional, Any
 
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget
-from .common import run_cmd, confirm, Color, Fx
+from .common import Color, Fx, run_cmd, confirm, render_str
 from .common.git_utils import (
     # info method
     load_status,
@@ -158,6 +158,11 @@ class ModelSwitcher(SwitchWidget):
 
 
 def main(args=None):
+    # tui interaction interface not support windows.
+    if sys.platform.lower().startswith("win"):
+        print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
+        return
+
     status = StatusPanel(widget=FilePanel())
     commit = CommitPanel(widget=CommitStatusPanel())
     switcher = ModelSwitcher(sub_widgets=[status, commit])

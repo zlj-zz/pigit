@@ -5,6 +5,15 @@ from .console import Term
 
 
 class Screen(object):
+    """
+    Params:
+        widget (Widget): main widget be needed by screen.
+        alt_screen (bool): whether switch to a new screen.
+
+    Attributes:
+        _size (tuple): the terminal can be using size (width, height).
+    """
+
     def __init__(self, widget=None, alt_screen: bool = True):
         self._widget = widget
         self._alt_screen = alt_screen
@@ -27,6 +36,7 @@ class Screen(object):
         self.stop()
 
     def resize(self):
+        """When the size has changed, this method will be call by `.loop.Loop` and try to render again."""
         self._size = None
         self.render()
 
