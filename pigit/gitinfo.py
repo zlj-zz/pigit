@@ -7,7 +7,7 @@ from typing import Optional
 
 from .common import exec_cmd, render_str
 from .common.git_utils import parse_git_config, git_version, current_repository
-from .common.str_table import dTable, TableTooWideError
+from .common.table import dTable, TableTooWideError
 
 Log = logging.getLogger(__name__)
 
