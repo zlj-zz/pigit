@@ -44,6 +44,13 @@ class Emoji(object):
     for k, v in EMOTION.items():
         __locals[k] = v
 
+    # Try to render the emoji from str. If the emoji code is invalid  will
+    # keep raw.
+    #
+    #           +----------------------> content
+    #           |               +------> emoji code
+    #           |               |
+    #   today is a nice day :rainbow:
     @classmethod
     def render(
         cls,

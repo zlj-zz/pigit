@@ -576,9 +576,9 @@ def process_keyqueue(codes, more_available):
     return ["esc"], codes[1:]
 
 
-class RealTerminal(object):
+class InputTerminal(object):
     def __init__(self):
-        super(RealTerminal, self).__init__()
+        super(InputTerminal, self).__init__()
         self._signal_keys_set = False
         self._old_signal_keys = None
 
@@ -646,7 +646,7 @@ class RealTerminal(object):
         return skeys
 
 
-class PosixInput(RealTerminal):
+class PosixInput(InputTerminal):
     def __init__(self, input=sys.stdin, output=sys.stdout) -> None:
         super().__init__()
 
