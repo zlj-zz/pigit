@@ -7,7 +7,7 @@ import logging
 from .utils import exec_cmd
 from .str_utils import shorten
 from .style import render_style
-from .git_model import File, Commit
+from .git_model import File, Commit, Branch
 
 Log = logging.getLogger(__name__)
 
@@ -97,6 +97,65 @@ def current_head():
 ###############
 # Special info
 ###############
+def load_branches() -> list[Branch]:
+    command = 'git branch --sort=-committerdate --format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" '
+    err, resp = exec_cmd(command)
+    resp = resp.strip()
+
+    if not resp:
+        return []
+
+    branchs = []
+    lines = resp.split("\n")
+
+    for line in lines:
+        items = line.split("|")
+        branch = Branch(
+            name=items[1], pushables="?", pullables="?", is_head=items[0] == "*"
+        )
+
+        upstream_name = items[2]
+
+        if not upstream_name:
+            branchs.append(branch)
+            continue
+
+        branch.upstream_name = upstream_name
+
+        track = items[3]
+        _re = re.compile(r"ahead (\d+)")
+        match = _re.search(track)
+        if match:
+            branch.pushables = str(match[1])
+        else:
+            branch.pushables = "0"
+
+        _re = re.compile(r"behind (\d+)")
+        match = _re.search(track)
+        if match:
+            branch.pullables = str(match[1])
+        else:
+            branch.pullables = "0"
+
+        branchs.append(branch)
+
+    return branchs
+
+
+def get_first_pushed_commit(branch_name: str):
+    command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
+    _, resp = exec_cmd(command)
+    return resp.strip()
+
+
+def get_log(branch_name: str, limit: bool = False, filter_path: str = ""):
+    limit_flag = "-300" if limit else ""
+    filter_flag = f"--follow -- {filter_path}" if filter_path else ""
+    command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
+    err, resp = exec_cmd(command)
+    return err, resp.strip()
+
+
 def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[File]:
     """Get the file tree status of GIT for processing and encapsulation.
     Args:
@@ -279,6 +338,11 @@ def discard_file(file: File):
         exec_cmd("git checkout -- {}".format(file.name))
     else:
         os.remove(os.path.join(file.name))
+
+
+def ignore(path: str):
+    with open(f"{Git.REPOSITORY_PATH}/.gitignore", "a") as f:
+        f.write(f"\n{path}")
 
 
 if __name__ == "__main__":

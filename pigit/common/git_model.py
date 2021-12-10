@@ -37,3 +37,12 @@ class Commit:
 
     def is_pushed(self):
         return self.status == "pushed"
+
+
+@dataclass
+class Branch:
+    name: str
+    pushables: str
+    pullables: str
+    is_head: bool
+    upstream_name: str = ""
