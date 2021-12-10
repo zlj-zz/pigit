@@ -4,7 +4,7 @@ from math import ceil
 from typing import Any, Optional
 
 from .console import Term
-from ..common import Fx, get_width, render_str
+from ..common import Fx, get_width, run_cmd, confirm
 
 
 class Widget(object):
@@ -236,3 +236,28 @@ class RowPanelWidget(Widget):
             str: help message string.
         """
         pass
+
+
+class ConfirmWidget:
+    def __init__(self, msg: str, default: bool = True) -> None:
+        self.msg = msg
+        self.default = default
+
+    def run(self):
+        print(Term.clear_screen, end="")
+        return confirm(self.msg, self.default)
+
+
+class CmdRunner:
+    def __init__(self, cmd: str, auto_run: bool = True) -> None:
+        self.cmd = cmd
+        self.auto_run = auto_run
+
+        if self.auto_run:
+            self.run()
+
+    def run(self):
+        print(Term.normal_screen)
+        res_code = run_cmd(self.cmd)
+        print(Term.alt_screen)
+        return res_code

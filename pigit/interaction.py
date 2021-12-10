@@ -4,8 +4,8 @@ from typing import Optional, Any
 
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
-from .tui.widgets import SwitchWidget, RowPanelWidget
-from .common import Color, Fx, run_cmd, confirm, render_str
+from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
+from .common import Color, Fx, render_str
 from .common.git_utils import (
     # info method
     load_status,
@@ -31,10 +31,14 @@ class StatusPanel(RowPanelWidget):
         return l
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
-        if is_cursor_row:
-            print("{} {}".format(self.cursor, line))
+        if self.raw_data:
+            if is_cursor_row:
+                print("{} {}".format(self.cursor, line))
+            else:
+                print("  " + line)
         else:
-            print("  " + line)
+            # No data, print tip.
+            print(line)
 
     def keyevent_help(self) -> str:
         return (
@@ -49,13 +53,14 @@ class StatusPanel(RowPanelWidget):
             switch_file_status(self.raw_data[cursor_row - 1])
             self.emit("update")
         elif input_key == "d":
-            if confirm("discard all changed? [y/n]:"):
+            if ConfirmWidget("discard all changed? [y/n]:").run():
+                # if confirm("discard all changed? [y/n]:"):
                 discard_file(self.raw_data[cursor_row - 1])
             self.emit("update")
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
-                run_cmd('{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name))
+                CmdRunner('{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name))
             else:
                 # No default editor to open file.
                 pass
@@ -63,7 +68,6 @@ class StatusPanel(RowPanelWidget):
             # TODO: how to do ?
             self.widget.set_file(self.raw_data[cursor_row - 1])
             self.widget.activate()
-            pass
         elif input_key == "q":
             raise ExitLoop
 
