@@ -340,9 +340,13 @@ def discard_file(file: File):
         os.remove(os.path.join(file.name))
 
 
-def ignore(path: str):
-    with open(f"{Git.REPOSITORY_PATH}/.gitignore", "a") as f:
-        f.write(f"\n{path}")
+def ignore_file(f_path: str):
+    """
+    Args:
+        f_path (str): full file path will be ignore.
+    """
+    with open(f"{current_repository()[0]}/.gitignore", "a") as f:
+        f.write(f"\n{f_path}")
 
 
 if __name__ == "__main__":
