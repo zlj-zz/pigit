@@ -2,6 +2,12 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.4 (2021-12-26)
+----------
+- Split TUI module.
+- Refactor interaction mode.
+- Add branch model of interaction.
+
 v1.3.3 (2021-11-05)
 ----------
 - Optimize CodeCounter.
