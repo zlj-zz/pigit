@@ -349,6 +349,12 @@ def ignore_file(f_path: str):
         f.write(f"\n{f_path}")
 
 
+def checkout_branch(branch_name: str):
+    err, _ = exec_cmd(f"git checkout {branch_name}")
+    if err:
+        return err
+
+
 if __name__ == "__main__":
     # import sys
     # sys.path.append(os.path.dirname(__file__))

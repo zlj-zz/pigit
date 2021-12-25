@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import os, sys
+from time import sleep
 from typing import Optional, Any
 
 from .tui.loop import Loop, ExitLoop
@@ -8,6 +9,7 @@ from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .common import Color, Fx, render_str
 from .common.git_utils import (
     # info method
+    load_branches,
     load_status,
     load_file_diff,
     load_commits,
@@ -16,8 +18,49 @@ from .common.git_utils import (
     # option method
     switch_file_status,
     discard_file,
+    checkout_branch,
 )
-from .common.git_model import File, Commit
+from .common.git_model import File, Commit, Branch
+
+
+class BranchPanel(RowPanelWidget):
+    def get_raw_data(self) -> list[Branch]:
+        return load_branches()
+
+    def process_raw_data(self, raw_data: list[Branch]) -> list[str]:
+        processed_branches = []
+        for branch in raw_data:
+            if branch.is_head:
+                processed_branches.append(
+                    f"* {Color.fg('#98FB98')}{branch.name}{Fx.rs}"
+                )
+            else:
+                processed_branches.append(f"  {branch.name}")
+
+        return processed_branches
+
+    def print_line(self, line: str, is_cursor_row: bool) -> None:
+        if is_cursor_row:
+            print(f"{self.cursor} {line}")
+        else:
+            print(f"  {line}")
+
+    def keyevent_help(self) -> str:
+        return "space: switch current branch.\n"
+
+    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+        if input_key == "q":
+            raise ExitLoop
+        elif input_key == " ":
+            local_branch = self.raw_data[cursor_row - 1]
+            if local_branch.is_head:
+                return
+
+            err = checkout_branch(local_branch.name)
+            if "error" in err:
+                print(Color.fg("#FF0000"), err, Fx.rs, sep="")
+                sleep(2)
+            self.emit("update")
 
 
 class StatusPanel(RowPanelWidget):
@@ -116,7 +159,7 @@ class CommitPanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print("{} {}".format(self.cursor, line))
+            print(f"{self.cursor} {line}")
         else:
             print("  " + line)
 
@@ -169,7 +212,8 @@ def main(args=None):
 
     status = StatusPanel(widget=FilePanel())
     commit = CommitPanel(widget=CommitStatusPanel())
-    switcher = ModelSwitcher(sub_widgets=[status, commit])
+    branch = BranchPanel()
+    switcher = ModelSwitcher(sub_widgets=[status, commit, branch])
 
     if args:
         start_idx = args[0]
