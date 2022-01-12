@@ -58,16 +58,20 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     """
 
     print("Set the interactive environment of user name and email ...")
+
+    is_global = ""
     _global = re.compile(r"\-\-global")
+
     for i in args:
         r = _global.search(i)
         if r is not None:
-            other = " --global "
-            print("Now set for global.")
+            is_global = " --global "
             break
+
+    if is_global:
+        print("Now set for global.")
     else:
         print("Now set for local.")
-        other = " "
 
     name = input("Please input username:").strip()
     while True:
@@ -86,8 +90,8 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
         else:
             break
 
-    if run_cmd("git config user.name" + other + name) and run_cmd(
-        "git config user.email" + other + email
+    if run_cmd(f"git config user.name {name} {is_global}") and run_cmd(
+        f"git config user.email {email} {is_global}"
     ):
         print(render_str("`Successfully set.`<ok>"))
     else:
