@@ -154,7 +154,7 @@ Git_Cmds = {
     },
     "cs": {
         "belong": CommandType.Commit,
-        "command": "git show --pretty={0}".format(GIT_PRINT_FORMAT),
+        "command": f"git show --pretty={GIT_PRINT_FORMAT}",
         "help": "shows one or more objects (blobs, trees, tags and commits).",
         "has_arguments": True,
     },
@@ -308,21 +308,17 @@ Git_Cmds = {
     },
     "ls": {
         "belong": CommandType.Log,
-        "command": "git log --topo-order --stat --pretty={0}".format(GIT_PRINT_FORMAT),
+        "command": f"git log --topo-order --stat --pretty={GIT_PRINT_FORMAT}",
         "help": "displays the stats log.",
     },
     "ld": {
         "belong": CommandType.Log,
-        "command": "git log --topo-order --stat --patch --pretty={0}".format(
-            GIT_PRINT_FORMAT
-        ),
+        "command": f"git log --topo-order --stat --patch --pretty={GIT_PRINT_FORMAT}",
         "help": "displays the diff log.",
     },
     "lv": {
         "belong": CommandType.Log,
-        "command": "git log --topo-order --show-signature --pretty={0}".format(
-            GIT_PRINT_FORMAT
-        ),
+        "command": f"git log --topo-order --show-signature --pretty={GIT_PRINT_FORMAT}",
         "help": "displays the log, verifying the GPG signature of commits.",
     },
     "lc": {
