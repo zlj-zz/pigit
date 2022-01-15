@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.5-beta1"
+__version__ = "1.3.5"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -51,7 +51,7 @@ from .gitinfo import (
     output_git_local_config,
 )
 from .decorator import time_it
-from .config import Config
+from .config import CONF_ERROR, Config
 from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse

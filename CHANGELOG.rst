@@ -2,6 +2,12 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.5 (2022-01-15)
+----------
+- Refactor part of code.
+- Fix ``ue`` command about setting global user and email.
+- Fix ``--create-config`` command when don't have config.
+
 v1.3.4 (2021-12-26)
 ----------
 - Split TUI module.
@@ -63,7 +69,7 @@ v1.0.6 (2021-08-08)
 - Rename project, pygittools -> pigit
 - Added configuration.
 - Added interactive file tree operation.
-- Allowed some command combined use, like: `-if`.
+- Allowed some command combined use, like: ``-if``.
 - Optimized ignore matching algorithm of CodeCounter.
 - Increase the output mode of CodeCounter. [table, simple]
 - Refactor Git command processor.
@@ -87,7 +93,7 @@ v1.0.2 (2021-07-30)
 ----------
 - Add debug mode.
 - Update completion function.
-- Support create \``.gitignore`\` template according to given type.
+- Support create ``.gitignore`` template according to given type.
 - Show runtime.
 - Improve print, more color and beautiful.
 - Fix color compatibility with python2.
