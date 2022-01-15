@@ -178,6 +178,8 @@ class Config(object, metaclass=Singleton):
         for key in self._keys:
             if key in self.conf.keys() and self.conf[key] != CONF_ERROR:
                 setattr(self, key, self.conf[key])
+            else:
+                self.conf[key] = getattr(self, key)
 
     def read_config(self) -> None:
         new_config = self.conf
@@ -211,6 +213,13 @@ class Config(object, metaclass=Singleton):
                     except ValueError:
                         self.warnings.append(
                             'Config key "{0}" should be an integer!'.format(key)
+                        )
+                elif type(getattr(self, key)) == float:
+                    try:
+                        new_config[key] = float(line)
+                    except ValueError:
+                        self.warnings.append(
+                            'Config key "{0}" should be an float!'.format(key)
                         )
                 elif type(getattr(self, key)) == bool:
                     try:

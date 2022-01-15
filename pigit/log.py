@@ -18,6 +18,7 @@ FMT_DEBUG = logging.Formatter(
 
 def setup_logging(debug: bool = False, log_file: Optional[str] = None):
     root_logger = logging.getLogger()
+    # print(log_file)
 
     if debug:
         log_level = logging.DEBUG
