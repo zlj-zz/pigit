@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 from urllib.request import urlopen
 
-from .common import Fx, Emoji, confirm
+from .common import Fx, Emoji, confirm, traceback_info
 
 Log = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class GitignoreGenetor(object):
         try:
             handle = urlopen(url, timeout=self.timeout)
         except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(traceback_info())
             # Exit once an error occurs.
             return None
         else:
@@ -143,7 +143,7 @@ class GitignoreGenetor(object):
                 with open(ignore_path, "w") as fd:
                     fd.write(ignore_content)
             except Exception as e:
-                Log.error(str(e) + str(e.__traceback__))
+                Log.error(traceback_info())
                 print(
                     "Write gitignore file failed. You can copy it with the following:"
                 )

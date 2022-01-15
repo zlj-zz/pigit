@@ -6,18 +6,35 @@ if os.name == "nt":
     os.system("")
 
 from .emoji import Emoji
-from .style import Fx, Color, BoxSymbol, render_style, is_color
-from .utils import run_cmd, exec_cmd, confirm, similar_command, get_current_shell
+from .style import Fx, Color, BoxSymbol, render_style
+from .utils import (
+    run_cmd,
+    exec_cmd,
+    traceback_info,
+    confirm,
+    similar_command,
+    get_current_shell,
+)
 from .str_utils import get_width, shorten, adjudgment_type, get_file_icon
 
 
-# yapf: disable
 __all__ = [
-    "Emoji", "Color", "BoxSymbol", "Fx", "render_style", "is_color",
-    "run_cmd", "exec_cmd", "confirm", "similar_command", "get_current_shell",
-    "get_width", "shorten", "adjudgment_type", "get_file_icon",
+    "Emoji",
+    "Color",
+    "Fx",
+    "BoxSymbol",
+    "render_style",
+    "run_cmd",
+    "exec_cmd",
+    "traceback_info",
+    "confirm",
+    "similar_command",
+    "get_current_shell",
+    "get_width",
+    "shorten",
+    "adjudgment_type",
+    "get_file_icon",
 ]
-# yapf: enable
 
 
 def render_str(

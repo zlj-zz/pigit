@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.5"
+__version__ = "1.3.6-dev1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -43,7 +43,7 @@ from shutil import get_terminal_size
 from typing import Optional, Union
 
 from .log import setup_logging
-from .common import Color, render_str, get_current_shell
+from .common import Color, render_str, get_current_shell, traceback_info
 from .gitinfo import (
     Git_Version,
     REPOSITORY_PATH,
@@ -51,7 +51,7 @@ from .gitinfo import (
     output_git_local_config,
 )
 from .decorator import time_it
-from .config import CONF_ERROR, Config
+from .config import Config
 from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse
@@ -166,11 +166,7 @@ def get_extra_cmds() -> dict:
         try:
             extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
         except Exception as e:
-            Log.error(
-                "Can't load file '{0}';{1};{2}".format(
-                    extra_cmd_path, str(e), str(e.__traceback__)
-                )
-            )
+            Log.error(traceback_info(f"Can't load file '{extra_cmd_path}'."))
         else:
             try:
                 extra_cmds = extra_cmd.extra_cmds  # type: ignore

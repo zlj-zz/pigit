@@ -163,6 +163,9 @@ FX_CODE = {
     "blink": "\033[5m",
 }
 
+# color hexa string reg.
+_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
+
 
 class Fx(object):
     """Text effects
@@ -286,7 +289,7 @@ class Color(object):
             if ct > 255 * 3 or ct < 0:
                 raise ValueError("RGB values out of range: {}".format(color))
         except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(f"File style.py, line {e.__traceback__.tb_lineno}, {e}")
             self.escape = ""
             return
 
@@ -425,40 +428,36 @@ class Color(object):
         else:
             return ""
 
+    @staticmethod
+    def is_color(code: Union[str, list, tuple]) -> bool:
+        """Adjust whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
 
-# color hexa string reg.
-_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
+        Test `is_color()` whether can right adjust.
 
+            >>> Color.is_color('#FF0000')
+            True
+            >>> Color.is_color('sky_blue')
+            True
+            >>> Color.is_color([255, 0, 0])
+            True
+            >>> Color.is_color((0, 256, 0))
+            False
+            >>> Color.is_color(None)
+            False
+            >>> Color.is_color(12345)
+            False
 
-def is_color(code: Union[str, list, tuple]) -> bool:
-    """Adjust whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
+        """
 
-    Test `is_color()` whether can right adjust.
-
-        >>> is_color('#FF0000')
-        True
-        >>> is_color('sky_blue')
-        True
-        >>> is_color([255, 0, 0])
-        True
-        >>> is_color((0, 256, 0))
-        False
-        >>> is_color(None)
-        False
-        >>> is_color(12345)
-        False
-
-    """
-
-    if type(code) == str:
-        return (
-            _color_re.match(str(code)) is not None
-            or COLOR_CODE.get(code, None) is not None
-        )
-    elif isinstance(code, list) or isinstance(code, tuple):
-        return len(code) == 3 and not bool([i for i in code if i < 0 or i > 255])
-    else:
-        return False
+        if type(code) == str:
+            return (
+                _color_re.match(str(code)) is not None
+                or COLOR_CODE.get(code, None) is not None
+            )
+        elif isinstance(code, list) or isinstance(code, tuple):
+            return len(code) == 3 and not bool([i for i in code if i < 0 or i > 255])
+        else:
+            return False
 
 
 # If has special format string, will try to render the color and font style.

@@ -49,7 +49,7 @@ def main(command_str=[]):
     except KeyboardInterrupt:
         print("\n👋 goodbye")
     except Exception as e:
-        print(str(e), str(e.__traceback__))
+        print(str(e))
 
 
 def tomato(minutes, notify_msg):

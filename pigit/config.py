@@ -5,7 +5,7 @@ import logging
 import textwrap
 from distutils.util import strtobool
 
-from .common import confirm, is_color
+from .common import Color, confirm, traceback_info
 from .common.singleton import Singleton
 
 Log = logging.getLogger(__name__)
@@ -169,7 +169,7 @@ class Config(object, metaclass=Singleton):
         try:
             self.read_config()
         except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(traceback_info())
             self.warnings.append("Can not load the config file.")
 
         self.parse_conf()
@@ -232,7 +232,7 @@ class Config(object, metaclass=Singleton):
                             'Config key "{0}" can only be True or False!'.format(key)
                         )
                 elif type(getattr(self, key)) == str:
-                    if "color" in key and not is_color(line):
+                    if "color" in key and not Color.is_color(line):
                         self.warnings.append(
                             'Config key "{0}" should be RGB string, like: #FF0000'.format(
                                 key
@@ -307,7 +307,7 @@ class Config(object, metaclass=Singleton):
             ) as f:
                 f.write(self.CONFIG_TEMPLATE.format(**self.conf))
         except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(traceback_info())
             print("Fail to create config.")
         else:
             print("Successful.")

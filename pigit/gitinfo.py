@@ -4,7 +4,7 @@ import re
 import textwrap
 import logging
 
-from .common import exec_cmd, render_str
+from .common import exec_cmd, render_str, traceback_info
 from .common.git_utils import parse_git_config, git_version, current_repository
 from .common.table import dTable, TableTooWideError
 
@@ -66,7 +66,7 @@ def output_git_local_config(style: str = "table") -> None:
             output_way["normal"](config_dict)
 
             # log error info.
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(traceback_info())
 
 
 def output_repository_info(

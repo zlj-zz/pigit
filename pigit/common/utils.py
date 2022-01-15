@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import sys
 import subprocess
 import logging
 from math import sqrt
@@ -8,6 +9,29 @@ from typing import Iterable, Tuple
 
 
 Log = logging.getLogger(__name__)
+
+
+def traceback_info(extra_msg: str = "null"):
+    """Get traceback infomation.
+
+    Args:
+        extra_msg (str, optional): extra custom message. Defaults to "null".
+
+    Returns:
+        str: formated traceback infomation.
+    """
+
+    exc_type, exc_value, exc_obj = sys.exc_info()
+    if exc_type == None or exc_value == None or exc_obj == None:
+        return ""
+
+    err_value = exc_type.__name__
+    lineno = exc_obj.tb_lineno
+    filename = exc_obj.tb_frame.f_code.co_filename
+
+    return (
+        f"File {filename}, line {lineno}, {err_value}:{exc_value}, remark:[{extra_msg}]"
+    )
 
 
 def run_cmd(*args) -> bool:
@@ -28,7 +52,7 @@ def run_cmd(*args) -> bool:
         proc = subprocess.Popen(" ".join(args), shell=True)
         proc.wait()
     except Exception as e:
-        Log.error(str(e) + str(e.__traceback__))
+        Log.error(traceback_info())
         return False
     else:
         return True
@@ -55,7 +79,7 @@ def exec_cmd(*args) -> tuple[str, str]:
         err = proc.stderr.read().decode()
         proc.kill()
     except Exception as e:
-        Log.error(str(e) + str(e.__traceback__))
+        Log.error(traceback_info())
         return str(e), ""
     else:
         return err, res
@@ -160,3 +184,9 @@ if __name__ == "__main__":
     doctest.testmod(verbose=True)
 
     print(get_current_shell())
+
+    try:
+        a = int("abcd")
+    except Exception as e:
+        print(traceback_info())
+    print(traceback_info())

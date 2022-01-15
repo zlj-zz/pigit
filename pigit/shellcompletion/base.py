@@ -106,7 +106,7 @@ class ShellCompletion(object):
                 for line in complete_src:
                     f.write(line)
         except Exception as e:
-            Log.error(str(e) + str(e.__traceback__))
+            Log.error(str(e))
             return False
         else:
             return True
