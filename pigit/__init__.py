@@ -82,18 +82,22 @@ if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
     PIGIT_HOME = os.path.join(USER_HOME, __project__)
 else:
+    # ~/.config/pigit
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-LOG_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
-CONFIG_PATH: str = PIGIT_HOME + "/pigit.conf"
-COUNTER_PATH: str = PIGIT_HOME + "/Counter"
+LOG_FILE_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
+CONFIG_FILE_PATH: str = PIGIT_HOME + "/pigit.conf"
+COUNTER_DIR_PATH: str = PIGIT_HOME + "/Counter"
+EXTRA_CMD_FILE_PATH: str = PIGIT_HOME + "/extra_cmds.py"
 
 
 #####################################################################
 # Configuration.                                                    #
 #####################################################################
-CONFIG = Config(path=CONFIG_PATH, version=__version__, auto_load=True).output_warnings()
+CONFIG = Config(
+    path=CONFIG_FILE_PATH, version=__version__, auto_load=True
+).output_warnings()
 
 
 #####################################################################
@@ -124,7 +128,9 @@ def introduce() -> None:
     # Print package path.
     print(
         render_str(
-            "b`Local path`: u`{}`<sky_blue>\n".format(__file__.replace("./", ""))
+            "b`Local path`: u`{}`<sky_blue>\n".format(
+                os.path.dirname(__file__.replace("./", ""))
+            )
         )
     )
 
@@ -132,19 +138,13 @@ def introduce() -> None:
     print(
         render_str(
             "b`Description:`\n"
-            "  Terminal tool, help you use git more simple."
-            " Support Linux, MacOS and Windows.\n"
+            "  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.\n"
             "  It use short command to replace the original command, like: \n"
-            "  ``pigit ws``<ok> -> ``git status --short``<ok>,"
-            " ``pigit b``<ok> -> ``git branch``<ok>.\n"
-            "  Also you use ``pigit -s``<ok> to get the all short command,"
-            " have fun and good lucky.\n"
-            f"  The open source path on github: u`{__url__}`<sky_blue>"
+            "  ``pigit ws``<ok> -> ``git status --short``<ok>, ``pigit b``<ok> -> ``git branch``<ok>.\n"
+            "  Also you use ``pigit -s``<ok> to get the all short command, have fun and good lucky.\n"
+            f"  The open source path on github: u`{__url__}`<sky_blue>\n\n"
+            "You can use `-h`<ok> or `--help`<ok> to get help and more usage."
         )
-    )
-
-    print(
-        render_str("\nYou can use `-h`<ok> or `--help`<ok> to get help and more usage.")
     )
 
 
@@ -159,7 +159,7 @@ def get_extra_cmds() -> dict:
     """
     import imp
 
-    extra_cmd_path: str = PIGIT_HOME + "/extra_cmds.py"
+    extra_cmd_path = EXTRA_CMD_FILE_PATH
     extra_cmds = {}
 
     if os.path.isfile(extra_cmd_path):
@@ -538,7 +538,7 @@ class Parser(object):
                 CodeCounter(
                     count_path=path,
                     use_ignore=CONFIG.codecounter_use_gitignore,
-                    result_saved_path=COUNTER_PATH,
+                    result_saved_path=COUNTER_DIR_PATH,
                     result_format=CONFIG.codecounter_result_format,
                     use_icon=CONFIG.codecounter_show_icon,
                 ).count_and_format_print(
@@ -605,7 +605,7 @@ def main(custom_commands: Optional[list] = None):
     stdargs, extra_unknown = parser.parse()
 
     # Setup log handle.
-    log_file = LOG_PATH if stdargs.out_log or CONFIG.stream_output_log else None
+    log_file = LOG_FILE_PATH if stdargs.out_log or CONFIG.stream_output_log else None
     setup_logging(debug=stdargs.debug or CONFIG.debug_mode, log_file=log_file)
 
     # Process result.

@@ -7,7 +7,7 @@ import concurrent.futures
 from pprint import pprint
 from .utils import analyze_it
 
-from pigit import COUNTER_PATH
+from pigit import COUNTER_DIR_PATH
 from pigit.codecounter import CodeCounter, CodeCounterError
 
 
@@ -18,7 +18,7 @@ def test_codecounter(path=os.getcwd()):
 
     start_t = time.time()
     CodeCounter(
-        result_saved_path=COUNTER_PATH, count_path=path
+        result_saved_path=COUNTER_DIR_PATH, count_path=path
     ).count_and_format_print()
     print(time.time() - start_t)
 

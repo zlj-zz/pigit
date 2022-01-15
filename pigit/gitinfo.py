@@ -3,7 +3,6 @@
 import re
 import textwrap
 import logging
-from typing import Optional
 
 from .common import exec_cmd, render_str
 from .common.git_utils import parse_git_config, git_version, current_repository
