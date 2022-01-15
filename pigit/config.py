@@ -4,12 +4,13 @@ import os
 import logging
 import textwrap
 from distutils.util import strtobool
-from typing import Optional
 
 from .common import confirm, is_color
 from .common.singleton import Singleton
 
 Log = logging.getLogger(__name__)
+
+CONF_ERROR = "==error=="
 
 
 class ConfigError(Exception):
@@ -135,81 +136,111 @@ class Config(object, metaclass=Singleton):
     # Store warning messages.
     warnings: list = []
 
-    def __init__(self, path: str, current_version: str = "unknown") -> None:
+    def __init__(
+        self, path: str, version: str = "unknown", auto_load: bool = True
+    ) -> None:
         super(Config, self).__init__()
 
-        self.config_path = path
-        self.current_version = current_version
+        self.config_file_path: str = path
+        self.current_version: str = version
+        self.conf: dict = {}
 
-        conf = self.load_config()
+        if auto_load:
+            self.load_config()
 
-        for key in self._keys:
-            if key in conf.keys() and conf[key] != "==error==":
-                setattr(self, key, conf[key])
+    def output_warnings(self):
+        """Output config warning info and return self object.
 
-    def load_config(self) -> dict:
-        new_config = {}
-        config_file = self.config_path
+        Returns:
+            self (Config): single `Config` object.
+        """
+
+        if self.warnings:
+            print("Config Warning Info")
+            print("=" * 30)
+            for warning in self.warnings:
+                print(warning)
+            print("=" * 30)
+            self.warnings = []
+
+        return self
+
+    def load_config(self) -> None:
         try:
-            with open(config_file) as cf:
-                for line in cf:
-                    line = line.strip()
-                    if line.startswith("#? Config"):
-                        new_config["version"] = line[line.find("v. ") + 3 :]
-                        continue
-                    if line.startswith("#"):
-                        # comment line.
-                        continue
-                    if "=" not in line:
-                        # invalid line.
-                        continue
-                    key, line = line.split("=", maxsplit=1)
-
-                    # processing.
-                    key = key.strip()
-                    line = line.strip().strip('"')
-
-                    # checking.
-                    if key not in self._keys:
-                        self.warnings.append("'{0}' is not be supported!".format(key))
-                        continue
-                    elif type(getattr(self, key)) == int:
-                        try:
-                            new_config[key] = int(line)
-                        except ValueError:
-                            self.warnings.append(
-                                'Config key "{0}" should be an integer!'.format(key)
-                            )
-                    elif type(getattr(self, key)) == bool:
-                        try:
-                            # True values are y, yes, t, true, on and 1;
-                            # false values are n, no, f, false, off and 0.
-                            # Raises ValueError if val is anything else.
-                            new_config[key] = bool(strtobool(line))
-                        except ValueError:
-                            self.warnings.append(
-                                'Config key "{0}" can only be True or False!'.format(
-                                    key
-                                )
-                            )
-                    elif type(getattr(self, key)) == str:
-                        if "color" in key and not is_color(line):
-                            self.warnings.append(
-                                'Config key "{0}" should be RGB string, like: #FF0000'.format(
-                                    key
-                                )
-                            )
-                            continue
-                        new_config[key] = str(line)
+            self.read_config()
         except Exception as e:
             Log.error(str(e) + str(e.__traceback__))
+            self.warnings.append("Can not load the config file.")
+
+        self.parse_conf()
+
+        # setting config.
+        for key in self._keys:
+            if key in self.conf.keys() and self.conf[key] != CONF_ERROR:
+                setattr(self, key, self.conf[key])
+
+    def read_config(self) -> None:
+        new_config = self.conf
+        config_file = self.config_file_path
+
+        with open(config_file) as cf:
+            for line in cf:
+                line = line.strip()
+                if line.startswith("#? Config"):
+                    new_config["version"] = line[line.find("v. ") + 3 :]
+                    continue
+                if line.startswith("#"):
+                    # comment line.
+                    continue
+                if "=" not in line:
+                    # invalid line.
+                    continue
+                key, line = line.split("=", maxsplit=1)
+
+                # processing.
+                key = key.strip()
+                line = line.strip().strip('"')
+
+                # checking.
+                if key not in self._keys:
+                    self.warnings.append("'{0}' is not be supported!".format(key))
+                    continue
+                elif type(getattr(self, key)) == int:
+                    try:
+                        new_config[key] = int(line)
+                    except ValueError:
+                        self.warnings.append(
+                            'Config key "{0}" should be an integer!'.format(key)
+                        )
+                elif type(getattr(self, key)) == bool:
+                    try:
+                        # True values are y, yes, t, true, on and 1;
+                        # false values are n, no, f, false, off and 0.
+                        # Raises ValueError if val is anything else.
+                        new_config[key] = bool(strtobool(line))
+                    except ValueError:
+                        self.warnings.append(
+                            'Config key "{0}" can only be True or False!'.format(key)
+                        )
+                elif type(getattr(self, key)) == str:
+                    if "color" in key and not is_color(line):
+                        self.warnings.append(
+                            'Config key "{0}" should be RGB string, like: #FF0000'.format(
+                                key
+                            )
+                        )
+                        continue
+                    new_config[key] = str(line)
+
+    def parse_conf(self) -> None:
+        new_config = self.conf
 
         if (  # check codecounter output format whether supported.
             "codecounter_result_format" in new_config
             and new_config["codecounter_result_format"]
             not in self._supported_result_format
         ):
-            new_config["codecounter_result_format"] = "==error=="
+            new_config["codecounter_result_format"] = CONF_ERROR
             self.warnings.append(
                 'Config key "{0}" support must in {1}'.format(
                     "codecounter_result_format", self._supported_result_format
@@ -220,7 +251,7 @@ class Config(object, metaclass=Singleton):
             "git_config_format" in new_config
             and new_config["git_config_format"] not in self._supported_git_config_format
         ):
-            new_config["git_config_format"] = "==error=="
+            new_config["git_config_format"] = CONF_ERROR
             self.warnings.append(
                 'Config key "{0}" support must in {1}'.format(
                     "git_config_format", self._supported_git_config_format
@@ -245,33 +276,29 @@ class Config(object, metaclass=Singleton):
                 "You'd better recreate it."
             )
 
-        return new_config
-
     def create_config_template(self) -> None:
-        parent_dir = os.path.dirname(self.config_path)
+        parent_dir = os.path.dirname(self.config_file_path)
         if not os.path.isdir(parent_dir):
             os.makedirs(parent_dir, exist_ok=True)
 
-        if os.path.exists(self.config_path) and not confirm(
+        if os.path.exists(self.config_file_path) and not confirm(
             "Configuration exists, overwrite? [y/n]"
         ):
             return None
 
         # Try to load already has config.
-        conf = self.load_config()
-        for key in self._keys:
-            if not conf.get(key, None) or conf[key] == "==error==":
-                conf[key] = getattr(self, key)
-        conf["version"] = self.current_version
+        self.load_config()
+        self.conf["version"] = self.current_version
 
         # Write config. Will save before custom setting.
         try:
             with open(
-                self.config_path, "w" if os.path.isfile(self.config_path) else "x"
+                self.config_file_path,
+                "w" if os.path.isfile(self.config_file_path) else "x",
             ) as f:
-                f.write(self.CONFIG_TEMPLATE.format(**conf))
+                f.write(self.CONFIG_TEMPLATE.format(**self.conf))
         except Exception as e:
             Log.error(str(e) + str(e.__traceback__))
-            print("Failed, create config.")
+            print("Fail to create config.")
         else:
             print("Successful.")

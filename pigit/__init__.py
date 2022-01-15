@@ -93,11 +93,7 @@ COUNTER_PATH: str = PIGIT_HOME + "/Counter"
 #####################################################################
 # Configuration.                                                    #
 #####################################################################
-CONFIG = Config(path=CONFIG_PATH, current_version=__version__)
-if CONFIG.warnings:
-    for warning in CONFIG.warnings:
-        print(warning)
-    CONFIG.warnings = []
+CONFIG = Config(path=CONFIG_PATH, version=__version__, auto_load=True).output_warnings()
 
 
 #####################################################################
