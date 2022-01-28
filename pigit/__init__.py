@@ -148,6 +148,11 @@ def introduce() -> None:
     )
 
 
+def print_alias(alias_name: str):
+    alias = f"alias {alias_name}=pigit"
+    print(alias)
+
+
 def get_extra_cmds() -> dict:
     """Get custom cmds.
 
@@ -414,6 +419,12 @@ class Parser(object):
             help="List all command types and exit.",
         )
         p.add_argument(
+            "--alias",
+            nargs="?",
+            const="g",
+            help="print PIGIT alias handle, custom alias name.",
+        )
+        p.add_argument(
             "-d",
             "--debug",
             action="store_true",
@@ -503,6 +514,9 @@ class Parser(object):
                 show_lastest_log=CONFIG.repository_show_lastest_log,
                 show_summary=CONFIG.repository_show_summary,
             )
+
+            if known_args.alias:
+                return print_alias(known_args.alias)
 
             if known_args.complete:
                 # Generate competion vars dict.
