@@ -18,6 +18,7 @@ from .common.git_utils import (
     # option method
     switch_file_status,
     discard_file,
+    ignore_file,
     checkout_branch,
 )
 from .common.git_model import File, Commit, Branch
@@ -99,6 +100,9 @@ class StatusPanel(RowPanelWidget):
             if ConfirmWidget("discard all changed? [y/n]:").run():
                 # if confirm("discard all changed? [y/n]:"):
                 discard_file(self.raw_data[cursor_row - 1])
+            self.emit("update")
+        elif input_key == "i":
+            ignore_file(self.raw_data[cursor_row - 1])
             self.emit("update")
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
