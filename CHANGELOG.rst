@@ -2,6 +2,13 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.3.6 (2022-02-10)
+----------
+- Console add ``--alias`` command.
+- Interaction mode add ignore fuc.
+- Add new short git command about submodule.
+- Update log info more clear.
+
 v1.3.5 (2022-01-15)
 ----------
 - Refactor part of code.

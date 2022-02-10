@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.6-dev1"
+__version__ = "1.3.6"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -32,7 +32,7 @@ __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 
 __license__ = "MIT"
-__copyright__ = "Copyright (c) 2021 Zachary"
+__copyright__ = "Copyright (c) 2021-2022 Zachary"
 
 
 import os
