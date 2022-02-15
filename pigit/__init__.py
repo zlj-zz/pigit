@@ -24,7 +24,7 @@
 
 
 __project__ = "pigit"
-__version__ = "1.3.6"
+__version__ = "1.3.7-dev.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 

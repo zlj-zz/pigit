@@ -5,7 +5,7 @@ import re
 import logging
 
 from .utils import exec_cmd
-from .str_utils import shorten
+from .str_utils import shorten, garbled_code_analysis
 from .style import render_style
 from .git_model import File, Commit, Branch
 
@@ -172,6 +172,10 @@ def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[Fil
     if err:
         raise Exception("Can't get git status.")
     for file in files.rstrip().split("\n"):
+        # may is chinese char code.
+        if file.endswith('"'):
+            file = garbled_code_analysis(file)
+
         if not file.strip():
             # skip blank line.
             continue

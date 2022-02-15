@@ -33,6 +33,7 @@ release: del
 	twine upload dist/*
 
 install: del
+	$(PY) -m pip uninstall pigit
 	$(PY) setup.py install
 
 todo:

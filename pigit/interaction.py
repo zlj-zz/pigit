@@ -88,6 +88,7 @@ class StatusPanel(RowPanelWidget):
         return (
             "a / space: toggle storage or unstorage file.\n"
             "d: discard the file changed.\n"
+            "i: append the file to `.gitignore`.\n"
             "e: open file with default editor.\n"
             "↲ : check file diff.\n"
         )

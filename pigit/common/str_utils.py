@@ -28,6 +28,11 @@ Docs Test
         'Hello ^-^'
         >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
         '^-^world!'
+
+    Garbled code analysis.
+
+        # >>> garbled_code_analysis("\\346\\265\\213\\350\\257\\225\\344\\270\\255\\346\\226\\207\\345\\220\\215\\347\\247\\260")
+        中文测试名称
 """
 
 # from typing import Final # python3.8
@@ -255,6 +260,13 @@ def shorten(
             text = text[: width - len(placeholder)] + placeholder
 
     return text
+
+
+def garbled_code_analysis(v: str):
+    # TODO: not best way.
+    temp = f"b'{v}'"
+    temp = eval(temp)
+    return str(temp, encoding="utf-8")
 
 
 if __name__ == "__main__":
