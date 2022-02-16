@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import re
 import textwrap
 import random
 from typing import Optional, Union
@@ -53,24 +54,18 @@ class CmdProcessor(object):
             (str): color command string.
         """
 
-        command_list = command.split(" ")
-        color_command = render_str(
-            f"b`{command_list.pop(0)}`<ok> b`{command_list.pop(0)}`<goldenrod> "
-        )
+        handle = re.match(r"(\w+)\s+(\w+)", command)
+        prop = handle.group(1)
+        cmd = handle.group(2)
+        next_position = handle.span()[1]
 
-        less_len = len(command_list)
-        idx = 0
-        while idx < less_len:
-            if command_list[idx].startswith("-"):
-                temp = []
-                while idx < less_len and command_list[idx].startswith("-"):
-                    temp.append(command_list[idx])
-                    idx += 1
-                color_command += render_str(f"`{' '.join(temp)}`<sky_blue> ")
-            else:
-                while idx < less_len and not command_list[idx].startswith("-"):
-                    color_command += command_list[idx] + " "
-                    idx += 1
+        color_command = render_str(f"b`{prop}`<ok> b`{cmd}`<goldenrod> ")
+
+        arguments = re.findall(
+            r"\s+(-?-?[^\s]+)(=?([\w-]+:)?(\".*?\"|\'.*?\'))?", command[next_position:]
+        )
+        for arg_handle, value, _, _ in arguments:
+            color_command += render_str(f"`{arg_handle}`<sky_blue>{value} ")
 
         return color_command
 
