@@ -1,0 +1,116 @@
+#compdef pigit
+
+complete_pigit(){
+local curcontext="$curcontext" state line ret=1
+typeset -A opt_args
+
+_alternative\
+  'args:options arg:((\
+    b\:"lists, creates, renames, and deletes branches."\
+    bc\:"creates a new branch."\
+    bl\:"lists branches and their commits."\
+    bL\:"lists local and remote branches and their commits."\
+    bs\:"lists branches and their commits with ancestry graphs."\
+    bS\:"lists local and remote branches and their commits with ancestry graphs."\
+    bm\:"renames a branch."\
+    bM\:"renames a branch even if the new branch name already exists."\
+    bd\:"delete a local branch by name."\
+    c\:"records changes to the repository."\
+    ca\:"commits all modified and deleted files."\
+    cA\:"commits all modified and deleted files interactively"\
+    cm\:"commits with the given message."\
+    co\:"checks out a branch or paths to the working tree."\
+    cO\:"checks out hunks from the index or the tree interactively."\
+    cf\:"amends the tip of the current branch reusing the same log message as HEAD."\
+    cF\:"amends the tip of the current branch."\
+    cr\:"reverts existing commits by reverting patches and recording new commits."\
+    cR\:"removes the HEAD commit."\
+    cs\:"shows one or more objects (blobs, trees, tags and commits)."\
+    Cl\:"lists unmerged files."\
+    Ca\:"adds unmerged file contents to the index."\
+    Ce\:"executes merge-tool on all unmerged files."\
+    Co\:"checks out our changes for unmerged paths."\
+    CO\:"checks out our changes for all unmerged paths."\
+    Ct\:"checks out their changes for unmerged paths."\
+    CT\:"checks out their changes for all unmerged paths."\
+    f\:"downloads objects and references from another repository."\
+    fc\:"clones a repository into a new directory."\
+    fC\:"clones a repository into a new directory clearly(depth:1)."\
+    fm\:"fetches from and merges with another repository or local branch."\
+    fr\:"fetches from and rebase on top of another repository or local branch."\
+    fu\:"removes un-existing remote-tracking references, fetches all remotes and merges."\
+    fb\:"fetch other branch to local as same name."\
+    ia\:"adds file contents to the index(default: all files)."\
+    iA\:"adds file contents to the index interactively."\
+    iu\:"adds file contents to the index (updates only known files)."\
+    id\:"displays changes between the index and a named commit (diff)."\
+    iD\:"displays changes between the index and a named commit (word diff)."\
+    ir\:"resets the current HEAD to the specified state."\
+    iR\:"resets the current index interactively."\
+    ix\:"removes files from the index (recursively)."\
+    iX\:"removes files from the index (recursively and forced)."\
+    l\:"display the log with good format."\
+    l1\:"display the log with oneline."\
+    ls\:"displays the stats log."\
+    ld\:"displays the diff log."\
+    lv\:"displays the log, verifying the GPG signature of commits."\
+    lc\:"displays the commit count for each contributor in descending order."\
+    lr\:"manages reflog information."\
+    m\:"joins two or more development histories together."\
+    ma\:"aborts the conflict resolution, and reconstructs the pre-merge state."\
+    mC\:"performs the merge but does not commit."\
+    mF\:"creates a merge commit even if the merge could be resolved as a fast-forward."\
+    mS\:"performs the merge and GPG-signs the resulting commit."\
+    mv\:"verifies the GPG signature of the tip commit of the side branch being merged."\
+    mt\:"runs the merge conflict resolution tools to resolve conflicts."\
+    p\:"updates remote refs along with associated objects."\
+    pf\:"forces a push safely (with "lease")."\
+    pF\:"forces a push."\
+    pa\:"pushes all branches."\
+    pA\:"pushes all branches and tags."\
+    pt\:"pushes all tags."\
+    pc\:"pushes the current branch and adds origin as an upstream reference for it."\
+    pp\:"pulls and pushes the current branch from origin to origin."\
+    R\:"manages tracked repositories."\
+    Rl\:"lists remote names and their URLs."\
+    Ra\:"adds a new remote."\
+    Rx\:"removes a remote."\
+    Rm\:"renames a remote."\
+    Ru\:"fetches remotes updates."\
+    Rp\:"prunes all stale remote tracking branches."\
+    Rs\:"shows information about a given remote."\
+    RS\:"changes URLs for a remote."\
+    s\:"stashes the changes of the dirty working directory."\
+    sp\:"removes and applies a single stashed state from the stash list."\
+    sl\:"lists stashed states."\
+    sd\:"Remove submodule from repository."\
+    sD\:"Inverse initialization submodule, clear the dir."\
+    t\:"creates, lists, deletes or verifies a tag object signed with GPG."\
+    ta\:"create a new tag."\
+    tx\:"deletes tags with given names."\
+    ws\:"displays working-tree status in the short format."\
+    wS\:"displays working-tree status."\
+    wd\:"displays changes between the working tree and the index (diff)."\
+    wD\:"displays changes between the working tree and the index (word diff)."\
+    wr\:"resets the current HEAD to the specified state, does not touch the index nor the working tree."\
+    wR\:"resets the current HEAD, index and working tree to the specified state."\
+    wc\:"cleans untracked files from the working tree (dry-run)."\
+    wC\:"cleans untracked files from the working tree."\
+    wm\:"moves or renames files."\
+    wM\:"moves or renames files (forced)."\
+    wx\:"removes files from the working tree and from the index (recursively)."\
+    wX\:"removes files from the working tree and from the index (recursively and forced)."\
+    sc\:"Clone a repository as a submodule."\
+    si\:"Pull the submodule for the first time."\
+    su\:"Update git submodule."\
+    savepd\:"Remember your account and password."\
+    ue\:"set email and username interactively."\
+    user\:"set username."\
+    email\:"set user email."\
+    open\:"open remote repository in web browser"\
+  ))'\
+  'files:filename:_files'
+return ret
+}
+
+compdef complete_pigit pigit

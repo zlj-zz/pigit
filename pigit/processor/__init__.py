@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import textwrap
 import random
 from typing import Optional, Union
 
@@ -22,13 +23,13 @@ class CmdProcessor(object):
     def __init__(
         self,
         extra_cmds: Optional[dict] = None,
-        use_recommend: bool = True,
+        command_prompt: bool = True,
         show_original: bool = True,
         **kwargs,
     ) -> None:
         super(CmdProcessor, self).__init__()
 
-        self.use_recommend = use_recommend
+        self.use_recommend = command_prompt
         self.show_original = show_original
 
         self.cmds = Git_Cmds
@@ -146,7 +147,9 @@ class CmdProcessor(object):
     ################################
     # Print command help message.
     ################################
-    def _generate_help_by_key(self, _key: str, use_color: bool = True) -> str:
+    def _generate_help_by_key(
+        self, _key: str, use_color: bool = True, max_width=90
+    ) -> str:
         """Generate one help by given key.
 
         Args:
@@ -157,40 +160,33 @@ class CmdProcessor(object):
             (str): Help message of one command.
         """
 
-        _msg: str = "    {key_color}{:<9}{reset}{}{command_color}{}{reset}"
-        if use_color:
-            _key_color = Color.by_name("ok")
-            _command_color = Color.by_name("gold")
-        else:
-            _key_color = _command_color = ""
+        help_position = 15
+        msg_max_width = max_width - help_position
 
         # Get help message and command.
-        _help: str = self.cmds[_key].get("help", "")
-        try:
-            # must have key `command`.
-            _command = self.cmds[_key]["command"]
-        except:
-            raise ValueError("The `command` key can not be empty.")
+        _help: str = self.cmds[_key].get("help", "").strip()
+        if _help:
+            _help = textwrap.wrap(_help, msg_max_width)
+            help_msg = _help[0] + "\n"
+            for line in _help[1:]:
+                help_msg += "%*s%s\n" % (help_position, "", line)
+        else:
+            help_msg = ""
 
-        # Process help.
-        _help = _help + "\n" if _help else ""
-
-        # Process command.
+        _command = self.cmds[_key].get("command", "ERROR: empty command.")
         if callable(_command):
-            _command = "Callable: %s" % _command.__name__
+            _command = "Func: %s" % _command.__name__
 
-        _command = shorten(_command, 70, placeholder="...")
-        _command = " " * 13 + _command if _help else _command
+        _command = shorten(_command, msg_max_width, placeholder="...")
+        if help_msg:
+            command_msg = "%*s%s" % (help_position, "", _command)
+        else:
+            command_msg = _command
 
-        # Splicing and return.
-        return _msg.format(
-            _key,
-            _help,
-            _command,
-            key_color=_key_color,
-            command_color=_command_color,
-            reset=Fx.reset,
-        )
+        if use_color:
+            return render_str(f"  `{_key:<13}`<ok>{help_msg}`{command_msg}`<gold>")
+        else:
+            return f"  {_key:<12} {_help}{command_msg}"
 
     def command_help(self) -> None:
         """Print help message."""

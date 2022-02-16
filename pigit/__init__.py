@@ -574,7 +574,7 @@ class Parser(object):
 
             git_processor = CmdProcessor(
                 extra_cmds=extra_cmd,
-                use_recommend=CONFIG.gitprocessor_use_recommend,
+                command_prompt=CONFIG.gitprocessor_use_recommend,
                 show_original=CONFIG.gitprocessor_show_original,
                 use_color=CONFIG.gitprocessor_interactive_color,
                 help_wait=CONFIG.gitprocessor_interactive_help_showtime,
