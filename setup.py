@@ -37,17 +37,17 @@ python setup.py install  # On windows
     """
 
 from setuptools import setup, find_packages
-import pigit
+from pigit.const import __project__, __version__, __author__, __email__, __url__
 
 setup(
-    name=pigit.__project__,
-    version=pigit.__version__,
-    author=pigit.__author__,
-    author_email=pigit.__email__,
+    name=__project__,
+    version=__version__,
+    author=__author__,
+    author_email=__email__,
     description="Simple terminal tool of Git.",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url=pigit.__url__,
+    url=__url__,
     packages=find_packages(),
     include_package_data=True,
     classifiers=[

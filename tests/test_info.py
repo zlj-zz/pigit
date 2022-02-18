@@ -2,7 +2,7 @@ import pytest
 from .utils import analyze_it
 
 from pigit import Parser, introduce
-from pigit.gitinfo import output_repository_info, output_git_local_config
+from pigit.common.git_utils import output_repository_info, output_git_local_config
 
 
 @analyze_it

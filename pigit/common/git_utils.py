@@ -1,13 +1,15 @@
 # -*- coding:utf-8 -*-
 
-import os
-import re
-import logging
+import os, re, json, textwrap, logging
 
+
+from . import render_str, traceback_info
 from .utils import exec_cmd
 from .str_utils import shorten, garbled_code_analysis
 from .style import render_style
 from .git_model import File, Commit, Branch
+from .table import dTable, TableTooWideError
+from pigit.const import REPOS_PATH
 
 Log = logging.getLogger(__name__)
 
@@ -15,7 +17,7 @@ Log = logging.getLogger(__name__)
 #############
 # Basic info
 #############
-def git_version() -> str:
+def get_git_version() -> str:
     """Get Git version."""
 
     _, git_version_ = exec_cmd("git --version")
@@ -23,7 +25,26 @@ def git_version() -> str:
     return git_version_ or ""
 
 
-def current_repository() -> tuple[str, str]:
+def load_repos():
+    if not os.path.isfile(REPOS_PATH):
+        return []
+
+    with open(REPOS_PATH, "r") as fp:
+        repo_list = fp.read().split("\n")
+        return repo_list
+
+
+def _cache_repo(repo_path: str):
+    if not os.path.isfile(REPOS_PATH):
+        os.makedirs(os.path.dirname(REPOS_PATH), exist_ok=True)
+
+    with open(REPOS_PATH, "a+") as fp:
+        repo_list = fp.read().split("\n")
+        if repo_path not in repo_list:
+            fp.write(repo_path + "\n")
+
+
+def get_repo_info() -> tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -53,6 +74,9 @@ def current_repository() -> tuple[str, str]:
     else:
         git_conf_path = path
         repo_path = path[:-5]
+
+    if repo_path:
+        _cache_repo(repo_path)
 
     Log.debug("Final repo: {0}, {1}".format(repo_path, git_conf_path))
     return repo_path, git_conf_path
@@ -148,7 +172,7 @@ def get_first_pushed_commit(branch_name: str):
     return resp.strip()
 
 
-def get_log(branch_name: str, limit: bool = False, filter_path: str = ""):
+def load_log(branch_name: str, limit: bool = False, filter_path: str = ""):
     limit_flag = "-300" if limit else ""
     filter_flag = f"--follow -- {filter_path}" if filter_path else ""
     command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
@@ -349,7 +373,7 @@ def ignore_file(file: File):
     Args:
         f_path (str): full file path will be ignore.
     """
-    with open(f"{current_repository()[0]}/.gitignore", "a+") as f:
+    with open(f"{get_repo_info()[0]}/.gitignore", "a+") as f:
         f.write(f"\n{file.name}")
 
 
@@ -359,41 +383,128 @@ def checkout_branch(branch_name: str):
         return err
 
 
-if __name__ == "__main__":
-    # import sys
-    # sys.path.append(os.path.dirname(__file__))
-    from pprint import pprint
+##############
+# Config info
+##############
+def _config_normal_output(conf: dict[str, dict]) -> None:
+    for t, d in conf.items():
+        print(render_str(f"`[{t}]`<tomato>"))
+        for k, v in d.items():
+            print(render_str(f"\t`{k}`<sky_blue>=`{v}`<medium_violet_red>"))
 
-    conf = """
-    [core]
-        repositoryformatversion = 0
-        filemode = true
-        bare = false
-        logallrefupdates = true
-        ignorecase = true
-        precomposeunicode = true
-    [remote "origin"]
-        url = https://github.com/zlj-zz/pigit.git
-        fetch = +refs/heads/*:refs/remotes/origin/*
-    [branch "main"]
-        remote = origin
-        merge = refs/heads/main
-    [branch "pygittolls"]
-        remote = origin
-        merge = refs/heads/pygittolls
-    [branch "pygittools"]
-        remote = origin
-        merge = refs/heads/pygittools
-    [credential]
-        helper = store
-    [branch "split_file"]
-        remote = origin
-        merge = refs/heads/split_file
-    [branch "singla_file"]
-        remote = origin
-        merge = refs/heads/singla_file
-    [branch "compat-for-2"]
-        remote = origin
-        merge = refs/heads/compat-for-2
+
+def _config_table_output(conf: dict[str, dict]) -> None:
+    for sub in conf.values():
+        for k, v in sub.items():
+            sub[k] = render_str(f"`{v:40}`<pale_green>")
+
+    tb = dTable(conf, title="Git Local Config")
+    tb.print()
+
+
+_output_way = {
+    "normal": _config_normal_output,
+    "table": _config_table_output,
+}
+
+
+def output_git_local_config(style: str = "table") -> None:
+    """Print the local config of current git repository."""
+
+    REPOSITORY_PATH, GIT_CONF_PATH = get_repo_info()
+
+    if not REPOSITORY_PATH:
+        print(render_str("`This directory is not a git repository yet.`<error>"))
+        return None
+
+    try:
+        with open(GIT_CONF_PATH + "/config", "r") as cf:
+            context = cf.read()
+    except Exception as e:
+        print(
+            render_str("`Error reading configuration file. {0}`<error>").format(str(e))
+        )
+    else:
+        config_dict = parse_git_config(context)
+
+        try:
+            _output_way[style](config_dict)
+        except (KeyError, TableTooWideError) as e:
+            # There are two different causes of errors that can be triggered here.
+            # First, a non-existent format string is passed in (theoretically impossible),
+            # but terminal does not have enough width to display the table.
+            _output_way["normal"](config_dict)
+
+            # log error info.
+            Log.error(traceback_info())
+
+
+def output_repository_info(
+    show_path: bool = True,
+    show_remote: bool = True,
+    show_branches: bool = True,
+    show_lastest_log: bool = True,
+    show_summary: bool = True,
+) -> None:
+    """Print some information of the repository.
+
+    repository: `Repository_Path`
+    remote: read from '.git/conf'
+    >>> all_branch = run_cmd_with_resp('git branch --all --color')
+    >>> lastest_log = run_cmd_with_resp('git log -1')
     """
-    pprint(parse_git_config(conf))
+
+    print("waiting ...", end="")
+
+    error_str = render_str("`Error getting.`<error>")
+
+    REPOSITORY_PATH, _ = get_repo_info()
+
+    # Print content.
+    print(render_str("\r[b`Repository Information`]\n"))
+    if show_path:
+        print(render_str(f"Repository: \n\t`{REPOSITORY_PATH}`<sky_blue>\n"))
+
+    # Get remote url.
+    if show_remote:
+        try:
+            with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
+                config = cf.read()
+        except Exception:
+            remote = error_str
+        else:
+            res = re.findall(r"url\s=\s(.*)", config)
+            remote = "\n".join([render_str(f"\ti`{x}`<sky_blue>") for x in res])
+        print("Remote: \n%s\n" % remote)
+
+    # Get all branches.
+    if show_branches:
+        err, res = exec_cmd("git branch --all --color")
+        if err:
+            branches = "\t" + error_str
+        else:
+            branches = textwrap.indent(res, "\t")
+        print("Branches: \n%s\n" % branches)
+
+    # Get the lastest log.
+    if show_lastest_log:
+        err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
+        if err:
+            git_log = "\t" + error_str
+        else:
+            # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
+            git_log = textwrap.indent(res, "\t")
+        print("Lastest log:\n%s\n" % git_log)
+
+    # Get git summary.
+    if show_summary:
+        err, res = exec_cmd("git shortlog --summary --numbered")
+        if err:
+            summary = "\t" + error_str
+        else:
+            summary = textwrap.indent(res, "\t")
+        print("Summary:\n%s\n" % summary)
+
+
+if __name__ == "__main__":
+    pass

@@ -23,18 +23,6 @@
 # SOFTWARE.
 
 
-__project__ = "pigit"
-__version__ = "1.3.7-dev.1"
-__url__ = "https://github.com/zlj-zz/pigit.git"
-__uri__ = __url__
-
-__author__ = "Zachary Zhang"
-__email__ = "zlj19971222@outlook.com"
-
-__license__ = "MIT"
-__copyright__ = "Copyright (c) 2021-2022 Zachary"
-
-
 import os
 import sys
 import argparse
@@ -42,13 +30,24 @@ import logging
 from shutil import get_terminal_size
 from typing import Optional, Union
 
+
 from .log import setup_logging
+from .const import (
+    __version__,
+    __url__,
+    __project__,
+    PIGIT_HOME,
+    LOG_FILE_PATH,
+    CONFIG_FILE_PATH,
+    COUNTER_DIR_PATH,
+    EXTRA_CMD_FILE_PATH,
+)
 from .common import Color, render_str, get_current_shell, traceback_info
-from .gitinfo import (
-    Git_Version,
-    REPOSITORY_PATH,
-    output_repository_info,
+from .common.git_utils import (
+    get_git_version,
+    get_repo_info,
     output_git_local_config,
+    output_repository_info,
 )
 from .decorator import time_it
 from .config import Config
@@ -66,30 +65,6 @@ else:
 
 
 Log = logging.getLogger(__name__)
-
-#####################################################################
-# Part of compatibility.                                            #
-# Handled the incompatibility between python2 and python3.          #
-#####################################################################
-
-# For windows.
-USER_HOME: str = ""
-PIGIT_HOME: str = ""
-IS_WIN: bool = sys.platform.lower().startswith("win")
-Log.debug("Runtime platform is windows: {0}".format(IS_WIN))
-
-if IS_WIN:
-    USER_HOME = os.environ["USERPROFILE"]
-    PIGIT_HOME = os.path.join(USER_HOME, __project__)
-else:
-    # ~/.config/pigit
-    USER_HOME = os.environ["HOME"]
-    PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
-
-LOG_FILE_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
-CONFIG_FILE_PATH: str = PIGIT_HOME + "/pigit.conf"
-COUNTER_DIR_PATH: str = PIGIT_HOME + "/Counter"
-EXTRA_CMD_FILE_PATH: str = PIGIT_HOME + "/extra_cmds.py"
 
 
 #####################################################################
@@ -120,10 +95,11 @@ def introduce() -> None:
     )
 
     # Print git version.
-    if Git_Version is None:
+    git_version = get_git_version()
+    if git_version is None:
         print(render_str("`Don't found Git, maybe need install.`<error>"))
     else:
-        print(Git_Version)
+        print(git_version)
 
     # Print package path.
     print(
@@ -504,6 +480,8 @@ class Parser(object):
         return args, unknown
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
+        repo_path, repo_conf_path = get_repo_info()
+
         try:
             known_args.config and output_git_local_config(CONFIG.git_config_format)
 
@@ -540,7 +518,7 @@ class Parser(object):
                     timeout=CONFIG.gitignore_generator_timeout,
                 ).launch(
                     known_args.ignore_type,
-                    dir_path=REPOSITORY_PATH,
+                    dir_path=repo_path,
                 )
 
             if known_args.count:
