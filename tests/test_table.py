@@ -2,7 +2,7 @@ import time
 import textwrap
 import pytest
 
-from pigit.common.table import Table, dTable
+from pigit.tui.table import Table, dTable
 
 
 @pytest.mark.parametrize(

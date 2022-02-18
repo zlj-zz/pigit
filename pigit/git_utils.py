@@ -3,12 +3,12 @@
 import os, re, json, textwrap, logging
 
 
-from . import render_str, traceback_info
-from .utils import exec_cmd
-from .str_utils import shorten, garbled_code_analysis
-from .style import render_style
+from .common import render_str, traceback_info
+from .common.utils import exec_cmd
+from .common.str_utils import shorten, garbled_code_analysis
+from .common.style import render_style
 from .git_model import File, Commit, Branch
-from .table import dTable, TableTooWideError
+from .tui.table import dTable, TableTooWideError
 from pigit.const import REPOS_PATH
 
 Log = logging.getLogger(__name__)

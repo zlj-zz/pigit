@@ -13,7 +13,7 @@ from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
 from .common import Color, Fx, confirm, shorten, get_file_icon, adjudgment_type
-from .common.table import Table
+from .tui.table import Table
 
 
 Log = logging.getLogger(__name__)

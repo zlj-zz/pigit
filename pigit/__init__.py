@@ -43,7 +43,7 @@ from .const import (
     EXTRA_CMD_FILE_PATH,
 )
 from .common import Color, render_str, get_current_shell, traceback_info
-from .common.git_utils import (
+from .git_utils import (
     get_git_version,
     get_repo_info,
     output_git_local_config,

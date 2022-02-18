@@ -7,7 +7,7 @@ from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .common import Color, Fx, render_str
-from .common.git_utils import (
+from .git_utils import (
     # info method
     load_branches,
     load_status,
@@ -21,7 +21,7 @@ from .common.git_utils import (
     ignore_file,
     checkout_branch,
 )
-from .common.git_model import File, Commit, Branch
+from .git_model import File, Commit, Branch
 
 
 class BranchPanel(RowPanelWidget):

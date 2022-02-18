@@ -5,8 +5,8 @@ from shutil import get_terminal_size
 from copy import deepcopy
 from typing import Generator
 
-from .style import BoxSymbol, Fx
-from .str_utils import get_width
+from ..common.style import BoxSymbol, Fx
+from ..common.str_utils import get_width
 
 
 class TableTooWideError(Exception):
