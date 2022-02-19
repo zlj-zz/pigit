@@ -30,7 +30,7 @@ class TestCompletion:
 
     def test_parse_parser(self):
         p = Parser()
-        p.parse([""])
+        # p.parse([])
         res = process_argparse(p._parser)
         pprint(res)
 

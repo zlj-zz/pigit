@@ -26,5 +26,5 @@ def test_table():
 
 def test_show_help():
     p = Parser()
-    p.parse([""])
+    # p.parse([])
     p._parser.print_help()
