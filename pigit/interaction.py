@@ -209,7 +209,7 @@ class ModelSwitcher(SwitchWidget):
             return int(key) - 1
 
 
-def main(args=None):
+def main(index=None):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
         print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
@@ -220,8 +220,8 @@ def main(args=None):
     branch = BranchPanel()
     switcher = ModelSwitcher(sub_widgets=[status, commit, branch])
 
-    if args:
-        start_idx = args[0]
+    if index:
+        start_idx = index
         switcher.set_current(int(start_idx) - 1)
 
     screen = Screen(switcher)

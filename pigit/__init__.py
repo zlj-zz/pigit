@@ -24,10 +24,8 @@
 
 
 import os
-import sys
 import argparse
 import logging
-from shutil import get_terminal_size
 from typing import Optional, Union
 
 
@@ -40,9 +38,8 @@ from .const import (
     LOG_FILE_PATH,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
-    EXTRA_CMD_FILE_PATH,
 )
-from .common import Color, render_str, get_current_shell, traceback_info
+from .common import render_str, get_current_shell
 from .git_utils import (
     get_git_version,
     get_repo_info,
@@ -54,14 +51,7 @@ from .config import Config
 from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse
-from .processor import CmdProcessor, Git_Cmds, CommandType
-
-if not sys.platform.lower().startswith("win"):
-    from .interaction import main as interactive_interface
-else:
-
-    def interactive_interface(args=None):
-        print(render_str("`Windows not support this.`<#FF0000>"))
+from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
 
 
 Log = logging.getLogger(__name__)
@@ -115,47 +105,15 @@ def introduce() -> None:
         render_str(
             "b`Description:`\n"
             "  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.\n"
-            "  It use short command to replace the original command, like: \n"
-            "  ``pigit ws``<ok> -> ``git status --short``<ok>, ``pigit b``<ok> -> ``git branch``<ok>.\n"
-            "  Also you use ``pigit -s``<ok> to get the all short command, have fun and good lucky.\n"
             f"  The open source path on github: u`{__url__}`<sky_blue>\n\n"
-            "You can use `-h`<ok> or `--help`<ok> to get help and more usage."
+            "You can use `-h`<ok> or `--help`<ok> to get help and usage."
         )
     )
 
 
-def print_alias(alias_name: str):
-    alias = f"alias {alias_name}=pigit"
+def print_alias(alias_name: str, cmd: str = ""):
+    alias = f'alias {alias_name}="pigit {cmd}"'
     print(alias)
-
-
-def get_extra_cmds() -> dict:
-    """Get custom cmds.
-
-    Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
-    exists, and return it. If not have, return a empty dict.
-
-    Returns:
-        (dict[str,str]): extra cmds dict.
-    """
-    import imp
-
-    extra_cmd_path = EXTRA_CMD_FILE_PATH
-    extra_cmds = {}
-
-    if os.path.isfile(extra_cmd_path):
-        try:
-            extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
-        except Exception as e:
-            Log.error(traceback_info(f"Can't load file '{extra_cmd_path}'."))
-        else:
-            try:
-                extra_cmds = extra_cmd.extra_cmds  # type: ignore
-            except AttributeError:
-                Log.error("Can't found dict name is 'extra_cmds'.")
-
-    # print(extra_cmds)
-    return extra_cmds
 
 
 def shell_mode(git_processor: CmdProcessor):
@@ -248,116 +206,119 @@ def shell_mode(git_processor: CmdProcessor):
     return None
 
 
-class CustomHelpFormatter(argparse.HelpFormatter):
-    """Formatter for generating usage messages and argument help strings.
-
-    This class inherits `argparse.HelpFormatter` and rewrites some methods
-    to complete customization.
-    """
-
-    def __init__(
-        self, prog, indent_increment=2, max_help_position=24, width=90, colors=None
-    ):
-        width = CONFIG.help_max_line_width
-        max_width, _ = get_terminal_size()
-
-        width = width if width < max_width else max_width - 2
-        super(CustomHelpFormatter, self).__init__(
-            prog, indent_increment, max_help_position, width
-        )
-        if not colors or not isinstance(colors, list):
-            colors = {
-                "red": Color.fg("#FF6347"),  # Tomato
-                "green": Color.fg("#98FB98"),  # PaleGreen
-                "yellow": Color.fg("#EBCB8C"),  # Yellow
-                "blue": Color.fg("#87CEFA"),  # SkyBlue
-                # Color.fg("#FFC0CB"),  # Pink
-            }
-        self.colors = colors
-        self.color_len = len(colors)
-        self._old_color = None
-
-    def _format_action(self, action):
-        # determine the required width and the entry label
-        help_position = min(self._action_max_length + 2, self._max_help_position)
-        help_width = max(self._width - help_position, 11)
-        action_width = help_position - self._current_indent - 2
-        action_header = self._format_action_invocation(action)
-
-        # no help; start on same line and add a final newline
-        if not action.help:
-            tup = self._current_indent, "", action_header
-            action_header = "%*s%s\n" % tup
-
-        # short action name; start on the same line and pad two spaces
-        elif len(action_header) <= action_width:
-            tup = self._current_indent, "", action_width, action_header
-            action_header = "%*s%-*s  " % tup
-            indent_first = 0
-
-        # long action name; start on the next line
-        else:
-            tup = self._current_indent, "", action_header
-            action_header = "%*s%s\n" % tup
-            indent_first = help_position
-
-        # collect the pieces of the action help
-        # @Overwrite
-        if CONFIG.help_use_color:
-            _color = self.colors["green"]
-        else:
-            _color = ""
-        parts = [_color + action_header + "\033[0m"]
-
-        # if there was help for the action, add lines of help text
-        if action.help:
-            help_text = self._expand_help(action)
-            help_lines = self._split_lines(help_text, help_width)
-            parts.append("%*s%s\n" % (indent_first, "", help_lines[0]))
-            for line in help_lines[1:]:
-                parts.append("%*s%s\n" % (help_position, "", line))
-
-        # or add a newline if the description doesn't end with one
-        elif not action_header.endswith("\n"):
-            parts.append("\n")
-
-        # if there are any sub-actions, add their help as well
-        for subaction in self._iter_indented_subactions(action):
-            parts.append(self._format_action(subaction))
-
-        # return a single string
-        return self._join_parts(parts)
-
-    def _fill_text(self, text, width, indent):
-        try:
-            return "".join(indent + line for line in text.splitlines(keepends=True))
-        except TypeError:
-            return "".join(indent + line for line in text.splitlines())
-
-    def _get_help_string(self, action):
-        help = action.help
-        if "%(default)" not in action.help:
-            if action.default is not argparse.SUPPRESS:
-                defaulting_nargs = [argparse.OPTIONAL, argparse.ZERO_OR_MORE]
-                if action.option_strings or action.nargs in defaulting_nargs:
-                    # help += " (default: %(default)s)"
-                    pass
-        return help
-
-
 class Parser(object):
     def __init__(self) -> None:
         super(Parser, self).__init__()
         self._parser = argparse.ArgumentParser(
             prog="pigit",
+            prefix_chars="-",
+            # formatter_class=CustomHelpFormatter,
+        )
+        self._subparsers = self._parser.add_subparsers()
+
+        self._add_cmd_args()
+        self._add_repo_args()
+        self._add_tui_args()
+        self._add_args()
+
+    def _add_cmd_args(self) -> None:
+        cmd = self._subparsers.add_parser(
+            "cmd",
+            help="git short command.",
             description="If you want to use some original git commands, "
             "please use -- to indicate.",
-            prefix_chars="-",
-            formatter_class=CustomHelpFormatter,
         )
-        self._add_arguments()
+        cmd.add_argument(
+            "command",
+            nargs="?",
+            type=str,
+            default=None,
+            help="Short git command or other.",
+        )
+        cmd.add_argument("args", nargs="*", type=str, help="Command parameter list.")
+        cmd.add_argument(
+            "-s",
+            "--show-commands",
+            action="store_true",
+            help="List all available short command and wealth and exit.",
+        )
+        cmd.add_argument(
+            "-p",
+            "--show-part-command",
+            type=str,
+            metavar="TYPE",
+            dest="command_type",
+            help="According to given type [%s] list available short command and "
+            "wealth and exit." % ", ".join(CommandType.__members__.keys()),
+        )
+        cmd.add_argument(
+            "-t",
+            "--types",
+            action="store_true",
+            help="List all command types and exit.",
+        )
+        cmd.add_argument(
+            "--shell",
+            action="store_true",
+            help="Go to the pigit shell mode.",
+        )
+        cmd.set_defaults(func=self._cmd_func)
 
-    def _add_arguments(self) -> None:
+    def _cmd_func(self, args: argparse.Namespace, unknown: list):
+        extra_cmd = {
+            "shell": {
+                "command": lambda _: shell_mode(git_processor),
+                "type": "func",
+                "help": "Into PIGIT shell mode.",
+            },  # only for tips.
+        }
+        extra_cmd.update(get_extra_cmds())
+
+        git_processor = CmdProcessor(
+            extra_cmds=extra_cmd,
+            command_prompt=CONFIG.gitprocessor_use_recommend,
+            show_original=CONFIG.gitprocessor_show_original,
+            use_color=CONFIG.gitprocessor_interactive_color,
+            help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+        )
+
+        if args.shell:
+            shell_mode(git_processor)
+
+        if args.show_commands:
+            return git_processor.command_help()
+
+        if args.command_type:
+            return git_processor.command_help_by_type(args.command_type)
+
+        if args.types:
+            return git_processor.type_help()
+
+        if args.command:
+            command = args.command
+            args.args.extend(unknown)
+            git_processor.process_command(command, args.args)
+            return None
+        else:
+            print(render_str("`pigit cmd -h`<ok> for help."))
+
+    def _add_repo_args(self) -> None:
+
+        repo = self._subparsers.add_parser("repo", help="repo options.")
+
+    def _add_tui_args(self) -> None:
+        tui = self._subparsers.add_parser(
+            "tui", help="interactive operation git tree status."
+        )
+        tui.add_argument("index", type=int, nargs="?", const=1, help="page index.")
+        tui.set_defaults(func=self._tui_func)
+
+    def _tui_func(self, args: argparse.Namespace, unknown: list):
+        from .interaction import main as interactive_interface
+
+        interactive_interface(args.index)
+
+    def _add_args(self) -> None:
         p = self._parser
 
         p.add_argument(
@@ -374,30 +335,8 @@ class Parser(object):
             help="Add shell prompt script and exit.(Supported bash, zsh, fish)",
         )
         p.add_argument(
-            "-s",
-            "--show-commands",
-            action="store_true",
-            help="List all available short command and wealth and exit.",
-        )
-        p.add_argument(
-            "-p",
-            "--show-part-command",
-            type=str,
-            metavar="TYPE",
-            dest="command_type",
-            help="According to given type [%s] list available short command and "
-            "wealth and exit." % ", ".join(CommandType.__members__.keys()),
-        )
-        p.add_argument(
-            "-t",
-            "--types",
-            action="store_true",
-            help="List all command types and exit.",
-        )
-        p.add_argument(
             "--alias",
-            nargs="?",
-            const="g",
+            nargs="*",
             help="print PIGIT alias handle, custom alias name.",
         )
         p.add_argument(
@@ -452,16 +391,6 @@ class Parser(object):
             help="Create a pre-configured file of PIGIT."
             "(If a profile exists, the values available in it are used)",
         )
-        tool_group.add_argument(
-            "--shell",
-            action="store_true",
-            help="Go to the pigit shell mode.",
-        )
-
-        p.add_argument(
-            "command", nargs="?", type=str, help="Short git command or other."
-        )
-        p.add_argument("args", nargs="*", type=str, help="Command parameter list.")
 
     def parse(
         self, custom_commands: Union[list, str, None] = None
@@ -480,6 +409,7 @@ class Parser(object):
         return args, unknown
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
+        # print(known_args)
         repo_path, repo_conf_path = get_repo_info()
 
         try:
@@ -494,7 +424,13 @@ class Parser(object):
             )
 
             if known_args.alias:
-                return print_alias(known_args.alias)
+                alias = known_args.alias
+                if len(alias) > 2:
+                    return print("error: argument --alias: max support 2 arguments.")
+                elif len(alias) == 2:
+                    return print_alias(alias[0], alias[1])
+                else:
+                    return print_alias(alias[0])
 
             if known_args.complete:
                 # Generate competion vars dict.
@@ -534,47 +470,8 @@ class Parser(object):
                 )
                 return None
 
-            extra_cmd = {
-                "ui": {
-                    "belong": CommandType.Index,
-                    "command": interactive_interface,
-                    "help": "interactive operation git tree status.",
-                    "type": "func",
-                    "has_arguments": True,
-                },
-                "shell": {
-                    "command": lambda _: shell_mode(git_processor),
-                    "type": "func",
-                    "help": "Into PIGIT shell mode.",
-                },  # only for tips.
-            }
-            extra_cmd.update(get_extra_cmds())
-
-            git_processor = CmdProcessor(
-                extra_cmds=extra_cmd,
-                command_prompt=CONFIG.gitprocessor_use_recommend,
-                show_original=CONFIG.gitprocessor_show_original,
-                use_color=CONFIG.gitprocessor_interactive_color,
-                help_wait=CONFIG.gitprocessor_interactive_help_showtime,
-            )
-
-            if known_args.shell:
-                shell_mode(git_processor)
-
-            if known_args.show_commands:
-                return git_processor.command_help()
-
-            if known_args.command_type:
-                return git_processor.command_help_by_type(known_args.command_type)
-
-            if known_args.types:
-                return git_processor.type_help()
-
-            if known_args.command:
-                command = known_args.command
-                known_args.args.extend(extra_unknown)
-                git_processor.process_command(command, known_args.args)
-                return None
+            if "func" in known_args:
+                known_args.func(known_args, extra_unknown)
 
             # Don't have invalid command list.
             if not list(filter(lambda x: x, vars(known_args).values())):

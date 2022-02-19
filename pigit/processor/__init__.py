@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
 
+import os
 import re
 import textwrap
 import random
+import logging
 from typing import Optional, Union
 
 from ..common import (
@@ -14,11 +16,45 @@ from ..common import (
     confirm,
     similar_command,
     shorten,
+    traceback_info,
 )
+from ..common.singleton import Singleton
+from ..const import EXTRA_CMD_FILE_PATH
 from .cmds import Git_Cmds, CommandType
 
+Log = logging.getLogger(__name__)
 
-class CmdProcessor(object):
+
+def get_extra_cmds() -> dict:
+    """Get custom cmds.
+
+    Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
+    exists, and return it. If not have, return a empty dict.
+
+    Returns:
+        (dict[str,str]): extra cmds dict.
+    """
+    import imp
+
+    extra_cmd_path = EXTRA_CMD_FILE_PATH
+    extra_cmds = {}
+
+    if os.path.isfile(extra_cmd_path):
+        try:
+            extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
+        except Exception as e:
+            Log.error(traceback_info(f"Can't load file '{extra_cmd_path}'."))
+        else:
+            try:
+                extra_cmds = extra_cmd.extra_cmds  # type: ignore
+            except AttributeError:
+                Log.error("Can't found dict name is 'extra_cmds'.")
+
+    # print(extra_cmds)
+    return extra_cmds
+
+
+class CmdProcessor(object, metaclass=Singleton):
     """Git short command processor."""
 
     def __init__(
