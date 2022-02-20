@@ -462,6 +462,7 @@ class Parser(object):
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
         repo_path, repo_conf_path = get_repo_info()
+        # print(repo_path, repo_conf_path)
         # if repo_path:
         #     add_repos([repo_path])
 
