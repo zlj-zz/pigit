@@ -14,7 +14,7 @@ from .git_utils import (
     load_file_diff,
     load_commits,
     load_commit_info,
-    current_head,
+    get_head,
     # option method
     switch_file_status,
     discard_file,
@@ -147,7 +147,7 @@ class FilePanel(RowPanelWidget):
 
 class CommitPanel(RowPanelWidget):
     def get_raw_data(self) -> list[Commit]:
-        branch_name = current_head()
+        branch_name = get_head()
         return load_commits(branch_name)
 
     def process_raw_data(self, raw_data: list[Any]) -> list[str]:

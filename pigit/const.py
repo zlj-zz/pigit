@@ -40,4 +40,4 @@ COUNTER_DIR_PATH: str = PIGIT_HOME + "/Counter"
 
 EXTRA_CMD_FILE_PATH: str = PIGIT_HOME + "/extra_cmds.py"
 
-REPOS_PATH: str = PIGIT_HOME + "/repos.txt"
+REPOS_PATH: str = PIGIT_HOME + "/repos.json"

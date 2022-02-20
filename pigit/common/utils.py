@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
 
 import sys
+import platform
 import subprocess
+import asyncio
 import logging
 from math import sqrt
 from collections import Counter
@@ -34,7 +36,7 @@ def traceback_info(extra_msg: str = "null"):
     )
 
 
-def run_cmd(*args) -> bool:
+def run_cmd(*args, cwd=None) -> bool:
     """Run system command.
 
     Returns:
@@ -49,7 +51,7 @@ def run_cmd(*args) -> bool:
 
     try:
         # ? In python2, `subprocess` not support `with` sentence.
-        proc = subprocess.Popen(" ".join(args), shell=True)
+        proc = subprocess.Popen(" ".join(args), shell=True, cwd=cwd)
         proc.wait()
     except Exception as e:
         Log.error(traceback_info())
@@ -58,7 +60,7 @@ def run_cmd(*args) -> bool:
         return True
 
 
-def exec_cmd(*args) -> tuple[str, str]:
+def exec_cmd(*args, cwd=None) -> tuple[str, str]:
     """Run system command and get result.
 
     Returns:
@@ -67,22 +69,64 @@ def exec_cmd(*args) -> tuple[str, str]:
 
     try:
         # Take over the input stream and get the return information.
-        proc = subprocess.Popen(
+        with subprocess.Popen(
             " ".join(args),
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
             shell=True,
-        )
+            cwd=cwd,
+        ) as proc:
 
-        # Get normal output and error output.
-        res = proc.stdout.read().decode()
-        err = proc.stderr.read().decode()
-        proc.kill()
+            output = proc.communicate()
+            # Get normal output and error output.
+            res = output[0].decode()
+            err = output[1].decode()
+            # res = proc.stdout.read().decode()
+            # err = proc.stderr.read().decode()
     except Exception as e:
         Log.error(traceback_info())
         return str(e), ""
     else:
         return err, res
+
+
+async def async_run_cmd(*args, cwd=None):
+    cmds = " ".join(args).split(" ")
+
+    # receive (program, *args, ...), so must split the full cmd,
+    # and unpack incoming.
+    proc = await asyncio.create_subprocess_exec(
+        *cmds,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        start_new_session=True,
+        cwd=cwd,
+    )
+    res, err = await proc.communicate()
+    if res:
+        print(res.decode())
+    if err:
+        print(err.decode())
+
+    if proc.returncode != 0:
+        return cwd
+
+
+def exec_async_tasks(tasks) -> list:
+    """Execute tasks asynchronously."""
+
+    # TODO: asyncio API is nicer in python 3.7
+    if platform.system() == "Windows":
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+    else:
+        loop = asyncio.get_event_loop()
+
+    try:
+        errors = loop.run_until_complete(asyncio.gather(*tasks))
+    finally:
+        loop.close()
+    return errors
 
 
 def confirm(text: str = "", default: bool = True) -> bool:

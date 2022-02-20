@@ -1,15 +1,16 @@
 # -*- coding:utf-8 -*-
 
-import os, re, json, textwrap, logging
+import os, re, textwrap, logging
 
-
-from .common import render_str, traceback_info
-from .common.utils import exec_cmd
-from .common.str_utils import shorten, garbled_code_analysis
-from .common.style import render_style
+from .common import (
+    render_str,
+    traceback_info,
+    exec_cmd,
+    shorten,
+    garbled_code_analysis,
+)
 from .git_model import File, Commit, Branch
 from .tui.table import dTable, TableTooWideError
-from pigit.const import REPOS_PATH
 
 Log = logging.getLogger(__name__)
 
@@ -25,23 +26,17 @@ def get_git_version() -> str:
     return git_version_ or ""
 
 
-def load_repos():
-    if not os.path.isfile(REPOS_PATH):
-        return []
+def is_git_path(path: str) -> bool:
+    """Return True if path is a git dir else False."""
 
-    with open(REPOS_PATH, "r") as fp:
-        repo_list = fp.read().split("\n")
-        return repo_list
+    if not os.path.isdir(path):
+        return False
 
-
-def _cache_repo(repo_path: str):
-    if not os.path.isfile(REPOS_PATH):
-        os.makedirs(os.path.dirname(REPOS_PATH), exist_ok=True)
-
-    with open(REPOS_PATH, "a+") as fp:
-        repo_list = fp.read().split("\n")
-        if repo_path not in repo_list:
-            fp.write(repo_path + "\n")
+    _, res = exec_cmd("git rev-parse --is-inside-work-tree", cwd=path)
+    if res.strip() == "true":
+        return True
+    else:
+        return False
 
 
 def get_repo_info() -> tuple[str, str]:
@@ -75,8 +70,8 @@ def get_repo_info() -> tuple[str, str]:
         git_conf_path = path
         repo_path = path[:-5]
 
-    if repo_path:
-        _cache_repo(repo_path)
+    # if repo_path:
+    #     _cache_repo(repo_path)
 
     Log.debug("Final repo: {0}, {1}".format(repo_path, git_conf_path))
     return repo_path, git_conf_path
@@ -110,11 +105,13 @@ def parse_git_config(conf: str) -> dict:
     return config_dict
 
 
-def current_head():
+def get_head(cwd: str = "."):
     """Get current repo head.
     return a branch name or a commit sha string.
     """
-    _, res = exec_cmd("git symbolic-ref -q --short HEAD")
+    _, res = exec_cmd(
+        "git symbolic-ref -q --short HEAD || git describe --tags --exact-match", cwd=cwd
+    )
     return res.rstrip()
 
 
@@ -214,7 +211,7 @@ def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[Fil
 
         display_name = shorten(name, max_width - 3 - ident)
         # color full command.
-        display_str = render_style(
+        display_str = render_str(
             f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {display_name}"
         )
 

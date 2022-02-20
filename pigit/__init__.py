@@ -46,6 +46,14 @@ from .git_utils import (
     output_git_local_config,
     output_repository_info,
 )
+from .repo_utils import (
+    add_repos,
+    rm_repos,
+    rename_repo,
+    ll_repos,
+    repo_options,
+    process_repo_option,
+)
 from .decorator import time_it
 from .config import Config
 from .codecounter import CodeCounter
@@ -264,7 +272,7 @@ class Parser(object):
         )
         cmd.set_defaults(func=self._cmd_func)
 
-    def _cmd_func(self, args: argparse.Namespace, unknown: list):
+    def _cmd_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
         extra_cmd = {
             "shell": {
                 "command": lambda _: shell_mode(git_processor),
@@ -305,6 +313,50 @@ class Parser(object):
     def _add_repo_args(self) -> None:
 
         repo = self._subparsers.add_parser("repo", help="repo options.")
+        repo_sub = repo.add_subparsers()
+
+        add = repo_sub.add_parser("add", help="add repo(s).")
+        add.add_argument("paths", nargs="+", help="path of reps(s).")
+        add.add_argument("--dry-run", action="store_true", help="dry run.")
+        add.set_defaults(func=self._repo_func, kwargs={"option": "add"})
+
+        rm = repo_sub.add_parser("rm", help="remove repo(s).")
+        rm.add_argument("repos", nargs="+", help="name or path of repo(s).")
+        rm.add_argument(
+            "--use-path",
+            action="store_true",
+            help="remove follow path, defult is name.",
+        )
+        rm.set_defaults(func=self._repo_func, kwargs={"option": "rm"})
+
+        rename = repo_sub.add_parser("rename", help="rename a repo.")
+        rename.add_argument("repo", help="the name of repo.")
+        rename.add_argument("new_name", help="the new name of repo.")
+        rename.set_defaults(func=self._repo_func, kwargs={"option": "rename"})
+
+        ll = repo_sub.add_parser("ll", help="display summary of all repos.")
+        ll.add_argument("--simple", action="store_true", help="display simple summary.")
+        ll.set_defaults(func=self._repo_func, kwargs={"option": "ll"})
+
+        for name, op in repo_options.items():
+            help_msg = op.get("help", "") + " for repo(s)."
+            sp = repo_sub.add_parser(name, help=help_msg)
+            sp.add_argument("repos", nargs="*", help="name of repo(s).")
+            sp.set_defaults(func=self._repo_func, kwargs={"option": name})
+
+    def _repo_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
+        option = kwargs.get("option", "")
+
+        if option == "add":
+            add_repos(args.paths, args.dry_run)
+        elif option == "rm":
+            rm_repos(args.repos, args.use_path)
+        elif option == "rename":
+            rename_repo(args.repo, args.new_name)
+        elif option == "ll":
+            ll_repos(args.simple)
+        else:
+            process_repo_option(args.repos, option)
 
     def _add_tui_args(self) -> None:
         tui = self._subparsers.add_parser(
@@ -313,7 +365,7 @@ class Parser(object):
         tui.add_argument("index", type=int, nargs="?", const=1, help="page index.")
         tui.set_defaults(func=self._tui_func)
 
-    def _tui_func(self, args: argparse.Namespace, unknown: list):
+    def _tui_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
         from .interaction import main as interactive_interface
 
         interactive_interface(args.index)
@@ -409,8 +461,9 @@ class Parser(object):
         return args, unknown
 
     def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
-        # print(known_args)
         repo_path, repo_conf_path = get_repo_info()
+        # if repo_path:
+        #     add_repos([repo_path])
 
         try:
             known_args.config and output_git_local_config(CONFIG.git_config_format)
@@ -471,7 +524,8 @@ class Parser(object):
                 return None
 
             if "func" in known_args:
-                known_args.func(known_args, extra_unknown)
+                kwargs = getattr(known_args, "kwargs", {})
+                known_args.func(known_args, extra_unknown, kwargs)
 
             # Don't have invalid command list.
             if not list(filter(lambda x: x, vars(known_args).values())):
