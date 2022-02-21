@@ -120,7 +120,6 @@ def introduce() -> None:
 
 
 def shell_mode(git_processor: CmdProcessor):
-    import pigit.tomato
 
     print(
         "Welcome come PIGIT shell.\n"
@@ -144,10 +143,6 @@ def shell_mode(git_processor: CmdProcessor):
 
         elif command in git_processor.cmds.keys():
             git_processor.process_command(command, args_str.split())
-
-        elif command == "tomato":
-            # Tomato clock.
-            pigit.tomato.main(input_argv_str.split())
 
         elif command in ["sh", "shell"]:
             if args_str:
@@ -178,9 +173,6 @@ def shell_mode(git_processor: CmdProcessor):
 
             elif "all" in args_str:
                 git_processor.command_help()
-
-            elif "tomato" in args_str:
-                pigit.tomato.help("tomato")
 
             elif "sh" in args_str or "shell" in args_str:
                 print(
