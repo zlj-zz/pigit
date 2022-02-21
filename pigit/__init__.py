@@ -119,11 +119,6 @@ def introduce() -> None:
     )
 
 
-def print_alias(alias_name: str, cmd: str = ""):
-    alias = f'alias {alias_name}="pigit {cmd}"'
-    print(alias)
-
-
 def shell_mode(git_processor: CmdProcessor):
     import pigit.tomato
 
@@ -414,11 +409,6 @@ class Parser(object):
             description="Auxiliary type commands.",
         )
         tool_group.add_argument(
-            "--alias",
-            nargs="*",
-            help="print PIGIT alias handle, custom alias name.",
-        )
-        tool_group.add_argument(
             "-c",
             "--count",
             nargs="?",
@@ -480,15 +470,6 @@ class Parser(object):
                 show_lastest_log=CONFIG.repository_show_lastest_log,
                 show_summary=CONFIG.repository_show_summary,
             )
-
-        elif known_args.alias:
-            alias = known_args.alias
-            if len(alias) > 2:
-                return print("error: argument --alias: max support 2 arguments.")
-            elif len(alias) == 2:
-                return print_alias(alias[0], alias[1])
-            else:
-                return print_alias(alias[0])
 
         elif known_args.complete:
             # Generate competion vars dict.
