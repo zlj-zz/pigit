@@ -9,12 +9,13 @@ from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .common import Color, Fx, render_str
 from .git_utils import (
     # info method
+    get_repo_info,
+    get_head,
     load_branches,
     load_status,
     load_file_diff,
     load_commits,
     load_commit_info,
-    get_head,
     # option method
     switch_file_status,
     discard_file,
@@ -213,6 +214,10 @@ def main(index=None):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
         print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
+        return
+
+    if not get_repo_info()[0]:
+        print(render_str("`Please run in a git repo dir.`<tomato>"))
         return
 
     status = StatusPanel(widget=FilePanel())

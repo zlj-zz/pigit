@@ -28,7 +28,6 @@ import argparse
 import logging
 from typing import Optional, Union
 
-
 from .log import setup_logging
 from .const import (
     __version__,
@@ -38,8 +37,9 @@ from .const import (
     LOG_FILE_PATH,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
+    IS_FIRST_RUN,
 )
-from .common import render_str, get_current_shell
+from .common import render_str, get_current_shell, confirm
 from .git_utils import (
     get_git_version,
     get_repo_info,
@@ -56,7 +56,6 @@ from .repo_utils import (
 )
 from .decorator import time_it
 from .config import Config
-from .codecounter import CodeCounter
 from .gitignore import GitignoreGenetor
 from .shellcompletion import shell_compele, process_argparse
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
@@ -220,13 +219,13 @@ class Parser(object):
         self._parser = argparse.ArgumentParser(
             prog="pigit",
             prefix_chars="-",
+            description="Pigit TUI is called automatically if no parameters are followed."
             # formatter_class=CustomHelpFormatter,
         )
         self._subparsers = self._parser.add_subparsers()
 
         self._add_cmd_args()
         self._add_repo_args()
-        self._add_tui_args()
         self._add_args()
 
     def _add_cmd_args(self) -> None:
@@ -358,18 +357,6 @@ class Parser(object):
         else:
             process_repo_option(args.repos, option)
 
-    def _add_tui_args(self) -> None:
-        tui = self._subparsers.add_parser(
-            "tui", help="interactive operation git tree status."
-        )
-        tui.add_argument("index", type=int, nargs="?", const=1, help="page index.")
-        tui.set_defaults(func=self._tui_func)
-
-    def _tui_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
-        from .interaction import main as interactive_interface
-
-        interactive_interface(args.index)
-
     def _add_args(self) -> None:
         p = self._parser
 
@@ -381,15 +368,22 @@ class Parser(object):
             version="Version: %s" % __version__,
         )
         p.add_argument(
-            "-C",
-            "--complete",
+            "-r",
+            "--report",
             action="store_true",
-            help="Add shell prompt script and exit.(Supported bash, zsh, fish)",
+            help="Report the pigit desc and exit.",
         )
         p.add_argument(
-            "--alias",
-            nargs="*",
-            help="print PIGIT alias handle, custom alias name.",
+            "-f",
+            "--config",
+            action="store_true",
+            help="Display the config of current git repository and exit.",
+        )
+        p.add_argument(
+            "-i",
+            "--information",
+            action="store_true",
+            help="Show some information about the current git repository.",
         )
         p.add_argument(
             "-d",
@@ -408,16 +402,9 @@ class Parser(object):
             description="Auxiliary type commands.",
         )
         tool_group.add_argument(
-            "-f",
-            "--config",
-            action="store_true",
-            help="Display the config of current git repository and exit.",
-        )
-        tool_group.add_argument(
-            "-i",
-            "--information",
-            action="store_true",
-            help="Show some information about the current git repository.",
+            "--alias",
+            nargs="*",
+            help="print PIGIT alias handle, custom alias name.",
         )
         tool_group.add_argument(
             "-c",
@@ -430,6 +417,12 @@ class Parser(object):
             "A given path can be accepted, and the default is the current directory.",
         )
         tool_group.add_argument(
+            "-C",
+            "--complete",
+            action="store_true",
+            help="Add shell prompt script and exit.(Supported bash, zsh, fish)",
+        )
+        tool_group.add_argument(
             "--create-ignore",
             type=str,
             metavar="TYPE",
@@ -437,7 +430,7 @@ class Parser(object):
             help="Create a demo .gitignore file. Need one argument, support: [%s]"
             % ", ".join(GitignoreGenetor.Supported_Types.keys()),
         )
-        p.add_argument(
+        tool_group.add_argument(
             "--create-config",
             action="store_true",
             help="Create a pre-configured file of PIGIT."
@@ -460,16 +453,15 @@ class Parser(object):
         Log.debug("Parser result: {0}, {1}".format(args, unknown))
         return args, unknown
 
-    def process(self, known_args, extra_unknown: Optional[list] = None) -> None:
-        repo_path, repo_conf_path = get_repo_info()
-        # print(repo_path, repo_conf_path)
-        # if repo_path:
-        #     add_repos([repo_path])
+    def _process(self, known_args, extra_unknown: Optional[list] = None) -> None:
+        if known_args.report:
+            introduce()
 
-        try:
-            known_args.config and output_git_local_config(CONFIG.git_config_format)
+        elif known_args.config:
+            output_git_local_config(CONFIG.git_config_format)
 
-            known_args.information and output_repository_info(
+        elif known_args.information:
+            output_repository_info(
                 show_path=CONFIG.repository_show_path,
                 show_remote=CONFIG.repository_show_remote,
                 show_branches=CONFIG.repository_show_branchs,
@@ -477,60 +469,76 @@ class Parser(object):
                 show_summary=CONFIG.repository_show_summary,
             )
 
-            if known_args.alias:
-                alias = known_args.alias
-                if len(alias) > 2:
-                    return print("error: argument --alias: max support 2 arguments.")
-                elif len(alias) == 2:
-                    return print_alias(alias[0], alias[1])
-                else:
-                    return print_alias(alias[0])
+        elif known_args.alias:
+            alias = known_args.alias
+            if len(alias) > 2:
+                return print("error: argument --alias: max support 2 arguments.")
+            elif len(alias) == 2:
+                return print_alias(alias[0], alias[1])
+            else:
+                return print_alias(alias[0])
 
-            if known_args.complete:
-                # Generate competion vars dict.
-                completion_vars = {
-                    key: value.get("help", "") for key, value in Git_Cmds.items()
-                }
+        elif known_args.complete:
+            # Generate competion vars dict.
+            completion_vars = {
+                key: value.get("help", "") for key, value in Git_Cmds.items()
+            }
 
-                # Update var dict with shell command.
-                completion_vars.update(process_argparse(self._parser))
+            # Update var dict with shell command.
+            completion_vars.update(process_argparse(self._parser))
 
-                shell_compele(
-                    get_current_shell(), __project__, completion_vars, PIGIT_HOME
-                )
-                return None
+            shell_compele(get_current_shell(), __project__, completion_vars, PIGIT_HOME)
+            return None
 
-            if known_args.create_config:
-                return CONFIG.create_config_template()
+        elif known_args.create_config:
+            return CONFIG.create_config_template()
 
-            if known_args.ignore_type:
-                return GitignoreGenetor(
-                    timeout=CONFIG.gitignore_generator_timeout,
-                ).launch(
-                    known_args.ignore_type,
-                    dir_path=repo_path,
-                )
+        elif known_args.ignore_type:
+            repo_path, repo_conf_path = get_repo_info()
 
-            if known_args.count:
-                path = known_args.count if known_args.count != "." else os.getcwd()
-                CodeCounter(
-                    count_path=path,
-                    use_ignore=CONFIG.codecounter_use_gitignore,
-                    result_saved_path=COUNTER_DIR_PATH,
-                    result_format=CONFIG.codecounter_result_format,
-                    use_icon=CONFIG.codecounter_show_icon,
-                ).count_and_format_print(
-                    show_invalid=CONFIG.codecounter_show_invalid,
-                )
-                return None
+            return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
+                known_args.ignore_type,
+                dir_path=repo_path,
+            )
 
-            if "func" in known_args:
-                kwargs = getattr(known_args, "kwargs", {})
-                known_args.func(known_args, extra_unknown, kwargs)
+        elif known_args.count:
+            from .codecounter import CodeCounter
 
-            # Don't have invalid command list.
-            if not list(filter(lambda x: x, vars(known_args).values())):
+            path = (
+                os.path.abspath(known_args.count)
+                if known_args.count != "."
+                else os.getcwd()
+            )
+            CodeCounter(
+                count_path=path,
+                use_ignore=CONFIG.codecounter_use_gitignore,
+                result_saved_path=COUNTER_DIR_PATH,
+                result_format=CONFIG.codecounter_result_format,
+                use_icon=CONFIG.codecounter_show_icon,
+            ).count_and_format_print(
+                show_invalid=CONFIG.codecounter_show_invalid,
+            )
+            return None
+
+        elif "func" in known_args:
+            kwargs = getattr(known_args, "kwargs", {})
+            known_args.func(known_args, extra_unknown, kwargs)
+
+        # Don't have invalid command list.
+        # if not list(filter(lambda x: x, vars(known_args).values())):
+        else:
+            from .interaction import main as interactive_interface
+
+            if IS_FIRST_RUN:
                 introduce()
+                if not confirm("Input `enter` to continue:"):
+                    return
+
+            interactive_interface()
+
+    def process(self, a, b):
+        try:
+            self._process(a, b)
         except (KeyboardInterrupt, EOFError):
             raise SystemExit(0)
 

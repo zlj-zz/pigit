@@ -26,20 +26,7 @@ def get_git_version() -> str:
     return git_version_ or ""
 
 
-def is_git_path(path: str) -> bool:
-    """Return True if path is a git dir else False."""
-
-    if not os.path.isdir(path):
-        return False
-
-    _, res = exec_cmd("git rev-parse --is-inside-work-tree", cwd=path)
-    if res.strip() == "true":
-        return True
-    else:
-        return False
-
-
-def get_repo_info() -> tuple[str, str]:
+def get_repo_info(path: str = ".") -> tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -48,11 +35,14 @@ def get_repo_info() -> tuple[str, str]:
         (tuple[str, str]): repository path, git config path.
     """
 
-    err, path = exec_cmd("git rev-parse --git-dir")
-
     repo_path: str = ""
     git_conf_path: str = ""
 
+    path = os.path.abspath(path)
+    if not os.path.isdir(path):
+        return repo_path, git_conf_path
+
+    err, path = exec_cmd("git rev-parse --git-dir", cwd=path)
     if err:
         return repo_path, git_conf_path
 

@@ -3,10 +3,9 @@ import os
 import textwrap
 from collections import Counter
 
-from pigit.common import render_str
-from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
+from pigit.common import render_str, async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
 from pigit.const import REPOS_PATH
-from pigit.git_utils import get_head, is_git_path
+from pigit.git_utils import get_head, get_repo_info
 
 
 def _make_repo_name(path: str, repos: list[str], name_counts: Counter) -> str:
@@ -53,10 +52,13 @@ def save_repos(repos: dict) -> bool:
 
 def add_repos(paths: list[str], dry_run: bool = False):
     exist_repos = load_repos()
-    exist_path = [r["path"] for r in exist_repos.values()]
+    exist_paths = [r["path"] for r in exist_repos.values()]
 
-    true_paths = [os.path.abspath(p) for p in paths]
-    new_git_paths = [p for p in true_paths if is_git_path(p) and p not in exist_path]
+    new_git_paths = []
+    for p in paths:
+        repo_path, repo_conf = get_repo_info(p)
+        if repo_path and repo_path not in exist_paths:
+            new_git_paths.append(repo_path)
 
     if new_git_paths:
         print(f"Found {len(new_git_paths)} new repo(s).")
