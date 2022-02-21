@@ -28,77 +28,64 @@ python setup.py install  # On windows
 
 ## Usage
 
-You can run `pigit` in terminal, and you will see this intro:
+You can run `pigit -r` in terminal, and you will see this intro:
 
 ```
  ____ ___ ____ ___ _____
 |  _ \_ _/ ___|_ _|_   _|
 | |_) | | |  _ | |  | |
 |  __/| | |_| || |  | |
-|_|  |___\____|___| |_| version: 1.3.4.dev
+|_|  |___\____|___| |_| version: 1.5.0-dev.1
 
-git version 2.30.1 (Apple Git-130)
+git version 2.32.0 (Apple Git-132)
 
-Local path: /usr/local/lib/python3.9/site-packages/pigit-1.3.4.dev0-py3.9.egg/pigit/__init__.py
+Local path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.5.0.dev1-py3.9.egg/pigit
 
 Description:
   Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
-  It use short command to replace the original command, like:
-  `pigit ws` -> `git status --short`, `pigit b` -> `git branch`.
-  Also you use `pigit -s` to get the all short command, have fun and good lucky.
   The open source path on github: https://github.com/zlj-zz/pigit.git
 
-You can use -h or --help to get help and more usage.
+You can use -h or --help to get help and usage.
 
 ```
 
 You can run `pigit -h` or `pigit --help` to get the help message. Like this:
 
 ```bash
-usage: pigit [-h] [-v] [-C] [-s] [-p TYPE] [-t] [-d] [--out-log] [-f] [-i] [-c [PATH]]
-             [--create-ignore TYPE] [--create-config] [--shell]
-             [command] [args ...]
+usage: pigit [-h] [-v] [-r] [-f] [-i] [-d] [--out-log] [-c [PATH]] [-C] [--create-ignore TYPE] [--create-config] {cmd,repo} ...
 
-If you want to use some original git commands, please use -- to indicate.
+Pigit TUI is called automatically if no parameters are followed.
 
 positional arguments:
-  command               Short git command or other.
-  args                  Command parameter list.
+  {cmd,repo}
+    cmd                 git short command.
+    repo                repo options.
 
 optional arguments:
   -h, --help            show this help message and exit
   -v, --version         Show version and exit.
-  -C, --complete        Add shell prompt script and exit.(Supported bash, zsh, fish)
-  -s, --show-commands   List all available short command and wealth and exit.
-  -p TYPE, --show-part-command TYPE
-                        According to given type [Branch, Commit, Conflict, Fetch, Index,
-                        Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Submodule,
-                        Setting, Extra] list available short command and wealth and exit.
-  -t, --types           List all command types and exit.
+  -r, --report          Report the pigit desc and exit.
+  -f, --config          Display the config of current git repository and exit.
+  -i, --information     Show some information about the current git repository.
   -d, --debug           Current runtime in debug mode.
   --out-log             Print log to console.
-  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the
-                        values available in it are used)
 
 tools arguments:
   Auxiliary type commands.
 
-  -f, --config          Display the config of current git repository and exit.
-  -i, --information     Show some information about the current git repository.
   -c [PATH], --count [PATH]
-                        Count the number of codes and output them in tabular form.A given
-                        path can be accepted, and the default is the current directory.
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support:
-                        [android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin,
-                        lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift,
-                        unity]
-  --shell               Go to the pigit shell mode.
+                        Count the number of codes and output them in tabular form.A given path can be accepted, and the default is
+                        the current directory.
+  -C, --complete        Add shell prompt script and exit.(Supported bash, zsh, fish)
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c, dart, elisp, gitbook,
+                        go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity]
+  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the values available in it are used)
 
 ```
 
 **For example**
 
-You can use `pigit -s` to check what short command it supported, it will display the corresponding help information and the original command, like this:
+You can use `pigit cmd -s` to check what short command it supported, it will display the corresponding help information and the original command, like this:
 
 ```
 These are short commands that can replace git operations:
@@ -127,7 +114,7 @@ These are short commands that can replace git operations:
 
 ### Interaction
 
-It support a simple interactive mode. You can use `pigit ui` into the interactive mode and it let control the working tree simpler. like this:
+It support a simple interactive mode. You can use `pigit` into the interactive mode and it let control the working tree simpler. like this:
 
 ![interaction demo](./interaction.gif)
 
@@ -135,7 +122,7 @@ And in the interaction mode, you can use `?` or `h` to see the help message.
 
 ### Open remote
 
-You can use `pigit open` to open your remote website (just support **github**). These are some other parameters this command supported:
+You can use `pigit cmd open` to open your remote website (just support **github**). These are some other parameters this command supported:
 
 ```bash
   -i, --issue:
@@ -153,13 +140,16 @@ You can use `pigit open` to open your remote website (just support **github**). 
 
 ## Alias
 
-Alias is recommended for faster use _pigit_. Open your shell profile and append:
+Alias is good way to help you use _pigit_ faster . Open your shell profile and append:
 
 ```bash
-alias g=pigit
+if type pigit >/dev/null 2>&1; then
+    alias gt=pigit
+    alias g="pigit cmd"
+fi
 ```
 
-Then, you can use `g` to call pigit.
+Then, you can use `gt` to call TUI and use `g` to call `pigit cmd`.
 
 ## Configuration
 
