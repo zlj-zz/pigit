@@ -105,6 +105,12 @@ def get_head(cwd: str = "."):
     return res.rstrip()
 
 
+def get_first_pushed_commit(branch_name: str):
+    command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
+    _, resp = exec_cmd(command)
+    return resp.strip()
+
+
 ###############
 # Special info
 ###############
@@ -151,12 +157,6 @@ def load_branches() -> list[Branch]:
         branchs.append(branch)
 
     return branchs
-
-
-def get_first_pushed_commit(branch_name: str):
-    command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
-    _, resp = exec_cmd(command)
-    return resp.strip()
 
 
 def load_log(branch_name: str, limit: bool = False, filter_path: str = ""):
@@ -223,7 +223,11 @@ def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[Fil
 
 
 def load_file_diff(
-    file: str, tracked: bool = True, cached: bool = False, plain: bool = False
+    file: str,
+    tracked: bool = True,
+    cached: bool = False,
+    plain: bool = False,
+    path: str = ".",
 ) -> str:
     """Gets the modification of the file.
     Args:
@@ -247,7 +251,8 @@ def load_file_diff(
         file = file.split("->")[-1].strip()
 
     err, res = exec_cmd(
-        command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file)
+        command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file),
+        cwd=path,
     )
     if err:
         return "Can't get diff."
@@ -336,16 +341,16 @@ def load_commit_info(commit_sha: str, file_name: str = "", plain: bool = False) 
 ##########
 # Options
 ##########
-def switch_file_status(file: File):
+def switch_file_status(file: File, path: str = "."):
     if file.has_merged_conflicts or file.has_inline_merged_conflicts:
         pass
     elif file.has_unstaged_change:
-        exec_cmd("git add -- {}".format(file.name))
+        exec_cmd("git add -- {}".format(file.name), cwd=path)
     elif file.has_staged_change:
         if file.tracked:
-            exec_cmd("git reset HEAD -- {}".format(file.name))
+            exec_cmd("git reset HEAD -- {}".format(file.name), cwd=path)
         else:
-            exec_cmd("git rm --cached --force -- {}".format(file.name))
+            exec_cmd("git rm --cached --force -- {}".format(file.name), cwd=path)
 
 
 def discard_file(file: File):

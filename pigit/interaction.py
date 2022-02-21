@@ -66,6 +66,8 @@ class BranchPanel(RowPanelWidget):
 
 
 class StatusPanel(RowPanelWidget):
+    repo_path, repo_conf = get_repo_info()
+
     def get_raw_data(self) -> list[File]:
         return load_status(self.size[0])
 
@@ -96,12 +98,12 @@ class StatusPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key in ["a", " "]:
-            switch_file_status(self.raw_data[cursor_row - 1])
+            switch_file_status(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
         elif input_key == "d":
             if ConfirmWidget("discard all changed? [y/n]:").run():
                 # if confirm("discard all changed? [y/n]:"):
-                discard_file(self.raw_data[cursor_row - 1])
+                discard_file(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
         elif input_key == "i":
             ignore_file(self.raw_data[cursor_row - 1])
@@ -109,13 +111,15 @@ class StatusPanel(RowPanelWidget):
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
-                CmdRunner('{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name))
+                CmdRunner(
+                    '{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name),
+                    path=self.repo_path,
+                )
             else:
                 # No default editor to open file.
                 pass
         elif input_key == "enter":
-            # TODO: how to do ?
-            self.widget.set_file(self.raw_data[cursor_row - 1])
+            self.widget.set_file(self.raw_data[cursor_row - 1], self.repo_path)
             self.widget.activate()
         elif input_key == "q":
             raise ExitLoop
@@ -123,16 +127,22 @@ class StatusPanel(RowPanelWidget):
 
 class FilePanel(RowPanelWidget):
     _file = None
+    _repo_path = None
 
-    def set_file(self, file: File):
+    def set_file(self, file: File, path: str):
         if self._file != file:
             self.size = None
             self.cursor_row = 1
             self._file = file
+        if self._repo_path != path:
+            self._repo_path = path
 
     def get_raw_data(self) -> list[Any]:
         return load_file_diff(
-            self._file.name, self._file.tracked, self._file.has_staged_change
+            self._file.name,
+            self._file.tracked,
+            self._file.has_staged_change,
+            path=self._repo_path,
         ).split("\n")
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:

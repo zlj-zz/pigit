@@ -249,15 +249,16 @@ class ConfirmWidget:
 
 
 class CmdRunner:
-    def __init__(self, cmd: str, auto_run: bool = True) -> None:
+    def __init__(self, cmd: str, auto_run: bool = True, path: str = ".") -> None:
         self.cmd = cmd
         self.auto_run = auto_run
+        self.run_path = path
 
         if self.auto_run:
             self.run()
 
     def run(self):
         print(Term.normal_screen)
-        res_code = run_cmd(self.cmd)
+        res_code = run_cmd(self.cmd, cwd=self.run_path)
         print(Term.alt_screen)
         return res_code
