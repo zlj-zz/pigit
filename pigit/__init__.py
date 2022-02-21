@@ -48,6 +48,7 @@ from .git_utils import (
 )
 from .repo_utils import (
     add_repos,
+    clear_repos,
     rm_repos,
     rename_repo,
     ll_repos,
@@ -272,6 +273,12 @@ class Parser(object):
         cmd.set_defaults(func=self._cmd_func)
 
     def _cmd_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
+        # If you want to manipulate the current folder with git,
+        # try adding it to repos automatically.
+        if True:
+            repo_path, repo_conf = get_repo_info()
+            add_repos([repo_path], silent=True)
+
         extra_cmd = {
             "shell": {
                 "command": lambda _: shell_mode(git_processor),
@@ -337,6 +344,9 @@ class Parser(object):
         ll.add_argument("--simple", action="store_true", help="display simple summary.")
         ll.set_defaults(func=self._repo_func, kwargs={"option": "ll"})
 
+        clear = repo_sub.add_parser("clear", help="clear the all repos.")
+        clear.set_defaults(func=self._repo_func, kwargs={"option": "clear"})
+
         for name, op in repo_options.items():
             help_msg = op.get("help", "") + " for repo(s)."
             sp = repo_sub.add_parser(name, help=help_msg)
@@ -354,6 +364,8 @@ class Parser(object):
             rename_repo(args.repo, args.new_name)
         elif option == "ll":
             ll_repos(args.simple)
+        elif option == "clear":
+            clear_repos()
         else:
             process_repo_option(args.repos, option)
 

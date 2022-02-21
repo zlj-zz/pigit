@@ -50,7 +50,21 @@ def save_repos(repos: dict) -> bool:
         return False
 
 
-def add_repos(paths: list[str], dry_run: bool = False):
+def clear_repos():
+    if os.path.isfile(REPOS_PATH):
+        os.remove(REPOS_PATH)
+
+
+def add_repos(paths: list[str], dry_run: bool = False, silent: bool = False):
+    """
+    Traverse the incoming paths. If it is not saved and is a git directory, add it to repos.
+
+    Args:
+        paths (list[str]): incoming paths.
+        dry_run (bool, optional): Show but not really execute. Defaults to False.
+        silent (bool, optional): No output. Defaults to False.
+    """
+
     exist_repos = load_repos()
     exist_paths = [r["path"] for r in exist_repos.values()]
 
@@ -61,9 +75,9 @@ def add_repos(paths: list[str], dry_run: bool = False):
             new_git_paths.append(repo_path)
 
     if new_git_paths:
-        print(f"Found {len(new_git_paths)} new repo(s).")
+        not silent and print(f"Found {len(new_git_paths)} new repo(s).")
         for path in new_git_paths:
-            print(render_str(f"`{path}`<sky_blue>"))
+            not silent and print(render_str(f"`{path}`<sky_blue>"))
 
         if dry_run:
             return
@@ -78,7 +92,7 @@ def add_repos(paths: list[str], dry_run: bool = False):
 
         save_repos({**exist_repos, **new_repos})
     else:
-        print(render_str("`No new repos found!`<tomato>"))
+        not silent and print(render_str("`No new repos found!`<tomato>"))
 
 
 def rm_repos(repos: list[str], use_path: bool = False):
