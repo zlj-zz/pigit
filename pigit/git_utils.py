@@ -431,13 +431,7 @@ def output_git_local_config(style: str = "table") -> None:
             Log.error(traceback_info())
 
 
-def output_repository_info(
-    show_path: bool = True,
-    show_remote: bool = True,
-    show_branches: bool = True,
-    show_lastest_log: bool = True,
-    show_summary: bool = True,
-) -> None:
+def output_repository_info(include_part: list = None) -> None:
     """Print some information of the repository.
 
     repository: `Repository_Path`
@@ -454,11 +448,11 @@ def output_repository_info(
 
     # Print content.
     print(render_str("\r[b`Repository Information`]\n"))
-    if show_path:
+    if not include_part or "path" in include_part:
         print(render_str(f"Repository: \n\t`{REPOSITORY_PATH}`<sky_blue>\n"))
 
     # Get remote url.
-    if show_remote:
+    if not include_part or "remote" in include_part:
         try:
             with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
                 config = cf.read()
@@ -470,7 +464,7 @@ def output_repository_info(
         print("Remote: \n%s\n" % remote)
 
     # Get all branches.
-    if show_branches:
+    if not include_part or "branch" in include_part:
         err, res = exec_cmd("git branch --all --color")
         if err:
             branches = "\t" + error_str
@@ -479,7 +473,7 @@ def output_repository_info(
         print("Branches: \n%s\n" % branches)
 
     # Get the lastest log.
-    if show_lastest_log:
+    if not include_part or "log" in include_part:
         err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
         if err:
             git_log = "\t" + error_str
@@ -489,7 +483,7 @@ def output_repository_info(
         print("Lastest log:\n%s\n" % git_log)
 
     # Get git summary.
-    if show_summary:
+    if not include_part or "summary" in include_part:
         err, res = exec_cmd("git shortlog --summary --numbered")
         if err:
             summary = "\t" + error_str

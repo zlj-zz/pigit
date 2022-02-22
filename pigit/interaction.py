@@ -220,7 +220,7 @@ class ModelSwitcher(SwitchWidget):
             return int(key) - 1
 
 
-def main(index=None):
+def main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
         print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
@@ -230,9 +230,9 @@ def main(index=None):
         print(render_str("`Please run in a git repo dir.`<tomato>"))
         return
 
-    status = StatusPanel(widget=FilePanel())
-    commit = CommitPanel(widget=CommitStatusPanel())
-    branch = BranchPanel()
+    status = StatusPanel(widget=FilePanel(), help_wait=help_wait)
+    commit = CommitPanel(widget=CommitStatusPanel(), help_wait=help_wait)
+    branch = BranchPanel(help_wait=help_wait)
     switcher = ModelSwitcher(sub_widgets=[status, commit, branch])
 
     if index:

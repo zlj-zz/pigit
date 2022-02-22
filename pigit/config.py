@@ -1,8 +1,6 @@
 # -*- coding:utf-8 -*-
 
-import os
-import logging
-import textwrap
+import os, re, textwrap, logging
 from distutils.util import strtobool
 
 from .common import Color, confirm, traceback_info
@@ -34,104 +32,99 @@ class Config(object, metaclass=Singleton):
         #                                     {version:>20} |___/
         # Git-tools -- pigit configuration.
 
-        # Show original git command.
-        gitprocessor_show_original={gitprocessor_show_original}
+        # (bool) Show original git command.
+        cmd_show_original={cmd_show_original}
 
-        # Is it recommended to correct when entering wrong commands.
-        gitprocessor_use_recommend={gitprocessor_use_recommend}
+        # (bool) Is it recommended to correct when entering wrong commands.
+        cmd_recommend={cmd_recommend}
 
-        # Whether color is enabled in interactive mode.
-        gitprocessor_interactive_color={gitprocessor_interactive_color}
+        # (float) Display time of help information in interactive mode.
+        tui_help_showtime={tui_help_showtime}
 
-        # Display time of help information in interactive mode, 0 is permanent.
-        gitprocessor_interactive_help_showtime={gitprocessor_interactive_help_showtime}
+        # (bool) Whether to use the ignore configuration of the `.gitignore` file.
+        counter_use_gitignore={counter_use_gitignore}
 
-        # Whether to use the ignore configuration of the `.gitignore` file.
-        codecounter_use_gitignore={codecounter_use_gitignore}
+        # (bool) Whether show files that cannot be counted.
+        counter_show_invalid={counter_show_invalid}
 
-        # Whether show files that cannot be counted.
-        codecounter_show_invalid={codecounter_show_invalid}
+        # (bool) Whether show files icons. Font support required, like: 'Nerd Font'
+        counter_show_icon={counter_show_icon}
 
-        # Whether show files icons. Font support required, like: 'Nerd Font'
-        codecounter_show_icon={codecounter_show_icon}
-
-        # Output format of statistical results.
-        # Supported: [table, simple]
+        # Output format of statistical results. Supported: [table, simple]
         # When the command line width is not enough, the `simple ` format is forced.
-        codecounter_result_format={codecounter_result_format}
+        counter_format={counter_format}
 
-        # Timeout for getting `.gitignore` template from net.
+        # (int) Timeout for getting `.gitignore` template from network.
         gitignore_generator_timeout={gitignore_generator_timeout}
 
-        # Git local config print format.
-        # Supported: [table, normal]
+        # Git local config print format. Supported: [table, normal]
         git_config_format={git_config_format}
 
         # Control which parts need to be displayed when viewing git repository information.
-        repository_show_path={repository_show_path}
-        repository_show_remote={repository_show_remote}
-        repository_show_branchs={repository_show_branchs}
-        repository_show_lastest_log={repository_show_lastest_log}
-        repository_show_summary={repository_show_summary}
+        # Support: (path,remote,branch,log,summary)
+        repo_info_include={repo_info_include}
 
-        # Whether with color when use `-h` get help message.
-        help_use_color={help_use_color}
+        # (bool) Whether auto append path to repos.
+        repo_auto_append={repo_auto_append}
 
-        # The max line width when use `-h` get help message.
-        help_max_line_width={help_max_line_width}
+        # (bool) Whether run PIGIT in debug mode.
+        debug_open={debug_open}
 
-        # Whether run PIGIT in debug mode.
-        debug_mode={debug_mode}
-
-        # Whether output log in terminal.
-        stream_output_log={stream_output_log}
+        # (bool) Whether output log in terminal.
+        log_output={log_output}
 
         """
     )
 
-    # yapf: disable
-    _keys :list[str]= [
-        'gitprocessor_show_original', 'gitprocessor_use_recommend',
-        'gitprocessor_interactive_color', 'gitprocessor_interactive_help_showtime',
-        'codecounter_use_gitignore', 'codecounter_show_invalid',
-        'codecounter_result_format', 'codecounter_show_icon',
-        'gitignore_generator_timeout',
-        'git_config_format',
-        'repository_show_path', 'repository_show_remote', 'repository_show_branchs',
-        'repository_show_lastest_log', 'repository_show_summary',
-        'help_use_color', 'help_max_line_width',
-        'debug_mode', 'stream_output_log'
+    _keys: list[str] = [
+        "cmd_show_original",
+        "cmd_recommend",
+        "tui_help_showtime",
+        "counter_use_gitignore",
+        "counter_show_invalid",
+        "counter_show_icon",
+        "counter_format",
+        "gitignore_generator_timeout",
+        "git_config_format",
+        "repo_info_include",
+        "repo_auto_append",
+        "debug_open",
+        "log_output",
     ]
-    # yapf: enable
 
+    #########################
     # config default values.
-    gitprocessor_show_original: bool = True
-    gitprocessor_use_recommend: bool = True
-    gitprocessor_interactive_color: bool = True
-    gitprocessor_interactive_help_showtime: float = 1.5
+    #########################
 
-    codecounter_use_gitignore: bool = True
-    codecounter_show_invalid: bool = False
-    codecounter_show_icon: bool = False
-    codecounter_result_format: str = "table"  # table, simple
+    # cmd processor conf
+    cmd_show_original: bool = True
+    cmd_recommend: bool = True
+
+    # tui conf
+    tui_help_showtime: float = 1.5
+
+    # code counter conf
+    counter_use_gitignore: bool = True
+    counter_show_invalid: bool = False
+    counter_show_icon: bool = False
+    counter_format: str = "table"  # table, simple
     _supported_result_format: list = ["table", "simple"]
 
+    # ignore file conf
     gitignore_generator_timeout: int = 60
 
+    # info conf
     git_config_format: str = "table"
     _supported_git_config_format: list = ["normal", "table"]
 
-    repository_show_path: bool = True
-    repository_show_remote: bool = True
-    repository_show_branchs: bool = True
-    repository_show_lastest_log: bool = True
-    repository_show_summary: bool = False
+    repo_info_include: list[str] = ["remote", "branch", "log"]
 
-    help_use_color: bool = True
-    help_max_line_width: int = 90
+    # repo conf
+    repo_auto_append: bool = False
 
-    debug_mode: bool = False
-    stream_output_log: bool = False
+    # setting conf
+    debug_open: bool = False
+    log_output: bool = False
 
     # Store warning messages.
     warnings: list = []
@@ -205,22 +198,20 @@ class Config(object, metaclass=Singleton):
 
                 # checking.
                 if key not in self._keys:
-                    self.warnings.append("'{0}' is not be supported!".format(key))
+                    self.warnings.append(f"'{key}' is not be supported!")
                     continue
                 elif type(getattr(self, key)) == int:
                     try:
                         new_config[key] = int(line)
                     except ValueError:
                         self.warnings.append(
-                            'Config key "{0}" should be an integer!'.format(key)
+                            f'Config key "{key}" should be an integer!'
                         )
                 elif type(getattr(self, key)) == float:
                     try:
                         new_config[key] = float(line)
                     except ValueError:
-                        self.warnings.append(
-                            'Config key "{0}" should be an float!'.format(key)
-                        )
+                        self.warnings.append(f'Config key "{key}" should be a float!')
                 elif type(getattr(self, key)) == bool:
                     try:
                         # True values are y, yes, t, true, on and 1;
@@ -229,17 +220,22 @@ class Config(object, metaclass=Singleton):
                         new_config[key] = bool(strtobool(line))
                     except ValueError:
                         self.warnings.append(
-                            'Config key "{0}" can only be True or False!'.format(key)
+                            f'Config key "{key}" can only be True or False!'
                         )
                 elif type(getattr(self, key)) == str:
                     if "color" in key and not Color.is_color(line):
                         self.warnings.append(
-                            'Config key "{0}" should be RGB string, like: #FF0000'.format(
-                                key
-                            )
+                            f'Config key "{key}" should be RGB string, like: "#FF0000".'
                         )
                         continue
                     new_config[key] = str(line)
+                elif type(getattr(self, key)) == list:
+                    if re.match(r"^\[[\w\s0-9\'\"_]+,?([\s\w0-9\'\"_]+,?)*\]$", line):
+                        new_config[key] = eval(line)
+                    else:
+                        self.warnings.append(
+                            f'Config key "{key}" not support `{line}`.'
+                        )
 
     def parse_conf(self) -> None:
         new_config = self.conf

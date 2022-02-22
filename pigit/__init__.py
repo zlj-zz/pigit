@@ -262,7 +262,7 @@ class Parser(object):
     def _cmd_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
         # If you want to manipulate the current folder with git,
         # try adding it to repos automatically.
-        if True:
+        if CONFIG.repo_auto_append:
             repo_path, repo_conf = get_repo_info()
             add_repos([repo_path], silent=True)
 
@@ -277,10 +277,8 @@ class Parser(object):
 
         git_processor = CmdProcessor(
             extra_cmds=extra_cmd,
-            command_prompt=CONFIG.gitprocessor_use_recommend,
-            show_original=CONFIG.gitprocessor_show_original,
-            use_color=CONFIG.gitprocessor_interactive_color,
-            help_wait=CONFIG.gitprocessor_interactive_help_showtime,
+            command_prompt=CONFIG.cmd_recommend,
+            show_original=CONFIG.cmd_show_original,
         )
 
         if args.shell:
@@ -455,13 +453,7 @@ class Parser(object):
             output_git_local_config(CONFIG.git_config_format)
 
         elif known_args.information:
-            output_repository_info(
-                show_path=CONFIG.repository_show_path,
-                show_remote=CONFIG.repository_show_remote,
-                show_branches=CONFIG.repository_show_branchs,
-                show_lastest_log=CONFIG.repository_show_lastest_log,
-                show_summary=CONFIG.repository_show_summary,
-            )
+            output_repository_info(include_part=CONFIG.repo_info_include)
 
         elif known_args.complete:
             # Generate competion vars dict.
@@ -496,12 +488,12 @@ class Parser(object):
             )
             CodeCounter(
                 count_path=path,
-                use_ignore=CONFIG.codecounter_use_gitignore,
+                use_ignore=CONFIG.counter_use_gitignore,
                 result_saved_path=COUNTER_DIR_PATH,
-                result_format=CONFIG.codecounter_result_format,
-                use_icon=CONFIG.codecounter_show_icon,
+                result_format=CONFIG.counter_format,
+                use_icon=CONFIG.counter_show_icon,
             ).count_and_format_print(
-                show_invalid=CONFIG.codecounter_show_invalid,
+                show_invalid=CONFIG.counter_show_invalid,
             )
             return None
 
@@ -519,7 +511,7 @@ class Parser(object):
                 if not confirm("Input `enter` to continue:"):
                     return
 
-            interactive_interface()
+            interactive_interface(help_wait=CONFIG.tui_help_showtime)
 
     def process(self, a, b):
         try:
@@ -538,8 +530,8 @@ def main(custom_commands: Optional[list] = None):
     stdargs, extra_unknown = parser.parse()
 
     # Setup log handle.
-    log_file = LOG_FILE_PATH if stdargs.out_log or CONFIG.stream_output_log else None
-    setup_logging(debug=stdargs.debug or CONFIG.debug_mode, log_file=log_file)
+    log_file = LOG_FILE_PATH if stdargs.out_log or CONFIG.log_output else None
+    setup_logging(debug=stdargs.debug or CONFIG.debug_open, log_file=log_file)
 
     # Process result.
     parser.process(stdargs, extra_unknown)
