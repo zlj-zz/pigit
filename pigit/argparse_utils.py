@@ -1,5 +1,5 @@
-import argparse
 from typing import Union
+from argparse import ArgumentParser, Namespace
 
 
 class Parser(object):
@@ -9,19 +9,12 @@ class Parser(object):
         self._parse_dict()
 
     def _parse_dict(self):
-        d = self._args_dict
-        p = self._parser = argparse.ArgumentParser(
-            prog=d.get("prog", None),
-            prefix_chars=d.get("prefix_chars", None),
-            description=d.get("description", None),
-            add_help=d.get("add_help", True),
-        )
+        """Parse `self._args_dict` to genrate a `ArgumentParser`."""
 
-        def _parse_args(handle: argparse.ArgumentParser, args: dict):
+        def _parse_args(handle: ArgumentParser, args: dict):
             sub_parsers = None
 
             for name, prop in args.items():
-                sub_args: dict = prop.get("args", None)
 
                 if name == "-groups":
                     # TODO: '_ArgumentGroup' object has no attribute 'add_subparsers'
@@ -30,25 +23,23 @@ class Parser(object):
                             title=group.get("title", ""),
                             description=group.get("description", ""),
                         )
-                        group_args = group.get("args", {})
+                        group_args: dict = group.get("args", {})
 
                         _parse_args(group_handle, group_args)
 
-                elif not sub_args:
-                    names: str = name.split(" ")
-                    handle.add_argument(*names, **prop)
-
-                else:
-                    # Deleting `prop["args"]` dose not affect `sub_args`.
-                    del prop["args"]
-
-                    # cannot have multiple subparser arguments.
+                elif "args" in prop:
+                    # Cannot have multiple subparser arguments.
                     if not sub_parsers:
                         sub_parsers = handle.add_subparsers()
 
-                    sub_handle: argparse.ArgumentParser = sub_parsers.add_parser(
-                        name, **prop
-                    )
+                    # Deleting `prop["args"]` dose not affect `sub_args`.
+                    sub_args: dict = prop.get("args", None)
+                    del prop["args"]
+
+                    # Create subparser.
+                    sub_handle: ArgumentParser = sub_parsers.add_parser(name, **prop)
+
+                    # If `set_defaults` in args, special treatment is required.
                     set_defaults: dict = sub_args.get("set_defaults", None)
                     if set_defaults:
                         del sub_args["set_defaults"]
@@ -56,23 +47,34 @@ class Parser(object):
 
                     _parse_args(sub_handle, sub_args)
 
+                else:
+                    names: list[str] = name.split(" ")
+                    handle.add_argument(*names, **prop)
+
+        d = self._args_dict
         args: dict = d.get("args", {})
+
+        # Create root parser.
+        p = self._parser = ArgumentParser(
+            prog=d.get("prog", None),
+            prefix_chars=d.get("prefix_chars", None),
+            description=d.get("description", None),
+            add_help=d.get("add_help", True),
+        )
+
         _parse_args(p, args)
 
-    def parse(
-        self, custom_commands: Union[list, str, None] = None
-    ) -> tuple[argparse.Namespace, list]:
-        if custom_commands:
-            if isinstance(custom_commands, list):
-                args, unknown = self._parser.parse_known_args(custom_commands)
-            elif isinstance(custom_commands, str):
-                args, unknown = self._parser.parse_known_args(custom_commands.split())
-            else:
-                raise AttributeError("custom_commands need be list or str.")
+    def parse(self, args: Union[list, str, None] = None) -> tuple[Namespace, list]:
+        if not args:
+            known_args, unknown = self._parser.parse_known_args()
+        elif isinstance(args, list):
+            known_args, unknown = self._parser.parse_known_args(args)
+        elif isinstance(args, str):
+            known_args, unknown = self._parser.parse_known_args(args.split())
         else:
-            args, unknown = self._parser.parse_known_args()
+            raise AttributeError("custom_commands need be list, str or empty.")
 
-        return args, unknown
+        return known_args, unknown
 
 
 if __name__ == "__main__":

@@ -81,8 +81,10 @@ class Emoji(object):
         return _emoji_sub(do_replace, _msg)
 
     @classmethod
-    def print(cls, _msg, /, *, sep: str = " ", end: str = "\n", flush: bool = True):
-        _render_msg = cls.render(_msg)
+    def print(
+        cls, _msg: str, /, *, sep: str = " ", end: str = "\n", flush: bool = True
+    ):
+        _render_msg: str = cls.render(_msg)
         print(_render_msg, sep=sep, end=end, flush=flush)
 
 

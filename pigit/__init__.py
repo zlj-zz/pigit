@@ -26,7 +26,7 @@
 import os
 import argparse
 import logging
-from typing import Optional, Union
+from typing import Optional
 
 from .log import setup_logging
 from .const import (
@@ -66,17 +66,17 @@ from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
 Log = logging.getLogger(__name__)
 
 
-#####################################################################
-# Configuration.                                                    #
-#####################################################################
+#################
+# Configuration.
+#################
 CONFIG = Config(
     path=CONFIG_FILE_PATH, version=__version__, auto_load=True
 ).output_warnings()
 
 
-#####################################################################
-# Implementation of additional functions.                           #
-#####################################################################
+##########################################
+# Implementation of additional functions.
+##########################################
 def introduce() -> None:
     """Print the description information."""
 
@@ -209,7 +209,7 @@ def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         repo_path, repo_conf = get_repo_info()
         add_repos([repo_path], silent=True)
 
-    extra_cmd = {
+    extra_cmd: dict = {
         "shell": {
             "command": lambda _: shell_mode(git_processor),
             "type": "func",
@@ -246,7 +246,7 @@ def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
 
 
 def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
-    option = kwargs.get("option", "")
+    option: str = kwargs.get("option", "")
 
     if option == "add":
         add_repos(args.paths, args.dry_run)
@@ -434,17 +434,20 @@ argparse_dict = {
 }
 
 
-def _process(known_args, extra_unknown: Optional[list] = None) -> None:
-    if known_args.report:
+def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> None:
+    if args.report:
         introduce()
 
-    elif known_args.config:
+    elif args.create_config:
+        return CONFIG.create_config_template()
+
+    elif args.config:
         output_git_local_config(CONFIG.git_config_format)
 
-    elif known_args.information:
+    elif args.information:
         output_repository_info(include_part=CONFIG.repo_info_include)
 
-    elif known_args.complete:
+    elif args.complete:
         # Generate competion vars dict.
         completion_vars = {
             key: value.get("help", "") for key, value in Git_Cmds.items()
@@ -456,25 +459,18 @@ def _process(known_args, extra_unknown: Optional[list] = None) -> None:
         shell_compele(get_current_shell(), __project__, completion_vars, PIGIT_HOME)
         return None
 
-    elif known_args.create_config:
-        return CONFIG.create_config_template()
-
-    elif known_args.ignore_type:
+    elif args.ignore_type:
         repo_path, repo_conf_path = get_repo_info()
 
         return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
-            known_args.ignore_type,
+            args.ignore_type,
             dir_path=repo_path,
         )
 
-    elif known_args.count:
+    elif args.count:
         from .codecounter import CodeCounter
 
-        path = (
-            os.path.abspath(known_args.count)
-            if known_args.count != "."
-            else os.getcwd()
-        )
+        path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
         CodeCounter(
             count_path=path,
             use_ignore=CONFIG.counter_use_gitignore,
@@ -486,9 +482,9 @@ def _process(known_args, extra_unknown: Optional[list] = None) -> None:
         )
         return None
 
-    elif "func" in known_args:
-        kwargs = getattr(known_args, "kwargs", {})
-        known_args.func(known_args, extra_unknown, kwargs)
+    elif "func" in args:
+        kwargs = getattr(args, "kwargs", {})
+        args.func(args, extra_unknown, kwargs)
 
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
@@ -503,13 +499,16 @@ def _process(known_args, extra_unknown: Optional[list] = None) -> None:
         interactive_interface(help_wait=CONFIG.tui_help_showtime)
 
 
-def process(a, b):
+def process(args: argparse.Namespace, unknown: list):
     try:
-        _process(a, b)
+        _process(args, unknown)
     except (KeyboardInterrupt, EOFError):
         raise SystemExit(0)
 
 
+#############
+# main entry
+#############
 @time_it
 def main(custom_commands: Optional[list] = None):
     parser = Parser(argparse_dict)
