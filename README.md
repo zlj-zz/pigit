@@ -52,7 +52,9 @@ You can use -h or --help to get help and usage.
 You can run `pigit -h` or `pigit --help` to get the help message. Like this:
 
 ```bash
-usage: pigit [-h] [-v] [-r] [-f] [-i] [-d] [--out-log] [-c [PATH]] [-C] [--create-ignore TYPE] [--create-config] {cmd,repo} ...
+usage: pigit [-h] [-v] [-r] [-f] [-i] [-d] [--out-log] [-c [PATH]] [-C] [--create-ignore TYPE]
+             [--create-config]
+             {cmd,repo} ...
 
 Pigit TUI is called automatically if no parameters are followed.
 
@@ -74,13 +76,14 @@ tools arguments:
   Auxiliary type commands.
 
   -c [PATH], --count [PATH]
-                        Count the number of codes and output them in tabular form.A given path can be accepted, and the default is
-                        the current directory.
+                        Count the number of codes and output them in tabular form.A given path can be
+                        accepted, and the default is the current directory.
   -C, --complete        Add shell prompt script and exit.(Supported bash, zsh, fish)
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c, dart, elisp, gitbook,
-                        go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity]
-  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the values available in it are used)
-
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c,
+                        dart, elisp, gitbook, go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby,
+                        rust, sass, swift, unity]
+  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the values available in it
+                        are used)
 ```
 
 **For example**
@@ -107,8 +110,6 @@ These are short commands that can replace git operations:
              git branch --move --force
     bd       delete a local branch by name.
              git branch -d
-    c        records changes to the repository.
-             git commit --verbose
 ......
 ```
 
