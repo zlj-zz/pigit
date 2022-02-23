@@ -57,8 +57,9 @@ from .repo_utils import (
 )
 from .decorator import time_it
 from .config import Config
+from .argparse_utils import Parser
 from .gitignore import GitignoreGenetor
-from .shellcompletion import shell_compele, process_argparse
+from .shellcompletion import shell_compele
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
 
 
@@ -201,332 +202,319 @@ def shell_mode(git_processor: CmdProcessor):
     return None
 
 
-class Parser(object):
-    def __init__(self) -> None:
-        super(Parser, self).__init__()
-        self._parser = argparse.ArgumentParser(
-            prog="pigit",
-            prefix_chars="-",
-            description="Pigit TUI is called automatically if no parameters are followed."
-            # formatter_class=CustomHelpFormatter,
-        )
-        self._subparsers = self._parser.add_subparsers()
+def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+    # If you want to manipulate the current folder with git,
+    # try adding it to repos automatically.
+    if CONFIG.repo_auto_append:
+        repo_path, repo_conf = get_repo_info()
+        add_repos([repo_path], silent=True)
 
-        self._add_cmd_args()
-        self._add_repo_args()
-        self._add_args()
+    extra_cmd = {
+        "shell": {
+            "command": lambda _: shell_mode(git_processor),
+            "type": "func",
+            "help": "Into PIGIT shell mode.",
+        },  # only for tips.
+    }
+    extra_cmd.update(get_extra_cmds())
 
-    def _add_cmd_args(self) -> None:
-        cmd = self._subparsers.add_parser(
-            "cmd",
-            help="git short command.",
-            description="If you want to use some original git commands, "
-            "please use -- to indicate.",
-        )
-        cmd.add_argument(
-            "command",
-            nargs="?",
-            type=str,
-            default=None,
-            help="Short git command or other.",
-        )
-        cmd.add_argument("args", nargs="*", type=str, help="Command parameter list.")
-        cmd.add_argument(
-            "-s",
-            "--show-commands",
-            action="store_true",
-            help="List all available short command and wealth and exit.",
-        )
-        cmd.add_argument(
-            "-p",
-            "--show-part-command",
-            type=str,
-            metavar="TYPE",
-            dest="command_type",
-            help="According to given type [%s] list available short command and "
-            "wealth and exit." % ", ".join(CommandType.__members__.keys()),
-        )
-        cmd.add_argument(
-            "-t",
-            "--types",
-            action="store_true",
-            help="List all command types and exit.",
-        )
-        cmd.add_argument(
-            "--shell",
-            action="store_true",
-            help="Go to the pigit shell mode.",
-        )
-        cmd.set_defaults(func=self._cmd_func)
+    git_processor = CmdProcessor(
+        extra_cmds=extra_cmd,
+        command_prompt=CONFIG.cmd_recommend,
+        show_original=CONFIG.cmd_show_original,
+    )
 
-    def _cmd_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
-        # If you want to manipulate the current folder with git,
-        # try adding it to repos automatically.
-        if CONFIG.repo_auto_append:
-            repo_path, repo_conf = get_repo_info()
-            add_repos([repo_path], silent=True)
+    if args.shell:
+        shell_mode(git_processor)
 
-        extra_cmd = {
-            "shell": {
-                "command": lambda _: shell_mode(git_processor),
-                "type": "func",
-                "help": "Into PIGIT shell mode.",
-            },  # only for tips.
-        }
-        extra_cmd.update(get_extra_cmds())
+    if args.show_commands:
+        return git_processor.command_help()
 
-        git_processor = CmdProcessor(
-            extra_cmds=extra_cmd,
-            command_prompt=CONFIG.cmd_recommend,
-            show_original=CONFIG.cmd_show_original,
-        )
+    if args.command_type:
+        return git_processor.command_help_by_type(args.command_type)
 
-        if args.shell:
-            shell_mode(git_processor)
+    if args.types:
+        return git_processor.type_help()
 
-        if args.show_commands:
-            return git_processor.command_help()
+    if args.command:
+        command = args.command
+        args.args.extend(unknown)
+        git_processor.process_command(command, args.args)
+        return None
+    else:
+        print(render_str("`pigit cmd -h`<ok> for help."))
 
-        if args.command_type:
-            return git_processor.command_help_by_type(args.command_type)
 
-        if args.types:
-            return git_processor.type_help()
+def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+    option = kwargs.get("option", "")
 
-        if args.command:
-            command = args.command
-            args.args.extend(unknown)
-            git_processor.process_command(command, args.args)
-            return None
-        else:
-            print(render_str("`pigit cmd -h`<ok> for help."))
+    if option == "add":
+        add_repos(args.paths, args.dry_run)
+    elif option == "rm":
+        rm_repos(args.repos, args.use_path)
+    elif option == "rename":
+        rename_repo(args.repo, args.new_name)
+    elif option == "ll":
+        ll_repos(args.simple)
+    elif option == "clear":
+        clear_repos()
+    else:
+        process_repo_option(args.repos, option)
 
-    def _add_repo_args(self) -> None:
 
-        repo = self._subparsers.add_parser("repo", help="repo options.")
-        repo_sub = repo.add_subparsers()
-
-        add = repo_sub.add_parser("add", help="add repo(s).")
-        add.add_argument("paths", nargs="+", help="path of reps(s).")
-        add.add_argument("--dry-run", action="store_true", help="dry run.")
-        add.set_defaults(func=self._repo_func, kwargs={"option": "add"})
-
-        rm = repo_sub.add_parser("rm", help="remove repo(s).")
-        rm.add_argument("repos", nargs="+", help="name or path of repo(s).")
-        rm.add_argument(
-            "--use-path",
-            action="store_true",
-            help="remove follow path, defult is name.",
-        )
-        rm.set_defaults(func=self._repo_func, kwargs={"option": "rm"})
-
-        rename = repo_sub.add_parser("rename", help="rename a repo.")
-        rename.add_argument("repo", help="the name of repo.")
-        rename.add_argument("new_name", help="the new name of repo.")
-        rename.set_defaults(func=self._repo_func, kwargs={"option": "rename"})
-
-        ll = repo_sub.add_parser("ll", help="display summary of all repos.")
-        ll.add_argument("--simple", action="store_true", help="display simple summary.")
-        ll.set_defaults(func=self._repo_func, kwargs={"option": "ll"})
-
-        clear = repo_sub.add_parser("clear", help="clear the all repos.")
-        clear.set_defaults(func=self._repo_func, kwargs={"option": "clear"})
-
-        for name, op in repo_options.items():
-            help_msg = op.get("help", "") + " for repo(s)."
-            sp = repo_sub.add_parser(name, help=help_msg)
-            sp.add_argument("repos", nargs="*", help="name of repo(s).")
-            sp.set_defaults(func=self._repo_func, kwargs={"option": name})
-
-    def _repo_func(self, args: argparse.Namespace, unknown: list, kwargs: dict):
-        option = kwargs.get("option", "")
-
-        if option == "add":
-            add_repos(args.paths, args.dry_run)
-        elif option == "rm":
-            rm_repos(args.repos, args.use_path)
-        elif option == "rename":
-            rename_repo(args.repo, args.new_name)
-        elif option == "ll":
-            ll_repos(args.simple)
-        elif option == "clear":
-            clear_repos()
-        else:
-            process_repo_option(args.repos, option)
-
-    def _add_args(self) -> None:
-        p = self._parser
-
-        p.add_argument(
-            "-v",
-            "--version",
-            action="version",
-            help="Show version and exit.",
-            version="Version: %s" % __version__,
-        )
-        p.add_argument(
-            "-r",
-            "--report",
-            action="store_true",
-            help="Report the pigit desc and exit.",
-        )
-        p.add_argument(
-            "-f",
-            "--config",
-            action="store_true",
-            help="Display the config of current git repository and exit.",
-        )
-        p.add_argument(
-            "-i",
-            "--information",
-            action="store_true",
-            help="Show some information about the current git repository.",
-        )
-        p.add_argument(
-            "-d",
-            "--debug",
-            action="store_true",
-            help="Current runtime in debug mode.",
-        )
-        p.add_argument(
-            "--out-log",
-            action="store_true",
-            help="Print log to console.",
-        )
-
-        tool_group = p.add_argument_group(
-            title="tools arguments",
-            description="Auxiliary type commands.",
-        )
-        tool_group.add_argument(
-            "-c",
-            "--count",
-            nargs="?",
-            const=".",
-            type=str,
-            metavar="PATH",
-            help="Count the number of codes and output them in tabular form."
-            "A given path can be accepted, and the default is the current directory.",
-        )
-        tool_group.add_argument(
-            "-C",
-            "--complete",
-            action="store_true",
-            help="Add shell prompt script and exit.(Supported bash, zsh, fish)",
-        )
-        tool_group.add_argument(
-            "--create-ignore",
-            type=str,
-            metavar="TYPE",
-            dest="ignore_type",
-            help="Create a demo .gitignore file. Need one argument, support: [%s]"
-            % ", ".join(GitignoreGenetor.Supported_Types.keys()),
-        )
-        tool_group.add_argument(
-            "--create-config",
-            action="store_true",
-            help="Create a pre-configured file of PIGIT."
-            "(If a profile exists, the values available in it are used)",
-        )
-
-    def parse(
-        self, custom_commands: Union[list, str, None] = None
-    ) -> tuple[argparse.Namespace, list]:
-        if custom_commands:
-            if isinstance(custom_commands, list):
-                args, unknown = self._parser.parse_known_args(custom_commands)
-            elif isinstance(custom_commands, str):
-                args, unknown = self._parser.parse_known_args(custom_commands.split())
-            else:
-                raise AttributeError("custom_commands need be list or str.")
-        else:
-            args, unknown = self._parser.parse_known_args()
-
-        Log.debug("Parser result: {0}, {1}".format(args, unknown))
-        return args, unknown
-
-    def _process(self, known_args, extra_unknown: Optional[list] = None) -> None:
-        if known_args.report:
-            introduce()
-
-        elif known_args.config:
-            output_git_local_config(CONFIG.git_config_format)
-
-        elif known_args.information:
-            output_repository_info(include_part=CONFIG.repo_info_include)
-
-        elif known_args.complete:
-            # Generate competion vars dict.
-            completion_vars = {
-                key: value.get("help", "") for key, value in Git_Cmds.items()
+argparse_dict = {
+    "prog": "pigit",
+    "prefix_chars": "-",
+    "description": "Pigit TUI is called automatically if no parameters are followed.",
+    "args": {
+        "-v --version": {
+            "action": "version",
+            "help": "Show version and exit.",
+            "version": f"Version: {__version__}",
+        },
+        "-r --report": {
+            "action": "store_true",
+            "help": "Report the pigit desc and exit.",
+        },
+        "-f --config": {
+            "action": "store_true",
+            "help": "Display the config of current git repository and exit.",
+        },
+        "-i --information": {
+            "action": "store_true",
+            "help": "Show some information about the current git repository.",
+        },
+        "-d --debug": {
+            "action": "store_true",
+            "help": "Current runtime in debug mode.",
+        },
+        "--out-log": {"action": "store_true", "help": "Print log to console."},
+        "-groups": {
+            "tools": {
+                "title": "tools arguments",
+                "description": "Auxiliary type commands.",
+                "args": {
+                    "-c --count": {
+                        "nargs": "?",
+                        "const": ".",
+                        "type": str,
+                        "metavar": "PATH",
+                        "help": "Count the number of codes and output them in tabular form."
+                        "A given path can be accepted, and the default is the current directory.",
+                    },
+                    "-C --complete": {
+                        "action": "store_true",
+                        "help": "Add shell prompt script and exit.(Supported bash, zsh, fish)",
+                    },
+                    "--create-ignore": {
+                        "type": str,
+                        "metavar": "TYPE",
+                        "dest": "ignore_type",
+                        "help": "Create a demo .gitignore file. Need one argument, support: [%s]"
+                        % ", ".join(GitignoreGenetor.Supported_Types.keys()),
+                    },
+                    "--create-config": {
+                        "action": "store_true",
+                        "help": "Create a pre-configured file of PIGIT."
+                        "(If a profile exists, the values available in it are used)",
+                    },
+                },
             }
+        },
+        "cmd": {
+            "help": "git short command.",
+            "description": "If you want to use some original git commands, please use -- to indicate.",
+            "args": {
+                "command": {
+                    "nargs": "?",
+                    "type": str,
+                    "default": None,
+                    "help": "Short git command or other.",
+                },
+                "args": {"nargs": "*", "type": str, "help": "Command parameter list."},
+                "-s --show-commands": {
+                    "action": "store_true",
+                    "help": "List all available short command and wealth and exit.",
+                },
+                "-p --show-part-command": {
+                    "type": str,
+                    "metavar": "TYPE",
+                    "dest": "command_type",
+                    "help": "According to given type [%s] list available short command and wealth and exit."
+                    % ", ".join(CommandType.__members__.keys()),
+                },
+                "-t --types": {
+                    "action": "store_true",
+                    "help": "List all command types and exit.",
+                },
+                "--shell": {
+                    "action": "store_true",
+                    "help": "Go to the pigit shell mode.",
+                },
+                "set_defaults": {"func": _cmd_func},
+            },
+        },
+        "repo": {
+            "help": "repo options.",
+            "args": {
+                "add": {
+                    "help": "add repo(s).",
+                    "args": {
+                        "paths": {"nargs": "+", "help": "path of reps(s)."},
+                        "--dry-run": {"action": "store_true", "help": "dry run."},
+                        "set_defaults": {
+                            "func": _repo_func,
+                            "kwargs": {"option": "add"},
+                        },
+                    },
+                },
+                "rm": {
+                    "help": "remove repo(s).",
+                    "args": {
+                        "repos": {"nargs": "+", "help": "name or path of repo(s)."},
+                        "--path": {
+                            "action": "store_true",
+                            "help": "remove follow path, defult is name.",
+                        },
+                        "set_defaults": {
+                            "func": _repo_func,
+                            "kwargs": {"option": "rm"},
+                        },
+                    },
+                },
+                "rename": {
+                    "help": "rename a repo.",
+                    "args": {
+                        "repo": {"help": "the name of repo."},
+                        "new_name": {"help": "the new name of repo."},
+                        "set_defaults": {
+                            "func": _repo_func,
+                            "kwargs": {"option": "rename"},
+                        },
+                    },
+                },
+                "ll": {
+                    "help": "display summary of all repos.",
+                    "args": {
+                        "--simple": {
+                            "action": "store_true",
+                            "help": "display simple summary.",
+                        },
+                        "set_defaults": {
+                            "func": _repo_func,
+                            "kwargs": {"option": "ll"},
+                        },
+                    },
+                },
+                "clear": {
+                    "help": "clear the all repos.",
+                    "args": {
+                        "set_defaults": {
+                            "func": _repo_func,
+                            "kwargs": {"option": "clear"},
+                        },
+                    },
+                },
+                **{
+                    name: {
+                        "help": prop["help"] + " for repo(s).",
+                        "args": {
+                            "repos": {"nargs": "*", "help": "name of repo(s)."},
+                            "set_defaults": {
+                                "func": _repo_func,
+                                "kwargs": {"option": name},
+                            },
+                        },
+                    }
+                    for name, prop in repo_options.items()
+                },
+            },
+        },
+    },
+}
 
-            # Update var dict with shell command.
-            completion_vars.update(process_argparse(self._parser))
 
-            shell_compele(get_current_shell(), __project__, completion_vars, PIGIT_HOME)
-            return None
+def _process(known_args, extra_unknown: Optional[list] = None) -> None:
+    if known_args.report:
+        introduce()
 
-        elif known_args.create_config:
-            return CONFIG.create_config_template()
+    elif known_args.config:
+        output_git_local_config(CONFIG.git_config_format)
 
-        elif known_args.ignore_type:
-            repo_path, repo_conf_path = get_repo_info()
+    elif known_args.information:
+        output_repository_info(include_part=CONFIG.repo_info_include)
 
-            return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
-                known_args.ignore_type,
-                dir_path=repo_path,
-            )
+    elif known_args.complete:
+        # Generate competion vars dict.
+        completion_vars = {
+            key: value.get("help", "") for key, value in Git_Cmds.items()
+        }
 
-        elif known_args.count:
-            from .codecounter import CodeCounter
+        # Update var dict with shell command.
+        # completion_vars.update(process_argparse(self._parser))
 
-            path = (
-                os.path.abspath(known_args.count)
-                if known_args.count != "."
-                else os.getcwd()
-            )
-            CodeCounter(
-                count_path=path,
-                use_ignore=CONFIG.counter_use_gitignore,
-                result_saved_path=COUNTER_DIR_PATH,
-                result_format=CONFIG.counter_format,
-                use_icon=CONFIG.counter_show_icon,
-            ).count_and_format_print(
-                show_invalid=CONFIG.counter_show_invalid,
-            )
-            return None
+        shell_compele(get_current_shell(), __project__, completion_vars, PIGIT_HOME)
+        return None
 
-        elif "func" in known_args:
-            kwargs = getattr(known_args, "kwargs", {})
-            known_args.func(known_args, extra_unknown, kwargs)
+    elif known_args.create_config:
+        return CONFIG.create_config_template()
 
-        # Don't have invalid command list.
-        # if not list(filter(lambda x: x, vars(known_args).values())):
-        else:
-            from .interaction import main as interactive_interface
+    elif known_args.ignore_type:
+        repo_path, repo_conf_path = get_repo_info()
 
-            if IS_FIRST_RUN:
-                introduce()
-                if not confirm("Input `enter` to continue:"):
-                    return
+        return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
+            known_args.ignore_type,
+            dir_path=repo_path,
+        )
 
-            interactive_interface(help_wait=CONFIG.tui_help_showtime)
+    elif known_args.count:
+        from .codecounter import CodeCounter
 
-    def process(self, a, b):
-        try:
-            self._process(a, b)
-        except (KeyboardInterrupt, EOFError):
-            raise SystemExit(0)
+        path = (
+            os.path.abspath(known_args.count)
+            if known_args.count != "."
+            else os.getcwd()
+        )
+        CodeCounter(
+            count_path=path,
+            use_ignore=CONFIG.counter_use_gitignore,
+            result_saved_path=COUNTER_DIR_PATH,
+            result_format=CONFIG.counter_format,
+            use_icon=CONFIG.counter_show_icon,
+        ).count_and_format_print(
+            show_invalid=CONFIG.counter_show_invalid,
+        )
+        return None
+
+    elif "func" in known_args:
+        kwargs = getattr(known_args, "kwargs", {})
+        known_args.func(known_args, extra_unknown, kwargs)
+
+    # Don't have invalid command list.
+    # if not list(filter(lambda x: x, vars(known_args).values())):
+    else:
+        from .interaction import main as interactive_interface
+
+        if IS_FIRST_RUN:
+            introduce()
+            if not confirm("Input `enter` to continue:"):
+                return
+
+        interactive_interface(help_wait=CONFIG.tui_help_showtime)
+
+
+def process(a, b):
+    try:
+        _process(a, b)
+    except (KeyboardInterrupt, EOFError):
+        raise SystemExit(0)
 
 
 @time_it
 def main(custom_commands: Optional[list] = None):
-    parser = Parser()
+    parser = Parser(argparse_dict)
 
     # Parse custom comand or parse input command.
-    if custom_commands is not None:
-        stdargs, extra_unknown = parser.parse(custom_commands)
     stdargs, extra_unknown = parser.parse()
 
     # Setup log handle.
@@ -534,7 +522,7 @@ def main(custom_commands: Optional[list] = None):
     setup_logging(debug=stdargs.debug or CONFIG.debug_open, log_file=log_file)
 
     # Process result.
-    parser.process(stdargs, extra_unknown)
+    process(stdargs, extra_unknown)
 
 
 if __name__ == "__main__":

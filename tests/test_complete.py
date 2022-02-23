@@ -8,7 +8,6 @@ from pigit.shellcompletion import (
     ZshCompletion,
     BashCompletion,
     FishCompletion,
-    process_argparse,
 )
 
 
@@ -20,19 +19,6 @@ class TestCompletion:
     def test_error_complete_vars(self):
         with pytest.raises(TypeError):
             BashCompletion("test", "xxx", ".")
-
-    def test_error_argparse_obj(self):
-        with pytest.raises(TypeError):
-            process_argparse("xxx")
-
-        with pytest.raises(TypeError):
-            process_argparse(object)
-
-    def test_parse_parser(self):
-        p = Parser()
-        # p.parse([])
-        res = process_argparse(p._parser)
-        pprint(res)
 
     def print(self, c):
         print(c.prop)

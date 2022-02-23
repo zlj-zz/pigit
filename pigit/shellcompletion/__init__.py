@@ -40,26 +40,3 @@ def shell_compele(shell: str, prog: str, complete_var: str, script_dir: str):
             print(":: Command already exist.")
     except Exception as e:
         print(str(e))
-
-
-def process_argparse(argparse_obj) -> dict:
-    """Parse arguments from a ``ArgumentParser`` object."""
-
-    if not (
-        isinstance(argparse_obj, object) and "ArgumentParser" in argparse_obj.__str__()
-    ):
-        raise TypeError("Need a argparse.ArgumentParser object.")
-
-    try:
-        if not argparse_obj.__dict__.get("_actions", None):
-            raise TypeError("Need a argparse.ArgumentParser object.")
-    except AttributeError:
-        raise TypeError("Need a argparse.ArgumentParser object.")
-
-    arguments = {}
-
-    for action in argparse_obj.__dict__["_actions"]:
-        for option in action.option_strings:
-            arguments[option] = action.help
-
-    return arguments

@@ -1,7 +1,7 @@
 import pytest
 from .utils import analyze_it
 
-from pigit import Parser, introduce
+from pigit import introduce
 from pigit.git_utils import output_repository_info, output_git_local_config
 
 
@@ -22,9 +22,3 @@ def test_normal():
 
 def test_table():
     output_git_local_config("table")
-
-
-def test_show_help():
-    p = Parser()
-    # p.parse([])
-    p._parser.print_help()

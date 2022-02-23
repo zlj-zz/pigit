@@ -25,3 +25,7 @@ htmlcov/
 test.py
 calc.py
 trans.txt
+
+tests/bash_pigit_comp
+tests/fish_pigit_comp
+tests/zsh_pigit_comp
