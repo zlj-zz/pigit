@@ -353,11 +353,11 @@ def switch_file_status(file: File, path: str = "."):
             exec_cmd("git rm --cached --force -- {}".format(file.name), cwd=path)
 
 
-def discard_file(file: File):
+def discard_file(file: File, path: str = "."):
     if file.tracked:
-        exec_cmd("git checkout -- {}".format(file.name))
+        exec_cmd("git checkout -- {}".format(file.name), cwd=path)
     else:
-        os.remove(os.path.join(file.name))
+        os.remove(os.path.join(path, file.name))
 
 
 def ignore_file(file: File):
