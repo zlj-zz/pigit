@@ -1,0 +1,10 @@
+#!/usr/env bash
+
+_pigit_completion(){
+  if [[ "${COMP_CWORD}" == "1" ]];then
+      COMP_WORD="-v --version -r --report -f --config -i --information -d --debug --out-log -c --count -C --complete --create-ignore --create-config cmd -s --show-commands -p --show-part-command -t --types --shell repo add --dry-run rm --path rename ll --simple clear fetch pull push b bc bl bL bs bS bm bM bd c ca cA cm co cO cf cF cr cR cs Cl Ca Ce Co CO Ct CT f fc fC fm fr fu fb ia iA iu id iD ir iR ix iX l l1 ls ld lv lc lr m ma mC mF mS mv mt p pf pF pa pA pt pc pp R Rl Ra Rx Rm Ru Rp Rs RS s sp sl sd sD t ta tx ws wS wd wD wr wR wc wC wm wM wx wX sc si su savepd ue user email open"
+      COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
+  fi
+}
+
+complete -F _pigit_completion pigit

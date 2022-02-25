@@ -29,3 +29,7 @@ trans.txt
 tests/bash_pigit_comp
 tests/fish_pigit_comp
 tests/zsh_pigit_comp
+tests/zsh_pigit-dev_comp
+tests/pigit-dev_zsh_comp
+tests/pigit_bash_comp
+tests/pigit_fish_comp

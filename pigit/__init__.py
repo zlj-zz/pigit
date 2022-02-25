@@ -448,15 +448,15 @@ def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> 
         output_repository_info(include_part=CONFIG.repo_info_include)
 
     elif args.complete:
+        from copy import deepcopy
+
         # Generate competion vars dict.
-        completion_vars = {
-            key: value.get("help", "") for key, value in Git_Cmds.items()
-        }
+        completion_vars = deepcopy(argparse_dict)
+        completion_vars["args"]["cmd"]["args"].update(
+            {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
+        )
 
-        # Update var dict with shell command.
-        # completion_vars.update(process_argparse(self._parser))
-
-        shell_compele(get_current_shell(), __project__, completion_vars, PIGIT_HOME)
+        shell_compele(get_current_shell(), None, completion_vars, PIGIT_HOME)
         return None
 
     elif args.ignore_type:

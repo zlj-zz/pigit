@@ -1,0 +1,217 @@
+#compdef pigit-dev
+
+#--------------------------------------------------------------------
+# This completion script is generated automatically by parsing
+# parameters.
+#
+#--------------------------------------------------------------------
+# Author
+#--------
+#
+# * Zachary Zhang (https://github.com/zlj-zz)
+#
+#--------------------------------------------------------------------
+
+__cmd_values() {
+  _values '' \
+    {-s,--show-commands}'[List all available short command and wealth and exit.]' \
+    {-p,--show-part-command}'[According to given type `Branch, Commit, Conflict, Fetch, Index, Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Submodule, Setting, Extra` list available short command and wealth and exit.]' \
+    {-t,--types}'[List all command types and exit.]' \
+    '--shell[Go to the pigit shell mode.]' \
+    'b[lists, creates, renames, and deletes branches.]' \
+    'bc[creates a new branch.]' \
+    'bl[lists branches and their commits.]' \
+    'bL[lists local and remote branches and their commits.]' \
+    'bs[lists branches and their commits with ancestry graphs.]' \
+    'bS[lists local and remote branches and their commits with ancestry graphs.]' \
+    'bm[renames a branch.]' \
+    'bM[renames a branch even if the new branch name already exists.]' \
+    'bd[delete a local branch by name.]' \
+    'c[records changes to the repository.]' \
+    'ca[commits all modified and deleted files.]' \
+    'cA[commits all modified and deleted files interactively]' \
+    'cm[commits with the given message.]' \
+    'co[checks out a branch or paths to the working tree.]' \
+    'cO[checks out hunks from the index or the tree interactively.]' \
+    'cf[amends the tip of the current branch reusing the same log message as HEAD.]' \
+    'cF[amends the tip of the current branch.]' \
+    'cr[reverts existing commits by reverting patches and recording new commits.]' \
+    'cR[removes the HEAD commit.]' \
+    'cs[shows one or more objects (blobs, trees, tags and commits).]' \
+    'Cl[lists unmerged files.]' \
+    'Ca[adds unmerged file contents to the index.]' \
+    'Ce[executes merge-tool on all unmerged files.]' \
+    'Co[checks out our changes for unmerged paths.]' \
+    'CO[checks out our changes for all unmerged paths.]' \
+    'Ct[checks out their changes for unmerged paths.]' \
+    'CT[checks out their changes for all unmerged paths.]' \
+    'f[downloads objects and references from another repository.]' \
+    'fc[clones a repository into a new directory.]' \
+    'fC[clones a repository into a new directory clearly(depth:1).]' \
+    'fm[fetches from and merges with another repository or local branch.]' \
+    'fr[fetches from and rebase on top of another repository or local branch.]' \
+    'fu[removes un-existing remote-tracking references, fetches all remotes and merges.]' \
+    'fb[fetch other branch to local as same name.]' \
+    'ia[adds file contents to the index(default: all files).]' \
+    'iA[adds file contents to the index interactively.]' \
+    'iu[adds file contents to the index (updates only known files).]' \
+    'id[displays changes between the index and a named commit (diff).]' \
+    'iD[displays changes between the index and a named commit (word diff).]' \
+    'ir[resets the current HEAD to the specified state.]' \
+    'iR[resets the current index interactively.]' \
+    'ix[removes files from the index (recursively).]' \
+    'iX[removes files from the index (recursively and forced).]' \
+    'l[display the log with good format.]' \
+    'l1[display the log with oneline.]' \
+    'ls[displays the stats log.]' \
+    'ld[displays the diff log.]' \
+    'lv[displays the log, verifying the GPG signature of commits.]' \
+    'lc[displays the commit count for each contributor in descending order.]' \
+    'lr[manages reflog information.]' \
+    'm[joins two or more development histories together.]' \
+    'ma[aborts the conflict resolution, and reconstructs the pre-merge state.]' \
+    'mC[performs the merge but does not commit.]' \
+    'mF[creates a merge commit even if the merge could be resolved as a fast-forward.]' \
+    'mS[performs the merge and GPG-signs the resulting commit.]' \
+    'mv[verifies the GPG signature of the tip commit of the side branch being merged.]' \
+    'mt[runs the merge conflict resolution tools to resolve conflicts.]' \
+    'p[updates remote refs along with associated objects.]' \
+    'pf[forces a push safely (with "lease").]' \
+    'pF[forces a push.]' \
+    'pa[pushes all branches.]' \
+    'pA[pushes all branches and tags.]' \
+    'pt[pushes all tags.]' \
+    'pc[pushes the current branch and adds origin as an upstream reference for it.]' \
+    'pp[pulls and pushes the current branch from origin to origin.]' \
+    'R[manages tracked repositories.]' \
+    'Rl[lists remote names and their URLs.]' \
+    'Ra[adds a new remote.]' \
+    'Rx[removes a remote.]' \
+    'Rm[renames a remote.]' \
+    'Ru[fetches remotes updates.]' \
+    'Rp[prunes all stale remote tracking branches.]' \
+    'Rs[shows information about a given remote.]' \
+    'RS[changes URLs for a remote.]' \
+    's[stashes the changes of the dirty working directory.]' \
+    'sp[removes and applies a single stashed state from the stash list.]' \
+    'sl[lists stashed states.]' \
+    'sd[Remove submodule from repository.]' \
+    'sD[Inverse initialization submodule, clear the dir.]' \
+    't[creates, lists, deletes or verifies a tag object signed with GPG.]' \
+    'ta[create a new tag.]' \
+    'tx[deletes tags with given names.]' \
+    'ws[displays working-tree status in the short format.]' \
+    'wS[displays working-tree status.]' \
+    'wd[displays changes between the working tree and the index (diff).]' \
+    'wD[displays changes between the working tree and the index (word diff).]' \
+    'wr[resets the current HEAD to the specified state, does not touch the index nor the working tree.]' \
+    'wR[resets the current HEAD, index and working tree to the specified state.]' \
+    'wc[cleans untracked files from the working tree (dry-run).]' \
+    'wC[cleans untracked files from the working tree.]' \
+    'wm[moves or renames files.]' \
+    'wM[moves or renames files (forced).]' \
+    'wx[removes files from the working tree and from the index (recursively).]' \
+    'wX[removes files from the working tree and from the index (recursively and forced).]' \
+    'sc[Clone a repository as a submodule.]' \
+    'si[Pull the submodule for the first time.]' \
+    'su[Update git submodule.]' \
+    'savepd[Remember your account and password.]' \
+    'ue[set email and username interactively.]' \
+    'user[set username.]' \
+    'email[set user email.]' \
+    'open[open remote repository in web browser]' \
+  && ret=0
+}
+
+__add_values() {
+  _values '' \
+    '--dry-run[dry run.]' \
+  && ret=0
+}
+
+__rm_values() {
+  _values '' \
+    '--path[remove follow path, defult is name.]' \
+  && ret=0
+}
+
+__ll_values() {
+  _values '' \
+    '--simple[display simple summary.]' \
+  && ret=0
+}
+
+__repo_values() {
+  _values '' \
+    'add[add repo(s).]' \
+    'rm[remove repo(s).]' \
+    'rename[rename a repo.]' \
+    'll[display summary of all repos.]' \
+    'clear[clear the all repos.]' \
+    'fetch[fetch remote update for repo(s).]' \
+    'pull[pull remote updates for repo(s).]' \
+    'push[push the local updates for repo(s).]' \
+  && ret=0
+}
+
+
+######################
+# sub-commands helper
+######################
+__sub_opt_values() {
+  _values '' \
+    'cmd[git short command.]' \
+    'repo[repo options.]' \
+  && ret=0
+}
+
+
+_pigit_dev_completion(){
+  local curcontext="$curcontext" state line ret=1
+  typeset -A opt_args
+
+  
+  _arguments -C \
+    {-v,--version}'[Show version and exit.]' \
+    {-r,--report}'[Report the pigit desc and exit.]' \
+    {-f,--config}'[Display the config of current git repository and exit.]' \
+    {-i,--information}'[Show some information about the current git repository.]' \
+    {-d,--debug}'[Current runtime in debug mode.]' \
+    '--out-log[Print log to console.]' \
+    {-c,--count}'[Count the number of codes and output them in tabular form.A given path can be accepted, and the default is the current directory.]' \
+    {-C,--complete}'[Add shell prompt script and exit.(Supported bash, zsh, fish)]' \
+    '--create-ignore[Create a demo .gitignore file. Need one argument, support: `android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity`]' \
+    '--create-config[Create a pre-configured file of PIGIT.(If a profile exists, the values available in it are used)]' \
+    '1: :->opts'\
+    '*::arg:->args'\
+  && ret=0
+
+
+  
+  case $state in
+  opts) __sub_opt_values ;;
+    args)
+
+      if [[ ${#line} -eq 3 ]]; then
+        case $line[2] in
+          add) __add_values ;;
+          rm) __rm_values ;;
+          ll) __ll_values ;;
+
+        esac
+      fi
+
+
+      if [[ ${#line} -eq 2 ]]; then
+        case $line[1] in
+          cmd) __cmd_values ;;
+          repo) __repo_values ;;
+
+        esac
+      fi
+  esac
+
+  return ret
+}
+
+compdef _pigit_dev_completion pigit-dev

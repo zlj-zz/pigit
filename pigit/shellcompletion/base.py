@@ -20,13 +20,13 @@ class ShellCompletion(object):
 
     _SHELL: str  # shell name.
     _INJECT_PATH: str  # script inject path.
-    _TEMPLATE: str  # script tempelate string.
+    _template_source: str  # script tempelate string.
 
     def __init__(
         self,
-        prop: str,
-        complete_vars: dict,
-        script_dir: str,
+        prog_name: str = None,
+        complete_vars: dict = None,
+        script_dir: str = None,
         script_name: Optional[str] = None,
         inject_path: Optional[str] = None,
     ) -> None:
@@ -48,15 +48,61 @@ class ShellCompletion(object):
         """
         super(ShellCompletion, self).__init__()
 
-        self.prop = prop
-
         if not isinstance(complete_vars, dict):
             raise TypeError("complete_var muse be dict.")
         self.complete_vars = complete_vars
 
+        if prog_name:
+            self.prog_name = prog_name
+        else:
+            if prog_name := complete_vars.get("prog"):
+                self.prog_name = prog_name
+            else:
+                raise ValueError("Can't get prog name anywhere.")
+
         self.script_dir = script_dir
-        self.script_name = script_name or "{0}_{1}_comp".format(self._SHELL, self.prop)
+        self.script_name = script_name or "{0}_{1}_comp".format(
+            self.prog_name, self._SHELL
+        )
         self.inject_path = inject_path or self._INJECT_PATH
+
+    @property
+    def func_name(self) -> str:
+        """The name of the shell function defined by the completion
+        script.
+        """
+
+        safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
+        return f"_{safe_name}_completion"
+
+    def _parse(self, args: dict):
+        _arguments = []
+        _positions = []
+        _sub_opts = {}
+
+        for name, prop in args.items():
+            if name == "-groups":
+                for g_name, g_p in prop.items():
+                    a, p, s = self._parse(g_p["args"])
+                    _arguments.extend(a)
+                    _positions.extend(p)
+            elif name == "set_defaults":
+                # Special need be ignore.
+                pass
+            elif "args" in prop:
+                a, p, s = self._parse(prop["args"])
+                _sub_opts[name] = {
+                    "_arguments": a,
+                    "_positions": p,
+                    "_sub_opts": s,
+                    "help": prop.get("help", "_"),
+                }
+            elif name.startswith("-"):
+                _arguments.append((name, prop.get("help", "_")))
+            else:
+                _positions.append((name, prop.get("help", "_")))
+
+        return _arguments, _positions, _sub_opts
 
     def generate(self):
         """Generate script content.
@@ -79,8 +125,9 @@ class ShellCompletion(object):
         """
 
         complete_content = self.generate()
-        script_src = self._TEMPLATE % {
-            "prop": self.prop,
+        script_src = self._template_source % {
+            "func_name": self.func_name,
+            "prop": self.prog_name,
             "complete_vars": complete_content,
         }
 

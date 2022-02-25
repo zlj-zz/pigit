@@ -13,12 +13,18 @@ supported_shell = {
 def shell_compele(shell: str, prog: str, complete_var: str, script_dir: str):
     # check shell validable.
     shell = shell.lower()
+
+    if not shell:
+        print("No shell be found!")
+        return
+
     if shell not in supported_shell:
-        raise ValueError(
+        print(
             "shell name '{0}' is not supported, see {1}".format(
                 shell, supported_shell.keys()
             )
         )
+        return
 
     print("\n===Try to add completion ...")
     print(":: Completion shell: %s" % repr(shell))
