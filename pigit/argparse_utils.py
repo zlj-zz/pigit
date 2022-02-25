@@ -1,10 +1,11 @@
 from typing import Union
+from copy import deepcopy
 from argparse import ArgumentParser, Namespace
 
 
 class Parser(object):
     def __init__(self, args_dict: dict) -> None:
-        self._args_dict = args_dict
+        self._args_dict = deepcopy(args_dict)
 
         self._parse_dict()
 
