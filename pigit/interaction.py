@@ -98,12 +98,12 @@ class StatusPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key in ["a", " "]:
-            switch_file_status(self.raw_data[cursor_row - 1], path=self.repo_path)
+            switch_file_status(self.raw_data[cursor_row - 1], repo_path=self.repo_path)
             self.emit("update")
         elif input_key == "d":
             if ConfirmWidget("discard all changed? [y/n]:").run():
                 # if confirm("discard all changed? [y/n]:"):
-                discard_file(self.raw_data[cursor_row - 1], path=self.repo_path)
+                discard_file(self.raw_data[cursor_row - 1], repo_path=self.repo_path)
             self.emit("update")
         elif input_key == "i":
             ignore_file(self.raw_data[cursor_row - 1])
@@ -142,7 +142,7 @@ class FilePanel(RowPanelWidget):
             self._file.name,
             self._file.tracked,
             self._file.has_staged_change,
-            path=self._repo_path,
+            repo_path=self._repo_path,
         ).split("\n")
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:

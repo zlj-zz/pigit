@@ -1,3 +1,5 @@
+# -*- coding:utf-8 -*-
+
 from .bash import BashCompletion
 from .zsh import ZshCompletion
 from .fish import FishCompletion
@@ -34,8 +36,10 @@ def shell_compele(shell: str, prog: str, complete_var: str, script_dir: str):
     # try create completion file.
     completion_src = complete_handle.generate_resource()
     if not complete_handle.write_completion(completion_src):
-        print(":: Write completion script failed.")
+        print(":: Write completion script failed!")
         return None
+    else:
+        print(":: Write completion script success.")
 
     # try inject to shell config.
     try:

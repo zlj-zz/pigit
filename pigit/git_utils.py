@@ -22,11 +22,10 @@ def get_git_version() -> str:
     """Get Git version."""
 
     _, git_version_ = exec_cmd("git --version")
-    Log.debug("Detect git version:" + str(git_version_))
     return git_version_ or ""
 
 
-def get_repo_info(repo_path: str = ".") -> tuple[str, str]:
+def get_repo_info(repo_path: str = None) -> tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -63,39 +62,10 @@ def get_repo_info(repo_path: str = ".") -> tuple[str, str]:
     # if repo_path:
     #     _cache_repo(repo_path)
 
-    Log.debug("Final repo: {0}, {1}".format(repo_path, git_conf_path))
     return repo_path, git_conf_path
 
 
-def parse_git_config(conf: str) -> dict:
-    conf_list = re.split(r"\r\n|\r|\n", conf)
-    config_dict: dict[str, dict[str, str]] = {}
-    config_type: str = ""
-
-    for line in conf_list:
-        line = line.strip()
-
-        if not line:
-            continue
-
-        elif line.startswith("["):
-            config_type = line[1:-1].strip()
-            config_dict[config_type] = {}
-
-        elif "=" in line:
-            key, value = line.split("=", 1)
-            config_dict[config_type][key.strip()] = value.strip()
-
-        else:
-            continue
-
-    # debug info.
-    Log.debug(config_dict)
-
-    return config_dict
-
-
-def get_head(repo_path: str = "."):
+def get_head(repo_path: str = None):
     """Get current repo head.
     return a branch name or a commit sha string.
     """
@@ -106,14 +76,14 @@ def get_head(repo_path: str = "."):
     return res.rstrip()
 
 
-def get_branches(repo_path: str = "."):
+def get_branches(repo_path: str = None):
     """Get repo all branch."""
 
-    err, branches = exec_cmd("git branch")
+    err, branches = exec_cmd("git branch", cwd=repo_path)
     return branches
 
 
-def get_remote(repo_path: str = "."):
+def get_remote(repo_path: str = None):
     """Get repo remote url."""
 
     # Get remote name, exit when error.
@@ -258,7 +228,7 @@ def load_file_diff(
     tracked: bool = True,
     cached: bool = False,
     plain: bool = False,
-    path: str = ".",
+    repo_path: str = None,
 ) -> str:
     """Gets the modification of the file.
     Args:
@@ -283,7 +253,7 @@ def load_file_diff(
 
     err, res = exec_cmd(
         command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file),
-        cwd=path,
+        cwd=repo_path,
     )
     if err:
         return "Can't get diff."
@@ -372,23 +342,23 @@ def load_commit_info(commit_sha: str, file_name: str = "", plain: bool = False) 
 ##########
 # Options
 ##########
-def switch_file_status(file: File, path: str = "."):
+def switch_file_status(file: File, repo_path: str = None):
     if file.has_merged_conflicts or file.has_inline_merged_conflicts:
         pass
     elif file.has_unstaged_change:
-        exec_cmd("git add -- {}".format(file.name), cwd=path)
+        exec_cmd("git add -- {}".format(file.name), cwd=repo_path)
     elif file.has_staged_change:
         if file.tracked:
-            exec_cmd("git reset HEAD -- {}".format(file.name), cwd=path)
+            exec_cmd("git reset HEAD -- {}".format(file.name), cwd=repo_path)
         else:
-            exec_cmd("git rm --cached --force -- {}".format(file.name), cwd=path)
+            exec_cmd("git rm --cached --force -- {}".format(file.name), cwd=repo_path)
 
 
-def discard_file(file: File, path: str = "."):
+def discard_file(file: File, repo_path: str = None):
     if file.tracked:
-        exec_cmd("git checkout -- {}".format(file.name), cwd=path)
+        exec_cmd("git checkout -- {}".format(file.name), cwd=repo_path)
     else:
-        os.remove(os.path.join(path, file.name))
+        os.remove(os.path.join(repo_path, file.name))
 
 
 def ignore_file(file: File):
@@ -409,6 +379,31 @@ def checkout_branch(branch_name: str):
 ##############
 # Config info
 ##############
+def parse_git_config(conf: str) -> dict:
+    conf_list = re.split(r"\r\n|\r|\n", conf)
+    config_dict: dict[str, dict[str, str]] = {}
+    config_type: str = ""
+
+    for line in conf_list:
+        line = line.strip()
+
+        if not line:
+            continue
+
+        elif line.startswith("["):
+            config_type = line[1:-1].strip()
+            config_dict[config_type] = {}
+
+        elif "=" in line:
+            key, value = line.split("=", 1)
+            config_dict[config_type][key.strip()] = value.strip()
+
+        else:
+            continue
+
+    return config_dict
+
+
 def _config_normal_output(conf: dict[str, dict]) -> None:
     for t, d in conf.items():
         print(render_str(f"`[{t}]`<tomato>"))
