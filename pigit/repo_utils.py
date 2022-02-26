@@ -138,7 +138,7 @@ def ll_repos(simple: bool = False):
     exist_repos = load_repos()
 
     for repo_name, prop in exist_repos.items():
-        head = get_head(cwd=prop["path"])
+        head = get_head(repo_path=prop["path"])
 
         _, unstaged = exec_cmd("git diff --stat", cwd=prop["path"])
         _, staged = exec_cmd("git diff --stat --cached", cwd=prop["path"])

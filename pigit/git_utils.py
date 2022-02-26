@@ -26,7 +26,7 @@ def get_git_version() -> str:
     return git_version_ or ""
 
 
-def get_repo_info(path: str = ".") -> tuple[str, str]:
+def get_repo_info(repo_path: str = ".") -> tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -38,27 +38,27 @@ def get_repo_info(path: str = ".") -> tuple[str, str]:
     repo_path: str = ""
     git_conf_path: str = ""
 
-    path = os.path.abspath(path)
-    if not os.path.isdir(path):
+    repo_path = os.path.abspath(repo_path)
+    if not os.path.isdir(repo_path):
         return repo_path, git_conf_path
 
-    err, path = exec_cmd("git rev-parse --git-dir", cwd=path)
+    err, repo_path = exec_cmd("git rev-parse --git-dir", cwd=repo_path)
     if err:
         return repo_path, git_conf_path
 
     # remove useless space.
-    path = path.strip()
+    repo_path = repo_path.strip()
 
-    if ".git/submodule/" in path:
+    if ".git/submodule/" in repo_path:
         # this repo is submodule.
-        git_conf_path = path
-        repo_path = path.replace(".git/submodule/", "")
-    if path == ".git":
+        git_conf_path = repo_path
+        repo_path = repo_path.replace(".git/submodule/", "")
+    if repo_path == ".git":
         repo_path = os.getcwd()
         git_conf_path = os.path.join(repo_path, ".git")
     else:
-        git_conf_path = path
-        repo_path = path[:-5]
+        git_conf_path = repo_path
+        repo_path = repo_path[:-5]
 
     # if repo_path:
     #     _cache_repo(repo_path)
@@ -95,14 +95,45 @@ def parse_git_config(conf: str) -> dict:
     return config_dict
 
 
-def get_head(cwd: str = "."):
+def get_head(repo_path: str = "."):
     """Get current repo head.
     return a branch name or a commit sha string.
     """
     _, res = exec_cmd(
-        "git symbolic-ref -q --short HEAD || git describe --tags --exact-match", cwd=cwd
+        "git symbolic-ref -q --short HEAD || git describe --tags --exact-match",
+        cwd=repo_path,
     )
     return res.rstrip()
+
+
+def get_branches(repo_path: str = "."):
+    """Get repo all branch."""
+
+    err, branches = exec_cmd("git branch")
+    return branches
+
+
+def get_remote(repo_path: str = "."):
+    """Get repo remote url."""
+
+    # Get remote name, exit when error.
+    err, remote = exec_cmd("git remote show", cwd=repo_path)
+
+    if err:
+        return None
+
+    remote = remote.strip().split("\n")[0]
+
+    # Get remote url, exit when error.
+    err, remote_url = exec_cmd(
+        "git ls-remote --get-url {0}".format(remote), cwd=repo_path
+    )
+
+    if err:
+        return None
+
+    remote_url = remote_url[:-5]
+    return remote_url
 
 
 def get_first_pushed_commit(branch_name: str):

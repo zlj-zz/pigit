@@ -659,11 +659,4 @@ Git_Cmds = {
         "help": "set user email.",
         "has_arguments": True,
     },
-    "open": {
-        "belong": CommandType.Setting,
-        "command": open_remote_url,
-        "help": "open remote repository in web browser",
-        "type": "func",
-        "has_arguments": True,
-    },
 }  # type: dict[str,dict]

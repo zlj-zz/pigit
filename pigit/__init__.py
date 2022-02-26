@@ -43,6 +43,8 @@ from .common import render_str, get_current_shell, confirm
 from .git_utils import (
     get_git_version,
     get_repo_info,
+    get_branches,
+    get_remote,
     output_git_local_config,
     output_repository_info,
 )
@@ -262,6 +264,30 @@ def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         process_repo_option(args.repos, option)
 
 
+def _open_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+    branch = issue = commit = ""
+
+    remote_url = get_remote()
+
+    if args.branch:
+        branches = get_branches()
+        branch = f"/tree/{args.branch}"
+        remote_url += branch
+    elif args.issue:
+        issue = f"/issues/{args.issue}"
+        remote_url += issue
+    elif args.commit:
+        commit = f"/commit/{args.commit}"
+        remote_url += commit
+
+    if args.print:
+        print(render_str(f"Remote URL: `{remote_url}`<sky_blue>"))
+    else:
+        import webbrowser
+
+        webbrowser.open(remote_url)
+
+
 argparse_dict = {
     "prog": "pigit",
     "prefix_chars": "-",
@@ -428,6 +454,23 @@ argparse_dict = {
                     }
                     for name, prop in repo_options.items()
                 },
+            },
+        },
+        "open": {
+            "help": "open remote repository in web browser.",
+            "args": {
+                "branch": {
+                    "nargs": "?",
+                    "default": None,
+                    "help": "the branch of repository.",
+                },
+                "-i --issue": {"help": "the given issue of the repository."},
+                "-c --commit": {"help": "the current commit in the repo website."},
+                "-p --print": {
+                    "action": "store_true",
+                    "help": "only print the url at the terminal, but do not open it.",
+                },
+                "set_defaults": {"func": _open_func},
             },
         },
     },
