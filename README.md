@@ -62,6 +62,7 @@ positional arguments:
   {cmd,repo}
     cmd                 git short command.
     repo                repo options.
+    open                open remote repository in web browser.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -120,24 +121,6 @@ It support a simple interactive mode. You can use `pigit` into the interactive m
 ![interaction demo](./interaction.gif)
 
 And in the interaction mode, you can use `?` or `h` to see the help message.
-
-### Open remote
-
-You can use `pigit cmd open` to open your remote website (just support **github**). These are some other parameters this command supported:
-
-```bash
-  -i, --issue:
-      open given issue of the repository.
-      # pigit open -- -i 20
-      # pigit open -- --issue=20
-  -c, --commit:
-      open the current commit in the repo website.
-      # pigit open -- --commit
-  -p, --print:
-      only print the url at the terminal, but don't open it.
-  <branch>:
-      open the page for this branch on the repo website.
-```
 
 ## Alias
 
