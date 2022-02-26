@@ -29,10 +29,11 @@ import logging
 from typing import Optional
 
 from .log import setup_logging
+from .decorator import time_it
+from .config import Config
+from .argparse_utils import Parser
 from .const import (
     __version__,
-    __url__,
-    __project__,
     PIGIT_HOME,
     LOG_FILE_PATH,
     CONFIG_FILE_PATH,
@@ -40,14 +41,7 @@ from .const import (
     IS_FIRST_RUN,
 )
 from .common import render_str, get_current_shell, confirm
-from .git_utils import (
-    get_git_version,
-    get_repo_info,
-    get_branches,
-    get_remote,
-    output_git_local_config,
-    output_repository_info,
-)
+from .git_utils import get_repo_info, get_branches, get_remote
 from .repo_utils import (
     add_repos,
     clear_repos,
@@ -57,12 +51,10 @@ from .repo_utils import (
     repo_options,
     process_repo_option,
 )
-from .decorator import time_it
-from .config import Config
-from .argparse_utils import Parser
 from .gitignore import GitignoreGenetor
-from .shellcompletion import shell_compele
+from .shellcompletion import shell_complete
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
+from .info import output_git_local_config, output_repository_info, introduce
 
 
 Log = logging.getLogger(__name__)
@@ -79,49 +71,6 @@ CONFIG = Config(
 ##########################################
 # Implementation of additional functions.
 ##########################################
-def introduce() -> None:
-    """Print the description information."""
-
-    # Print version.
-    print(
-        """\
- ____ ___ ____ ___ _____
-|  _ \\_ _/ ___|_ _|_   _|
-| |_) | | |  _ | |  | |
-|  __/| | |_| || |  | |
-|_|  |___\\____|___| |_| version: {}
-""".format(
-            __version__
-        )
-    )
-
-    # Print git version.
-    git_version = get_git_version()
-    if git_version is None:
-        print(render_str("`Don't found Git, maybe need install.`<error>"))
-    else:
-        print(git_version)
-
-    # Print package path.
-    print(
-        render_str(
-            "b`Local path`: u`{}`<sky_blue>\n".format(
-                os.path.dirname(__file__.replace("./", ""))
-            )
-        )
-    )
-
-    # Print description.
-    print(
-        render_str(
-            "b`Description:`\n"
-            "  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.\n"
-            f"  The open source path on github: u`{__url__}`<sky_blue>\n\n"
-            "You can use `-h`<ok> or `--help`<ok> to get help and usage."
-        )
-    )
-
-
 def shell_mode(git_processor: CmdProcessor):
 
     print(
@@ -499,7 +448,7 @@ def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> 
             {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
         )
 
-        shell_compele(get_current_shell(), None, completion_vars, PIGIT_HOME)
+        shell_complete(get_current_shell(), None, completion_vars, PIGIT_HOME)
         return None
 
     elif args.ignore_type:
@@ -532,14 +481,14 @@ def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> 
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
-        from .interaction import main as interactive_interface
+        from .interaction import tui_main
 
         if IS_FIRST_RUN:
             introduce()
             if not confirm("Input `enter` to continue:"):
                 return
 
-        interactive_interface(help_wait=CONFIG.tui_help_showtime)
+        tui_main(help_wait=CONFIG.tui_help_showtime)
 
 
 def process(args: argparse.Namespace, unknown: list):
@@ -549,15 +498,15 @@ def process(args: argparse.Namespace, unknown: list):
         raise SystemExit(0)
 
 
-#############
-# main entry
-#############
+##############
+# main entry.
+##############
 @time_it
 def main(custom_commands: Optional[list] = None):
     parser = Parser(argparse_dict)
 
     # Parse custom comand or parse input command.
-    stdargs, extra_unknown = parser.parse()
+    stdargs, extra_unknown = parser.parse(custom_commands)
 
     # Setup log handle.
     log_file = LOG_FILE_PATH if stdargs.out_log or CONFIG.log_output else None

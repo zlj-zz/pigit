@@ -95,7 +95,7 @@ class GitignoreGenetor(object):
             content = handle.read().decode("utf-8")
             return content
 
-    def launch(self, genre: str, dir_path: str) -> None:
+    def launch(self, ignore_type: str, dir_path: str) -> None:
         """Try to create gitignore template file.
 
         Args:
@@ -104,9 +104,9 @@ class GitignoreGenetor(object):
         """
 
         # Process and check the type, and exit in case of any accident.
-        name = self.Supported_Types.get(genre.lower(), None)
+        name = self.Supported_Types.get(ignore_type.lower(), None)
         if name is None:
-            print("Unsupported type: %s" % genre)
+            print("Unsupported type: %s" % ignore_type)
             print(
                 "Supported type: [{}]. Case insensitive.".format(
                     " ".join(self.Supported_Types.keys())
@@ -124,7 +124,7 @@ class GitignoreGenetor(object):
             )
 
         if whether_write:
-            base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+            base_url = "https://github.com/github/gitignore/blob/main/%s.gitignore"
             target_url = base_url % name
 
             print(

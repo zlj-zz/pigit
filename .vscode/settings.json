@@ -25,6 +25,7 @@
         "Pomodoro",
         "Popen",
         "pygittools",
+        "pyinstrument",
         "pynput",
         "pypi",
         "pytest",

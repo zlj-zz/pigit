@@ -12,7 +12,7 @@ supported_shell = {
 }
 
 
-def shell_compele(shell: str, prog: str, complete_var: str, script_dir: str):
+def shell_complete(shell: str, prog: str, complete_var: str, script_dir: str):
     # check shell validable.
     shell = shell.lower()
 

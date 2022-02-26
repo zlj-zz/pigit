@@ -16,22 +16,16 @@ def setup():
     return CmdProcessor(extra_cmds=extra)
 
 
-# def test_process_error(setup):
-#     handle = setup
-
-#     with pytest.raises(ValueError):
-#         handle._generate_help_by_key("aa")
-
-
 @pytest.mark.parametrize(
     "command",
     [
         "git status",
+        "git add xxx/xxx",
+        "git checkout -b test",
         "git log --online --graph",
         "git log --dep 10 --online --graph",
         "git log --dep 10 --online --graph --color true",
-        "git add xxx/xxx",
-        "git checkout -b test",
+        'git log --topo-order --stat --pretty=format:"%C(bold yellow)commit"',
     ],
 )
 def test_color_command(setup, command: str):

@@ -6,7 +6,7 @@ from pigit import GitignoreGenetor
 
 @analyze_it
 def test_fetch_gitignore():
-    base_url = "https://github.com/github/gitignore/blob/master/%s.gitignore"
+    base_url = "https://github.com/github/gitignore/blob/main/%s.gitignore"
     name = "Python"
 
     handle = GitignoreGenetor()

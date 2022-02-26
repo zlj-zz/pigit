@@ -220,7 +220,7 @@ class ModelSwitcher(SwitchWidget):
             return int(key) - 1
 
 
-def main(index=None, help_wait=1.5):
+def tui_main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
         print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
