@@ -2,6 +2,19 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+v1.5.0 (2022-02-26)
+----------
+- Refactor code, split sub-command of usage.
+- Refactor shell completion.
+- Refactor args parser.
+- Feat function, add ``repo`` option.
+- Feat function, add ``open`` option.
+- Fix color error of print original git command.
+- Fix some logic bug of TUI.
+- Fix can't process chinese error of TUI.
+- Update config.
+- Remove useless function: ``tomato``.
+
 v1.3.6 (2022-02-10)
 ----------
 - Console add ``--alias`` command.
