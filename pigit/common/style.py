@@ -480,7 +480,6 @@ def render_style(
         r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})>)?)"
     ).sub,
 ):
-    get_color = COLOR_CODE.__getitem__
     get_fx = FX_CODE.__getitem__
 
     def do_replace(match: Match[str]) -> str:
@@ -495,16 +494,10 @@ def render_style(
                 font_style = get_fx(fx) if fx else ""
 
                 # Get color hexa.
-                if color_code:
-                    color_hexa = (
-                        color_code
-                        if color_code.startswith("#")
-                        else get_color(color_code)
-                    )
+                if color_code and color_code.startswith("#"):
+                    color_style = Color.fg(color_code)
                 else:
-                    color_hexa = ""
-
-                color_style = Color.fg(color_hexa) if color_hexa else ""
+                    color_style = Color.by_name(color_code, depth="fg")
 
                 return font_style + color_style + content + "\033[0m"
             except KeyError:

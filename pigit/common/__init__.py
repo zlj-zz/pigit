@@ -32,3 +32,10 @@ def render_str(
         text = Emoji.render(text)
 
     return text
+
+
+def echo(
+    *values, sep: str = " ", end: str = "\n", file: str = None, flush: bool = True
+):
+    value_list = [render_str(value) for value in values]
+    print(*value_list, sep=sep, end=end, file=file, flush=flush)

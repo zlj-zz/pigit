@@ -80,14 +80,6 @@ class Emoji(object):
 
         return _emoji_sub(do_replace, _msg)
 
-    @classmethod
-    def print(
-        cls, _msg: str, /, *, sep: str = " ", end: str = "\n", flush: bool = True
-    ):
-        _render_msg: str = cls.render(_msg)
-        print(_render_msg, sep=sep, end=end, flush=flush)
-
 
 if __name__ == "__main__":
     print(Emoji.render("Today is a nice day :smiler:."))
-    Emoji.print("Today is a nice day :smiler:.")
