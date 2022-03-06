@@ -26,10 +26,10 @@ def render_str(
     """
 
     if hightlight:
-        text = render_style(text)
+        text = Style.render_style(text)
 
     if allow_emoji:
-        text = Emoji.render(text)
+        text = Emoji.render_emoji(text)
 
     return text
 

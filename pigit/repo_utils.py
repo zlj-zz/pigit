@@ -5,7 +5,7 @@ import textwrap
 from collections import Counter
 
 from pigit.common import async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
-from pigit.render import render_str
+from pigit.render import echo
 from pigit.const import REPOS_PATH
 from pigit.git_utils import get_head, get_repo_info
 
@@ -79,7 +79,7 @@ def add_repos(paths: list[str], dry_run: bool = False, silent: bool = False):
     if new_git_paths:
         not silent and print(f"Found {len(new_git_paths)} new repo(s).")
         for path in new_git_paths:
-            not silent and print(render_str(f"`{path}`<sky_blue>"))
+            not silent and echo(f"`{path}`<sky_blue>")
 
         if dry_run:
             return
@@ -94,7 +94,7 @@ def add_repos(paths: list[str], dry_run: bool = False, silent: bool = False):
 
         save_repos({**exist_repos, **new_repos})
     else:
-        not silent and print(render_str("`No new repos found!`<tomato>"))
+        not silent and echo("`No new repos found!`<tomato>")
 
 
 def rm_repos(repos: list[str], use_path: bool = False):
@@ -110,7 +110,7 @@ def rm_repos(repos: list[str], use_path: bool = False):
             if exist_repos.get(repo, None):
                 del_repos.append(repo)
             else:
-                print(render_str(f"`No repo name is '{repo}'.`<tomato>"))
+                echo(f"`No repo name is '{repo}'.`<tomato>")
 
     for repo in del_repos:
         print(f"Deleted repo. name: '{repo}', path: {exist_repos[repo]['path']}")
@@ -161,10 +161,9 @@ def ll_repos(simple: bool = False):
                 f"{repo_name:<20} {head} {unstaged_symbol}{staged_symbol}{untracked_symbol}"
             )
         else:
-            print(
-                render_str(
-                    textwrap.dedent(
-                        f"""\
+            echo(
+                textwrap.dedent(
+                    f"""\
                     b`{repo_name}`
                         Branch: {head} {unstaged_symbol}{staged_symbol}{untracked_symbol}
                         Branch status: {branch_status}
@@ -172,7 +171,6 @@ def ll_repos(simple: bool = False):
                         Commit msg: {commit_msg}
                         Path: `{prop['path']}`<sky_blue>
                     """
-                    )
                 )
             )
 
@@ -202,4 +200,4 @@ def process_repo_option(repos, op):
 
         for path in errors:
             if path:
-                print(render_str(f"`{op} failed, path: {path}`<tomato>"))
+                echo(f"`{op} failed, path: {path}`<tomato>")

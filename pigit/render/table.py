@@ -5,8 +5,28 @@ from shutil import get_terminal_size
 from copy import deepcopy
 from typing import Generator
 
-from .style import BoxSymbol, Fx
+from .style import Fx
 from .str_utils import get_width
+
+
+class BoxSymbol(object):
+    # yapf: disable
+    rune:dict[str,list[str]] = {
+        "normal":        ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"],
+        "normal_double": ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="],
+        "fine":          ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"],
+        "radian":        ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"],
+        "bold":     ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"],
+        "double":   ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"],
+    }
+
+    normal_rune: list[str] = ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"]
+    normal_double_rune: list[str] = ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="]
+    fine_rune: list[str] = ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"]
+    radian_rune: list[str] = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]
+    bold_rune: list[str] = ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"]
+    double_rune: list[str] = ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]
+    # yapf: enable
 
 
 class TableTooWideError(Exception):

@@ -16,7 +16,7 @@ import re
 from typing import Union
 
 from ..common import exec_cmd, run_cmd
-from ..render import Emoji, render_str
+from ..render import echo
 
 
 def add(args: Union[list, tuple]) -> None:
@@ -32,9 +32,9 @@ def add(args: Union[list, tuple]) -> None:
     if args:
         args_str = " ".join(args)
 
-    print(
-        "{0} Storage file: {1}".format(
-            Emoji.rainbow, "all" if args_str.strip() == "." else args_str
+    echo(
+        ":rainbow: Storage file: {0}".format(
+            "all" if args_str.strip() == "." else args_str
         )
     )
     run_cmd("git add " + args_str)
@@ -48,7 +48,7 @@ def fetch_remote_branch(args: Union[list, tuple]) -> None:
     if branch:
         run_cmd("git fetch origin {0}:{0} ".format(branch))
     else:
-        print(render_str("`This option need a branch name.`<error>"))
+        echo("`This option need a branch name.`<error>")
 
 
 def set_email_and_username(args: Union[list, tuple]) -> None:
@@ -77,7 +77,7 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     name = input("Please input username:").strip()
     while True:
         if not name:
-            print(render_str("`Name is empty.`<error>"))
+            echo("`Name is empty.`<error>")
             name = input("Please input username again:")
         else:
             break
@@ -86,7 +86,7 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:
         if email_re.match(email) is None:
-            print(render_str("`Bad mailbox format.`<error>"))
+            echo("`Bad mailbox format.`<error>")
             email = input("Please input email again:")
         else:
             break
@@ -94,6 +94,6 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
     if run_cmd(f"git config user.name {name} {is_global}") and run_cmd(
         f"git config user.email {email} {is_global}"
     ):
-        print(render_str("`Successfully set.`<ok>"))
+        echo("`Successfully set.`<ok>")
     else:
-        print(render_str("`Failed. Please check log.`<error>"))
+        echo("`Failed. Please check log.`<error>")

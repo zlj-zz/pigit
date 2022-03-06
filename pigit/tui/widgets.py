@@ -4,7 +4,8 @@ from math import ceil
 from typing import Any, Optional
 
 from .console import Term
-from ..common import Fx, get_width, run_cmd, confirm
+from ..common import run_cmd, confirm
+from ..render import Fx, get_width
 
 
 class Widget(object):

@@ -52,7 +52,7 @@ class Emoji(object):
     #           |               |
     #   today is a nice day :rainbow:
     @classmethod
-    def render(
+    def render_emoji(
         cls,
         _msg: str,
         /,
@@ -82,4 +82,4 @@ class Emoji(object):
 
 
 if __name__ == "__main__":
-    print(Emoji.render("Today is a nice day :smiler:."))
+    print(Emoji.render_emoji("Today is a nice day :smiler:."))

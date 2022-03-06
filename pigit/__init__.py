@@ -40,8 +40,8 @@ from .const import (
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
+from .render import echo
 from .common import get_current_shell, confirm
-from .render import render_str
 from .git_utils import get_repo_info, get_branches, get_remote
 from .repo_utils import (
     add_repos,
@@ -194,7 +194,7 @@ def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         git_processor.process_command(command, args.args)
         return None
     else:
-        print(render_str("`pigit cmd -h`<ok> for help."))
+        echo("`pigit cmd -h`<ok> for help.")
 
 
 def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
@@ -231,7 +231,7 @@ def _open_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         remote_url += commit
 
     if args.print:
-        print(render_str(f"Remote URL: `{remote_url}`<sky_blue>"))
+        echo(f"Remote URL: `{remote_url}`<sky_blue>")
     else:
         import webbrowser
 

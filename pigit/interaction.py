@@ -6,7 +6,7 @@ from typing import Optional, Any
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .common import Color, Fx, render_str
+from .render import Color, Fx, render_str, echo
 from .git_utils import (
     # info method
     get_repo_info,
@@ -223,11 +223,11 @@ class ModelSwitcher(SwitchWidget):
 def tui_main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
-        print(render_str("`Terminal interaction not support windows now.`<#FF0000>"))
+        echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
     if not get_repo_info()[0]:
-        print(render_str("`Please run in a git repo dir.`<tomato>"))
+        echo("`Please run in a git repo dir.`<tomato>")
         return
 
     status = StatusPanel(widget=FilePanel(), help_wait=help_wait)

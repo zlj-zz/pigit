@@ -152,17 +152,6 @@ COLOR_CODE = {
     "black": "#000000",
 }
 
-FX_CODE = {
-    "b": "\033[1m",
-    "u": "\033[4m",
-    "i": "\033[3m",
-    "bl": "\033[5m",
-    "bold": "\033[1m",
-    "underline": "\033[4m",
-    "italic": "\033[3m",
-    "blink": "\033[5m",
-}
-
 # color hexa string reg.
 _color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
 
@@ -214,6 +203,15 @@ class Fx(object):
     @classmethod
     def pure(cls, string):
         return cls.style_re.sub("", cls.uncolor(string))
+
+    @classmethod
+    def by_name(cls, name: str):
+        try:
+            fx_code = getattr(cls, name)
+        except AttributeError:
+            fx_code = ""
+
+        return fx_code
 
 
 class Color(object):
@@ -460,70 +458,62 @@ class Color(object):
             return False
 
 
-# If has special format string, will try to render the color and font style.
-# If cannot to render the string will keep it.
-#
-# .+--------------------------------> font style prefix (options).
-#  |         +----------------------> the content being rendered.
-#  |         |             +--------> color code or color name, like: blue (options).
-#  |         |             |
-#  b`This is a string.`<#FF0000>
-#
-# Must keep has one of font style or color for making sure can right render.
-# If ignore the two both, it will do nothing.
-# Only '`' with consecutive beginning and ending will be considered part of the content.
-def render_style(
-    _msg: str,
-    /,
-    *,
-    _color_sub=re.compile(
-        r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})>)?)"
-    ).sub,
-):
-    get_fx = FX_CODE.__getitem__
+class Style(object):
+    # If has special format string, will try to render the color and font style.
+    # If cannot to render the string will keep it.
+    #
+    # .+-----------------------------------> font style prefix (options).
+    #  |         +-------------------------> the content being rendered.
+    #  |         |             +-----------> color code or color name, like: blue (options).
+    #  |         |             |       +---> background color code.
+    #  |         |             |       |
+    #  |         |             |       |
+    #  b`This is a string.`<#FF0000,#00FF00>
+    #
+    # Must keep has one of font style or color for making sure can right render.
+    # If ignore the two both, it will do nothing.
+    # Only '`' with consecutive beginning and ending will be considered part of the content.
+    @staticmethod
+    def render_style(
+        _msg: str,
+        /,
+        *,
+        _color_sub=re.compile(
+            r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})?(?:,([a-zA-Z_]+|#[0-9a-fA-F]{6}))?>)?)"
+        ).sub,
+    ):
+        def do_replace(match: Match[str]) -> str:
+            raw, fx, content, color_code, color_bg_code = match.groups()
+            # print(raw, fx, content, color_code, color_bg_code)
 
-    def do_replace(match: Match[str]) -> str:
-        raw, fx, content, color_code = match.groups()
-        # print(raw, fx, content, color_code)
-
-        if not color_code and not fx:
-            return raw
-        else:
-            try:
-                # No fx then get empty.
-                font_style = get_fx(fx) if fx else ""
-
-                # Get color hexa.
-                if color_code and color_code.startswith("#"):
-                    color_style = Color.fg(color_code)
-                else:
-                    color_style = Color.by_name(color_code, depth="fg")
-
-                return font_style + color_style + content + "\033[0m"
-            except KeyError:
+            if not color_code and not fx and not color_bg_code:
                 return raw
+            else:
+                try:
+                    # No fx then get empty.
+                    if fx:
+                        font_style = Fx.by_name(fx)
+                    else:
+                        font_style = ""
 
-    return _color_sub(do_replace, _msg)
+                    # Get color hexa.
+                    if color_code and color_code.startswith("#"):
+                        color_style = Color.fg(color_code)
+                    else:
+                        color_style = Color.by_name(color_code, depth="fg")
 
+                    if color_bg_code and color_bg_code.startswith("#"):
+                        color_bg_style = Color.bg(color_bg_code)
+                    else:
+                        color_bg_style = Color.by_name(color_bg_code, depth="bg")
 
-class BoxSymbol(object):
-    # yapf: disable
-    rune:dict[str,list[str]] = {
-        "normal":        ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"],
-        "normal_double": ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="],
-        "fine":          ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"],
-        "radian":        ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"],
-        "bold":     ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"],
-        "double":   ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"],
-    }
+                    return (
+                        font_style + color_style + color_bg_style + content + "\033[0m"
+                    )
+                except KeyError:
+                    return raw
 
-    normal_rune: list[str] = ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"]
-    normal_double_rune: list[str] = ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="]
-    fine_rune: list[str] = ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"]
-    radian_rune: list[str] = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]
-    bold_rune: list[str] = ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"]
-    double_rune: list[str] = ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]
-    # yapf: enable
+        return _color_sub(do_replace, _msg)
 
 
 if __name__ == "__main__":
@@ -531,22 +521,28 @@ if __name__ == "__main__":
 
     doctest.testmod(verbose=True)
 
-    txt1 = "Today is a b`nice` `day`<green>."
-    print(render_style(txt1))
+    txt1 = "Today is a b`nice` `day`<green,red>."
+    print(Style.render_style(txt1))
 
     txt1 = "Today is a b`nice`<#FF0000> day."
-    # print(render_style(txt1))
+    print(Style.render_style(txt1))
 
     txt2 = "Today is a `nice`<sky_blue> day."
-    # print(render_style(txt2))
+    print(Style.render_style(txt2))
+
+    txt2 = "Today is a `nice`<,sky_blue> day."
+    print(Style.render_style(txt2))
+
+    txt2 = "Today is a `nice`<> day."
+    print(Style.render_style(txt2))
 
     txt2 = "Today is a b```nice``` day."
-    print(render_style(txt2))
+    # print(Style.render_style(txt2))
 
     txt2 = "Today is a `nice`xxxxxxx day."
-    print(render_style(txt2))
+    # print(Style.render_style(txt2))
 
     txt2 = "Today is a `nice`<xxxxxxx> day."
-    print(render_style(txt2))
+    # print(Style.render_style(txt2))
 
-    print(render_style("i`Don't found Git, maybe need install.`tomato"))
+    print(Style.render_style("i`Don't found Git, maybe need install.`tomato"))

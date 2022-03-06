@@ -4,7 +4,7 @@ import textwrap
 
 from pigit.const import __version__, __url__
 from pigit.common import exec_cmd
-from pigit.render import render_str
+from pigit.render import echo, render_str
 from pigit.git_utils import get_git_version, get_repo_info
 from pigit.render.table import TableTooWideError, dTable
 
@@ -28,27 +28,23 @@ def introduce() -> None:
     # Print git version.
     git_version = get_git_version()
     if git_version is None:
-        print(render_str("`Don't found Git, maybe need install.`<error>"))
+        echo("`Don't found Git, maybe need install.`<error>")
     else:
         print(git_version)
 
     # Print package path.
-    print(
-        render_str(
-            "b`Local path`: u`{}`<sky_blue>\n".format(
-                os.path.dirname(__file__.replace("./", ""))
-            )
+    echo(
+        "b`Local path`: u`{}`<sky_blue>\n".format(
+            os.path.dirname(__file__.replace("./", ""))
         )
     )
 
     # Print description.
-    print(
-        render_str(
-            "b`Description:`\n"
-            "  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.\n"
-            f"  The open source path on github: u`{__url__}`<sky_blue>\n\n"
-            "You can use `-h`<ok> or `--help`<ok> to get help and usage."
-        )
+    echo(
+        "b`Description:`\n"
+        "  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.\n"
+        f"  The open source path on github: u`{__url__}`<sky_blue>\n\n"
+        "You can use `-h`<ok> or `--help`<ok> to get help and usage."
     )
 
 
@@ -82,9 +78,9 @@ def parse_git_config(conf: str) -> dict:
 
 def _config_normal_output(conf: dict[str, dict]) -> None:
     for t, d in conf.items():
-        print(render_str(f"`[{t}]`<tomato>"))
+        echo(f"`[{t}]`<tomato>")
         for k, v in d.items():
-            print(render_str(f"\t`{k}`<sky_blue>=`{v}`<medium_violet_red>"))
+            echo(f"\t`{k}`<sky_blue>=`{v}`<medium_violet_red>")
 
 
 def _config_table_output(conf: dict[str, dict]) -> None:
@@ -108,16 +104,14 @@ def output_git_local_config(style: str = "table") -> None:
     REPOSITORY_PATH, GIT_CONF_PATH = get_repo_info()
 
     if not REPOSITORY_PATH:
-        print(render_str("`This directory is not a git repository yet.`<error>"))
+        echo("`This directory is not a git repository yet.`<error>")
         return None
 
     try:
         with open(GIT_CONF_PATH + "/config", "r") as cf:
             context = cf.read()
     except Exception as e:
-        print(
-            render_str("`Error reading configuration file. {0}`<error>").format(str(e))
-        )
+        echo("`Error reading configuration file. {0}`<error>").format(str(e))
     else:
         config_dict = parse_git_config(context)
 
@@ -141,14 +135,14 @@ def output_repository_info(include_part: list = None) -> None:
 
     print("waiting ...", end="")
 
-    error_str = render_str("`Error getting.`<error>")
+    error_str = "`Error getting.`<error>"
 
     REPOSITORY_PATH, _ = get_repo_info()
 
     # Print content.
-    print(render_str("\r[b`Repository Information`]\n"))
+    echo("\r[b`Repository Information`]\n")
     if not include_part or "path" in include_part:
-        print(render_str(f"Repository: \n\t`{REPOSITORY_PATH}`<sky_blue>\n"))
+        echo(f"Repository: \n\t`{REPOSITORY_PATH}`<sky_blue>\n")
 
     # Get remote url.
     if not include_part or "remote" in include_part:
@@ -159,8 +153,8 @@ def output_repository_info(include_part: list = None) -> None:
             remote = error_str
         else:
             res = re.findall(r"url\s=\s(.*)", config)
-            remote = "\n".join([render_str(f"\ti`{x}`<sky_blue>") for x in res])
-        print("Remote: \n%s\n" % remote)
+            remote = "\n".join([f"\ti`{x}`<sky_blue>" for x in res])
+        echo("Remote: \n%s\n" % remote)
 
     # Get all branches.
     if not include_part or "branch" in include_part:
