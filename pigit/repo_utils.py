@@ -4,7 +4,8 @@ import os
 import textwrap
 from collections import Counter
 
-from pigit.common import render_str, async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
+from pigit.common import async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
+from pigit.render import render_str
 from pigit.const import REPOS_PATH
 from pigit.git_utils import get_head, get_repo_info
 

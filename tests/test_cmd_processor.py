@@ -2,7 +2,7 @@ import pytest
 from .utils import analyze_it
 
 from pigit.processor import CmdProcessor
-from pigit.common import Fx
+from pigit.render import Fx
 
 
 def test_init():

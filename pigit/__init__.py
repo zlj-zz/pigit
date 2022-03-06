@@ -40,7 +40,8 @@ from .const import (
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
-from .common import render_str, get_current_shell, confirm
+from .common import get_current_shell, confirm
+from .render import render_str
 from .git_utils import get_repo_info, get_branches, get_remote
 from .repo_utils import (
     add_repos,

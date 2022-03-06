@@ -3,8 +3,9 @@
 import os, re, textwrap, logging
 from distutils.util import strtobool
 
-from .common import Color, confirm, traceback_info
+from .common import confirm, traceback_info
 from .common.singleton import Singleton
+from .render.style import Color
 
 Log = logging.getLogger(__name__)
 

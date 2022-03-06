@@ -6,7 +6,8 @@ import logging
 from typing import Optional
 from urllib.request import urlopen
 
-from .common import Fx, Emoji, confirm, traceback_info
+from .common import confirm, traceback_info
+from .render import Fx, Emoji
 
 Log = logging.getLogger(__name__)
 

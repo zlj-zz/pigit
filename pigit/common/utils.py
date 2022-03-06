@@ -222,6 +222,154 @@ def get_current_shell() -> str:
     return current_shell.lower()
 
 
+# Mark the type corresponding to the file suffix.
+# abcdefg hijklmn opq rst uvw xyz
+SUFFIX_TYPE: dict[str, str] = {
+    "": "",
+    "bat": "Batch",
+    "c": "C",
+    "cfg": "Properties",
+    "conf": "Properties",
+    "cpp": "C++",
+    "cs": "C#",
+    "css": "CSS",
+    "dart": "Dart",
+    "dea": "XML",
+    "go": "Go",
+    "gradle": "Groovy",
+    "h": "C",
+    "hpp": "C++",
+    "htm": "HTML",
+    "html": "HTML",
+    "ini": "Ini",
+    "java": "Java",
+    "js": "Java Script",
+    "json": "Json",
+    "jsx": "React",
+    "kt": "Kotlin",
+    "launch": "XML",
+    "less": "CSS",
+    "lua": "Lua",
+    "log": "Log",
+    "m": "Object-C",
+    "mm": "Object-C++",
+    "markdown": "Markdown",
+    "md": "Markdown",
+    "msg": "ROS Message",
+    "php": "PHP",
+    "plist": "XML",
+    "properties": "Propertie",
+    "py": "Python",
+    "r": "R",
+    "rb": "Ruby",
+    "rc": "Properties",
+    "rs": "Rust",
+    "rst": "reStructuredText",
+    "ts": "Type Script",
+    "tsx": "React",
+    "sass": "CSS",
+    "scss": "CSS",
+    "sh": "Shell",
+    "sql": "SQL",
+    "srv": "ROS Message",
+    "swift": "Swift",
+    "toml": "Properties",
+    "vb": "Visual Basic",
+    "vim": "Vim Scirpt",
+    "vue": "Vue",
+    "xhtml": "HTML",
+    "xml": "XML",
+    "yaml": "YAML",
+    "yml": "YAML",
+    "zsh": "Shell",
+}
+
+# Mark the type of some special files.
+SPECIAL_NAMES: dict[str, str] = {
+    "license": "LICENSE",
+    "requirements.txt": "Pip requirement",
+    "vimrc": "Vim Scirpt",
+    "dockerfile": "Docker",
+}
+
+
+def adjudgment_type(file: str, original: bool = False) -> str:
+    """Get file type.
+
+    First, judge whether the file name is special, and then query the
+    file suffix. Otherwise, the suffix or name will be returned as is.
+
+    Args:
+        file (str): file name string.
+        original (bool, option): whether return origin when match failed.
+
+    Returns:
+        (str): file type.
+    """
+
+    pre_type = SPECIAL_NAMES.get(file.lower(), None)
+    if pre_type:
+        return pre_type
+
+    suffix = file.split(".")[-1]
+    suffix_type = SUFFIX_TYPE.get(suffix.lower(), None)
+    if suffix_type:
+        return suffix_type
+    else:
+        return suffix if original else "unknown"
+
+
+FILE_ICONS: dict[str, str] = {
+    "": "",
+    "Batch": "",
+    "C": "",
+    "C#": "",
+    "C++": "",
+    "CSS": "",
+    "Dart": "",
+    "Groovy": "",
+    "Go": "",
+    "HTML": "",
+    "Java": "",
+    "Java Scirpt": "",
+    "Lua": "",
+    "Kotlin": "",
+    "Markdown": "",
+    "PHP": "",
+    "Propertie": "",
+    "Python": "",
+    "R": "ﳒ",
+    "React": "",
+    "Ruby": "",
+    "Rust": "",
+    "ROS Message": "",
+    "reStructuredText": "",
+    "Shell": "",
+    "Swift": "",
+    "SQL": "",
+    "snippets": "",
+    "Type Scirpt": "",
+    "Vim Scirpt": "",
+    "Vue": "﵂",
+    "YAML": "",
+    "XML": "",
+}
+
+
+def get_file_icon(file_type: str) -> str:
+    """According file type return icon.
+
+    Args:
+        file_type (str): type string.
+
+    Returns:
+        str: icon.
+    """
+
+    #     
+    return FILE_ICONS.get(file_type, "")
+
+
 if __name__ == "__main__":
     import doctest
 

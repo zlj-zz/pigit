@@ -3,9 +3,10 @@ import re
 import textwrap
 
 from pigit.const import __version__, __url__
-from pigit.common import render_str, exec_cmd
+from pigit.common import exec_cmd
+from pigit.render import render_str
 from pigit.git_utils import get_git_version, get_repo_info
-from pigit.tui.table import TableTooWideError, dTable
+from pigit.render.table import TableTooWideError, dTable
 
 
 def introduce() -> None:

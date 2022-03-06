@@ -2,12 +2,8 @@
 
 import os, re
 
-from .common import (
-    render_str,
-    exec_cmd,
-    shorten,
-    garbled_code_analysis,
-)
+from .common import exec_cmd
+from .render import render_str, shorten, garbled_code_analysis
 from .git_model import File, Commit, Branch
 
 

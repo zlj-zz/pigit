@@ -7,17 +7,8 @@ import random
 import logging
 from typing import Optional, Union
 
-from ..common import (
-    Fx,
-    Color,
-    Emoji,
-    render_str,
-    run_cmd,
-    confirm,
-    similar_command,
-    shorten,
-    traceback_info,
-)
+from ..common import run_cmd, confirm, similar_command, traceback_info
+from ..render import Fx, Color, Emoji, render_str, shorten
 from ..common.singleton import Singleton
 from ..const import EXTRA_CMD_FILE_PATH
 from .cmds import Git_Cmds, CommandType

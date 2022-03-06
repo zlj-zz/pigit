@@ -15,7 +15,8 @@ Like this:
 import re
 from typing import Union
 
-from ..common import Emoji, exec_cmd, run_cmd, render_str
+from ..common import exec_cmd, run_cmd
+from ..render import Emoji, render_str
 
 
 def add(args: Union[list, tuple]) -> None:

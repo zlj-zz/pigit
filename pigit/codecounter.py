@@ -12,8 +12,8 @@ from math import ceil
 from shutil import get_terminal_size, register_unpack_format
 from typing import Optional
 
-from .common import Color, Fx, confirm, shorten, get_file_icon, adjudgment_type
-from .tui.table import Table
+from .common import confirm, get_file_icon, adjudgment_type
+from .render import Table, Color, Fx, shorten
 
 
 Log = logging.getLogger(__name__)
@@ -389,7 +389,7 @@ class CodeCounter(object):
         """Load count result."""
         file_path = self._get_saved_path(root_path)
         try:
-            with open(file_path,'r') as rf:
+            with open(file_path, "r") as rf:
                 res = json.load(rf)
         except Exception:
             return None
