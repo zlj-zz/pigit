@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from typing import Callable, Iterable, Optional, Tuple
 import sys
 import platform
 import subprocess
@@ -7,7 +8,6 @@ import asyncio
 import logging
 from math import sqrt
 from collections import Counter
-from typing import Iterable, Tuple
 
 
 Log = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def traceback_info(extra_msg: str = "null"):
     )
 
 
-def run_cmd(*args, cwd=None) -> bool:
+def run_cmd(*args, cwd: Optional[str] = None) -> bool:
     """Run system command.
 
     Returns:
@@ -60,7 +60,7 @@ def run_cmd(*args, cwd=None) -> bool:
         return True
 
 
-def exec_cmd(*args, cwd=None) -> tuple[str, str]:
+def exec_cmd(*args, cwd: Optional[str] = None) -> tuple[str, str]:
     """Run system command and get result.
 
     Returns:
@@ -90,7 +90,7 @@ def exec_cmd(*args, cwd=None) -> tuple[str, str]:
         return err, res
 
 
-async def async_run_cmd(*args, cwd=None):
+async def async_run_cmd(*args, cwd: Optional[str] = None, msg: Optional[str] = None):
     cmds = " ".join(args).split(" ")
 
     # receive (program, *args, ...), so must split the full cmd,
@@ -103,16 +103,16 @@ async def async_run_cmd(*args, cwd=None):
         cwd=cwd,
     )
     res, err = await proc.communicate()
-    if res:
-        print(res.decode())
-    if err:
-        print(err.decode())
+
+    msg and print(msg)
+    res and print(res.decode())
+    err and print(err.decode())
 
     if proc.returncode != 0:
         return cwd
 
 
-def exec_async_tasks(tasks) -> list:
+def exec_async_tasks(tasks: list[Callable]) -> list[str]:
     """Execute tasks asynchronously."""
 
     # TODO: asyncio API is nicer in python 3.7

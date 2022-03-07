@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
-import json
-import os
-import textwrap
+from typing import Optional
+import os, json, textwrap
 from collections import Counter
 
 from pigit.common import async_run_cmd, exec_async_tasks, exec_cmd, run_cmd
@@ -24,7 +23,7 @@ def _make_repo_name(path: str, repos: list[str], name_counts: Counter) -> str:
         (str): final repo name.
     """
 
-    name = os.path.basename(os.path.normpath(path))
+    name: str = os.path.basename(os.path.normpath(path))
     if name in repos or name_counts[name] > 1:
         # path has no trailing /
         par_name = os.path.basename(os.path.dirname(path))
@@ -119,7 +118,7 @@ def rm_repos(repos: list[str], use_path: bool = False):
     save_repos(exist_repos)
 
 
-def rename_repo(repo, name):
+def rename_repo(repo: str, name: str):
     print(repo, name)
     exist_repos = load_repos()
 
@@ -182,7 +181,7 @@ repo_options = {
 }
 
 
-def process_repo_option(repos, op):
+def process_repo_option(repos: Optional[list[str]], op: str):
     exist_repos = load_repos()
 
     if repos:
@@ -195,7 +194,8 @@ def process_repo_option(repos, op):
             run_cmd(cmd, prop["path"])
     else:
         errors = exec_async_tasks(
-            async_run_cmd(cmd, cwd=prop["path"]) for name, prop in exist_repos.items()
+            async_run_cmd(cmd, cwd=prop["path"], msg=f":: {prop['path']}")
+            for name, prop in exist_repos.items()
         )
 
         for path in errors:
