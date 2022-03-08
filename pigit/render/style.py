@@ -153,7 +153,25 @@ COLOR_CODE = {
 }
 
 # color hexa string reg.
-_color_re = re.compile(r"^#[0-9A-Fa-f]{6}")
+_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}")
+
+# If has special format string, will try to render the color and font style.
+# If cannot to render the string will keep it.
+#
+# .+-----------------------------------> font style prefix (options).
+#  |         +-------------------------> the content being rendered.
+#  |         |             +-----------> color code or color name, like: blue (options).
+#  |         |             |       +---> background color code.
+#  |         |             |       |
+#  |         |             |       |
+#  b`This is a string.`<#FF0000,#00FF00>
+#
+# Must keep has one of font style or color for making sure can right render.
+# If ignore the two both, it will do nothing.
+# Only '`' with consecutive beginning and ending will be considered part of the content.
+_STYLE_RE = re.compile(
+    r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})?(?:,([a-zA-Z_]+|#[0-9a-fA-F]{6}))?>)?)"
+)
 
 
 class Fx(object):
@@ -449,7 +467,7 @@ class Color(object):
 
         if type(code) == str:
             return (
-                _color_re.match(str(code)) is not None
+                _COLOR_RE.match(str(code)) is not None
                 or COLOR_CODE.get(code, None) is not None
             )
         elif isinstance(code, list) or isinstance(code, tuple):
@@ -459,29 +477,8 @@ class Color(object):
 
 
 class Style(object):
-    # If has special format string, will try to render the color and font style.
-    # If cannot to render the string will keep it.
-    #
-    # .+-----------------------------------> font style prefix (options).
-    #  |         +-------------------------> the content being rendered.
-    #  |         |             +-----------> color code or color name, like: blue (options).
-    #  |         |             |       +---> background color code.
-    #  |         |             |       |
-    #  |         |             |       |
-    #  b`This is a string.`<#FF0000,#00FF00>
-    #
-    # Must keep has one of font style or color for making sure can right render.
-    # If ignore the two both, it will do nothing.
-    # Only '`' with consecutive beginning and ending will be considered part of the content.
     @staticmethod
-    def render_style(
-        _msg: str,
-        /,
-        *,
-        _color_sub=re.compile(
-            r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})?(?:,([a-zA-Z_]+|#[0-9a-fA-F]{6}))?>)?)"
-        ).sub,
-    ):
+    def render_style(_msg: str, /, *, _style_sub=_STYLE_RE.sub):
         def do_replace(match: Match[str]) -> str:
             raw, fx, content, color_code, color_bg_code = match.groups()
             # print(raw, fx, content, color_code, color_bg_code)
@@ -513,7 +510,7 @@ class Style(object):
                 except KeyError:
                     return raw
 
-        return _color_sub(do_replace, _msg)
+        return _style_sub(do_replace, _msg)
 
 
 if __name__ == "__main__":
