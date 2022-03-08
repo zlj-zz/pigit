@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+from typing import TYPE_CHECKING
 import os
 
 # For windows print color.
@@ -9,6 +10,22 @@ from .emoji import Emoji
 from .style import *
 from .str_utils import *
 from .table import *
+
+if TYPE_CHECKING:
+    from .console import Console
+
+_console: "Console" = None
+
+
+def get_console():
+    global _console
+
+    if not _console:
+        from .console import Console
+
+        _console = Console()
+
+    return _console
 
 
 def render_str(

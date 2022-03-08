@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
 
-import sys
-import re
-import logging
-from typing import Tuple, Union, Match
+from typing import Optional, Tuple, Union, Match
+import sys, re
 
-Log = logging.getLogger(__name__)
+from pigit.render.new_table import Column
+
+from .errors import StyleSyntaxError
 
 
 COLOR_CODE = {
@@ -206,6 +206,29 @@ class Fx(object):
     strike = s = "\033[9m"  # * Strike / crossed-out on
     unstrike = us = "\033[29m"  # * Strike / crossed-out off
 
+    supports = {
+        "bold": "bold",
+        "b": "bold",
+        "dark": "dark",
+        "d": "dark",
+        "italic": "italic",
+        "i": "italic",
+        "underline": "underline",
+        "u": "underline",
+        "strike": "strike",
+        "s": "strike",
+        "blink": "blink",
+    }
+
+    code_map = {
+        0: "1",
+        1: "2",
+        2: "3",
+        3: "4",
+        4: "5",
+        5: "9",
+    }
+
     # * Precompiled regex for finding a 24-bit color escape sequence in a string
     color_re = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m")
     style_re = re.compile(r"\033\[\d+m")
@@ -223,7 +246,7 @@ class Fx(object):
         return cls.style_re.sub("", cls.uncolor(string))
 
     @classmethod
-    def by_name(cls, name: str):
+    def by_name(cls, name: str) -> str:
         try:
             fx_code = getattr(cls, name)
         except AttributeError:
@@ -305,7 +328,6 @@ class Color(object):
             if ct > 255 * 3 or ct < 0:
                 raise ValueError("RGB values out of range: {}".format(color))
         except Exception as e:
-            Log.error(f"File style.py, line {e.__traceback__.tb_lineno}, {e}")
             self.escape = ""
             return
 
@@ -477,6 +499,140 @@ class Color(object):
 
 
 class Style(object):
+    def __init__(
+        self,
+        *,
+        color: Optional[str] = None,
+        bg_color: Optional[str] = None,
+        bold: Optional[bool] = None,
+        dark: Optional[bool] = None,
+        italic: Optional[bool] = None,
+        underline: Optional[bool] = None,
+        blink: Optional[bool] = None,
+        strick: Optional[bool] = None,
+    ) -> None:
+        self.color = color if Color.is_color(color) else None
+        self.bg_color = bg_color if Color.is_color(bg_color) else None
+
+        self._set_attributes = sum(
+            (
+                bold is not None and 1,
+                dark is not None and 2,
+                italic is not None and 4,
+                underline is not None and 8,
+                blink is not None and 16,
+                strick is not None and 32,
+            )
+        )
+        self._attributes = sum(
+            (
+                bold and 1 or 0,
+                dark and 2 or 0,
+                italic and 4 or 0,
+                underline and 8 or 0,
+                blink and 16 or 0,
+                strick and 32 or 0,
+            )
+        )
+
+        self._style_definition: Optional[str] = None
+        self._ansi: Optional[str] = None
+
+    def __str__(self) -> str:
+        if self._style_definition is None:
+            style_res: list[str] = []
+            append = style_res.append
+
+            bits = self._set_attributes
+            bits2 = self._attributes
+            if bits & 0b000001111:
+                if bits & 1:
+                    append("bold" if bits2 & 1 else "not bold")
+                if bits & (1 << 1):
+                    append("dark" if bits2 & (1 << 1) else "not dark")
+                if bits & (1 << 2):
+                    append("italic" if bits2 & (1 << 2) else "not italic")
+                if bits & (1 << 3):
+                    append("underline" if bits2 & (1 << 3) else "not underline")
+            if bits & 0b111110000:
+                if bits & (1 << 4):
+                    append("blink" if bits2 & (1 << 4) else "not blink")
+                if bits & (1 << 5):
+                    append("strick" if bits2 & (1 << 5) else "not strick")
+
+            if self.color:
+                style_res.append(self.color)
+            if self.bg_color:
+                style_res.append("on")
+                style_res.append(self.bg_color)
+
+            self._style_definition = " ".join(style_res) or "none"
+
+        return self._style_definition
+
+    def _make_ansi_code(self) -> str:
+        if self._ansi is None:
+            sgr: list[str] = []
+            fx_map = Fx.code_map
+            attributes = self._set_attributes & self._attributes
+            if attributes:
+                for bit in range(6):
+                    if attributes & (1 << bit):
+                        sgr.append(fx_map[bit])
+
+            self._ansi = f"{Fx.start}{';'.join(sgr)}{Fx.end}"
+            if self.color:
+                self._ansi += Color.by_name(self.color) or Color.fg(self.color)
+            if self.bg_color:
+                self._ansi += Color.by_name(self.bg_color, depth="bg") or Color.bg(
+                    self.bg_color
+                )
+
+        print(repr(self._ansi))
+        return self._ansi
+
+    def render(self, text: str) -> str:
+        attrs = self._make_ansi_code()
+        rendered = f"{attrs}{text}{Fx.reset}" if attrs else text
+        return rendered
+
+    def test(self, text: Optional[str] = None):
+        text = text or str(self)
+        print(self.render(text))
+
+    @classmethod
+    def parse(cls, style_definition: str):
+        FX_ATTRIBUTES = Fx.supports
+        color = ""
+        bg_color = ""
+        attributes = {}
+
+        words = iter(style_definition.split())
+        for original_word in words:
+            word = original_word.lower()
+
+            if word == "on":
+                word = next(words, "")
+                if not word:
+                    raise StyleSyntaxError("color expected after 'on'")
+                if Color.is_color(word):
+                    bg_color = word
+                else:
+                    raise StyleSyntaxError(
+                        f"unable to parse {word!r} as background color."
+                    )
+
+            elif word in FX_ATTRIBUTES:
+                attributes[word] = True
+
+            else:
+                if Color.is_color(word):
+                    color = word
+                else:
+                    raise StyleSyntaxError(f"unable to parse {word!r} as color.")
+
+        return Style(color=color, bg_color=bg_color, **attributes)
+
     @staticmethod
     def render_style(_msg: str, /, *, _style_sub=_STYLE_RE.sub):
         def do_replace(match: Match[str]) -> str:
@@ -517,29 +673,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod(verbose=True)
-
-    txt1 = "Today is a b`nice` `day`<green,red>."
-    print(Style.render_style(txt1))
-
-    txt1 = "Today is a b`nice`<#FF0000> day."
-    print(Style.render_style(txt1))
-
-    txt2 = "Today is a `nice`<sky_blue> day."
-    print(Style.render_style(txt2))
-
-    txt2 = "Today is a `nice`<,sky_blue> day."
-    print(Style.render_style(txt2))
-
-    txt2 = "Today is a `nice`<> day."
-    print(Style.render_style(txt2))
-
-    txt2 = "Today is a b```nice``` day."
-    # print(Style.render_style(txt2))
-
-    txt2 = "Today is a `nice`xxxxxxx day."
-    # print(Style.render_style(txt2))
-
-    txt2 = "Today is a `nice`<xxxxxxx> day."
-    # print(Style.render_style(txt2))
-
-    print(Style.render_style("i`Don't found Git, maybe need install.`tomato"))
