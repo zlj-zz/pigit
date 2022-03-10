@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
 
 from typing import TYPE_CHECKING, Optional
-from itertools import islice
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from . import box
+from .style import Style
 from .segment import Segment
 from .ratio import ratio_reduce
 from ._loop import loop_first_last, loop_last, loop_first
@@ -44,6 +44,8 @@ class Table:
         box: box.Box = box.HEAVY_HEAD,
         width: Optional[int] = None,
         show_edge: bool = True,
+        show_lines: bool = False,
+        show_header: bool = True,
         title_style: Optional[str] = None,
         caption_style: Optional[str] = None,
         border_style: Optional[str] = None,
@@ -56,7 +58,9 @@ class Table:
         self._box = box
         self.width = width
 
-        self._show_edge: bool = show_edge
+        self._show_edge = show_edge
+        self._show_lines = show_lines
+        self.show_header = show_header
 
         self.title_style = title_style or ""
         self.caption_style = caption_style or ""
@@ -75,7 +79,7 @@ class Table:
     def add_column(
         self,
         header,
-        header_style: Optional[str] = None,
+        header_style: Optional[str] = "bold",
         style: Optional[str] = None,
         no_wrap: bool = False,
     ):
@@ -112,12 +116,37 @@ class Table:
 
         self._rows.append(Row(style=style, end_section=end_section))
 
-    def _measure_column(self, column: Column, max_width: int):
+    def get_row_style(self, console: "Console", index: int):
+        """Get current row style."""
+
+        style = Style.null()
+        row_style = self._rows[index].style
+        if row_style is not None:
+            style += console.get_style(row_style)
+
+        return style
+
+    def _get_cells(self, console: "Console", column: Column):
+        raw_cells = []
+
+        if self.show_header:
+            raw_cells.append(
+                Segment(column.header, console.get_style(column.header_style or ""))
+            )
+
+        cell_style = console.get_style(column.style or "")
+        for cell in column._cells:
+            raw_cells.append(Segment(cell, cell_style))
+
+        return raw_cells
+
+    def _measure_column(self, console: "Console", column: Column, max_width: int):
         if max_width < 1:
             return 0
 
-        cells = self._get_cells(column)
-        return max([sum(c.cell_len for c in cell) for cell in cells])
+        cells = self._get_cells(console, column)
+
+        return max([cell.cell_len_without_tag for cell in cells])
 
     def _collapse_widths(self, widths: list[int], wrapable: list[bool], max_width: int):
         """Reduce widths so that the total is under max_width.
@@ -159,10 +188,12 @@ class Table:
 
         return widths
 
-    def _calc_column_widths(self, max_width: int):
+    def _calc_column_widths(self, console: "Console", max_width: int):
         columns = self._columns
 
-        widths = [self._measure_column(column, max_width) for column in columns]
+        widths = [
+            self._measure_column(console, column, max_width) for column in columns
+        ]
 
         table_width = sum(widths)
 
@@ -178,58 +209,73 @@ class Table:
 
         return widths
 
-    def _get_cells(self, column: Column):
-        raw_cells = []
-
-        raw_cells.append([Segment(column.header)])
-
-        for cell in column._cells:
-            raw_cells.append([Segment(cell, column.style)])
-
-        return raw_cells
-
     def _render(self, console: "Console", widths: list[int]):
-        new_line = "\n"
 
-        _columns_cells = [self._get_cells(column) for column in self._columns]
+        border_style = console.get_style(self.border_style or "")
+        _columns_cells = [self._get_cells(console, column) for column in self._columns]
         row_cells = list(zip(*_columns_cells))
         # print(row_cells)
 
         columns = self._columns
         show_edge = self._show_edge
+        show_lines = self._show_lines
+        show_header = self.show_header
 
         _box = self._box
+        new_line = Segment.line()
 
         if _box:
             box_segments = [
-                (_box.head_left, _box.head_right, _box.head_vertical),
-                (_box.foot_left, _box.foot_right, _box.foot_vertical),
-                (_box.mid_left, _box.mid_right, _box.mid_vertical),
+                (
+                    Segment(_box.head_left, border_style),
+                    Segment(_box.head_right, border_style),
+                    Segment(_box.head_vertical, border_style),
+                ),
+                (
+                    Segment(_box.foot_left, border_style),
+                    Segment(_box.foot_right, border_style),
+                    Segment(_box.foot_vertical, border_style),
+                ),
+                (
+                    Segment(_box.mid_left, border_style),
+                    Segment(_box.mid_right, border_style),
+                    Segment(_box.mid_vertical, border_style),
+                ),
             ]
             if show_edge:
-                yield _box.get_top(widths)
+                yield Segment(_box.get_top(widths), border_style)
                 yield new_line
         else:
             box_segments = []
 
         # print(box_segments)
+        get_row_style = self.get_row_style
+        get_style = console.get_style
 
         for index, (first, last, row_cell) in enumerate(loop_first_last(row_cells)):
-            header_row = first
+            header_row = first and show_header
             footer_row = last
-            row = self._rows[index] if (not header_row and not footer_row) else None
+            row = (
+                self._rows[index - show_header]
+                if (not header_row and not footer_row)
+                else None
+            )
             # print(row_cell)
 
-            def render_lines(console, width, cell):
-                lines = list(
-                    islice(Segment.split_and_crop_lines(cell, width), None, None)
-                )
-                return lines
-
             max_height = 1
-            cells = []
+            cells: list = []
+            if header_row or footer_row:
+                row_style = Style.null()
+            else:
+                row_style = get_style(
+                    get_row_style(console, index - 1 if show_header else index)
+                )
+
             for width, cell, column in zip(widths, row_cell, columns):
-                lines = render_lines(console, width, cell)
+                # print(cell)
+                lines = console.render_lines(
+                    cell.text, width, style=cell.style + row_style
+                )
                 # print(lines)
                 max_height = max(max_height, len(lines))
                 cells.append(lines)
@@ -272,16 +318,28 @@ class Table:
                     for rendered_cell in cells:
                         yield from rendered_cell[line_no]
                     yield new_line
-            if _box and first:
-                yield _box.get_row(widths, "head", edge=show_edge)
+            if _box and first and show_header:
+                yield Segment(
+                    _box.get_row(widths, "head", edge=show_edge), style=border_style
+                )
                 yield new_line
             end_section = row and row.end_section
-            if _box and (end_section):
-                if not last and not (index >= len(row_cells) - 2) and not (header_row):
+            if _box and (show_lines or end_section):
+                if (
+                    not last
+                    # and not (show_footer and index >= len(row_cells) - 2)
+                    and not (show_header and header_row)
+                ):
+                    # yield Segment(
+                    #     _box.get_row(widths, "mid", edge=show_edge), style=border_style
+                    # )
+                    yield Segment(
+                        _box.get_row(widths, "row", edge=show_edge), style=border_style
+                    )
                     yield new_line
 
         if _box and show_edge:
-            yield _box.get_bottom(widths)
+            yield Segment(_box.get_bottom(widths), style=border_style)
             yield new_line
 
     def __render__(self, console: "Console"):
@@ -295,7 +353,7 @@ class Table:
             max_width = self.width
 
         extra_width = self._extra_width
-        widths = self._calc_column_widths(max_width - extra_width)
+        widths = self._calc_column_widths(console, max_width - extra_width)
         # print(widths)
         table_width = sum(widths) + extra_width
 
@@ -310,8 +368,11 @@ class Table:
         if self._title:
             yield render_annotation(
                 (table_width - len(self._title)) // 2 * " " + self._title + "\n",
-                style=self.title_style,
+                style=console.get_style(self.title_style),
             )
         yield from self._render(console, widths)
         if self._caption:
-            yield render_annotation(self._caption + "\n", style=self.caption_style)
+            yield render_annotation(
+                (table_width - len(self._caption)) // 2 * " " + self._caption + "\n",
+                style=console.get_style(self.caption_style),
+            )

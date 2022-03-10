@@ -1,19 +1,24 @@
 from typing import TYPE_CHECKING, Iterable, Optional
 
 from .str_utils import cell_len, set_cell_size
+from .style import Style, Fx
+
 
 if TYPE_CHECKING:
     from .console import Console
 
 
 class Segment:
-    def __init__(self, text: str = "", style: Optional[str] = "") -> None:
+    def __init__(self, text: str = "", style: Optional[Style] = None) -> None:
         self.text = text
         self.style = style
         self._length = len(text)
 
     def __render__(self, console: "Console"):
-        yield self.text
+        if self.style:
+            yield self.style.render(self.text)
+        else:
+            yield self.text
 
     def __len__(self):
         return self._length
@@ -22,11 +27,15 @@ class Segment:
         return bool(self._length)
 
     def __repr__(self) -> str:
-        return f"<Segment {self.text!r} >"
+        return f"<Segment {self.text!r} style='{str(self.style)}' >"
 
     @property
     def cell_len(self):
-        return cell_len(self.text)
+        return cell_len(Fx.pure(self.text))
+
+    @property
+    def cell_len_without_tag(self):
+        return cell_len(Fx.pure(Style.render_style(self.text)))
 
     @classmethod
     def line(cls) -> "Segment":
@@ -124,3 +133,13 @@ class Segment:
         else:
             new_line = line[:]
         return new_line
+
+    @classmethod
+    def apply_style(cls, segments: Iterable["Segment"], style: Optional[Style] = None):
+        result_segments = segments
+        if style:
+            apply = style.__add__
+            result_segments = (
+                cls(segment.text, apply(segment.style)) for segment in result_segments
+            )
+        return result_segments

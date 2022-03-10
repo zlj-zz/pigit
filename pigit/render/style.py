@@ -3,8 +3,6 @@
 from typing import Optional, Tuple, Union, Match
 import sys, re
 
-from pigit.render.new_table import Column
-
 from .errors import StyleSyntaxError
 
 
@@ -537,6 +535,7 @@ class Style(object):
 
         self._style_definition: Optional[str] = None
         self._ansi: Optional[str] = None
+        self._null = not (self._set_attributes or color or bg_color)
 
     def __str__(self) -> str:
         if self._style_definition is None:
@@ -588,7 +587,7 @@ class Style(object):
                     self.bg_color
                 )
 
-        print(repr(self._ansi))
+        # print(repr(self._ansi))
         return self._ansi
 
     def render(self, text: str) -> str:
@@ -599,6 +598,26 @@ class Style(object):
     def test(self, text: Optional[str] = None):
         text = text or str(self)
         print(self.render(text))
+
+    def __add__(self, style: Optional["Style"]) -> "Style":
+        if not (isinstance(style, Style) or Style is None):
+            return NotImplemented
+
+        if style is None or style._null:
+            return self
+
+        new_style: Style = self.__new__(Style)
+        new_style._ansi = None
+        new_style._style_definition = None
+        new_style.color = style.color or self.color
+        new_style.bg_color = style.bg_color or self.bg_color
+        new_style._attributes = (self._attributes & ~style._set_attributes) | (
+            style._attributes & style._set_attributes
+        )
+        new_style._set_attributes = self._set_attributes | style._set_attributes
+        new_style._null = style._null or self._null
+
+        return new_style
 
     @classmethod
     def parse(cls, style_definition: str):
@@ -623,7 +642,7 @@ class Style(object):
                     )
 
             elif word in FX_ATTRIBUTES:
-                attributes[word] = True
+                attributes[FX_ATTRIBUTES[word]] = True
 
             else:
                 if Color.is_color(word):
@@ -667,6 +686,13 @@ class Style(object):
                     return raw
 
         return _style_sub(do_replace, _msg)
+
+    @classmethod
+    def null(cls) -> "Style":
+        return NULL_STYLE
+
+
+NULL_STYLE = Style()
 
 
 if __name__ == "__main__":

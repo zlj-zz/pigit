@@ -3,6 +3,7 @@ import pytest
 from .utils import analyze_it
 
 from pigit.render.style import Style
+from pigit.render.markup import render_markup
 
 
 @pytest.mark.parametrize(
@@ -52,8 +53,19 @@ def test_style_render(color, bg_color, bold, dark, italic, underline, blink, str
     style.test()
 
 
-# def test_style():
-#     style = Style(color="green", bold=True)
-#     print("\n", style)
-#     style._make_ansi_code()
-#     style.test()
+def test_style_add():
+    style1 = Style(color="green", bold=True)
+    style2 = Style(bg_color="red", bold=False, dark=True)
+
+    print("\n", style1 + style2)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Today is a b`nice` `day`<green,red>. bye.",
+    ],
+)
+def test_style_render_markup(text: str):
+    print("\n", text)
+    render_markup(text)

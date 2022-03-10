@@ -1,13 +1,13 @@
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Union
+from itertools import islice
 from inspect import isclass
 from shutil import get_terminal_size
 
-from pigit.render.segment import Segment
-
-
 from .style import Style
+from .markup import render_markup
+from .segment import Segment
 from .emoji import Emoji
-from .errors import NotRenderableError
+from .errors import NotRenderableError, StyleSyntaxError, MissingStyle
 
 
 class Console:
@@ -32,6 +32,37 @@ class Console:
 
     def _collect(self, objs):
         pass
+
+    def get_style(
+        self, name: Union[str, Style], *, default: Optional[Union[str, Style]] = None
+    ):
+        if isinstance(name, Style):
+            return name
+
+        try:
+            style = Style.parse(name)
+            return style
+        except StyleSyntaxError as e:
+            if default is not None:
+                return self.get_style(default)
+            raise MissingStyle(f"Failed to get style {name!r}; {e}")
+
+    def render_lines(
+        self,
+        renderable,
+        max_width,
+        *,
+        style: Optional[Style] = None,
+        pad: bool = True,
+        new_lines: bool = False,
+    ):
+        _rendered = render_markup(renderable)
+        if style:
+            _rendered = Segment.apply_style(_rendered, style)
+        lines = list(
+            islice(Segment.split_and_crop_lines(_rendered, max_width), None, None)
+        )
+        return lines
 
     def render_str(
         self, text: str, /, *, allow_style: bool = True, allow_emoji: bool = True
