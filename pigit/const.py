@@ -35,13 +35,13 @@ IS_FIRST_RUN: bool = not os.path.isdir(PIGIT_HOME)
 
 LOG_FILE_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
 
-CONFIG_FILE_PATH: str = PIGIT_HOME + "/pigit.conf"
+CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
 
-COUNTER_DIR_PATH: str = PIGIT_HOME + "/Counter"
+COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 
-EXTRA_CMD_FILE_PATH: str = PIGIT_HOME + "/extra_cmds.py"
+EXTRA_CMD_FILE_PATH: str = f"{PIGIT_HOME}/extra_cmds.py"
 
-REPOS_PATH: str = PIGIT_HOME + "/repos.json"
+REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 
 if IS_FIRST_RUN:
     os.makedirs(PIGIT_HOME, exist_ok=True)

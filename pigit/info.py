@@ -4,7 +4,8 @@ import textwrap
 
 from pigit.const import __version__, __url__
 from pigit.common import exec_cmd
-from pigit.render import echo, render_str
+from pigit.render import echo
+from pigit.render.console import Console
 from pigit.git_utils import get_git_version, get_repo_info
 from pigit.render.table import TableTooWideError, dTable
 
@@ -86,7 +87,7 @@ def _config_normal_output(conf: dict[str, dict]) -> None:
 def _config_table_output(conf: dict[str, dict]) -> None:
     for sub in conf.values():
         for k, v in sub.items():
-            sub[k] = render_str(f"`{v:40}`<pale_green>")
+            sub[k] = Console.render_str(f"`{v:40}`<pale_green>")
 
     tb = dTable(conf, title="Git Local Config")
     tb.print()
@@ -108,7 +109,7 @@ def output_git_local_config(style: str = "table") -> None:
         return None
 
     try:
-        with open(GIT_CONF_PATH + "/config", "r") as cf:
+        with open(f"{GIT_CONF_PATH}/config", "r") as cf:
             context = cf.read()
     except Exception as e:
         echo("`Error reading configuration file. {0}`<error>").format(str(e))
@@ -147,7 +148,7 @@ def output_repository_info(include_part: list = None) -> None:
     # Get remote url.
     if not include_part or "remote" in include_part:
         try:
-            with open(REPOSITORY_PATH + "/.git/config", "r") as cf:
+            with open(f"{REPOSITORY_PATH}/.git/config", "r") as cf:
                 config = cf.read()
         except Exception:
             remote = error_str
@@ -159,27 +160,17 @@ def output_repository_info(include_part: list = None) -> None:
     # Get all branches.
     if not include_part or "branch" in include_part:
         err, res = exec_cmd("git branch --all --color")
-        if err:
-            branches = "\t" + error_str
-        else:
-            branches = textwrap.indent(res, "\t")
+        branches = "\t" + error_str if err else textwrap.indent(res, "\t")
         print("Branches: \n%s\n" % branches)
 
     # Get the lastest log.
     if not include_part or "log" in include_part:
         err, res = exec_cmd("git log --stat --oneline --decorate -1 --color")
-        if err:
-            git_log = "\t" + error_str
-        else:
-            # git_log = "\n".join(["\t" + x for x in res.strip().split("\n")])
-            git_log = textwrap.indent(res, "\t")
+        git_log = "\t" + error_str if err else textwrap.indent(res, "\t")
         print("Lastest log:\n%s\n" % git_log)
 
     # Get git summary.
     if not include_part or "summary" in include_part:
         err, res = exec_cmd("git shortlog --summary --numbered")
-        if err:
-            summary = "\t" + error_str
-        else:
-            summary = textwrap.indent(res, "\t")
+        summary = "\t" + error_str if err else textwrap.indent(res, "\t")
         print("Summary:\n%s\n" % summary)

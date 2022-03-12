@@ -101,9 +101,7 @@ def rm_repos(repos: list[str], use_path: bool = False):
 
     del_repos = []
     if use_path:
-        for repo, v in exist_repos.items():
-            if v["path"] in repos:
-                del_repos.append(repo)
+        del_repos.extend(repo for repo, v in exist_repos.items() if v["path"] in repos)
     else:
         for repo in repos:
             if exist_repos.get(repo, None):

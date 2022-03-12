@@ -24,7 +24,7 @@ def traceback_info(extra_msg: str = "null"):
     """
 
     exc_type, exc_value, exc_obj = sys.exc_info()
-    if exc_type == None or exc_value == None or exc_obj == None:
+    if exc_type is None or exc_value is None or exc_obj is None:
         return ""
 
     err_value = exc_type.__name__
@@ -140,9 +140,9 @@ def confirm(text: str = "", default: bool = True) -> bool:
     """
 
     input_command: str = input(text).strip().lower()
-    if input_command in ["n", "no", "N", "No"]:
+    if input_command in {"n", "no", "N", "No"}:
         return False
-    elif input_command in ["y", "yes", "Y", "Yes"]:
+    elif input_command in {"y", "yes", "Y", "Yes"}:
         return True
     else:
         return default
@@ -195,6 +195,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     # the minimum.
     # Distance weight: compensate for the effect of length difference.
     # Compare Weight: The more similar the beginning, the higher the weight.
+    # sourcery skip: inline-immediately-returned-variable, or-if-exp-identity
     min_frequency_command: str = min(
         frequency_sum_square,
         key=lambda item: item[1]
@@ -215,10 +216,8 @@ def get_current_shell() -> str:
     Returns:
             (str): Current shell string.
     """
-    current_shell = ""
     _, resp = exec_cmd("echo $SHELL")
-    if resp:
-        current_shell = resp.split("/")[-1].strip()
+    current_shell = resp.split("/")[-1].strip() if resp else ""
     return current_shell.lower()
 
 
@@ -307,13 +306,11 @@ def adjudgment_type(file: str, original: bool = False) -> str:
         (str): file type.
     """
 
-    pre_type = SPECIAL_NAMES.get(file.lower(), None)
-    if pre_type:
+    if pre_type := SPECIAL_NAMES.get(file.lower(), None):
         return pre_type
 
     suffix = file.split(".")[-1]
-    suffix_type = SUFFIX_TYPE.get(suffix.lower(), None)
-    if suffix_type:
+    if suffix_type := SUFFIX_TYPE.get(suffix.lower(), None):
         return suffix_type
     else:
         return suffix if original else "unknown"

@@ -28,31 +28,8 @@ def get_console():
     return _console
 
 
-def render_str(
-    text: str, /, *, hightlight: bool = True, allow_emoji: bool = True
-) -> str:
-    """Render color, font and emoji code in string.
-
-    Args:
-        text (str): The text string that need be rendered.
-        hightlight (bool, optional): whether render color and font. Defaults to True.
-        allow_emoji (bool, optional): whether render emoji. Defaults to True.
-
-    Returns:
-        str: the rendered text string.
-    """
-
-    if hightlight:
-        text = Style.render_style(text)
-
-    if allow_emoji:
-        text = Emoji.render_emoji(text)
-
-    return text
-
-
 def echo(
     *values, sep: str = " ", end: str = "\n", file: str = None, flush: bool = True
 ):
-    value_list = [render_str(value) for value in values]
+    value_list = [get_console().render_str(value) for value in values]
     print(*value_list, sep=sep, end=end, file=file, flush=flush)

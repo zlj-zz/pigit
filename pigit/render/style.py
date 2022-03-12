@@ -353,8 +353,7 @@ class Color(object):
         return repr(self.escape)
 
     def __iter__(self):
-        for c in self.dec:
-            yield c
+        yield from self.dec
 
     # def __call__(self, *args: str) -> str:
     #     if len(args) < 1:
@@ -368,17 +367,15 @@ class Color(object):
 
         greyscale = (rgb[0] // 11, rgb[1] // 11, rgb[2] // 11)
         if greyscale[0] == greyscale[1] == greyscale[2]:
-            out = "{}{}m".format(pre, 232 + greyscale[0])
+            return "{}{}m".format(pre, 232 + greyscale[0])
         else:
-            out = "{}{}m".format(
+            return "{}{}m".format(
                 pre,
                 round(rgb[0] / 51) * 36
                 + round(rgb[1] / 51) * 6
                 + round(rgb[2] / 51)
                 + 16,
             )
-
-        return out
 
     @staticmethod
     def escape_color(hexa="", r=0, g=0, b=0, depth="fg") -> str:
@@ -427,11 +424,11 @@ class Color(object):
             except ValueError:
                 # errlog.exception(f'{e}')
                 pass
+        elif Color.TRUE_COLOR:
+            color = "\033[{};2;{};{};{}m".format(dint, r, g, b)
         else:
-            if Color.TRUE_COLOR:
-                color = "\033[{};2;{};{};{}m".format(dint, r, g, b)
-            else:
-                color = Color.truecolor_to_256(rgb=(r, g, b), depth=depth)
+            color = Color.truecolor_to_256(rgb=(r, g, b), depth=depth)
+
         return color
 
     @classmethod
@@ -562,8 +559,7 @@ class Style(object):
             if self.color:
                 style_res.append(self.color)
             if self.bg_color:
-                style_res.append("on")
-                style_res.append(self.bg_color)
+                style_res.extend(("on", self.bg_color))
 
             self._style_definition = " ".join(style_res) or "none"
 
@@ -573,11 +569,9 @@ class Style(object):
         if self._ansi is None:
             sgr: list[str] = []
             fx_map = Fx.code_map
-            attributes = self._set_attributes & self._attributes
-            if attributes:
-                for bit in range(6):
-                    if attributes & (1 << bit):
-                        sgr.append(fx_map[bit])
+
+            if attributes := self._set_attributes & self._attributes:
+                sgr.extend(fx_map[bit] for bit in range(6) if attributes & (1 << bit))
 
             self._ansi = f"{Fx.start}{';'.join(sgr)}{Fx.end}"
             if self.color:
@@ -592,8 +586,7 @@ class Style(object):
 
     def render(self, text: str) -> str:
         attrs = self._make_ansi_code()
-        rendered = f"{attrs}{text}{Fx.reset}" if attrs else text
-        return rendered
+        return f"{attrs}{text}{Fx.reset}" if attrs else text
 
     def test(self, text: Optional[str] = None):
         text = text or str(self)
@@ -644,11 +637,10 @@ class Style(object):
             elif word in FX_ATTRIBUTES:
                 attributes[FX_ATTRIBUTES[word]] = True
 
+            elif Color.is_color(word):
+                color = word
             else:
-                if Color.is_color(word):
-                    color = word
-                else:
-                    raise StyleSyntaxError(f"unable to parse {word!r} as color.")
+                raise StyleSyntaxError(f"unable to parse {word!r} as color.")
 
         return Style(color=color, bg_color=bg_color, **attributes)
 
@@ -660,30 +652,25 @@ class Style(object):
 
             if not color_code and not fx and not color_bg_code:
                 return raw
-            else:
-                try:
-                    # No fx then get empty.
-                    if fx:
-                        font_style = Fx.by_name(fx)
-                    else:
-                        font_style = ""
 
-                    # Get color hexa.
-                    if color_code and color_code.startswith("#"):
-                        color_style = Color.fg(color_code)
-                    else:
-                        color_style = Color.by_name(color_code, depth="fg")
+            try:
+                # No fx then get empty.
+                font_style = Fx.by_name(fx) if fx else ""
 
-                    if color_bg_code and color_bg_code.startswith("#"):
-                        color_bg_style = Color.bg(color_bg_code)
-                    else:
-                        color_bg_style = Color.by_name(color_bg_code, depth="bg")
+                # Get color hexa.
+                if color_code and color_code.startswith("#"):
+                    color_style = Color.fg(color_code)
+                else:
+                    color_style = Color.by_name(color_code, depth="fg")
 
-                    return (
-                        font_style + color_style + color_bg_style + content + "\033[0m"
-                    )
-                except KeyError:
-                    return raw
+                if color_bg_code and color_bg_code.startswith("#"):
+                    color_bg_style = Color.bg(color_bg_code)
+                else:
+                    color_bg_style = Color.by_name(color_bg_code, depth="bg")
+
+                return font_style + color_style + color_bg_style + content + "\033[0m"
+            except KeyError:
+                return raw
 
         return _style_sub(do_replace, _msg)
 

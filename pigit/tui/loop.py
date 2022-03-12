@@ -46,9 +46,7 @@ class Loop(object):
 
     def _loop(self):
         """Main loop"""
-        input_key = self._input_handle.get_input()
-
-        if input_key:
+        if input_key := self._input_handle.get_input():
             first_one = input_key[0]
 
             if first_one == "window resize":
@@ -57,9 +55,8 @@ class Loop(object):
                 self._screen.process_mouse(first_one)
             else:
                 self._screen.process_input(first_one)
-        else:
-            if self._real_time:
-                self._screen.render()
+        elif self._real_time:
+            self._screen.render()
 
     def _run(self):
         try:

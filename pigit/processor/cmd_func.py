@@ -26,18 +26,13 @@ def add(args: Union[list, tuple]) -> None:
         args (list): arguments list, maybe empty. need file string.
     """
 
-    # default add all.
-    args_str = " ."
-    # process arguments if has.
-    if args:
-        args_str = " ".join(args)
-
+    args_str = " ".join(args) if args else " ."
     echo(
         ":rainbow: Storage file: {0}".format(
             "all" if args_str.strip() == "." else args_str
         )
     )
-    run_cmd("git add " + args_str)
+    run_cmd(f"git add {args_str}")
 
 
 def fetch_remote_branch(args: Union[list, tuple]) -> None:
@@ -76,20 +71,20 @@ def set_email_and_username(args: Union[list, tuple]) -> None:
 
     name = input("Please input username:").strip()
     while True:
-        if not name:
-            echo("`Name is empty.`<error>")
-            name = input("Please input username again:")
-        else:
+        if name:
             break
+
+        echo("`Name is empty.`<error>")
+        name = input("Please input username again:")
 
     email = input("Please input email:")
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:
-        if email_re.match(email) is None:
-            echo("`Bad mailbox format.`<error>")
-            email = input("Please input email again:")
-        else:
+        if email_re.match(email) is not None:
             break
+
+        echo("`Bad mailbox format.`<error>")
+        email = input("Please input email again:")
 
     if run_cmd(f"git config user.name {name} {is_global}") and run_cmd(
         f"git config user.email {email} {is_global}"

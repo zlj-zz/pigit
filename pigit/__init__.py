@@ -496,7 +496,7 @@ def process(args: argparse.Namespace, unknown: list):
     try:
         _process(args, unknown)
     except (KeyboardInterrupt, EOFError):
-        raise SystemExit(0)
+        raise SystemExit(0) from None
 
 
 ##############

@@ -40,12 +40,11 @@ class Console:
             return name
 
         try:
-            style = Style.parse(name)
-            return style
+            return Style.parse(name)
         except StyleSyntaxError as e:
             if default is not None:
                 return self.get_style(default)
-            raise MissingStyle(f"Failed to get style {name!r}; {e}")
+            raise MissingStyle(f"Failed to get style {name!r}; {e}") from None
 
     def render_lines(
         self,
@@ -64,14 +63,15 @@ class Console:
         )
         return lines
 
+    @classmethod
     def render_str(
-        self, text: str, /, *, allow_style: bool = True, allow_emoji: bool = True
+        cls, text: str, /, *, allow_style: bool = True, allow_emoji: bool = True
     ) -> str:
         """Render color, font and emoji code in string.
 
         Args:
             text (str): The text string that need be rendered.
-            hightlight (bool, optional): whether render color and font. Defaults to True.
+            allow_style (bool, optional): whether render color and font. Defaults to True.
             allow_emoji (bool, optional): whether render emoji. Defaults to True.
 
         Returns:
@@ -103,7 +103,9 @@ class Console:
         try:
             render_iter = iter(render_iterable)
         except TypeError:
-            raise NotRenderableError(f"object {render_iterable!r} is not renderable")
+            raise NotRenderableError(
+                f"object {render_iterable!r} is not renderable"
+            ) from None
 
         for render_output in render_iter:
             if isinstance(render_output, str):

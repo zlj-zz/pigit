@@ -123,9 +123,7 @@ class RowPanelWidget(Widget):
         new_list = []
         for line in raw_data:
             text = Fx.uncolor(line)
-            count = 0
-            for ch in text:
-                count += get_width(ord(ch))
+            count = sum(get_width(ord(ch)) for ch in text)
             # [float] is to solve the division of python2 without
             # retaining decimal places.
             new_list.append((line, ceil(count / width) - 1))
@@ -170,8 +168,8 @@ class RowPanelWidget(Widget):
 
         # Print needed display part.
         for index, item in enumerate(self.show_data, start=1):
-            line, each_extra = item
             if self.display_range[0] <= index <= self.display_range[1] - self.extra:
+                line, each_extra = item
                 self.print_line(line, index == self.cursor_row)
                 self.extra += each_extra
 
@@ -181,27 +179,27 @@ class RowPanelWidget(Widget):
             self.widget._process_event(key)
         elif self.is_activation():
             # Process key.
-            if key in ["j", "down"]:
+            if key in {"j", "down"}:
                 # select pre file.
                 self.cursor_row += 1
                 self.cursor_row = min(self.cursor_row, len(self.show_data))
 
-            elif key in ["k", "up"]:
+            elif key in {"k", "up"}:
                 # select next file.
                 self.cursor_row -= 1
                 self.cursor_row = max(self.cursor_row, 1)
 
-            elif key in ["J"]:
+            elif key in {"J"}:
                 # scroll down 5 lines.
                 self.cursor_row += 5
                 self.cursor_row = min(self.cursor_row, len(self.show_data))
 
-            elif key in ["K"]:
+            elif key in {"K"}:
                 # scroll up 5 line
                 self.cursor_row -= 5
                 self.cursor_row = max(self.cursor_row, 1)
 
-            elif key in ["?", "h"]:
+            elif key in {"?", "h"}:
                 print(Term.clear_screen)
                 print(
                     (

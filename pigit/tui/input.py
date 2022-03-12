@@ -409,7 +409,8 @@ class KeyqueueTrie(object):
             if k == ord(";"):
                 if not y:
                     return None
-                break
+                else:
+                    break
             if k < ord("0") or k > ord("9"):
                 return None
             if not y and k == ord("0"):
@@ -424,17 +425,14 @@ class KeyqueueTrie(object):
         for k in keys[i:]:
             i += 1
             if k == ord("R"):
-                if not x:
-                    return None
-                return (("cursor position", x - 1, y - 1), keys[i:])
+                return None if not x else (("cursor position", x - 1, y - 1), keys[i:])
             if k < ord("0") or k > ord("9"):
                 return None
             if not x and k == ord("0"):
                 return None
             x = x * 10 + k - ord("0")
-        if not keys[i:]:
-            if more_available:
-                raise MoreInputRequired()
+        if not keys[i:] and more_available:
+            raise MoreInputRequired()
         return None
 
 

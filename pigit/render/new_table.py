@@ -135,9 +135,7 @@ class Table:
             )
 
         cell_style = console.get_style(column.style or "")
-        for cell in column._cells:
-            raw_cells.append(Segment(cell, cell_style))
-
+        raw_cells.extend(Segment(cell, cell_style) for cell in column._cells)
         return raw_cells
 
     def _measure_column(self, console: "Console", column: Column, max_width: int):
@@ -146,7 +144,7 @@ class Table:
 
         cells = self._get_cells(console, column)
 
-        return max([cell.cell_len_without_tag for cell in cells])
+        return max(cell.cell_len_without_tag for cell in cells)
 
     def _collapse_widths(self, widths: list[int], wrapable: list[bool], max_width: int):
         """Reduce widths so that the total is under max_width.
@@ -284,11 +282,7 @@ class Table:
 
             def set_shape(height, lines, width):
                 extra_lines = height - len(lines)
-                if not extra_lines:
-                    lines = lines[:]
-                else:
-                    lines = lines[:height]
-
+                lines = lines[:] if not extra_lines else lines[:height]
                 blank = [" " * width]
                 lines = lines + blank * extra_lines
 

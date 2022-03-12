@@ -6,7 +6,7 @@ from typing import Optional, Any
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .render import Color, Fx, render_str, echo
+from .render import Color, Fx, echo
 from .git_utils import (
     # info method
     get_repo_info,
@@ -74,15 +74,14 @@ class StatusPanel(RowPanelWidget):
     def process_raw_data(self, raw_data: list[Any]) -> list[str]:
         if not raw_data:
             return ["No status changed."]
-        l = [file.display_str for file in raw_data]
-        return l
+        return [file.display_str for file in raw_data]
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if self.raw_data:
             if is_cursor_row:
                 print("{} {}".format(self.cursor, line))
             else:
-                print("  " + line)
+                print(f"  {line}")
         else:
             # No data, print tip.
             print(line)
@@ -97,7 +96,7 @@ class StatusPanel(RowPanelWidget):
         )
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
-        if input_key in ["a", " "]:
+        if input_key in {"a", " "}:
             switch_file_status(self.raw_data[cursor_row - 1], repo_path=self.repo_path)
             self.emit("update")
         elif input_key == "d":
@@ -115,9 +114,6 @@ class StatusPanel(RowPanelWidget):
                     '{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name),
                     path=self.repo_path,
                 )
-            else:
-                # No default editor to open file.
-                pass
         elif input_key == "enter":
             self.widget.set_file(self.raw_data[cursor_row - 1], self.repo_path)
             self.widget.activate()
@@ -177,15 +173,14 @@ class CommitPanel(RowPanelWidget):
         if is_cursor_row:
             print(f"{self.cursor} {line}")
         else:
-            print("  " + line)
+            print(f"  {line}")
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
-        if input_key == "q":
-            raise ExitLoop
-
-        elif input_key == "enter":
+        if input_key == "enter":
             self.widget.set_commit(self.raw_data[cursor_row - 1])
             self.widget.activate()
+        elif input_key == "q":
+            raise ExitLoop
 
     def keyevent_help(self) -> str:
         return "↲ : check commit diff.\n"

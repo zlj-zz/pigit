@@ -8,7 +8,8 @@ import logging
 from typing import Optional, Union
 
 from ..common import run_cmd, confirm, similar_command, traceback_info
-from ..render import Fx, Color, render_str, shorten, echo
+from ..render import Fx, Color, shorten, echo
+from ..render.console import Console
 from ..common.singleton import Singleton
 from ..const import EXTRA_CMD_FILE_PATH
 from .cmds import Git_Cmds, CommandType
@@ -119,7 +120,7 @@ class CmdProcessor(object, metaclass=Singleton):
             if self.use_recommend:  # check config.
                 predicted_command = similar_command(command_, self.cmds.keys())
                 if confirm(
-                    render_str(
+                    Console.render_str(
                         f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
                     )
                 ):
@@ -133,12 +134,9 @@ class CmdProcessor(object, metaclass=Singleton):
             echo("`Invalid custom short command, nothing can to exec.`<error>")
             return None
 
-        if not option.get("has_arguments", False):
-            if args:
-                echo(
-                    f"`The command does not accept parameters. Discard {args}.`<error>"
-                )
-                args = []
+        if not option.get("has_arguments", False) and args:
+            echo(f"`The command does not accept parameters. Discard {args}.`<error>")
+            args = []
 
         _type = option.get("type", "command")
         if _type == "func":
@@ -188,10 +186,7 @@ class CmdProcessor(object, metaclass=Singleton):
             _command = "Func: %s" % _command.__name__
 
         _command = shorten(_command, msg_max_width, placeholder="...")
-        if help_msg:
-            command_msg = "%*s%s" % (help_position, "", _command)
-        else:
-            command_msg = _command
+        command_msg = "%*s%s" % (help_position, "", _command) if help_msg else _command
 
         if use_color:
             return f"  `{_key:<13}`<ok>{help_msg}`{command_msg}`<gold>"
@@ -231,7 +226,7 @@ class CmdProcessor(object, metaclass=Singleton):
                     command_type, CommandType.__members__.keys()
                 )
                 if confirm(
-                    render_str(
+                    Console.render_str(
                         f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
                     )
                 ):

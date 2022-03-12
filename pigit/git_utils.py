@@ -3,7 +3,8 @@
 import os, re
 
 from .common import exec_cmd
-from .render import render_str, shorten, garbled_code_analysis
+from .render import shorten, garbled_code_analysis
+from .render.console import Console
 from .git_model import File, Commit, Branch
 
 
@@ -134,19 +135,9 @@ def load_branches() -> list[Branch]:
 
         track = items[3]
         _re = re.compile(r"ahead (\d+)")
-        match = _re.search(track)
-        if match:
-            branch.pushables = str(match[1])
-        else:
-            branch.pushables = "0"
-
+        branch.pushables = str(match[1]) if (match := _re.search(track)) else "0"
         _re = re.compile(r"behind (\d+)")
-        match = _re.search(track)
-        if match:
-            branch.pullables = str(match[1])
-        else:
-            branch.pullables = "0"
-
+        branch.pullables = str(match[1]) if (match := _re.search(track)) else "0"
         branchs.append(branch)
 
     return branchs
@@ -194,7 +185,7 @@ def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[Fil
 
         display_name = shorten(name, max_width - 3 - ident)
         # color full command.
-        display_str = render_str(
+        display_str = Console.render_str(
             f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {display_name}"
         )
 
@@ -262,14 +253,11 @@ def load_commits(
         filter_path (str): filter dir path, default is empty.
     """
 
-    passed_first_pushed_commit = False
     command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
     _, resp = exec_cmd(command)
     first_pushed_commit = resp.strip()
 
-    if not first_pushed_commit:
-        passed_first_pushed_commit = True
-
+    passed_first_pushed_commit = not first_pushed_commit
     commits: list[Commit] = []
 
     # Generate git command.
@@ -366,7 +354,3 @@ def checkout_branch(branch_name: str):
     err, _ = exec_cmd(f"git checkout {branch_name}")
     if err:
         return err
-
-
-if __name__ == "__main__":
-    pass

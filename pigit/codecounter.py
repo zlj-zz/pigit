@@ -177,7 +177,7 @@ class CodeCounter(object):
                 slash_index = item.find("/")
                 if slash_index == 0:
                     item = root + item
-                elif slash_index == -1 or slash_index == len(item) - 1:
+                elif slash_index in [-1, len(item) - 1]:
                     item = "/".join([root, "**", item])
                 else:
                     item = "/".join([root, item])
@@ -212,11 +212,11 @@ class CodeCounter(object):
         res = list(filter(lambda rule: rule["pattern"].search(full_path), self.Rules))
         if not res:
             return True
-        else:
-            # If multiple rules match successfully, we think the last rule added has
-            # the highest priority. Or if just one, this no problem also.
-            return res[-1]["include"]
-            # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
+
+        # If multiple rules match successfully, we think the last rule added has
+        # the highest priority. Or if just one, this no problem also.
+        return res[-1]["include"]
+        # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
     def _sub_count(self, root: str, files: list) -> tuple:
         """Process handle use by `self.count`."""
@@ -422,10 +422,7 @@ class CodeCounter(object):
     @classmethod
     def color_index(cls, _count: int) -> int:
         _index = len(str(_count // 1000))
-        if _index > len(cls.level_color):
-            return -1
-        else:
-            return _index - 1
+        return -1 if _index > len(cls.level_color) else _index - 1
 
     def format_print(self, new: dict, old: Optional[dict] = None) -> None:
         """Print result with color and diff.
@@ -519,7 +516,7 @@ class CodeCounter(object):
             # and the base is the total number of last statistics.
             if additions > 0 or deletions > 0:
                 # Get prev count sum.
-                old_sum = sum([i["lines"] for i in old.values()])
+                old_sum = sum(i["lines"] for i in old.values())
 
                 print(" Altered: ", end="")
                 print(

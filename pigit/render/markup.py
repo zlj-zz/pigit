@@ -33,8 +33,7 @@ def render_markup(markup: str, style: Union[str, Style] = "", emoji: bool = True
         if color:
             sgr.append(color)
         if bg_color:
-            sgr.append("on")
-            sgr.append(bg_color)
+            sgr.extend(("on", bg_color))
 
         renderables.append(Segment(text, style=Style.parse(" ".join(sgr))))
 

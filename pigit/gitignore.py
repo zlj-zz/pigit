@@ -93,8 +93,7 @@ class GitignoreGenetor(object):
             # Exit once an error occurs.
             return None
         else:
-            content = handle.read().decode("utf-8")
-            return content
+            return handle.read().decode("utf-8")
 
     def launch(self, ignore_type: str, dir_path: str) -> None:
         """Try to create gitignore template file.

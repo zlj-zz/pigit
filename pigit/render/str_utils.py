@@ -73,12 +73,9 @@ WIDTHS: list[tuple[int, int]] = [
 def get_width(r: int) -> int:
     """Gets the width occupied by characters on the command line."""
 
-    if r == 0xE or r == 0xF:
+    if r in {0xE, 0xF}:
         return 0
-    for num, wid in WIDTHS:
-        if r <= num:
-            return wid
-    return 1
+    return next((wid for num, wid in WIDTHS if r <= num), 1)
 
 
 def get_char_width(character: str) -> int:

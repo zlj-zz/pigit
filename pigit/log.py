@@ -39,7 +39,7 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
             )
         except PermissionError:
             print("No permission to write to '{0}' directory!".format(log_file))
-            raise SystemExit(1)
+            raise SystemExit(1) from None
 
     log_handle.setFormatter(formatter)
     log_handle.setLevel(log_level)
