@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
+from typing import TYPE_CHECKING, Optional, Any
 import os, sys
 from time import sleep
-from typing import Optional, Any
 
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
@@ -22,14 +22,16 @@ from .git_utils import (
     ignore_file,
     checkout_branch,
 )
-from .git_model import File, Commit, Branch
+
+if TYPE_CHECKING:
+    from .git_model import File, Commit, Branch
 
 
 class BranchPanel(RowPanelWidget):
-    def get_raw_data(self) -> list[Branch]:
+    def get_raw_data(self) -> list["Branch"]:
         return load_branches()
 
-    def process_raw_data(self, raw_data: list[Branch]) -> list[str]:
+    def process_raw_data(self, raw_data: list["Branch"]) -> list[str]:
         processed_branches = []
         for branch in raw_data:
             if branch.is_head:
@@ -68,7 +70,7 @@ class BranchPanel(RowPanelWidget):
 class StatusPanel(RowPanelWidget):
     repo_path, repo_conf = get_repo_info()
 
-    def get_raw_data(self) -> list[File]:
+    def get_raw_data(self) -> list["File"]:
         return load_status(self.size[0])
 
     def process_raw_data(self, raw_data: list[Any]) -> list[str]:
@@ -125,7 +127,7 @@ class FilePanel(RowPanelWidget):
     _file = None
     _repo_path = None
 
-    def set_file(self, file: File, path: str):
+    def set_file(self, file: "File", path: str):
         if self._file != file:
             self.size = None
             self.cursor_row = 1
@@ -153,7 +155,7 @@ class FilePanel(RowPanelWidget):
 
 
 class CommitPanel(RowPanelWidget):
-    def get_raw_data(self) -> list[Commit]:
+    def get_raw_data(self) -> list["Commit"]:
         branch_name = get_head()
         return load_commits(branch_name)
 
@@ -189,7 +191,7 @@ class CommitPanel(RowPanelWidget):
 class CommitStatusPanel(RowPanelWidget):
     _commit = None
 
-    def set_commit(self, commit: Commit):
+    def set_commit(self, commit: "Commit"):
         if self._commit != commit:
             self.size = None
             self.cursor_row = 1

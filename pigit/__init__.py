@@ -23,10 +23,8 @@
 # SOFTWARE.
 
 
-import os
-import argparse
-import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+import os, logging
 
 from .log import setup_logging
 from .decorator import time_it
@@ -42,7 +40,7 @@ from .const import (
 )
 from .render import echo
 from .common import get_current_shell, confirm
-from .git_utils import get_repo_info, get_branches, get_remote
+from .git_utils import get_repo_info, get_repo_desc, get_remote
 from .repo_utils import (
     add_repos,
     clear_repos,
@@ -53,9 +51,11 @@ from .repo_utils import (
     process_repo_option,
 )
 from .gitignore import GitignoreGenetor
-from .shellcompletion import shell_complete
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
-from .info import output_git_local_config, output_repository_info, introduce
+from .info import introduce, GitConfig
+
+if TYPE_CHECKING:
+    import argparse
 
 
 Log = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ def shell_mode(git_processor: CmdProcessor):
     return None
 
 
-def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+def _cmd_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
@@ -197,7 +197,7 @@ def _cmd_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         echo("`pigit cmd -h`<ok> for help.")
 
 
-def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+def _repo_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
     option: str = kwargs.get("option", "")
 
     if option == "add":
@@ -214,13 +214,12 @@ def _repo_func(args: argparse.Namespace, unknown: list, kwargs: dict):
         process_repo_option(args.repos, option)
 
 
-def _open_func(args: argparse.Namespace, unknown: list, kwargs: dict):
+def _open_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
     branch = issue = commit = ""
 
     remote_url = get_remote()
 
     if args.branch:
-        branches = get_branches()
         branch = f"/tree/{args.branch}"
         remote_url += branch
     elif args.issue:
@@ -427,18 +426,18 @@ argparse_dict = {
 }
 
 
-def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> None:
+def _process(args: "argparse.Namespace", extra_unknown: Optional[list] = None) -> None:
     if args.report:
-        introduce()
+        echo(introduce())
 
     elif args.create_config:
         return CONFIG.create_config_template()
 
     elif args.config:
-        output_git_local_config(CONFIG.git_config_format)
+        echo(GitConfig(format_type=CONFIG.git_config_format).generate())
 
     elif args.information:
-        output_repository_info(include_part=CONFIG.repo_info_include)
+        echo(get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
         from copy import deepcopy
@@ -448,6 +447,8 @@ def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> 
         completion_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
         )
+
+        from .shellcompletion import shell_complete
 
         shell_complete(get_current_shell(), None, completion_vars, PIGIT_HOME)
         return None
@@ -492,7 +493,7 @@ def _process(args: argparse.Namespace, extra_unknown: Optional[list] = None) -> 
         tui_main(help_wait=CONFIG.tui_help_showtime)
 
 
-def process(args: argparse.Namespace, unknown: list):
+def process(args: "argparse.Namespace", unknown: list):
     try:
         _process(args, unknown)
     except (KeyboardInterrupt, EOFError):

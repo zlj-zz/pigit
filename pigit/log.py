@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
+from typing import Optional
 import os
 import logging
 import logging.handlers
-from typing import Optional
 
 
 FMT_NORMAL = logging.Formatter(

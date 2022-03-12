@@ -11,7 +11,9 @@ _ReSubCallable = Callable[[_ReStringMatch], str]  # Callable invoked by re.sub
 _EmojiSubMethod = Callable[[_ReSubCallable, str], str]  # Sub method of a compiled re
 # https://github.com/willmcgugan/rich/blob/master/rich/_emoji_replace.py
 
-_EMOJI_RE: _ReStringMatch = re.compile(r"(:(\S*?)(?:(?:\-)(emoji|text))?:)")
+_EMOJI_RE: _ReStringMatch = re.compile(
+    r"(:(\S*?)(?:(?:\-)(emoji|text))?:)", re.M | re.S
+)  # allow multi lines.
 
 
 class Emoji(object):

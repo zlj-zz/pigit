@@ -168,7 +168,8 @@ _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}")
 # If ignore the two both, it will do nothing.
 # Only '`' with consecutive beginning and ending will be considered part of the content.
 _STYLE_RE = re.compile(
-    r"(([a-z]+)?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})?(?:,([a-zA-Z_]+|#[0-9a-fA-F]{6}))?>)?)"
+    r"(([a-z]+|\((?:[a-z\s],?)+\))?`(`*.*?`*)`(?:<([a-zA-Z_]+|#[0-9a-fA-F]{6})?(?:,([a-zA-Z_]+|#[0-9a-fA-F]{6}))?>)?)",
+    re.M | re.S,  # allow multi lines.
 )
 
 
@@ -647,15 +648,25 @@ class Style(object):
     @staticmethod
     def render_style(_msg: str, /, *, _style_sub=_STYLE_RE.sub):
         def do_replace(match: Match[str]) -> str:
-            raw, fx, content, color_code, color_bg_code = match.groups()
-            # print(raw, fx, content, color_code, color_bg_code)
+            raw, fx_tag, content, color_code, bg_color_code = match.groups()
+            # print(raw, fx_tag, content, color_code, bg_color_code)
 
-            if not color_code and not fx and not color_bg_code:
+            if not color_code and not fx_tag and not bg_color_code:
                 return raw
 
             try:
-                # No fx then get empty.
-                font_style = Fx.by_name(fx) if fx else ""
+                if fx_tag is None:
+                    # No fx then get empty.
+                    font_style = ""
+                elif fx_tag.startswith("(") and fx_tag.endswith(")"):
+                    # Has multi fx tags.
+                    fx_tag = fx_tag[1:-1]
+                    font_style = "".join(
+                        Fx.by_name(fx_code.strip()) for fx_code in fx_tag.split(",")
+                    )
+                else:
+                    # Only one.
+                    font_style = Fx.by_name(fx_tag)
 
                 # Get color hexa.
                 if color_code and color_code.startswith("#"):
@@ -663,16 +674,32 @@ class Style(object):
                 else:
                     color_style = Color.by_name(color_code, depth="fg")
 
-                if color_bg_code and color_bg_code.startswith("#"):
-                    color_bg_style = Color.bg(color_bg_code)
+                if bg_color_code and bg_color_code.startswith("#"):
+                    bg_color_style = Color.bg(bg_color_code)
                 else:
-                    color_bg_style = Color.by_name(color_bg_code, depth="bg")
+                    bg_color_style = Color.by_name(bg_color_code, depth="bg")
 
-                return font_style + color_style + color_bg_style + content + "\033[0m"
+                return f"{font_style}{color_style}{bg_color_style}{content}\033[0m"
             except KeyError:
                 return raw
 
         return _style_sub(do_replace, _msg)
+
+    @classmethod
+    def remove_style(cls, _msg: str, /, *, _style_sub=_STYLE_RE.sub):
+        def do_replace(match: Match[str]) -> str:
+            raw, fx, content, color_code, color_bg_code = match.groups()
+
+            if not color_code and not fx and not color_bg_code:
+                return raw
+
+            return content
+
+        return _style_sub(do_replace, _msg)
+
+    @classmethod
+    def clear_text(cls, _msg: str) -> str:
+        return Fx.pure(cls.remove_style(_msg))
 
     @classmethod
     def null(cls) -> "Style":

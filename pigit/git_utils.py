@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
-import os, re
+from typing import Optional
+import os, re, textwrap
 
 from .common import exec_cmd
 from .render import shorten, garbled_code_analysis
@@ -18,7 +19,9 @@ def get_git_version() -> str:
     return git_version_ or ""
 
 
-def get_repo_info(repo_path: str = None) -> tuple[str, str]:
+def get_repo_info(
+    given_path: Optional[str] = None, exclude_submodule: bool = False
+) -> tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -30,38 +33,101 @@ def get_repo_info(repo_path: str = None) -> tuple[str, str]:
     repo_path: str = ""
     git_conf_path: str = ""
 
-    repo_path = os.path.abspath(repo_path)
-    if not os.path.isdir(repo_path):
+    given_path = os.path.abspath(given_path or ".")
+    if not os.path.isdir(given_path):
         return repo_path, git_conf_path
 
-    err, repo_path = exec_cmd("git rev-parse --git-dir", cwd=repo_path)
+    err, repo_path = exec_cmd("git rev-parse --git-dir", cwd=given_path)
     if err:
         return repo_path, git_conf_path
 
     # remove useless space.
     repo_path = repo_path.strip()
 
-    if ".git/submodule/" in repo_path:
+    if ".git/submodule/" in repo_path and not exclude_submodule:
         # this repo is submodule.
         git_conf_path = repo_path
         repo_path = repo_path.replace(".git/submodule/", "")
-    if repo_path == ".git":
-        repo_path = os.getcwd()
+    elif repo_path == ".git":
+        repo_path = given_path
         git_conf_path = os.path.join(repo_path, ".git")
     else:
         git_conf_path = repo_path
         repo_path = repo_path[:-5]
 
-    # if repo_path:
-    #     _cache_repo(repo_path)
-
     return repo_path, git_conf_path
 
 
-def get_head(repo_path: str = None):
-    """Get current repo head.
-    return a branch name or a commit sha string.
+def get_repo_desc(
+    include_part: Optional[list] = None, path: Optional[str] = None, color: bool = True
+) -> str:
+    """Return a string of repo various information.
+
+    Args:
+        include_part (Optional[list], optional): should return info part: [path,remote,branch,log,summary]. Defaults to None.
+        path (Optional[str], optional): custom repo path. Defaults to None.
+        color (bool, optional): whether return with color. Defaults to True.
+
+    Returns:
+        str:
     """
+
+    error_str = "`Error getting.`<error>"
+    gen = ["[b`Repository Information`]" if color else "[Repository Information]"]
+    repo_path, _ = get_repo_info(path)
+
+    # Get content.
+    if not include_part or "path" in include_part:
+        gen.append(
+            f"Repository: \n\t`{repo_path}`<sky_blue>\n"
+            if color
+            else f"Repository: \n\t{repo_path}\n"
+        )
+
+    # Get remote url.
+    if not include_part or "remote" in include_part:
+        try:
+            with open(f"{repo_path}/.git/config", "r") as cf:
+                config = cf.read()
+        except Exception:
+            remote = error_str
+        else:
+            res = re.findall(r"url\s=\s(.*)", config)
+            remote = "\n".join(
+                [f"\ti`{x}`<sky_blue>" if color else f"\t{x}" for x in res]
+            )
+        gen.append("Remote: \n%s\n" % remote)
+
+    # Get all branches.
+    if not include_part or "branch" in include_part:
+        err, res = exec_cmd(
+            f"git branch --all --color={'always' if color else 'never'}"
+        )
+        branches = "\t" + error_str if err else textwrap.indent(res, "\t")
+        gen.append("Branches: \n%s\n" % branches)
+
+    # Get the lastest log.
+    if not include_part or "log" in include_part:
+        err, res = exec_cmd(
+            f"git log --stat --oneline --decorate -1 --color={'always' if color else 'never'}"
+        )
+        git_log = "\t" + error_str if err else textwrap.indent(res, "\t")
+        gen.append("Lastest log:\n%s\n" % git_log)
+
+    # Get git summary.
+    if not include_part or "summary" in include_part:
+        err, res = exec_cmd(
+            f"git shortlog --summary --numbered --color={'always' if color else 'never'}"
+        )
+        summary = "\t" + error_str if err else textwrap.indent(res, "\t")
+        gen.append("Summary:\n%s\n" % summary)
+
+    return "\n".join(gen)
+
+
+def get_head(repo_path: Optional[str] = None):
+    """Get current repo head. Return a branch name or a commit sha string."""
+
     _, res = exec_cmd(
         "git symbolic-ref -q --short HEAD || git describe --tags --exact-match",
         cwd=repo_path,
@@ -69,14 +135,14 @@ def get_head(repo_path: str = None):
     return res.rstrip()
 
 
-def get_branches(repo_path: str = None):
+def get_branches(repo_path: Optional[str] = None):
     """Get repo all branch."""
 
     err, branches = exec_cmd("git branch", cwd=repo_path)
     return branches
 
 
-def get_remote(repo_path: str = None):
+def get_remote(repo_path: Optional[str] = None):
     """Get repo remote url."""
 
     # Get remote name, exit when error.
@@ -143,7 +209,7 @@ def load_branches() -> list[Branch]:
     return branchs
 
 
-def load_log(branch_name: str, limit: bool = False, filter_path: str = ""):
+def load_log(branch_name: str, limit: bool = False, filter_path: str = "") -> tuple:
     limit_flag = "-300" if limit else ""
     filter_flag = f"--follow -- {filter_path}" if filter_path else ""
     command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
@@ -322,7 +388,7 @@ def load_commit_info(commit_sha: str, file_name: str = "", plain: bool = False) 
 ##########
 # Options
 ##########
-def switch_file_status(file: File, repo_path: str = None):
+def switch_file_status(file: File, repo_path: Optional[str] = None):
     if file.has_merged_conflicts or file.has_inline_merged_conflicts:
         pass
     elif file.has_unstaged_change:
@@ -334,7 +400,7 @@ def switch_file_status(file: File, repo_path: str = None):
             exec_cmd("git rm --cached --force -- {}".format(file.name), cwd=repo_path)
 
 
-def discard_file(file: File, repo_path: str = None):
+def discard_file(file: File, repo_path: Optional[str] = None):
     if file.tracked:
         exec_cmd("git checkout -- {}".format(file.name), cwd=repo_path)
     else:

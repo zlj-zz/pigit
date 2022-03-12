@@ -1,28 +1,34 @@
 import pytest
 from .utils import analyze_it
 
-from pigit import introduce
-from pigit.info import output_repository_info, output_git_local_config
+from pigit.git_utils import get_repo_desc
+from pigit.info import GitConfig, introduce
+from pigit.render import echo
 
 
 def test_introduce():
-    introduce()
+    echo()
+    echo(introduce())
 
 
-@analyze_it
 def test_info():
-    output_repository_info()
+    echo(get_repo_desc())
 
 
-def test_output_config_error():
-    output_git_local_config("xxx")
+def test_gitconfig():
+    c = GitConfig()
+    # c = GitConfig(format_type="normal")
+    print()
+    echo(c.generate())
 
 
 @analyze_it
-def test_normal():
-    output_git_local_config("normal")
+def test():
+    introduce()
+    get_repo_desc(color=False)
 
-
-@analyze_it
-def test_table():
-    output_git_local_config("table")
+    c = GitConfig()
+    c.format_type = "table"
+    c.generate()
+    c.format_type = "normal"
+    c.generate()

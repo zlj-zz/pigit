@@ -31,5 +31,5 @@ def get_console():
 def echo(
     *values, sep: str = " ", end: str = "\n", file: str = None, flush: bool = True
 ):
-    value_list = [get_console().render_str(value) for value in values]
+    value_list = [get_console().render_str(str(value)) for value in values]
     print(*value_list, sep=sep, end=end, file=file, flush=flush)

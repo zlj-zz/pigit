@@ -17,11 +17,33 @@ from pigit.render.markup import render_markup
         "Today is a b```nice``` day.",
         "Today is a `nice`xxxxxxx day.",
         "Today is a `nice`<xxxxxxx> day.",
+        "Today is a (bold,underline)`nice`<yellow> day.",
+        "Today is a (bold ,  underline)`nice`<yellow> day.",
+        "Today is a (bold,underline`nice`<yellow> day.",
+        "Today is a bold,underline)`nice`<yellow> day.",
         "i`Don't found Git, maybe need install.`tomato",
     ],
 )
 def test_style_render_style(text: str):
     print("\n", Style.render_style(text))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Today is a b`nice` `day`<green,red>.",
+        "Today is a b`nice`<#FF0000> day.",
+        "Today is a `nice`<sky_blue> day.",
+        "Today is a `nice`<,sky_blue> day.",
+        "Today is a `nice`<> day.",
+        "Today is a b```nice``` day.",
+        "Today is a `nice`xxxxxxx day.",
+        "Today is a `nice`<xxxxxxx> day.",
+        "i`Don't found Git, maybe need install.`tomato",
+    ],
+)
+def test_style_remove_style(text: str):
+    print("\n", Style.remove_style(text))
 
 
 @pytest.mark.parametrize(

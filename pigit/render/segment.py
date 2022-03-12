@@ -35,7 +35,7 @@ class Segment:
 
     @property
     def cell_len_without_tag(self):
-        return cell_len(Fx.pure(Style.render_style(self.text)))
+        return cell_len(Style.clear_text(self.text))
 
     @classmethod
     def line(cls) -> "Segment":
