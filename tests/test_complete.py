@@ -9,6 +9,7 @@ from pigit.shellcompletion import (
     ZshCompletion,
     BashCompletion,
     FishCompletion,
+    shell_complete,
 )
 
 
@@ -36,7 +37,7 @@ class TestCompletion:
 
     @analyze_it
     def test_bash(self):
-        c = BashCompletion(self.prog, self.complete_vars, self.script_dir)
+        c = BashCompletion(None, self.complete_vars, self.script_dir)
         self.print(c)
 
     @analyze_it
@@ -44,8 +45,9 @@ class TestCompletion:
         c = ZshCompletion("pigit-dev", self.complete_vars, self.script_dir)
         self.print(c)
 
-        # print(c.inject_into_shell())
-
     def test_fish(self):
         c = FishCompletion(self.prog, self.complete_vars, self.script_dir)
         self.print(c)
+
+    def test_action(self):
+        shell_complete("bash", "xxx", self.complete_vars, ".", None, "./test.txt")

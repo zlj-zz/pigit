@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Callable, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 import sys
 import platform
 import subprocess
@@ -13,7 +13,7 @@ from collections import Counter
 Log = logging.getLogger(__name__)
 
 
-def traceback_info(extra_msg: str = "null"):
+def traceback_info(extra_msg: str = "null") -> str:
     """Get traceback infomation.
 
     Args:
@@ -60,7 +60,7 @@ def run_cmd(*args, cwd: Optional[str] = None) -> bool:
         return True
 
 
-def exec_cmd(*args, cwd: Optional[str] = None) -> tuple[str, str]:
+def exec_cmd(*args, cwd: Optional[str] = None) -> Tuple[str, str]:
     """Run system command and get result.
 
     Returns:
@@ -112,7 +112,7 @@ async def async_run_cmd(*args, cwd: Optional[str] = None, msg: Optional[str] = N
         return cwd
 
 
-def exec_async_tasks(tasks: list[Callable]) -> list[str]:
+def exec_async_tasks(tasks: List[Callable]) -> List[str]:
     """Execute tasks asynchronously."""
 
     # TODO: asyncio API is nicer in python 3.7
@@ -223,7 +223,7 @@ def get_current_shell() -> str:
 
 # Mark the type corresponding to the file suffix.
 # abcdefg hijklmn opq rst uvw xyz
-SUFFIX_TYPE: dict[str, str] = {
+SUFFIX_TYPE: Dict[str, str] = {
     "": "",
     "bat": "Batch",
     "c": "C",
@@ -284,7 +284,7 @@ SUFFIX_TYPE: dict[str, str] = {
 }
 
 # Mark the type of some special files.
-SPECIAL_NAMES: dict[str, str] = {
+SPECIAL_NAMES: Dict[str, str] = {
     "license": "LICENSE",
     "requirements.txt": "Pip requirement",
     "vimrc": "Vim Scirpt",
@@ -316,7 +316,7 @@ def adjudgment_type(file: str, original: bool = False) -> str:
         return suffix if original else "unknown"
 
 
-FILE_ICONS: dict[str, str] = {
+FILE_ICONS: Dict[str, str] = {
     "": "",
     "Batch": "",
     "C": "",
@@ -371,11 +371,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod(verbose=True)
-
-    print(get_current_shell())
-
-    try:
-        a = int("abcd")
-    except Exception as e:
-        print(traceback_info())
-    print(traceback_info())

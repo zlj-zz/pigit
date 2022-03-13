@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional, Tuple
 import os, re
 
 from .const import __version__, __url__
@@ -59,10 +59,10 @@ class GitConfig:
         self.color = color
 
     @property
-    def repo_info(self) -> tuple[str, str]:
+    def repo_info(self) -> Tuple[str, str]:
         return get_repo_info(self.repo_path)
 
-    def parse_git_config(self, config_context: str) -> dict:
+    def parse_git_config(self, config_context: str) -> Dict:
         """Retrun a dict from parsing git local config.
 
         Args:
@@ -94,7 +94,7 @@ class GitConfig:
 
         return config_dict
 
-    def normal_config(self, config_dict: dict[str, dict]) -> str:
+    def normal_config(self, config_dict: Dict[str, Dict]) -> str:
         gen = []
         color = self.color
 
@@ -107,7 +107,7 @@ class GitConfig:
 
         return "\n".join(gen)
 
-    def table_config(self, config_dict: dict[str, dict]) -> str:
+    def table_config(self, config_dict: Dict[str, Dict]) -> str:
         if self.color:
             for sub in config_dict.values():
                 for k, v in sub.items():

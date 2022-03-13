@@ -1,12 +1,13 @@
 # -*- coding:utf-8 -*-
 
-from typing import Optional, Tuple, Union, Match
+from typing import List, Optional, Tuple, Union, Match
 import sys, re
 
 from .errors import StyleSyntaxError
 
 
 COLOR_CODE = {
+    "nocolor": "",
     "light_pink": "#FFB6C1",
     "pink": "#FFC0CB",
     "crimson": "#DC143C",
@@ -463,7 +464,7 @@ class Color(object):
             return ""
 
     @staticmethod
-    def is_color(code: Union[str, list, tuple]) -> bool:
+    def is_color(code: Union[str, List, Tuple]) -> bool:
         """Adjust whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
 
         Test `is_color()` whether can right adjust.
@@ -537,7 +538,7 @@ class Style(object):
 
     def __str__(self) -> str:
         if self._style_definition is None:
-            style_res: list[str] = []
+            style_res: List[str] = []
             append = style_res.append
 
             bits = self._set_attributes
@@ -568,7 +569,7 @@ class Style(object):
 
     def _make_ansi_code(self) -> str:
         if self._ansi is None:
-            sgr: list[str] = []
+            sgr: List[str] = []
             fx_map = Fx.code_map
 
             if attributes := self._set_attributes & self._attributes:

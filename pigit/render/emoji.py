@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 import sys
 import re
-from typing import Optional, Match, Callable
+from typing import Dict, Optional, Match, Callable
 
 # For encoding.
 Icon_Supported_Encoding: list = ["utf-8"]
@@ -17,21 +17,21 @@ _EMOJI_RE: _ReStringMatch = re.compile(
 
 
 class Emoji(object):
-    _EMOTION: dict[str, str] = {
+    _EMOTION: Dict[str, str] = {
         "rainbow": "🌈",
         "smiler": "😊",
         "thinking": "🧐",
         "sorry": "😅",
     }
 
-    _WIN_EMOTION: dict[str, str] = {
+    _WIN_EMOTION: Dict[str, str] = {
         "rainbow": "::",
         "smiler": "^_^",
         "thinking": "-?-",
         "sorry": "Orz",
     }
 
-    EMOTION: dict[str, str]
+    EMOTION: Dict[str, str]
 
     # XXX(zachary): There are some problems with the output emoji on windows.
     # ? In CMD, encoding is right, but emoji is error.

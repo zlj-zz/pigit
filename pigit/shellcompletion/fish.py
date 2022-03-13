@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from typing import Dict
 import os
 import textwrap
 
@@ -51,7 +52,7 @@ class FishCompletion(ShellCompletion):
 
         sub_q = [_sub_opts]
         while sub_q:
-            temp: dict = sub_q.pop(0)
+            temp: Dict = sub_q.pop(0)
             for opt_name, p in temp.items():
                 comp_keys.append(opt_name)
 

@@ -5,7 +5,7 @@ import re
 import textwrap
 import random
 import logging
-from typing import Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from ..common import run_cmd, confirm, similar_command, traceback_info
 from ..render import Fx, Color, shorten, echo
@@ -17,7 +17,7 @@ from .cmds import Git_Cmds, CommandType
 Log = logging.getLogger(__name__)
 
 
-def get_extra_cmds() -> dict:
+def get_extra_cmds() -> Dict:
     """Get custom cmds.
 
     Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
@@ -98,7 +98,7 @@ class CmdProcessor(object, metaclass=Singleton):
         return color_command
 
     def process_command(
-        self, command_: str, args: Optional[Union[list, tuple]] = None
+        self, command_: str, args: Optional[Union[List, Tuple]] = None
     ) -> None:
         """Process command and arguments.
 
@@ -111,7 +111,7 @@ class CmdProcessor(object, metaclass=Singleton):
             SystemExit: short command not right.
         """
 
-        option: Optional[dict] = self.cmds.get(command_, None)
+        option: Optional[Dict] = self.cmds.get(command_, None)
 
         # Invalid, if need suggest.
         if option is None:

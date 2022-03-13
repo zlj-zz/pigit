@@ -28,7 +28,10 @@ Docs Test
 
 # from typing import Final # python3.8
 
-WIDTHS: list[tuple[int, int]] = [
+from typing import List, Tuple
+
+
+WIDTHS: List[Tuple[int, int]] = [
     (126, 1),
     (159, 0),
     (687, 1),
@@ -88,14 +91,14 @@ def cell_len(cell: str) -> int:
 
 # TODO: This is inefficient
 # TODO: This might not work with CWJ type characters
-def chop_cells(text: str, max_size: int, position: int = 0) -> list[str]:
+def chop_cells(text: str, max_size: int, position: int = 0) -> List[str]:
     """Break text in to equal (cell) length strings."""
     _get_character_cell_size = get_char_width
     characters = [
         (character, _get_character_cell_size(character)) for character in text
     ][::-1]
     total_size = position
-    lines: list[list[str]] = [[]]
+    lines: List[List[str]] = [[]]
     append = lines[-1].append
 
     pop = characters.pop

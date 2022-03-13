@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
-from typing import Union
+from typing import Dict, List, Tuple, Union
 from copy import deepcopy
 from argparse import ArgumentParser, Namespace
 
 
 class Parser(object):
-    def __init__(self, args_dict: dict) -> None:
+    def __init__(self, args_dict: Dict) -> None:
         self._args_dict = deepcopy(args_dict)
 
         self._parse_dict()
@@ -66,7 +66,7 @@ class Parser(object):
 
         _parse_args(p, args)
 
-    def parse(self, args: Union[list, str, None] = None) -> tuple[Namespace, list]:
+    def parse(self, args: Union[List, str, None] = None) -> Tuple[Namespace, List]:
         if not args:
             known_args, unknown = self._parser.parse_known_args()
         elif isinstance(args, list):

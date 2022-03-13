@@ -1,28 +1,24 @@
 # -*- coding:utf-8 -*-
 
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, Any
 import os
 import stat
 import re
 import json
-import time
 import logging
 import threading
 import concurrent.futures
-from math import ceil
-from shutil import get_terminal_size, register_unpack_format
-from typing import Optional
+from shutil import get_terminal_size
 
 from .common import confirm, get_file_icon, adjudgment_type
-from .render import Table, Color, Fx, shorten
+from .render.new_table import Table
+from .render import get_console
 
 
 Log = logging.getLogger(__name__)
 
 
-class CodeCounterError(Exception):
-    """CodeCounter error class."""
-
-    pass
+CounterFormatType = Literal["simple", "table"]
 
 
 class CodeCounter(object):
@@ -32,15 +28,13 @@ class CodeCounter(object):
         Absolute_Rules (dict): Precompiled rules.
         Suffix_Type (dict): Supported file suffix dictionary.
         Special_Name (dict): Type dict of special file name.
-        level_color (list): Color list. The levels are calibrated by
             subscript, and the codes of different levels are colored
             when the results are output.
         symbol (dict):
-        _support_format (list):
     """
 
     # The default rule is to count only files. Ignore all video, audio, fonts, binaries.
-    Absolute_Rules: list[dict] = [
+    Absolute_Rules: List[Dict] = [
         # Exclude `.git` folder.
         {"pattern": re.compile(r"\.git$|\.git\/"), "include": False},
         {
@@ -85,30 +79,19 @@ class CodeCounter(object):
         },
     ]
 
-    # Colors displayed for different code quantities.
-    level_color: list[str] = [
-        "",
-        Color.fg("#EBCB8C"),  # yellow
-        Color.fg("#FF6347"),  # tomato
-        Color.fg("#C71585"),  # middle violet red
-        Color.fg("#87CEFA"),  # skyblue
-    ]
-
-    # Symbol corresponds to the desired color.
-    symbol_color: dict = {"+": Color.fg("#98FB98"), "-": Color.fg("#FF6347")}
-
-    # Supported output format.
-    _support_format: list = ["table", "simple"]
-
     _Lock = threading.Lock()
 
     def __init__(
         self,
-        count_path: str = os.getcwd(),
+        *,
+        count_path: Optional[str] = None,
+        format_type: CounterFormatType = "table",
         use_ignore: bool = True,
+        use_icon: bool = True,
         result_saved_path: str = "",
-        result_format: str = "table",
-        use_icon: bool = False,
+        whether_save: bool = False,
+        color: bool = True,
+        show_invalid: bool = False,
     ) -> None:
         """
         Args:
@@ -118,25 +101,20 @@ class CodeCounter(object):
             result_format (str, optional): Output format string. Defaults to "table".
             use_icon (bool, optional): Whether output with icon. Defaults to False.
 
-        Raises:
-            CodeCounterError: when format string not right.
         """
-        super(CodeCounter, self).__init__()
-
         # Store the rules obtained after processing.
-        self.Rules: list = []
+        self.Rules: List = []
 
-        self.count_path = count_path
+        self.count_path = count_path or os.getcwd()
+        self.format_type = format_type
         self.use_ignore = use_ignore
-        self.result_saved_path = result_saved_path
-        if result_format not in self._support_format:
-            raise CodeCounterError(
-                "Unsupported format, choice in {0}".format(self._support_format)
-            )
-        self.result_format = result_format
         self.use_icon = use_icon
+        self.result_saved_path = result_saved_path
+        self.whether_save = whether_save
+        self.color = color
+        self.show_invalid = show_invalid
 
-    def process_gitignore(self, root: str) -> None:
+    def parse_gitignore2rule(self, root: str) -> None:
         """Process `.gitignore` files and add matching rules.
 
         Args:
@@ -160,14 +138,12 @@ class CodeCounter(object):
                     ),
                 )
         except PermissionError:
-            if confirm(
-                "Can't read {0}, whether get jurisdiction[y/n]:".format(ignore_path)
-            ):
+            if confirm(f"Can't read {ignore_path}, whether get jurisdiction[y/n]:"):
                 os.chmod(ignore_path, stat.S_IXGRP)
                 os.chmod(ignore_path, stat.S_IWGRP)
-                self.process_gitignore(root)
+                self.parse_gitignore2rule(root)
         except Exception as e:
-            print("Read gitignore error: {0}".format(e))
+            print(f"Read gitignore error: {e}")
         else:
             for item in ignore_content:
                 is_negative = item[0] == "!"
@@ -192,7 +168,7 @@ class CodeCounter(object):
                 item = re.sub(r"\/$", "(([\\\\/].*)|$)", item)  # for trialing with `/`
                 self.Rules.append({"pattern": re.compile(item), "include": is_negative})
 
-    def matching(self, full_path: str) -> bool:
+    def matching_rules(self, full_path: str) -> bool:
         """Matching rules.
 
         Judge whether it is the required file according to the rule matching path.
@@ -218,43 +194,44 @@ class CodeCounter(object):
         return res[-1]["include"]
         # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
-    def _sub_count(self, root: str, files: list) -> tuple:
+    def _sub_count(self, root: str, files: List) -> tuple:
         """Process handle use by `self.count`."""
-        result = {}  # type: dict[str,dict]
+        show_invailed = self.show_invalid
+
+        result: dict[str[dict[str, int]]] = {}  # type: dict[str,dict]
         valid_counter = invalid_counter = 0
-        invalid_list = []
-        total_size = 0
+        invalid_list: list[str] = []
+        total_size: int = 0
 
         for file in files:
             full_path = os.path.join(root, file)
-            is_effective = self.matching(full_path)
+            is_effective = self.matching_rules(full_path)
             if is_effective:
                 try:
                     # Try read size of the valid file. Then do sum calc.
-                    size_ = os.path.getsize(full_path)
-                    total_size += size_
+                    file_size = os.path.getsize(full_path)
+                    total_size += file_size
                 except:
-                    Log.debug(f"Can't read size of '{full_path}'")
+                    Log.warn(f"Can't read size of '{full_path}'")
 
                 # Get file type.
-                type_ = adjudgment_type(file, original=True)
+                file_type = adjudgment_type(file, original=True)
                 try:
                     with open(full_path) as f:
                         count = len(f.read().split("\n"))
                 except Exception:
+                    if show_invailed:
+                        invalid_list.append(file)
                     invalid_counter += 1
-                    invalid_list.append(file)
                     continue
                 else:
                     # Superposition.
-                    if result.get(type_, None) is None:
-                        result[type_] = {"files": 1, "lines": count}
+                    if result.get(file_type) is None:
+                        result[file_type] = {"files": 1, "lines": count}
                     else:
-                        result[type_]["files"] += 1
-                        result[type_]["lines"] += count
+                        result[file_type]["files"] += 1
+                        result[file_type]["lines"] += count
                     valid_counter += 1
-                finally:
-                    pass
 
         return result, total_size, valid_counter, invalid_counter, invalid_list
 
@@ -264,9 +241,7 @@ class CodeCounter(object):
         print("Walk error: {0}".format(e))
         return
 
-    def count(
-        self, root_path: str, use_ignore: bool = True, progress: bool = True
-    ) -> tuple[dict, list, list]:
+    def count(self) -> Tuple[Dict, List, List]:
         """Statistics file and returns the result dictionary for Python3.
 
         Args:
@@ -279,17 +254,15 @@ class CodeCounter(object):
             invalid_list (list): invalid file list.
             total_size (int): the sum size of all valid files.
 
-        >>> result = {
-        ...     'py': {
-        ...         'files': 5,
-        ...         'lines': 2124,
-        ...     }
-        ... }
-        >>> CodeCounter().count('~/.config', use_ignore=True)
+            result = {
+                'Python': {
+                    'files': 5,
+                    'lines': 2124,
+                }
+            }
         """
-
-        if progress:
-            width, _msg = self._get_ready()
+        root_path = self.count_path
+        use_ignore = self.use_ignore
 
         result = {}  # type: dict[str,dict]
         data_count = [0, 0, 0]  # [total_size, valid_count, invalid_count]
@@ -306,7 +279,7 @@ class CodeCounter(object):
 
             with self._Lock:
                 for key, values in _result.items():
-                    if result.get(key, None) is None:
+                    if result.get(key) is None:
                         result[key] = values
                     else:
                         result[key]["files"] += _result[key]["files"]
@@ -318,24 +291,23 @@ class CodeCounter(object):
                 invalid_list.extend(_invalid_list)
 
         cpu: int = os.cpu_count() or 1
-        max_queue = cpu * 200
+        max_queue: int = cpu * 200
         print("Detect CPU count: {0}, start record ...".format(cpu))
 
         with concurrent.futures.ProcessPoolExecutor() as pool:
             for root, _, files in os.walk(root_path, onerror=self._walk_err_callback):
+                if not files:
+                    continue
 
-                # First judge whether the directory is valid. Invalid directories
+                # Judge whether the directory is valid. Invalid directories
                 # do not traverse files.
-                is_effective_dir = self.matching(root)
+                is_effective_dir = self.matching_rules(root)
                 if not is_effective_dir:
                     continue
 
-                # Process .gitignore file, add custom rules.
+                # Process ``.gitignore`` file, add custom rules.
                 if use_ignore and ".gitignore" in files:
-                    self.process_gitignore(root)
-
-                if not files:
-                    continue
+                    self.parse_gitignore2rule(root)
 
                 # If the number of files(exclude sub dir) in the directory is greater
                 # than 15 and the number of enabled processes does not exceed the upper
@@ -371,7 +343,7 @@ class CodeCounter(object):
 
         return result, invalid_list, data_count[0]
 
-    def _get_ready(self) -> tuple[int, str]:
+    def _get_ready(self) -> Tuple[int, str]:
         width, _ = get_terminal_size()
         if width > 55:
             _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
@@ -385,7 +357,7 @@ class CodeCounter(object):
         )
         return os.path.join(self.result_saved_path, file_name)
 
-    def load_recorded_result(self, root_path: str) -> Optional[dict]:
+    def load_recorded_result(self, root_path: str) -> Optional[Dict]:
         """Load count result."""
         file_path = self._get_saved_path(root_path)
         try:
@@ -396,7 +368,7 @@ class CodeCounter(object):
         else:
             return res
 
-    def save_result(self, result: dict, root_path: str) -> bool:
+    def save_result(self, result: Dict, root_path: str) -> bool:
         """Save count result.
 
         Generate name according to `root_path`, then try save the record
@@ -419,12 +391,97 @@ class CodeCounter(object):
         else:
             return True
 
-    @classmethod
-    def color_index(cls, _count: int) -> int:
-        _index = len(str(_count // 1000))
-        return -1 if _index > len(cls.level_color) else _index - 1
+    def simple_output(self, result: Dict) -> str:
+        gen = []
+        for key, value in result.items():
+            line = f"::{key}  (files:{value['files']:,} | lines:{value['lines']:,})"
+            gen.append(line)
 
-    def format_print(self, new: dict, old: Optional[dict] = None) -> None:
+        return "\n".join(gen)
+
+    def table_output(self, new: Dict, old: Dict) -> Table:
+        use_icon = self.use_icon
+        color = self.color
+
+        tb = Table(title="[Code Counter Result]", title_style="bold")
+        tb.add_column("Language")
+        tb.add_column("Files")
+        tb.add_column("Code lines")
+
+        # Diff
+        sum_lines = 0
+        for key, value in new.items():
+            files = value["files"]
+            lines = value["lines"]
+            # Calc sum code line.
+            sum_lines += lines
+
+            file_type_str = (
+                "{0} {1}".format(get_file_icon(key), key) if use_icon else key
+            )
+            files_str = f"{files:,}"
+            lines_str = f"{lines:,}"
+
+            if color:
+                file_type_str = f"`{file_type_str}`<cyan>"
+                files_str = f"`{files_str}`<{self.color_index(files)}>"
+                lines_str = f"`{lines_str}`<{self.color_index(lines)}>"
+
+            # Compare change.
+            if isinstance(old, dict) and old.get(key) is not None:
+                old_files = old.get(key).get("files", None)
+                old_lines = old.get(key).get("lines", None)
+
+                if old_files and old_files != files:
+                    files_change = "{:+}".format(files - old_files)
+                else:
+                    files_change = ""
+
+                if old_lines and old_lines != lines:
+                    lines_change = "{:+}".format(lines - old_lines)
+                else:
+                    lines_change = ""
+
+            else:
+                files_change = lines_change = ""
+
+            if color:
+                files_change_str = f"`{files_change}`<{'#98fb98' if files_change.startswith('+') else '#ff6347'}>"
+            else:
+                files_change_str = files_change
+
+            if color:
+                lines_change_str = f"`{lines_change}`<{'#98fb98' if lines_change.startswith('+') else '#ff6347'}>"
+            else:
+                lines_change_str = lines_change
+
+            tb.add_row(
+                file_type_str,
+                f"{files_str} {files_change_str}",
+                f"{lines_str} {lines_change_str}",
+            )
+
+        # Print total and change graph.
+        tb._caption = " Total: {0} lines".format(sum_lines)
+        return tb
+
+    @classmethod
+    def color_index(
+        cls, count: int, level_color: Union[List, Tuple, None] = None
+    ) -> int:
+        # Colors displayed for different code quantities.
+        if level_color is None:
+            level_color = (
+                "nocolor",
+                "#EBCB8C",  # yellow
+                "#FF6347",  # tomato
+                "#C71585",  # middle violet red
+                "#87CEFA",  # skyblue
+            )
+        index = len(str(count // 1000))
+        return level_color[-1] if index > len(level_color) else level_color[index - 1]
+
+    def generate_format_output(self, new: Dict, old: Optional[Dict] = None) -> Any:
         """Print result with color and diff.
 
         If the console width is not enough, the output is simple.
@@ -434,130 +491,73 @@ class CodeCounter(object):
             old (dict|None): The results saved in the past may not exist.
         """
 
-        result_format: str = self.result_format
+        result_format = self.format_type
+
         needed_width: int = 67
         width, _ = get_terminal_size()
         if result_format == "simple" or width < needed_width:
-            for key, value in new.items():
-                line = "::{} -> {:,} | {:,}".format(key, value["files"], value["lines"])
-                print(line)
-            return None
+            return self.simple_output(new)
 
         elif result_format == "table":
-            title = "[Code Counter Result]"
-            header = ["Language", "Files", "Code lines"]
+            return self.table_output(new, old)
 
-            # Print full time.
-            print(time.strftime("%H:%M:%S %a %Y-%m-%d %Z", time.localtime()))
-
-            # Diff
-            sum_ = 0
-            additions = 0
-            deletions = 0
-            tb_data = []
-            for key, value in new.items():
-                if self.use_icon:
-                    key_display_str = "{0} {1}".format(get_file_icon(key), key)
-                else:
-                    key_display_str = key
-
-                # Processing too long name.
-                key_display_str = shorten(key_display_str, 20, front=False)
-
-                # Set color.
-                lines_color = self.level_color[self.color_index(value["lines"])]
-
-                # Compare change.
-                if isinstance(old, dict) and old.get(key, None) is not None:
-                    old_files = old.get(key).get("files", None)
-                    old_lines = old.get(key).get("lines", None)
-
-                    if old_files and old_files != value["files"]:
-                        files_change = "{:+}".format(value["files"] - old_files)
-                        files_symbol = files_change[0]
-                    else:
-                        files_symbol = files_change = ""
-
-                    if old_lines and old_lines != value["lines"]:
-                        _change = value["lines"] - old_lines
-                        lines_change = "{:+}".format(_change)
-                        lines_symbol = lines_change[0]
-                        if _change > 0:
-                            additions += _change
-                        else:
-                            deletions -= _change
-                    else:
-                        lines_symbol = lines_change = ""
-
-                else:
-                    files_change = files_symbol = lines_change = lines_symbol = ""
-
-                file_symbol = self.symbol_color.get(files_symbol, "")
-                line_symbol = self.symbol_color.get(lines_symbol, "")
-                tb_data.append(
-                    [
-                        f" {key_display_str:<21}",
-                        f" {Fx.i}{value['files']:<11}{Fx.rs} {file_symbol}{files_change:>5}{Fx.rs}",
-                        f" {Fx.i}{value['lines']:<15}{Fx.rs} {line_symbol}{lines_change:>6}{Fx.rs}",
-                    ]
-                )
-
-                # Calc sum code line.
-                sum_ += value["lines"]
-
-            # Print table.
-            tb = Table(header, tb_data, title=title)
-            tb.print()
-
-            # Print total and change graph.
-            print(" Total: {0}".format(sum_))
-
-            # Additions and deletions are calculated by percentage,
-            # and the base is the total number of last statistics.
-            if additions > 0 or deletions > 0:
-                # Get prev count sum.
-                old_sum = sum(i["lines"] for i in old.values())
-
-                print(" Altered: ", end="")
-                print(
-                    "{0}{1}".format(
-                        self.symbol_color["+"], "+" * ceil(additions / old_sum * 100)
-                    ),
-                    end="",
-                )
-                print(
-                    "{0}{1}{2}".format(
-                        self.symbol_color["-"],
-                        "-" * ceil(deletions / old_sum * 100),
-                        Fx.rs,
-                    )
-                )
-
-    def count_and_format_print(
-        self, if_save: bool = True, show_invalid: bool = False
+    def run(
+        self,
+        whether_output: bool = True,
+        *,
+        count_path: Optional[str] = None,
+        format_type: Optional[CounterFormatType] = None,
+        use_ignore: Optional[bool] = None,
+        use_icon: Optional[bool] = None,
+        result_saved_path: Optional[str] = "",
+        whether_save: Optional[bool] = None,
+        color: Optional[bool] = None,
+        show_invalid: Optional[bool] = None,
     ) -> None:
-        result, invalid_list, total_size = self.count(self.count_path, self.use_ignore)
+        if count_path is not None:
+            self.count_path = count_path
+        if format_type is not None:
+            self.format_type = format_type
+        if use_ignore is not None:
+            self.use_ignore = use_ignore
+        if use_icon is not None:
+            self.use_icon = use_icon
+        if result_saved_path is not None:
+            self.result_saved_path = result_saved_path
+        if whether_save is not None:
+            self.whether_save = whether_save
+        if color is not None:
+            self.color = color
+        if show_invalid is not None:
+            self.show_invalid = show_invalid
+
+        result, invalid_list, total_size = self.count()
 
         old_result = self.load_recorded_result(self.count_path)
 
         # diff print.
-        self.format_print(result, old_result)
-        if if_save:
-            self.save_result(result, self.count_path)
-        if (
-            show_invalid
-            and invalid_list
-            and confirm("Whether print invalid file list?[y/n]", default=False)
-        ):
-            print(invalid_list)
+        if whether_output:
+            output = self.generate_format_output(result, old_result)
+            get_console().echo(output)
 
-        # optimize size unit.
-        size_unit = ["byte", "KB", "MB", "GB"]
-        for i in range(3):
-            if total_size >= 1024:
-                total_size /= 1024
+            if self.whether_save:
+                self.save_result(result, self.count_path)
+            if (
+                self.show_invalid
+                and invalid_list
+                and confirm("Whether print invalid file list?[y/n]", default=False)
+            ):
+                print(invalid_list)
+
+            # optimize size unit.
+            size_unit = ["byte", "KB", "MB", "GB"]
+            for i in range(3):
+                if total_size >= 1024:
+                    total_size /= 1024
+                else:
+                    break
             else:
-                break
-        else:
-            i = 3
-        print(" Files total size: {0:.2f}{1}".format(total_size, size_unit[i]))
+                i = 3
+            print("Files total size: {0:.2f}{1}".format(total_size, size_unit[i]))
+
+        return result

@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from typing import Optional
+from typing import Dict, List, Optional
 import os, json, textwrap
 from collections import Counter
 
@@ -9,7 +9,7 @@ from pigit.const import REPOS_PATH
 from pigit.git_utils import get_head, get_repo_info
 
 
-def _make_repo_name(path: str, repos: list[str], name_counts: Counter) -> str:
+def _make_repo_name(path: str, repos: List[str], name_counts: Counter) -> str:
     """
     Given a new repo `path`, create a repo name. By default, basename is used.
     If name collision exists, further include parent path name.
@@ -31,7 +31,7 @@ def _make_repo_name(path: str, repos: list[str], name_counts: Counter) -> str:
     return name
 
 
-def load_repos() -> dict:
+def load_repos() -> Dict:
     if not os.path.isfile(REPOS_PATH):
         return {}
 
@@ -39,7 +39,7 @@ def load_repos() -> dict:
         return json.load(fp)
 
 
-def save_repos(repos: dict) -> bool:
+def save_repos(repos: Dict) -> bool:
     if not os.path.isfile(REPOS_PATH):
         os.makedirs(os.path.dirname(REPOS_PATH), exist_ok=True)
 
@@ -56,7 +56,7 @@ def clear_repos():
         os.remove(REPOS_PATH)
 
 
-def add_repos(paths: list[str], dry_run: bool = False, silent: bool = False):
+def add_repos(paths: List[str], dry_run: bool = False, silent: bool = False):
     """
     Traverse the incoming paths. If it is not saved and is a git directory, add it to repos.
 
@@ -96,7 +96,7 @@ def add_repos(paths: list[str], dry_run: bool = False, silent: bool = False):
         not silent and echo("`No new repos found!`<tomato>")
 
 
-def rm_repos(repos: list[str], use_path: bool = False):
+def rm_repos(repos: List[str], use_path: bool = False):
     exist_repos = load_repos()
 
     del_repos = []
@@ -179,7 +179,7 @@ repo_options = {
 }
 
 
-def process_repo_option(repos: Optional[list[str]], op: str):
+def process_repo_option(repos: Optional[List[str]], op: str):
     exist_repos = load_repos()
 
     if repos:

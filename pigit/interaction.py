@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from typing import TYPE_CHECKING, Optional, Any
+from typing import TYPE_CHECKING, List, Optional, Any
 import os, sys
 from time import sleep
 
@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 
 class BranchPanel(RowPanelWidget):
-    def get_raw_data(self) -> list["Branch"]:
+    def get_raw_data(self) -> List["Branch"]:
         return load_branches()
 
-    def process_raw_data(self, raw_data: list["Branch"]) -> list[str]:
+    def process_raw_data(self, raw_data: List["Branch"]) -> List[str]:
         processed_branches = []
         for branch in raw_data:
             if branch.is_head:
@@ -70,10 +70,10 @@ class BranchPanel(RowPanelWidget):
 class StatusPanel(RowPanelWidget):
     repo_path, repo_conf = get_repo_info()
 
-    def get_raw_data(self) -> list["File"]:
+    def get_raw_data(self) -> List["File"]:
         return load_status(self.size[0])
 
-    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
+    def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         if not raw_data:
             return ["No status changed."]
         return [file.display_str for file in raw_data]
@@ -135,7 +135,7 @@ class FilePanel(RowPanelWidget):
         if self._repo_path != path:
             self._repo_path = path
 
-    def get_raw_data(self) -> list[Any]:
+    def get_raw_data(self) -> List[Any]:
         return load_file_diff(
             self._file.name,
             self._file.tracked,
@@ -155,11 +155,11 @@ class FilePanel(RowPanelWidget):
 
 
 class CommitPanel(RowPanelWidget):
-    def get_raw_data(self) -> list["Commit"]:
+    def get_raw_data(self) -> List["Commit"]:
         branch_name = get_head()
         return load_commits(branch_name)
 
-    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
+    def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         color_data = []
         pushed_c = Color.fg("#F0E68C")
         unpushed_c = Color.fg("#F08080")
@@ -197,7 +197,7 @@ class CommitStatusPanel(RowPanelWidget):
             self.cursor_row = 1
             self._commit = commit
 
-    def get_raw_data(self) -> list[Any]:
+    def get_raw_data(self) -> List[Any]:
         return load_commit_info(self._commit.sha).split("\n")
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:

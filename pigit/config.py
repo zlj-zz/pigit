@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from typing import Dict, List
 import os, re, textwrap, logging
 from distutils.util import strtobool
 
@@ -77,7 +78,7 @@ class Config(object, metaclass=Singleton):
         """
     )
 
-    _keys: list[str] = [
+    _keys: List[str] = [
         "cmd_show_original",
         "cmd_recommend",
         "tui_help_showtime",
@@ -109,16 +110,16 @@ class Config(object, metaclass=Singleton):
     counter_show_invalid: bool = False
     counter_show_icon: bool = False
     counter_format: str = "table"  # table, simple
-    _supported_result_format: list = ["table", "simple"]
+    _supported_result_format: List = ["table", "simple"]
 
     # ignore file conf
     gitignore_generator_timeout: int = 60
 
     # info conf
     git_config_format: str = "table"
-    _supported_git_config_format: list = ["normal", "table"]
+    _supported_git_config_format: List = ["normal", "table"]
 
-    repo_info_include: list[str] = ["remote", "branch", "log"]
+    repo_info_include: List[str] = ["remote", "branch", "log"]
 
     # repo conf
     repo_auto_append: bool = False
@@ -128,7 +129,7 @@ class Config(object, metaclass=Singleton):
     log_output: bool = False
 
     # Store warning messages.
-    warnings: list = []
+    warnings: List = []
 
     def __init__(
         self, path: str, version: str = "unknown", auto_load: bool = True
@@ -137,7 +138,7 @@ class Config(object, metaclass=Singleton):
 
         self.config_file_path: str = path
         self.current_version: str = version
-        self.conf: dict = {}
+        self.conf: Dict = {}
 
         if auto_load:
             self.load_config()

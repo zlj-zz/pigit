@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
+from typing import Dict, Generator, List
 from abc import ABC, abstractmethod
 from shutil import get_terminal_size
 from copy import deepcopy
-from typing import Generator
 
 from .style import Fx
 from .str_utils import get_width
@@ -11,7 +11,7 @@ from .str_utils import get_width
 
 class BoxSymbol(object):
     # yapf: disable
-    rune:dict[str,list[str]] = {
+    rune:Dict[str,List[str]] = {
         "normal":        ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"],
         "normal_double": ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="],
         "fine":          ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"],
@@ -20,12 +20,12 @@ class BoxSymbol(object):
         "double":   ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"],
     }
 
-    normal_rune: list[str] = ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"]
-    normal_double_rune: list[str] = ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="]
-    fine_rune: list[str] = ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"]
-    radian_rune: list[str] = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]
-    bold_rune: list[str] = ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"]
-    double_rune: list[str] = ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]
+    normal_rune: List[str] = ["-", "|", "|", "|", "|", "|", "|", "|", "-", "-", "-"]
+    normal_double_rune: List[str] = ["=", "‖", "‖", "‖", "‖", "‖", "‖", "‖", "=", "=", "="]
+    fine_rune: List[str] = ["─", "│", "╭", "╮", "╰", "╯", "├", "┤", "┬", "┴", "┼"]
+    radian_rune: List[str] = ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]
+    bold_rune: List[str] = ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"]
+    double_rune: List[str] = ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]
     # yapf: enable
 
 
@@ -37,7 +37,7 @@ class _baseTable(ABC):
 
     """Docstring for baseTable."""
 
-    each_column_width: list
+    each_column_width: List
 
     def __init__(self, frame_format: str, nil: str, title: str = ""):
         if frame_format not in BoxSymbol.rune.keys():
@@ -64,7 +64,7 @@ class _baseTable(ABC):
 
     def real_len(self, text: str):
         """Gets the true width of the element on the command line."""
-        return sum([get_width(ord(ch)) for ch in text])
+        return sum(get_width(ord(ch)) for ch in text)
 
     @abstractmethod
     def fix_data(self):
@@ -125,8 +125,8 @@ class Table(_baseTable):
 
     def __init__(
         self,
-        header: list,
-        data: list[list],
+        header: List,
+        data: List[List],
         title: str = "",
         frame_format: str = "bold",
         nil: str = "",
@@ -158,22 +158,22 @@ class Table(_baseTable):
             if item_len < header_len:
                 item.extend([self.nil] * (header_len - item_len))
             elif item_len > header_len:
-                item = item[0:header_len]
+                item = item[:header_len]
             # Calc each max.
             self._adjust_each_max(item)
 
-    def add_row(self, row: list) -> None:
+    def add_row(self, row: List) -> None:
         # XXX: whether need deepcopy
         row_len = len(row)
         if row_len < self.header_len:
             row.extend([self.nil] * (self.header_len - row_len))
         elif row_len > self.header_len:
-            row = row[0 : self.header_len]
+            row = row[: self.header_len]
 
         self._adjust_each_max(row)
         self.data.append(row)
 
-    def _adjust_each_max(self, cells: list) -> None:
+    def _adjust_each_max(self, cells: List) -> None:
         for i, x in enumerate(cells):
             x_len = self.real_len(Fx.pure(x))
             self.each_column_width[i] = max(self.each_column_width[i], x_len)
@@ -243,7 +243,7 @@ class dTable(_baseTable):
     """
 
     def __init__(
-        self, d_data: dict, title: str = "", frame_format: str = "bold", nil: str = ""
+        self, d_data: Dict, title: str = "", frame_format: str = "bold", nil: str = ""
     ):
         # check data whether right.
         if not isinstance(d_data, dict):

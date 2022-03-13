@@ -13,13 +13,13 @@ Like this:
 """
 
 import re
-from typing import Union
+from typing import List, Tuple, Union
 
 from ..common import exec_cmd, run_cmd
 from ..render import echo
 
 
-def add(args: Union[list, tuple]) -> None:
+def add(args: Union[List, Tuple]) -> None:
     """git add option.
 
     Args:
@@ -35,7 +35,7 @@ def add(args: Union[list, tuple]) -> None:
     run_cmd(f"git add {args_str}")
 
 
-def fetch_remote_branch(args: Union[list, tuple]) -> None:
+def fetch_remote_branch(args: Union[List, Tuple]) -> None:
     "Fetch a remote branch to local and with the same name."
 
     branch = args[0] if len(args) > 1 else None
@@ -46,7 +46,7 @@ def fetch_remote_branch(args: Union[list, tuple]) -> None:
         echo("`This option need a branch name.`<error>")
 
 
-def set_email_and_username(args: Union[list, tuple]) -> None:
+def set_email_and_username(args: Union[List, Tuple]) -> None:
     """Set git username and email with interaction.
 
     Args:

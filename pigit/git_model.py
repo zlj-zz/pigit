@@ -2,6 +2,7 @@
 
 """This file save some model class of git info class."""
 
+from typing import List
 from dataclasses import dataclass
 
 # flake8: noqa
@@ -32,7 +33,7 @@ class Commit:
     unix_timestamp: int
     status: str
     extra_info: str
-    tag: list
+    tag: List
     action: str = ""
 
     def is_pushed(self):

@@ -23,7 +23,7 @@
 # SOFTWARE.
 
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 import os, logging
 
 from .log import setup_logging
@@ -154,7 +154,7 @@ def shell_mode(git_processor: CmdProcessor):
     return None
 
 
-def _cmd_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
+def _cmd_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
@@ -197,7 +197,7 @@ def _cmd_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
         echo("`pigit cmd -h`<ok> for help.")
 
 
-def _repo_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
+def _repo_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     option: str = kwargs.get("option", "")
 
     if option == "add":
@@ -214,7 +214,7 @@ def _repo_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
         process_repo_option(args.repos, option)
 
 
-def _open_func(args: "argparse.Namespace", unknown: list, kwargs: dict):
+def _open_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     branch = issue = commit = ""
 
     remote_url = get_remote()
@@ -426,7 +426,7 @@ argparse_dict = {
 }
 
 
-def _process(args: "argparse.Namespace", extra_unknown: Optional[list] = None) -> None:
+def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -> None:
     if args.report:
         echo(introduce())
 
@@ -469,9 +469,9 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[list] = None) -
             count_path=path,
             use_ignore=CONFIG.counter_use_gitignore,
             result_saved_path=COUNTER_DIR_PATH,
-            result_format=CONFIG.counter_format,
+            format_type=CONFIG.counter_format,
             use_icon=CONFIG.counter_show_icon,
-        ).count_and_format_print(
+        ).run(
             show_invalid=CONFIG.counter_show_invalid,
         )
         return None
@@ -493,7 +493,7 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[list] = None) -
         tui_main(help_wait=CONFIG.tui_help_showtime)
 
 
-def process(args: "argparse.Namespace", unknown: list):
+def process(args: "argparse.Namespace", unknown: List):
     try:
         _process(args, unknown)
     except (KeyboardInterrupt, EOFError):
@@ -504,7 +504,7 @@ def process(args: "argparse.Namespace", unknown: list):
 # main entry.
 ##############
 @time_it
-def main(custom_commands: Optional[list] = None):
+def main(custom_commands: Optional[List] = None):
     parser = Parser(argparse_dict)
 
     # Parse custom comand or parse input command.

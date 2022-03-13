@@ -1,9 +1,8 @@
 # -*- coding:utf-8 -*-
 
-import os
-import re
+from typing import Dict, Optional
+import os, re
 import logging
-from typing import Optional
 
 
 Log = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ class ShellCompletion(object):
     def __init__(
         self,
         prog_name: str = None,
-        complete_vars: dict = None,
+        complete_vars: Dict = None,
         script_dir: str = None,
         script_name: Optional[str] = None,
         inject_path: Optional[str] = None,
@@ -75,7 +74,7 @@ class ShellCompletion(object):
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
-    def _parse(self, args: dict):
+    def _parse(self, args: Dict):
         _arguments = []
         _positions = []
         _sub_opts = {}
@@ -125,13 +124,11 @@ class ShellCompletion(object):
         """
 
         complete_content = self.generate()
-        script_src = self._template_source % {
+        return self._template_source % {
             "func_name": self.func_name,
             "prop": self.prog_name,
             "complete_vars": complete_content,
         }
-
-        return script_src
 
     def write_completion(self, complete_src: str) -> bool:
         """Save completion to config path.
@@ -172,13 +169,14 @@ class ShellCompletion(object):
             with open(self.inject_path, "r") as f:
                 shell_conf = f.read()
         except Exception as e:
-            raise ShellCompletionError("Read shell config error: {0}".format(e))
+            raise ShellCompletionError(
+                "Read shell config error: {0}".format(e)
+            ) from None
         else:
             _re = re.compile(r"{}[^\s]*".format(full_script_path))
             files = _re.findall(shell_conf)
 
-        injected = True if files else False
-
+        injected = bool(files)
         if injected:
             return False
 
@@ -187,6 +185,6 @@ class ShellCompletion(object):
             with open(self.inject_path, "a") as f:
                 f.write("source %s" % (full_script_path))
         except Exception as e:
-            raise ShellCompletionError(f"Inject error: {str(e)}")
+            raise ShellCompletionError(f"Inject error: {str(e)}") from None
 
         return True

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Iterable, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional
 
 from .str_utils import cell_len, set_cell_size
 from .style import Style, Fx
@@ -50,7 +50,7 @@ class Segment:
         style: Optional[str] = None,
         pad: bool = True,
         include_new_lines: bool = True,
-    ) -> Iterable[list["Segment"]]:
+    ) -> Iterable[List["Segment"]]:
         """Split segments in to lines, and crop lines greater than a given length.
 
         Args:
@@ -63,7 +63,7 @@ class Segment:
         Returns:
             Iterable[List[Segment]]: An iterable of lines of segments.
         """
-        line: list[Segment] = []
+        line: List[Segment] = []
         append = line.append
 
         adjust_line_length = cls.adjust_line_length
@@ -92,11 +92,11 @@ class Segment:
     @classmethod
     def adjust_line_length(
         cls,
-        line: list["Segment"],
+        line: List["Segment"],
         length: int,
         style: Optional[str] = None,
         pad: bool = True,
-    ) -> list["Segment"]:
+    ) -> List["Segment"]:
         """Adjust a line to a given width (cropping or padding as required).
 
         Args:
@@ -109,7 +109,7 @@ class Segment:
             List[Segment]: A line of segments with the desired length.
         """
         line_length = sum(segment.cell_len for segment in line)
-        new_line: list[Segment]
+        new_line: List[Segment]
 
         if line_length < length:
             if pad:
@@ -121,14 +121,15 @@ class Segment:
             append = new_line.append
             line_length = 0
             for segment in line:
-                segment_length = segment.cell_length
+                segment_length = segment.cell_len
                 if line_length + segment_length < length:
                     append(segment)
                     line_length += segment_length
                 else:
-                    text, segment_style, _ = segment
+                    # text, segment_style, _ = segment
+                    text = segment.text
                     text = set_cell_size(text, length - line_length)
-                    append(cls(text, segment_style))
+                    append(cls(text, segment.style))
                     break
         else:
             new_line = line[:]

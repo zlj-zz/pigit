@@ -1,4 +1,4 @@
-from typing import Iterable, Literal
+from typing import Iterable, List, Literal
 
 from ._loop import loop_last
 
@@ -74,7 +74,7 @@ class Box:
             str: A string of box characters.
         """
 
-        parts: list[str] = []
+        parts: List[str] = []
         append = parts.append
         append(self.top_left)
         for last, width in loop_last(widths):
@@ -121,7 +121,7 @@ class Box:
         else:
             raise ValueError("level must be 'head', 'row' or 'foot'")
 
-        parts: list[str] = []
+        parts: List[str] = []
         append = parts.append
         if edge:
             append(left)
@@ -143,7 +143,7 @@ class Box:
             str: A string of box characters.
         """
 
-        parts: list[str] = []
+        parts: List[str] = []
         append = parts.append
         append(self.bottom_left)
         for last, width in loop_last(widths):

@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Optional
+from typing import List, Optional, Tuple
 import os, re, textwrap
 
 from .common import exec_cmd
@@ -21,7 +21,7 @@ def get_git_version() -> str:
 
 def get_repo_info(
     given_path: Optional[str] = None, exclude_submodule: bool = False
-) -> tuple[str, str]:
+) -> Tuple[str, str]:
     """
     Get the current git repository path. If not, the path is empty.
     Get the local git config path. If not, the path is empty.
@@ -59,7 +59,7 @@ def get_repo_info(
 
 
 def get_repo_desc(
-    include_part: Optional[list] = None, path: Optional[str] = None, color: bool = True
+    include_part: Optional[List] = None, path: Optional[str] = None, color: bool = True
 ) -> str:
     """Return a string of repo various information.
 
@@ -174,7 +174,7 @@ def get_first_pushed_commit(branch_name: str):
 ###############
 # Special info
 ###############
-def load_branches() -> list[Branch]:
+def load_branches() -> List[Branch]:
     command = 'git branch --sort=-committerdate --format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" '
     err, resp = exec_cmd(command)
     resp = resp.strip()
@@ -209,7 +209,7 @@ def load_branches() -> list[Branch]:
     return branchs
 
 
-def load_log(branch_name: str, limit: bool = False, filter_path: str = "") -> tuple:
+def load_log(branch_name: str, limit: bool = False, filter_path: str = "") -> Tuple:
     limit_flag = "-300" if limit else ""
     filter_flag = f"--follow -- {filter_path}" if filter_path else ""
     command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
@@ -217,7 +217,7 @@ def load_log(branch_name: str, limit: bool = False, filter_path: str = "") -> tu
     return err, resp.strip()
 
 
-def load_status(max_width: int, ident: int = 2, plain: bool = False) -> list[File]:
+def load_status(max_width: int, ident: int = 2, plain: bool = False) -> List[File]:
     """Get the file tree status of GIT for processing and encapsulation.
     Args:
         max_width (int): The max length of display string.
@@ -311,7 +311,7 @@ def load_file_diff(
 
 def load_commits(
     branch_name: str, limit: bool = True, filter_path: str = ""
-) -> list[Commit]:
+) -> List[Commit]:
     """Get the all commit of a given branch.
     Args:
         branch_name (str): want branch name.
@@ -324,7 +324,7 @@ def load_commits(
     first_pushed_commit = resp.strip()
 
     passed_first_pushed_commit = not first_pushed_commit
-    commits: list[Commit] = []
+    commits: List[Commit] = []
 
     # Generate git command.
     limit_flag = "-300" if limit else ""

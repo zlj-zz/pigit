@@ -1,6 +1,9 @@
+from typing import List
+
+
 def ratio_reduce(
-    total: int, ratios: list[int], maximums: list[int], values: list[int]
-) -> list[int]:
+    total: int, ratios: List[int], maximums: List[int], values: List[int]
+) -> List[int]:
     """Divide an integer total in to parts based on ratios.
 
     Args:
@@ -17,7 +20,7 @@ def ratio_reduce(
     if not total_ratio:
         return values[:]
     total_remaining = total
-    result: list[int] = []
+    result: List[int] = []
     append = result.append
     for ratio, maximum, value in zip(ratios, maximums, values):
         if ratio and total_ratio > 0:

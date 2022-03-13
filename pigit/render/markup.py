@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Union
 
 from .emoji import Emoji
 from .style import _STYLE_RE, Style, Fx
@@ -25,7 +25,7 @@ def render_markup(markup: str, style: Union[str, Style] = "", emoji: bool = True
     if emoji:
         markup = Emoji.render_emoji(markup)
 
-    renderables: list[Segment] = []
+    renderables: List[Segment] = []
     for text, fx, color, bg_color in _parse(markup):
         sgr = []
         if fx:

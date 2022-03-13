@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -26,7 +26,7 @@ class Column(object):
 
     no_wrap: bool = False
 
-    _cells: list = field(default_factory=list)
+    _cells: List = field(default_factory=list)
 
 
 @dataclass
@@ -50,8 +50,8 @@ class Table:
         caption_style: Optional[str] = None,
         border_style: Optional[str] = None,
     ) -> None:
-        self._columns: list[Column] = []
-        self._rows: list[Row] = []
+        self._columns: List[Column] = []
+        self._rows: List[Row] = []
 
         self._title = title
         self._caption = caption
@@ -146,7 +146,7 @@ class Table:
 
         return max(cell.cell_len_without_tag for cell in cells)
 
-    def _collapse_widths(self, widths: list[int], wrapable: list[bool], max_width: int):
+    def _collapse_widths(self, widths: List[int], wrapable: List[bool], max_width: int):
         """Reduce widths so that the total is under max_width.
 
         Args:
@@ -207,7 +207,7 @@ class Table:
 
         return widths
 
-    def _render(self, console: "Console", widths: list[int]):
+    def _render(self, console: "Console", widths: List[int]):
 
         border_style = console.get_style(self.border_style or "")
         _columns_cells = [self._get_cells(console, column) for column in self._columns]
@@ -261,7 +261,7 @@ class Table:
             # print(row_cell)
 
             max_height = 1
-            cells: list = []
+            cells: List = []
             if header_row or footer_row:
                 row_style = Style.null()
             else:

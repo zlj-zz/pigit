@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from typing import Dict, List
 import os
 import textwrap
 
@@ -78,7 +79,7 @@ class ZshCompletion(ShellCompletion):
         return res
 
     def _process_sub_commands(
-        self, _sub_opts: dict, _sub_opt_comps: list, relationship: list, idx: int = 1
+        self, _sub_opts: Dict, _sub_opt_comps: List, relationship: List, idx: int = 1
     ):
         relation_str = ""
 
@@ -121,7 +122,7 @@ class ZshCompletion(ShellCompletion):
 
     def args2complete(self, d):
         prog_handle: str = d["prog"]
-        args: dict = d["args"]
+        args: Dict = d["args"]
 
         _arguments, _positions, _sub_opts = self._parse(args)
 

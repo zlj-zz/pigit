@@ -1,9 +1,8 @@
 # -*- coding:utf-8 -*-
 
-import os
-import re
+from typing import Dict, Optional
+import os, re
 import logging
-from typing import Optional
 from urllib.request import urlopen
 
 from .common import confirm, traceback_info
@@ -24,7 +23,7 @@ class GitignoreGenetor(object):
     """
 
     # Supported type. https://github.com/github/gitignore
-    Supported_Types: dict[str, str] = {
+    Supported_Types: Dict[str, str] = {
         "android": "Android",
         "c++": "C++",
         "cpp": "C++",
