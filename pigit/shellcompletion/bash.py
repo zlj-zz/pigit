@@ -11,7 +11,10 @@ class BashCompletion(ShellCompletion):
 
     _SHELL: str = "bash"
 
-    _INJECT_PATH: str = os.environ["HOME"] + "/.bashrc"
+    try:
+        _INJECT_PATH: str = os.environ["HOME"] + "/.bashrc"
+    except:
+        _INJECT_PATH: str = ""
 
     _template_source: str = textwrap.dedent(
         """\

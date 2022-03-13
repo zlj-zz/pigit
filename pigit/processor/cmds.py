@@ -499,11 +499,13 @@ Git_Cmds = {
     "sd": {
         "belong": CommandType.Stash,
         "command": "git stash show",
+        "help": "display stash list.",
         "has_arguments": True,
     },
     "sD": {
         "belong": CommandType.Stash,
         "command": "git stash show --patch --stat",
+        "help": "display stash list with detail.",
         "has_arguments": True,
     },
     # Tag (t)
@@ -600,13 +602,13 @@ Git_Cmds = {
         "has_arguments": True,
     },
     # Submodule
-    "sc": {
+    "Sc": {
         "belong": CommandType.Submodule,
         "command": "git clone --recursive",
         "help": "Clone a repository as a submodule.",
         "has_arguments": True,
     },
-    "si": {
+    "Si": {
         "belong": CommandType.Submodule,
         "command": "git submodule update --init --recursive",
         "help": "Pull the submodule for the first time.",
@@ -616,18 +618,18 @@ Git_Cmds = {
     # For above git 1.7.3
     #   `git submodule update --recursive`
     #   `git pull --reccurse-submodules`
-    "su": {
+    "Su": {
         "belong": CommandType.Submodule,
         "command": "git submodule update --recursive --remote",
         "help": "Update git submodule.",
     },
-    "sd": {
+    "Sd": {
         "belong": CommandType.Submodule,
         "command": "git rm --cached",
         "help": "Remove submodule from repository.",
         "has_arguments": True,
     },
-    "sD": {
+    "SD": {
         "belong": CommandType.Submodule,
         "command": "git submodule deinit",
         "help": "Inverse initialization submodule, clear the dir.",

@@ -327,7 +327,7 @@ class Color(object):
             ct = self.dec[0] + self.dec[1] + self.dec[2]
             if ct > 255 * 3 or ct < 0:
                 raise ValueError("RGB values out of range: {}".format(color))
-        except Exception as e:
+        except Exception:
             self.escape = ""
             return
 
@@ -364,7 +364,6 @@ class Color(object):
 
     @staticmethod
     def truecolor_to_256(rgb, depth="fg") -> str:
-        out = ""
         pre = "\033[{};5;".format("38" if depth == "fg" else "48")
 
         greyscale = (rgb[0] // 11, rgb[1] // 11, rgb[2] // 11)

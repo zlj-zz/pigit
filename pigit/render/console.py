@@ -1,4 +1,5 @@
 from typing import Any, Iterable, Optional, Union
+import sys
 from itertools import islice
 from inspect import isclass
 from shutil import get_terminal_size
@@ -30,8 +31,9 @@ class Console:
     def hight(self):
         return self.size.lines
 
-    def _collect(self, objs):
-        pass
+    @property
+    def encoding(self):
+        return sys.getdefaultencoding().lower()
 
     def get_style(
         self, name: Union[str, Style], *, default: Optional[Union[str, Style]] = None

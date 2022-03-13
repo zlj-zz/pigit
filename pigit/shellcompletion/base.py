@@ -23,9 +23,9 @@ class ShellCompletion(object):
 
     def __init__(
         self,
-        prog_name: str = None,
+        prog_name: Optional[str] = None,
         complete_vars: Dict = None,
-        script_dir: str = None,
+        script_dir: Optional[str] = None,
         script_name: Optional[str] = None,
         inject_path: Optional[str] = None,
     ) -> None:
@@ -51,15 +51,14 @@ class ShellCompletion(object):
             raise TypeError("complete_var muse be dict.")
         self.complete_vars = complete_vars
 
-        if prog_name:
+        if prog_name is not None:
             self.prog_name = prog_name
+        elif inner_prog_name := complete_vars.get("prog"):
+            self.prog_name = inner_prog_name
         else:
-            if prog_name := complete_vars.get("prog"):
-                self.prog_name = prog_name
-            else:
-                raise ValueError("Can't get prog name anywhere.")
+            raise ShellCompletionError("Can't get prog name anywhere.") from None
 
-        self.script_dir = script_dir
+        self.script_dir = script_dir or "."
         self.script_name = script_name or "{0}_{1}_comp".format(
             self.prog_name, self._SHELL
         )

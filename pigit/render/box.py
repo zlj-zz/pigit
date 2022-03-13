@@ -1,4 +1,5 @@
 from typing import Iterable, List, Literal
+import platform
 
 from ._loop import loop_last
 
@@ -63,6 +64,15 @@ class Box:
 
     def __str__(self) -> str:
         return self._box
+
+    def substitute(self, encoding: str) -> "Box":
+        box = self
+        if platform.system == "Windows":
+            box = WINDOWS_SUBSTITUTIONS.get(box, box)
+        if not encoding.startswith("utf"):
+            box = ASCII
+
+        return box
 
     def get_top(self, widths: Iterable[int]) -> str:
         """Get the top of a simple box.
@@ -397,3 +407,13 @@ DOUBLE_EDGE: Box = Box(
 ╚═╧╝.
 """
 )
+
+# Map Boxes that don't render with raster fonts on to equivalent that do
+WINDOWS_SUBSTITUTIONS = {
+    ROUNDED: SQUARE,
+    MINIMAL_HEAVY_HEAD: MINIMAL,
+    SIMPLE_HEAVY: SIMPLE,
+    HEAVY: SQUARE,
+    HEAVY_EDGE: SQUARE,
+    HEAVY_HEAD: SQUARE,
+}

@@ -11,7 +11,10 @@ class FishCompletion(ShellCompletion):
 
     _SHELL: str = "fish"
 
-    _INJECT_PATH: str = os.environ["HOME"] + "/.config/fish/config.fish"
+    try:
+        _INJECT_PATH: str = os.environ["HOME"] + "/.config/fish/config.fish"
+    except:
+        _INJECT_PATH: str = ""
 
     _template_source: str = textwrap.dedent(
         """\

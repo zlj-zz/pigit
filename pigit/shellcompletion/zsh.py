@@ -56,7 +56,10 @@ class ZshCompletion(ShellCompletion):
 
     _SHELL: str = "zsh"
 
-    _INJECT_PATH: str = os.environ["HOME"] + "/.zshrc"
+    try:
+        _INJECT_PATH: str = os.environ["HOME"] + "/.zshrc"
+    except:
+        _INJECT_PATH: str = ""
 
     _template_source: str = _TEMPLATE_ZSH
 

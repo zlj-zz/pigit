@@ -1,14 +1,13 @@
 # -*- coding:utf-8 -*-
 
 from typing import TYPE_CHECKING, List, Optional
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from . import box
 from .style import Style
 from .segment import Segment
 from .ratio import ratio_reduce
-from ._loop import loop_first_last, loop_last, loop_first
+from ._loop import loop_first_last, loop_last
 
 if TYPE_CHECKING:
     from .console import Console
@@ -219,7 +218,7 @@ class Table:
         show_lines = self._show_lines
         show_header = self.show_header
 
-        _box = self._box
+        _box = self._box.substitute(console.encoding) if self._box else None
         new_line = Segment.line()
 
         if _box:

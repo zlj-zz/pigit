@@ -53,7 +53,7 @@ def run_cmd(*args, cwd: Optional[str] = None) -> bool:
         # ? In python2, `subprocess` not support `with` sentence.
         proc = subprocess.Popen(" ".join(args), shell=True, cwd=cwd)
         proc.wait()
-    except Exception as e:
+    except Exception:
         Log.error(traceback_info())
         return False
     else:

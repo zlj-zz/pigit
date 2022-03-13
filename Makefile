@@ -16,7 +16,7 @@ run:
 
 lint:
 	@if [ ! -f flake8 ]; then $(PY) -m pip install flake8; fi
-	@flake8 -v --ignore=W503,F403,F405,E501,E402,E203,E741 --show-source
+	@flake8 -v --ignore=W503,F403,F405,E501,E402,E203,E741,E401 --show-source ./pigit
 	@echo
 
 clean:

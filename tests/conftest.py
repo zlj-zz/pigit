@@ -1,5 +1,5 @@
-import os
-import sys
+# -*- coding:utf-8 -*-
+import os, sys
 
 # Add source environment.
 _PIGIT_PATH = os.path.dirname(os.path.dirname(__file__))

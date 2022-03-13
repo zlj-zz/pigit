@@ -1,7 +1,7 @@
 from typing import List, Union
 
 from .emoji import Emoji
-from .style import _STYLE_RE, Style, Fx
+from .style import _STYLE_RE, Style
 from .segment import Segment
 
 
