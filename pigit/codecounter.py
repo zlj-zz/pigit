@@ -89,7 +89,7 @@ class CodeCounter(object):
         use_ignore: bool = True,
         use_icon: bool = True,
         result_saved_path: str = "",
-        whether_save: bool = False,
+        whether_save: bool = True,
         color: bool = True,
         show_invalid: bool = False,
     ) -> None:
@@ -509,7 +509,7 @@ class CodeCounter(object):
         format_type: Optional[CounterFormatType] = None,
         use_ignore: Optional[bool] = None,
         use_icon: Optional[bool] = None,
-        result_saved_path: Optional[str] = "",
+        result_saved_path: Optional[str] = None,
         whether_save: Optional[bool] = None,
         color: Optional[bool] = None,
         show_invalid: Optional[bool] = None,
