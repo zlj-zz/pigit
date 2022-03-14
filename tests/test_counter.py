@@ -30,20 +30,3 @@ def test_pure_walk(path: Optional[str]):
     cc.run()
     cc.run(format_type="simple")
     print(f"Result spend time: {time.time() - start_t}")
-
-
-"""
-[just match root]
-13.6025s
-
-[record lines count]
-use thread: 65.19s
-no thread:  77.51s
-
-[print content]
-use thread: 570.698s
-no thread:  569.579s
-
-877.2
-954.35
-"""

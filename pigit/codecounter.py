@@ -343,14 +343,6 @@ class CodeCounter(object):
 
         return result, invalid_list, data_count[0]
 
-    def _get_ready(self) -> Tuple[int, str]:
-        width, _ = get_terminal_size()
-        if width > 55:
-            _msg = "\rValid files found: {:,}, Invalid files found: {:,}"
-        else:
-            _msg = "\r:: [{:,} | {:,}]"
-        return width, _msg
-
     def _get_saved_path(self, root_path: str) -> str:
         file_name: str = (
             root_path.replace("/", "_").replace("\\", "_").replace(".", "_")

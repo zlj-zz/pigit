@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-import os, sys
+import os, platform
 
 __project__ = "pigit"
 __version__ = "1.5.1.dev"
@@ -21,7 +21,7 @@ __copyright__ = "Copyright (c) 2021-2022 Zachary"
 # For windows.
 USER_HOME: str = ""
 PIGIT_HOME: str = ""
-IS_WIN: bool = sys.platform.lower().startswith("win")
+IS_WIN: bool = platform.system() == "Windows"
 
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
@@ -31,9 +31,7 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
-IS_FIRST_RUN: bool = not os.path.isdir(PIGIT_HOME)
-
-LOG_FILE_PATH: str = PIGIT_HOME + "/log/{0}.log".format(__project__)
+LOG_FILE_PATH: str = f"{PIGIT_HOME}/log/{__project__}.log"
 
 CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
 
@@ -43,5 +41,6 @@ EXTRA_CMD_FILE_PATH: str = f"{PIGIT_HOME}/extra_cmds.py"
 
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 
+IS_FIRST_RUN: bool = not os.path.isdir(PIGIT_HOME)
 if IS_FIRST_RUN:
     os.makedirs(PIGIT_HOME, exist_ok=True)

@@ -7,13 +7,12 @@ from argparse import ArgumentParser, Namespace
 class Parser(object):
     def __init__(self, args_dict: Dict) -> None:
         self._args_dict = deepcopy(args_dict)
+        self._parse_handle = None
 
-        self._parse_dict()
-
-    def _parse_dict(self):
+    def _generate_handle_from_args(self) -> None:
         """Parse `self._args_dict` to genrate a `ArgumentParser`."""
 
-        def _parse_args(handle: ArgumentParser, args: dict):
+        def _parse_args(handle: ArgumentParser, args: Dict) -> None:
             sub_parsers = None
 
             for name, prop in args.items():
@@ -57,7 +56,7 @@ class Parser(object):
         args: dict = d.get("args", {})
 
         # Create root parser.
-        p = self._parser = ArgumentParser(
+        p = self._parse_handle = ArgumentParser(
             prog=d.get("prog", None),
             prefix_chars=d.get("prefix_chars", None),
             description=d.get("description", None),
@@ -66,80 +65,22 @@ class Parser(object):
 
         _parse_args(p, args)
 
+    @property
+    def parse_handle(self):
+        """Return a handle, create it when not exist."""
+        if self._parse_handle is None:
+            self._generate_handle_from_args()
+
+        return self._parse_handle
+
     def parse(self, args: Union[List, str, None] = None) -> Tuple[Namespace, List]:
-        if not args:
-            known_args, unknown = self._parser.parse_known_args()
+        if args is None:
+            known_args, unknown = self.parse_handle.parse_known_args()
         elif isinstance(args, list):
-            known_args, unknown = self._parser.parse_known_args(args)
+            known_args, unknown = self.parse_handle.parse_known_args(args)
         elif isinstance(args, str):
-            known_args, unknown = self._parser.parse_known_args(args.split())
+            known_args, unknown = self.parse_handle.parse_known_args(args.split())
         else:
             raise AttributeError("custom_commands need be list, str or empty.")
 
         return known_args, unknown
-
-
-if __name__ == "__main__":
-    argparse_dict = {
-        "prog": "pigit",
-        "prefix_chars": "-",
-        "description": "Pigit TUI is called automatically if no parameters are followed.",
-        "args": {
-            "-v --version": {
-                "action": "version",
-                "help": "Show version and exit.",
-                "version": "Version: ",
-            },
-            "-d --debug": {
-                "action": "store_true",
-                "help": "Current runtime in debug mode.",
-            },
-            "--out-log": {"action": "store_true", "help": "Print log to console."},
-            "-groups": {
-                "tools": {
-                    "title": "tools arguments",
-                    "description": "Auxiliary type commands.",
-                    "args": {
-                        "-c --count": {
-                            "nargs": "?",
-                            "const": ".",
-                            "type": str,
-                            "metavar": "PATH",
-                            "help": "Count the number of codes and output them in tabular form."
-                            "A given path can be accepted, and the default is the current directory.",
-                        },
-                        "--create-config": {
-                            "action": "store_true",
-                            "help": "Create a pre-configured file of PIGIT."
-                            "(If a profile exists, the values available in it are used)",
-                        },
-                    },
-                }
-            },
-            "cmd": {
-                "help": "git short command.",
-                "description": "If you want to use some original git commands, please use -- to indicate.",
-                "args": {
-                    "command": {
-                        "nargs": "?",
-                        "type": str,
-                        "default": None,
-                        "help": "Short git command or other.",
-                    },
-                    "args": {
-                        "nargs": "*",
-                        "type": str,
-                        "help": "Command parameter list.",
-                    },
-                    "-t --types": {
-                        "action": "store_true",
-                        "help": "List all command types and exit.",
-                    },
-                    "set_defaults": {"func": range},
-                },
-            },
-        },
-    }
-    parser = Parser(argparse_dict)
-    parser._parser.print_help()
-    print(parser.parse())
