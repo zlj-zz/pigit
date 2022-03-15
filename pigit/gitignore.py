@@ -11,49 +11,47 @@ from .render import Fx, Emoji
 Log = logging.getLogger(__name__)
 
 
+# Supported type. https://github.com/github/gitignore
+SUPPORTED_GITIGNORE_TYPES: Dict[str, str] = {
+    "android": "Android",
+    "c++": "C++",
+    "cpp": "C++",
+    "c": "C",
+    "dart": "Dart",
+    "elisp": "Elisp",
+    "gitbook": "GitBook",
+    "go": "Go",
+    "java": "Java",
+    "kotlin": "Java",
+    "lua": "Lua",
+    "maven": "Maven",
+    "node": "Node",
+    "python": "Python",
+    "qt": "Qt",
+    "r": "R",
+    "ros": "ROS",
+    "ruby": "Ruby",
+    "rust": "Rust",
+    "sass": "Sass",
+    "swift": "Swift",
+    "unity": "Unity",
+}
+
+
 class GitignoreGenetor(object):
     """Generate gitignore template.
-
-    Attributes:
-        Supported_Types (dict): supported type.
 
     Raises:
         SystemExit: Can't get template.
         SystemExit: No name.
     """
 
-    # Supported type. https://github.com/github/gitignore
-    Supported_Types: Dict[str, str] = {
-        "android": "Android",
-        "c++": "C++",
-        "cpp": "C++",
-        "c": "C",
-        "dart": "Dart",
-        "elisp": "Elisp",
-        "gitbook": "GitBook",
-        "go": "Go",
-        "java": "Java",
-        "kotlin": "Java",
-        "lua": "Lua",
-        "maven": "Maven",
-        "node": "Node",
-        "python": "Python",
-        "qt": "Qt",
-        "r": "R",
-        "ros": "ROS",
-        "ruby": "Ruby",
-        "rust": "Rust",
-        "sass": "Sass",
-        "swift": "Swift",
-        "unity": "Unity",
-    }
-
     def __init__(self, timeout: int = 60) -> None:
         super(GitignoreGenetor, self).__init__()
 
         self.timeout = timeout
 
-    def parse_gitignore_page(self, content: str) -> str:
+    def parse_gitignore_page(self, html: str) -> str:
         """Parse html for getting gitignore content.
 
         Args:
@@ -64,7 +62,7 @@ class GitignoreGenetor(object):
         """
 
         # findall table tag, should only one.
-        text = re.findall(r"(<table.*?>.*?<\/table>)", content, re.S)
+        text = re.findall(r"(<table.*?>.*?<\/table>)", html, re.S)
         if not text:
             return ""
 
@@ -94,59 +92,79 @@ class GitignoreGenetor(object):
         else:
             return handle.read().decode("utf-8")
 
-    def launch(self, ignore_type: str, dir_path: str) -> None:
+    def out_ignore_content(self, content: str) -> None:
+        print("You can copy it with the following:")
+        print("#" * 80)
+        print(content)
+        print("#" * 80)
+
+    def launch(
+        self,
+        ignore_type: str,
+        dir_path: str,
+        writting: bool = True,
+        file_name: str = ".gitignore",
+    ) -> bool:
         """Try to create gitignore template file.
 
         Args:
-            genre (str): template type, like: 'python'.
-            dir_path (str): .gitignore file save path.
+            ignore_type (str): the type that want to generate.
+            dir_path (str): the path for saving.
+            writing (bool, optional): whether write to a file. Defaults to True.
+            file_name (str, optional): the name of generate file. Defaults to ".gitignore".
+
+        Returns:
+            bool: whether run it successful.
         """
 
+        name = SUPPORTED_GITIGNORE_TYPES.get(ignore_type.lower(), None)
+        ignore_path = os.path.join(dir_path, file_name)
+
         # Process and check the type, and exit in case of any accident.
-        name = self.Supported_Types.get(ignore_type.lower(), None)
         if name is None:
             print("Unsupported type: %s" % ignore_type)
             print(
                 "Supported type: [{}]. Case insensitive.".format(
-                    " ".join(self.Supported_Types.keys())
+                    " ".join(SUPPORTED_GITIGNORE_TYPES)
                 )
             )
-            return None
-
-        ignore_path = dir_path + "/.gitignore"
-        whether_write = True
+            return False
 
         # Adjust `.gitignore` whether exist.
-        if os.path.exists(ignore_path):
-            whether_write = confirm(
-                "`.gitignore` existed, overwrite this file? (default: y) [y/n]:"
+        if writting and os.path.exists(ignore_path):
+            re_writing = confirm(
+                f"The `{file_name}` existed, overwrite this file? (default: y) [y/n]:"
             )
+            if not re_writing:
+                print("Cancel generate gitignore file.")
+                return False
 
-        if whether_write:
-            base_url = "https://github.com/github/gitignore/blob/main/%s.gitignore"
-            target_url = base_url % name
+        base_url = "https://github.com/github/gitignore/blob/main/%s.gitignore"
+        target_url = base_url % name
 
-            print(
-                "Will get ignore file content from %s"
-                % (Fx.italic + Fx.underline + target_url + Fx.reset)
-            )
-            content = self.get_html_from_url(target_url)
-            if not content:
-                print("Failed to get content and will exit.")
-                return None
+        print(
+            "Will get ignore file content from %s"
+            % (Fx.italic + Fx.underline + target_url + Fx.reset)
+        )
+        content = self.get_html_from_url(target_url)
+        if not content:
+            print("Failed to get content and will exit.")
+            return False
 
-            ignore_content = self.parse_gitignore_page(content)
+        ignore_content = self.parse_gitignore_page(content)
 
+        if writting:
             print("Got content, trying to write ... ")
             try:
                 with open(ignore_path, "w") as fd:
                     fd.write(ignore_content)
-            except Exception as e:
+            except Exception:
                 Log.error(traceback_info())
-                print(
-                    "Write gitignore file failed. You can copy it with the following:"
-                )
-                print("#" * 60)
-                print(ignore_content)
+                self.out_ignore_content(ignore_content)
+
             else:
                 print("Write gitignore file successful. {0}".format(Emoji.smiler))
+        else:
+            self.out_ignore_content(ignore_content)
+
+        return True

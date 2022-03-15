@@ -24,6 +24,20 @@ Docs Test
 
         # >>> garbled_code_analysis("\\346\\265\\213\\350\\257\\225\\344\\270\\255\\346\\226\\207\\345\\220\\215\\347\\247\\260")
         中文测试名称
+
+    Chop cell.
+        >>> chop_cells('12345678', 4)
+        ['1234', '5678']
+        >>> chop_cells('12345678', 10)
+        ['12345678']
+
+    Set cell size
+        >>> set_cell_size('123456', 4)
+        '1234'
+        >>> set_cell_size('123456', 6)
+        '123456'
+        >>> set_cell_size('123456', 8)
+        '123456  '
 """
 
 # from typing import Final # python3.8

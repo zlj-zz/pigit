@@ -50,7 +50,7 @@ from .repo_utils import (
     repo_options,
     process_repo_option,
 )
-from .gitignore import GitignoreGenetor
+from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
 from .info import introduce, GitConfig
 
@@ -286,7 +286,7 @@ argparse_dict = {
                         "metavar": "TYPE",
                         "dest": "ignore_type",
                         "help": "Create a demo .gitignore file. Need one argument, support: [%s]"
-                        % ", ".join(GitignoreGenetor.Supported_Types.keys()),
+                        % ", ".join(SUPPORTED_GITIGNORE_TYPES),
                     },
                     "--create-config": {
                         "action": "store_true",

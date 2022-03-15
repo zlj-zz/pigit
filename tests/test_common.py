@@ -4,14 +4,20 @@ import doctest
 from unittest.mock import patch
 
 import pigit.common.utils
-from pigit.common.utils import traceback_info, get_current_shell, confirm
+from pigit.common.utils import (
+    traceback_info,
+    get_current_shell,
+    confirm,
+    async_run_cmd,
+    exec_async_tasks,
+)
 
 
 def test_doctest():
     doctest.testmod(pigit.common.utils, verbose=True)
 
 
-def test():
+def test_traceback_info():
     try:
         _ = int("abcd")
     except Exception:
@@ -26,7 +32,7 @@ def test_1():
 
 
 @pytest.mark.parametrize(
-    ["input_value", "return_bool"],
+    ("input_value", "return_bool"),
     [
         ["", True],
         ["y", True],
@@ -39,3 +45,23 @@ def test_1():
 def test_confirm(mock_input, input_value: str, return_bool: bool):
     mock_input.return_value = input_value
     assert confirm("confirm:") == return_bool
+
+
+def test_async_func():
+    # TODO: the code is real running.
+    code = """\
+# -*- coding:utf-8 -*-
+
+if __name__ == '__main__':
+    import time
+
+    print({0})
+    time.sleep({0})
+    print({0})
+"""
+    tasks = [
+        async_run_cmd(*["python3", "-c", code.format(i)], msg=f"msg {i}.")
+        for i in range(10)
+    ]
+    error = exec_async_tasks(tasks)
+    print(error)

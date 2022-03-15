@@ -1,10 +1,15 @@
 # -*- coding:utf-8 -*-
+import doctest
 from typing import Optional
 import pytest
+import doctest
 from .utils import analyze_it
 
+from pigit.render.console import Console
 from pigit.render.style import Color, Style
 from pigit.render.markup import render_markup
+from pigit.render.new_table import Table
+import pigit.render.str_utils
 
 
 class TestColor:
@@ -123,3 +128,32 @@ class TestStyle:
     def test_style_render_markup(self, text: str):
         print("\n", text)
         render_markup(text)
+
+
+def test_table():
+    console = Console()
+    # print(Text("`1234`<yellow>"))
+    res_t = Table(
+        title="Search Result",
+        title_style="red",
+        # box=box.SIMPLE_HEAD,
+        caption="good table",
+        caption_style="purple dark",
+        border_style="red",
+        # show_lines=True
+        # show_header=False
+    )
+    res_t.add_column("Idx", style="green")
+    res_t.add_column("Fiction Name", style="yellow")
+    res_t.add_column("Last Update", style="cyan")
+    res_t.add_column("Other Info")
+
+    res_t.add_row("12", "34", "56", "1")
+    res_t.add_row("56", "`sun`<red> is so big.", "10.dark`00`", "1")
+    res_t.add_row("我最棒", "9", "25", "100")
+
+    console.echo(res_t, "`sun`<red> is so big.")
+
+
+def test_str_utils():
+    doctest.testmod(pigit.render.str_utils, verbose=True)
