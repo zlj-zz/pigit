@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
-from typing import List, Optional, Tuple, Union, Match
+from typing import List, Literal, Optional, Tuple, Union, Match
 import sys, re
 
-from .errors import StyleSyntaxError
+from .errors import ColorError, StyleSyntaxError
 
 
 COLOR_CODE = {
@@ -151,8 +151,11 @@ COLOR_CODE = {
     "black": "#000000",
 }
 
+ColorType = Union[str, List, Tuple]
+ColorDepthType = Literal["fg", "bg"]
+
 # color hexa string reg.
-_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}")
+_COLOR_RE = re.compile(r"^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{2})$")
 
 # If has special format string, will try to render the color and font style.
 # If cannot to render the string will keep it.
@@ -277,7 +280,7 @@ class Color(object):
     """
 
     hexa: str
-    dec: Tuple[int, int, int]
+    rgb: Tuple[int, int, int]
     red: int
     green: int
     blue: int
@@ -287,66 +290,37 @@ class Color(object):
 
     TRUE_COLOR = sys.version_info < (3, 0)
 
-    def __init__(self, color, depth="fg", default=False) -> None:
+    def __init__(
+        self,
+        color: Optional[ColorType] = None,
+        depth: ColorDepthType = "fg",
+        default: bool = False,
+    ) -> None:
         self.depth = depth
         self.default = default
-        try:
-            if not color:
-                self.dec = (-1, -1, -1)
-                self.hexa = ""
-                self.red = self.green = self.blue = -1
-                self.escape = "\033[49m" if depth == "bg" and default else ""
-                return
 
-            elif color.startswith("#"):
-                self.hexa = color
-                if len(self.hexa) == 3:
-                    self.hexa += self.hexa[1:3] + self.hexa[1:3]
-                    c = int(self.hexa[1:3], base=16)
-                    self.dec = (c, c, c)
-                elif len(self.hexa) == 7:
-                    self.dec = (
-                        int(self.hexa[1:3], base=16),
-                        int(self.hexa[3:5], base=16),
-                        int(self.hexa[5:7], base=16),
-                    )
-                else:
-                    raise ValueError(
-                        "Incorrectly formatted hexadecimal rgb string: {}".format(
-                            self.hexa
-                        )
-                    )
-
-            else:
-                c_t = tuple(map(int, color.split(" ")))
-                if len(c_t) == 3:
-                    self.dec = c_t  # type: ignore
-                else:
-                    raise ValueError('RGB dec should be "0-255 0-255 0-255"')
-
-            ct = self.dec[0] + self.dec[1] + self.dec[2]
-            if ct > 255 * 3 or ct < 0:
-                raise ValueError("RGB values out of range: {}".format(color))
-        except Exception:
-            self.escape = ""
+        if not color:
+            self.rgb = (-1, -1, -1)
+            self.hexa = ""
+            self.red = self.green = self.blue = -1
+            self.escape = "\033[49m" if depth == "bg" and default else ""
             return
 
-        if self.dec and not self.hexa:
-            self.hexa = "%s%s%s" % (
-                hex(self.dec[0]).lstrip("0x").zfill(2),
-                hex(self.dec[1]).lstrip("0x").zfill(2),
-                hex(self.dec[2]).lstrip("0x").zfill(2),
+        if not self.is_color(color):
+            raise ColorError("Not valid color.") from None
+
+        if isinstance(color, str):
+            self.rgb = rgb = self.generate_rgb(color)
+            self.hexa = color
+        else:  # list or tuple
+            self.rgb = rgb = color
+            self.hexa = "#%s%s%s" % (
+                hex(rgb[0]).lstrip("0x").zfill(2),
+                hex(rgb[1]).lstrip("0x").zfill(2),
+                hex(rgb[2]).lstrip("0x").zfill(2),
             )
 
-        if self.dec and self.hexa:
-            self.red, self.green, self.blue = self.dec
-            self.escape = "\033[%s;2;%sm" % (
-                38 if self.depth == "fg" else 48,
-                ";".join(str(c) for c in self.dec),
-            )
-
-        if Color.TRUE_COLOR:
-            self.escape = self.truecolor_to_256(rgb=self.dec, depth=self.depth)
+        self.escape = self.escape_color(r=rgb[0], g=rgb[1], b=rgb[2], depth=depth)
 
     def __str__(self):
         return self.escape
@@ -355,31 +329,51 @@ class Color(object):
         return repr(self.escape)
 
     def __iter__(self):
-        yield from self.dec
-
-    # def __call__(self, *args: str) -> str:
-    #     if len(args) < 1:
-    #         return ""
-    #     return f'{self.escape}{"".join(args)}{getattr(Term, self.depth)}'
+        yield from self.rgb
 
     @staticmethod
-    def truecolor_to_256(rgb, depth="fg") -> str:
-        pre = "\033[{};5;".format("38" if depth == "fg" else "48")
+    def generate_rgb(hexa: str) -> Tuple:
+        hexa_len = len(hexa)
+        try:
+            if hexa_len == 3:
+                c = int(hexa[1:], base=16)
+                rgb = (c, c, c)
+            elif hexa_len == 7:
+                rgb = (
+                    int(hexa[1:3], base=16),
+                    int(hexa[3:5], base=16),
+                    int(hexa[5:7], base=16),
+                )
+        except ValueError:
+            raise ColorError(
+                f"The hexa `{hexa}` of color can't to be parsing."
+            ) from None
+        else:
+            return rgb
+
+    @staticmethod
+    def truecolor_to_256(rgb: Tuple) -> int:
 
         greyscale = (rgb[0] // 11, rgb[1] // 11, rgb[2] // 11)
         if greyscale[0] == greyscale[1] == greyscale[2]:
-            return "{}{}m".format(pre, 232 + greyscale[0])
+            return 232 + greyscale[0]
         else:
-            return "{}{}m".format(
-                pre,
+            return (
                 round(rgb[0] / 51) * 36
                 + round(rgb[1] / 51) * 6
                 + round(rgb[2] / 51)
-                + 16,
+                + 16
             )
 
-    @staticmethod
-    def escape_color(hexa="", r=0, g=0, b=0, depth="fg") -> str:
+    @classmethod
+    def escape_color(
+        cls,
+        hexa: Optional[str] = None,
+        r: int = 0,
+        g: int = 0,
+        b: int = 0,
+        depth: ColorDepthType = "fg",
+    ) -> str:
         """Returns escape sequence to set color
 
         Args:
@@ -394,43 +388,12 @@ class Color(object):
         """
 
         dint = 38 if depth == "fg" else 48
-        color = ""
-        if hexa:
-            try:
-                if len(hexa) == 3:
-                    c = int(hexa[1:], base=16)
-                    if Color.TRUE_COLOR:
-                        color = "\033[{};2;{};{};{}m".format(dint, c, c, c)
-                    else:
-                        color = Color.truecolor_to_256(rgb=(c, c, c), depth=depth)
-                elif len(hexa) == 7:
-                    if Color.TRUE_COLOR:
-                        color = "\033[{};2;{};{};{}m".format(
-                            dint,
-                            int(hexa[1:3], base=16),
-                            int(hexa[3:5], base=16),
-                            int(hexa[5:7], base=16),
-                        )
-                    else:
-                        color = "{}".format(
-                            Color.truecolor_to_256(
-                                rgb=(
-                                    int(hexa[1:3], base=16),
-                                    int(hexa[3:5], base=16),
-                                    int(hexa[5:7], base=16),
-                                ),
-                                depth=depth,
-                            )
-                        )
-            except ValueError:
-                # errlog.exception(f'{e}')
-                pass
-        elif Color.TRUE_COLOR:
-            color = "\033[{};2;{};{};{}m".format(dint, r, g, b)
-        else:
-            color = Color.truecolor_to_256(rgb=(r, g, b), depth=depth)
+        rgb = cls.generate_rgb(hexa) if hexa else (r, g, b)
 
-        return color
+        if not Color.TRUE_COLOR:
+            return "\033[{};5;{}m".format(dint, Color.truecolor_to_256(rgb=rgb))
+
+        return "\033[{};2;{};{};{}m".format(dint, *rgb)
 
     @classmethod
     def fg(cls, *args) -> str:
@@ -447,7 +410,7 @@ class Color(object):
             return cls.escape_color(hexa=args[0], depth="bg")
 
     @classmethod
-    def by_name(cls, name: str, depth: str = "fg"):
+    def by_name(cls, name: str, depth: ColorDepthType = "fg"):
         """Get color ascii code by support color name."""
 
         color_hexa = COLOR_CODE.get(name, "")
@@ -464,32 +427,23 @@ class Color(object):
 
     @staticmethod
     def is_color(code: Union[str, List, Tuple]) -> bool:
-        """Adjust whether is color. Like: '#FF0000', [255, 0, 0], (0, 255, 0)
-
-        Test `is_color()` whether can right adjust.
-
-            >>> Color.is_color('#FF0000')
-            True
-            >>> Color.is_color('sky_blue')
-            True
-            >>> Color.is_color([255, 0, 0])
-            True
-            >>> Color.is_color((0, 256, 0))
-            False
-            >>> Color.is_color(None)
-            False
-            >>> Color.is_color(12345)
-            False
-
+        """Return True if code is color else False.
+        Like: '#FF0000', '#FF', 'red', [255, 0, 0], (0, 255, 0)
         """
 
         if type(code) == str:
             return (
                 _COLOR_RE.match(str(code)) is not None
-                or COLOR_CODE.get(code, None) is not None
+                or COLOR_CODE.get(code) is not None
             )
         elif isinstance(code, list) or isinstance(code, tuple):
-            return len(code) == 3 and not bool([i for i in code if i < 0 or i > 255])
+            if len(code) != 3:
+                return False
+            for c in code:
+                if not (0 <= c <= 255):
+                    return False
+            else:
+                return True
         else:
             return False
 
@@ -576,10 +530,16 @@ class Style(object):
 
             self._ansi = f"{Fx.start}{';'.join(sgr)}{Fx.end}"
             if self.color:
-                self._ansi += Color.by_name(self.color) or Color.fg(self.color)
+                self._ansi += (
+                    Color.by_name(self.color)
+                    if not self.color.startswith("#")
+                    else Color.fg(self.color)
+                )
             if self.bg_color:
-                self._ansi += Color.by_name(self.bg_color, depth="bg") or Color.bg(
-                    self.bg_color
+                self._ansi += (
+                    Color.by_name(self.bg_color, depth="bg")
+                    if not self.bg_color.startswith("#")
+                    else Color.bg(self.bg_color)
                 )
 
         # print(repr(self._ansi))

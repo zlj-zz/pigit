@@ -4,6 +4,12 @@ class NotRenderableError(Exception):
     pass
 
 
+class ColorError(Exception):
+    """The error of ``Color`` class."""
+
+    pass
+
+
 class StyleSyntaxError(Exception):
     """Style was badly formatted."""
 

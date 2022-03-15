@@ -29,6 +29,7 @@ Docs Test
 # from typing import Final # python3.8
 
 from typing import List, Tuple
+from functools import lru_cache
 
 
 WIDTHS: List[Tuple[int, int]] = [
@@ -73,6 +74,7 @@ WIDTHS: List[Tuple[int, int]] = [
 ]
 
 
+@lru_cache(maxsize=1024)
 def get_width(r: int) -> int:
     """Gets the width occupied by characters on the command line."""
 
