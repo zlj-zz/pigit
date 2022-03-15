@@ -6,7 +6,7 @@ from typing import List
 from dataclasses import dataclass
 
 # flake8: noqa
-@dataclass(frozen=True)
+@dataclass
 class File:
     """Model class of git file."""
 
@@ -40,7 +40,7 @@ class File:
     has_inline_merged_conflicts: bool
 
 
-@dataclass(frozen=True)
+@dataclass
 class Commit:
     """Model class of a git commit."""
 
@@ -71,7 +71,7 @@ class Commit:
         return self.status == "pushed"
 
 
-@dataclass(frozen=True)
+@dataclass
 class Branch:
     """Model class of git branch."""
 

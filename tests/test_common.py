@@ -3,8 +3,6 @@ import pytest
 import doctest
 from unittest.mock import patch
 
-from .utils import analyze_it
-
 import pigit.common.utils
 from pigit.common.utils import traceback_info, get_current_shell, confirm
 
@@ -15,8 +13,8 @@ def test_doctest():
 
 def test():
     try:
-        a = int("abcd")
-    except Exception as e:
+        _ = int("abcd")
+    except Exception:
         print(traceback_info("here is extra msg."))
 
     # when no traceback

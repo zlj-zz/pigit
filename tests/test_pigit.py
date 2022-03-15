@@ -14,6 +14,9 @@ from pigit import main
         "--count",  # code counter
         "--create-config",
         "cmd -h",
+        "cmd -s",
+        "cmd -t",
+        "cmd -p branch",
         "cmd ws",
         "cmd -t",
         "repo ll",

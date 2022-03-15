@@ -3,9 +3,6 @@ from typing import Optional
 import os, time
 import pytest
 
-from pprint import pprint
-from .utils import analyze_it
-
 from pigit.codecounter import CodeCounter
 from pigit.render import get_console
 

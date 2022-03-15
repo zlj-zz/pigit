@@ -47,7 +47,7 @@ def get_repo_info(
     if ".git/submodule/" in repo_path and not exclude_submodule:
         # this repo is submodule.
         git_conf_path = repo_path
-        repo_path = repo_path.replace(".git/submodule/", "")
+        repo_path = repo_path.replace("/.git/submodule/", "")
     elif repo_path == ".git":
         repo_path = given_path
         git_conf_path = os.path.join(repo_path, ".git")

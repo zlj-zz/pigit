@@ -15,7 +15,7 @@ Like this:
 import re
 from typing import List, Tuple, Union
 
-from ..common import exec_cmd, run_cmd
+from ..common import run_cmd
 from ..render import echo
 
 
@@ -55,36 +55,31 @@ def set_email_and_username(args: Union[List, Tuple]) -> None:
 
     print("Set the interactive environment of user name and email ...")
 
-    is_global = ""
-    _global = re.compile(r"\-\-global")
-
-    for i in args:
-        r = _global.search(i)
-        if r is not None:
-            is_global = " --global "
-            break
+    is_global = next(
+        (" --global " for i in args if i.strip() in ["-g", "--global"]), ""
+    )
 
     if is_global:
         print("Now set for global.")
     else:
         print("Now set for local.")
 
-    name = input("Please input username:").strip()
     while True:
+        name = input("Please input username:").strip()
+
         if name:
             break
+        else:
+            echo("`Name is empty.`<error>")
 
-        echo("`Name is empty.`<error>")
-        name = input("Please input username again:")
-
-    email = input("Please input email:")
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:
+        email = input("Please input email:")
+
         if email_re.match(email) is not None:
             break
-
-        echo("`Bad mailbox format.`<error>")
-        email = input("Please input email again:")
+        else:
+            echo("`Bad mailbox format.`<error>")
 
     if run_cmd(f"git config user.name {name} {is_global}") and run_cmd(
         f"git config user.email {email} {is_global}"
