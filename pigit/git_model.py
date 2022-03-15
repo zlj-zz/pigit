@@ -6,44 +6,86 @@ from typing import List
 from dataclasses import dataclass
 
 # flake8: noqa
-# yapf: disable
-@dataclass
+@dataclass(frozen=True)
 class File:
     """Model class of git file."""
 
-    name: str                         # File path relative to Git.
-    display_str: str                  # Display string, may has color.
-    short_status: str                 # status string, like: 'MM'
-    has_staged_change: bool           # file whether has staged change.
-    has_unstaged_change: bool         # file whether has unstaged change.
-    tracked: bool                     # Is the file on the tracking tree.
-    deleted: bool                     # file whether deleted.
-    added: bool                       # file whether added.
-    has_merged_conflicts: bool        # file whether has merged conflict.
-    has_inline_merged_conflicts: bool # file whether has inline merged conflict.
+    # File path relative to Git.
+    name: str
+    # Display string, may has color.
+    display_str: str
+
+    # status string, like: 'MM'
+    short_status: str
+
+    # file whether has staged change.
+    has_staged_change: bool
+
+    # file whether has unstaged change.
+    has_unstaged_change: bool
+
+    # Is the file on the tracking tree.
+    tracked: bool
+
+    # file whether deleted.
+    deleted: bool
+
+    # file whether added.
+    added: bool
+
+    # file whether has merged conflict.
+    has_merged_conflicts: bool
+
+    # file whether has inline merged conflict.
+    has_inline_merged_conflicts: bool
 
 
-@dataclass
+@dataclass(frozen=True)
 class Commit:
-    """Model class of git commit info."""
+    """Model class of a git commit."""
 
+    # The commit sha value.
     sha: str
+
+    # The commit simple msg.
     msg: str
+
+    # The author of the commit.
     author: str
+
+    # The created time of the commit.
     unix_timestamp: int
+
+    # The commit status, 'pushed' or 'unpushed'.
     status: str
+
+    # The commit detail msg.
     extra_info: str
+
+    # Tag list of the commit.
     tag: List
+
     action: str = ""
 
-    def is_pushed(self):
+    def is_pushed(self) -> bool:
         return self.status == "pushed"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Branch:
+    """Model class of git branch."""
+
+    # The branch name.
     name: str
+
+    # This should be `True` if the branch can be pushing.
     pushables: str
+
+    # This should be `True` if the branch can be pulling.
     pullables: str
+
+    # This should be `True` if the branch is head.
     is_head: bool
+
+    # The branch up-stream name. Default is "".
     upstream_name: str = ""
