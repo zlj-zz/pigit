@@ -40,7 +40,7 @@ from .const import (
 )
 from .render import echo
 from .common import get_current_shell, confirm
-from .git_utils import get_repo_info, get_repo_desc, get_remote
+from .git_utils import get_repo_info, get_repo_desc, get_remote, open_repo_in_browser
 from .repo_utils import (
     add_repos,
     clear_repos,
@@ -215,26 +215,10 @@ def _repo_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
 
 
 def _open_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
-    branch = issue = commit = ""
-
-    remote_url = get_remote()
-
-    if args.branch:
-        branch = f"/tree/{args.branch}"
-        remote_url += branch
-    elif args.issue:
-        issue = f"/issues/{args.issue}"
-        remote_url += issue
-    elif args.commit:
-        commit = f"/commit/{args.commit}"
-        remote_url += commit
-
-    if args.print:
-        echo(f"Remote URL: `{remote_url}`<sky_blue>")
-    else:
-        import webbrowser
-
-        webbrowser.open(remote_url)
+    code, msg = open_repo_in_browser(
+        branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
+    )
+    echo(msg)
 
 
 argparse_dict = {
