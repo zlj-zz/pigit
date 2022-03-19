@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
-from .str_utils import cell_len, set_cell_size
+from .str_utils import cell_len, set_cell_size, chop_cells
 from .style import Style, Fx
 
 
@@ -49,7 +49,7 @@ class Segment:
         length: int,
         style: Optional[str] = None,
         pad: bool = True,
-        include_new_lines: bool = True,
+        include_new_lines: bool = False,
     ) -> Iterable[List["Segment"]]:
         """Split segments in to lines, and crop lines greater than a given length.
 
@@ -71,7 +71,8 @@ class Segment:
 
         for segment in segments:
             if "\n" in segment.text:
-                text, style, _ = segment
+                text = segment.text
+                style = segment.style
                 while text:
                     _text, new_line, text = text.partition("\n")
                     if _text:
@@ -126,7 +127,6 @@ class Segment:
                     append(segment)
                     line_length += segment_length
                 else:
-                    # text, segment_style, _ = segment
                     text = segment.text
                     text = set_cell_size(text, length - line_length)
                     append(cls(text, segment.style))

@@ -35,6 +35,8 @@ class Box:
             self.head_row_horizontal,
             self.head_row_cross,
             self.head_row_right,
+            self.head_row_up_cross,
+            self.head_row_down_cross,
             _,
         ) = iter(line3)
 
@@ -74,7 +76,7 @@ class Box:
 
         return box
 
-    def get_top(self, widths: Iterable[int]) -> str:
+    def get_top(self, widths: Iterable[int], merge: bool = False) -> str:
         """Get the top of a simple box.
 
         Args:
@@ -90,7 +92,10 @@ class Box:
         for last, width in loop_last(widths):
             append(self.top * width)
             if not last:
-                append(self.top_divider)
+                if merge:
+                    append(self.top)
+                else:
+                    append(self.top_divider)
         append(self.top_right)
         return "".join(parts)
 
@@ -99,6 +104,7 @@ class Box:
         widths: Iterable[int],
         level: Literal["head", "row", "foot", "mid"] = "row",
         edge: bool = True,
+        cross_level: Literal["mid", "up", "down"] = "mid",
     ) -> str:
         """Get the top of a simple box.
 
@@ -111,13 +117,18 @@ class Box:
         if level == "head":
             left = self.head_row_left
             horizontal = self.head_row_horizontal
-            cross = self.head_row_cross
             right = self.head_row_right
+            if cross_level == "up":
+                cross = self.head_row_up_cross
+            elif cross_level == "down":
+                cross = self.head_row_down_cross
+            else:
+                cross = self.head_row_cross
         elif level == "row":
             left = self.row_left
             horizontal = self.row_horizontal
-            cross = self.row_cross
             right = self.row_right
+            cross = self.row_cross
         elif level == "mid":
             left = self.mid_left
             horizontal = " "
@@ -171,7 +182,7 @@ ASCII: Box = Box(
     """\
 +--+.
 | ||.
-|-+|.
+|-+|--.
 | ||.
 |-+|.
 |-+|.
@@ -185,7 +196,7 @@ ASCII2: Box = Box(
     """\
 +-++.
 | ||.
-+-++.
++-++++.
 | ||.
 +-++.
 +-++.
@@ -199,7 +210,7 @@ ASCII_DOUBLE_HEAD: Box = Box(
     """\
 +-++.
 | ||.
-+=++.
++=++++.
 | ||.
 +-++.
 +-++.
@@ -213,7 +224,7 @@ SQUARE: Box = Box(
     """\
 ┌─┬┐.
 │ ││.
-├─┼┤.
+├─┼┤┴┬.
 │ ││.
 ├─┼┤.
 ├─┼┤.
@@ -226,7 +237,7 @@ SQUARE_DOUBLE_HEAD: Box = Box(
     """\
 ┌─┬┐.
 │ ││.
-╞═╪╡.
+╞═╪╡╧╤.
 │ ││.
 ├─┼┤.
 ├─┼┤.
@@ -239,7 +250,7 @@ MINIMAL: Box = Box(
     """\
   ╷ .
   │ .
-╶─┼╴.
+╶─┼╴┴┬.
   │ .
 ╶─┼╴.
 ╶─┼╴.
@@ -253,7 +264,7 @@ MINIMAL_HEAVY_HEAD: Box = Box(
     """\
   ╷ .
   │ .
-╺━┿╸.
+╺━┿╸┷┯.
   │ .
 ╶─┼╴.
 ╶─┼╴.
@@ -266,7 +277,7 @@ MINIMAL_DOUBLE_HEAD: Box = Box(
     """\
   ╷ .
   │ .
- ═╪ .
+ ═╪ ╧╤.
   │ .
  ─┼ .
  ─┼ .
@@ -280,7 +291,7 @@ SIMPLE: Box = Box(
     """\
     .
     .
- ── .
+ ── ──.
     .
     .
  ── .
@@ -293,7 +304,7 @@ SIMPLE_HEAD: Box = Box(
     """\
     .
     .
- ── .
+ ── ──.
     .
     .
     .
@@ -307,7 +318,7 @@ SIMPLE_HEAVY: Box = Box(
     """\
     .
     .
- ━━ .
+ ━━ ━━.
     .
     .
  ━━ .
@@ -321,7 +332,7 @@ HORIZONTALS: Box = Box(
     """\
  ── .
     .
- ── .
+ ── ──.
     .
  ── .
  ── .
@@ -334,7 +345,7 @@ ROUNDED: Box = Box(
     """\
 ╭─┬╮.
 │ ││.
-├─┼┤.
+├─┼┤┴┬.
 │ ││.
 ├─┼┤.
 ├─┼┤.
@@ -347,7 +358,7 @@ HEAVY: Box = Box(
     """\
 ┏━┳┓.
 ┃ ┃┃.
-┣━╋┫.
+┣━╋┫┻┳.
 ┃ ┃┃.
 ┣━╋┫.
 ┣━╋┫.
@@ -360,7 +371,7 @@ HEAVY_EDGE: Box = Box(
     """\
 ┏━┯┓.
 ┃ │┃.
-┠─┼┨.
+┠─┼┨┴┬.
 ┃ │┃.
 ┠─┼┨.
 ┠─┼┨.
@@ -373,7 +384,7 @@ HEAVY_HEAD: Box = Box(
     """\
 ┏━┳┓.
 ┃ ┃┃.
-┡━╇┩.
+┡━╇┩┻┯.
 │ ││.
 ├─┼┤.
 ├─┼┤.
@@ -386,7 +397,7 @@ DOUBLE: Box = Box(
     """\
 ╔═╦╗.
 ║ ║║.
-╠═╬╣.
+╠═╬╣╩╦.
 ║ ║║.
 ╠═╬╣.
 ╠═╬╣.
@@ -399,7 +410,7 @@ DOUBLE_EDGE: Box = Box(
     """\
 ╔═╤╗.
 ║ │║.
-╟─┼╢.
+╟─┼╢┴┬.
 ║ │║.
 ╟─┼╢.
 ╟─┼╢.

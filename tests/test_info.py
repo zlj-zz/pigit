@@ -3,19 +3,21 @@ import pytest
 from .utils import analyze_it
 
 from pigit.info import GitConfig, introduce
-from pigit.render import echo
+from pigit.render import get_console
+
+console = get_console()
 
 
 def test_introduce():
-    echo()
-    echo(introduce())
+    console.echo()
+    console.echo(introduce())
 
 
 def test_gitconfig():
     c = GitConfig()
     # c = GitConfig(format_type="normal")
     print()
-    echo(c.generate())
+    console.echo(c.generate())
 
 
 @analyze_it

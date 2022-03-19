@@ -574,7 +574,7 @@ class Style(object):
         return new_style
 
     @classmethod
-    def parse(cls, style_definition: str):
+    def parse(cls, style_definition: str) -> "Style":
         FX_ATTRIBUTES = Fx.supports
         color = ""
         bg_color = ""

@@ -3,9 +3,8 @@ import os, re
 
 from .const import __version__, __url__
 from .git_utils import get_git_version, get_repo_info
-from .render import echo
-from .render.console import Console
-from .render.table import TableTooWideError, dTable
+from .render.table import UintTable
+from .render import box
 
 
 def introduce() -> str:
@@ -108,13 +107,13 @@ class GitConfig:
         return "\n".join(gen)
 
     def table_config(self, config_dict: Dict[str, Dict]) -> str:
-        if self.color:
-            for sub in config_dict.values():
-                for k, v in sub.items():
-                    sub[k] = Console.render_str(f"`{v:40}`<pale_green>")
+        style = ["", "pale_green" if self.color else ""]
+        tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
 
-        tb = dTable(config_dict, title="Git Local Config")
-        return "".join(tb.table_generator())
+        for header, values in config_dict.items():
+            tb.add_unit(header, header_style="bold", values=values, values_style=style)
+
+        return tb
 
     def generate(self) -> str:
         repo_path, config_path = self.repo_info

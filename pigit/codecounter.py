@@ -11,7 +11,7 @@ import concurrent.futures
 from shutil import get_terminal_size
 
 from .common import confirm, get_file_icon, adjudgment_type
-from .render.new_table import Table
+from .render.table import Table
 from .render import get_console
 
 
@@ -454,7 +454,7 @@ class CodeCounter(object):
             )
 
         # Print total and change graph.
-        tb._caption = " Total: {0} lines".format(sum_lines)
+        tb.caption = " Total: {0} lines".format(sum_lines)
         return tb
 
     @classmethod

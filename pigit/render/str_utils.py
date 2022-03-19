@@ -182,7 +182,7 @@ def shorten(
 
 
 # TODO: not best way.
-def garbled_code_analysis(v: str):
+def garbled_code_analysis(v: str) -> str:
     temp = f"b'{v}'"
     temp = eval(temp)
     return str(temp, encoding="utf-8")

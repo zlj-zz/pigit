@@ -1,4 +1,4 @@
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, List, Optional, Union
 import sys
 from itertools import islice
 from inspect import isclass
@@ -37,7 +37,7 @@ class Console:
 
     def get_style(
         self, name: Union[str, Style], *, default: Optional[Union[str, Style]] = None
-    ):
+    ) -> Style:
         if isinstance(name, Style):
             return name
 
@@ -56,7 +56,7 @@ class Console:
         style: Optional[Style] = None,
         pad: bool = True,
         new_lines: bool = False,
-    ):
+    ) -> List[Segment]:
         _rendered = render_markup(renderable)
         if style:
             _rendered = Segment.apply_style(_rendered, style)

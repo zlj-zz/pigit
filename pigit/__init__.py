@@ -38,7 +38,7 @@ from .const import (
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
-from .render import echo
+from .render import get_console
 from .common import get_current_shell, confirm
 from .git_utils import get_repo_info, get_repo_desc, get_remote, open_repo_in_browser
 from .repo_utils import (
@@ -218,7 +218,7 @@ def _open_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     code, msg = open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
-    echo(msg)
+    get_console().echo(msg)
 
 
 argparse_dict = {
@@ -412,16 +412,16 @@ argparse_dict = {
 
 def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -> None:
     if args.report:
-        echo(introduce())
+        get_console().echo(introduce())
 
     elif args.create_config:
         return CONFIG.create_config_template()
 
     elif args.config:
-        echo(GitConfig(format_type=CONFIG.git_config_format).generate())
+        get_console().echo(GitConfig(format_type=CONFIG.git_config_format).generate())
 
     elif args.information:
-        echo(get_repo_desc(include_part=CONFIG.repo_info_include))
+        get_console().echo(get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
         from copy import deepcopy

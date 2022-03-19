@@ -9,7 +9,6 @@ if os.name == "nt":
 from .emoji import Emoji
 from .style import *
 from .str_utils import *
-from .table import *
 
 if TYPE_CHECKING:
     from .console import Console
