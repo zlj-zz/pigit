@@ -13,6 +13,7 @@ from pigit import main
         "--information",  # git information
         "--count",  # code counter
         "--create-config",
+        "cmd",
         "cmd -h",
         "cmd -s",
         "cmd -t",

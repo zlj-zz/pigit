@@ -15,7 +15,7 @@ Like this:
 import re
 from typing import List, Tuple, Union
 
-from ..common import run_cmd
+from ..common.utils import run_cmd
 from ..render import echo
 
 

@@ -10,7 +10,7 @@ import threading
 import concurrent.futures
 from shutil import get_terminal_size
 
-from .common import confirm, get_file_icon, adjudgment_type
+from .common.utils import confirm, get_file_icon, adjudgment_type
 from .render.table import Table
 from .render import get_console
 

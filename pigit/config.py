@@ -4,7 +4,7 @@ from typing import Dict, List
 import os, re, textwrap, logging
 from distutils.util import strtobool
 
-from .common import confirm, traceback_info
+from .common.utils import confirm, traceback_info
 from .common.singleton import Singleton
 from .render.style import Color
 

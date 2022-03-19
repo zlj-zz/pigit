@@ -7,10 +7,10 @@ import random
 import logging
 from typing import Dict, List, Optional, Tuple, Union
 
-from ..common import run_cmd, confirm, similar_command, traceback_info
-from ..render import Fx, Color, shorten, echo
-from ..render.console import Console
+from ..common.utils import run_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
+from ..render import get_console
+from ..render.str_utils import shorten
 from ..const import EXTRA_CMD_FILE_PATH
 from .cmds import Git_Cmds, CommandType
 
@@ -115,7 +115,9 @@ class CmdProcessor(object, metaclass=Singleton):
 
         # Invalid, if need suggest.
         if option is None:
-            echo("Don't support this command, please try `g --show-commands`<gold>")
+            get_console().echo(
+                "Don't support this command, please try `g --show-commands`<gold>"
+            )
 
             if self.use_recommend:  # check config.
                 predicted_command = similar_command(command_, self.cmds.keys())
@@ -131,11 +133,15 @@ class CmdProcessor(object, metaclass=Singleton):
         command = option.get("command", None)
         # Has no command can be executed.
         if not command:
-            echo("`Invalid custom short command, nothing can to exec.`<error>")
+            get_console().echo(
+                "`Invalid custom short command, nothing can to exec.`<error>"
+            )
             return None
 
         if not option.get("has_arguments", False) and args:
-            echo(f"`The command does not accept parameters. Discard {args}.`<error>")
+            get_console().echo(
+                f"`The command does not accept parameters. Discard {args}.`<error>"
+            )
             args = []
 
         _type = option.get("type", "command")
@@ -143,13 +149,13 @@ class CmdProcessor(object, metaclass=Singleton):
             try:
                 command(args)
             except Exception as e:
-                echo(f"`{e}`<error>")
+                get_console().echo(f"`{e}`<error>")
         else:  # is command.
             if args:
                 args_str = " ".join(args)
                 command = " ".join([command, args_str])
             if self.show_original:
-                echo(f":rainbow:  {self.color_command(command)}")
+                get_console().echo(f":rainbow:  {self.color_command(command)}")
             run_cmd(command)
 
     ################################
@@ -183,7 +189,7 @@ class CmdProcessor(object, metaclass=Singleton):
 
         _command = self.cmds[_key].get("command", "ERROR: empty command.")
         if callable(_command):
-            _command = "Func: %s" % _command.__name__
+            _command = f"Func: {_command.__name__}"
 
         _command = shorten(_command, msg_max_width, placeholder="...")
         command_msg = "%*s%s" % (help_position, "", _command) if help_msg else _command
@@ -198,7 +204,7 @@ class CmdProcessor(object, metaclass=Singleton):
         print("These are short commands that can replace git operations:")
         for key in self.cmds.keys():
             msg = self._generate_help_by_key(key)
-            echo(msg)
+            get_console().echo(msg)
 
     def command_help_by_type(self, command_type: str) -> None:
         """Print a part of help message.
@@ -216,7 +222,7 @@ class CmdProcessor(object, metaclass=Singleton):
 
         # Checking the type whether right.
         if command_type not in CommandType.__members__:
-            echo(
+            get_console().echo(
                 "`There is no such type.`<error>\n"
                 "Please use `git --types`<ok> to view the supported types."
             )
@@ -226,7 +232,7 @@ class CmdProcessor(object, metaclass=Singleton):
                     command_type, CommandType.__members__.keys()
                 )
                 if confirm(
-                    Console.render_str(
+                    get_console().render_str(
                         f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
                     )
                 ):
@@ -240,21 +246,20 @@ class CmdProcessor(object, metaclass=Singleton):
             # Prevent the `belong` attribute from being set in the custom command.
             if isinstance(belong, CommandType) and belong.value == command_type:
                 msg = self._generate_help_by_key(k)
-                echo(msg)
+                get_console().echo(msg)
 
     @classmethod
     def type_help(cls) -> None:
         """Print all command types with random color."""
+        res = []
+
         for member in CommandType:
-            print(
-                "{0}{1}  ".format(
-                    Color.fg(
-                        random.randint(70, 255),
-                        random.randint(70, 255),
-                        random.randint(70, 255),
-                    ),
-                    member.value,
-                ),
-                end="",
+            color_str = "#{:02X}{:02X}{:02X}".format(
+                random.randint(70, 255),
+                random.randint(70, 255),
+                random.randint(70, 255),
             )
-        print(Fx.reset)
+
+            res.append(f"`{member.value}`<{color_str}>")
+
+        get_console().echo(" ".join(res))

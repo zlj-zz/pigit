@@ -6,7 +6,8 @@ from time import sleep
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .render import Color, Fx, echo
+from .render import echo
+from .render.style import Color, Fx
 from .git_utils import (
     # info method
     get_repo_info,

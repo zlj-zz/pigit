@@ -39,7 +39,7 @@ from .const import (
     IS_FIRST_RUN,
 )
 from .render import get_console
-from .common import get_current_shell, confirm
+from .common.utils import get_current_shell, confirm
 from .git_utils import get_repo_info, get_repo_desc, get_remote, open_repo_in_browser
 from .repo_utils import (
     add_repos,
@@ -194,7 +194,7 @@ def _cmd_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
         git_processor.process_command(command, args.args)
         return None
     else:
-        echo("`pigit cmd -h`<ok> for help.")
+        get_console().echo("`pigit cmd -h`<ok> for help.")
 
 
 def _repo_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
@@ -269,8 +269,7 @@ argparse_dict = {
                         "type": str,
                         "metavar": "TYPE",
                         "dest": "ignore_type",
-                        "help": "Create a demo .gitignore file. Need one argument, support: [%s]"
-                        % ", ".join(SUPPORTED_GITIGNORE_TYPES),
+                        "help": f'Create a demo .gitignore file. Need one argument, support: [{", ".join(SUPPORTED_GITIGNORE_TYPES)}]',
                     },
                     "--create-config": {
                         "action": "store_true",
@@ -290,7 +289,11 @@ argparse_dict = {
                     "default": None,
                     "help": "Short git command or other.",
                 },
-                "args": {"nargs": "*", "type": str, "help": "Command parameter list."},
+                "args": {
+                    "nargs": "*",
+                    "type": str,
+                    "help": "Command parameter list.",
+                },
                 "-s --show-commands": {
                     "action": "store_true",
                     "help": "List all available short command and wealth and exit.",
@@ -299,8 +302,7 @@ argparse_dict = {
                     "type": str,
                     "metavar": "TYPE",
                     "dest": "command_type",
-                    "help": "According to given type [%s] list available short command and wealth and exit."
-                    % ", ".join(CommandType.__members__.keys()),
+                    "help": f'According to given type [{", ".join(CommandType.__members__.keys())}] list available short command and wealth and exit.',
                 },
                 "-t --types": {
                     "action": "store_true",
@@ -320,7 +322,10 @@ argparse_dict = {
                     "help": "add repo(s).",
                     "args": {
                         "paths": {"nargs": "+", "help": "path of reps(s)."},
-                        "--dry-run": {"action": "store_true", "help": "dry run."},
+                        "--dry-run": {
+                            "action": "store_true",
+                            "help": "dry run.",
+                        },
                         "set_defaults": {
                             "func": _repo_func,
                             "kwargs": {"option": "add"},
@@ -330,7 +335,10 @@ argparse_dict = {
                 "rm": {
                     "help": "remove repo(s).",
                     "args": {
-                        "repos": {"nargs": "+", "help": "name or path of repo(s)."},
+                        "repos": {
+                            "nargs": "+",
+                            "help": "name or path of repo(s).",
+                        },
                         "--path": {
                             "action": "store_true",
                             "help": "remove follow path, defult is name.",
@@ -378,7 +386,10 @@ argparse_dict = {
                     name: {
                         "help": prop["help"] + " for repo(s).",
                         "args": {
-                            "repos": {"nargs": "*", "help": "name of repo(s)."},
+                            "repos": {
+                                "nargs": "*",
+                                "help": "name of repo(s).",
+                            },
                             "set_defaults": {
                                 "func": _repo_func,
                                 "kwargs": {"option": name},
@@ -398,7 +409,9 @@ argparse_dict = {
                     "help": "the branch of repository.",
                 },
                 "-i --issue": {"help": "the given issue of the repository."},
-                "-c --commit": {"help": "the current commit in the repo website."},
+                "-c --commit": {
+                    "help": "the current commit in the repo website."
+                },
                 "-p --print": {
                     "action": "store_true",
                     "help": "only print the url at the terminal, but do not open it.",

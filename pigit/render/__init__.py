@@ -6,12 +6,10 @@ import os
 if os.name == "nt":
     os.system("")
 
-from .emoji import Emoji
-from .style import *
-from .str_utils import *
 
 if TYPE_CHECKING:
     from .console import Console
+
 
 _console: "Console" = None
 

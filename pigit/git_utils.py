@@ -3,8 +3,8 @@
 from typing import List, Optional, Tuple
 import os, re, textwrap
 
-from .common import exec_cmd
-from .render import shorten, garbled_code_analysis
+from .common.utils import exec_cmd
+from .render.str_utils import shorten, garbled_code_analysis
 from .render.console import Console
 from .git_model import File, Commit, Branch
 

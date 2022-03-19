@@ -5,8 +5,9 @@ import os, re
 import logging
 from urllib.request import urlopen
 
-from .common import confirm, traceback_info
-from .render import Fx, Emoji
+from .common.utils import confirm, traceback_info
+from .render import get_console
+
 
 Log = logging.getLogger(__name__)
 
@@ -122,12 +123,11 @@ class GitignoreGenetor(object):
 
         # Process and check the type, and exit in case of any accident.
         if name is None:
-            print("Unsupported type: %s" % ignore_type)
+            print(f"Unsupported type: {ignore_type}")
             print(
-                "Supported type: [{}]. Case insensitive.".format(
-                    " ".join(SUPPORTED_GITIGNORE_TYPES)
-                )
+                f'Supported type: [{" ".join(SUPPORTED_GITIGNORE_TYPES)}]. Case insensitive.'
             )
+
             return False
 
         # Adjust `.gitignore` whether exist.
@@ -142,10 +142,11 @@ class GitignoreGenetor(object):
         base_url = "https://github.com/github/gitignore/blob/main/%s.gitignore"
         target_url = base_url % name
 
-        print(
-            "Will get ignore file content from %s"
-            % (Fx.italic + Fx.underline + target_url + Fx.reset)
+        get_console().echo(
+            f"Will get ignore file content from (i,u)`{target_url}`"
+            # f"Will get ignore file content from {Fx.italic + Fx.underline + target_url + Fx.reset}"
         )
+
         content = self.get_html_from_url(target_url)
         if not content:
             print("Failed to get content and will exit.")
@@ -163,7 +164,7 @@ class GitignoreGenetor(object):
                 self.out_ignore_content(ignore_content)
 
             else:
-                print("Write gitignore file successful. {0}".format(Emoji.smiler))
+                get_console().echo("Write gitignore file successful. :smiler:")
         else:
             self.out_ignore_content(ignore_content)
 
