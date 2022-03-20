@@ -21,6 +21,7 @@ log
 htmlcov/
 
 
+tests/test_repo
 
 test.py
 calc.py

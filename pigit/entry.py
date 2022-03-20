@@ -31,6 +31,7 @@ from .decorator import time_it
 from .config import Config
 from .argparse_utils import Parser
 from .const import (
+    REPOS_PATH,
     __version__,
     PIGIT_HOME,
     LOG_FILE_PATH,
@@ -40,16 +41,7 @@ from .const import (
 )
 from .render import get_console
 from .common.utils import get_current_shell, confirm
-from .git_utils import get_repo_info, get_repo_desc, get_remote, open_repo_in_browser
-from .repo_utils import (
-    add_repos,
-    clear_repos,
-    rm_repos,
-    rename_repo,
-    ll_repos,
-    repo_options,
-    process_repo_option,
-)
+from .common.git import GitOption
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
 from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
 from .info import introduce, GitConfig
@@ -67,6 +59,10 @@ Log = logging.getLogger(__name__)
 CONFIG = Config(
     path=CONFIG_FILE_PATH, version=__version__, auto_load=True
 ).output_warnings()
+
+
+git = GitOption(repo_info_path=REPOS_PATH)
+console = get_console()
 
 
 ##########################################
@@ -158,8 +154,8 @@ def _cmd_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
-        repo_path, repo_conf = get_repo_info()
-        add_repos([repo_path], silent=True)
+        repo_path, repo_conf = git.get_repo_info()
+        git.add_repos([repo_path])
 
     extra_cmd: dict = {
         "shell": {
@@ -194,32 +190,59 @@ def _cmd_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
         git_processor.process_command(command, args.args)
         return None
     else:
-        get_console().echo("`pigit cmd -h`<ok> for help.")
+        console.echo("`pigit cmd -h`<ok> for help.")
 
 
 def _repo_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
     option: str = kwargs.get("option", "")
 
     if option == "add":
-        add_repos(args.paths, args.dry_run)
+        if added := git.add_repos(args.paths, args.dry_run):
+            console.echo(f"Found {len(added)} new repo(s).")
+            for path in added:
+                console.echo(f"\t`{path}`<sky_blue>")
+        else:
+            console.echo("`No new repos found!`<tomato>")
     elif option == "rm":
-        rm_repos(args.repos, args.use_path)
+        res = git.rm_repos(args.repos, args.path)
+        for one in res:
+            console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
     elif option == "rename":
-        rename_repo(args.repo, args.new_name)
+        success, msg = git.rename_repo(args.repo, args.new_name)
+        console.echo(msg)
     elif option == "ll":
-        ll_repos(args.simple)
+        for info in git.ll_repos():
+            if args.simple:
+                console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
+            else:
+                console.echo(
+                    f"""\
+{info[0][0]}
+    {info[1][0]}: {info[1][1]}
+    {info[2][0]}: {info[2][1]}
+    {info[3][0]}: `{info[3][1]}`<khaki>
+    {info[4][0]}: `{info[4][1]}`<ok>
+    {info[5][0]}: `{info[5][1]}`<sky_blue>
+                    """
+                )
     elif option == "clear":
-        clear_repos()
+        git.clear_repos()
     else:
-        process_repo_option(args.repos, option)
+        git.process_repo_option(args.repos, repo_options[option]["cmd"])
 
 
 def _open_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
-    code, msg = open_repo_in_browser(
+    code, msg = git.open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
-    get_console().echo(msg)
+    console.echo(msg)
 
+
+repo_options = {
+    "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
+    "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
+    "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
+}
 
 argparse_dict = {
     "prog": "pigit",
@@ -409,9 +432,7 @@ argparse_dict = {
                     "help": "the branch of repository.",
                 },
                 "-i --issue": {"help": "the given issue of the repository."},
-                "-c --commit": {
-                    "help": "the current commit in the repo website."
-                },
+                "-c --commit": {"help": "the current commit in the repo website."},
                 "-p --print": {
                     "action": "store_true",
                     "help": "only print the url at the terminal, but do not open it.",
@@ -425,16 +446,16 @@ argparse_dict = {
 
 def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -> None:
     if args.report:
-        get_console().echo(introduce())
+        console.echo(introduce())
 
     elif args.create_config:
         return CONFIG.create_config_template()
 
     elif args.config:
-        get_console().echo(GitConfig(format_type=CONFIG.git_config_format).generate())
+        console.echo(GitConfig(format_type=CONFIG.git_config_format).generate())
 
     elif args.information:
-        get_console().echo(get_repo_desc(include_part=CONFIG.repo_info_include))
+        console.echo(git.get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
         from copy import deepcopy
@@ -451,7 +472,7 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -
         return None
 
     elif args.ignore_type:
-        repo_path, repo_conf_path = get_repo_info()
+        repo_path, repo_conf_path = git.get_repo_info()
 
         return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
             args.ignore_type,

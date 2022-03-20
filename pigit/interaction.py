@@ -8,29 +8,20 @@ from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .render import echo
 from .render.style import Color, Fx
-from .git_utils import (
-    # info method
-    get_repo_info,
-    get_head,
-    load_branches,
-    load_status,
-    load_file_diff,
-    load_commits,
-    load_commit_info,
-    # option method
-    switch_file_status,
-    discard_file,
-    ignore_file,
-    checkout_branch,
-)
+from .common.git import GitOption
+
 
 if TYPE_CHECKING:
-    from .git_model import File, Commit, Branch
+    from .common.git_model import File, Commit, Branch
+
+
+# git option handler
+git = GitOption()
 
 
 class BranchPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Branch"]:
-        return load_branches()
+        return git.load_branches()
 
     def process_raw_data(self, raw_data: List["Branch"]) -> List[str]:
         processed_branches = []
@@ -61,7 +52,7 @@ class BranchPanel(RowPanelWidget):
             if local_branch.is_head:
                 return
 
-            err = checkout_branch(local_branch.name)
+            err = git.checkout_branch(local_branch.name)
             if "error" in err:
                 print(Color.fg("#FF0000"), err, Fx.rs, sep="")
                 sleep(2)
@@ -69,10 +60,10 @@ class BranchPanel(RowPanelWidget):
 
 
 class StatusPanel(RowPanelWidget):
-    repo_path, repo_conf = get_repo_info()
+    repo_path, repo_conf = git.get_repo_info()
 
     def get_raw_data(self) -> List["File"]:
-        return load_status(self.size[0])
+        return git.load_status(self.size[0])
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         if not raw_data:
@@ -100,15 +91,15 @@ class StatusPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key in {"a", " "}:
-            switch_file_status(self.raw_data[cursor_row - 1], repo_path=self.repo_path)
+            git.switch_file_status(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
         elif input_key == "d":
             if ConfirmWidget("discard all changed? [y/n]:").run():
                 # if confirm("discard all changed? [y/n]:"):
-                discard_file(self.raw_data[cursor_row - 1], repo_path=self.repo_path)
+                git.discard_file(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
         elif input_key == "i":
-            ignore_file(self.raw_data[cursor_row - 1])
+            git.ignore_file(self.raw_data[cursor_row - 1])
             self.emit("update")
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
@@ -137,11 +128,11 @@ class FilePanel(RowPanelWidget):
             self._repo_path = path
 
     def get_raw_data(self) -> List[Any]:
-        return load_file_diff(
+        return git.load_file_diff(
             self._file.name,
             self._file.tracked,
             self._file.has_staged_change,
-            repo_path=self._repo_path,
+            path=self._repo_path,
         ).split("\n")
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
@@ -157,8 +148,8 @@ class FilePanel(RowPanelWidget):
 
 class CommitPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Commit"]:
-        branch_name = get_head()
-        return load_commits(branch_name)
+        branch_name = git.get_head()
+        return git.load_commits(branch_name)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         color_data = []
@@ -199,7 +190,7 @@ class CommitStatusPanel(RowPanelWidget):
             self._commit = commit
 
     def get_raw_data(self) -> List[Any]:
-        return load_commit_info(self._commit.sha).split("\n")
+        return git.load_commit_info(self._commit.sha).split("\n")
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
@@ -224,7 +215,7 @@ def tui_main(index=None, help_wait=1.5):
         echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
-    if not get_repo_info()[0]:
+    if not git.get_repo_info()[0]:
         echo("`Please run in a git repo dir.`<tomato>")
         return
 
