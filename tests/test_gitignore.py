@@ -4,7 +4,7 @@ from unittest.mock import patch
 from .conftest import TEST_PATH
 from .utils import analyze_it
 
-from pigit import GitignoreGenetor
+from pigit.gitignore import GitignoreGenetor
 
 
 handle = GitignoreGenetor()

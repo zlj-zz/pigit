@@ -67,7 +67,7 @@ setup(
     install_requires=[],
     entry_points="""
         [console_scripts]
-        pigit=pigit:main
+        pigit=pigit.entry:main
     """,
     python_requires=">=3.8",
 )

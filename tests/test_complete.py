@@ -5,7 +5,7 @@ from pprint import pprint
 from copy import deepcopy
 from .utils import analyze_it
 
-from pigit import Git_Cmds, argparse_dict
+from pigit.entry import Git_Cmds, argparse_dict
 from pigit.shellcompletion import (
     ZshCompletion,
     BashCompletion,

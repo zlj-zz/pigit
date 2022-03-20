@@ -2,7 +2,7 @@
 import pytest
 from .utils import analyze_it
 
-from pigit import main
+from pigit.entry import main
 
 
 @pytest.mark.parametrize(

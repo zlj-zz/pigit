@@ -464,7 +464,7 @@ class CodeCounter(object):
         # Colors displayed for different code quantities.
         if level_color is None:
             level_color = (
-                "nocolor",
+                "green",
                 "#EBCB8C",  # yellow
                 "#FF6347",  # tomato
                 "#C71585",  # middle violet red
