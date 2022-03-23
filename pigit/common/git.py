@@ -6,7 +6,7 @@ import os, re, textwrap, json
 
 from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd
 from pigit.common.git_model import File, Commit, Branch
-from pigit.render.str_utils import shorten, garbled_code_analysis
+from pigit.render.str_utils import shorten, byte_str2str
 from pigit.render.console import Console
 
 
@@ -321,14 +321,13 @@ class GitOption:
                 # skip blank line.
                 continue
 
-            if file.endswith('"'):
-                # may is chinese char code.
-                file = garbled_code_analysis(file)
-
             change = file[:2]
             staged_change = file[:1]
             unstaged_change = file[1:2]
             name = file[3:]
+            if name.endswith('"'):
+                # may is chinese char code.
+                name = byte_str2str(name[1:-1])
             untracked = change in ["??", "A ", "AM"]
             has_no_staged_change = staged_change in [" ", "U", "?"]
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]

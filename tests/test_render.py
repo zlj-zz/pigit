@@ -11,6 +11,7 @@ from pigit.render.markup import render_markup
 from pigit.render.table import Table, UintTable
 from pigit.render import box
 import pigit.render.str_utils
+from pigit.render.str_utils import byte_str2str
 
 
 class TestColor:
@@ -182,5 +183,13 @@ class TestTableModule:
         console.echo(ut)
 
 
-def test_str_utils():
-    doctest.testmod(pigit.render.str_utils, verbose=True)
+class TestStrUtils:
+    def test_str_utils(self):
+        doctest.testmod(pigit.render.str_utils, verbose=True)
+
+    def test_byte_str2str(self):
+        s = byte_str2str(
+            "test/\\346\\265\\213\\350\\257\\225\\344\\270\\255\\346\\226\\207.py"
+        )
+        print(s)
+        assert s == "test/测试中文.py"

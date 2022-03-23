@@ -20,11 +20,6 @@ Docs Test
         >>> shorten('Hello world!', 9, placeholder='^-^', front=True)
         '^-^world!'
 
-    Garbled code analysis.
-
-        # >>> garbled_code_analysis("\\346\\265\\213\\350\\257\\225\\344\\270\\255\\346\\226\\207\\345\\220\\215\\347\\247\\260")
-        中文测试名称
-
     Chop cell.
         >>> chop_cells('12345678', 4)
         ['1234', '5678']
@@ -39,8 +34,6 @@ Docs Test
         >>> set_cell_size('123456', 8)
         '123456  '
 """
-
-# from typing import Final # python3.8
 
 from typing import List, Tuple
 from functools import lru_cache
@@ -148,7 +141,7 @@ def set_cell_size(text: str, total: int) -> str:
         before = text[: pos + 1]
         before_len = cell_len(before)
         if before_len == total + 1 and cell_len(before[-1]) == 2:
-            return before[:-1] + " "
+            return f"{before[:-1]} "
         if before_len == total:
             return before
         if before_len > total:
@@ -181,11 +174,11 @@ def shorten(
     return text
 
 
-# TODO: not best way.
-def garbled_code_analysis(v: str) -> str:
-    temp = f"b'{v}'"
-    temp = eval(temp)
-    return str(temp, encoding="utf-8")
+def byte_str2str(text: str) -> str:
+    temp = f"b'{text}'"
+    # use ~eval transfrom `str` to `bytes`
+    b = eval(temp)
+    return str(b, encoding="utf-8")
 
 
 if __name__ == "__main__":
