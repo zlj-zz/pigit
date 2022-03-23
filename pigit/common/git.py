@@ -726,14 +726,14 @@ class GitOption:
 
     def process_repo_option(self, repos: Optional[List[str]], cmd: str):
         exist_repos = self.load_repos()
-        print(cmd, "\n")
+        print(f":: {cmd}\n")
 
         if repos:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
         if len(exist_repos) >= 1:
             return exec_async_tasks(
-                async_run_cmd(cmd, cwd=prop["path"], msg=f":: {prop['path']}")
+                async_run_cmd(*cmd.split(), cwd=prop["path"], msg=f":: {prop['path']}")
                 for name, prop in exist_repos.items()
             )
 
