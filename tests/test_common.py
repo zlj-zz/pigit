@@ -2,6 +2,7 @@
 import pytest
 import doctest
 from unittest.mock import patch
+from pprint import pprint
 
 import pigit.common.utils
 from pigit.common.utils import (
@@ -47,8 +48,9 @@ def test_confirm(mock_input, input_value: str, return_bool: bool):
     assert confirm("confirm:") == return_bool
 
 
-def test_async_func():
-    # TODO: the code is real running.
+def test_async_cmd_func():
+    print()
+
     code = """\
 # -*- coding:utf-8 -*-
 
@@ -56,12 +58,13 @@ if __name__ == '__main__':
     import time
 
     print({0})
-    time.sleep({0})
+    time.sleep(int({0}))
     print({0})
 """
     tasks = [
         async_run_cmd(*["python3", "-c", code.format(i)], msg=f"msg {i}.")
-        for i in range(10)
+        for i in range(5)
     ]
-    error = exec_async_tasks(tasks)
-    print(error)
+    pprint(tasks)
+    result = exec_async_tasks(tasks)
+    print(result)
