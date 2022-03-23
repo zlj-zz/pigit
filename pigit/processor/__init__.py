@@ -11,13 +11,12 @@ from ..common.utils import run_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
 from ..render import get_console
 from ..render.str_utils import shorten
-from ..const import EXTRA_CMD_FILE_PATH
 from .cmds import Git_Cmds, CommandType
 
 Log = logging.getLogger(__name__)
 
 
-def get_extra_cmds() -> Dict:
+def get_extra_cmds(name: str, path: str) -> Dict:
     """Get custom cmds.
 
     Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
@@ -26,23 +25,24 @@ def get_extra_cmds() -> Dict:
     Returns:
         (dict[str,str]): extra cmds dict.
     """
-    import imp
+    import importlib.util
 
-    extra_cmd_path = EXTRA_CMD_FILE_PATH
     extra_cmds = {}
 
-    if os.path.isfile(extra_cmd_path):
+    if os.path.isfile(path):
         try:
-            extra_cmd = imp.load_source("extra_cmd", extra_cmd_path)
-        except Exception as e:
-            Log.error(traceback_info(f"Can't load file '{extra_cmd_path}'."))
+            # load a module form localtion.
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except Exception:
+            Log.error(traceback_info(f"Can't load file '{path}'."))
         else:
             try:
-                extra_cmds = extra_cmd.extra_cmds  # type: ignore
+                extra_cmds = module.extra_cmds  # type: ignore
             except AttributeError:
                 Log.error("Can't found dict name is 'extra_cmds'.")
 
-    # print(extra_cmds)
     return extra_cmds
 
 
@@ -122,7 +122,7 @@ class CmdProcessor(object, metaclass=Singleton):
             if self.use_recommend:  # check config.
                 predicted_command = similar_command(command_, self.cmds.keys())
                 if confirm(
-                    Console.render_str(
+                    get_console().render_str(
                         f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
                     )
                 ):
