@@ -1,12 +1,16 @@
 # -*- coding:utf-8 -*-
-from typing import Callable
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .screen import Screen
 
 
-class ExitLoop(Exception):
-    pass
+class ExitEventLoop(Exception):
+    """Get to exit current event loop."""
 
 
-class Loop(object):
+class EventLoop(object):
     """
     Params:
         screen (Screen): screen to use, default is a new :class:`.screen.Screen`.
@@ -16,7 +20,7 @@ class Loop(object):
 
     def __init__(
         self,
-        screen=None,
+        screen: "Screen" = None,
         input_handle=None,
         real_time: bool = False,
         debug: bool = False,
@@ -41,7 +45,7 @@ class Loop(object):
             self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
 
-    def set_input_timeouts(self, timeout):
+    def set_input_timeouts(self, timeout: float):
         self._input_handle.set_input_timeouts(timeout)
 
     def _loop(self):
@@ -62,7 +66,7 @@ class Loop(object):
         try:
             while True:
                 self._loop()
-        except (ExitLoop, KeyboardInterrupt):
+        except (ExitEventLoop, KeyboardInterrupt, IOError):
             self._input_handle.stop()
 
     def run(self):

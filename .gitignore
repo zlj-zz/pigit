@@ -35,3 +35,5 @@ tests/pigit-dev_zsh_comp
 tests/pigit_bash_comp
 tests/pigit_fish_comp
 tests/ignore_test
+
+debug.log

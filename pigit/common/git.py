@@ -490,11 +490,16 @@ class GitOption:
         else:
             raise GitOptionError("`file` only allow 'str' or 'File'.") from None
 
+        if "->" in file_name:
+            file_name = file_name.split("->")[-1].strip()
+
         return file_name
 
     def switch_file_status(self, file: Union[File, str], path: Optional[str] = None):
         path = path or self.op_path
         file_name = self._get_file_str(file)
+        # with open("./debug.log", "a+") as f:
+        #     f.write(f"{file_name}\n")
 
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
