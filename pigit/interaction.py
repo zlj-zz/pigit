@@ -6,7 +6,7 @@ from time import sleep
 from .tui.loop import Loop, ExitLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .render import echo
+from .render import get_console
 from .render.style import Color, Fx
 from .common.git import GitOption
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 # git option handler
 git = GitOption()
+console = get_console()
 
 
 class BranchPanel(RowPanelWidget):
@@ -66,14 +67,16 @@ class StatusPanel(RowPanelWidget):
         return git.load_status(self.size[0])
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
-        if not raw_data:
-            return ["No status changed."]
-        return [file.display_str for file in raw_data]
+        return (
+            [file.display_str for file in raw_data]
+            if raw_data
+            else ["No status changed."]
+        )
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if self.raw_data:
             if is_cursor_row:
-                print("{} {}".format(self.cursor, line))
+                print(f"{self.cursor} {line}")
             else:
                 print(f"  {line}")
         else:
@@ -105,9 +108,10 @@ class StatusPanel(RowPanelWidget):
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
                 CmdRunner(
-                    '{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name),
+                    f'{editor} "{self.raw_data[cursor_row - 1].name}"',
                     path=self.repo_path,
                 )
+
         elif input_key == "enter":
             self.widget.set_file(self.raw_data[cursor_row - 1], self.repo_path)
             self.widget.activate()
@@ -141,7 +145,7 @@ class FilePanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
         else:
             print(line)
 
@@ -194,7 +198,7 @@ class CommitStatusPanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
         else:
             print(line)
 
@@ -212,11 +216,11 @@ class ModelSwitcher(SwitchWidget):
 def tui_main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
-        echo("`Terminal interaction not support windows now.`<#FF0000>")
+        console.echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
     if not git.get_repo_info()[0]:
-        echo("`Please run in a git repo dir.`<tomato>")
+        console.echo("`Please run in a git repo dir.`<tomato>")
         return
 
     status = StatusPanel(widget=FilePanel(), help_wait=help_wait)

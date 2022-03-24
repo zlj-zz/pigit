@@ -1,5 +1,5 @@
 from typing import Any, Iterable, List, Optional, Union
-import sys
+import sys, platform
 from itertools import islice
 from inspect import isclass
 from shutil import get_terminal_size
@@ -30,6 +30,15 @@ class Console:
     @property
     def hight(self):
         return self.size.lines
+
+    @property
+    def system(self) -> str:
+        """Return the OS name.
+
+        Values: 'Linux', 'Darwin', 'Java', 'Window', ''
+        """
+
+        return platform.system()
 
     @property
     def encoding(self):

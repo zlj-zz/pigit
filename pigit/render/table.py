@@ -221,7 +221,7 @@ class Table(BaseTb):
         show_lines = self.show_lines
         show_header = self.show_header
 
-        _box = self.box.substitute(console.encoding) if self.box else None
+        _box = self.box.substitute(console) if self.box else None
         new_line = Segment.line()
 
         if _box:
@@ -528,7 +528,7 @@ class UintTable(BaseTb):
         show_lines = self.show_lines
         show_header = self.show_header
 
-        _box = self.box.substitute(console.encoding) if self.box else None
+        _box = self.box.substitute(console) if self.box else None
         new_line = Segment.line()
 
         if _box:
