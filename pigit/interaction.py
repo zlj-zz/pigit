@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, List, Optional, Any
 import os, sys
 from time import sleep
 
-from .tui.loop import Loop, ExitLoop
+from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .render import echo
+from .render import get_console
 from .render.style import Color, Fx
 from .common.git import GitOption
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 # git option handler
 git = GitOption()
+console = get_console()
 
 
 class BranchPanel(RowPanelWidget):
@@ -46,7 +47,7 @@ class BranchPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
         elif input_key == " ":
             local_branch = self.raw_data[cursor_row - 1]
             if local_branch.is_head:
@@ -66,14 +67,16 @@ class StatusPanel(RowPanelWidget):
         return git.load_status(self.size[0])
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
-        if not raw_data:
-            return ["No status changed."]
-        return [file.display_str for file in raw_data]
+        return (
+            [file.display_str for file in raw_data]
+            if raw_data
+            else ["No status changed."]
+        )
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if self.raw_data:
             if is_cursor_row:
-                print("{} {}".format(self.cursor, line))
+                print(f"{self.cursor} {line}")
             else:
                 print(f"  {line}")
         else:
@@ -105,14 +108,15 @@ class StatusPanel(RowPanelWidget):
             # editor = os.environ.get("EDITOR", None)
             if editor := os.environ.get("EDITOR", None):
                 CmdRunner(
-                    '{} "{}"'.format(editor, self.raw_data[cursor_row - 1].name),
+                    f'{editor} "{self.raw_data[cursor_row - 1].name}"',
                     path=self.repo_path,
                 )
+
         elif input_key == "enter":
             self.widget.set_file(self.raw_data[cursor_row - 1], self.repo_path)
             self.widget.activate()
         elif input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
 
 
 class FilePanel(RowPanelWidget):
@@ -141,9 +145,12 @@ class FilePanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
         else:
             print(line)
+
+    def keyevent_help(self) -> str:
+        return ""
 
 
 class CommitPanel(RowPanelWidget):
@@ -174,7 +181,7 @@ class CommitPanel(RowPanelWidget):
             self.widget.set_commit(self.raw_data[cursor_row - 1])
             self.widget.activate()
         elif input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
 
     def keyevent_help(self) -> str:
         return "↲ : check commit diff.\n"
@@ -194,7 +201,7 @@ class CommitStatusPanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print("{}{}{}".format(Color.bg("#6495ED"), line, Fx.reset))
+            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
         else:
             print(line)
 
@@ -202,21 +209,28 @@ class CommitStatusPanel(RowPanelWidget):
         if input_key == "q":
             self.deactivate()
 
+    def keyevent_help(self) -> str:
+        return ""
+
 
 class ModelSwitcher(SwitchWidget):
     def process_keyevent(self, key: str) -> Optional[int]:
         if key in "123456789":
             return int(key) - 1
+        elif key in {"h"}:
+            self.set_current(self.current - 1)
+        elif key in {"l"}:
+            self.set_current(self.current + 1)
 
 
 def tui_main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
     if sys.platform.lower().startswith("win"):
-        echo("`Terminal interaction not support windows now.`<#FF0000>")
+        console.echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
     if not git.get_repo_info()[0]:
-        echo("`Please run in a git repo dir.`<tomato>")
+        console.echo("`Please run in a git repo dir.`<tomato>")
         return
 
     status = StatusPanel(widget=FilePanel(), help_wait=help_wait)
@@ -229,6 +243,6 @@ def tui_main(index=None, help_wait=1.5):
         switcher.set_current(int(start_idx) - 1)
 
     screen = Screen(switcher)
-    main_loop = Loop(screen)
+    main_loop = EventLoop(screen)
     main_loop.set_input_timeouts(0.125)
     main_loop.run()

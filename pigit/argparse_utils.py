@@ -1,10 +1,13 @@
 # -*- coding:utf-8 -*-
+
 from typing import Dict, List, Tuple, Union
 from copy import deepcopy
 from argparse import ArgumentParser, Namespace
 
 
 class Parser(object):
+    """~Parser can parse a valid dict to generate cmd arguments."""
+
     def __init__(self, args_dict: Dict) -> None:
         self._args_dict = deepcopy(args_dict)
         self._parse_handle = None

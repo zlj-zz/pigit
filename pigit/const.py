@@ -18,11 +18,11 @@ __copyright__ = "Copyright (c) 2021-2022 Zachary"
 # Handled the incompatibility between python2 and python3.          #
 #####################################################################
 
-# For windows.
-USER_HOME: str = ""
-PIGIT_HOME: str = ""
 IS_WIN: bool = platform.system() == "Windows"
 
+# For windows should have a different home path.
+USER_HOME: str = ""
+PIGIT_HOME: str = ""
 if IS_WIN:
     USER_HOME = os.environ["USERPROFILE"]
     PIGIT_HOME = os.path.join(USER_HOME, __project__)
@@ -37,7 +37,8 @@ CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
 
 COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 
-EXTRA_CMD_FILE_PATH: str = f"{PIGIT_HOME}/extra_cmds.py"
+EXTRA_CMD_MODULE_NAME: str = "extra_cmds"
+EXTRA_CMD_MODULE_PATH: str = f"{PIGIT_HOME}/{EXTRA_CMD_MODULE_NAME}.py"
 
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 

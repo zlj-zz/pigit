@@ -1,10 +1,11 @@
 # -*- coding:utf-8 -*-
+import os
 import pytest
 from unittest.mock import patch
 
 from .utils import analyze_it
 
-from pigit.processor import CmdProcessor
+from pigit.processor import CmdProcessor, get_extra_cmds
 from pigit.processor.cmd_func import add, set_email_and_username, fetch_remote_branch
 
 
@@ -38,6 +39,18 @@ class TestCmdProcessor:
 
         color_str = handle.color_command(command)
         console.echo(color_str)
+
+
+def test_load_cmds():
+    name = "test_module"
+    file = f"./{name}.py"
+    with open(file, "w") as f:
+        f.write("""extra_cmds = { 'A': 1 }""")
+
+    d = get_extra_cmds(name, file)
+    assert d["A"] == 1
+
+    os.remove(file)
 
 
 @patch("pigit.processor.cmd_func.run_cmd", return_value=None)

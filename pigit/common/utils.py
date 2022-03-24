@@ -2,7 +2,6 @@
 
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 import sys
-import platform
 import subprocess
 import asyncio
 import logging
@@ -81,8 +80,6 @@ def exec_cmd(*args, cwd: Optional[str] = None) -> Tuple[str, str]:
             # Get normal output and error output.
             res = output[0].decode()
             err = output[1].decode()
-            # res = proc.stdout.read().decode()
-            # err = proc.stderr.read().decode()
     except Exception as e:
         Log.error(traceback_info())
         return str(e), ""
@@ -90,13 +87,14 @@ def exec_cmd(*args, cwd: Optional[str] = None) -> Tuple[str, str]:
         return err, res
 
 
-async def async_run_cmd(*args, cwd: Optional[str] = None, msg: Optional[str] = None):
-    cmds = " ".join(args).split(" ")
+async def async_run_cmd(
+    *args, cwd: Optional[str] = None, msg: Optional[str] = None, output: bool = True
+):
 
     # receive (program, *args, ...), so must split the full cmd,
     # and unpack incoming.
     proc = await asyncio.create_subprocess_exec(
-        *cmds,
+        *args,
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE,
         start_new_session=True,
@@ -104,29 +102,27 @@ async def async_run_cmd(*args, cwd: Optional[str] = None, msg: Optional[str] = N
     )
     res, err = await proc.communicate()
 
-    msg and print(msg)
-    res and print(res.decode())
-    err and print(err.decode())
+    if output:
+        msg and print(msg)
+        res and print(res.decode())
+        err and print(err.decode())
 
     if proc.returncode != 0:
-        return cwd
+        return proc.returncode, args, cwd
+    else:
+        return proc.returncode, err.decode(), res.decode()
 
 
 def exec_async_tasks(tasks: List[Callable]) -> List[str]:
     """Execute tasks asynchronously."""
 
-    # TODO: asyncio API is nicer in python 3.7
-    if platform.system() == "Windows":
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-    else:
-        loop = asyncio.get_event_loop()
+    # The loop argument is deprecated since Python 3.8
+    # and scheduled for removal in Python 3.10
+    async def main():
+        L = await asyncio.gather(*tasks)
+        return L
 
-    try:
-        errors = loop.run_until_complete(asyncio.gather(*tasks))
-    finally:
-        loop.close()
-    return errors
+    return asyncio.run(main())
 
 
 def confirm(text: str = "", default: bool = True) -> bool:

@@ -1,7 +1,8 @@
 # -*- coding:utf-8 -*-
+from typing import Any, List, Optional, Tuple
+from abc import ABC, abstractmethod
 import time
 from math import ceil
-from typing import Any, Optional
 
 from .console import Term
 from ..common.utils import run_cmd, confirm
@@ -9,7 +10,7 @@ from ..render.str_utils import get_width
 from ..render.style import Fx
 
 
-class Widget(object):
+class Widget(ABC):
     _activation = False
 
     def activate(self):
@@ -21,30 +22,42 @@ class Widget(object):
     def is_activation(self):
         return self._activation
 
+    @abstractmethod
     def _process_event(self):
-        raise NotImplementedError()
+        """Method of processing keyboard event.
 
+        It will be instance in sub-class.
+        """
+
+    @abstractmethod
     def _render(self, size):
-        raise NotImplementedError()
+        """Method of render a widget.
+
+        It will be instance in sub-class.
+        """
 
 
 class SwitchWidget(Widget):
-    _activation = True
+    _activation: bool = True
 
-    def __init__(self, sub_widgets: list = None, start_idx: int = 0):
+    def __init__(self, sub_widgets: List = None, start_idx: int = 0):
         self.idx = start_idx
 
         if not sub_widgets:
-            self.sub_widgets: list[Widget] = []
+            self.sub_widgets: List[Widget] = []
             self.sub_widgets_count = 0
         else:
             self.sub_widgets = sub_widgets
             self.sub_widgets_count = len(sub_widgets)
 
-    def add(self, widget):
+    def add(self, widget: Widget):
         """Add new sub widget."""
         self.sub_widgets.append(widget)
         self.sub_widgets_count += 1
+
+    @property
+    def current(self) -> int:
+        return self.idx
 
     def set_current(self, idx: int):
         """Set the top sub widget, if index is valid."""
@@ -53,8 +66,9 @@ class SwitchWidget(Widget):
             self.idx = idx
             self.sub_widgets[self.idx].activate()
 
+    @abstractmethod
     def process_keyevent(self, key: str) -> Optional[int]:
-        raise NotImplementedError()
+        """Costom process keyboard event, instance in sub-class."""
 
     def _process_event(self, key: str):
         next_idx = self.process_keyevent(key)
@@ -94,28 +108,28 @@ class RowPanelWidget(Widget):
 
         # Initialize.
         self.cursor_row: int = 1
-        self.display_range: list = None  # Allow display row range.
+        self.display_range: List = None  # Allow display row range.
 
         self.extra = 0  # Extra occupied row.
 
-        self.raw_data: list = None
-        self.show_data: list = None
+        self.raw_data: List = None
+        self.show_data: List = None
 
         self.update_raw: bool = False
 
         for key, value in kwargs.items():
             setattr(self, "_ex_{}".format(key), value)
 
-    def get_raw_data(self) -> list[Any]:
+    @abstractmethod
+    def get_raw_data(self) -> List[Any]:
         """How to get the raw data."""
-        raise NotImplementedError()
 
-    def process_raw_data(self, raw_data: list[Any]) -> list[str]:
+    def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         return raw_data
 
     def generate_show_data(
-        self, raw_data: list[str], width: int
-    ) -> list[tuple[str, int]]:
+        self, raw_data: List[str], width: int
+    ) -> List[Tuple[str, int]]:
         """
         Process the raw data, and indicate the number of additional
         rows that need to be occupied when each piece of data is displayed.
@@ -130,17 +144,17 @@ class RowPanelWidget(Widget):
             new_list.append((line, ceil(count / width) - 1))
         return new_list
 
+    @abstractmethod
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         """How to output one line.
 
         May has some different when current line is cursor line.
         Support to process cursor line specially.
         """
-        raise NotImplementedError()
 
     def update(self):
         self.display_range = [1, self.size[1] - 1]
-        self.raw_data: list[Any] = self.get_raw_data()
+        self.raw_data: List[Any] = self.get_raw_data()
         self.show_data = self.generate_show_data(
             self.process_raw_data(self.raw_data), self.size[0]
         )
@@ -200,7 +214,7 @@ class RowPanelWidget(Widget):
                 self.cursor_row -= 5
                 self.cursor_row = max(self.cursor_row, 1)
 
-            elif key in {"?", "h"}:
+            elif key in {"?", "H"}:
                 print(Term.clear_screen)
                 print(
                     (
@@ -208,7 +222,7 @@ class RowPanelWidget(Widget):
                         "j / ↓: select next line.\n"
                         "J: Scroll down 5 lines.\n"
                         "K: Scroll down 5 lines.\n"
-                        "? / h : show help, wait {}s and exit.\n" + self.keyevent_help()
+                        "? / H : show help, wait {}s and exit.\n" + self.keyevent_help()
                     ).format(self.help_wait)
                 )
                 time.sleep(self.help_wait)
@@ -216,6 +230,7 @@ class RowPanelWidget(Widget):
             else:
                 self.process_keyevent(key, self.cursor_row)
 
+    @abstractmethod
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         """Handles keyboard events other than movement.
 
@@ -227,15 +242,14 @@ class RowPanelWidget(Widget):
         Returns:
             bool: whether need refresh data.
         """
-        pass
 
+    @abstractmethod
     def keyevent_help(self) -> str:
         """Get extra keyevent help message.
 
         Returns:
             str: help message string.
         """
-        pass
 
 
 class ConfirmWidget:

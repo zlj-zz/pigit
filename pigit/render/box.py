@@ -1,7 +1,9 @@
-from typing import Iterable, List, Literal
-import platform
+from typing import Iterable, List, Literal, TYPE_CHECKING
 
 from ._loop import loop_last
+
+if TYPE_CHECKING:
+    from .console import Console
 
 
 class Box:
@@ -67,11 +69,11 @@ class Box:
     def __str__(self) -> str:
         return self._box
 
-    def substitute(self, encoding: str) -> "Box":
+    def substitute(self, console: "Console") -> "Box":
         box = self
-        if platform.system == "Windows":
+        if console.system == "Windows":
             box = WINDOWS_SUBSTITUTIONS.get(box, box)
-        if not encoding.startswith("utf"):
+        if not console.encoding.startswith("utf"):
             box = ASCII
 
         return box

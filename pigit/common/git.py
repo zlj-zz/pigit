@@ -6,7 +6,7 @@ import os, re, textwrap, json
 
 from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd
 from pigit.common.git_model import File, Commit, Branch
-from pigit.render.str_utils import shorten, garbled_code_analysis
+from pigit.render.str_utils import shorten, byte_str2str
 from pigit.render.console import Console
 
 
@@ -321,14 +321,13 @@ class GitOption:
                 # skip blank line.
                 continue
 
-            if file.endswith('"'):
-                # may is chinese char code.
-                file = garbled_code_analysis(file)
-
             change = file[:2]
             staged_change = file[:1]
             unstaged_change = file[1:2]
             name = file[3:]
+            if name.endswith('"'):
+                # may is chinese char code.
+                name = byte_str2str(name[1:-1])
             untracked = change in ["??", "A ", "AM"]
             has_no_staged_change = staged_change in [" ", "U", "?"]
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
@@ -491,11 +490,16 @@ class GitOption:
         else:
             raise GitOptionError("`file` only allow 'str' or 'File'.") from None
 
+        if "->" in file_name:
+            file_name = file_name.split("->")[-1].strip()
+
         return file_name
 
     def switch_file_status(self, file: Union[File, str], path: Optional[str] = None):
         path = path or self.op_path
         file_name = self._get_file_str(file)
+        # with open("./debug.log", "a+") as f:
+        #     f.write(f"{file_name}\n")
 
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
@@ -727,14 +731,14 @@ class GitOption:
 
     def process_repo_option(self, repos: Optional[List[str]], cmd: str):
         exist_repos = self.load_repos()
-        print(cmd, "\n")
+        print(f":: {cmd}\n")
 
         if repos:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
         if len(exist_repos) >= 1:
             return exec_async_tasks(
-                async_run_cmd(cmd, cwd=prop["path"], msg=f":: {prop['path']}")
+                async_run_cmd(*cmd.split(), cwd=prop["path"], msg=f":: {prop['path']}")
                 for name, prop in exist_repos.items()
             )
 
