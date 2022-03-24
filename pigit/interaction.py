@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Optional, Any
 import os, sys
 from time import sleep
 
-from .tui.loop import Loop, ExitLoop
+from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .render import get_console
@@ -47,7 +47,7 @@ class BranchPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
         elif input_key == " ":
             local_branch = self.raw_data[cursor_row - 1]
             if local_branch.is_head:
@@ -116,7 +116,7 @@ class StatusPanel(RowPanelWidget):
             self.widget.set_file(self.raw_data[cursor_row - 1], self.repo_path)
             self.widget.activate()
         elif input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
 
 
 class FilePanel(RowPanelWidget):
@@ -149,6 +149,9 @@ class FilePanel(RowPanelWidget):
         else:
             print(line)
 
+    def keyevent_help(self) -> str:
+        return ""
+
 
 class CommitPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Commit"]:
@@ -178,7 +181,7 @@ class CommitPanel(RowPanelWidget):
             self.widget.set_commit(self.raw_data[cursor_row - 1])
             self.widget.activate()
         elif input_key == "q":
-            raise ExitLoop
+            raise ExitEventLoop
 
     def keyevent_help(self) -> str:
         return "↲ : check commit diff.\n"
@@ -206,11 +209,18 @@ class CommitStatusPanel(RowPanelWidget):
         if input_key == "q":
             self.deactivate()
 
+    def keyevent_help(self) -> str:
+        return ""
+
 
 class ModelSwitcher(SwitchWidget):
     def process_keyevent(self, key: str) -> Optional[int]:
         if key in "123456789":
             return int(key) - 1
+        elif key in {"h"}:
+            self.set_current(self.current - 1)
+        elif key in {"l"}:
+            self.set_current(self.current + 1)
 
 
 def tui_main(index=None, help_wait=1.5):
@@ -233,6 +243,6 @@ def tui_main(index=None, help_wait=1.5):
         switcher.set_current(int(start_idx) - 1)
 
     screen = Screen(switcher)
-    main_loop = Loop(screen)
+    main_loop = EventLoop(screen)
     main_loop.set_input_timeouts(0.125)
     main_loop.run()

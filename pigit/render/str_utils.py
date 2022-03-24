@@ -150,6 +150,37 @@ def set_cell_size(text: str, total: int) -> str:
             start = pos
 
 
+def wrap_color_str(line: str, width: int):
+    """Warp a colored line.
+    Wrap a colored string according to the width of the restriction.
+    Args:
+        line: A colored string.
+        width: Limit width.
+    """
+    # line = re.sub(r"\x1b(?P<need>\[\d+;*\d*[suABCDf])", "\g<need>", line)
+    # line = line.replace("\\", "\\\\")
+    line_len = len(line)
+    lines = []
+    start = 0
+    i = 0
+    count = 0
+    while i < line_len:
+        if line[i] == "\x1b":
+            while line[i] not in ["m"]:
+                i += 1
+        i += 1
+        count += get_char_width(line[i]) if i < line_len else 0
+        if count + 1 >= width - 1:
+            i += 1
+            lines.append(line[start:i])
+            start = i
+            count = 0
+    if start < line_len:
+        lines.append(line[start:])
+
+    return lines
+
+
 def shorten(
     text: str, width: int, placeholder: str = "...", front: bool = False
 ) -> str:
