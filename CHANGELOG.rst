@@ -2,8 +2,16 @@
 Changelog of pigit
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-v1.5.0 (2022-02-26)
-----------
+## v1.5.1 (2022-03-24)
+- Support using pigit like normal third-module.
+- Fixed bug of tui mode.
+- Improve pigit code structure.
+- Improve code counter output.
+- New rendering module.
+- Update style, support background color.
+- Beautify the repo option output.
+
+## v1.5.0 (2022-02-26)
 - Refactor code, split sub-command of usage.
 - Refactor shell completion.
 - Refactor args parser.
