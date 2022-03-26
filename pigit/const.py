@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
-import os, platform
+import os, platform, datetime
 
 __project__ = "pigit"
-__version__ = "1.5.1"
+__version__ = "1.5.2-dev"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -11,12 +11,13 @@ __author__ = "Zachary Zhang"
 __email__ = "zlj19971222@outlook.com"
 
 __license__ = "MIT"
-__copyright__ = "Copyright (c) 2021-2022 Zachary"
+__copyright__ = f"Copyright (c) 2021-{datetime.datetime.now().year} Zachary"
 
 #####################################################################
 # Part of compatibility.                                            #
 # Handled the incompatibility between python2 and python3.          #
 #####################################################################
+VERSION = __version__
 
 IS_WIN: bool = platform.system() == "Windows"
 

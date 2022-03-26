@@ -1,38 +1,71 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
+from argparse import ArgumentParser, Namespace, _ArgumentGroup
 from copy import deepcopy
-from argparse import ArgumentParser, Namespace
 
 
 class Parser(object):
-    """~Parser can parse a valid dict to generate cmd arguments."""
+    """~Parser can parse a valid dict to generate cmd arguments.
+
+    It is realized by encapsulating ~ArgumentParser. Some parameters
+    can refer to ~ArgumentParser.
+
+    Example:
+        d = {
+            "prog": prog name, like: 'pigit',
+            "prefix_chars": default is `-`,
+            "description": description message of the Parser,
+            "args": {
+                "command name": {
+                    'type': ... [groups, sub, None],
+                    ... command arguments,
+                    "set_defaults": a dict, will use `set_defaults` method,
+                },
+                ...,
+            },
+        }
+    """
 
     def __init__(self, args_dict: Dict) -> None:
         self._args_dict = deepcopy(args_dict)
         self._parse_handle = None
 
-    def _generate_handle_from_args(self) -> None:
+    def _parse_from_args(self) -> None:
         """Parse `self._args_dict` to genrate a `ArgumentParser`."""
 
+        def add_command(
+            handle: Union[ArgumentParser, _ArgumentGroup],
+            name: str,
+            args: Dict[str, Any],
+        ) -> None:
+            """Add command to handle object."""
+            # print(name)
+            names: list[str] = name.split(" ")
+            handle.add_argument(*names, **args)
+
         def _parse_args(handle: ArgumentParser, args: Dict) -> None:
-            sub_parsers = None
+            sub_parsers: ArgumentParser = None
 
             for name, prop in args.items():
+                # Get command type.
+                prop_type = prop.get("type")
+                if prop_type:
+                    del prop["type"]
 
-                if name == "-groups":
-                    # TODO: '_ArgumentGroup' object has no attribute 'add_subparsers'
-                    for g_name, group in prop.items():
-                        group_handle = handle.add_argument_group(
-                            title=group.get("title", ""),
-                            description=group.get("description", ""),
-                        )
-                        group_args: dict = group.get("args", {})
+                # Process command according to type.
+                if prop_type == "groups":
+                    # Create argument group.
+                    g_handle: _ArgumentGroup = handle.add_argument_group(
+                        title=prop.get("title", ""),
+                        description=prop.get("description", ""),
+                    )
+                    # Add command to group.
+                    for g_name, g_prop in prop.get("args", {}).items():
+                        add_command(g_handle, g_name, g_prop)
 
-                        _parse_args(group_handle, group_args)
-
-                elif "args" in prop:
-                    # Cannot have multiple subparser arguments.
+                elif prop_type == "sub":
+                    # Cannot have multiple subparser arguments for same ~ArgumentParser.
                     if not sub_parsers:
                         sub_parsers = handle.add_subparsers()
 
@@ -52,31 +85,28 @@ class Parser(object):
                     _parse_args(sub_handle, sub_args)
 
                 else:
-                    names: list[str] = name.split(" ")
-                    handle.add_argument(*names, **prop)
+                    add_command(handle, name, prop)
 
-        d = self._args_dict
-        args: dict = d.get("args", {})
+        top_dict = self._args_dict
+        args: dict = top_dict.get("args", {})
+        del top_dict["args"]
 
         # Create root parser.
-        p = self._parse_handle = ArgumentParser(
-            prog=d.get("prog", None),
-            prefix_chars=d.get("prefix_chars", None),
-            description=d.get("description", None),
-            add_help=d.get("add_help", True),
-        )
-
+        p = self._parse_handle = ArgumentParser(**top_dict)
+        # Parse and add command.
         _parse_args(p, args)
 
     @property
     def parse_handle(self):
         """Return a handle, create it when not exist."""
         if self._parse_handle is None:
-            self._generate_handle_from_args()
+            self._parse_from_args()
 
         return self._parse_handle
 
     def parse(self, args: Union[List, str, None] = None) -> Tuple[Namespace, List]:
+        """Parse argument."""
+
         if args is None:
             known_args, unknown = self.parse_handle.parse_known_args()
         elif isinstance(args, list):

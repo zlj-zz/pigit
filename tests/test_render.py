@@ -1,5 +1,4 @@
 # -*- coding:utf-8 -*-
-import doctest
 from typing import Optional
 import pytest
 import doctest

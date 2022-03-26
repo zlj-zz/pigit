@@ -9,12 +9,12 @@ from .decorator import time_it
 from .config import Config
 from .argparse_utils import Parser
 from .const import (
+    VERSION,
     REPOS_PATH,
-    __version__,
     PIGIT_HOME,
+    LOG_FILE_PATH,
     EXTRA_CMD_MODULE_NAME,
     EXTRA_CMD_MODULE_PATH,
-    LOG_FILE_PATH,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
@@ -37,7 +37,7 @@ Log = logging.getLogger(__name__)
 # Configuration.
 #################
 CONFIG = Config(
-    path=CONFIG_FILE_PATH, version=__version__, auto_load=True
+    path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
 ).output_warnings()
 
 
@@ -232,7 +232,7 @@ argparse_dict = {
         "-v --version": {
             "action": "version",
             "help": "Show version and exit.",
-            "version": f"Version: {__version__}",
+            "version": f"Version: {VERSION}",
         },
         "-r --report": {
             "action": "store_true",
@@ -251,38 +251,38 @@ argparse_dict = {
             "help": "Current runtime in debug mode.",
         },
         "--out-log": {"action": "store_true", "help": "Print log to console."},
-        "-groups": {
-            "tools": {
-                "title": "tools arguments",
-                "description": "Auxiliary type commands.",
-                "args": {
-                    "-c --count": {
-                        "nargs": "?",
-                        "const": ".",
-                        "type": str,
-                        "metavar": "PATH",
-                        "help": "Count the number of codes and output them in tabular form."
-                        "A given path can be accepted, and the default is the current directory.",
-                    },
-                    "-C --complete": {
-                        "action": "store_true",
-                        "help": "Add shell prompt script and exit.(Supported bash, zsh, fish)",
-                    },
-                    "--create-ignore": {
-                        "type": str,
-                        "metavar": "TYPE",
-                        "dest": "ignore_type",
-                        "help": f'Create a demo .gitignore file. Need one argument, support: [{", ".join(SUPPORTED_GITIGNORE_TYPES)}]',
-                    },
-                    "--create-config": {
-                        "action": "store_true",
-                        "help": "Create a pre-configured file of PIGIT."
-                        "(If a profile exists, the values available in it are used)",
-                    },
+        "tools": {
+            "type": "groups",
+            "title": "tools arguments",
+            "description": "Auxiliary type commands.",
+            "args": {
+                "-c --count": {
+                    "nargs": "?",
+                    "const": ".",
+                    "type": str,
+                    "metavar": "PATH",
+                    "help": "Count the number of codes and output them in tabular form."
+                    "A given path can be accepted, and the default is the current directory.",
                 },
-            }
+                "-C --complete": {
+                    "action": "store_true",
+                    "help": "Add shell prompt script and exit.(Supported bash, zsh, fish)",
+                },
+                "--create-ignore": {
+                    "type": str,
+                    "metavar": "TYPE",
+                    "dest": "ignore_type",
+                    "help": f'Create a demo .gitignore file. Need one argument, support: [{", ".join(SUPPORTED_GITIGNORE_TYPES)}]',
+                },
+                "--create-config": {
+                    "action": "store_true",
+                    "help": "Create a pre-configured file of PIGIT."
+                    "(If a profile exists, the values available in it are used)",
+                },
+            },
         },
         "cmd": {
+            "type": "sub",
             "help": "git short command.",
             "description": "If you want to use some original git commands, please use -- to indicate.",
             "args": {
@@ -319,9 +319,11 @@ argparse_dict = {
             },
         },
         "repo": {
+            "type": "sub",
             "help": "repo options.",
             "args": {
                 "add": {
+                    "type": "sub",
                     "help": "add repo(s).",
                     "args": {
                         "paths": {"nargs": "+", "help": "path of reps(s)."},
@@ -336,6 +338,7 @@ argparse_dict = {
                     },
                 },
                 "rm": {
+                    "type": "sub",
                     "help": "remove repo(s).",
                     "args": {
                         "repos": {
@@ -353,6 +356,7 @@ argparse_dict = {
                     },
                 },
                 "rename": {
+                    "type": "sub",
                     "help": "rename a repo.",
                     "args": {
                         "repo": {"help": "the name of repo."},
@@ -364,6 +368,7 @@ argparse_dict = {
                     },
                 },
                 "ll": {
+                    "type": "sub",
                     "help": "display summary of all repos.",
                     "args": {
                         "--simple": {
@@ -377,6 +382,7 @@ argparse_dict = {
                     },
                 },
                 "clear": {
+                    "type": "sub",
                     "help": "clear the all repos.",
                     "args": {
                         "set_defaults": {
@@ -387,6 +393,7 @@ argparse_dict = {
                 },
                 **{
                     name: {
+                        "type": "sub",
                         "help": prop["help"] + " for repo(s).",
                         "args": {
                             "repos": {
@@ -404,6 +411,7 @@ argparse_dict = {
             },
         },
         "open": {
+            "type": "sub",
             "help": "open remote repository in web browser.",
             "args": {
                 "branch": {
@@ -514,7 +522,3 @@ def main(custom_commands: Optional[List] = None):
 
     # Process result.
     process(stdargs, extra_unknown)
-
-
-if __name__ == "__main__":
-    main()

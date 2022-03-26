@@ -31,7 +31,7 @@ class BashCompletion(ShellCompletion):
         """
     )
 
-    def generate(self):
+    def generate(self) -> str:
         # TODO:improve `bash` completion script.
         comp_keys = []
 

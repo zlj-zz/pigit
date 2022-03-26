@@ -38,7 +38,7 @@ def shell_complete(
         return
 
     print("\n===Try to add completion ...")
-    print(":: Completion shell: %s" % repr(shell))
+    print(f":: Completion shell: {repr(shell)}")
 
     complete_handle = supported_shell[shell](
         prog, complete_var, script_dir, script_name, inject_path

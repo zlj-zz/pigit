@@ -1,6 +1,8 @@
+from pprint import pprint
 import pytest
 
 from pigit.argparse_utils import Parser
+from pigit.shellcompletion.base import ShellCompletion
 
 
 def test():
@@ -19,28 +21,28 @@ def test():
                 "help": "Current runtime in debug mode.",
             },
             "--out-log": {"action": "store_true", "help": "Print log to console."},
-            "-groups": {
-                "tools": {
-                    "title": "tools arguments",
-                    "description": "Auxiliary type commands.",
-                    "args": {
-                        "-c --count": {
-                            "nargs": "?",
-                            "const": ".",
-                            "type": str,
-                            "metavar": "PATH",
-                            "help": "Count the number of codes and output them in tabular form."
-                            "A given path can be accepted, and the default is the current directory.",
-                        },
-                        "--create-config": {
-                            "action": "store_true",
-                            "help": "Create a pre-configured file of PIGIT."
-                            "(If a profile exists, the values available in it are used)",
-                        },
+            "tools": {
+                "type": "groups",
+                "title": "tools arguments",
+                "description": "Auxiliary type commands.",
+                "args": {
+                    "-c --count": {
+                        "nargs": "?",
+                        "const": ".",
+                        "type": str,
+                        "metavar": "PATH",
+                        "help": "Count the number of codes and output them in tabular form."
+                        "A given path can be accepted, and the default is the current directory.",
                     },
-                }
+                    "--create-config": {
+                        "action": "store_true",
+                        "help": "Create a pre-configured file of PIGIT."
+                        "(If a profile exists, the values available in it are used)",
+                    },
+                },
             },
             "cmd": {
+                "type": "sub",
                 "help": "git short command.",
                 "description": "If you want to use some original git commands, please use -- to indicate.",
                 "args": {
@@ -74,4 +76,7 @@ def test():
         parser.parse({})
 
     # with pytest.raises(SystemExit):
-        # print(parser.parse())
+    # print(parser.parse())
+    ShellCompletion._SHELL = ""
+    ShellCompletion._INJECT_PATH = ""
+    pprint(ShellCompletion("", {})._parse(argparse_dict["args"]))
