@@ -3,6 +3,7 @@ import doctest
 from typing import Optional
 import pytest
 import doctest
+
 from .utils import analyze_it
 
 from pigit.render.console import Console
@@ -193,3 +194,8 @@ class TestStrUtils:
         )
         print(s)
         assert s == "test/测试中文.py"
+
+
+def test_console():
+    console = Console()
+    console.echo([1, 2, 3, 4, 5])

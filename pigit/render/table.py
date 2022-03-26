@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, Generator, List, Optional, Tuple, Union
 from dataclasses import dataclass, field
 
 # from . import box
@@ -110,7 +110,7 @@ class Table(BaseTb):
         self._rows: List[Row] = []
 
     @property
-    def _extra_width(self):
+    def _extra_width(self) -> int:
         width = 0
         if self.box and self.show_edge:
             width += 2
@@ -125,7 +125,7 @@ class Table(BaseTb):
         header_style: Optional[str] = "bold",
         style: Optional[str] = None,
         no_wrap: bool = False,
-    ):
+    ) -> None:
         column = Column(
             header=header,
             header_style=header_style,
@@ -136,7 +136,9 @@ class Table(BaseTb):
 
         self._columns.append(column)
 
-    def add_row(self, *values, style: Optional[str] = None, end_section: bool = False):
+    def add_row(
+        self, *values, style: Optional[str] = None, end_section: bool = False
+    ) -> None:
         cells = values
         columns = self._columns
 
@@ -159,7 +161,7 @@ class Table(BaseTb):
 
         self._rows.append(Row(style=style, end_section=end_section))
 
-    def get_row_style(self, console: "Console", index: int):
+    def get_row_style(self, console: "Console", index: int) -> Style:
         """Get current row style."""
 
         style = Style.null()
@@ -169,7 +171,7 @@ class Table(BaseTb):
 
         return style
 
-    def _get_cells(self, console: "Console", column: Column):
+    def _get_cells(self, console: "Console", column: Column) -> List[Segment]:
         raw_cells = []
 
         if self.show_header:
@@ -181,7 +183,9 @@ class Table(BaseTb):
         raw_cells.extend(Segment(cell, cell_style) for cell in column._cells)
         return raw_cells
 
-    def _measure_column(self, console: "Console", column: Column, max_width: int):
+    def _measure_column(
+        self, console: "Console", column: Column, max_width: int
+    ) -> int:
         if max_width < 1:
             return 0
 
@@ -189,7 +193,7 @@ class Table(BaseTb):
 
         return max(cell.cell_len_without_tag for cell in cells)
 
-    def _calc_column_widths(self, console: "Console", max_width: int):
+    def _calc_column_widths(self, console: "Console", max_width: int) -> List[int]:
         columns = self._columns
 
         widths = [
@@ -210,7 +214,7 @@ class Table(BaseTb):
 
         return widths
 
-    def _render(self, console: "Console", widths: List[int]):
+    def _render(self, console: "Console", widths: List[int]) -> Generator:
 
         border_style = console.get_style(self.border_style or "")
         _columns_cells = [self._get_cells(console, column) for column in self._columns]
@@ -327,7 +331,7 @@ class Table(BaseTb):
             yield Segment(_box.get_bottom(widths), style=border_style)
             yield new_line
 
-    def __render__(self, console: "Console"):
+    def __render__(self, console: "Console") -> Generator:
 
         if not self._columns:
             yield Segment("\n")
@@ -417,7 +421,7 @@ class UintTable(BaseTb):
         self.units: List[Unit] = []
 
     @property
-    def _extra_width(self):
+    def _extra_width(self) -> int:
         width = 0
         if self.box and self.show_edge:
             width += 2
@@ -446,7 +450,9 @@ class UintTable(BaseTb):
         self.units.append(unit)
         return unit
 
-    def _measure_unit(self, console: "Console", unit: Unit, max_width: int):
+    def _measure_unit(
+        self, console: "Console", unit: Unit, max_width: int
+    ) -> Tuple[int, int]:
         # TODO: process for chinese
         if max_width < 1:
             return (0, 0)
@@ -490,7 +496,7 @@ class UintTable(BaseTb):
 
     def _render_line(
         self, cells, height, box_segments, show_edge, is_header: bool = False
-    ):
+    ) -> Generator:
         new_line = Segment.line()
 
         if box_segments:
@@ -519,7 +525,7 @@ class UintTable(BaseTb):
                     yield from rendered_cell[line_no]
                 yield new_line
 
-    def _render(self, console: "Console", widths: List[int]):
+    def _render(self, console: "Console", widths: List[int]) -> Generator:
         border_style = console.get_style(self.border_style or "")
         units = self.units
         # print(units)
@@ -555,20 +561,19 @@ class UintTable(BaseTb):
         get_style = console.get_style
         set_shape = self.set_shape
 
-        for index, (first, last, unit) in enumerate(loop_first_last(units)):
+        for (first, last, unit) in loop_first_last(units):
             header_row = first and show_header
             footer_row = last
 
             if show_edge:
                 if header_row:
                     yield Segment(_box.get_top(widths, merge=True), border_style)
-                    yield new_line
                 else:
                     yield Segment(
                         _box.get_row(widths, "head", edge=show_edge, cross_level="up"),
                         style=border_style,
                     )
-                    yield new_line
+                yield new_line
 
             # yield one unit header
             header_style = get_style(unit.header_style or "")
@@ -612,7 +617,7 @@ class UintTable(BaseTb):
             yield Segment(_box.get_bottom(widths), style=border_style)
             yield new_line
 
-    def __render__(self, console: "Console"):
+    def __render__(self, console: "Console") -> Generator:
         if not self.units:
             yield Segment.line()
             return

@@ -314,6 +314,7 @@ class Color(object):
             self.hexa = color
         else:  # list or tuple
             self.rgb = rgb = color
+            # sourcery skip: replace-interpolation-with-fstring
             self.hexa = "#%s%s%s" % (
                 hex(rgb[0]).lstrip("0x").zfill(2),
                 hex(rgb[1]).lstrip("0x").zfill(2),
@@ -436,14 +437,10 @@ class Color(object):
                 _COLOR_RE.match(str(code)) is not None
                 or COLOR_CODE.get(code) is not None
             )
-        elif isinstance(code, list) or isinstance(code, tuple):
+        elif isinstance(code, (list, tuple)):
             if len(code) != 3:
                 return False
-            for c in code:
-                if not (0 <= c <= 255):
-                    return False
-            else:
-                return True
+            return all(0 <= c <= 255 for c in code)
         else:
             return False
 
@@ -531,15 +528,15 @@ class Style(object):
             self._ansi = f"{Fx.start}{';'.join(sgr)}{Fx.end}"
             if self.color:
                 self._ansi += (
-                    Color.by_name(self.color)
-                    if not self.color.startswith("#")
-                    else Color.fg(self.color)
+                    Color.fg(self.color)
+                    if self.color.startswith("#")
+                    else Color.by_name(self.color)
                 )
             if self.bg_color:
                 self._ansi += (
-                    Color.by_name(self.bg_color, depth="bg")
-                    if not self.bg_color.startswith("#")
-                    else Color.bg(self.bg_color)
+                    Color.bg(self.bg_color)
+                    if self.bg_color.startswith("#")
+                    else Color.by_name(self.bg_color, depth="bg")
                 )
 
         # print(repr(self._ansi))
@@ -549,7 +546,7 @@ class Style(object):
         attrs = self._make_ansi_code()
         return f"{attrs}{text}{Fx.reset}" if attrs else text
 
-    def test(self, text: Optional[str] = None):
+    def test(self, text: Optional[str] = None) -> None:
         text = text or str(self)
         print(self.render(text))
 
@@ -606,7 +603,7 @@ class Style(object):
         return Style(color=color, bg_color=bg_color, **attributes)
 
     @staticmethod
-    def render_style(_msg: str, /, *, _style_sub=_STYLE_RE.sub):
+    def render_style(_msg: str, /, *, _style_sub=_STYLE_RE.sub) -> str:
         def do_replace(match: Match[str]) -> str:
             raw, fx_tag, content, color_code, bg_color_code = match.groups()
             # print(raw, fx_tag, content, color_code, bg_color_code)
@@ -646,7 +643,7 @@ class Style(object):
         return _style_sub(do_replace, _msg)
 
     @classmethod
-    def remove_style(cls, _msg: str, /, *, _style_sub=_STYLE_RE.sub):
+    def remove_style(cls, _msg: str, /, *, _style_sub=_STYLE_RE.sub) -> str:
         def do_replace(match: Match[str]) -> str:
             raw, fx, content, color_code, color_bg_code = match.groups()
 

@@ -693,7 +693,7 @@ class GitOption:
             self.save_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def ll_repos(self) -> Generator:
+    def ll_repos(self) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name, prop in exist_repos.items():

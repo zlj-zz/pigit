@@ -66,7 +66,7 @@ class EventLoop(object):
         try:
             while True:
                 self._loop()
-        except (ExitEventLoop, KeyboardInterrupt, IOError):
+        except (ExitEventLoop, KeyboardInterrupt, EOFError):
             self._input_handle.stop()
 
     def run(self):

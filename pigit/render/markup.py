@@ -1,11 +1,11 @@
-from typing import List, Union
+from typing import List, Tuple, Union
 
 from .emoji import Emoji
 from .style import _STYLE_RE, Style
 from .segment import Segment
 
 
-def _parse(markup: str):
+def _parse(markup: str) -> Tuple:
     position = 0
 
     for match in _STYLE_RE.finditer(markup):
@@ -21,7 +21,9 @@ def _parse(markup: str):
         yield markup[position:], None, None, None
 
 
-def render_markup(markup: str, style: Union[str, Style] = "", emoji: bool = True):
+def render_markup(
+    markup: str, style: Union[str, Style] = "", emoji: bool = True
+) -> List[Segment]:
     if emoji:
         markup = Emoji.render_emoji(markup)
 
