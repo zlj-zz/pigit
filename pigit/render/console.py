@@ -1,5 +1,6 @@
 from typing import Any, Iterable, List, Optional, Union
 import sys, platform
+from threading import Lock
 from itertools import islice
 from inspect import isclass
 from shutil import get_terminal_size
@@ -12,6 +13,8 @@ from .errors import NotRenderableError, StyleSyntaxError, MissingStyle
 
 
 class Console:
+    _lock = Lock()
+
     def __init__(self) -> None:
         self._buffer = []
         self._size = None
@@ -107,9 +110,7 @@ class Console:
         elif hasattr(obj, "__render__") and not isclass(obj):
             render_iterable = obj.__render__(self)
         else:
-            raise NotRenderableError(
-                f"{obj!r} can't render without `__render__` method."
-            )
+            render_iterable = [str(obj)]
 
         try:
             render_iter = iter(render_iterable)
@@ -125,12 +126,13 @@ class Console:
                 yield from self.render(render_output)
 
     def echo(self, *values, sep: str = " ", end: str = "\n", flush: bool = True):
-        for value in values:
-            render_iter = self.render(value)
-            self._buffer.append("".join(render_iter))
+        with self._lock:
+            for value in values:
+                render_iter = self.render(value)
+                self._buffer.append("".join(render_iter))
 
-        # print(self._buffer, len(self._buffer))
+            # print(self._buffer, len(self._buffer))
 
-        if self._buffer:
-            print(*self._buffer, sep=sep, end=end, flush=flush)
-            del self._buffer[:]
+            if self._buffer:
+                print(*self._buffer, sep=sep, end=end, flush=flush)
+                del self._buffer[:]

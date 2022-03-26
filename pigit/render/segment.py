@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Generator
 
 from .str_utils import cell_len, set_cell_size, chop_cells
 from .style import Style, Fx
@@ -14,7 +14,7 @@ class Segment:
         self.style = style
         self._length = len(text)
 
-    def __render__(self, console: "Console"):
+    def __render__(self, console: "Console") -> Generator[str, None, None]:
         if self.style:
             yield self.style.render(self.text)
         else:

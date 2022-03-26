@@ -150,7 +150,7 @@ def set_cell_size(text: str, total: int) -> str:
             start = pos
 
 
-def wrap_color_str(line: str, width: int):
+def wrap_color_str(line: str, width: int) -> List[str]:
     """Warp a colored line.
     Wrap a colored string according to the width of the restriction.
     Args:

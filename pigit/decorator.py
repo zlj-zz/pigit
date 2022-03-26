@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import contextlib
 import time
 from functools import wraps
 
@@ -16,10 +17,8 @@ def time_it(fn):
         time_it.deep += 1
         start_time = time.time()
         res = None
-        try:
+        with contextlib.suppress(SystemExit, EOFError):
             res = fn(*args, **kwargs)
-        except (SystemExit, EOFError):
-            pass
         time_it.deep -= 1
 
         # Indicates that the decorated method does not or end a recursive call.
