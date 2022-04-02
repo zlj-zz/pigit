@@ -53,11 +53,12 @@ console = get_console()
 # ========================================
 # Implementation of additional functions.
 # ========================================
-def shell_mode(git_processor: CmdProcessor)->None:
+def shell_mode(git_processor: CmdProcessor) -> None:
+    """shell mode entry."""
 
-    print(
-        "Welcome come PIGIT shell.\n"
-        "You can use short commands directly. Input '?' to get help.\n"
+    console.echo(
+        "b`Welcome come PIGIT shell.`<khaki>\n"
+        "`You can use short commands directly. Input '?' to get help.`<khaki>\n"
     )
 
     stopping: bool = False
@@ -72,46 +73,45 @@ def shell_mode(git_processor: CmdProcessor)->None:
         args_str = argv[1] if len(argv) == 2 else ""
 
         # Process.
-        if command in ["quit", "exit"]:  # ctrl+c
+        if command in {"quit", "exit"}:  # ctrl+c
             stopping = True
 
-        elif command in git_processor.cmds.keys():
+        elif command in git_processor.cmds:
             git_processor.process_command(command, args_str.split())
 
-        elif command in ["sh", "shell"]:
+        elif command in {"sh", "shell"}:
             if args_str:
                 os.system(args_str)
             else:
-                print("pigit shell: Please input shell command.")
+                console.echo("`pigit shell: Please input shell command.`<error>")
 
         elif command == "?":
             if not args_str:
-                print(
-                    "Options:\n"
-                    "  quit, exit      Exit the pigit shell mode.\n"
-                    "  sh, shell       Run a shell command.\n"
-                    "  tomato          It's a terminal tomato clock.\n"
-                    "  ? [comand...]   Show help message. Use `? ?` to look detail.\n"
+                console.echo(
+                    "b`Options`:\n"
+                    "  `quit`<ok>, `exit`<ok>      Exit the pigit shell mode.\n"
+                    "  `sh`<ok>, `shell`<ok>       Run a shell command.\n"
+                    "  `? [comand...]`<ok>   Show help message. Use `? ?` to look detail.\n"
                 )
 
             elif "?" in args_str:
-                print(
-                    "? is a tip command."
-                    "Use `?` to look pigit shell options."
-                    "Use `? [command...]` to look option help message.\n"
-                    "Like:\n"
-                    "`? sh` to get the help of sh command.\n"
-                    "`? all` to get all support git quick command help.\n"
-                    "Or `? ws ls` to get the help you want.\n"
+                console.echo(
+                    "`'?' is a tip command. "
+                    "Use '?' to look pigit shell options. "
+                    "Use '? [command...]' to look option help message.`<khaki>\n\n"
+                    "Example:\n"
+                    "  `? sh`<ok> to get the help of sh command.\n"
+                    "  `? all`<ok> to get all support git quick command help.\n"
+                    "  Or `? ws ls`<ok> to get the help you want.\n"
                 )
 
             elif "all" in args_str:
                 git_processor.command_help()
 
             elif "sh" in args_str or "shell" in args_str:
-                print(
+                console.echo(
                     "This command is help you to run a normal terminal command in pigit shell.\n"
-                    "For example, you can use `sh ls` to check the files of current dir.\n"
+                    "For example, you can use `sh ls`<ok> to check the files of current dir.\n"
                 )
 
             else:
@@ -119,24 +119,28 @@ def shell_mode(git_processor: CmdProcessor)->None:
 
                 for item in args_str.split():
                     if item in git_processor.cmds.keys():
-                        print(git_processor._generate_help_by_key(item))
+                        console.echo(git_processor._generate_help_by_key(item))
                     else:
                         invalid.append(item)
 
                 if invalid:
-                    print("Cannot find command: {0}".format(",".join(invalid)))
+                    console.echo(
+                        "`Cannot find command: {0}`<error>".format(",".join(invalid))
+                    )
 
         else:
-            print(
-                "pigit shell: Invalid command `{0}`, please select from "
-                "[shell, tomato, quit] or git short command.".format(command)
+            console.echo(
+                "`pigit shell: Invalid command '{0}', please select from`<error> "
+                "`[shell, quit] or git short command.`<error>".format(command)
             )
 
     return None
 
 
+# =====================
+# main command `pigit`
 # yapf: disable
-
+# =====================
 @command("pigit", description="Pigit TUI is called automatically if no parameters are followed.")
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
