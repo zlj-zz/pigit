@@ -21,6 +21,7 @@ def shell_complete(
     script_dir: str,
     script_name: Optional[str] = None,
     inject_path: Optional[str] = None,
+    inject: bool = True,
 ):
     # check shell validable.
     shell = shell.lower()
@@ -46,6 +47,10 @@ def shell_complete(
 
     # try create completion file.
     completion_src = complete_handle.generate_resource()
+    if not inject:
+        print(completion_src)
+        return
+
     if not complete_handle.write_completion(completion_src):
         print(":: Write completion script failed!")
         return None
@@ -61,3 +66,18 @@ def shell_complete(
             print(":: Command already exist.")
     except Exception as e:
         print(e)
+
+
+def get_shell() -> str:
+    """Gets the currently used shell.
+
+    Returns:
+            (str): Current shell string.
+    """
+    import os
+
+    try:
+        shell_string = os.environ["SHELL"]
+        return shell_string.split("/")[-1].strip()
+    except KeyError:
+        return ""

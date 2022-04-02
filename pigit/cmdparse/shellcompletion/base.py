@@ -73,7 +73,7 @@ class ShellCompletion(object):
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
-    def _parse(self, args: Dict)->Tuple:
+    def _parse(self, args: Dict) -> Tuple:
         _arguments = []
         _positions = []
         _sub_opts = {}
@@ -94,12 +94,12 @@ class ShellCompletion(object):
                     "_arguments": a,
                     "_positions": p,
                     "_sub_opts": s,
-                    "help": prop.get("help", "_"),
+                    "help": prop.get("help", "_").replace("\n", ""),
                 }
             elif name.startswith("-"):
-                _arguments.append((name, prop.get("help", "_")))
+                _arguments.append((name, prop.get("help", "_").replace("\n", "")))
             else:
-                _positions.append((name, prop.get("help", "_")))
+                _positions.append((name, prop.get("help", "_").replace("\n", "")))
 
         return _arguments, _positions, _sub_opts
 
