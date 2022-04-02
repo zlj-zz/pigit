@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Optional
+from typing import Dict, Optional
 
 from .bash import BashCompletion
 from .zsh import ZshCompletion
@@ -15,17 +15,28 @@ supported_shell = {
 
 
 def shell_complete(
-    shell: str,
-    prog: str,
-    complete_var: str,
-    script_dir: str,
+    complete_vars: Dict,
+    script_dir: Optional[str] = None,
+    shell: Optional[str] = None,
+    prog: Optional[str] = None,
     script_name: Optional[str] = None,
     inject_path: Optional[str] = None,
     inject: bool = True,
-):
-    # check shell validable.
-    shell = shell.lower()
+) -> None:
+    """Generate completion script source and try to injecting.
 
+    Args:
+        complete_vars (Dict): a dict of ~Parser serialization.
+        script_dir (Optional[str], optional): where the script saved. Defaults to None.
+        shell (Optional[str], optional): shell name. Defaults to None.
+        prog (Optional[str], optional): cmd prog. Defaults to None.
+        script_name (Optional[str], optional): completion script name. Defaults to None.
+        inject_path (Optional[str], optional): where the script injecting. Defaults to None.
+        inject (bool, optional): whether inject script. Defaults to True.
+    """
+
+    # check shell validable.
+    shell = get_shell() if shell is None else shell.lower().strip()
     if not shell:
         print("No shell be found!")
         return
@@ -42,12 +53,12 @@ def shell_complete(
     print(f":: Completion shell: {repr(shell)}")
 
     complete_handle = supported_shell[shell](
-        prog, complete_var, script_dir, script_name, inject_path
+        prog, complete_vars, script_dir, script_name, inject_path
     )
 
     # try create completion file.
     completion_src = complete_handle.generate_resource()
-    if not inject:
+    if not inject or not script_dir:
         print(completion_src)
         return
 

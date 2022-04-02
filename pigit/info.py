@@ -43,9 +43,9 @@ You can use `-h`<ok> or `--help`<ok> to get help and usage.
     )
 
 
-##############
+# ============
 # Config info
-##############
+# ============
 FormatType = Literal["normal", "table"]
 
 

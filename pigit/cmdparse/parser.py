@@ -74,6 +74,9 @@ class Parser(ArgumentParser):
     # call method
     # ============
     def main(self, args: Optional[List[str]] = None, **kwargs):
+        known_args: Namespace
+        unknown: List
+
         known_args, unknown = self.parse_known_args(args)
         # print("call", known_args, unknown)
 
@@ -85,12 +88,12 @@ class Parser(ArgumentParser):
     def __call__(self, args: Optional[List[str]] = None, **kwds: Any) -> Any:
         self.main(args, **kwds)
 
-    # ==============
-    # tools methods
-    # ==============
+    # ===============================
+    # tools methods of serialization
+    # ===============================
     @classmethod
     def from_dict(cls, top_dict: Dict) -> "Parser":
-        """Parse a `dict` to genrate a `ArgumentParser`."""
+        """Parse a `dict` to genrate a ~Parser."""
         from copy import deepcopy
 
         top_dict = deepcopy(top_dict)
@@ -155,15 +158,17 @@ class Parser(ArgumentParser):
 
         return p
 
-    def to_dict(self):
-        cmd_names = [
+    def to_dict(self) -> Dict:
+        """Return a dict of a parameter serialization of ~Parser."""
+
+        cmd_names: List[str] = [
             "prog",
             "usage",
             "description",
             "epilog",
             "prefix_chars",
         ]
-        argument_names = [
+        argument_names: List[str] = [
             "nargs",
             "const",
             "dest",
@@ -173,11 +178,11 @@ class Parser(ArgumentParser):
             "help",
         ]
 
-        def _process(parser: Sequence["Parser"], target_d: Dict) -> Dict:
+        def _process(parser: Sequence["Parser"], target_dict: Dict) -> Dict:
             for name in cmd_names:
-                target_d[name] = getattr(parser, name, None)
+                target_dict[name] = getattr(parser, name, None)
 
-            target_d["args"] = args = {}
+            target_dict["args"] = args = {}
 
             for action_group in parser._action_groups:
                 for action in action_group._group_actions:
@@ -197,7 +202,7 @@ class Parser(ArgumentParser):
                         for name in argument_names:
                             args[option_string][name] = getattr(action, name, None)
 
-            return target_d
+            return target_dict
 
         return _process(self, {})
 
@@ -305,10 +310,13 @@ class Parser(ArgumentParser):
         return decorator
 
 
+# ====================================
+# decorator method of creating parser
+# ====================================
 @overload
 def command(
     prog: Union[str, Callable, None] = None,
-    cls=None,
+    cls: Sequence[Parser] = None,
     usage: Optional[str] = None,
     description: Optional[str] = None,
     epilog: Optional[str] = None,

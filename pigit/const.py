@@ -13,10 +13,10 @@ __email__ = "zlj19971222@outlook.com"
 __license__ = "MIT"
 __copyright__ = f"Copyright (c) 2021-{datetime.datetime.now().year} Zachary"
 
-#####################################################################
-# Part of compatibility.                                            #
-# Handled the incompatibility between python2 and python3.          #
-#####################################################################
+# =========================================================
+# Part of compatibility.
+# Handled the incompatibility between python2 and python3.
+# =========================================================
 VERSION = __version__
 
 IS_WIN: bool = platform.system() == "Windows"

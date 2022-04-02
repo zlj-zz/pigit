@@ -94,9 +94,9 @@ class Config(object, metaclass=Singleton):
         "log_output",
     ]
 
-    #########################
+    # ======================
     # config default values.
-    #########################
+    # ======================
 
     # cmd processor conf
     cmd_show_original: bool = True

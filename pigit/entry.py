@@ -2,7 +2,7 @@
 # The PIGIT terminal tool entry file.
 
 from typing import List, Optional
-import os, logging
+import os, logging, textwrap
 
 from .log import setup_logging
 from .decorator import time_it
@@ -23,33 +23,37 @@ from .render import get_console
 from .common.utils import confirm
 from .common.git import GitOption
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
-from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
+from .processor import CmdProcessor, Git_Cmds, get_extra_cmds
 from .info import introduce, GitConfig
 
 
 Log = logging.getLogger(__name__)
 
 
-#################
+# ===============
 # Configuration.
-#################
+# ===============
 CONFIG = Config(
     path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
 ).output_warnings()
 
 setup_logging(
-    debug=CONFIG.debug_open, log_file=LOG_FILE_PATH if CONFIG.log_output else None
+    debug=CONFIG.debug_open,
+    log_file=LOG_FILE_PATH if CONFIG.log_output else None,
 )
 
 
+# ==============
+# Global handle
+# ==============
 git = GitOption(repo_info_path=REPOS_PATH)
 console = get_console()
 
 
-##########################################
+# ========================================
 # Implementation of additional functions.
-##########################################
-def shell_mode(git_processor: CmdProcessor):
+# ========================================
+def shell_mode(git_processor: CmdProcessor)->None:
 
     print(
         "Welcome come PIGIT shell.\n"
@@ -151,17 +155,15 @@ def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
         console.echo(git.get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
-        from copy import deepcopy
-
         # Generate competion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
         )
 
-        from .cmdparse.shellcompletion import shell_complete,get_shell
+        from .cmdparse.shellcompletion import shell_complete
 
-        shell_complete(get_shell(), 'pigit', complete_vars, PIGIT_HOME,inject=False)
+        shell_complete(complete_vars, PIGIT_HOME, inject=True)
         return None
 
     elif args.ignore_type:
@@ -186,10 +188,6 @@ def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
             show_invalid=CONFIG.counter_show_invalid,
         )
         return None
-
-    elif "func" in args:
-        kwargs = getattr(args, "kwargs", {})
-        args.func(args, extra_unknown, kwargs)
 
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
@@ -254,7 +252,7 @@ def _cmd_func(args: Namespace, unknown: List):
     )
 
     if args.shell:
-        shell_mode(git_processor)
+        return shell_mode(git_processor)
 
     if args.show_commands:
         return git_processor.command_help()
@@ -317,14 +315,16 @@ def repo_ll(args, _):
             console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
         else:
             console.echo(
-                f"""\
-{info[0][0]}
-    {info[1][0]}: {info[1][1]}
-    {info[2][0]}: {info[2][1]}
-    {info[3][0]}: `{info[3][1]}`<khaki>
-    {info[4][0]}: `{info[4][1]}`<ok>
-    {info[5][0]}: `{info[5][1]}`<sky_blue>
+                textwrap.dedent(
+                    f"""\
+                    b`{info[0][0]}`
+                        {info[1][0]}: {info[1][1]}
+                        {info[2][0]}: {info[2][1]}
+                        {info[3][0]}: `{info[3][1]}`<khaki>
+                        {info[4][0]}: `{info[4][1]}`<ok>
+                        {info[5][0]}: `{info[5][1]}`<sky_blue>
                     """
+                )
             )
 
 

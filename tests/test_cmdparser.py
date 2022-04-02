@@ -124,4 +124,4 @@ class TestCompletion:
         print(get_shell())
 
     def test_action(self):
-        shell_complete("bash", "xxx", self.complete_vars, ".", None, "./test.txt")
+        shell_complete(self.complete_vars, "bash", "xxx", ".", None, "./test.txt")

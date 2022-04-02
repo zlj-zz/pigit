@@ -37,9 +37,9 @@ class GitOption:
 
         return self
 
-    ####################
+    # ==================
     # Basic info option
-    ####################
+    # ==================
     @property
     def git_version(self) -> str:
         """Get Git version."""
@@ -238,9 +238,9 @@ class GitOption:
 
         return "\n".join(gen)
 
-    ###############
+    # =============
     # Special info
-    ###############
+    # =============
     def load_branches(self, path: Optional[str] = None) -> List[Branch]:
         path = path or self.op_path
         command = (
@@ -479,9 +479,9 @@ class GitOption:
         _, resp = exec_cmd(command, cwd=path)
         return resp.rstrip()
 
-    ##########
-    # Options
-    ##########
+    # ===============
+    # Options of git
+    # ===============
     def _get_file_str(self, file) -> str:
         if isinstance(file, File):
             file_name = file.name
@@ -580,9 +580,9 @@ class GitOption:
         else:
             return True, "Successfully opened repo."
 
-    ###############
-    # repo options
-    ###############
+    # ====================
+    # custom repo options
+    # ====================
     @staticmethod
     def _make_repo_name(path: str, repos: List[str], name_counts: Counter) -> str:
         """
