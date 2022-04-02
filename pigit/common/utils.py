@@ -206,17 +206,6 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     return min_frequency_command
 
 
-def get_current_shell() -> str:
-    """Gets the currently used shell.
-
-    Returns:
-            (str): Current shell string.
-    """
-    _, resp = exec_cmd("echo $SHELL")
-    current_shell = resp.split("/")[-1].strip() if resp else ""
-    return current_shell.lower()
-
-
 # Mark the type corresponding to the file suffix.
 # abcdefg hijklmn opq rst uvw xyz
 SUFFIX_TYPE: Dict[str, str] = {

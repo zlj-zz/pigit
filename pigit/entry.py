@@ -1,58 +1,64 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import TYPE_CHECKING, Dict, List, Optional
-import os, logging
+from typing import List, Optional
+import os, logging, textwrap
 
 from .log import setup_logging
 from .decorator import time_it
 from .config import Config
-from .argparse_utils import Parser
+from .cmdparse.parser import command, argument, Namespace
 from .const import (
+    VERSION,
     REPOS_PATH,
-    __version__,
     PIGIT_HOME,
+    LOG_FILE_PATH,
     EXTRA_CMD_MODULE_NAME,
     EXTRA_CMD_MODULE_PATH,
-    LOG_FILE_PATH,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
 from .render import get_console
-from .common.utils import get_current_shell, confirm
+from .common.utils import confirm
 from .common.git import GitOption
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
-from .processor import CmdProcessor, Git_Cmds, CommandType, get_extra_cmds
+from .processor import CmdProcessor, Git_Cmds, get_extra_cmds
 from .info import introduce, GitConfig
-
-if TYPE_CHECKING:
-    import argparse
 
 
 Log = logging.getLogger(__name__)
 
 
-#################
+# ===============
 # Configuration.
-#################
+# ===============
 CONFIG = Config(
-    path=CONFIG_FILE_PATH, version=__version__, auto_load=True
+    path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
 ).output_warnings()
 
+setup_logging(
+    debug=CONFIG.debug_open,
+    log_file=LOG_FILE_PATH if CONFIG.log_output else None,
+)
 
+
+# ==============
+# Global handle
+# ==============
 git = GitOption(repo_info_path=REPOS_PATH)
 console = get_console()
 
 
-##########################################
+# ========================================
 # Implementation of additional functions.
-##########################################
-def shell_mode(git_processor: CmdProcessor):
+# ========================================
+def shell_mode(git_processor: CmdProcessor) -> None:
+    """shell mode entry."""
 
-    print(
-        "Welcome come PIGIT shell.\n"
-        "You can use short commands directly. Input '?' to get help.\n"
+    console.echo(
+        "b`Welcome come PIGIT shell.`<khaki>\n"
+        "`You can use short commands directly. Input '?' to get help.`<khaki>\n"
     )
 
     stopping: bool = False
@@ -67,46 +73,45 @@ def shell_mode(git_processor: CmdProcessor):
         args_str = argv[1] if len(argv) == 2 else ""
 
         # Process.
-        if command in ["quit", "exit"]:  # ctrl+c
+        if command in {"quit", "exit"}:  # ctrl+c
             stopping = True
 
-        elif command in git_processor.cmds.keys():
+        elif command in git_processor.cmds:
             git_processor.process_command(command, args_str.split())
 
-        elif command in ["sh", "shell"]:
+        elif command in {"sh", "shell"}:
             if args_str:
                 os.system(args_str)
             else:
-                print("pigit shell: Please input shell command.")
+                console.echo("`pigit shell: Please input shell command.`<error>")
 
         elif command == "?":
             if not args_str:
-                print(
-                    "Options:\n"
-                    "  quit, exit      Exit the pigit shell mode.\n"
-                    "  sh, shell       Run a shell command.\n"
-                    "  tomato          It's a terminal tomato clock.\n"
-                    "  ? [comand...]   Show help message. Use `? ?` to look detail.\n"
+                console.echo(
+                    "b`Options`:\n"
+                    "  `quit`<ok>, `exit`<ok>      Exit the pigit shell mode.\n"
+                    "  `sh`<ok>, `shell`<ok>       Run a shell command.\n"
+                    "  `? [comand...]`<ok>   Show help message. Use `? ?` to look detail.\n"
                 )
 
             elif "?" in args_str:
-                print(
-                    "? is a tip command."
-                    "Use `?` to look pigit shell options."
-                    "Use `? [command...]` to look option help message.\n"
-                    "Like:\n"
-                    "`? sh` to get the help of sh command.\n"
-                    "`? all` to get all support git quick command help.\n"
-                    "Or `? ws ls` to get the help you want.\n"
+                console.echo(
+                    "`'?' is a tip command. "
+                    "Use '?' to look pigit shell options. "
+                    "Use '? [command...]' to look option help message.`<khaki>\n\n"
+                    "Example:\n"
+                    "  `? sh`<ok> to get the help of sh command.\n"
+                    "  `? all`<ok> to get all support git quick command help.\n"
+                    "  Or `? ws ls`<ok> to get the help you want.\n"
                 )
 
             elif "all" in args_str:
                 git_processor.command_help()
 
             elif "sh" in args_str or "shell" in args_str:
-                print(
+                console.echo(
                     "This command is help you to run a normal terminal command in pigit shell.\n"
-                    "For example, you can use `sh ls` to check the files of current dir.\n"
+                    "For example, you can use `sh ls`<ok> to check the files of current dir.\n"
                 )
 
             else:
@@ -114,317 +119,33 @@ def shell_mode(git_processor: CmdProcessor):
 
                 for item in args_str.split():
                     if item in git_processor.cmds.keys():
-                        print(git_processor._generate_help_by_key(item))
+                        console.echo(git_processor._generate_help_by_key(item))
                     else:
                         invalid.append(item)
 
                 if invalid:
-                    print("Cannot find command: {0}".format(",".join(invalid)))
+                    console.echo(
+                        "`Cannot find command: {0}`<error>".format(",".join(invalid))
+                    )
 
         else:
-            print(
-                "pigit shell: Invalid command `{0}`, please select from "
-                "[shell, tomato, quit] or git short command.".format(command)
+            console.echo(
+                "`pigit shell: Invalid command '{0}', please select from`<error> "
+                "`[shell, quit] or git short command.`<error>".format(command)
             )
 
     return None
 
 
-def _cmd_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
-    # If you want to manipulate the current folder with git,
-    # try adding it to repos automatically.
-    if CONFIG.repo_auto_append:
-        repo_path, repo_conf = git.get_repo_info()
-        git.add_repos([repo_path])
-
-    extra_cmd: dict = {
-        "shell": {
-            "command": lambda _: shell_mode(git_processor),
-            "type": "func",
-            "help": "Into PIGIT shell mode.",
-        },  # only for tips.
-    }
-    extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
-
-    git_processor = CmdProcessor(
-        extra_cmds=extra_cmd,
-        command_prompt=CONFIG.cmd_recommend,
-        show_original=CONFIG.cmd_show_original,
-    )
-
-    if args.shell:
-        shell_mode(git_processor)
-
-    if args.show_commands:
-        return git_processor.command_help()
-
-    if args.command_type:
-        return git_processor.command_help_by_type(args.command_type)
-
-    if args.types:
-        return git_processor.type_help()
-
-    if args.command:
-        command = args.command
-        args.args.extend(unknown)
-        git_processor.process_command(command, args.args)
-        return None
-    else:
-        console.echo("`pigit cmd -h`<ok> for help.")
-
-
-def _repo_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
-    option: str = kwargs.get("option", "")
-
-    if option == "add":
-        if added := git.add_repos(args.paths, args.dry_run):
-            console.echo(f"Found {len(added)} new repo(s).")
-            for path in added:
-                console.echo(f"\t`{path}`<sky_blue>")
-        else:
-            console.echo("`No new repos found!`<tomato>")
-    elif option == "rm":
-        res = git.rm_repos(args.repos, args.path)
-        for one in res:
-            console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
-    elif option == "rename":
-        success, msg = git.rename_repo(args.repo, args.new_name)
-        console.echo(msg)
-    elif option == "ll":
-        for info in git.ll_repos():
-            if args.simple:
-                console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
-            else:
-                console.echo(
-                    f"""\
-{info[0][0]}
-    {info[1][0]}: {info[1][1]}
-    {info[2][0]}: {info[2][1]}
-    {info[3][0]}: `{info[3][1]}`<khaki>
-    {info[4][0]}: `{info[4][1]}`<ok>
-    {info[5][0]}: `{info[5][1]}`<sky_blue>
-                    """
-                )
-    elif option == "clear":
-        git.clear_repos()
-    else:
-        git.process_repo_option(args.repos, repo_options[option]["cmd"])
-
-
-def _open_func(args: "argparse.Namespace", unknown: List, kwargs: Dict):
-    code, msg = git.open_repo_in_browser(
-        branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
-    )
-    console.echo(msg)
-
-
-repo_options = {
-    "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
-    "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
-    "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
-}
-
-argparse_dict = {
-    "prog": "pigit",
-    "prefix_chars": "-",
-    "description": "Pigit TUI is called automatically if no parameters are followed.",
-    "args": {
-        "-v --version": {
-            "action": "version",
-            "help": "Show version and exit.",
-            "version": f"Version: {__version__}",
-        },
-        "-r --report": {
-            "action": "store_true",
-            "help": "Report the pigit desc and exit.",
-        },
-        "-f --config": {
-            "action": "store_true",
-            "help": "Display the config of current git repository and exit.",
-        },
-        "-i --information": {
-            "action": "store_true",
-            "help": "Show some information about the current git repository.",
-        },
-        "-d --debug": {
-            "action": "store_true",
-            "help": "Current runtime in debug mode.",
-        },
-        "--out-log": {"action": "store_true", "help": "Print log to console."},
-        "-groups": {
-            "tools": {
-                "title": "tools arguments",
-                "description": "Auxiliary type commands.",
-                "args": {
-                    "-c --count": {
-                        "nargs": "?",
-                        "const": ".",
-                        "type": str,
-                        "metavar": "PATH",
-                        "help": "Count the number of codes and output them in tabular form."
-                        "A given path can be accepted, and the default is the current directory.",
-                    },
-                    "-C --complete": {
-                        "action": "store_true",
-                        "help": "Add shell prompt script and exit.(Supported bash, zsh, fish)",
-                    },
-                    "--create-ignore": {
-                        "type": str,
-                        "metavar": "TYPE",
-                        "dest": "ignore_type",
-                        "help": f'Create a demo .gitignore file. Need one argument, support: [{", ".join(SUPPORTED_GITIGNORE_TYPES)}]',
-                    },
-                    "--create-config": {
-                        "action": "store_true",
-                        "help": "Create a pre-configured file of PIGIT."
-                        "(If a profile exists, the values available in it are used)",
-                    },
-                },
-            }
-        },
-        "cmd": {
-            "help": "git short command.",
-            "description": "If you want to use some original git commands, please use -- to indicate.",
-            "args": {
-                "command": {
-                    "nargs": "?",
-                    "type": str,
-                    "default": None,
-                    "help": "Short git command or other.",
-                },
-                "args": {
-                    "nargs": "*",
-                    "type": str,
-                    "help": "Command parameter list.",
-                },
-                "-s --show-commands": {
-                    "action": "store_true",
-                    "help": "List all available short command and wealth and exit.",
-                },
-                "-p --show-part-command": {
-                    "type": str,
-                    "metavar": "TYPE",
-                    "dest": "command_type",
-                    "help": f'According to given type [{", ".join(CommandType.__members__.keys())}] list available short command and wealth and exit.',
-                },
-                "-t --types": {
-                    "action": "store_true",
-                    "help": "List all command types and exit.",
-                },
-                "--shell": {
-                    "action": "store_true",
-                    "help": "Go to the pigit shell mode.",
-                },
-                "set_defaults": {"func": _cmd_func},
-            },
-        },
-        "repo": {
-            "help": "repo options.",
-            "args": {
-                "add": {
-                    "help": "add repo(s).",
-                    "args": {
-                        "paths": {"nargs": "+", "help": "path of reps(s)."},
-                        "--dry-run": {
-                            "action": "store_true",
-                            "help": "dry run.",
-                        },
-                        "set_defaults": {
-                            "func": _repo_func,
-                            "kwargs": {"option": "add"},
-                        },
-                    },
-                },
-                "rm": {
-                    "help": "remove repo(s).",
-                    "args": {
-                        "repos": {
-                            "nargs": "+",
-                            "help": "name or path of repo(s).",
-                        },
-                        "--path": {
-                            "action": "store_true",
-                            "help": "remove follow path, defult is name.",
-                        },
-                        "set_defaults": {
-                            "func": _repo_func,
-                            "kwargs": {"option": "rm"},
-                        },
-                    },
-                },
-                "rename": {
-                    "help": "rename a repo.",
-                    "args": {
-                        "repo": {"help": "the name of repo."},
-                        "new_name": {"help": "the new name of repo."},
-                        "set_defaults": {
-                            "func": _repo_func,
-                            "kwargs": {"option": "rename"},
-                        },
-                    },
-                },
-                "ll": {
-                    "help": "display summary of all repos.",
-                    "args": {
-                        "--simple": {
-                            "action": "store_true",
-                            "help": "display simple summary.",
-                        },
-                        "set_defaults": {
-                            "func": _repo_func,
-                            "kwargs": {"option": "ll"},
-                        },
-                    },
-                },
-                "clear": {
-                    "help": "clear the all repos.",
-                    "args": {
-                        "set_defaults": {
-                            "func": _repo_func,
-                            "kwargs": {"option": "clear"},
-                        },
-                    },
-                },
-                **{
-                    name: {
-                        "help": prop["help"] + " for repo(s).",
-                        "args": {
-                            "repos": {
-                                "nargs": "*",
-                                "help": "name of repo(s).",
-                            },
-                            "set_defaults": {
-                                "func": _repo_func,
-                                "kwargs": {"option": name},
-                            },
-                        },
-                    }
-                    for name, prop in repo_options.items()
-                },
-            },
-        },
-        "open": {
-            "help": "open remote repository in web browser.",
-            "args": {
-                "branch": {
-                    "nargs": "?",
-                    "default": None,
-                    "help": "the branch of repository.",
-                },
-                "-i --issue": {"help": "the given issue of the repository."},
-                "-c --commit": {"help": "the current commit in the repo website."},
-                "-p --print": {
-                    "action": "store_true",
-                    "help": "only print the url at the terminal, but do not open it.",
-                },
-                "set_defaults": {"func": _open_func},
-            },
-        },
-    },
-}
-
-
-def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -> None:
+# =====================
+# main command `pigit`
+# yapf: disable
+# =====================
+@command("pigit", description="Pigit TUI is called automatically if no parameters are followed.")
+@argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
+@argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
+@argument("-i --information", action="store_true", help="Show some information about the current git repository.")
+def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -438,17 +159,15 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -
         console.echo(git.get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
-        from copy import deepcopy
-
         # Generate competion vars dict.
-        completion_vars = deepcopy(argparse_dict)
-        completion_vars["args"]["cmd"]["args"].update(
+        complete_vars = pigit.to_dict()
+        complete_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
         )
 
-        from .shellcompletion import shell_complete
+        from .cmdparse.shellcompletion import shell_complete
 
-        shell_complete(get_current_shell(), None, completion_vars, PIGIT_HOME)
+        shell_complete(complete_vars, PIGIT_HOME, inject=True)
         return None
 
     elif args.ignore_type:
@@ -474,10 +193,6 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -
         )
         return None
 
-    elif "func" in args:
-        kwargs = getattr(args, "kwargs", {})
-        args.func(args, extra_unknown, kwargs)
-
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
@@ -491,30 +206,169 @@ def _process(args: "argparse.Namespace", extra_unknown: Optional[List] = None) -
         tui_main(help_wait=CONFIG.tui_help_showtime)
 
 
-def process(args: "argparse.Namespace", unknown: List):
+pigit.add_argument("-v", "--version", action="version", help="Show version and exit.", version=f"Version:{VERSION}")
+
+tools_group = pigit.add_argument_group(title="tools arguments", description="Auxiliary type commands.")
+tools_group.add_argument("-c", "--count", nargs="?", const=".", type=str, metavar="PATH",
+    help="""Count the number of codes and output them in tabular form.
+    A given path can be accepted, and the default is the current directory.
+    """,)
+tools_group.add_argument( "--create-ignore", type=str, metavar="TYPE", dest="ignore_type",
+    help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""")
+tools_group.add_argument("-C", "--complete", action="store_true",
+    help="Add shell prompt script and exit. (Supported bash, zsh, fish)")
+tools_group.add_argument("--create-config", action="store_true",
+    help="Create a pre-configured file of PIGIT."
+    "(If a profile exists, the values available in it are used)",)
+
+# =============================================
+# sub command `cmd`
+# =============================================
+@pigit.sub_parser("cmd", help="git short command.")
+@argument("--shell", action="store_true", help="Go to the pigit shell mode.")
+@argument("-t --types", action="store_true", help="List all command types and exit.")
+@argument("-p --show-part-command", type=str, metavar="TYPE", dest="command_type", help='According to given type to list available short command and wealth and exit.')
+@argument("-s --show-commands", action="store_true", help="List all available short command and wealth and exit.")
+@argument("args", nargs="*", type=str, help="Command parameter list.")
+@argument("command", nargs="?", type=str, default=None, help="Short git command or other.")
+def _cmd_func(args: Namespace, unknown: List):
+    """If you want to use some original git commands, please use -- to indicate."""
+
+    # If you want to manipulate the current folder with git,
+    # try adding it to repos automatically.
+    if CONFIG.repo_auto_append:
+        repo_path, repo_conf = git.get_repo_info()
+        git.add_repos([repo_path])
+
+    extra_cmd: dict = {
+        "shell": {
+            "command": lambda _: shell_mode(git_processor),
+            "type": "func",
+            "help": "Into PIGIT shell mode.",
+        },  # only for tips.
+    }
+    extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
+
+    git_processor = CmdProcessor(
+        extra_cmds=extra_cmd,
+        command_prompt=CONFIG.cmd_recommend,
+        show_original=CONFIG.cmd_show_original,
+    )
+
+    if args.shell:
+        return shell_mode(git_processor)
+
+    if args.show_commands:
+        return git_processor.command_help()
+
+    if args.command_type:
+        return git_processor.command_help_by_type(args.command_type)
+
+    if args.types:
+        return git_processor.type_help()
+
+    if args.command:
+        command = args.command
+        args.args.extend(unknown)
+        git_processor.process_command(command, args.args)
+        return None
+    else:
+        console.echo("`pigit cmd -h`<ok> for help.")
+
+
+# =============================================
+# sub command `repo`
+# =============================================
+repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h help"))
+
+
+@repo.sub_parser("add", help="add repo(s).")
+@argument("--dry-run", action="store_true", help="dry run.")
+@argument("paths", nargs="+", help="path of reps(s).")
+def repo_add(args, _):
+    if added := git.add_repos(args.paths, args.dry_run):
+        console.echo(f"Found {len(added)} new repo(s).")
+        for path in added:
+            console.echo(f"\t`{path}`<sky_blue>")
+    else:
+        console.echo("`No new repos found!`<tomato>")
+
+
+@repo.sub_parser("rm", help="remove repo(s).")
+@argument("--path", action="store_true", help="remove follow path, defult is name.")
+@argument("repos", nargs="+", help="name or path of repo(s).")
+def repo_rm(args, _):
+    res = git.rm_repos(args.repos, args.path)
+    for one in res:
+        console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
+
+
+@repo.sub_parser("rename", help="rename a repo.")
+@argument("new_name", help="the new name of repo.")
+@argument("repo", help="the name of repo.")
+def repo_rename(args, _):
+    success, msg = git.rename_repo(args.repo, args.new_name)
+    console.echo(msg)
+
+
+@repo.sub_parser("ll", help="display summary of all repos.")
+@argument("--simple", action="store_true", help="display simple summary.")
+def repo_ll(args, _):
+    for info in git.ll_repos():
+        if args.simple:
+            console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
+        else:
+            console.echo(
+                textwrap.dedent(
+                    f"""\
+                    b`{info[0][0]}`
+                        {info[1][0]}: {info[1][1]}
+                        {info[2][0]}: {info[2][1]}
+                        {info[3][0]}: `{info[3][1]}`<khaki>
+                        {info[4][0]}: `{info[4][1]}`<ok>
+                        {info[5][0]}: `{info[5][1]}`<sky_blue>
+                    """
+                )
+            )
+
+
+repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: git.clear_repos())
+
+
+repo_options = {
+    "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
+    "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
+    "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
+}
+for k, v in repo_options.items():
+    repo.sub_parser(k, help=v.get("help", "null"))(
+        argument("repos", nargs="*", help="name of repo(s).")(
+            lambda args, _: git.process_repo_option(args.repos, v["cmd"])
+        )
+    )
+
+
+# =============================================
+# sub command `open`
+# =============================================
+@pigit.sub_parser("open", help="open remote repository in web browser.")
+@argument("-p --print", action="store_true", help="only print the url at the terminal, but do not open it.")
+@argument("-c --commit", help="the current commit in the repo website.")
+@argument("-i --issue", help="the given issue of the repository.")
+@argument("branch", nargs="?", default=None, help="the branch of repository.")
+def _open_func(args: Namespace, _):
+    code, msg = git.open_repo_in_browser(
+        branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
+    )
+    console.echo(msg)
+
+
+# =============================================
+# terminal entry
+# =============================================
+@time_it
+def main():
     try:
-        _process(args, unknown)
+        pigit()
     except (KeyboardInterrupt, EOFError):
         raise SystemExit(0) from None
-
-
-##############
-# main entry.
-##############
-@time_it
-def main(custom_commands: Optional[List] = None):
-    parser = Parser(argparse_dict)
-
-    # Parse custom comand or parse input command.
-    stdargs, extra_unknown = parser.parse(custom_commands)
-
-    # Setup log handle.
-    log_file = LOG_FILE_PATH if stdargs.out_log or CONFIG.log_output else None
-    setup_logging(debug=stdargs.debug or CONFIG.debug_open, log_file=log_file)
-
-    # Process result.
-    process(stdargs, extra_unknown)
-
-
-if __name__ == "__main__":
-    main()

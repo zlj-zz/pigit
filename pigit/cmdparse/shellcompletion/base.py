@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import os, re
 import logging
 
@@ -73,17 +73,18 @@ class ShellCompletion(object):
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
-    def _parse(self, args: Dict):
+    def _parse(self, args: Dict) -> Tuple:
         _arguments = []
         _positions = []
         _sub_opts = {}
 
         for name, prop in args.items():
-            if name == "-groups":
-                for g_name, g_p in prop.items():
-                    a, p, s = self._parse(g_p["args"])
-                    _arguments.extend(a)
-                    _positions.extend(p)
+            prop_type = prop.get("type")
+
+            if prop_type == "groups":
+                a, p, s = self._parse(prop["args"])
+                _arguments.extend(a)
+                _positions.extend(p)
             elif name == "set_defaults":
                 # Special need be ignore.
                 pass
@@ -93,12 +94,12 @@ class ShellCompletion(object):
                     "_arguments": a,
                     "_positions": p,
                     "_sub_opts": s,
-                    "help": prop.get("help", "_"),
+                    "help": prop.get("help", "_").replace("\n", ""),
                 }
             elif name.startswith("-"):
-                _arguments.append((name, prop.get("help", "_")))
+                _arguments.append((name, prop.get("help", "_").replace("\n", "")))
             else:
-                _positions.append((name, prop.get("help", "_")))
+                _positions.append((name, prop.get("help", "_").replace("\n", "")))
 
         return _arguments, _positions, _sub_opts
 
@@ -172,7 +173,7 @@ class ShellCompletion(object):
                 "Read shell config error: {0}".format(e)
             ) from None
         else:
-            _re = re.compile(r"{}[^\s]*".format(full_script_path))
+            _re = re.compile(f"{full_script_path}[^\\s]*")
             files = _re.findall(shell_conf)
 
         injected = bool(files)
@@ -182,8 +183,7 @@ class ShellCompletion(object):
         try:
             # Inject.
             with open(self.inject_path, "a") as f:
-                f.write("source %s" % (full_script_path))
+                f.write(f"source {full_script_path}")
         except Exception as e:
             raise ShellCompletionError(f"Inject error: {str(e)}") from None
-
         return True

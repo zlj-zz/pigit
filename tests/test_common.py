@@ -1,13 +1,13 @@
 # -*- coding:utf-8 -*-
 import pytest
 import doctest
+import os
 from unittest.mock import patch
 from pprint import pprint
 
 import pigit.common.utils
 from pigit.common.utils import (
     traceback_info,
-    get_current_shell,
     confirm,
     async_run_cmd,
     exec_async_tasks,
@@ -26,10 +26,6 @@ def test_traceback_info():
 
     # when no traceback
     assert traceback_info() == ""
-
-
-def test_1():
-    print(get_current_shell())
 
 
 @pytest.mark.parametrize(

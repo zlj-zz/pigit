@@ -158,9 +158,9 @@ class CmdProcessor(object, metaclass=Singleton):
                 get_console().echo(f":rainbow:  {self.color_command(command)}")
             run_cmd(command)
 
-    ################################
+    # ============================
     # Print command help message.
-    ################################
+    # ============================
     def _generate_help_by_key(
         self, _key: str, use_color: bool = True, max_width=90
     ) -> str:

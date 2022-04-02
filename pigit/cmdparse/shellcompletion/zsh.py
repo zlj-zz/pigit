@@ -63,7 +63,7 @@ class ZshCompletion(ShellCompletion):
 
     _template_source: str = _TEMPLATE_ZSH
 
-    def _process_arguments(self, _arguments):
+    def _process_arguments(self, _arguments) -> str:
         res = []
 
         for one in _arguments:
@@ -123,9 +123,9 @@ class ZshCompletion(ShellCompletion):
             )
             relationship.append(relation_str)
 
-    def args2complete(self, d):
-        prog_handle: str = d["prog"]
-        args: Dict = d["args"]
+    def args2complete(self, args_dict: Dict) -> str:
+        prog_handle: str = args_dict["prog"]
+        args: Dict = args_dict["args"]
 
         _arguments, _positions, _sub_opts = self._parse(args)
 
@@ -137,11 +137,11 @@ class ZshCompletion(ShellCompletion):
         _sub_relationship = []
 
         if _sub_opts:
-            _subs = []
-            for opt_name, opt_args in _sub_opts.items():
-                _subs.append(
-                    f"'{opt_name}[{opt_args['help']}]' \\",
-                )
+            _subs = [
+                f"'{opt_name}[{opt_args['help']}]' \\"
+                for opt_name, opt_args in _sub_opts.items()
+            ]
+
             _sub_opt_str = textwrap.dedent(
                 """
                 ######################

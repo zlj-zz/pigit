@@ -5,15 +5,15 @@ import signal
 from subprocess import Popen, PIPE
 
 
-#############
+# ===========
 # Predefined
-#############
+# ===========
 ord2 = lambda x: x
 B = lambda x: x.encode("iso8859-1")  # noqa: E731
 
-####################
+# ==================
 # Terminal encoding
-####################
+# ==================
 _byte_encoding = None
 
 
@@ -108,9 +108,9 @@ def set_encoding(encoding):
         pass
 
 
-################
+# ==============
 # Util function
-################
+# ==============
 def within_double_byte(text, line_start, pos):
     """Return whether pos is within a double-byte encoded character.
     text -- byte string in question
@@ -156,9 +156,9 @@ def is_mouse_press(ev):
     return ev.find("press") >= 0
 
 
-###################
+# =================
 ## Input sequences
-###################
+# =================
 class MoreInputRequired(Exception):
     pass
 
@@ -436,10 +436,10 @@ class KeyqueueTrie(object):
         return None
 
 
-#################################################
+# ===============================================
 # Build the input trie from input_sequences list
 input_trie = KeyqueueTrie(input_sequences)
-#################################################
+# ===============================================
 
 ESC = "\x1b"
 MOUSE_TRACKING_ON = ESC + "[?1000h" + ESC + "[?1002h" + ESC + "[?1006h"

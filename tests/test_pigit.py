@@ -2,7 +2,7 @@
 import pytest
 from .utils import analyze_it
 
-from pigit.entry import main
+from pigit.entry import pigit
 
 
 @pytest.mark.parametrize(
@@ -14,7 +14,6 @@ from pigit.entry import main
         "--count",  # code counter
         "--create-config",
         "cmd",
-        "cmd -h",
         "cmd -s",
         "cmd -t",
         "cmd -p branch",
@@ -25,4 +24,4 @@ from pigit.entry import main
 )
 def test_color_command(command: str):
     print()
-    main(command)
+    pigit(command.split())
