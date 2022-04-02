@@ -10,6 +10,7 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Tuple,
     Union,
     overload,
 )
@@ -39,7 +40,7 @@ class Parser(ArgumentParser):
         conflict_handler: str = "error",
         add_help: bool = True,
         allow_abbrev: bool = True,
-        exit_on_error: bool = True,
+        # exit_on_error: bool = True,  # python3.9 feature
         callback: Optional[Callable] = None,
     ) -> None:
         if parents is None:
@@ -57,7 +58,6 @@ class Parser(ArgumentParser):
             conflict_handler,
             add_help,
             allow_abbrev,
-            exit_on_error,
         )
 
         self.subparsers_action: Optional["_SubParsersAction"] = None
@@ -422,7 +422,7 @@ def argument(
     choices: Optional[Iterable] = None,
     required: Optional[bool] = None,
     help: Optional[str] = None,
-    metavar: Union[str, tuple[str, ...], None] = None,
+    metavar: Union[str, Tuple[str, ...], None] = None,
     dest: Optional[str] = None,
     version: Optional[str] = None,
     **kwargs: Any,
