@@ -12,7 +12,6 @@ Like this:
 >>>     pass
 """
 
-import re
 from typing import List, Tuple, Union
 
 from ..common.utils import run_cmd
@@ -71,6 +70,8 @@ def set_email_and_username(args: Union[List, Tuple]) -> None:
             break
         else:
             echo("`Name is empty.`<error>")
+
+    import re
 
     email_re = re.compile(r"^[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$")
     while True:

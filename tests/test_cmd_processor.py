@@ -5,19 +5,19 @@ from unittest.mock import patch
 
 from .utils import analyze_it
 
-from pigit.processor import CmdProcessor, get_extra_cmds
-from pigit.processor.cmd_func import add, set_email_and_username, fetch_remote_branch
+from pigit.gitlib.processor import GitShortCmdProcessor, get_extra_cmds
+from pigit.gitlib._cmd_func import add, set_email_and_username, fetch_remote_branch
 
 
 class TestCmdProcessor:
     def test_init_error(self):
         with pytest.raises(TypeError):
-            CmdProcessor(extra_cmds="xxx")
+            GitShortCmdProcessor(extra_cmds="xxx")
 
     @pytest.fixture(scope="module")
     def setup(self):
         extra = {"aa": {"help": "print system user name."}}
-        return CmdProcessor(extra_cmds=extra)
+        return GitShortCmdProcessor(extra_cmds=extra)
 
     @pytest.mark.parametrize(
         "command",
@@ -53,12 +53,12 @@ def test_load_cmds():
     os.remove(file)
 
 
-@patch("pigit.processor.cmd_func.run_cmd", return_value=None)
+@patch("pigit.gitlib._cmd_func.run_cmd", return_value=None)
 def test_add(_):
     add([])
 
 
-@patch("pigit.processor.cmd_func.run_cmd", return_value=None)
+@patch("pigit.gitlib._cmd_func.run_cmd", return_value=None)
 def test_fetch_remote(_):
     fetch_remote_branch([])
 
@@ -73,6 +73,6 @@ def test_fetch_remote(_):
     ],
 )
 @patch("builtins.input", return_value="abc@gmail.com")
-@patch("pigit.processor.cmd_func.run_cmd", return_value=False)
+@patch("pigit.gitlib._cmd_func.run_cmd", return_value=False)
 def test_set_ua(_a, _b, args):
     set_email_and_username(args)

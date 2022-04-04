@@ -3,8 +3,7 @@ import pytest
 from unittest.mock import patch, Mock
 
 from .conftest import TEST_PATH
-from pigit.render import get_console
-from pigit.common.git import GitOption
+from pigit.gitlib.options import GitOption
 from pigit.common.utils import exec_cmd
 
 
@@ -56,7 +55,7 @@ def test1():
         [("", "a/b/.git/submodule/"), ("a/b", "a/b/.git/submodule/")],
     ],
 )
-@patch("pigit.common.git.exec_cmd")
+@patch("pigit.gitlib.options.exec_cmd")
 def test_get_repo_info(mock_exec_cmd, get_path, expected):
     mock_exec_cmd.return_value = get_path
     assert git.get_repo_info() == expected

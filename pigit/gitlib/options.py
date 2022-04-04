@@ -5,9 +5,9 @@ from collections import Counter
 import os, re, textwrap, json
 
 from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd
-from pigit.common.git_model import File, Commit, Branch
 from pigit.render.str_utils import shorten, byte_str2str
 from pigit.render.console import Console
+from pigit.gitlib.model import File, Commit, Branch
 
 
 class GitOptionError(Exception):

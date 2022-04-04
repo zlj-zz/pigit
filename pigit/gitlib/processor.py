@@ -1,17 +1,17 @@
 # -*- coding:utf-8 -*-
 
+from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 import re
 import textwrap
 import random
 import logging
-from typing import Dict, List, Optional, Tuple, Union
 
 from ..common.utils import run_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
 from ..render import get_console
 from ..render.str_utils import shorten
-from .cmds import Git_Cmds, CommandType
+from .shortcmds import GIT_CMDS, CommandType
 
 Log = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class CmdProcessor(object, metaclass=Singleton):
+class GitShortCmdProcessor(metaclass=Singleton):
     """Git short command processor."""
 
     def __init__(
@@ -56,30 +56,24 @@ class CmdProcessor(object, metaclass=Singleton):
         show_original: bool = True,
         **kwargs,
     ) -> None:
-        super(CmdProcessor, self).__init__()
 
         self.use_recommend = command_prompt
         self.show_original = show_original
 
-        self.cmds = Git_Cmds
+        # Init commands.
+        self.cmds = GIT_CMDS
         if extra_cmds:
             if not isinstance(extra_cmds, dict):
-                raise TypeError("Custom cmds must be dict.")
+                raise TypeError("Custom cmds must be a dict.") from None
             self.cmds.update(extra_cmds)
 
     @staticmethod
     def color_command(command: str) -> str:
-        """Color the command string.
-        prog: green;
-        short command: yellow;
-        arguments: skyblue;
-        values: white.
-
-        Args:
-            command(str): valid command string.
-
-        Returns:
-            (str): color command string.
+        """Return the command string with color.
+        prog      : green;
+        command   : yellow;
+        arguments : skyblue;
+        values    : white.
         """
 
         handle = re.match(r"(\w+)\s+(\w+)", command)
@@ -111,12 +105,12 @@ class CmdProcessor(object, metaclass=Singleton):
             SystemExit: short command not right.
         """
 
-        option: Optional[Dict] = self.cmds.get(command_, None)
+        option: Optional[Dict[str, Dict]] = self.cmds.get(command_, None)
 
         # Invalid, if need suggest.
         if option is None:
             get_console().echo(
-                "Don't support this command, please try `g --show-commands`<gold>"
+                f"Don't support this command: `{command_}`<error>, please try `--show-commands`<gold>"
             )
 
             if self.use_recommend:  # check config.
@@ -130,7 +124,7 @@ class CmdProcessor(object, metaclass=Singleton):
 
             return None
 
-        command = option.get("command", None)
+        command: Dict[str, Any] = option.get("command", None)
         # Has no command can be executed.
         if not command:
             get_console().echo(
@@ -199,14 +193,14 @@ class CmdProcessor(object, metaclass=Singleton):
         else:
             return f"  {_key:<12} {_help}{command_msg}"
 
-    def command_help(self) -> None:
+    def print_help(self) -> None:
         """Print help message."""
         print("These are short commands that can replace git operations:")
         for key in self.cmds.keys():
             msg = self._generate_help_by_key(key)
             get_console().echo(msg)
 
-    def command_help_by_type(self, command_type: str) -> None:
+    def print_help_by_type(self, command_type: str) -> None:
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -236,7 +230,7 @@ class CmdProcessor(object, metaclass=Singleton):
                         f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
                     )
                 ):
-                    self.command_help_by_type(predicted_type)
+                    self.print_help_by_type(predicted_type)
             return None
 
         # Print help.
@@ -249,7 +243,7 @@ class CmdProcessor(object, metaclass=Singleton):
                 get_console().echo(msg)
 
     @classmethod
-    def type_help(cls) -> None:
+    def print_types(cls) -> None:
         """Print all command types with random color."""
         res = []
 
