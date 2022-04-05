@@ -22,7 +22,7 @@ from .const import (
 from .render import get_console
 from .common.utils import confirm
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
-from .gitlib.processor import GitShortCmdProcessor, GIT_CMDS, get_extra_cmds
+from .gitlib.processor import ShortGiter, GIT_CMDS, get_extra_cmds
 from .gitlib.options import GitOption
 from .info import introduce, GitConfig
 
@@ -46,14 +46,14 @@ setup_logging(
 # ==============
 # Global handle
 # ==============
-git = GitOption(repo_info_path=REPOS_PATH)
+git = GitOption(repo_json_path=REPOS_PATH)
 console = get_console()
 
 
 # ========================================
 # Implementation of additional functions.
 # ========================================
-def shell_mode(git_processor: GitShortCmdProcessor) -> None:
+def shell_mode(git_processor: ShortGiter) -> None:
     """shell mode entry."""
 
     console.echo(
@@ -251,7 +251,7 @@ def _cmd_func(args: Namespace, unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = GitShortCmdProcessor(
+    git_processor = ShortGiter(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,

@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
+from pathlib import Path
 import os, re, textwrap, json
 
 from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd
@@ -18,14 +19,15 @@ class GitOption:
     """Git option class."""
 
     def __init__(
-        self, op_path: Optional[str] = None, repo_info_path: Optional[str] = None
+        self, op_path: Optional[str] = None, repo_json_path: Optional[str] = None
     ) -> None:
         self.op_path = op_path
-        if repo_info_path is None:
-            repo_info_path = os.path.abspath("./repos.json")
-        # elif not os.path.isfile(repo_info_path):
-        #     raise GitOptionError("'repo_info_path' is invalid file path.") from None
-        self.repo_info_path = repo_info_path
+        self.repo_json_path = (
+            Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
+        )
+
+        # create repo path dir.
+        self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
 
     def update_setting(
         self, *, op_path: Optional[str] = None, repo_info_path: Optional[str] = None
@@ -33,7 +35,7 @@ class GitOption:
         if op_path is not None:
             self.op_path = op_path
         if repo_info_path is not None:
-            self.repo_info_path = repo_info_path
+            self.repo_json_path = repo_info_path
 
         return self
 
@@ -606,30 +608,26 @@ class GitOption:
         return name
 
     def load_repos(self) -> Dict:
-        if not os.path.isfile(self.repo_info_path):
+        if not self.repo_json_path.is_file():
             return {}
 
-        with open(self.repo_info_path, "r") as fp:
+        with self.repo_json_path.open(mode="r") as fp:
             return json.load(fp)
 
     def save_repos(self, repos: Dict) -> bool:
-        if not os.path.isfile(self.repo_info_path):
-            os.makedirs(os.path.dirname(self.repo_info_path), exist_ok=True)
-
         try:
-            with open(self.repo_info_path, "w+") as fp:
+            with self.repo_json_path.open(mode="w+") as fp:
                 json.dump(repos, fp, indent=2)
                 return True
         except Exception:
             return False
 
     def clear_repos(self) -> None:
-        if os.path.isfile(self.repo_info_path):
-            os.remove(self.repo_info_path)
+        self.repo_json_path.unlink(missing_ok=True)
 
     def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
-        """
-        Traverse the incoming paths. If it is not saved and is a git directory, add it to repos.
+        """Traverse the incoming paths. If it is not saved and is a git
+        directory, add it to repos.
 
         Args:
             paths (list[str]): incoming paths.

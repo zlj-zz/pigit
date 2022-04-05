@@ -5,19 +5,19 @@ from unittest.mock import patch
 
 from .utils import analyze_it
 
-from pigit.gitlib.processor import GitShortCmdProcessor, get_extra_cmds
+from pigit.gitlib.processor import ShortGiter, get_extra_cmds
 from pigit.gitlib._cmd_func import add, set_email_and_username, fetch_remote_branch
 
 
 class TestCmdProcessor:
     def test_init_error(self):
         with pytest.raises(TypeError):
-            GitShortCmdProcessor(extra_cmds="xxx")
+            ShortGiter(extra_cmds="xxx")
 
     @pytest.fixture(scope="module")
     def setup(self):
         extra = {"aa": {"help": "print system user name."}}
-        return GitShortCmdProcessor(extra_cmds=extra)
+        return ShortGiter(extra_cmds=extra)
 
     @pytest.mark.parametrize(
         "command",
