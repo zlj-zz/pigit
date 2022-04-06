@@ -22,7 +22,7 @@ from .const import (
 from .render import get_console
 from .common.utils import confirm
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
-from .gitlib.processor import ShortGiter, GIT_CMDS, get_extra_cmds
+from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
 from .gitlib.options import GitOption
 from .info import introduce, GitConfig
 
@@ -48,93 +48,6 @@ setup_logging(
 # ==============
 git = GitOption(repo_json_path=REPOS_PATH)
 console = get_console()
-
-
-# ========================================
-# Implementation of additional functions.
-# ========================================
-def shell_mode(git_processor: ShortGiter) -> None:
-    """shell mode entry."""
-
-    console.echo(
-        "b`Welcome come PIGIT shell.`<khaki>\n"
-        "`You can use short commands directly. Input '?' to get help.`<khaki>\n"
-    )
-
-    stopping: bool = False
-
-    while not stopping:
-        if not (input_argv_str := input("(pigit)> ").strip()):
-            continue
-
-        # Explode command string.
-        argv = input_argv_str.split(maxsplit=1)
-        command = argv[0]
-        args_str = argv[1] if len(argv) == 2 else ""
-
-        # Process.
-        if command in {"quit", "exit"}:  # ctrl+c
-            stopping = True
-
-        elif command in git_processor.cmds:
-            git_processor.process_command(command, args_str.split())
-
-        elif command in {"sh", "shell"}:
-            if args_str:
-                os.system(args_str)
-            else:
-                console.echo("`pigit shell: Please input shell command.`<error>")
-
-        elif command == "?":
-            if not args_str:
-                console.echo(
-                    "b`Options`:\n"
-                    "  `quit`<ok>, `exit`<ok>      Exit the pigit shell mode.\n"
-                    "  `sh`<ok>, `shell`<ok>       Run a shell command.\n"
-                    "  `? [comand...]`<ok>   Show help message. Use `? ?` to look detail.\n"
-                )
-
-            elif "?" in args_str:
-                console.echo(
-                    "`'?' is a tip command. "
-                    "Use '?' to look pigit shell options. "
-                    "Use '? [command...]' to look option help message.`<khaki>\n\n"
-                    "Example:\n"
-                    "  `? sh`<ok> to get the help of sh command.\n"
-                    "  `? all`<ok> to get all support git quick command help.\n"
-                    "  Or `? ws ls`<ok> to get the help you want.\n"
-                )
-
-            elif "all" in args_str:
-                git_processor.print_help()
-
-            elif "sh" in args_str or "shell" in args_str:
-                console.echo(
-                    "This command is help you to run a normal terminal command in pigit shell.\n"
-                    "For example, you can use `sh ls`<ok> to check the files of current dir.\n"
-                )
-
-            else:
-                invalid = []
-
-                for item in args_str.split():
-                    if item in git_processor.cmds.keys():
-                        console.echo(git_processor._generate_help_by_key(item))
-                    else:
-                        invalid.append(item)
-
-                if invalid:
-                    console.echo(
-                        "`Cannot find command: {0}`<error>".format(",".join(invalid))
-                    )
-
-        else:
-            console.echo(
-                "`pigit shell: Invalid command '{0}', please select from`<error> "
-                "`[shell, quit] or git short command.`<error>".format(command)
-            )
-
-    return None
 
 
 # =====================
@@ -243,22 +156,26 @@ def _cmd_func(args: Namespace, unknown: List):
 
     # Init extra custom cmds.
     extra_cmd: dict = {
-        "shell": {
-            "command": lambda _: shell_mode(git_processor),
-            "type": "func",
-            "help": "Into PIGIT shell mode.",
-        },  # only for tips.
+        # "shell": {
+        #     "command": lambda _: shell_mode(git_processor),
+        #     "type": "func",
+        #     "help": "Into PIGIT shell mode.",
+        # },  # only for tips.
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = ShortGiter(
+    git_processor = ShortGitter(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,
     )
 
     if args.shell:
-        return shell_mode(git_processor)
+        from .shellmode import PigitShell
+        shell_ = PigitShell(git_processor)
+        # print(shell_.__dir__())
+        shell_.cmdloop()
+        return
 
     if args.show_commands:
         return git_processor.print_help()
