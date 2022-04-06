@@ -23,21 +23,21 @@ clean:
 	find . -type f -name *.pyc -delete
 	find . -type d -name __pycache__ -delete
 
-del: clean
+del:
 	@if [ -d ./dist ]; then rm -r ./dist/; fi
 	@if [ -d ./build ]; then rm -r ./build; fi
 	@if [ -d ./$(Project).egg-info ]; then rm -r "./$(Project).egg-info"; fi
 
-release: del
+release: del clean
 	$(PY) setup.py sdist bdist_wheel
 	twine upload dist/*
 
-install: del
+install: del clean
 	$(PY) -m pip uninstall pigit
 	$(PY) setup.py install
 
 todo:
-	@grep --color -Ion '\(TODO\|XXX\).*' -r $(Project)
+	@grep --color -Ion '\(TODO\|XXX\|FIXME\).*' -r $(Project)
 
 uml:
 	pyreverse -ASmy -o png pigit -d docs

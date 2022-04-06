@@ -145,6 +145,22 @@ On windows should be: `C:\\User\\<your username>`
 
 [here](./docs/pigit.conf) is a configuration template.
 
+| config key                  | type  | default                     | desc                                                                                                                        |
+| --------------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| cmd_show_original           | bool  | True                        | Show original git command.                                                                                                  |
+| cmd_recommend               | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
+| tui_help_showtime           | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
+| counter_use_gitignore       | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
+| counter_show_invalid        | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
+| counter_show_icon           | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
+| counter_format              | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
+| gitignore_generator_timeout | int   | 60                          | Timeout for getting `.gitignore` template from network.                                                                     |
+| git_config_format           | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
+| repo_info_include           | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
+| repo_auto_append            | bool  | False                       | Whether auto append path to repos.                                                                                          |
+| debug_open                  | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
+| log_output                  | bool  | False                       | Whether output log in terminal.                                                                                             |
+
 ## Extra cmds
 
 You can setting your custom cmds. It need create a `extra_cmds.py` file at the **pigit** home. And writing like this:
@@ -184,7 +200,8 @@ The command info has some options:
 - Code statistics and can be beautifully displayed.
 - Support generate and use shell completion script.
 - Support create `.gitignore` template from internet.
-- Support quick open remote url (only support github).
+- Support quick open remote url on website.
+- Support manage multi repos.
 - Have log output and help message tips.
 
 ---
