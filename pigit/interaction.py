@@ -8,11 +8,11 @@ from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .render import get_console
 from .render.style import Color, Fx
-from .common.git import GitOption
+from .gitlib.options import GitOption
 
 
 if TYPE_CHECKING:
-    from .common.git_model import File, Commit, Branch
+    from .gitlib.model import File, Commit, Branch
 
 
 # git option handler

@@ -2,7 +2,7 @@ from typing import Dict, Literal, Optional, Tuple
 import os, re
 
 from .const import __version__, __url__
-from .common.git import GitOption
+from .gitlib.options import GitOption
 from .render.table import UintTable
 from .render import box
 

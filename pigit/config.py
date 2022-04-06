@@ -19,7 +19,7 @@ class ConfigError(Exception):
     pass
 
 
-class Config(object, metaclass=Singleton):
+class Config(metaclass=Singleton):
     """PIGIT configuration class."""
 
     CONFIG_TEMPLATE: str = textwrap.dedent(
@@ -160,21 +160,39 @@ class Config(object, metaclass=Singleton):
 
         return self
 
-    def load_config(self) -> None:
-        try:
-            self.read_config()
-        except Exception as e:
-            Log.error(traceback_info())
-            self.warnings.append("Can not load the config file.")
-
-        self.parse_conf()
-
-        # setting config.
-        for key in self._keys:
-            if key in self.conf.keys() and self.conf[key] != CONF_ERROR:
-                setattr(self, key, self.conf[key])
+    def check_and_set_value(self, key: str, value: str, new_config: Dict) -> None:
+        if key not in self._keys:
+            self.warnings.append(f"'{key}' is not be supported!")
+        elif type(getattr(self, key)) == int:
+            try:
+                new_config[key] = int(value)
+            except ValueError:
+                self.warnings.append(f'Config key "{key}" should be an integer!')
+        elif type(getattr(self, key)) == float:
+            try:
+                new_config[key] = float(value)
+            except ValueError:
+                self.warnings.append(f'Config key "{key}" should be a float!')
+        elif type(getattr(self, key)) == bool:
+            try:
+                # True values are y, yes, t, true, on and 1;
+                # false values are n, no, f, false, off and 0.
+                # Raises ValueError if val is anything else.
+                new_config[key] = bool(strtobool(value))
+            except ValueError:
+                self.warnings.append(f'Config key "{key}" can only be True or False!')
+        elif type(getattr(self, key)) == str:
+            if "color" in key and not Color.is_color(value):
+                self.warnings.append(
+                    f'Config key "{key}" should be RGB string, like: "#FF0000".'
+                )
             else:
-                self.conf[key] = getattr(self, key)
+                new_config[key] = value
+        elif type(getattr(self, key)) == list:
+            if re.match(r"^\[[\w\s0-9\'\"_]+,?([\s\w0-9\'\"_]+,?)*\]$", value):
+                new_config[key] = eval(value)
+            else:
+                self.warnings.append(f'Config key "{key}" not support `{value}`.')
 
     def read_config(self) -> None:
         new_config = self.conf
@@ -192,52 +210,18 @@ class Config(object, metaclass=Singleton):
                 if "=" not in line:
                     # invalid line.
                     continue
-                key, line = line.split("=", maxsplit=1)
+
+                # remove line comment.
+                if line_comment_idx := line.find("#") > 0:
+                    line = line[:line_comment_idx]
 
                 # processing.
-                key = key.strip()
-                line = line.strip().strip('"')
+                key_string, value_string = line.split("=", maxsplit=1)
+                key_string = key_string.strip()
+                value_string = value_string.strip().strip('"')
 
                 # checking.
-                if key not in self._keys:
-                    self.warnings.append(f"'{key}' is not be supported!")
-                    continue
-                elif type(getattr(self, key)) == int:
-                    try:
-                        new_config[key] = int(line)
-                    except ValueError:
-                        self.warnings.append(
-                            f'Config key "{key}" should be an integer!'
-                        )
-                elif type(getattr(self, key)) == float:
-                    try:
-                        new_config[key] = float(line)
-                    except ValueError:
-                        self.warnings.append(f'Config key "{key}" should be a float!')
-                elif type(getattr(self, key)) == bool:
-                    try:
-                        # True values are y, yes, t, true, on and 1;
-                        # false values are n, no, f, false, off and 0.
-                        # Raises ValueError if val is anything else.
-                        new_config[key] = bool(strtobool(line))
-                    except ValueError:
-                        self.warnings.append(
-                            f'Config key "{key}" can only be True or False!'
-                        )
-                elif type(getattr(self, key)) == str:
-                    if "color" in key and not Color.is_color(line):
-                        self.warnings.append(
-                            f'Config key "{key}" should be RGB string, like: "#FF0000".'
-                        )
-                        continue
-                    new_config[key] = str(line)
-                elif type(getattr(self, key)) == list:
-                    if re.match(r"^\[[\w\s0-9\'\"_]+,?([\s\w0-9\'\"_]+,?)*\]$", line):
-                        new_config[key] = eval(line)
-                    else:
-                        self.warnings.append(
-                            f'Config key "{key}" not support `{line}`.'
-                        )
+                self.check_and_set_value(key_string, value_string, new_config)
 
     def parse_conf(self) -> None:
         new_config = self.conf
@@ -282,6 +266,22 @@ class Config(object, metaclass=Singleton):
                 "The current configuration file is not up-to-date."
                 "You'd better recreate it."
             )
+
+    def load_config(self) -> None:
+        try:
+            self.read_config()
+        except Exception as e:
+            Log.error(traceback_info())
+            self.warnings.append("Can not load the config file.")
+
+        self.parse_conf()
+
+        # setting config.
+        for key in self._keys:
+            if key in self.conf.keys() and self.conf[key] != CONF_ERROR:
+                setattr(self, key, self.conf[key])
+            else:
+                self.conf[key] = getattr(self, key)
 
     def create_config_template(self) -> None:
         parent_dir = os.path.dirname(self.config_file_path)

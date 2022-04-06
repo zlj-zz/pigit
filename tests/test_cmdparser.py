@@ -11,7 +11,7 @@ from pigit.cmdparse.shellcompletion import (
     shell_complete,
     get_shell,
 )
-from pigit.processor.cmds import Git_Cmds
+from pigit.gitlib.shortcmds import GIT_CMDS
 
 argparse_dict = {
     "prog": "pigit",
@@ -89,7 +89,7 @@ class TestCompletion:
     prog = "pigit"
     complete_vars = copy.deepcopy(argparse_dict)
     cmd_temp = complete_vars["args"]["cmd"]["args"]
-    cmd_temp.update({k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()})
+    cmd_temp.update({k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()})
     script_dir = os.path.dirname(__file__)
 
     def test_error_complete_vars(self):

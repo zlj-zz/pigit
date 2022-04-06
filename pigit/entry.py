@@ -21,9 +21,9 @@ from .const import (
 )
 from .render import get_console
 from .common.utils import confirm
-from .common.git import GitOption
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
-from .processor import CmdProcessor, Git_Cmds, get_extra_cmds
+from .gitlib.processor import ShortGiter, GIT_CMDS, get_extra_cmds
+from .gitlib.options import GitOption
 from .info import introduce, GitConfig
 
 
@@ -46,14 +46,14 @@ setup_logging(
 # ==============
 # Global handle
 # ==============
-git = GitOption(repo_info_path=REPOS_PATH)
+git = GitOption(repo_json_path=REPOS_PATH)
 console = get_console()
 
 
 # ========================================
 # Implementation of additional functions.
 # ========================================
-def shell_mode(git_processor: CmdProcessor) -> None:
+def shell_mode(git_processor: ShortGiter) -> None:
     """shell mode entry."""
 
     console.echo(
@@ -106,7 +106,7 @@ def shell_mode(git_processor: CmdProcessor) -> None:
                 )
 
             elif "all" in args_str:
-                git_processor.command_help()
+                git_processor.print_help()
 
             elif "sh" in args_str or "shell" in args_str:
                 console.echo(
@@ -162,7 +162,7 @@ def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
         # Generate competion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in Git_Cmds.items()}
+            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
         )
 
         from .cmdparse.shellcompletion import shell_complete
@@ -227,7 +227,8 @@ tools_group.add_argument("--create-config", action="store_true",
 @pigit.sub_parser("cmd", help="git short command.")
 @argument("--shell", action="store_true", help="Go to the pigit shell mode.")
 @argument("-t --types", action="store_true", help="List all command types and exit.")
-@argument("-p --show-part-command", type=str, metavar="TYPE", dest="command_type", help='According to given type to list available short command and wealth and exit.')
+@argument("-p --show-part-command", type=str, metavar="TYPE", dest="command_type",
+    help='According to given type to list available short command and wealth and exit.')
 @argument("-s --show-commands", action="store_true", help="List all available short command and wealth and exit.")
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument("command", nargs="?", type=str, default=None, help="Short git command or other.")
@@ -240,6 +241,7 @@ def _cmd_func(args: Namespace, unknown: List):
         repo_path, repo_conf = git.get_repo_info()
         git.add_repos([repo_path])
 
+    # Init extra custom cmds.
     extra_cmd: dict = {
         "shell": {
             "command": lambda _: shell_mode(git_processor),
@@ -249,7 +251,7 @@ def _cmd_func(args: Namespace, unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = CmdProcessor(
+    git_processor = ShortGiter(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,
@@ -259,13 +261,13 @@ def _cmd_func(args: Namespace, unknown: List):
         return shell_mode(git_processor)
 
     if args.show_commands:
-        return git_processor.command_help()
+        return git_processor.print_help()
 
     if args.command_type:
-        return git_processor.command_help_by_type(args.command_type)
+        return git_processor.print_help_by_type(args.command_type)
 
     if args.types:
-        return git_processor.type_help()
+        return git_processor.print_types()
 
     if args.command:
         command = args.command
