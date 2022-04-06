@@ -46,7 +46,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class ShortGiter(metaclass=Singleton):
+class ShortGitter(metaclass=Singleton):
     """Git short command processor."""
 
     def __init__(

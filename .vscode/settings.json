@@ -6,6 +6,7 @@
     "python.formatting.provider": "black",
     "cSpell.words": [
         "avif",
+        "cmdloop",
         "Cmds",
         "CWORD",
         "datefmt",
