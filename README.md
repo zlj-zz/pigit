@@ -6,53 +6,14 @@
 
 A terminal tool for git. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
 
-![demo display](./demo.gif)
-
-## Installation
-
-### Pip
-
-```bash
-pip install -U pigit
-```
-
-### Source
-
-```bash
-git clone https://github.com/zlj-zz/pigit.git --depth=1
-cd pigit
-make install
-# or
-python setup.py install  # On windows
-```
-
 ## Usage
 
-You can run `pigit -r` in terminal, and you will see this intro:
+If you want to use it, you must first know what it can do.
 
-```
- ____ ___ ____ ___ _____
-|  _ \_ _/ ___|_ _|_   _|
-| |_) | | |  _ | |  | |
-|  __/| | |_| || |  | |
-|_|  |___\____|___| |_| version: 1.5.0-dev.1
-
-git version 2.32.0 (Apple Git-132)
-
-Local path: /opt/homebrew/lib/python3.9/site-packages/pigit-1.5.0.dev1-py3.9.egg/pigit
-
-Description:
-  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
-  The open source path on github: https://github.com/zlj-zz/pigit.git
-
-You can use -h or --help to get help and usage.
-
-```
-
-You can run `pigit -h` or `pigit --help` to get the help message. Like this:
+The command of `pigit -h` or `pigit --help` to get the help message with usage. Like this:
 
 ```bash
-usage: pigit [-h] [-v] [-r] [-f] [-i] [-d] [--out-log] [-c [PATH]] [-C] [--create-ignore TYPE]
+usage: pigit [-h] [-v] [-r] [-f] [-i] [-c [PATH]] [-C] [--create-ignore TYPE]
              [--create-config]
              {cmd,repo} ...
 
@@ -70,8 +31,6 @@ optional arguments:
   -r, --report          Report the pigit desc and exit.
   -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
-  -d, --debug           Current runtime in debug mode.
-  --out-log             Print log to console.
 
 tools arguments:
   Auxiliary type commands.
@@ -87,9 +46,13 @@ tools arguments:
                         are used)
 ```
 
-**For example**
+### `cmd`
 
-You can use `pigit cmd -s` to check what short command it supported, it will display the corresponding help information and the original command, like this:
+The command of `cmd` support some short sub-command to replace the long git original command.
+
+![demo display](./docs//demo.gif)
+
+Use `pigit cmd -s` to check what short command it supported, it will display the corresponding help information and the git original command, like this:
 
 ```
 These are short commands that can replace git operations:
@@ -114,13 +77,43 @@ These are short commands that can replace git operations:
 ......
 ```
 
+### `repo`
+
+The command of `repo` support operate multiple repos at the same time.
+
+![demo display](./docs/demo_repo_1.png)
+![demo display](./docs/demo_repo_2.png)
+![demo display](./docs/demo_repo_3.png)
+
+Use `pigit repo -h` to get more help.
+
 ### Interaction
 
-It support a simple interactive mode. You can use `pigit` into the interactive mode and it let control the working tree simpler. like this:
+Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
 
-![interaction demo](./interaction.gif)
+Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
+
+![interaction demo](./docs/demo_interaction.gif)
 
 And in the interaction mode, you can use `?` or `h` to see the help message.
+
+## Installation
+
+### Pip
+
+```bash
+pip install -U pigit
+```
+
+### Source
+
+```bash
+git clone https://github.com/zlj-zz/pigit.git --depth=1
+cd pigit
+make install
+# or
+python setup.py install  # On windows
+```
 
 ## Alias
 
@@ -128,12 +121,13 @@ Alias is good way to help you use _pigit_ faster . Open your shell profile and a
 
 ```bash
 if type pigit >/dev/null 2>&1; then
-    alias gt=pigit
+    alias gt="pigit"
     alias g="pigit cmd"
+    alias repo="pigit repo"
 fi
 ```
 
-Then, you can use `gt` to call TUI and use `g` to call `pigit cmd`.
+Then, you can use `gt` to call `pigit` and use `g` to call `pigit cmd`.
 
 ## Configuration
 
