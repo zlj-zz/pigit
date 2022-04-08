@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 import pytest
 import doctest
-import os
 from unittest.mock import patch
 from pprint import pprint
 
