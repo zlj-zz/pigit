@@ -1,6 +1,7 @@
 import pytest, os, copy
 from pprint import pprint
 from .utils import analyze_it
+from .conftest import _PIGIT_PATH
 
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.shellcompletion.base import ShellCompletion
@@ -86,11 +87,23 @@ def test_generate_about_dict():
 
 
 class TestCompletion:
+    real = True
     prog = "pigit"
-    complete_vars = copy.deepcopy(argparse_dict)
-    cmd_temp = complete_vars["args"]["cmd"]["args"]
-    cmd_temp.update({k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()})
-    script_dir = os.path.dirname(__file__)
+    script_dir = os.path.join(_PIGIT_PATH, "docs")
+
+    if real:
+        from pigit.entry import pigit
+
+        complete_vars = pigit.to_dict()
+        complete_vars["args"]["cmd"]["args"].update(
+            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+        )
+    else:
+        complete_vars = copy.deepcopy(argparse_dict)
+        cmd_temp = complete_vars["args"]["cmd"]["args"]
+        cmd_temp.update(
+            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+        )
 
     def test_error_complete_vars(self):
         with pytest.raises(TypeError):

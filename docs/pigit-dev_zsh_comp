@@ -14,8 +14,9 @@
 
 __cmd_values() {
   _values '' \
+    {-h,--help}'[show this help message and exit]' \
     {-s,--show-commands}'[List all available short command and wealth and exit.]' \
-    {-p,--show-part-command}'[According to given type `Branch, Commit, Conflict, Fetch, Index, Log, Merge, Push, Remote, Stash, Tag, WorkingTree, Submodule, Setting, Extra` list available short command and wealth and exit.]' \
+    {-p,--show-part-command}'[According to given type to list available short command and wealth and exit.]' \
     {-t,--types}'[List all command types and exit.]' \
     '--shell[Go to the pigit shell mode.]' \
     'b[lists, creates, renames, and deletes branches.]' \
@@ -95,8 +96,8 @@ __cmd_values() {
     's[stashes the changes of the dirty working directory.]' \
     'sp[removes and applies a single stashed state from the stash list.]' \
     'sl[lists stashed states.]' \
-    'sd[Remove submodule from repository.]' \
-    'sD[Inverse initialization submodule, clear the dir.]' \
+    'sd[display stash list.]' \
+    'sD[display stash list with detail.]' \
     't[creates, lists, deletes or verifies a tag object signed with GPG.]' \
     'ta[create a new tag.]' \
     'tx[deletes tags with given names.]' \
@@ -112,37 +113,72 @@ __cmd_values() {
     'wM[moves or renames files (forced).]' \
     'wx[removes files from the working tree and from the index (recursively).]' \
     'wX[removes files from the working tree and from the index (recursively and forced).]' \
-    'sc[Clone a repository as a submodule.]' \
-    'si[Pull the submodule for the first time.]' \
-    'su[Update git submodule.]' \
+    'Sc[Clone a repository as a submodule.]' \
+    'Si[Pull the submodule for the first time.]' \
+    'Su[Update git submodule.]' \
+    'Sd[Remove submodule from repository.]' \
+    'SD[Inverse initialization submodule, clear the dir.]' \
     'savepd[Remember your account and password.]' \
     'ue[set email and username interactively.]' \
     'user[set username.]' \
     'email[set user email.]' \
-    'open[open remote repository in web browser]' \
   && ret=0
 }
 
 __add_values() {
   _values '' \
+    {-h,--help}'[show this help message and exit]' \
     '--dry-run[dry run.]' \
   && ret=0
 }
 
 __rm_values() {
   _values '' \
+    {-h,--help}'[show this help message and exit]' \
     '--path[remove follow path, defult is name.]' \
+  && ret=0
+}
+
+__rename_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
   && ret=0
 }
 
 __ll_values() {
   _values '' \
+    {-h,--help}'[show this help message and exit]' \
     '--simple[display simple summary.]' \
+  && ret=0
+}
+
+__clear_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+  && ret=0
+}
+
+__fetch_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+  && ret=0
+}
+
+__pull_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+  && ret=0
+}
+
+__push_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
   && ret=0
 }
 
 __repo_values() {
   _values '' \
+    {-h,--help}'[show this help message and exit]' \
     'add[add repo(s).]' \
     'rm[remove repo(s).]' \
     'rename[rename a repo.]' \
@@ -154,6 +190,15 @@ __repo_values() {
   && ret=0
 }
 
+__open_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+    {-i,--issue}'[the given issue of the repository.]' \
+    {-c,--commit}'[the current commit in the repo website.]' \
+    {-p,--print}'[only print the url at the terminal, but do not open it.]' \
+  && ret=0
+}
+
 
 ######################
 # sub-commands helper
@@ -161,7 +206,8 @@ __repo_values() {
 __sub_opt_values() {
   _values '' \
     'cmd[git short command.]' \
-    'repo[repo options.]' \
+    'repo[repos options.]' \
+    'open[open remote repository in web browser.]' \
   && ret=0
 }
 
@@ -172,15 +218,14 @@ _pigit_dev_completion(){
 
   
   _arguments -C \
-    {-v,--version}'[Show version and exit.]' \
-    {-r,--report}'[Report the pigit desc and exit.]' \
-    {-f,--config}'[Display the config of current git repository and exit.]' \
+    {-h,--help}'[show this help message and exit]' \
     {-i,--information}'[Show some information about the current git repository.]' \
-    {-d,--debug}'[Current runtime in debug mode.]' \
-    '--out-log[Print log to console.]' \
-    {-c,--count}'[Count the number of codes and output them in tabular form.A given path can be accepted, and the default is the current directory.]' \
-    {-C,--complete}'[Add shell prompt script and exit.(Supported bash, zsh, fish)]' \
-    '--create-ignore[Create a demo .gitignore file. Need one argument, support: `android, c++, cpp, c, dart, elisp, gitbook, go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby, rust, sass, swift, unity`]' \
+    {-f,--config}'[Display the config of current git repository and exit.]' \
+    {-r,--report}'[Report the pigit desc and exit.]' \
+    {-v,--version}'[Show version and exit.]' \
+    {-c,--count}'[Count the number of codes and output them in tabular form.    A given path can be accepted, and the default is the current directory.    ]' \
+    '--create-ignore[Create a demo .gitignore file. Need one argument, the type of gitignore.]' \
+    {-C,--complete}'[Add shell prompt script and exit. (Supported bash, zsh, fish)]' \
     '--create-config[Create a pre-configured file of PIGIT.(If a profile exists, the values available in it are used)]' \
     '1: :->opts'\
     '*::arg:->args'\
@@ -196,7 +241,12 @@ _pigit_dev_completion(){
         case $line[2] in
           add) __add_values ;;
           rm) __rm_values ;;
+          rename) __rename_values ;;
           ll) __ll_values ;;
+          clear) __clear_values ;;
+          fetch) __fetch_values ;;
+          pull) __pull_values ;;
+          push) __push_values ;;
 
         esac
       fi
@@ -206,6 +256,7 @@ _pigit_dev_completion(){
         case $line[1] in
           cmd) __cmd_values ;;
           repo) __repo_values ;;
+          open) __open_values ;;
 
         esac
       fi

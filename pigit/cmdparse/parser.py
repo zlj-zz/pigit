@@ -14,11 +14,113 @@ from typing import (
     Union,
     overload,
 )
-from argparse import Namespace, ArgumentParser, HelpFormatter, _SubParsersAction
+from argparse import (
+    Namespace,
+    ArgumentParser,
+    HelpFormatter,
+    _SubParsersAction,
+)
+from shutil import get_terminal_size
+from pigit.render.style import Style
 
 
 if TYPE_CHECKING:
     from argparse import Action, FileType, _ArgumentGroup
+
+FormatterStyle = Union[Style, str, None]
+
+
+class ColorHelpFormatter(HelpFormatter):
+    """Formatter for generating usage messages and argument help strings.
+    This class inherits `argparse.HelpFormatter` and rewrites some methods
+    to complete customization.
+    """
+
+    usage_style: FormatterStyle = "bold"
+    text_style: FormatterStyle = "i sky_blue"
+    command_style: FormatterStyle = "ok"
+    help_style: FormatterStyle = "i yellow"
+
+    def __init__(
+        self,
+        prog: str,
+        indent_increment: int = 2,
+        max_help_position: int = 24,
+        width: Optional[int] = None,
+    ):
+        max_width, _ = get_terminal_size()
+        if width is None:
+            width = max_width * 2 // 3
+        else:
+            width = width if width < max_width else max_width - 2
+
+        super().__init__(prog, indent_increment, max_help_position, width)
+
+    def _format_usage(
+        self,
+        usage: str,
+        actions: Iterable["Action"],
+        groups: Iterable["_ArgumentGroup"],
+        prefix: Optional[str],
+    ) -> str:
+        return Style.parse(self.usage_style).render(
+            super()._format_usage(usage, actions, groups, prefix)
+        )
+
+    def _format_text(self, text: str) -> str:
+        return Style.parse(self.text_style).render(super()._format_text(text))
+
+    def _format_action(self, action: "Action") -> str:
+        # determine the required width and the entry label
+        help_position = min(self._action_max_length + 2, self._max_help_position)
+        help_width = max(self._width - help_position, 11)
+        action_width = help_position - self._current_indent - 2
+        action_header = self._format_action_invocation(action)
+
+        # no help; start on same line and add a final newline
+        if not action.help:
+            tup = self._current_indent, "", action_header
+            action_header = "%*s%s\n" % tup
+
+        # short action name; start on the same line and pad two spaces
+        elif len(action_header) <= action_width:
+            tup = self._current_indent, "", action_width, action_header
+            action_header = "%*s%-*s  " % tup
+            indent_first = 0
+
+        # long action name; start on the next line
+        else:
+            tup = self._current_indent, "", action_header
+            action_header = "%*s%s\n" % tup
+            indent_first = help_position
+
+        # collect the pieces of the action help
+        # @Overwrite
+        parts = [Style.parse(self.command_style).render(action_header)]
+
+        # if there was help for the action, add lines of help text
+        if action.help:
+            help_text = self._expand_help(action)
+            help_lines = self._split_lines(help_text, help_width)
+            help_parts = ["%*s%s\n" % (indent_first, "", help_lines[0])]
+            help_parts.extend(
+                "%*s%s\n" % (help_position, "", line) for line in help_lines[1:]
+            )
+            parts.append(
+                Style.parse(self.help_style).render(self._join_parts(help_parts))
+            )
+
+        elif not action_header.endswith("\n"):
+            parts.append("\n")
+
+        # if there are any sub-actions, add their help as well
+        parts.extend(
+            self._format_action(subaction)
+            for subaction in self._iter_indented_subactions(action)
+        )
+
+        # return a single string
+        return self._join_parts(parts)
 
 
 class ParserError(Exception):
@@ -33,7 +135,7 @@ class Parser(ArgumentParser):
         description: Optional[str] = None,
         epilog: Optional[str] = None,
         parents: Sequence[ArgumentParser] = None,
-        formatter_class: HelpFormatter = HelpFormatter,
+        formatter_class: Sequence[HelpFormatter] = ColorHelpFormatter,
         prefix_chars: str = "-",
         fromfile_prefix_chars: Optional[str] = None,
         argument_default: Any = None,
@@ -92,18 +194,20 @@ class Parser(ArgumentParser):
     # tools methods of serialization
     # ===============================
     @classmethod
-    def from_dict(cls, top_dict: Dict) -> "Parser":
+    def from_dict(cls, parser_dict: Dict) -> "Parser":
         """Parse a `dict` to genrate a ~Parser."""
         from copy import deepcopy
 
-        top_dict = deepcopy(top_dict)
+        # Use `deepcopy` to ensure that the original dict will not be changed.
+        parser_dict = deepcopy(parser_dict)
 
         def add_command(
             handle: Union["Parser", "_ArgumentGroup"],
             name: str,
             args: Dict[str, Any],
         ) -> None:
-            """Add command to handle object."""
+            """Add command to ~Parser or ~Group object."""
+
             names: List[str] = name.split(" ")
             handle.add_argument(*names, **args)
 
@@ -114,26 +218,29 @@ class Parser(ArgumentParser):
                 # Get command type.
                 prop_type = prop.pop("type", "")
 
-                # Process command according to type.
+                # If the type is 'groups', it's mean that need create a new custom
+                # group. The command of the group in 'args', so we should iterative
+                # the 'args' to add each command.
                 if prop_type == "groups":
-                    # Create argument group.
                     g_handle: "_ArgumentGroup" = handle.add_argument_group(
                         title=prop.get("title", ""),
                         description=prop.get("description", ""),
                     )
-                    # Add command to group.
                     for g_name, g_prop in prop.get("args", {}).items():
                         add_command(g_handle, g_name, g_prop)
 
+                # If the type is 'sub', is's mean that need create a new sub-parser.
+                # Before create sub-parse, we need create a subparsers which a sub-parser
+                # group. Be careful that cannot have multiple subparser arguments for same
+                # ~ArgumentParser. The command of sub-parser in 'args' and it may include
+                # smaller sub-parser, so should resolve it recursively.
                 elif prop_type == "sub":
-                    # Cannot have multiple subparser arguments for same ~ArgumentParser.
+                    #
                     if not sub_parsers:
                         sub_parsers = handle.add_subparsers()
 
-                    # Deleting `prop["args"]` dose not affect `sub_args`.
                     sub_args: Dict = prop.pop("args", None)
 
-                    # Create subparser.
                     sub_handle: Sequence["Parser"] = sub_parsers.add_parser(
                         name, **prop
                     )
@@ -146,17 +253,18 @@ class Parser(ArgumentParser):
 
                     parse_args(sub_handle, sub_args)
 
+                # Other types will be ignored, and it is considered that the current is
+                # just an ordinary command to add.
                 else:
                     add_command(handle, name, prop)
 
-        args: dict = top_dict.pop("args", {})
+        args: Dict = parser_dict.pop("args", {})
 
-        # Create root parser.
-        p = cls(**top_dict)
-        # Parse and add command.
-        parse_args(p, args)
+        # Create root parser. Parse and add command.
+        root_parser = cls(**parser_dict)
+        parse_args(root_parser, args)
 
-        return p
+        return root_parser
 
     def to_dict(self) -> Dict:
         """Return a dict of a parameter serialization of ~Parser."""
@@ -179,12 +287,21 @@ class Parser(ArgumentParser):
         ]
 
         def _process(parser: Sequence["Parser"], target_dict: Dict) -> Dict:
+            # Set parser parameters.
             for name in cmd_names:
                 target_dict[name] = getattr(parser, name, None)
 
+            # Init `args`.
             target_dict["args"] = args = {}
 
+            # Iterative action groups. Include 'option', 'position' and 'subparsers'.
+            # If define custom group, also include them.
             for action_group in parser._action_groups:
+                # Iterative action in the group. The each action is adding by `add_argument`,
+                # so one action is one argument. It include the parameters that we needed,
+                # the name is define in `argument_names`. The only special type is
+                # ～_SubParserAction, which is a sub-parser. We need to deal with it
+                # separately and resolve its action groups recursively.
                 for action in action_group._group_actions:
                     if isinstance(action, _SubParsersAction):
                         sub_helps = {
@@ -205,41 +322,6 @@ class Parser(ArgumentParser):
             return target_dict
 
         return _process(self, {})
-
-    def complete_help(self) -> Dict:
-        """Return a dict of command with help message."""
-
-        def _process(parser: Sequence["Parser"]) -> Dict:
-            prefix_chars = parser.prefix_chars
-            _positions = []
-            _options = []
-            _subparsers = {}
-
-            for action_group in parser._action_groups:
-                for action in action_group._group_actions:
-                    if isinstance(action, _SubParsersAction):
-                        sub_helps = {
-                            choices_action.dest: choices_action.help
-                            for choices_action in action._choices_actions
-                        }
-                        for sub_prog, sub_parser in action._name_parser_map.items():
-                            _subparsers[sub_prog] = _process(sub_parser)
-                            _subparsers[sub_prog]["help"] = sub_helps.get(sub_prog, "_")
-                    else:
-                        for option_string in action.option_strings:
-                            help_string = action.help.replace("\n", "")
-                            if option_string[0] in prefix_chars:
-                                _options.append((option_string, help_string))
-                            else:
-                                _positions.append((option_string, help_string))
-
-            return {
-                "_positions": _positions,
-                "_options": _options,
-                "_subparsers": _subparsers,
-            }
-
-        return _process(self)
 
     # ===============================
     # quick add sub-parser decorator
