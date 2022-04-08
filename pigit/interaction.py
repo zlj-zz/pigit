@@ -1,8 +1,9 @@
 # -*- coding:utf-8 -*-
 from typing import TYPE_CHECKING, List, Optional, Any
-import os, sys
+import os
 from time import sleep
 
+from .const import IS_WIN
 from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
@@ -225,7 +226,7 @@ class ModelSwitcher(SwitchWidget):
 
 def tui_main(index=None, help_wait=1.5):
     # tui interaction interface not support windows.
-    if sys.platform.lower().startswith("win"):
+    if IS_WIN:
         console.echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 

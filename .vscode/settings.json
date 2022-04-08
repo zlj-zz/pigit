@@ -24,6 +24,7 @@
         "isclass",
         "ismethod",
         "jfif",
+        "kwdefaults",
         "msecs",
         "nargs",
         "noqa",

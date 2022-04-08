@@ -1,20 +1,21 @@
 # -*- coding:utf-8 -*-
 import pytest
 import doctest
-import os
 from unittest.mock import patch
 from pprint import pprint
 
-import pigit.common.utils
 from pigit.common.utils import (
     traceback_info,
     confirm,
     async_run_cmd,
     exec_async_tasks,
 )
+from pigit.common.func import dynamic_default_attrs
 
 
 def test_doctest():
+    import pigit.common.utils
+
     doctest.testmod(pigit.common.utils, verbose=True)
 
 
@@ -64,3 +65,18 @@ if __name__ == '__main__':
     pprint(tasks)
     result = exec_async_tasks(tasks)
     print(result)
+
+
+class TestFunc:
+    def test_dynamic_default_attrs(self):
+        da = {"c": 3, "d": 4}
+        f = dynamic_default_attrs(lambda a, b, c, d: (a, b, c, d), **da)
+
+        assert f(1, 2) == (1, 2, 3, 4)
+        assert f(1, 2, d=0) == (1, 2, 3, 0)
+        # assert f(1, 2, 0) == (1, 2, 0, 4)
+
+        def bp(a, b, c: int, d: int = 10):
+            return (a, b, c, d)
+
+        assert dynamic_default_attrs(bp, **da)(1, 2, 0) == (1, 2, 0, 4)

@@ -21,6 +21,7 @@ from .const import (
 )
 from .render import get_console
 from .common.utils import confirm
+from .common.func import dynamic_default_attrs
 from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
 from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
 from .gitlib.options import GitOption
@@ -262,7 +263,10 @@ repo_options = {
 for k, v in repo_options.items():
     repo.sub_parser(k, help=v.get("help", "null"))(
         argument("repos", nargs="*", help="name of repo(s).")(
-            lambda args, _: git.process_repo_option(args.repos, v["cmd"])
+            dynamic_default_attrs(
+                lambda args, _, cmd: git.process_repo_option(args.repos, cmd),
+                cmd=v['cmd']
+            )
         )
     )
 
