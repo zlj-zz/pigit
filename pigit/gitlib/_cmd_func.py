@@ -14,7 +14,7 @@ Like this:
 
 from typing import List, Tuple, Union
 
-from ..common.utils import run_cmd
+from ..common.utils import exec_cmd
 from ..render import echo
 
 
@@ -31,7 +31,7 @@ def add(args: Union[List, Tuple]) -> None:
             "all" if args_str.strip() == "." else args_str
         )
     )
-    run_cmd(f"git add {args_str}")
+    exec_cmd(f"git add {args_str}", reply=False)
 
 
 def fetch_remote_branch(args: Union[List, Tuple]) -> None:
@@ -40,7 +40,7 @@ def fetch_remote_branch(args: Union[List, Tuple]) -> None:
     branch = args[0] if len(args) > 1 else None
 
     if branch:
-        run_cmd("git fetch origin {0}:{0} ".format(branch))
+        exec_cmd("git fetch origin {0}:{0} ".format(branch), reply=False)
     else:
         echo("`This option need a branch name.`<error>")
 
@@ -82,8 +82,8 @@ def set_email_and_username(args: Union[List, Tuple]) -> None:
         else:
             echo("`Bad mailbox format.`<error>")
 
-    if run_cmd(f"git config user.name {name} {is_global}") and run_cmd(
-        f"git config user.email {email} {is_global}"
+    if exec_cmd(f"git config user.name {name} {is_global}", reply=False) and exec_cmd(
+        f"git config user.email {email} {is_global}", reply=False
     ):
         echo("`Successfully set.`<ok>")
     else:
