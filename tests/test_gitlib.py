@@ -6,6 +6,7 @@ from pigit.common.utils import exec_cmd
 from pigit.gitlib.options import GitOption
 from pigit.gitlib.processor import ShortGitter, get_extra_cmds
 from pigit.gitlib._cmd_func import add, set_email_and_username, fetch_remote_branch
+from pigit.gitlib.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
 
 
 class TestGitOption:
@@ -142,3 +143,23 @@ class TestCmdFunc:
     @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=False)
     def test_set_ua(self, _a, _b, args):
         set_email_and_username(args)
+
+
+def test_iter_ignore():
+    for t in IGNORE_TEMPLATE:
+        print(get_ignore_source(t))
+
+
+@pytest.mark.parametrize(
+    ["type_", "file_name", "dir_path", "writting"],
+    [
+        ["xxxxxx", "ignore_text", TEST_PATH, False],
+        ["rust", "ignore_test", TEST_PATH, False],
+        ["rust", "ignore_test", TEST_PATH, True],
+    ],
+)
+def test_ignore(type_, file_name, dir_path, writting):
+    code, msg = create_gitignore(
+        type_, file_name=file_name, dir_path=dir_path, writting=writting
+    )
+    print(code, msg)

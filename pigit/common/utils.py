@@ -4,12 +4,8 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, ByteString, 
 import sys
 import subprocess
 import asyncio
-import logging
 from math import sqrt
 from collections import Counter
-
-
-Log = logging.getLogger(__name__)
 
 
 def traceback_info(extra_msg: str = "null") -> str:
@@ -56,8 +52,7 @@ def exec_cmd(
             " ".join(args), stderr=_stderr, stdout=_stdout, shell=True, cwd=cwd
         ) as proc:
             outres, errres = proc.communicate()
-    except Exception as e:
-        Log.error(traceback_info())
+    except (FileNotFoundError,) as e:
         _error = str(e).encode()
     else:
         _error, _result = errres, outres

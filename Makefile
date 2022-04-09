@@ -9,7 +9,7 @@ endif
 test:
 	@if [ ! -f pytest ]; then $(PY) -m pip install pytest; fi
 	pytest ./tests
-	# pytest --cov=pigit --cov-report=html
+	# pytest ./tests --cov=pigit --cov-report=html
 
 run:
 	$(PY) ./tests/test_run.py

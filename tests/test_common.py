@@ -60,6 +60,7 @@ def test_exec_cmd():
 
     # execute error
     print(exec_cmd("xxxxxxxxx"))
+    print(exec_cmd("xxxxxxxxx", cwd="xxxxxxxxxxxx"))
 
 
 def test_async_cmd_func():

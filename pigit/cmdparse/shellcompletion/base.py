@@ -2,10 +2,6 @@
 
 from typing import Dict, Optional, Tuple
 import os, re
-import logging
-
-
-Log = logging.getLogger(__name__)
 
 
 class ShellCompletionError(Exception):
@@ -150,7 +146,6 @@ class ShellCompletion(object):
                 for line in complete_src:
                     f.write(line)
         except Exception as e:
-            Log.error(str(e))
             return False
         else:
             return True

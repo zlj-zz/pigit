@@ -22,9 +22,9 @@ from .const import (
 from .render import get_console
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs
-from .gitignore import GitignoreGenetor, SUPPORTED_GITIGNORE_TYPES
 from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
 from .gitlib.options import GitOption
+from .gitlib.ignore import create_gitignore
 from .info import introduce, GitConfig
 
 
@@ -85,12 +85,8 @@ def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
         return None
 
     elif args.ignore_type:
-        repo_path, repo_conf_path = git.get_repo_info()
-
-        return GitignoreGenetor(timeout=CONFIG.gitignore_generator_timeout,).launch(
-            args.ignore_type,
-            dir_path=repo_path,
-        )
+        _, msg = create_gitignore(args.ignore_type,writting=True)
+        console.echo(msg)
 
     elif args.count:
         from .codecounter import CodeCounter
