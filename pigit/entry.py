@@ -260,12 +260,13 @@ repo_options = {
     "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
     "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
 }
-for k, v in repo_options.items():
-    repo.sub_parser(k, help=v.get("help", "null"))(
+for subcmd, prop in repo_options.items():
+    help_string = f'{h.strip()} for repo(s).' if (h:=prop.get("help")) else "NULL"
+    repo.sub_parser(subcmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
                 lambda args, _, cmd: git.process_repo_option(args.repos, cmd),
-                cmd=v['cmd']
+                cmd=prop['cmd']
             )
         )
     )
