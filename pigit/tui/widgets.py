@@ -5,7 +5,7 @@ import time
 from math import ceil
 
 from .console import Term
-from ..common.utils import run_cmd, confirm
+from ..common.utils import exec_cmd, confirm
 from ..render.str_utils import get_width
 from ..render.style import Fx
 
@@ -273,6 +273,6 @@ class CmdRunner:
 
     def run(self):
         print(Term.normal_screen)
-        res_code = run_cmd(self.cmd, cwd=self.run_path)
+        res_code = exec_cmd(self.cmd, cwd=self.run_path, reply=False)
         print(Term.alt_screen)
         return res_code

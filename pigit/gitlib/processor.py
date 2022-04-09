@@ -7,7 +7,7 @@ import textwrap
 import random
 import logging
 
-from ..common.utils import run_cmd, confirm, similar_command, traceback_info
+from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
 from ..render import get_console
 from ..render.str_utils import shorten
@@ -150,7 +150,7 @@ class ShortGitter(metaclass=Singleton):
                 command = " ".join([command, args_str])
             if self.show_original:
                 get_console().echo(f":rainbow:  {self.color_command(command)}")
-            run_cmd(command)
+            exec_cmd(command, reply=False)
 
     # ============================
     # Print command help message.

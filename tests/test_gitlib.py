@@ -121,11 +121,11 @@ class TestShortGitter:
 
 
 class TestCmdFunc:
-    @patch("pigit.gitlib._cmd_func.run_cmd", return_value=None)
+    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=None)
     def test_add(self, _):
         add([])
 
-    @patch("pigit.gitlib._cmd_func.run_cmd", return_value=None)
+    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=None)
     def test_fetch_remote(self, _):
         fetch_remote_branch([])
 
@@ -139,6 +139,6 @@ class TestCmdFunc:
         ],
     )
     @patch("builtins.input", return_value="abc@gmail.com")
-    @patch("pigit.gitlib._cmd_func.run_cmd", return_value=False)
+    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=False)
     def test_set_ua(self, _a, _b, args):
         set_email_and_username(args)

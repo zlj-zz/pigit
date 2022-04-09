@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, ByteString, Union
 import sys
 import subprocess
 import asyncio
@@ -35,56 +35,40 @@ def traceback_info(extra_msg: str = "null") -> str:
     )
 
 
-def run_cmd(*args, cwd: Optional[str] = None) -> bool:
-    """Run system command.
+def exec_cmd(
+    *args, cwd: Optional[str] = None, reply: bool = True, decoding: bool = True
+) -> Tuple[Union[str, ByteString, None], ...]:
+    """Run system shell command.
 
-    Returns:
-        (bool): Whether run successful.
-
-    Docs test
-        >>> run_cmd('pwd')
-        True
-        >>> run_cmd('which', 'python')
-        True
+    Args:
+        reply (bool): whether return execute result. Default is True.
+        decoding (bool): whether decode the return. Default is True.
     """
+    _stderr: Optional[int] = subprocess.PIPE if reply else None
+    _stdout: Optional[int] = subprocess.PIPE if reply else None
 
-    try:
-        # ? In python2, `subprocess` not support `with` sentence.
-        proc = subprocess.Popen(" ".join(args), shell=True, cwd=cwd)
-        proc.wait()
-    except Exception:
-        Log.error(traceback_info())
-        return False
-    else:
-        return True
-
-
-def exec_cmd(*args, cwd: Optional[str] = None) -> Tuple[str, str]:
-    """Run system command and get result.
-
-    Returns:
-        (str, str): Error string and result string.
-    """
+    _error: Union[str, ByteString, None] = None
+    _result: Union[str, ByteString, None] = None
 
     try:
         # Take over the input stream and get the return information.
         with subprocess.Popen(
-            " ".join(args),
-            stderr=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            shell=True,
-            cwd=cwd,
+            " ".join(args), stderr=_stderr, stdout=_stdout, shell=True, cwd=cwd
         ) as proc:
-
-            output = proc.communicate()
-            # Get normal output and error output.
-            res = output[0].decode()
-            err = output[1].decode()
+            outres, errres = proc.communicate()
     except Exception as e:
         Log.error(traceback_info())
-        return str(e), ""
+        _error = str(e).encode()
     else:
-        return err, res
+        _error, _result = errres, outres
+
+    if decoding:
+        return (
+            _error is not None and _error.decode(),
+            _result is not None and _result.decode(),
+        )
+    else:
+        return _error, _result
 
 
 async def async_run_cmd(
