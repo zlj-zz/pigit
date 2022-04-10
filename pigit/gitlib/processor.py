@@ -1,11 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from typing import Any, Dict, List, Optional, Tuple, Union
-import os
-import re
-import textwrap
-import random
-import logging
+from typing import Callable, Dict, List, Optional, Tuple, Union
+import os, re, textwrap, random, logging
 
 from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
@@ -92,45 +88,29 @@ class ShortGitter(metaclass=Singleton):
         return color_command
 
     def process_command(
-        self, command_: str, args: Optional[Union[List, Tuple]] = None
-    ) -> None:
+        self, command_string: str, args: Optional[Union[List, Tuple]] = None
+    ) -> Tuple[int, str]:
         """Process command and arguments.
 
         Args:
             command_ (str): short command string
             args (list|None, optional): command arguments. Defaults to None.
-
-        Raises:
-            SystemExit: not git.
-            SystemExit: short command not right.
         """
 
-        option: Optional[Dict[str, Dict]] = self.cmds.get(command_, None)
+        option: Optional[Dict[str, Dict]] = self.cmds.get(command_string, None)
 
         # Invalid, if need suggest.
         if option is None:
-            get_console().echo(
-                f"Don't support this command: `{command_}`<error>, please try `--show-commands`<gold>"
+            return (
+                1,
+                f"Don't support this command: `{command_string}`<error>, "
+                "please try `--show-commands`<gold>",
             )
 
-            if self.use_recommend:  # check config.
-                predicted_command = similar_command(command_, self.cmds.keys())
-                if confirm(
-                    get_console().render_str(
-                        f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
-                    )
-                ):
-                    self.process_command(predicted_command, args=args)
-
-            return None
-
-        command: Dict[str, Any] = option.get("command", None)
+        command: Optional[Union[str, Callable]] = option.get("command")
         # Has no command can be executed.
         if not command:
-            get_console().echo(
-                "`Invalid custom short command, nothing can to exec.`<error>"
-            )
-            return None
+            return 2, "`Invalid custom short command, nothing can to exec.`<error>"
 
         if not option.get("has_arguments", False) and args:
             get_console().echo(
@@ -138,19 +118,38 @@ class ShortGitter(metaclass=Singleton):
             )
             args = []
 
-        _type = option.get("type", "command")
-        if _type == "func":
+        if isinstance(command, Callable):
             try:
                 command(args)
             except Exception as e:
-                get_console().echo(f"`{e}`<error>")
-        else:  # is command.
+                return 3, f"`{e}`<error>"
+        elif isinstance(command, str):
             if args:
-                args_str = " ".join(args)
-                command = " ".join([command, args_str])
+                command = " ".join([command, *args])
             if self.show_original:
                 get_console().echo(f":rainbow:  {self.color_command(command)}")
             exec_cmd(command, reply=False)
+        else:
+            return 5, "`The type of command not supported.`<error>"
+
+        return 0, ""
+
+    def do(self, command_string: str, args: Optional[Union[List, Tuple]] = None):
+        """Process command and arguments."""
+
+        code, msg = self.process_command(command_string, args)
+        if code == 0:
+            pass
+        elif code == 1 and self.use_recommend:  # check config.
+            predicted_command = similar_command(command_string, self.cmds.keys())
+            if confirm(
+                get_console().render_str(
+                    f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
+                )
+            ):
+                self.do(predicted_command, args=args)
+        else:
+            get_console().echo(msg)
 
     # ============================
     # Print command help message.
