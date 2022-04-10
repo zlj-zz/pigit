@@ -56,9 +56,6 @@ class Config(metaclass=Singleton):
         # When the command line width is not enough, the `simple ` format is forced.
         counter_format={counter_format}
 
-        # (int) Timeout for getting `.gitignore` template from network.
-        gitignore_generator_timeout={gitignore_generator_timeout}
-
         # Git local config print format. Supported: [table, normal]
         git_config_format={git_config_format}
 
@@ -86,7 +83,6 @@ class Config(metaclass=Singleton):
         "counter_show_invalid",
         "counter_show_icon",
         "counter_format",
-        "gitignore_generator_timeout",
         "git_config_format",
         "repo_info_include",
         "repo_auto_append",
@@ -111,9 +107,6 @@ class Config(metaclass=Singleton):
     counter_show_icon: bool = False
     counter_format: str = "table"  # table, simple
     _supported_result_format: List = ["table", "simple"]
-
-    # ignore file conf
-    gitignore_generator_timeout: int = 60
 
     # info conf
     git_config_format: str = "table"
