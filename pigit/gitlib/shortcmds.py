@@ -1,12 +1,14 @@
 # -*- coding:utf-8 -*-
 
 """Git optional short command dictionary.
+
 The key is a short command, and the value is the information dictionary of the
 short command.
+
 [belong] is the type of command. The default is `Extra`.
-[command] is the execution content of the short command.
+[command] is the execution content of the short command. It supports (method, command
+          string). The default is command.
 [help] is help information, optional.
-[type] indicates the type of command. It supports (func, command). The default is command.
 [has_arguments] indicates whether the short command receives parameters. The default is False.
 """
 
@@ -48,7 +50,6 @@ GIT_CMDS = {
         "belong": CommandType.Branch,
         "command": "git branch",
         "help": "lists, creates, renames, and deletes branches.",
-        "type": "command",
         "has_arguments": True,
     },
     "bc": {
@@ -237,7 +238,6 @@ GIT_CMDS = {
         "belong": CommandType.Fetch,
         "command": fetch_remote_branch,
         "help": "fetch other branch to local as same name.",
-        "type": "func",
     },
     # Index(i)
     "ia": {
@@ -245,7 +245,6 @@ GIT_CMDS = {
         "command": add,
         "help": "adds file contents to the index(default: all files).",
         "has_arguments": True,
-        "type": "func",
     },
     "iA": {
         "belong": CommandType.Index,
@@ -647,7 +646,6 @@ GIT_CMDS = {
         "command": set_email_and_username,
         "help": "set email and username interactively.",
         "has_arguments": True,
-        "type": "func",
     },
     "user": {
         "belong": CommandType.Setting,

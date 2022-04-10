@@ -186,7 +186,7 @@ def _cmd_func(args: Namespace, unknown: List):
     if args.command:
         command = args.command
         args.args.extend(unknown)
-        git_processor.process_command(command, args.args)
+        git_processor.do(command, args.args)
         return None
     else:
         console.echo("`pigit cmd -h`<ok> for help.")
