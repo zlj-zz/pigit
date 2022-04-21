@@ -88,7 +88,7 @@ class GitOption:
 
         return repo_path, git_conf_path
 
-    def get_head(self, path: Optional[str] = None) -> str:
+    def get_head(self, path: Optional[str] = None) -> Optional[str]:
         """Get current repo head. Return a branch name or a commit sha string."""
 
         path = path or self.op_path
@@ -96,7 +96,9 @@ class GitOption:
             "git symbolic-ref -q --short HEAD || git describe --tags --exact-match",
             cwd=path,
         )
-        return res.rstrip()
+        if res is not None:
+            res = res.rstrip()
+        return res
 
     def get_branches(
         self,
@@ -111,6 +113,9 @@ class GitOption:
         color = "never" if plain else "always"
 
         err, res = exec_cmd(f"git branch {include_remote} --color={color}", cwd=path)
+
+        if res is None:
+            return []
         return [branch[2:] for branch in res.rstrip().split("\n")]
 
     def get_first_pushed_commit(
@@ -295,6 +300,9 @@ class GitOption:
 
         command = f"git log {branch_name} {arg_str} {limit_flag}  {filter_flag}"
         err, resp = exec_cmd(command, cwd=path)
+
+        if resp is None:
+            return ""
         return resp.strip()
 
     def load_status(
@@ -691,41 +699,52 @@ class GitOption:
             self.save_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def ll_repos(self) -> Generator[List[Tuple], None, None]:
+    def ll_repos(self, revese: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name, prop in exist_repos.items():
             repo_path = prop["path"]
             head = self.get_head(repo_path)
 
-            _, unstaged = exec_cmd("git diff --stat", cwd=repo_path)
-            _, staged = exec_cmd("git diff --stat --cached", cwd=repo_path)
-            _, untracked = exec_cmd(
-                "git ls-files -zo --exclude-standard", cwd=repo_path
-            )
-            commit_hash = self.get_first_pushed_commit(path=repo_path, branch_name=head)
-            commit = self.load_log(
-                limit=1,
-                arg_str="--format='%s (%cd)||%C(auto)%d%n' --date=relative --color",
-                path=repo_path,
-            )
+            # jump invalid repo.
+            if head is None:
+                if revese:
+                    yield [
+                        (repo_name, ""),
+                        ("Local Path", repo_path),
+                    ]
 
-            commit_msg, branch_status = commit.strip().split("||")
-            unstaged_symbol = "*" if unstaged else " "
-            staged_symbol = "+" if staged else " "
-            untracked_symbol = "?" if untracked else " "
+            elif not revese:
+                _, unstaged = exec_cmd("git diff --stat", cwd=repo_path)
+                _, staged = exec_cmd("git diff --stat --cached", cwd=repo_path)
+                _, untracked = exec_cmd(
+                    "git ls-files -zo --exclude-standard", cwd=repo_path
+                )
+                commit_hash = self.get_first_pushed_commit(
+                    path=repo_path, branch_name=head
+                )
+                commit = self.load_log(
+                    limit=1,
+                    arg_str="--format='%s (%cd)||%C(auto)%d%n' --date=relative --color",
+                    path=repo_path,
+                )
 
-            yield [
-                (repo_name, ""),
-                (
-                    "Branch",
-                    f"{head} {unstaged_symbol}{staged_symbol}{untracked_symbol}",
-                ),
-                ("Status", branch_status),
-                ("Commit Hash", commit_hash),
-                ("Commit Msg", commit_msg),
-                ("Local Path", repo_path),
-            ]
+                commit_msg, branch_status = commit.strip().split("||")
+                unstaged_symbol = "*" if unstaged else " "
+                staged_symbol = "+" if staged else " "
+                untracked_symbol = "?" if untracked else " "
+
+                yield [
+                    (repo_name, ""),
+                    (
+                        "Branch",
+                        f"{head} {unstaged_symbol}{staged_symbol}{untracked_symbol}",
+                    ),
+                    ("Status", branch_status),
+                    ("Commit Hash", commit_hash),
+                    ("Commit Msg", commit_msg),
+                    ("Local Path", repo_path),
+                ]
 
     def process_repo_option(self, repos: Optional[List[str]], cmd: str):
         exist_repos = self.load_repos()

@@ -73,8 +73,8 @@ class ShortGitter(metaclass=Singleton):
         """
 
         handle = re.match(r"(\w+)\s+(\w+)", command)
-        prop = handle.group(1)
-        cmd = handle.group(2)
+        prop = handle[1]
+        cmd = handle[2]
         next_position = handle.span()[1]
 
         color_command = f"b`{prop}`<ok> b`{cmd}`<goldenrod> "
