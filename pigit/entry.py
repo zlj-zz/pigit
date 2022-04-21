@@ -229,13 +229,27 @@ def repo_rename(args, _):
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
+@argument("--revese", action="store_true", help="revese to display invalid repo.")
 def repo_ll(args, _):
-    for info in git.ll_repos():
-        if args.simple:
-            console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
+    simple = args.simple
+    revese = args.revese
+
+    for info in git.ll_repos(revese=revese):
+        if simple:
+            if revese:
+                console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
+            else:
+                console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
         else:
-            console.echo(
-                textwrap.dedent(
+            if revese:
+                summary_string = textwrap.dedent(
+                    f"""\
+                    b`{info[0][0]}`
+                        {info[1][0]}: `{info[1][1]}`<sky_blue>
+                    """
+                )
+            else:
+                summary_string = textwrap.dedent(
                     f"""\
                     b`{info[0][0]}`
                         {info[1][0]}: {info[1][1]}
@@ -245,7 +259,7 @@ def repo_ll(args, _):
                         {info[5][0]}: `{info[5][1]}`<sky_blue>
                     """
                 )
-            )
+            console.echo(summary_string)
 
 
 repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: git.clear_repos())

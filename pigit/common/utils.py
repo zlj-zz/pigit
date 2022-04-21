@@ -43,8 +43,8 @@ def exec_cmd(
     _stderr: Optional[int] = subprocess.PIPE if reply else None
     _stdout: Optional[int] = subprocess.PIPE if reply else None
 
-    _error: Union[str, ByteString, None] = None
-    _result: Union[str, ByteString, None] = None
+    _err: Union[str, ByteString, None] = None
+    _rlt: Union[str, ByteString, None] = None
 
     try:
         # Take over the input stream and get the return information.
@@ -52,18 +52,20 @@ def exec_cmd(
             " ".join(args), stderr=_stderr, stdout=_stdout, shell=True, cwd=cwd
         ) as proc:
             outres, errres = proc.communicate()
-    except (FileNotFoundError,) as e:
-        _error = str(e).encode()
+    except FileNotFoundError as e:
+        _err = str(e).encode()
     else:
-        _error, _result = errres, outres
+        _err, _rlt = errres, outres
 
-    if decoding:
-        return (
-            _error is not None and _error.decode(),
-            _result is not None and _result.decode(),
-        )
-    else:
-        return _error, _result
+    if not decoding:
+        return _err, _rlt
+
+    # decode
+    if _err is not None:
+        _err = _err.decode()
+    if _rlt is not None:
+        _rlt = _rlt.decode()
+    return _err, _rlt
 
 
 async def async_run_cmd(
