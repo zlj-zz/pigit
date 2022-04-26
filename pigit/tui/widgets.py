@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 from abc import ABC, abstractmethod
 import time
 from math import ceil
@@ -11,7 +11,7 @@ from ..render.style import Fx
 
 
 class Widget(ABC):
-    _activation = False
+    _activation: bool = False
 
     def activate(self):
         self._activation = True
@@ -71,6 +71,8 @@ class SwitchWidget(Widget):
         """Costom process keyboard event, instance in sub-class."""
 
     def _process_event(self, key: str):
+        # If the result of process is int, then switch the page.
+        # Else let current sub widget to process the key.
         next_idx = self.process_keyevent(key)
         if isinstance(next_idx, int):
             self.set_current(next_idx)
@@ -94,16 +96,12 @@ class RowPanelWidget(Widget):
         cursor: Optional[str] = None,
         help_wait: float = 1.5,
         widget: Widget = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.widget = widget
         self.size = None
 
-        if not cursor or get_width(ord(cursor)) != 1:
-            self.cursor = "→"
-        else:
-            self.cursor = cursor
-
+        self.cursor = "→" if not cursor or get_width(ord(cursor)) != 1 else cursor
         self.help_wait = help_wait
 
         # Initialize.
@@ -118,7 +116,7 @@ class RowPanelWidget(Widget):
         self.update_raw: bool = False
 
         for key, value in kwargs.items():
-            setattr(self, "_ex_{}".format(key), value)
+            setattr(self, f"_ex_{key}", value)
 
     @abstractmethod
     def get_raw_data(self) -> List[Any]:
@@ -159,7 +157,7 @@ class RowPanelWidget(Widget):
             self.process_raw_data(self.raw_data), self.size[0]
         )
 
-    def emit(self, name, cb=None):
+    def emit(self, name: str, cb: Optional[Callable] = None):
         if name == "update":
             self.update()
 
@@ -179,7 +177,7 @@ class RowPanelWidget(Widget):
 
         # Every time refresh the output, need to recalculate the
         # number of additional rows, so need to reset to zero.
-        self.extra = 0
+        self.extra: int = 0
 
         # Print needed display part.
         for index, item in enumerate(self.show_data, start=1):
@@ -228,10 +226,13 @@ class RowPanelWidget(Widget):
                 time.sleep(self.help_wait)
 
             else:
-                self.process_keyevent(key, self.cursor_row)
+                #
+                next_cursor = self.process_keyevent(key, self.cursor_row)
+                if next_cursor is not None and 1 <= next_cursor <= len(self.show_data):
+                    self.cursor_row = next_cursor
 
     @abstractmethod
-    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+    def process_keyevent(self, input_key: str, cursor_row: int) -> Optional[int]:
         """Handles keyboard events other than movement.
 
         Args:
@@ -240,16 +241,17 @@ class RowPanelWidget(Widget):
             data (Any): raw data.
 
         Returns:
-            bool: whether need refresh data.
+            int: next cursor index.
         """
 
-    @abstractmethod
     def keyevent_help(self) -> str:
         """Get extra keyevent help message.
 
         Returns:
             str: help message string.
         """
+
+        return ""
 
 
 class ConfirmWidget:

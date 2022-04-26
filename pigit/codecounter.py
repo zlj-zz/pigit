@@ -1,10 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, Any
-import os
-import stat
-import re
-import json
+from typing import Dict, List, Literal, Optional, Tuple, Union, Any
+import os, re, json, stat
 import logging
 import threading
 import concurrent.futures
@@ -15,7 +12,7 @@ from .render.table import Table
 from .render import get_console
 
 
-Log = logging.getLogger(__name__)
+Logger = logging.getLogger(__name__)
 
 
 CounterFormatType = Literal["simple", "table"]
@@ -212,7 +209,7 @@ class CodeCounter(object):
                     file_size = os.path.getsize(full_path)
                     total_size += file_size
                 except:
-                    Log.warn(f"Can't read size of '{full_path}'")
+                    Logger.warn(f"Can't read size of '{full_path}'")
 
                 # Get file type.
                 file_type = adjudgment_type(file, original=True)
@@ -439,12 +436,9 @@ class CodeCounter(object):
 
             if color:
                 files_change_str = f"`{files_change}`<{'#98fb98' if files_change.startswith('+') else '#ff6347'}>"
-            else:
-                files_change_str = files_change
-
-            if color:
                 lines_change_str = f"`{lines_change}`<{'#98fb98' if lines_change.startswith('+') else '#ff6347'}>"
             else:
+                files_change_str = files_change
                 lines_change_str = lines_change
 
             tb.add_row(

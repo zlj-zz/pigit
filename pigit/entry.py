@@ -1,11 +1,10 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import List, Optional
+from typing import List
 import os, logging, textwrap
 
 from .log import setup_logging
-from .decorator import time_it
 from .config import Config
 from .cmdparse.parser import command, argument, Namespace
 from .const import (
@@ -21,14 +20,14 @@ from .const import (
 )
 from .render import get_console
 from .common.utils import confirm
-from .common.func import dynamic_default_attrs
+from .common.func import dynamic_default_attrs, time_it
 from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
 from .gitlib.options import GitOption
 from .gitlib.ignore import create_gitignore
 from .info import introduce, GitConfig
 
 
-Log = logging.getLogger(__name__)
+Logger = logging.getLogger(__name__)
 
 
 # ===============
@@ -59,7 +58,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: Namespace, extra_unknown: Optional[List] = None) -> None:
+def pigit(args: Namespace, _) -> None:
     if args.report:
         console.echo(introduce())
 

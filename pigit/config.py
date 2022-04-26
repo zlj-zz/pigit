@@ -8,7 +8,7 @@ from .common.utils import confirm, traceback_info
 from .common.singleton import Singleton
 from .render.style import Color
 
-Log = logging.getLogger(__name__)
+Logger = logging.getLogger(__name__)
 
 CONF_ERROR = "==error=="
 
@@ -127,8 +127,6 @@ class Config(metaclass=Singleton):
     def __init__(
         self, path: str, version: str = "unknown", auto_load: bool = True
     ) -> None:
-        super(Config, self).__init__()
-
         self.config_file_path: str = path
         self.current_version: str = version
         self.conf: Dict = {}
@@ -136,7 +134,7 @@ class Config(metaclass=Singleton):
         if auto_load:
             self.load_config()
 
-    def output_warnings(self):
+    def output_warnings(self) -> None:
         """Output config warning info and return self object.
 
         Returns:
@@ -263,9 +261,11 @@ class Config(metaclass=Singleton):
     def load_config(self) -> None:
         try:
             self.read_config()
-        except Exception as e:
-            Log.error(traceback_info())
-            self.warnings.append("Can not load the config file.")
+        except Exception:
+            Logger.error(traceback_info())
+            self.warnings.append(
+                f"Can not load the config file. Path: {self.config_file_path}"
+            )
 
         self.parse_conf()
 
@@ -290,15 +290,15 @@ class Config(metaclass=Singleton):
         self.load_config()
         self.conf["version"] = self.current_version
 
-        # Write config. Will save before custom setting.
+        # Write config with already exist custom settings.
         try:
             with open(
                 self.config_file_path,
                 "w" if os.path.isfile(self.config_file_path) else "x",
             ) as f:
                 f.write(self.CONFIG_TEMPLATE.format(**self.conf))
-        except Exception as e:
-            Log.error(traceback_info())
+        except Exception:
+            Logger.error(traceback_info())
             print("Fail to create config.")
         else:
             print("Successful.")
