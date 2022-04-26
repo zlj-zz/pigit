@@ -8,11 +8,11 @@ if TYPE_CHECKING:
 
 
 class PigitShell(cmd.Cmd):
-    intro = get_console().render_str(
+    intro: str = get_console().render_str(
         "b`Welcome come PIGIT shell.`<khaki>\n"
         "`You can use short commands directly. Input '?' to get help.`<khaki>\n"
     )
-    prompt = "(pigit)> "
+    prompt: str = "(pigit)> "
 
     def __init__(
         self,

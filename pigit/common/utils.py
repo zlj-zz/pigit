@@ -1,9 +1,7 @@
 # -*- coding:utf-8 -*-
 
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, ByteString, Union
-import sys
-import subprocess
-import asyncio
+import sys, subprocess, asyncio
 from math import sqrt
 from collections import Counter
 

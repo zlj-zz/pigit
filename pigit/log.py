@@ -30,9 +30,9 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
     if log_file is None:
         log_handle = logging.StreamHandler()
     else:
-        dir_path = os.path.dirname(log_file)
-        if not os.path.isdir(dir_path):
-            os.makedirs(dir_path, exist_ok=True)
+        # try create dir of log.
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
         try:
             log_handle = logging.handlers.RotatingFileHandler(
                 log_file, maxBytes=1048576, backupCount=4

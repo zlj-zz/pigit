@@ -8,7 +8,7 @@ from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
 from .render import get_console
-from .render.style import Color, Fx
+from .render.style import Style
 from .gitlib.options import GitOption
 
 
@@ -20,6 +20,11 @@ if TYPE_CHECKING:
 git = GitOption()
 console = get_console()
 
+GREEN = "#98FB98"
+RED = "#F08080"
+BLUE = "#6495ED"
+YELLOW = "#F0E68C"
+
 
 class BranchPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Branch"]:
@@ -29,9 +34,7 @@ class BranchPanel(RowPanelWidget):
         processed_branches = []
         for branch in raw_data:
             if branch.is_head:
-                processed_branches.append(
-                    f"* {Color.fg('#98FB98')}{branch.name}{Fx.rs}"
-                )
+                processed_branches.append(f"* {Style(color=GREEN).render(branch.name)}")
             else:
                 processed_branches.append(f"  {branch.name}")
 
@@ -56,7 +59,7 @@ class BranchPanel(RowPanelWidget):
 
             err = git.checkout_branch(local_branch.name)
             if "error" in err:
-                print(Color.fg("#FF0000"), err, Fx.rs, sep="")
+                print(Style(color=RED).render(err), sep="")
                 sleep(2)
             self.emit("update")
 
@@ -93,15 +96,15 @@ class StatusPanel(RowPanelWidget):
             "↲ : check file diff.\n"
         )
 
-    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+    def process_keyevent(self, input_key: str, cursor_row: int) -> Optional[int]:
         if input_key in {"a", " "}:
             git.switch_file_status(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
         elif input_key == "d":
             if ConfirmWidget("discard all changed? [y/n]:").run():
-                # if confirm("discard all changed? [y/n]:"):
                 git.discard_file(self.raw_data[cursor_row - 1], path=self.repo_path)
             self.emit("update")
+            return cursor_row - 1
         elif input_key == "i":
             git.ignore_file(self.raw_data[cursor_row - 1])
             self.emit("update")
@@ -146,12 +149,9 @@ class FilePanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
+            print(Style(bg_color=BLUE).render(line))
         else:
             print(line)
-
-    def keyevent_help(self) -> str:
-        return ""
 
 
 class CommitPanel(RowPanelWidget):
@@ -161,13 +161,11 @@ class CommitPanel(RowPanelWidget):
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         color_data = []
-        pushed_c = Color.fg("#F0E68C")
-        unpushed_c = Color.fg("#F08080")
         for commit in raw_data:
-            c = pushed_c if commit.is_pushed() else unpushed_c
+            c = YELLOW if commit.is_pushed() else RED
             sha = commit.sha[:7]
             msg = commit.msg
-            color_data.append(f"{c}{sha} {msg}{Fx.rs}")
+            color_data.append(Style(color=c).render(f"{sha} {msg}"))
 
         return color_data
 
@@ -202,16 +200,13 @@ class CommitStatusPanel(RowPanelWidget):
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
-            print(f'{Color.bg("#6495ED")}{line}{Fx.reset}')
+            print(Style(bg_color=BLUE).render(line))
         else:
             print(line)
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
         if input_key == "q":
             self.deactivate()
-
-    def keyevent_help(self) -> str:
-        return ""
 
 
 class ModelSwitcher(SwitchWidget):

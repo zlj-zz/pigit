@@ -7,6 +7,7 @@
     "cSpell.words": [
         "avif",
         "cmdloop",
+        "cmdparse",
         "Cmds",
         "CWORD",
         "datefmt",
@@ -17,6 +18,7 @@
         "getch",
         "gitbook",
         "Giter",
+        "gitlib",
         "hexa",
         "hijklmn",
         "icns",
