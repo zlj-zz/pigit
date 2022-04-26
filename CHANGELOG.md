@@ -1,5 +1,16 @@
 # Changelog of pigit
 
+## v1.5.2 (2022-04-27)
+- Fix parameter typing of Python3.8
+- Fix `repo ll` command  error, when has invalid repo path.
+- Fix tui mode bugs when removing all new files or modifications from the bottom up.
+- Improve the shell mode.
+- Improve some inner util methods.
+- Improve `Console.echo()` support object.
+- Improve the way of custom command, remove `type` field.
+- Add `cmdparse` that support building the command line through the decorator.
+- Add `gitlib` that package the operating instructions for Git.
+
 ## v1.5.1 (2022-03-24)
 - Support using pigit like a normal third-module.
 - Fixed bug of tui mode.
