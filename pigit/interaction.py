@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 from typing import TYPE_CHECKING, List, Optional, Any
-import os
+import os, logging
 from time import sleep
 
 from .const import IS_WIN
@@ -11,10 +11,11 @@ from .render import get_console
 from .render.style import Style
 from .gitlib.options import GitOption
 
-
 if TYPE_CHECKING:
     from .gitlib.model import File, Commit, Branch
 
+
+Logger = logging.getLogger(__name__)
 
 # git option handler
 git = GitOption()
