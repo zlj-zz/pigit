@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import List
+from typing import Dict, List
 import os, logging, textwrap
 
 from .log import setup_logging
@@ -39,7 +39,7 @@ CONFIG = Config(
 
 setup_logging(
     debug=CONFIG.debug_open,
-    log_file=LOG_FILE_PATH if CONFIG.log_output else None,
+    log_file=None if CONFIG.log_output else LOG_FILE_PATH,
 )
 
 
@@ -151,7 +151,7 @@ def _cmd_func(args: Namespace, unknown: List):
         git.add_repos([repo_path])
 
     # Init extra custom cmds.
-    extra_cmd: dict = {
+    extra_cmd: Dict = {
         # "shell": {
         #     "command": lambda _: shell_mode(git_processor),
         #     "type": "func",
