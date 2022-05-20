@@ -508,18 +508,16 @@ class GitOption:
     def switch_file_status(self, file: Union[File, str], path: Optional[str] = None):
         path = path or self.op_path
         file_name = self._get_file_str(file)
-        # with open("./debug.log", "a+") as f:
-        #     f.write(f"{file_name}\n")
 
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
         elif file.has_unstaged_change:
-            exec_cmd(f"git add -- {file_name}", cwd=path)
+            exec_cmd(f"git add -- '{file_name}'", cwd=path)
         elif file.has_staged_change:
             if file.tracked:
-                exec_cmd(f"git reset HEAD -- {file_name}", cwd=path)
+                exec_cmd(f"git reset HEAD -- '{file_name}'", cwd=path)
             else:
-                exec_cmd(f"git rm --cached --force -- {file_name}", cwd=path)
+                exec_cmd(f"git rm --cached --force -- '{file_name}'", cwd=path)
 
     def discard_file(
         self,
