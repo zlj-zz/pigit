@@ -70,7 +70,7 @@ class StatusPanel(RowPanelWidget):
     repo_path, repo_conf = git.get_repo_info()
 
     def get_raw_data(self) -> List["File"]:
-        return git.load_status(self.size[0])
+        return git.load_status(self.size[0], icon=True)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         return (
