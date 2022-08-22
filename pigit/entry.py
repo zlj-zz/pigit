@@ -4,6 +4,8 @@
 from typing import Dict, List
 import os, logging, textwrap
 
+from plenty import get_console
+
 from .log import setup_logging
 from .config import Config
 from .cmdparse.parser import command, argument, Namespace
@@ -18,7 +20,6 @@ from .const import (
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
-from .render import get_console
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
 from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds

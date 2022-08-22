@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 import time
 from math import ceil
 
+from plenty.str_utils import get_width
+from plenty.style import Fx
+
 from .console import Term
 from ..common.utils import exec_cmd, confirm
-from ..render.str_utils import get_width
-from ..render.style import Fx
 
 
 class Widget(ABC):

@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Callable, List, Optional, IO
 import os, cmd
 import functools
-from pigit.render import get_console
+
+from plenty import get_console
 
 if TYPE_CHECKING:
     from pigit.gitlib.processor import ShortGitter

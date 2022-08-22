@@ -4,7 +4,6 @@ import os, time
 import pytest
 
 from pigit.codecounter import CodeCounter
-from pigit.render import get_console
 
 
 @pytest.mark.parametrize(

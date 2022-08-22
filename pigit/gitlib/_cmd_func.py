@@ -14,8 +14,9 @@ Like this:
 
 from typing import List, Tuple, Union
 
+from plenty import echo
+
 from ..common.utils import exec_cmd
-from ..render import echo
 
 
 def add(args: Union[List, Tuple]) -> None:
