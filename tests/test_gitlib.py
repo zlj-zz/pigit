@@ -99,7 +99,7 @@ class TestShortGitter:
         ],
     )
     def test_color_command(self, setup, command: str):
-        from pigit.render import get_console
+        from plenty import get_console
 
         console = get_console()
         handle = setup

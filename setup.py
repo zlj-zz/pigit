@@ -64,7 +64,7 @@ setup(
         "Operating System :: MacOS",
         "Operating System :: Microsoft :: Windows",
     ],
-    install_requires=[],
+    install_requires=['plenty==1.0.2'],
     entry_points="""
         [console_scripts]
         pigit=pigit.entry:main

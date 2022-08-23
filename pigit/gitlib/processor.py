@@ -3,10 +3,11 @@
 from typing import Callable, Dict, List, Optional, Tuple, Union
 import os, re, textwrap, random, logging
 
+from plenty import get_console
+from plenty.str_utils import shorten
+
 from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
 from ..common.singleton import Singleton
-from ..render import get_console
-from ..render.str_utils import shorten
 from .shortcmds import GIT_CMDS, CommandType
 
 Log = logging.getLogger(__name__)

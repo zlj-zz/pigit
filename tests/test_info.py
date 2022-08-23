@@ -3,7 +3,7 @@ import pytest
 from .utils import analyze_it
 
 from pigit.info import GitConfig, introduce
-from pigit.render import get_console
+from plenty import get_console
 
 console = get_console()
 

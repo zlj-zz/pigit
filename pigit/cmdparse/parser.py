@@ -21,7 +21,7 @@ from argparse import (
     _SubParsersAction,
 )
 from shutil import get_terminal_size
-from pigit.render.style import Style
+from plenty.style import Style
 
 
 if TYPE_CHECKING:

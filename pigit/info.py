@@ -1,10 +1,11 @@
 from typing import Dict, Literal, Optional, Tuple
 import os, re
 
+from plenty.table import UintTable
+from plenty import box
+
 from .const import __version__, __url__
 from .gitlib.options import GitOption
-from .render.table import UintTable
-from .render import box
 
 
 git = GitOption()

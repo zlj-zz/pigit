@@ -5,9 +5,16 @@ from collections import Counter
 from pathlib import Path
 import os, re, textwrap, json
 
-from pigit.common.utils import async_run_cmd, exec_async_tasks, exec_cmd
-from pigit.render.str_utils import shorten, byte_str2str
-from pigit.render.console import Console
+from plenty.str_utils import shorten, byte_str2str
+from plenty.console import Console
+
+from pigit.common.utils import (
+    adjudgment_type,
+    async_run_cmd,
+    exec_async_tasks,
+    exec_cmd,
+    get_file_icon,
+)
 from pigit.gitlib.model import File, Commit, Branch
 
 
@@ -311,6 +318,7 @@ class GitOption:
         ident: int = 2,
         plain: bool = False,
         path: Optional[str] = None,
+        icon: bool = False,
     ) -> List[File]:
         """Get the file tree status of GIT for processing and encapsulation.
         Args:
@@ -344,9 +352,12 @@ class GitOption:
             has_inline_merged_conflicts = change in ["UU", "AA"]
 
             display_name = shorten(name, max_width - 3 - ident)
+
+            icon_str = get_file_icon(adjudgment_type(display_name)) if icon else ""
+
             # color full command.
             display_str = Console.render_str(
-                f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {display_name}"
+                f"`{staged_change}`<{'bad' if has_no_staged_change else'right'}>`{unstaged_change}`<{'bad' if unstaged_change!=' ' else'right'}> {icon_str}{display_name}"
             )
 
             file_ = File(

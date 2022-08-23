@@ -1,5 +1,10 @@
 # Changelog of pigit
 
+## v1.6.0 (2022-08-22)
+- Show file icon in tui mode.
+- Use new dependencies -- `plenty`(render).
+- Independent render part, which is convenient for maintenance.
+
 ## v1.5.2 (2022-04-27)
 - Fix parameter typing of Python3.8
 - Fix `repo ll` command  error, when has invalid repo path.

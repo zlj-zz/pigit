@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 import time
 from math import ceil
 
+from plenty.str_utils import get_width
+from plenty.style import Style
+
 from .console import Term
 from ..common.utils import exec_cmd, confirm
-from ..render.str_utils import get_width
-from ..render.style import Fx
 
 
 class Widget(ABC):
@@ -135,7 +136,7 @@ class RowPanelWidget(Widget):
 
         new_list = []
         for line in raw_data:
-            text = Fx.uncolor(line)
+            text = Style.plain(line)
             count = sum(get_width(ord(ch)) for ch in text)
             # [float] is to solve the division of python2 without
             # retaining decimal places.

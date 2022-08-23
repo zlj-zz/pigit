@@ -3,12 +3,13 @@ from typing import TYPE_CHECKING, List, Optional, Any
 import os, logging
 from time import sleep
 
+from plenty import get_console
+from plenty.style import Style
+
 from .const import IS_WIN
 from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .render import get_console
-from .render.style import Style
 from .gitlib.options import GitOption
 
 if TYPE_CHECKING:
@@ -69,7 +70,7 @@ class StatusPanel(RowPanelWidget):
     repo_path, repo_conf = git.get_repo_info()
 
     def get_raw_data(self) -> List["File"]:
-        return git.load_status(self.size[0])
+        return git.load_status(self.size[0], icon=True)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         return (
