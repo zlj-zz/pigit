@@ -4,4 +4,4 @@ pylint
 pytest
 pytest-cov
 pyinstrument
-plenty
+plenty==1.0.2
