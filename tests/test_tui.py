@@ -10,7 +10,7 @@ def test():
     print()
 
     size = shutil.get_terminal_size()
-    panel = StatusPanel(widget=FilePanel())
+    panel = StatusPanel(widget=FilePanel(), files_icon=True)
     panel._render(size)
 
     branch_panel = BranchPanel()

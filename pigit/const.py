@@ -3,7 +3,7 @@
 import os, platform, datetime
 
 __project__ = "pigit"
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
