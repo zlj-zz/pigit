@@ -4,7 +4,7 @@
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A terminal tool for git. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
+A terminal tool for git. Read as [Pi Git], meaning to use git like pig it. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
 
 ## Usage
 
@@ -121,13 +121,13 @@ Alias is good way to help you use _pigit_ faster . Open your shell profile and a
 
 ```bash
 if type pigit >/dev/null 2>&1; then
-    alias gt="pigit"
+    alias pg="pigit"
     alias g="pigit cmd"
-    alias repo="pigit repo"
+    alias gr="pigit repo"
 fi
 ```
 
-Then, you can use `gt` to call `pigit` and use `g` to call `pigit cmd`.
+Then, you can use `pg` to call `pigit` and use `g` to call `pigit cmd`.
 
 ## Configuration
 
