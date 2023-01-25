@@ -113,7 +113,7 @@ def pigit(args: Namespace, _) -> None:
             if not confirm("Input `enter` to continue:"):
                 return
 
-        tui_main(help_wait=CONFIG.tui_help_showtime)
+        tui_main(CONFIG)
 
 
 pigit.add_argument("-v", "--version", action="version", help="Show version and exit.", version=f"Version:{VERSION}")

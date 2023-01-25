@@ -147,10 +147,7 @@ class GitOption:
         path = path or self.op_path
         err, res = exec_cmd("git remote show", cwd=path)
 
-        if err:
-            return []
-
-        return res.strip().split("\n")
+        return [] if err else res.strip().split("\n")
 
     def get_remote_url(
         self, path: Optional[str] = None, remote_name: Optional[str] = None
@@ -308,9 +305,7 @@ class GitOption:
         command = f"git log {branch_name} {arg_str} {limit_flag}  {filter_flag}"
         err, resp = exec_cmd(command, cwd=path)
 
-        if resp is None:
-            return ""
-        return resp.strip()
+        return "" if resp is None else resp.strip()
 
     def load_status(
         self,
@@ -409,9 +404,7 @@ class GitOption:
             command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file),
             cwd=path,
         )
-        if err:
-            return "Can't get diff."
-        return res.rstrip()
+        return "Can't get diff." if err else res.rstrip()
 
     def load_commits(
         self,
