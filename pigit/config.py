@@ -44,6 +44,10 @@ class Config(metaclass=Singleton):
         # (float) Display time of help information in interactive mode.
         tui_help_showtime={tui_help_showtime}
 
+        # (bool) Whether show the icon of file.
+        # The effect is not perfect and needs improvement.
+        tui_files_icon={tui_files_icon}
+
         # (bool) Whether to use the ignore configuration of the `.gitignore` file.
         counter_use_gitignore={counter_use_gitignore}
 
@@ -80,6 +84,7 @@ class Config(metaclass=Singleton):
         "cmd_show_original",
         "cmd_recommend",
         "tui_help_showtime",
+        "tui_files_icon",
         "counter_use_gitignore",
         "counter_show_invalid",
         "counter_show_icon",
@@ -101,6 +106,7 @@ class Config(metaclass=Singleton):
 
     # tui conf
     tui_help_showtime: float = 1.5
+    tui_files_icon: bool = False
 
     # code counter conf
     counter_use_gitignore: bool = True

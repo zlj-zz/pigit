@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from typing import TYPE_CHECKING, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Any
 import os, logging
 from time import sleep
 
@@ -14,6 +14,7 @@ from .gitlib.options import GitOption
 
 if TYPE_CHECKING:
     from .gitlib.model import File, Commit, Branch
+    from .config import Config
 
 
 Logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class StatusPanel(RowPanelWidget):
     repo_path, repo_conf = git.get_repo_info()
 
     def get_raw_data(self) -> List["File"]:
-        return git.load_status(self.size[0], icon=True)
+        return git.load_status(self.size[0], icon=self._ex_files_icon)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         return (
@@ -221,7 +222,7 @@ class ModelSwitcher(SwitchWidget):
             self.set_current(self.current + 1)
 
 
-def tui_main(index=None, help_wait=1.5):
+def tui_main(config: Optional["Config"] = None, index=None):
     # tui interaction interface not support windows.
     if IS_WIN:
         console.echo("`Terminal interaction not support windows now.`<#FF0000>")
@@ -231,7 +232,14 @@ def tui_main(index=None, help_wait=1.5):
         console.echo("`Please run in a git repo dir.`<tomato>")
         return
 
-    status = StatusPanel(widget=FilePanel(), help_wait=help_wait)
+    # Fetching config of tui from `CONFIG`.
+    help_wait = 1.5
+    files_icon = False
+    if config is not None:
+        help_wait = config.tui_help_showtime
+        files_icon = config.tui_files_icon
+
+    status = StatusPanel(widget=FilePanel(), help_wait=help_wait, files_icon=files_icon)
     commit = CommitPanel(widget=CommitStatusPanel(), help_wait=help_wait)
     branch = BranchPanel(help_wait=help_wait)
     switcher = ModelSwitcher(sub_widgets=[status, commit, branch])
