@@ -28,7 +28,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
 
     if os.path.isfile(path):
         try:
-            # load a module form localtion.
+            # load a module form location.
             spec = importlib.util.spec_from_file_location(name, path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -43,7 +43,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class ShortGitter(metaclass=Singleton):
+class ShortGiter(metaclass=Singleton):
     """Git short command processor."""
 
     def __init__(

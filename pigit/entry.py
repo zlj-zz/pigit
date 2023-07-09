@@ -22,7 +22,7 @@ from .const import (
 )
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
-from .git.processor import ShortGitter, GIT_CMDS, get_extra_cmds
+from .git.processor import ShortGiter, GIT_CMDS, get_extra_cmds
 from .git.options import GitOption
 from .git.ignore import create_gitignore
 from .info import introduce, GitConfig
@@ -73,7 +73,7 @@ def pigit(args: Namespace, _) -> None:
         console.echo(git.get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
-        # Generate competion vars dict.
+        # Generate completion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
@@ -161,7 +161,7 @@ def _cmd_func(args: Namespace, unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = ShortGitter(
+    git_processor = ShortGiter(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,
@@ -211,7 +211,7 @@ def repo_add(args, _):
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
-@argument("--path", action="store_true", help="remove follow path, defult is name.")
+@argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
     res = git.rm_repos(args.repos, args.path)
@@ -270,9 +270,9 @@ repo_options = {
     "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
     "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
 }
-for subcmd, prop in repo_options.items():
+for sub_cmd, prop in repo_options.items():
     help_string = f'{h.strip()} for repo(s).' if (h:=prop.get("help")) else "NULL"
-    repo.sub_parser(subcmd, help=help_string)(
+    repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
                 lambda args, _, cmd: git.process_repo_option(args.repos, cmd),

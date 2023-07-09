@@ -303,7 +303,7 @@ GIT_CMDS = {
     "l1": {
         "belong": CommandType.Log,
         "command": "git log --graph --all --decorate --oneline",
-        "help": "display the log with oneline.",
+        "help": "display the log with one-line.",
     },
     "ls": {
         "belong": CommandType.Log,
