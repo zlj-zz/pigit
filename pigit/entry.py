@@ -22,9 +22,9 @@ from .const import (
 )
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
-from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
-from .gitlib.options import GitOption
-from .gitlib.ignore import create_gitignore
+from .git.processor import ShortGitter, GIT_CMDS, get_extra_cmds
+from .git.options import GitOption
+from .git.ignore import create_gitignore
 from .info import introduce, GitConfig
 
 
@@ -85,7 +85,7 @@ def pigit(args: Namespace, _) -> None:
         return None
 
     elif args.ignore_type:
-        _, msg = create_gitignore(args.ignore_type,writting=True)
+        _, msg = create_gitignore(args.ignore_type,writing=True)
         console.echo(msg)
 
     elif args.count:

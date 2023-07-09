@@ -15,7 +15,7 @@ from pigit.common.utils import (
     exec_cmd,
     get_file_icon,
 )
-from pigit.gitlib.model import File, Commit, Branch
+from pigit.git.model import File, Commit, Branch
 
 
 class GitOptionError(Exception):

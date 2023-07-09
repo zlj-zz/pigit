@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 from shutil import get_terminal_size
 from pathlib import Path
+
 from .template import IGNORE_TEMPLATE
 
 
@@ -16,7 +17,7 @@ def create_gitignore(
     type_: str,
     file_name: str = ".gitignore",
     dir_path: Optional[str] = None,
-    writting: bool = True,
+    writing: bool = True,
 ) -> Tuple[int, str]:
     """Try to create a gitignore file.
 
@@ -24,7 +25,7 @@ def create_gitignore(
         type_ (str): project type.
         file_name (str, optional): file name. Defaults to ".gitignore".
         dir_path (Optional[str], optional): dir path. Defaults to None.
-        writting (bool, optional): whether writting. Defaults to True.
+        writing (bool, optional): whether writing. Defaults to True.
 
     Returns:
         Tuple[int, str]: (code, message)
@@ -40,7 +41,7 @@ def create_gitignore(
             f'Supported type: [{" ".join(IGNORE_TEMPLATE)}]. Case insensitive.'
         )
 
-    if not (writting and path.parent.is_dir()):
+    if not (writing and path.parent.is_dir()):
         width, _ = get_terminal_size()
         return 1, "{sep}{source}{sep}".format(sep="=" * width, source=source)
 

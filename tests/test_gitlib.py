@@ -3,10 +3,10 @@ from unittest.mock import patch, Mock
 
 from .conftest import TEST_PATH
 from pigit.common.utils import exec_cmd
-from pigit.gitlib.options import GitOption
-from pigit.gitlib.processor import ShortGitter, get_extra_cmds
-from pigit.gitlib._cmd_func import add, set_email_and_username, fetch_remote_branch
-from pigit.gitlib.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
+from pigit.git.options import GitOption
+from pigit.git.processor import ShortGitter, get_extra_cmds
+from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
+from pigit.git.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
 
 
 class TestGitOption:
@@ -160,6 +160,6 @@ def test_iter_ignore():
 )
 def test_ignore(type_, file_name, dir_path, writting):
     code, msg = create_gitignore(
-        type_, file_name=file_name, dir_path=dir_path, writting=writting
+        type_, file_name=file_name, dir_path=dir_path, writing=writting
     )
     print(code, msg)

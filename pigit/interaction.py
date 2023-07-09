@@ -10,10 +10,10 @@ from .const import IS_WIN
 from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .gitlib.options import GitOption
+from .git.options import GitOption
 
 if TYPE_CHECKING:
-    from .gitlib.model import File, Commit, Branch
+    from .git.model import File, Commit, Branch
     from .config import Config
 
 

@@ -12,7 +12,7 @@ from pigit.cmdparse.shellcompletion import (
     shell_complete,
     get_shell,
 )
-from pigit.gitlib.shortcmds import GIT_CMDS
+from pigit.git.shortcmds import GIT_CMDS
 
 argparse_dict = {
     "prog": "pigit",

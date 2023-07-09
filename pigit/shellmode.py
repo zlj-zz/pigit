@@ -5,7 +5,7 @@ import functools
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.gitlib.processor import ShortGitter
+    from pigit.git.processor import ShortGitter
 
 
 class PigitShell(cmd.Cmd):
