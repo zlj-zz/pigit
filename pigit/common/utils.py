@@ -7,13 +7,13 @@ from collections import Counter
 
 
 def traceback_info(extra_msg: str = "null") -> str:
-    """Get traceback infomation.
+    """Get traceback information.
 
     Args:
         extra_msg (str, optional): extra custom message. Defaults to "null".
 
     Returns:
-        str: formated traceback infomation.
+        str: formatted traceback information.
     """
 
     exc_type, exc_value, exc_obj = sys.exc_info()
@@ -238,7 +238,7 @@ SUFFIX_TYPE: Dict[str, str] = {
     "swift": "Swift",
     "toml": "Properties",
     "vb": "Visual Basic",
-    "vim": "Vim Scirpt",
+    "vim": "Vim Script",
     "vue": "Vue",
     "xhtml": "HTML",
     "xml": "XML",
@@ -251,7 +251,7 @@ SUFFIX_TYPE: Dict[str, str] = {
 SPECIAL_NAMES: Dict[str, str] = {
     "license": "LICENSE",
     "requirements.txt": "Pip requirement",
-    "vimrc": "Vim Scirpt",
+    "vimrc": "Vim Script",
     "dockerfile": "Docker",
 }
 
@@ -292,7 +292,7 @@ FILE_ICONS: Dict[str, str] = {
     "Go": "",
     "HTML": "",
     "Java": "",
-    "Java Scirpt": "",
+    "Java Script": "",
     "Lua": "",
     "Kotlin": "",
     "Markdown": "",
@@ -309,8 +309,8 @@ FILE_ICONS: Dict[str, str] = {
     "Swift": "",
     "SQL": "",
     "snippets": "",
-    "Type Scirpt": "",
-    "Vim Scirpt": "",
+    "Type Script": "",
+    "Vim Script": "",
     "Vue": "﵂",
     "YAML": "",
     "XML": "",

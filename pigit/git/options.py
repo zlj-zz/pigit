@@ -3,7 +3,10 @@
 from typing import Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
 from pathlib import Path
-import os, re, textwrap, json
+import os
+import re
+import json
+import textwrap
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -15,7 +18,7 @@ from pigit.common.utils import (
     exec_cmd,
     get_file_icon,
 )
-from pigit.git.model import File, Commit, Branch
+from .model import File, Commit, Branch
 
 
 class GitOptionError(Exception):

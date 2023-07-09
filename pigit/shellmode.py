@@ -5,7 +5,7 @@ import functools
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.git.processor import ShortGiter
+    from pigit.git.cmd import ShortGiter
 
 
 class PigitShell(cmd.Cmd):
@@ -99,4 +99,4 @@ class PigitShell(cmd.Cmd):
 
     def do_all(self, args: str):
         """Show all short git cmds help."""
-        self.short_giter.print_help()
+        get_console().echo(self.short_giter.get_help())

@@ -63,7 +63,7 @@ __cmd_values() {
     'ix[removes files from the index (recursively).]' \
     'iX[removes files from the index (recursively and forced).]' \
     'l[display the log with good format.]' \
-    'l1[display the log with oneline.]' \
+    'l1[display the log with one-line.]' \
     'ls[displays the stats log.]' \
     'ld[displays the diff log.]' \
     'lv[displays the log, verifying the GPG signature of commits.]' \
@@ -135,7 +135,7 @@ __add_values() {
 __rm_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
-    '--path[remove follow path, defult is name.]' \
+    '--path[remove follow path, default is name.]' \
   && ret=0
 }
 

@@ -22,7 +22,7 @@ from .const import (
 )
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
-from .git.processor import ShortGiter, GIT_CMDS, get_extra_cmds
+from .git.cmd import ShortGiter, GIT_CMDS, get_extra_cmds
 from .git.options import GitOption
 from .git.ignore import create_gitignore
 from .info import introduce, GitConfig
@@ -175,13 +175,14 @@ def _cmd_func(args: Namespace, unknown: List):
         return
 
     if args.show_commands:
-        return git_processor.print_help()
+        # return git_processor.print_help()
+        return console.echo(git_processor.get_help())
 
     if args.command_type:
         return git_processor.print_help_by_type(args.command_type)
 
     if args.types:
-        return git_processor.print_types()
+        return console.echo(git_processor.get_types())
 
     if args.command:
         command = args.command
