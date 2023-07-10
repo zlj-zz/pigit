@@ -23,7 +23,7 @@ from .const import (
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
 from .git.cmd import SCmd, GIT_CMDS, get_extra_cmds
-from .git.options import GitOption
+from .git.repo import Repo
 from .git.ignore import create_gitignore
 from .info import introduce, GitConfig
 
@@ -47,7 +47,7 @@ setup_logging(
 # ==============
 # Global handle
 # ==============
-git = GitOption(repo_json_path=REPOS_PATH)
+git = Repo(repo_json_path=REPOS_PATH)
 console = get_console()
 
 

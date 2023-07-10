@@ -3,15 +3,16 @@ from unittest.mock import patch, Mock
 
 from .conftest import TEST_PATH
 from pigit.common.utils import exec_cmd
-from pigit.git.options import GitOption
+from pigit.git import git_version
+from pigit.git.repo import Repo
 from pigit.git.cmd import SCmd, get_extra_cmds
 from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
 from pigit.git.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
 
 
 class TestGitOption:
-    git = GitOption()
-    if not git.git_version:
+    git = Repo()
+    if not git_version():
         exit(1)
 
     # =================
@@ -59,7 +60,7 @@ class TestGitOption:
             [("", "a/b/.git/modules/"), ("a/b/", "a/b/.git/modules/")],
         ],
     )
-    @patch("pigit.git.options.exec_cmd")
+    @patch("pigit.git.repo.exec_cmd")
     def test_get_repo_info(self, mock_exec_cmd, get_path, expected):
         mock_exec_cmd.return_value = get_path
         assert self.git.get_repo_info() == expected
