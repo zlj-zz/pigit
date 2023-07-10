@@ -4,7 +4,7 @@ from unittest.mock import patch, Mock
 from .conftest import TEST_PATH
 from pigit.common.utils import exec_cmd
 from pigit.git.options import GitOption
-from pigit.git.cmd import ShortGiter, get_extra_cmds
+from pigit.git.cmd import SCmd, get_extra_cmds
 from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
 from pigit.git.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
 
@@ -79,12 +79,12 @@ class TestGitOption:
 class TestShortGitter:
     def test_init_error(self):
         with pytest.raises(TypeError):
-            ShortGiter(extra_cmds="xxx")
+            SCmd(extra_cmds="xxx")
 
     @pytest.fixture(scope="module")
     def setup(self):
         extra = {"aa": {"help": "print system user name."}}
-        return ShortGiter(extra_cmds=extra)
+        return SCmd(extra_cmds=extra)
 
     @pytest.mark.parametrize(
         "command",

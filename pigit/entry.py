@@ -22,7 +22,7 @@ from .const import (
 )
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
-from .git.cmd import ShortGiter, GIT_CMDS, get_extra_cmds
+from .git.cmd import SCmd, GIT_CMDS, get_extra_cmds
 from .git.options import GitOption
 from .git.ignore import create_gitignore
 from .info import introduce, GitConfig
@@ -142,7 +142,7 @@ tools_group.add_argument("--create-config", action="store_true",
 @argument("-s --show-commands", action="store_true", help="List all available short command and wealth and exit.")
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument("command", nargs="?", type=str, default=None, help="Short git command or other.")
-def _cmd_func(args: Namespace, unknown: List):
+def _(args: Namespace, unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
     # If you want to manipulate the current folder with git,
@@ -161,7 +161,7 @@ def _cmd_func(args: Namespace, unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = ShortGiter(
+    git_processor = SCmd(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,
@@ -179,15 +179,15 @@ def _cmd_func(args: Namespace, unknown: List):
         return console.echo(git_processor.get_help())
 
     if args.command_type:
-        return git_processor.print_help_by_type(args.command_type)
+        return console.echo(git_processor.print_help_by_type(args.command_type))
 
     if args.types:
         return console.echo(git_processor.get_types())
 
     if args.command:
-        command = args.command
+        short_cmd = args.command
         args.args.extend(unknown)
-        git_processor.do(command, args.args)
+        console.echo(git_processor.do(short_cmd, args.args))
         return None
     else:
         console.echo("`pigit cmd -h`<ok> for help.")

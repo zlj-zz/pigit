@@ -7,11 +7,7 @@ import random
 import textwrap
 import logging
 
-from plenty import get_console
-from plenty.str_utils import shorten
-
 from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
-from ..common.singleton import Singleton
 from ._cmds import GIT_CMDS, CommandType
 
 Log = logging.getLogger(__name__)
@@ -47,17 +43,16 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class ShortGiter(metaclass=Singleton):
-    """Git short command processor."""
+class SCmd:
+    """Git short command handler."""
 
     def __init__(
         self,
         extra_cmds: Optional[dict] = None,
         command_prompt: bool = True,
         show_original: bool = True,
-        **kwargs,
     ) -> None:
-        self.use_recommend = command_prompt
+        self.prompt = command_prompt
         self.show_original = show_original
 
         # Init commands.
@@ -99,7 +94,18 @@ class ShortGiter(metaclass=Singleton):
         Args:
             command_ (str): short command string
             args (list|None, optional): command arguments. Defaults to None.
+
+        Returns:
+            Tuple[int, str]: (code, msg)
+                code:
+                    0: successful
+                    1: not supported
+                    2: has no cmd string
+                    3: func cmd exec error
+                    5: not supported cmd type
         """
+
+        msgs = []
 
         option: Optional[Dict[str, Dict]] = self.cmds.get(command_string, None)
 
@@ -117,7 +123,7 @@ class ShortGiter(metaclass=Singleton):
             return 2, "`Invalid custom short command, nothing can to exec.`<error>"
 
         if not option.get("has_arguments", False) and args:
-            get_console().echo(
+            msgs.append(
                 f"`The command does not accept parameters. Discard {args}.`<error>"
             )
             args = []
@@ -131,35 +137,30 @@ class ShortGiter(metaclass=Singleton):
             if args:
                 command = " ".join([command, *args])
             if self.show_original:
-                get_console().echo(f":rainbow:  {self.color_command(command)}")
+                msgs.append(f":rainbow:  {self.color_command(command)}")
             exec_cmd(command, reply=False)
         else:
             return 5, "`The type of command not supported.`<error>"
 
-        return 0, ""
+        return 0, "\n".join(msgs)
 
-    def do(self, command_string: str, args: Optional[Union[List, Tuple]] = None):
+    def do(self, short_cmd: str, args: Optional[Union[List, Tuple]] = None) -> str:
         """Process command and arguments."""
 
-        code, msg = self.process_command(command_string, args)
-        if code == 0:
-            pass
-        elif code == 1 and self.use_recommend:  # check config.
-            predicted_command = similar_command(command_string, self.cmds.keys())
-            if confirm(
-                get_console().render_str(
-                    f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
-                )
-            ):
-                self.do(predicted_command, args=args)
-        else:
-            get_console().echo(msg)
+        code, msg = self.process_command(short_cmd, args)
+
+        if code == 1 and self.prompt:  # check config.
+            predicted_command = similar_command(short_cmd, self.cmds.keys())
+            if confirm(f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"):
+                return self.do(predicted_command, args=args)
+
+        return msg
 
     # ============================
     # Print command help message.
     # ============================
     def generate_help_by_key(
-        self, key: str, use_color: bool = True, max_width=90
+        self, key: str, use_color: bool = True, max_width: int = 90
     ) -> str:
         """Generate one help by given key.
 
@@ -188,7 +189,6 @@ class ShortGiter(metaclass=Singleton):
         if callable(_command):
             _command = f"Func: {_command.__name__}"
 
-        _command = shorten(_command, msg_max_width, placeholder="...")
         command_msg = "%*s%s" % (help_position, "", _command) if help_msg else _command
 
         if use_color:
@@ -199,15 +199,15 @@ class ShortGiter(metaclass=Singleton):
     def get_help(self) -> str:
         """Get all help message."""
 
-        helps = ["These are short commands that can replace git operations:"]
+        msgs = ["These are short commands that can replace git operations:"]
 
         for key in self.cmds.keys():
             msg = self.generate_help_by_key(key)
-            helps.append(msg)
+            msgs.append(msg)
 
-        return "\n".join(helps)
+        return "\n".join(msgs)
 
-    def print_help_by_type(self, t: str) -> None:
+    def print_help_by_type(self, t: str) -> str:
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -223,34 +223,34 @@ class ShortGiter(metaclass=Singleton):
 
         # Checking the type whether right.
         if t not in CommandType.__members__:
-            get_console().echo(
-                "`There is no such type.`<error>\n"
-                "Please use `git --types`<ok> to view the supported types."
-            )
+            predicted_type = similar_command(t, CommandType.__members__.keys())
+            if self.prompt and confirm(
+                f":TIPS: The wanted type is `{predicted_type}`?[y/n]:"
+            ):
+                return self.print_help_by_type(predicted_type)
 
-            if self.use_recommend:
-                predicted_type = similar_command(t, CommandType.__members__.keys())
-                if confirm(
-                    get_console().render_str(
-                        f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
-                    )
-                ):
-                    self.print_help_by_type(predicted_type)
-            return None
+            else:
+                return (
+                    "`There is no such type.`<error>\n"
+                    "Please use `--types`<ok> to view the supported types."
+                )
 
-        # Print help.
-        print("These are the orders of {0}".format(t))
+        # Get help.
+        msgs = ["These are the orders of {0}".format(t)]
+
         for k, v in self.cmds.items():
             belong = v.get("belong", CommandType.Extra)
             # Prevent the `belong` attribute from being set in the custom command.
             if isinstance(belong, CommandType) and belong.value == t:
                 msg = self.generate_help_by_key(k)
-                get_console().echo(msg)
+                msgs.append(msg)
+
+        return "\n".join(msgs)
 
     @classmethod
     def get_types(cls) -> str:
         """Print all command types with random color."""
-        res = []
+        msgs = []
 
         for member in CommandType:
             color_str = "#{:02X}{:02X}{:02X}".format(
@@ -259,6 +259,6 @@ class ShortGiter(metaclass=Singleton):
                 random.randint(70, 255),
             )
 
-            res.append(f"`{member.value}`<{color_str}>")
+            msgs.append(f"`{member.value}`<{color_str}>")
 
-        return " ".join(res)
+        return " ".join(msgs)

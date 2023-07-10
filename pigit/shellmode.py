@@ -5,7 +5,7 @@ import functools
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.git.cmd import ShortGiter
+    from pigit.git.cmd import SCmd
 
 
 class PigitShell(cmd.Cmd):
@@ -17,7 +17,7 @@ class PigitShell(cmd.Cmd):
 
     def __init__(
         self,
-        short_giter: "ShortGiter",
+        short_giter: "SCmd",
         *,
         completekey: str = "tab",
         stdin: Optional[IO[str]] = None,
