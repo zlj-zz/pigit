@@ -71,10 +71,11 @@ class GitOption:
         """
 
         path = given_path or self.op_path or "."
+        path = os.path.abspath(path)
+
         repo_path: str = ""
         git_conf_path: str = ""
 
-        path = os.path.abspath(path)
         if not os.path.isdir(path):
             return repo_path, git_conf_path
 

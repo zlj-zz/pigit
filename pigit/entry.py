@@ -179,7 +179,7 @@ def _(args: Namespace, unknown: List):
         return console.echo(git_processor.get_help())
 
     if args.command_type:
-        return console.echo(git_processor.print_help_by_type(args.command_type))
+        return console.echo(git_processor.get_help_by_type(args.command_type))
 
     if args.types:
         return console.echo(git_processor.get_types())

@@ -1,5 +1,6 @@
 from typing import Dict, Literal, Optional, Tuple
-import os, re
+import os
+import re
 
 from plenty.table import UintTable
 from plenty import box

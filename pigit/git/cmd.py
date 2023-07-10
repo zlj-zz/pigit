@@ -207,7 +207,7 @@ class SCmd:
 
         return "\n".join(msgs)
 
-    def print_help_by_type(self, t: str) -> str:
+    def get_help_by_type(self, t: str) -> str:
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -227,7 +227,7 @@ class SCmd:
             if self.prompt and confirm(
                 f":TIPS: The wanted type is `{predicted_type}`?[y/n]:"
             ):
-                return self.print_help_by_type(predicted_type)
+                return self.get_help_by_type(predicted_type)
 
             else:
                 return (

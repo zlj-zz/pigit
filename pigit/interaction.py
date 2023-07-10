@@ -1,16 +1,17 @@
 # -*- coding:utf-8 -*-
-from typing import TYPE_CHECKING, Dict, List, Optional, Any
-import os, logging
+from typing import TYPE_CHECKING, List, Optional, Any
+import os
+import logging
 from time import sleep
 
 from plenty import get_console
 from plenty.style import Style
 
 from .const import IS_WIN
+from .git.options import GitOption
 from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
-from .git.options import GitOption
 
 if TYPE_CHECKING:
     from .git.model import File, Commit, Branch

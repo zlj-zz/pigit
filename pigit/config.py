@@ -1,8 +1,11 @@
 # -*- coding:utf-8 -*-
 
 from typing import Dict, List
-import os, re, textwrap, logging
 from distutils.util import strtobool
+import os
+import re
+import textwrap
+import logging
 
 from plenty.style import Color
 
