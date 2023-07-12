@@ -3,15 +3,16 @@ from unittest.mock import patch, Mock
 
 from .conftest import TEST_PATH
 from pigit.common.utils import exec_cmd
-from pigit.gitlib.options import GitOption
-from pigit.gitlib.processor import ShortGitter, get_extra_cmds
-from pigit.gitlib._cmd_func import add, set_email_and_username, fetch_remote_branch
-from pigit.gitlib.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
+from pigit.git import git_version
+from pigit.git.repo import Repo
+from pigit.git.cmd import SCmd, get_extra_cmds
+from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
+from pigit.git.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
 
 
 class TestGitOption:
-    git = GitOption()
-    if not git.git_version:
+    git = Repo()
+    if not git_version():
         exit(1)
 
     # =================
@@ -59,7 +60,7 @@ class TestGitOption:
             [("", "a/b/.git/modules/"), ("a/b/", "a/b/.git/modules/")],
         ],
     )
-    @patch("pigit.gitlib.options.exec_cmd")
+    @patch("pigit.git.repo.exec_cmd")
     def test_get_repo_info(self, mock_exec_cmd, get_path, expected):
         mock_exec_cmd.return_value = get_path
         assert self.git.get_repo_info() == expected
@@ -79,12 +80,12 @@ class TestGitOption:
 class TestShortGitter:
     def test_init_error(self):
         with pytest.raises(TypeError):
-            ShortGitter(extra_cmds="xxx")
+            SCmd(extra_cmds="xxx")
 
     @pytest.fixture(scope="module")
     def setup(self):
         extra = {"aa": {"help": "print system user name."}}
-        return ShortGitter(extra_cmds=extra)
+        return SCmd(extra_cmds=extra)
 
     @pytest.mark.parametrize(
         "command",
@@ -122,11 +123,11 @@ class TestShortGitter:
 
 
 class TestCmdFunc:
-    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=None)
+    @patch("pigit.git._cmd_func.exec_cmd", return_value=None)
     def test_add(self, _):
         add([])
 
-    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=None)
+    @patch("pigit.git._cmd_func.exec_cmd", return_value=None)
     def test_fetch_remote(self, _):
         fetch_remote_branch([])
 
@@ -140,7 +141,7 @@ class TestCmdFunc:
         ],
     )
     @patch("builtins.input", return_value="abc@gmail.com")
-    @patch("pigit.gitlib._cmd_func.exec_cmd", return_value=False)
+    @patch("pigit.git._cmd_func.exec_cmd", return_value=False)
     def test_set_ua(self, _a, _b, args):
         set_email_and_username(args)
 
@@ -160,6 +161,6 @@ def test_iter_ignore():
 )
 def test_ignore(type_, file_name, dir_path, writting):
     code, msg = create_gitignore(
-        type_, file_name=file_name, dir_path=dir_path, writting=writting
+        type_, file_name=file_name, dir_path=dir_path, writing=writting
     )
     print(code, msg)

@@ -1,7 +1,10 @@
 # -*- coding:utf-8 -*-
 
 from typing import Dict, List, Literal, Optional, Tuple, Union, Any
-import os, re, json, stat
+import os
+import re
+import json
+import stat
 import logging
 import threading
 import concurrent.futures
@@ -184,17 +187,15 @@ class CodeCounter(object):
 
         # Matching the generated rules.
         res = list(filter(lambda rule: rule["pattern"].search(full_path), self.Rules))
-        if not res:
-            return True
 
         # If multiple rules match successfully, we think the last rule added has
         # the highest priority. Or if just one, this no problem also.
-        return res[-1]["include"]
+        return res[-1]["include"] if res else True
         # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
     def _sub_count(self, root: str, files: List) -> tuple:
         """Process handle use by `self.count`."""
-        show_invailed = self.show_invalid
+        show_invalid = self.show_invalid
 
         result: dict[str[dict[str, int]]] = {}  # type: dict[str,dict]
         valid_counter = invalid_counter = 0
@@ -203,13 +204,12 @@ class CodeCounter(object):
 
         for file in files:
             full_path = os.path.join(root, file)
-            is_effective = self.matching_rules(full_path)
-            if is_effective:
+            if is_effective := self.matching_rules(full_path):
                 try:
                     # Try read size of the valid file. Then do sum calc.
                     file_size = os.path.getsize(full_path)
                     total_size += file_size
-                except:
+                except Exception:
                     Logger.warn(f"Can't read size of '{full_path}'")
 
                 # Get file type.
@@ -218,7 +218,7 @@ class CodeCounter(object):
                     with open(full_path) as f:
                         count = len(f.read().split("\n"))
                 except Exception:
-                    if show_invailed:
+                    if show_invalid:
                         invalid_list.append(file)
                     invalid_counter += 1
                     continue

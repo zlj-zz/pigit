@@ -1,14 +1,13 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import Dict, List
-import os, logging, textwrap
+from typing import Dict, List, TYPE_CHECKING
+import os
+import textwrap
+import logging
 
 from plenty import get_console
 
-from .log import setup_logging
-from .config import Config
-from .cmdparse.parser import command, argument, Namespace
 from .const import (
     VERSION,
     REPOS_PATH,
@@ -20,12 +19,16 @@ from .const import (
     COUNTER_DIR_PATH,
     IS_FIRST_RUN,
 )
+from .log import setup_logging
+from .config import Config
+from .cmdparse.parser import command, argument
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
-from .gitlib.processor import ShortGitter, GIT_CMDS, get_extra_cmds
-from .gitlib.options import GitOption
-from .gitlib.ignore import create_gitignore
+from .git import SCmd, GIT_CMDS, get_extra_cmds, Repo, create_gitignore
 from .info import introduce, GitConfig
+
+if TYPE_CHECKING:
+    from .cmdparse.parser import Namespace
 
 
 Logger = logging.getLogger(__name__)
@@ -47,7 +50,7 @@ setup_logging(
 # ==============
 # Global handle
 # ==============
-git = GitOption(repo_json_path=REPOS_PATH)
+repo_handler = Repo(repo_json_path=REPOS_PATH)
 console = get_console()
 
 
@@ -59,7 +62,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: Namespace, _) -> None:
+def pigit(args: 'Namespace', _) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -70,22 +73,22 @@ def pigit(args: Namespace, _) -> None:
         console.echo(GitConfig(format_type=CONFIG.git_config_format).generate())
 
     elif args.information:
-        console.echo(git.get_repo_desc(include_part=CONFIG.repo_info_include))
+        console.echo(repo_handler.get_repo_desc(include_part=CONFIG.repo_info_include))
 
     elif args.complete:
-        # Generate competion vars dict.
+        # Generate completion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
         )
 
-        from .cmdparse.shellcompletion import shell_complete
+        from .cmdparse.completion import shell_complete
 
         shell_complete(complete_vars, PIGIT_HOME, inject=True)
         return None
 
     elif args.ignore_type:
-        _, msg = create_gitignore(args.ignore_type,writting=True)
+        _, msg = create_gitignore(args.ignore_type,writing=True)
         console.echo(msg)
 
     elif args.count:
@@ -142,14 +145,14 @@ tools_group.add_argument("--create-config", action="store_true",
 @argument("-s --show-commands", action="store_true", help="List all available short command and wealth and exit.")
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument("command", nargs="?", type=str, default=None, help="Short git command or other.")
-def _cmd_func(args: Namespace, unknown: List):
+def _(args: 'Namespace', unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
-        repo_path, repo_conf = git.get_repo_info()
-        git.add_repos([repo_path])
+        repo_path, repo_conf = repo_handler.get_repo_info()
+        repo_handler.add_repos([repo_path])
 
     # Init extra custom cmds.
     extra_cmd: Dict = {
@@ -161,7 +164,7 @@ def _cmd_func(args: Namespace, unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = ShortGitter(
+    git_processor = SCmd(
         extra_cmds=extra_cmd,
         command_prompt=CONFIG.cmd_recommend,
         show_original=CONFIG.cmd_show_original,
@@ -175,18 +178,19 @@ def _cmd_func(args: Namespace, unknown: List):
         return
 
     if args.show_commands:
-        return git_processor.print_help()
+        # return git_processor.print_help()
+        return console.echo(git_processor.get_help())
 
     if args.command_type:
-        return git_processor.print_help_by_type(args.command_type)
+        return console.echo(git_processor.get_help_by_type(args.command_type))
 
     if args.types:
-        return git_processor.print_types()
+        return console.echo(git_processor.get_types())
 
     if args.command:
-        command = args.command
+        short_cmd = args.command
         args.args.extend(unknown)
-        git_processor.do(command, args.args)
+        console.echo(git_processor.do(short_cmd, args.args))
         return None
     else:
         console.echo("`pigit cmd -h`<ok> for help.")
@@ -202,7 +206,7 @@ repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h h
 @argument("--dry-run", action="store_true", help="dry run.")
 @argument("paths", nargs="+", help="path of reps(s).")
 def repo_add(args, _):
-    if added := git.add_repos(args.paths, args.dry_run):
+    if added := repo_handler.add_repos(args.paths, args.dry_run):
         console.echo(f"Found {len(added)} new repo(s).")
         for path in added:
             console.echo(f"\t`{path}`<sky_blue>")
@@ -211,10 +215,10 @@ def repo_add(args, _):
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
-@argument("--path", action="store_true", help="remove follow path, defult is name.")
+@argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
-    res = git.rm_repos(args.repos, args.path)
+    res = repo_handler.rm_repos(args.repos, args.path)
     for one in res:
         console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
 
@@ -223,25 +227,25 @@ def repo_rm(args, _):
 @argument("new_name", help="the new name of repo.")
 @argument("repo", help="the name of repo.")
 def repo_rename(args, _):
-    success, msg = git.rename_repo(args.repo, args.new_name)
+    success, msg = repo_handler.rename_repo(args.repo, args.new_name)
     console.echo(msg)
 
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
-@argument("--revese", action="store_true", help="revese to display invalid repo.")
+@argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 def repo_ll(args, _):
     simple = args.simple
-    revese = args.revese
+    reverse = args.reverse
 
-    for info in git.ll_repos(revese=revese):
+    for info in repo_handler.ll_repos(reverse=reverse):
         if simple:
-            if revese:
+            if reverse:
                 console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
             else:
                 console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
         else:
-            if revese:
+            if reverse:
                 summary_string = textwrap.dedent(
                     f"""\
                     b`{info[0][0]}`
@@ -262,7 +266,7 @@ def repo_ll(args, _):
             console.echo(summary_string)
 
 
-repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: git.clear_repos())
+repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: repo_handler.clear_repos())
 
 
 repo_options = {
@@ -270,12 +274,12 @@ repo_options = {
     "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
     "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
 }
-for subcmd, prop in repo_options.items():
+for sub_cmd, prop in repo_options.items():
     help_string = f'{h.strip()} for repo(s).' if (h:=prop.get("help")) else "NULL"
-    repo.sub_parser(subcmd, help=help_string)(
+    repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: git.process_repo_option(args.repos, cmd),
+                lambda args, _, cmd: repo_handler.process_repo_option(args.repos, cmd),
                 cmd=prop['cmd']
             )
         )
@@ -290,8 +294,8 @@ for subcmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _open_func(args: Namespace, _):
-    code, msg = git.open_repo_in_browser(
+def _open_func(args: 'Namespace', _):
+    code, msg = repo_handler.open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
     console.echo(msg)

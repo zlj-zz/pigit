@@ -1,14 +1,13 @@
 from typing import Dict, Literal, Optional, Tuple
-import os, re
+import os
+import re
 
 from plenty.table import UintTable
 from plenty import box
 
 from .const import __version__, __url__
-from .gitlib.options import GitOption
-
-
-git = GitOption()
+from .git import git_version
+from .git.repo import Repo
 
 
 def introduce() -> str:
@@ -34,11 +33,11 @@ You can use `-h`<ok> or `--help`<ok> to get help and usage.
 """
 
     # Print git version.
-    git_version = git.git_version or "`Don't found Git, maybe need install.`<error>"
+    _git_version = git_version() or "`Don't found Git, maybe need install.`<error>"
 
     return introduce_str.format(
         version=__version__,
-        git_version=git_version,
+        git_version=_git_version,
         local_path=os.path.dirname(__file__.replace("./", "")),
         url=__url__,
     )
@@ -63,10 +62,10 @@ class GitConfig:
 
     @property
     def repo_info(self) -> Tuple[str, str]:
-        return git.get_repo_info(self.repo_path)
+        return Repo().get_repo_info(self.repo_path)
 
     def parse_git_config(self, config_context: str) -> Dict:
-        """Retrun a dict from parsing git local config.
+        """Return a dict from parsing git local config.
 
         Args:
             conf (str): git local config string.

@@ -3,7 +3,10 @@
 from typing import Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
 from pathlib import Path
-import os, re, textwrap, json
+import os
+import re
+import json
+import textwrap
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -15,14 +18,14 @@ from pigit.common.utils import (
     exec_cmd,
     get_file_icon,
 )
-from pigit.gitlib.model import File, Commit, Branch
+from .model import File, Commit, Branch
 
 
-class GitOptionError(Exception):
+class RepoError(Exception):
     """Error class of ~GitOption."""
 
 
-class GitOption:
+class Repo:
     """Git option class."""
 
     def __init__(
@@ -38,7 +41,7 @@ class GitOption:
 
     def update_setting(
         self, *, op_path: Optional[str] = None, repo_info_path: Optional[str] = None
-    ) -> "GitOption":
+    ) -> "Repo":
         if op_path is not None:
             self.op_path = op_path
         if repo_info_path is not None:
@@ -49,13 +52,6 @@ class GitOption:
     # ==================
     # Basic info option
     # ==================
-    @property
-    def git_version(self) -> str:
-        """Get Git version."""
-
-        _, _version = exec_cmd("git --version")
-        return _version.strip() or ""
-
     def get_repo_info(
         self, given_path: Optional[str] = None, exclude_submodule: bool = False
     ) -> Tuple[str, str]:
@@ -68,10 +64,11 @@ class GitOption:
         """
 
         path = given_path or self.op_path or "."
+        path = os.path.abspath(path)
+
         repo_path: str = ""
         git_conf_path: str = ""
 
-        path = os.path.abspath(path)
         if not os.path.isdir(path):
             return repo_path, git_conf_path
 
@@ -502,7 +499,7 @@ class GitOption:
         elif isinstance(file, str):
             file_name = file
         else:
-            raise GitOptionError("`file` only allow 'str' or 'File'.") from None
+            raise RepoError("`file` only allow 'str' or 'File'.") from None
 
         if "->" in file_name:
             file_name = file_name.split("->")[-1].strip()
@@ -536,7 +533,7 @@ class GitOption:
             if isinstance(file, File):
                 tracked = file.tracked
             else:
-                raise GitOptionError("Please set `tracked` or give a 'File'.") from None
+                raise RepoError("Please set `tracked` or give a 'File'.") from None
 
         if tracked:
             exec_cmd(f"git checkout -- {file_name}", cwd=path)
@@ -701,7 +698,7 @@ class GitOption:
             self.save_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def ll_repos(self, revese: bool = False) -> Generator[List[Tuple], None, None]:
+    def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name, prop in exist_repos.items():
@@ -710,13 +707,13 @@ class GitOption:
 
             # jump invalid repo.
             if head is None:
-                if revese:
+                if reverse:
                     yield [
                         (repo_name, ""),
                         ("Local Path", repo_path),
                     ]
 
-            elif not revese:
+            elif not reverse:
                 _, unstaged = exec_cmd("git diff --stat", cwd=repo_path)
                 _, staged = exec_cmd("git diff --stat --cached", cwd=repo_path)
                 _, untracked = exec_cmd(

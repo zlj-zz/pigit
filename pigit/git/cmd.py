@@ -1,14 +1,14 @@
 # -*- coding:utf-8 -*-
 
 from typing import Callable, Dict, List, Optional, Tuple, Union
-import os, re, textwrap, random, logging
-
-from plenty import get_console
-from plenty.str_utils import shorten
+import os
+import re
+import random
+import textwrap
+import logging
 
 from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
-from ..common.singleton import Singleton
-from .shortcmds import GIT_CMDS, CommandType
+from ._cmds import GIT_CMDS, CommandType
 
 Log = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
 
     if os.path.isfile(path):
         try:
-            # load a module form localtion.
+            # load a module form location.
             spec = importlib.util.spec_from_file_location(name, path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -43,18 +43,16 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class ShortGitter(metaclass=Singleton):
-    """Git short command processor."""
+class SCmd:
+    """Git short command handler."""
 
     def __init__(
         self,
         extra_cmds: Optional[dict] = None,
         command_prompt: bool = True,
         show_original: bool = True,
-        **kwargs,
     ) -> None:
-
-        self.use_recommend = command_prompt
+        self.prompt = command_prompt
         self.show_original = show_original
 
         # Init commands.
@@ -71,6 +69,9 @@ class ShortGitter(metaclass=Singleton):
         command   : yellow;
         arguments : skyblue;
         values    : white.
+
+        Returns:
+            str: command with color tags.
         """
 
         handle = re.match(r"(\w+)\s+(\w+)", command)
@@ -89,74 +90,83 @@ class ShortGitter(metaclass=Singleton):
         return color_command
 
     def process_command(
-        self, command_string: str, args: Optional[Union[List, Tuple]] = None
+        self, short_cmd: str, args: Optional[Union[List, Tuple]] = None
     ) -> Tuple[int, str]:
         """Process command and arguments.
 
         Args:
             command_ (str): short command string
             args (list|None, optional): command arguments. Defaults to None.
+
+        Returns:
+            Tuple[int, str]: (code, msg)
+                code:
+                    0: successful with msg.
+                    1: has no option item.
+                    2: has no cmd string.
+                    3: func cmd exec error.
+                    5: not supported cmd type.
         """
 
-        option: Optional[Dict[str, Dict]] = self.cmds.get(command_string, None)
+        msgs = []
+
+        option: Optional[Dict[str, Dict]] = self.cmds.get(short_cmd, None)
 
         # Invalid, if need suggest.
         if option is None:
             return (
                 1,
-                f"Don't support this command: `{command_string}`<error>, "
+                f"Don't support this command: `{short_cmd}`<error>, "
                 "please try `--show-commands`<gold>",
             )
 
         command: Optional[Union[str, Callable]] = option.get("command")
+
         # Has no command can be executed.
         if not command:
             return 2, "`Invalid custom short command, nothing can to exec.`<error>"
 
+        # Invalid args need tip.
         if not option.get("has_arguments", False) and args:
-            get_console().echo(
+            args = []
+            msgs.append(
                 f"`The command does not accept parameters. Discard {args}.`<error>"
             )
-            args = []
 
         if isinstance(command, Callable):
             try:
-                command(args)
+                # exec func and return msg.
+                return 0, command(args)
             except Exception as e:
                 return 3, f"`{e}`<error>"
         elif isinstance(command, str):
             if args:
                 command = " ".join([command, *args])
             if self.show_original:
-                get_console().echo(f":rainbow:  {self.color_command(command)}")
+                msgs.append(f":rainbow:  {self.color_command(command)}")
             exec_cmd(command, reply=False)
         else:
             return 5, "`The type of command not supported.`<error>"
 
-        return 0, ""
+        return 0, "\n".join(msgs)
 
-    def do(self, command_string: str, args: Optional[Union[List, Tuple]] = None):
+    def do(self, short_cmd: str, args: Optional[Union[List, Tuple]] = None) -> str:
         """Process command and arguments."""
 
-        code, msg = self.process_command(command_string, args)
-        if code == 0:
-            pass
-        elif code == 1 and self.use_recommend:  # check config.
-            predicted_command = similar_command(command_string, self.cmds.keys())
-            if confirm(
-                get_console().render_str(
-                    f":thinking: The wanted command is `{predicted_command}`<ok> ?[y/n]:"
-                )
-            ):
-                self.do(predicted_command, args=args)
-        else:
-            get_console().echo(msg)
+        code, msg = self.process_command(short_cmd, args)
+
+        if code == 1 and self.prompt:  # check config.
+            predicted_command = similar_command(short_cmd, self.cmds.keys())
+            if confirm(f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"):
+                return self.do(predicted_command, args=args)
+
+        return msg
 
     # ============================
     # Print command help message.
     # ============================
-    def _generate_help_by_key(
-        self, _key: str, use_color: bool = True, max_width=90
+    def generate_help_by_key(
+        self, key: str, use_color: bool = True, max_width: int = 90
     ) -> str:
         """Generate one help by given key.
 
@@ -172,7 +182,7 @@ class ShortGitter(metaclass=Singleton):
         msg_max_width = max_width - help_position
 
         # Get help message and command.
-        _help: str = self.cmds[_key].get("help", "").strip()
+        _help: str = self.cmds[key].get("help", "").strip()
         if _help:
             _help = textwrap.wrap(_help, msg_max_width)
             help_msg = _help[0] + "\n"
@@ -181,26 +191,29 @@ class ShortGitter(metaclass=Singleton):
         else:
             help_msg = ""
 
-        _command = self.cmds[_key].get("command", "ERROR: empty command.")
+        _command = self.cmds[key].get("command", "ERROR: empty command.")
         if callable(_command):
             _command = f"Func: {_command.__name__}"
 
-        _command = shorten(_command, msg_max_width, placeholder="...")
         command_msg = "%*s%s" % (help_position, "", _command) if help_msg else _command
 
         if use_color:
-            return f"  `{_key:<13}`<ok>{help_msg}`{command_msg}`<gold>"
+            return f"  `{key:<13}`<ok>{help_msg}`{command_msg}`<gold>"
         else:
-            return f"  {_key:<12} {_help}{command_msg}"
+            return f"  {key:<12} {_help}{command_msg}"
 
-    def print_help(self) -> None:
-        """Print help message."""
-        print("These are short commands that can replace git operations:")
+    def get_help(self) -> str:
+        """Get all help message."""
+
+        msgs = ["These are short commands that can replace git operations:"]
+
         for key in self.cmds.keys():
-            msg = self._generate_help_by_key(key)
-            get_console().echo(msg)
+            msg = self.generate_help_by_key(key)
+            msgs.append(msg)
 
-    def print_help_by_type(self, command_type: str) -> None:
+        return "\n".join(msgs)
+
+    def get_help_by_type(self, t: str) -> str:
         """Print a part of help message.
 
         Print the help information of the corresponding part according to the
@@ -212,40 +225,38 @@ class ShortGitter(metaclass=Singleton):
         """
 
         # Process received type.
-        command_type = command_type.capitalize().strip()
+        t = t.capitalize().strip()
 
         # Checking the type whether right.
-        if command_type not in CommandType.__members__:
-            get_console().echo(
-                "`There is no such type.`<error>\n"
-                "Please use `git --types`<ok> to view the supported types."
-            )
+        if t not in CommandType.__members__:
+            predicted_type = similar_command(t, CommandType.__members__.keys())
+            if self.prompt and confirm(
+                f":TIPS: The wanted type is `{predicted_type}`?[y/n]:"
+            ):
+                return self.get_help_by_type(predicted_type)
 
-            if self.use_recommend:
-                predicted_type = similar_command(
-                    command_type, CommandType.__members__.keys()
+            else:
+                return (
+                    "`There is no such type.`<error>\n"
+                    "Please use `--types`<ok> to view the supported types."
                 )
-                if confirm(
-                    get_console().render_str(
-                        f":thinking: The wanted type is `{predicted_type}`<ok> ?[y/n]:"
-                    )
-                ):
-                    self.print_help_by_type(predicted_type)
-            return None
 
-        # Print help.
-        print("These are the orders of {0}".format(command_type))
+        # Get help.
+        msgs = ["These are the orders of {0}".format(t)]
+
         for k, v in self.cmds.items():
             belong = v.get("belong", CommandType.Extra)
             # Prevent the `belong` attribute from being set in the custom command.
-            if isinstance(belong, CommandType) and belong.value == command_type:
-                msg = self._generate_help_by_key(k)
-                get_console().echo(msg)
+            if isinstance(belong, CommandType) and belong.value == t:
+                msg = self.generate_help_by_key(k)
+                msgs.append(msg)
+
+        return "\n".join(msgs)
 
     @classmethod
-    def print_types(cls) -> None:
+    def get_types(cls) -> str:
         """Print all command types with random color."""
-        res = []
+        msgs = []
 
         for member in CommandType:
             color_str = "#{:02X}{:02X}{:02X}".format(
@@ -254,6 +265,6 @@ class ShortGitter(metaclass=Singleton):
                 random.randint(70, 255),
             )
 
-            res.append(f"`{member.value}`<{color_str}>")
+            msgs.append(f"`{member.value}`<{color_str}>")
 
-        get_console().echo(" ".join(res))
+        return " ".join(msgs)

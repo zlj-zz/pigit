@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING, Callable, List, Optional, IO
-import os, cmd
+import os
+import cmd
 import functools
 
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.gitlib.processor import ShortGitter
+    from pigit.git.cmd import SCmd
 
 
 class PigitShell(cmd.Cmd):
@@ -17,7 +18,7 @@ class PigitShell(cmd.Cmd):
 
     def __init__(
         self,
-        short_gitter: "ShortGitter",
+        short_giter: "SCmd",
         *,
         completekey: str = "tab",
         stdin: Optional[IO[str]] = None,
@@ -26,9 +27,9 @@ class PigitShell(cmd.Cmd):
         super().__init__(completekey, stdin, stdout)
 
         self.console = get_console()
-        self.short_gitter = short_gitter
+        self.short_giter = short_giter
 
-        for key, values in short_gitter.cmds.items():
+        for key, values in short_giter.cmds.items():
             func_name = f"do_{key}"
 
             self.set_instance_method(self.make_fun(key, values.get("help")), func_name)
@@ -40,7 +41,8 @@ class PigitShell(cmd.Cmd):
         _key = key
 
         def func(args: str):
-            self.short_gitter.process_command(_key, args.split())
+            _, msg = self.short_giter.process_command(_key, args.split())
+            get_console().echo(msg)
 
         func.__doc__ = doc
 
@@ -99,4 +101,4 @@ class PigitShell(cmd.Cmd):
 
     def do_all(self, args: str):
         """Show all short git cmds help."""
-        self.short_gitter.print_help()
+        get_console().echo(self.short_giter.get_help())

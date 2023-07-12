@@ -20,6 +20,7 @@ from argparse import (
     HelpFormatter,
     _SubParsersAction,
 )
+from functools import wraps
 from shutil import get_terminal_size
 from plenty.style import Style
 
@@ -195,7 +196,7 @@ class Parser(ArgumentParser):
     # ===============================
     @classmethod
     def from_dict(cls, parser_dict: Dict) -> "Parser":
-        """Parse a `dict` to genrate a ~Parser."""
+        """Parse a `dict` to generate a ~Parser."""
         from copy import deepcopy
 
         # Use `deepcopy` to ensure that the original dict will not be changed.
@@ -436,6 +437,7 @@ def command(
         fn = prog
         prog = None
 
+    @wraps(fn)
     def decorator(fn: Callable[..., Any]) -> Parser:
         kwargs = attrs
         attr_params = kwargs.pop("params", None)
@@ -463,10 +465,7 @@ def command(
 
         return cmd
 
-    if fn is not None:
-        return decorator(fn)
-
-    return decorator
+    return decorator(fn) if fn is not None else decorator
 
 
 def _param_memo(fn: Callable[..., Any], params) -> None:

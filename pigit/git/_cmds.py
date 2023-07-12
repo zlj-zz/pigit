@@ -10,9 +10,18 @@ short command.
           string). The default is command.
 [help] is help information, optional.
 [has_arguments] indicates whether the short command receives parameters. The default is False.
+
+Example:
+    "b": {
+        "belong": CommandType.Branch,
+        "command": "git branch",
+        "help": "lists, creates, renames, and deletes branches.",
+        "has_arguments": True,
+    }
 """
 
 import enum
+
 from ._cmd_func import *
 
 
@@ -303,7 +312,7 @@ GIT_CMDS = {
     "l1": {
         "belong": CommandType.Log,
         "command": "git log --graph --all --decorate --oneline",
-        "help": "display the log with oneline.",
+        "help": "display the log with one-line.",
     },
     "ls": {
         "belong": CommandType.Log,

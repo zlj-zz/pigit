@@ -4,15 +4,15 @@ from .utils import analyze_it
 from .conftest import _PIGIT_PATH
 
 from pigit.cmdparse.parser import command, Parser
-from pigit.cmdparse.shellcompletion.base import ShellCompletion
-from pigit.cmdparse.shellcompletion import (
+from pigit.cmdparse.completion.base import ShellCompletion
+from pigit.cmdparse.completion import (
     ZshCompletion,
     BashCompletion,
     FishCompletion,
     shell_complete,
     get_shell,
 )
-from pigit.gitlib.shortcmds import GIT_CMDS
+from pigit.git._cmds import GIT_CMDS
 
 argparse_dict = {
     "prog": "pigit",
