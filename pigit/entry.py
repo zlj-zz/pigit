@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 import os
 import textwrap
 import logging
@@ -21,11 +21,14 @@ from .const import (
 )
 from .log import setup_logging
 from .config import Config
-from .cmdparse.parser import command, argument, Namespace
+from .cmdparse.parser import command, argument
 from .common.utils import confirm
 from .common.func import dynamic_default_attrs, time_it
 from .git import SCmd, GIT_CMDS, get_extra_cmds, Repo, create_gitignore
 from .info import introduce, GitConfig
+
+if TYPE_CHECKING:
+    from .cmdparse.parser import Namespace
 
 
 Logger = logging.getLogger(__name__)
@@ -59,7 +62,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: Namespace, _) -> None:
+def pigit(args: 'Namespace', _) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -79,7 +82,7 @@ def pigit(args: Namespace, _) -> None:
             {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
         )
 
-        from .cmdparse.shellcompletion import shell_complete
+        from .cmdparse.completion import shell_complete
 
         shell_complete(complete_vars, PIGIT_HOME, inject=True)
         return None
@@ -142,7 +145,7 @@ tools_group.add_argument("--create-config", action="store_true",
 @argument("-s --show-commands", action="store_true", help="List all available short command and wealth and exit.")
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument("command", nargs="?", type=str, default=None, help="Short git command or other.")
-def _(args: Namespace, unknown: List):
+def _(args: 'Namespace', unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
     # If you want to manipulate the current folder with git,
@@ -291,7 +294,7 @@ for sub_cmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _open_func(args: Namespace, _):
+def _open_func(args: 'Namespace', _):
     code, msg = repo_handler.open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )

@@ -196,7 +196,7 @@ class Parser(ArgumentParser):
     # ===============================
     @classmethod
     def from_dict(cls, parser_dict: Dict) -> "Parser":
-        """Parse a `dict` to genrate a ~Parser."""
+        """Parse a `dict` to generate a ~Parser."""
         from copy import deepcopy
 
         # Use `deepcopy` to ensure that the original dict will not be changed.
