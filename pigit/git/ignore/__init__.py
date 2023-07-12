@@ -32,7 +32,7 @@ def create_gitignore(
         Tuple[int, str]: (code, message)
             code:
                 0: successful
-                1: dont write
+                1: don't write
                 2: not supported
     """
 

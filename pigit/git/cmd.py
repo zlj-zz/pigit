@@ -69,6 +69,9 @@ class SCmd:
         command   : yellow;
         arguments : skyblue;
         values    : white.
+
+        Returns:
+            str: command with color tags.
         """
 
         handle = re.match(r"(\w+)\s+(\w+)", command)
@@ -87,7 +90,7 @@ class SCmd:
         return color_command
 
     def process_command(
-        self, command_string: str, args: Optional[Union[List, Tuple]] = None
+        self, short_cmd: str, args: Optional[Union[List, Tuple]] = None
     ) -> Tuple[int, str]:
         """Process command and arguments.
 
@@ -98,39 +101,42 @@ class SCmd:
         Returns:
             Tuple[int, str]: (code, msg)
                 code:
-                    0: successful
-                    1: not supported
-                    2: has no cmd string
-                    3: func cmd exec error
-                    5: not supported cmd type
+                    0: successful with msg.
+                    1: has no option item.
+                    2: has no cmd string.
+                    3: func cmd exec error.
+                    5: not supported cmd type.
         """
 
         msgs = []
 
-        option: Optional[Dict[str, Dict]] = self.cmds.get(command_string, None)
+        option: Optional[Dict[str, Dict]] = self.cmds.get(short_cmd, None)
 
         # Invalid, if need suggest.
         if option is None:
             return (
                 1,
-                f"Don't support this command: `{command_string}`<error>, "
+                f"Don't support this command: `{short_cmd}`<error>, "
                 "please try `--show-commands`<gold>",
             )
 
         command: Optional[Union[str, Callable]] = option.get("command")
+
         # Has no command can be executed.
         if not command:
             return 2, "`Invalid custom short command, nothing can to exec.`<error>"
 
+        # Invalid args need tip.
         if not option.get("has_arguments", False) and args:
+            args = []
             msgs.append(
                 f"`The command does not accept parameters. Discard {args}.`<error>"
             )
-            args = []
 
         if isinstance(command, Callable):
             try:
-                command(args)
+                # exec func and return msg.
+                return 0, command(args)
             except Exception as e:
                 return 3, f"`{e}`<error>"
         elif isinstance(command, str):
