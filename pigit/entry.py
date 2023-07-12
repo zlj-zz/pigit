@@ -233,19 +233,19 @@ def repo_rename(args, _):
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
-@argument("--revese", action="store_true", help="revese to display invalid repo.")
+@argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 def repo_ll(args, _):
     simple = args.simple
-    revese = args.revese
+    reverse = args.reverse
 
-    for info in repo_handler.ll_repos(revese=revese):
+    for info in repo_handler.ll_repos(reverse=reverse):
         if simple:
-            if revese:
+            if reverse:
                 console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
             else:
                 console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
         else:
-            if revese:
+            if reverse:
                 summary_string = textwrap.dedent(
                     f"""\
                     b`{info[0][0]}`

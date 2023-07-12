@@ -698,7 +698,7 @@ class Repo:
             self.save_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def ll_repos(self, revese: bool = False) -> Generator[List[Tuple], None, None]:
+    def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name, prop in exist_repos.items():
@@ -707,13 +707,13 @@ class Repo:
 
             # jump invalid repo.
             if head is None:
-                if revese:
+                if reverse:
                     yield [
                         (repo_name, ""),
                         ("Local Path", repo_path),
                     ]
 
-            elif not revese:
+            elif not reverse:
                 _, unstaged = exec_cmd("git diff --stat", cwd=repo_path)
                 _, staged = exec_cmd("git diff --stat --cached", cwd=repo_path)
                 _, untracked = exec_cmd(

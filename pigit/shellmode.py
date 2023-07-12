@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Callable, List, Optional, IO
-import os, cmd
+import os
+import cmd
 import functools
 
 from plenty import get_console
@@ -40,7 +41,8 @@ class PigitShell(cmd.Cmd):
         _key = key
 
         def func(args: str):
-            self.short_giter.process_command(_key, args.split())
+            _, msg = self.short_giter.process_command(_key, args.split())
+            get_console().echo(msg)
 
         func.__doc__ = doc
 
