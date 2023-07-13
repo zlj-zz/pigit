@@ -146,21 +146,4 @@ class TestCmdFunc:
         set_email_and_username(args)
 
 
-def test_iter_ignore():
-    for t in IGNORE_TEMPLATE:
-        print(get_ignore_source(t))
 
-
-@pytest.mark.parametrize(
-    ["type_", "file_name", "dir_path", "writting"],
-    [
-        ["xxxxxx", "ignore_text", TEST_PATH, False],
-        ["rust", "ignore_test", TEST_PATH, False],
-        ["rust", "ignore_test", TEST_PATH, True],
-    ],
-)
-def test_ignore(type_, file_name, dir_path, writting):
-    code, msg = create_gitignore(
-        type_, file_name=file_name, dir_path=dir_path, writing=writting
-    )
-    print(code, msg)

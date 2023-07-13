@@ -2,7 +2,7 @@
 
 _pigit_completion(){
   if [[ "${COMP_CWORD}" == "1" ]];then
-      COMP_WORD="-h --help -i --information -f --config -r --report -v --version -c --count --create-ignore -C --complete --create-config cmd -h --help -s --show-commands -p --show-part-command -t --types --shell repo -h --help open -h --help -i --issue -c --commit -p --print add -h --help --dry-run rm -h --help --path rename -h --help ll -h --help --revese --simple clear -h --help fetch -h --help pull -h --help push -h --help b bc bl bL bs bS bm bM bd c ca cA cm co cO cf cF cr cR cs Cl Ca Ce Co CO Ct CT f fc fC fm fr fu fb ia iA iu id iD ir iR ix iX l l1 ls ld lv lc lr m ma mC mF mS mv mt p pf pF pa pA pt pc pp R Rl Ra Rx Rm Ru Rp Rs RS s sp sl sd sD t ta tx ws wS wd wD wr wR wc wC wm wM wx wX Sc Si Su Sd SD savepd ue user email"
+      COMP_WORD="-h --help -i --information -f --config -r --report -v --version -c --count --create-ignore -C --complete --create-config cmd -h --help -s --show-commands -p --show-part-command -t --types --shell repo -h --help open -h --help -i --issue -c --commit -p --print add -h --help --dry-run rm -h --help --path rename -h --help ll -h --help --reverse --simple clear -h --help fetch -h --help pull -h --help push -h --help b bc bl bL bs bS bm bM bd c ca cA cm co cO cf cF cr cR cs Cl Ca Ce Co CO Ct CT f fc fC fm fr fu fb ia iA iu id iD ir iR ix iX l l1 ls ld lv lc lr m ma mC mF mS mv mt p pf pF pa pA pt pc pp R Rl Ra Rx Rm Ru Rp Rs RS s sp sl sd sD t ta tx ws wS wd wD wr wR wc wC wm wM wx wX Sc Si Su Sd SD savepd ue user email"
       COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
 }

@@ -148,7 +148,7 @@ __rename_values() {
 __ll_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
-    '--revese[revese to display invalid repo.]' \
+    '--reverse[reverse to display invalid repo.]' \
     '--simple[display simple summary.]' \
   && ret=0
 }
