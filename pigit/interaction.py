@@ -69,7 +69,7 @@ class BranchPanel(RowPanelWidget):
 
 
 class StatusPanel(RowPanelWidget):
-    repo_path, repo_conf = git.get_repo_info()
+    repo_path, repo_conf = git.confirm_repo()
 
     def get_raw_data(self) -> List["File"]:
         return git.load_status(self.size[0], icon=self._ex_files_icon)
@@ -229,7 +229,7 @@ def tui_main(config: Optional["Config"] = None, index=None):
         console.echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
-    if not git.get_repo_info()[0]:
+    if not git.confirm_repo()[0]:
         console.echo("`Please run in a git repo dir.`<tomato>")
         return
 

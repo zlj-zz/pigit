@@ -78,11 +78,11 @@ class Branch:
     # The branch name.
     name: str
 
-    # This should be `True` if the branch can be pushing.
-    pushables: str
+    # The ahead time ou upstream, default '?'.
+    ahead: str
 
-    # This should be `True` if the branch can be pulling.
-    pullables: str
+    # The behind time ou upstream, default '?'.
+    behind: str
 
     # This should be `True` if the branch is head.
     is_head: bool

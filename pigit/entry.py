@@ -151,7 +151,7 @@ def _(args: 'Namespace', unknown: List):
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
-        repo_path, repo_conf = repo_handler.get_repo_info()
+        repo_path, repo_conf = repo_handler.confirm_repo()
         repo_handler.add_repos([repo_path])
 
     # Init extra custom cmds.
@@ -279,7 +279,7 @@ for sub_cmd, prop in repo_options.items():
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: repo_handler.process_repo_option(args.repos, cmd),
+                lambda args, _, cmd: repo_handler.process_repos_option(args.repos, cmd),
                 cmd=prop['cmd']
             )
         )
