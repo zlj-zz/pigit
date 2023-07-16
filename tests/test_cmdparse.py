@@ -1,8 +1,12 @@
-import pytest, os, copy
+import pytest
+import os
+import copy
 from pprint import pprint
-from .utils import analyze_it
-from .conftest import _PIGIT_PATH
 
+from .conftest import _PIGIT_PATH
+from .utils import analyze_it
+
+from pigit.git._cmds import GIT_CMDS
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion
 from pigit.cmdparse.completion import (
@@ -12,7 +16,7 @@ from pigit.cmdparse.completion import (
     shell_complete,
     get_shell,
 )
-from pigit.git._cmds import GIT_CMDS
+
 
 argparse_dict = {
     "prog": "pigit",

@@ -52,10 +52,10 @@ class Repo:
     # ==================
     # Basic info option
     # ==================
-    def get_repo_info(
+    def confirm_repo(
         self, given_path: Optional[str] = None, exclude_submodule: bool = False
     ) -> Tuple[str, str]:
-        """
+        """Confirm given path whether a git repo. And return repo path info.
         Get the current git repository path. If not, the path is empty.
         Get the local git config path. If not, the path is empty.
 
@@ -104,6 +104,21 @@ class Repo:
             res = res.rstrip()
         return res
 
+    def get_first_pushed_commit(
+        self, path: Optional[str] = None, branch_name: Optional[str] = None
+    ) -> str:
+        path = path or self.op_path
+
+        if branch_name is None:
+            if head := self.get_head(path):
+                branch_name = head
+            else:
+                return ""
+
+        command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
+        _, resp = exec_cmd(command, cwd=path)
+        return resp.strip()
+
     def get_branches(
         self,
         path: Optional[str] = None,
@@ -122,21 +137,6 @@ class Repo:
             return []
         return [branch[2:] for branch in res.rstrip().split("\n")]
 
-    def get_first_pushed_commit(
-        self, path: Optional[str] = None, branch_name: Optional[str] = None
-    ) -> str:
-        path = path or self.op_path
-
-        if branch_name is None:
-            if branches := self.get_branches(path):
-                branch_name = branches[0]
-            else:
-                return ""
-
-        command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
-        _, resp = exec_cmd(command, cwd=path)
-        return resp.strip()
-
     def get_remotes(self, path: Optional[str] = None) -> List[str]:
         """Get repo remote url."""
 
@@ -144,7 +144,7 @@ class Repo:
         path = path or self.op_path
         err, res = exec_cmd("git remote show", cwd=path)
 
-        return [] if err else res.strip().split("\n")
+        return res.strip().split("\n") if res else []
 
     def get_remote_url(
         self, path: Optional[str] = None, remote_name: Optional[str] = None
@@ -170,10 +170,10 @@ class Repo:
     def get_summary(self, path: Optional[str] = None, plain: bool = True) -> str:
         path = path or self.op_path
         color = "never" if plain else "always"
-        err, res = exec_cmd(
+        err, summary = exec_cmd(
             f"git shortlog --summary --numbered --color={color}", cwd=path
         )
-        return res
+        return summary
 
     def get_repo_desc(
         self,
@@ -195,7 +195,7 @@ class Repo:
         path = path or self.op_path
         error_str = "`Error getting.`<error>"
         gen = ["[b`Repository Information`]" if color else "[Repository Information]"]
-        repo_path, _ = self.get_repo_info(path)
+        repo_path, _ = self.confirm_repo(path)
 
         # Get content.
         if not include_part or "path" in include_part:
@@ -267,7 +267,7 @@ class Repo:
         for line in lines:
             items = line.split("|")
             branch = Branch(
-                name=items[1], pushables="?", pullables="?", is_head=items[0] == "*"
+                name=items[1], ahead="?", behind="?", is_head=items[0] == "*"
             )
 
             upstream_name = items[2]
@@ -280,9 +280,9 @@ class Repo:
 
             track = items[3]
             _re = re.compile(r"ahead (\d+)")
-            branch.pushables = str(match[1]) if (match := _re.search(track)) else "0"
+            branch.ahead = str(match[1]) if (match := _re.search(track)) else "0"
             _re = re.compile(r"behind (\d+)")
-            branch.pullables = str(match[1]) if (match := _re.search(track)) else "0"
+            branch.behind = str(match[1]) if (match := _re.search(track)) else "0"
             branches.append(branch)
 
         return branches
@@ -296,6 +296,7 @@ class Repo:
         path: Optional[str] = None,
     ) -> str:
         path = path or self.op_path
+
         limit_flag = f"-{limit}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
 
@@ -471,7 +472,7 @@ class Repo:
 
     def load_commit_info(
         self,
-        commit_sha: str,
+        commit_sha: str = "",
         file_name: str = "",
         plain: bool = False,
         path: Optional[str] = None,
@@ -538,14 +539,13 @@ class Repo:
         if tracked:
             exec_cmd(f"git checkout -- {file_name}", cwd=path)
         else:
-            repo_path, _ = self.get_repo_info(path)
-            os.remove(os.path.join(repo_path, file_name))
+            os.remove(os.path.join(path, file_name))
 
     def ignore_file(self, file: Union[File, str], path: Optional[str] = None):
         """Append file to `.gitignore` file."""
 
         path = path or self.op_path
-        repo_path, _ = self.get_repo_info(path)
+        repo_path, _ = self.confirm_repo(path)
         file_name = self._get_file_str(file)
 
         with open(f"{repo_path}/.gitignore", "a+") as f:
@@ -590,7 +590,7 @@ class Repo:
             return True, "Successfully opened repo."
 
     # ====================
-    # custom repo options
+    # custom repos option
     # ====================
     @staticmethod
     def _make_repo_name(path: str, repos: List[str], name_counts: Counter) -> str:
@@ -615,13 +615,17 @@ class Repo:
         return name
 
     def load_repos(self) -> Dict:
+        """Load repos info from cache file."""
+
         if not self.repo_json_path.is_file():
             return {}
 
         with self.repo_json_path.open(mode="r") as fp:
             return json.load(fp)
 
-    def save_repos(self, repos: Dict) -> bool:
+    def dump_repos(self, repos: Dict) -> bool:
+        """Dump repos info to cache file, re-write mode."""
+
         try:
             with self.repo_json_path.open(mode="w+") as fp:
                 json.dump(repos, fp, indent=2)
@@ -631,72 +635,6 @@ class Repo:
 
     def clear_repos(self) -> None:
         self.repo_json_path.unlink(missing_ok=True)
-
-    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
-        """Traverse the incoming paths. If it is not saved and is a git
-        directory, add it to repos.
-
-        Args:
-            paths (list[str]): incoming paths.
-            dry_run (bool, optional): Show but not really execute. Defaults to False.
-            silent (bool, optional): No output. Defaults to False.
-        """
-
-        exist_repos = self.load_repos()
-        exist_paths = [r["path"] for r in exist_repos.values()]
-
-        new_git_paths = []
-        for path in paths:
-            repo_path, _ = self.get_repo_info(path)
-            if repo_path and repo_path not in exist_paths:
-                new_git_paths.append(repo_path)
-
-        if new_git_paths and not dry_run:
-            name_counts = Counter(
-                os.path.basename(os.path.normpath(p)) for p in new_git_paths
-            )
-            new_repos = {
-                self._make_repo_name(path, exist_repos, name_counts): {"path": path}
-                for path in new_git_paths
-            }
-
-            self.save_repos({**exist_repos, **new_repos})
-
-        return new_git_paths
-
-    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
-        exist_repos = self.load_repos()
-
-        del_repos = []
-        del_paths = []
-        if use_path:
-            del_repos.extend(
-                repo for repo, info in exist_repos.items() if info["path"] in repos
-            )
-        else:
-            del_repos.extend(repo for repo in repos if exist_repos.get(repo))
-
-        for repo in del_repos:
-            del_paths.append(exist_repos[repo]["path"])
-            del exist_repos[repo]
-
-        self.save_repos(exist_repos)
-        return zip(del_repos, del_paths)
-
-    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
-        exist_repos = self.load_repos()
-
-        if name in exist_repos:
-            return False, f"'{name}' is already in use!"
-        elif repo not in exist_repos:
-            return False, f"'{repo}' is not a valid repo name!"
-        else:
-            prop = exist_repos[repo]
-            del exist_repos[repo]
-            exist_repos[name] = prop
-
-            self.save_repos(exist_repos)
-            return True, f"rename successful, `{repo}`->`{name}`."
 
     def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
@@ -745,7 +683,118 @@ class Repo:
                     ("Local Path", repo_path),
                 ]
 
-    def process_repo_option(self, repos: Optional[List[str]], cmd: str):
+    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
+        """Traverse the incoming paths. If it is not saved and is a git
+        directory, add it to repos.
+
+        Args:
+            paths (list[str]): incoming paths.
+            dry_run (bool, optional): Show but not really execute. Defaults to False.
+            silent (bool, optional): No output. Defaults to False.
+        """
+
+        exist_repos = self.load_repos()
+        exist_paths = [r["path"] for r in exist_repos.values()]
+
+        new_git_paths = []
+        for path in paths:
+            repo_path, _ = self.confirm_repo(path)
+            if repo_path and repo_path not in exist_paths:
+                new_git_paths.append(repo_path)
+
+        if new_git_paths and not dry_run:
+            name_counts = Counter(
+                os.path.basename(os.path.normpath(p)) for p in new_git_paths
+            )
+            new_repos = {
+                self._make_repo_name(path, exist_repos, name_counts): {"path": path}
+                for path in new_git_paths
+            }
+
+            self.dump_repos({**exist_repos, **new_repos})
+
+        return new_git_paths
+
+    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
+        exist_repos = self.load_repos()
+
+        del_repos = []
+        del_paths = []
+        if use_path:
+            del_repos.extend(
+                repo for repo, info in exist_repos.items() if info["path"] in repos
+            )
+        else:
+            del_repos.extend(repo for repo in repos if exist_repos.get(repo))
+
+        for repo in del_repos:
+            del_paths.append(exist_repos[repo]["path"])
+            del exist_repos[repo]
+
+        self.dump_repos(exist_repos)
+        return zip(del_repos, del_paths)
+
+    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
+        """Rename repo
+
+        Args:
+            repo (str): exist repo name
+            name (str): new name
+
+        Returns:
+            Tuple[bool, str]: whether rename successful, tip msg.
+        """
+
+        exist_repos = self.load_repos()
+
+        if name == repo:
+            return False, "The same name do nothing!"
+        elif name in exist_repos:
+            return False, f"'{name}' is already in use!"
+        elif repo not in exist_repos:
+            return False, f"'{repo}' is not a valid repo name!"
+        else:
+            prop = exist_repos[repo]
+            del exist_repos[repo]
+            exist_repos[name] = prop
+
+            self.dump_repos(exist_repos)
+            return True, f"rename successful, `{repo}`->`{name}`."
+
+    def cd_repo(self, repo: Optional[str] = None):
+        """Quick jump to repo dir.
+
+        Args:
+            repo (Optional[str], optional): repo name. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        command = "$SHELL -c 'cd {0} && exec $SHELL'"
+        exist_repos = self.load_repos()
+
+        if repo in exist_repos:
+            path = exist_repos[repo]["path"]
+            exec_cmd(command.format(path))
+        else:
+            cur_cache = []
+            print("Managed repos include the following:")
+            for i, r in enumerate(exist_repos, 0):
+                cur_cache.append(r)
+                print(".  ", i, r)
+
+            try:
+                input_num = int(input("Please input the index:"))
+                if 0 <= input_num <= len(cur_cache):
+                    path = exist_repos[cur_cache[input_num]]["path"]
+                    print(exec_cmd(command.format(path), cwd=".", reply=False))
+                else:
+                    print("Error: index out of range.")
+            except Exception:
+                print("Error: index need input a number.")
+
+    def process_repos_option(self, repos: Optional[List[str]], cmd: str):
         exist_repos = self.load_repos()
         print(f":: {cmd}\n")
 

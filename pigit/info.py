@@ -62,7 +62,7 @@ class GitConfig:
 
     @property
     def repo_info(self) -> Tuple[str, str]:
-        return Repo().get_repo_info(self.repo_path)
+        return Repo().confirm_repo(self.repo_path)
 
     def parse_git_config(self, config_context: str) -> Dict:
         """Return a dict from parsing git local config.

@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 from typing import Optional
-import os, time
+import os
+import time
 import pytest
 
 from pigit.codecounter import CodeCounter

@@ -151,7 +151,7 @@ def _(args: 'Namespace', unknown: List):
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
     if CONFIG.repo_auto_append:
-        repo_path, repo_conf = repo_handler.get_repo_info()
+        repo_path, repo_conf = repo_handler.confirm_repo()
         repo_handler.add_repos([repo_path])
 
     # Init extra custom cmds.
@@ -268,6 +268,10 @@ def repo_ll(args, _):
 
 repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: repo_handler.clear_repos())
 
+@repo.sub_parser("cd", help="jump to a repo dir.")
+@argument("repo", nargs='?',help="the name of repo.")
+def _(args, _):
+    repo_handler.cd_repo(args.repo)
 
 repo_options = {
     "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
@@ -279,7 +283,7 @@ for sub_cmd, prop in repo_options.items():
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: repo_handler.process_repo_option(args.repos, cmd),
+                lambda args, _, cmd: repo_handler.process_repos_option(args.repos, cmd),
                 cmd=prop['cmd']
             )
         )
@@ -294,7 +298,7 @@ for sub_cmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _open_func(args: 'Namespace', _):
+def _(args: 'Namespace', _):
     code, msg = repo_handler.open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
