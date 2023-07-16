@@ -615,13 +615,17 @@ class Repo:
         return name
 
     def load_repos(self) -> Dict:
+        """Load repos info from cache file."""
+
         if not self.repo_json_path.is_file():
             return {}
 
         with self.repo_json_path.open(mode="r") as fp:
             return json.load(fp)
 
-    def save_repos(self, repos: Dict) -> bool:
+    def dump_repos(self, repos: Dict) -> bool:
+        """Dump repos info to cache file, re-write mode."""
+
         try:
             with self.repo_json_path.open(mode="w+") as fp:
                 json.dump(repos, fp, indent=2)
@@ -631,84 +635,6 @@ class Repo:
 
     def clear_repos(self) -> None:
         self.repo_json_path.unlink(missing_ok=True)
-
-    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
-        """Traverse the incoming paths. If it is not saved and is a git
-        directory, add it to repos.
-
-        Args:
-            paths (list[str]): incoming paths.
-            dry_run (bool, optional): Show but not really execute. Defaults to False.
-            silent (bool, optional): No output. Defaults to False.
-        """
-
-        exist_repos = self.load_repos()
-        exist_paths = [r["path"] for r in exist_repos.values()]
-
-        new_git_paths = []
-        for path in paths:
-            repo_path, _ = self.confirm_repo(path)
-            if repo_path and repo_path not in exist_paths:
-                new_git_paths.append(repo_path)
-
-        if new_git_paths and not dry_run:
-            name_counts = Counter(
-                os.path.basename(os.path.normpath(p)) for p in new_git_paths
-            )
-            new_repos = {
-                self._make_repo_name(path, exist_repos, name_counts): {"path": path}
-                for path in new_git_paths
-            }
-
-            self.save_repos({**exist_repos, **new_repos})
-
-        return new_git_paths
-
-    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
-        exist_repos = self.load_repos()
-
-        del_repos = []
-        del_paths = []
-        if use_path:
-            del_repos.extend(
-                repo for repo, info in exist_repos.items() if info["path"] in repos
-            )
-        else:
-            del_repos.extend(repo for repo in repos if exist_repos.get(repo))
-
-        for repo in del_repos:
-            del_paths.append(exist_repos[repo]["path"])
-            del exist_repos[repo]
-
-        self.save_repos(exist_repos)
-        return zip(del_repos, del_paths)
-
-    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
-        """Rename repo
-
-        Args:
-            repo (str): exist repo name
-            name (str): new name
-
-        Returns:
-            Tuple[bool, str]: whether rename successful, tip msg.
-        """
-
-        exist_repos = self.load_repos()
-
-        if name == repo:
-            return False, "The same name do nothing!"
-        elif name in exist_repos:
-            return False, f"'{name}' is already in use!"
-        elif repo not in exist_repos:
-            return False, f"'{repo}' is not a valid repo name!"
-        else:
-            prop = exist_repos[repo]
-            del exist_repos[repo]
-            exist_repos[name] = prop
-
-            self.save_repos(exist_repos)
-            return True, f"rename successful, `{repo}`->`{name}`."
 
     def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
@@ -756,6 +682,117 @@ class Repo:
                     ("Commit Msg", commit_msg),
                     ("Local Path", repo_path),
                 ]
+
+    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
+        """Traverse the incoming paths. If it is not saved and is a git
+        directory, add it to repos.
+
+        Args:
+            paths (list[str]): incoming paths.
+            dry_run (bool, optional): Show but not really execute. Defaults to False.
+            silent (bool, optional): No output. Defaults to False.
+        """
+
+        exist_repos = self.load_repos()
+        exist_paths = [r["path"] for r in exist_repos.values()]
+
+        new_git_paths = []
+        for path in paths:
+            repo_path, _ = self.confirm_repo(path)
+            if repo_path and repo_path not in exist_paths:
+                new_git_paths.append(repo_path)
+
+        if new_git_paths and not dry_run:
+            name_counts = Counter(
+                os.path.basename(os.path.normpath(p)) for p in new_git_paths
+            )
+            new_repos = {
+                self._make_repo_name(path, exist_repos, name_counts): {"path": path}
+                for path in new_git_paths
+            }
+
+            self.dump_repos({**exist_repos, **new_repos})
+
+        return new_git_paths
+
+    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
+        exist_repos = self.load_repos()
+
+        del_repos = []
+        del_paths = []
+        if use_path:
+            del_repos.extend(
+                repo for repo, info in exist_repos.items() if info["path"] in repos
+            )
+        else:
+            del_repos.extend(repo for repo in repos if exist_repos.get(repo))
+
+        for repo in del_repos:
+            del_paths.append(exist_repos[repo]["path"])
+            del exist_repos[repo]
+
+        self.dump_repos(exist_repos)
+        return zip(del_repos, del_paths)
+
+    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
+        """Rename repo
+
+        Args:
+            repo (str): exist repo name
+            name (str): new name
+
+        Returns:
+            Tuple[bool, str]: whether rename successful, tip msg.
+        """
+
+        exist_repos = self.load_repos()
+
+        if name == repo:
+            return False, "The same name do nothing!"
+        elif name in exist_repos:
+            return False, f"'{name}' is already in use!"
+        elif repo not in exist_repos:
+            return False, f"'{repo}' is not a valid repo name!"
+        else:
+            prop = exist_repos[repo]
+            del exist_repos[repo]
+            exist_repos[name] = prop
+
+            self.dump_repos(exist_repos)
+            return True, f"rename successful, `{repo}`->`{name}`."
+
+    def cd_repo(self, repo: Optional[str] = None):
+        """Quick jump to repo dir.
+
+        Args:
+            repo (Optional[str], optional): repo name. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        command = "$SHELL -c 'cd {0} && exec $SHELL'"
+        exist_repos = self.load_repos()
+
+        if repo in exist_repos:
+            path = exist_repos[repo]["path"]
+            exec_cmd(command.format(path))
+        else:
+            cur_cache = []
+            print("Managed repos include the following:")
+            for i, r in enumerate(exist_repos, 0):
+                cur_cache.append(r)
+                print(".  ", i, r)
+
+            try:
+                input_num = int(input("Please input the index:"))
+                if 0 <= input_num <= len(cur_cache):
+                    path = exist_repos[cur_cache[input_num]]["path"]
+                    print(exec_cmd(command.format(path), cwd=".", reply=False))
+                else:
+                    print("Error: index out of range.")
+            except Exception:
+                print("Error: index need input a number.")
 
     def process_repos_option(self, repos: Optional[List[str]], cmd: str):
         exist_repos = self.load_repos()

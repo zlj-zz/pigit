@@ -35,6 +35,7 @@ def exec_cmd(
     """Run system shell command.
 
     Args:
+        cwd Option[str]: path of exec cmd. Default is None.
         reply (bool): whether return execute result. Default is True.
         decoding (bool): whether decode the return. Default is True.
     """
@@ -49,11 +50,11 @@ def exec_cmd(
         with subprocess.Popen(
             " ".join(args), stderr=_stderr, stdout=_stdout, shell=True, cwd=cwd
         ) as proc:
-            outres, errres = proc.communicate()
+            out_res, err_res = proc.communicate()
     except FileNotFoundError as e:
         _err = str(e).encode()
     else:
-        _err, _rlt = errres, outres
+        _err, _rlt = err_res, out_res
 
     if not decoding:
         return _err, _rlt

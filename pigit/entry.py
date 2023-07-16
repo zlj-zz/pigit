@@ -268,6 +268,10 @@ def repo_ll(args, _):
 
 repo.sub_parser("clear", help="clear the all repos.")(lambda _, __: repo_handler.clear_repos())
 
+@repo.sub_parser("cd", help="jump to a repo dir.")
+@argument("repo", nargs='?',help="the name of repo.")
+def _(args, _):
+    repo_handler.cd_repo(args.repo)
 
 repo_options = {
     "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
@@ -294,7 +298,7 @@ for sub_cmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _open_func(args: 'Namespace', _):
+def _(args: 'Namespace', _):
     code, msg = repo_handler.open_repo_in_browser(
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
