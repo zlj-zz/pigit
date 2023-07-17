@@ -1,4 +1,4 @@
-#compdef pigit-dev
+#compdef pigit
 
 #--------------------------------------------------------------------
 # This completion script is generated automatically by parsing
@@ -159,6 +159,12 @@ __clear_values() {
   && ret=0
 }
 
+__cd_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+  && ret=0
+}
+
 __fetch_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
@@ -185,6 +191,7 @@ __repo_values() {
     'rename[rename a repo.]' \
     'll[display summary of all repos.]' \
     'clear[clear the all repos.]' \
+    'cd[jump to a repo dir.]' \
     'fetch[fetch remote update for repo(s).]' \
     'pull[pull remote updates for repo(s).]' \
     'push[push the local updates for repo(s).]' \
@@ -213,7 +220,7 @@ __sub_opt_values() {
 }
 
 
-_pigit_dev_completion(){
+_pigit_completion(){
   local curcontext="$curcontext" state line ret=1
   typeset -A opt_args
 
@@ -226,7 +233,7 @@ _pigit_dev_completion(){
     {-v,--version}'[Show version and exit.]' \
     {-c,--count}'[Count the number of codes and output them in tabular form.    A given path can be accepted, and the default is the current directory.    ]' \
     '--create-ignore[Create a demo .gitignore file. Need one argument, the type of gitignore.]' \
-    {-C,--complete}'[Add shell prompt script and exit. (Supported bash, zsh, fish)]' \
+    '--complete[Add shell prompt script and exit. (Supported bash, zsh, fish)]' \
     '--create-config[Create a pre-configured file of PIGIT.(If a profile exists, the values available in it are used)]' \
     '1: :->opts'\
     '*::arg:->args'\
@@ -245,6 +252,7 @@ _pigit_dev_completion(){
           rename) __rename_values ;;
           ll) __ll_values ;;
           clear) __clear_values ;;
+          cd) __cd_values ;;
           fetch) __fetch_values ;;
           pull) __pull_values ;;
           push) __push_values ;;
@@ -266,4 +274,4 @@ _pigit_dev_completion(){
   return ret
 }
 
-compdef _pigit_dev_completion pigit-dev
+compdef _pigit_completion pigit

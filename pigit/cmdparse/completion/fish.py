@@ -1,22 +1,15 @@
 # -*- coding:utf-8 -*-
 
 from typing import Dict
-import os
 import textwrap
 
 from .base import ShellCompletion
 
 
 class FishCompletion(ShellCompletion):
+    SHELL: str = "fish"
 
-    _SHELL: str = "fish"
-
-    try:
-        _INJECT_PATH: str = os.environ["HOME"] + "/.config/fish/config.fish"
-    except:
-        _INJECT_PATH: str = ""
-
-    _template_source: str = textwrap.dedent(
+    TEMPLATE_SRC: str = textwrap.dedent(
         """\
         function %(func_name)s;
             set -l response;
@@ -44,7 +37,7 @@ class FishCompletion(ShellCompletion):
         """
     )
 
-    def generate(self) -> str:
+    def generate_content(self) -> str:
         # TODO:improve `fish` completion script.
         comp_keys = []
 

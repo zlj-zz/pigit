@@ -8,7 +8,7 @@ from .utils import analyze_it
 
 from pigit.git._cmds import GIT_CMDS
 from pigit.cmdparse.parser import command, Parser
-from pigit.cmdparse.completion.base import ShellCompletion
+from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (
     ZshCompletion,
     BashCompletion,
@@ -84,53 +84,59 @@ def test_generate_about_dict():
     parser = Parser.from_dict(argparse_dict)
     parser.print_help()
 
-    ShellCompletion._SHELL = ""
-    ShellCompletion._INJECT_PATH = ""
+    ShellCompletion.SHELL = ""
     args = parser.to_dict()["args"]
     pprint(ShellCompletion("", {})._parse(args))
 
 
 class TestCompletion:
-    real = True
-    prog = "pigit"
-    script_dir = os.path.join(_PIGIT_PATH, "docs")
+    @classmethod
+    def setup_class(cls):
+        real = True
 
-    if real:
-        from pigit.entry import pigit
+        cls.prog = "pigit"
+        cls.script_dir = os.path.join(_PIGIT_PATH, "docs")
 
-        complete_vars = pigit.to_dict()
-        complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
-        )
-    else:
-        complete_vars = copy.deepcopy(argparse_dict)
-        cmd_temp = complete_vars["args"]["cmd"]["args"]
-        cmd_temp.update(
-            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
-        )
+        if real:
+            from pigit.entry import pigit
 
-    def test_error_complete_vars(self):
+            cls.complete_vars = pigit.to_dict()
+            cls.complete_vars["args"]["cmd"]["args"].update(
+                {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+            )
+        else:
+            cls.complete_vars = copy.deepcopy(argparse_dict)
+            cmd_temp = cls.complete_vars["args"]["cmd"]["args"]
+            cmd_temp.update(
+                {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+            )
+
+    def test_error(self):
+        # error complete_vars
         with pytest.raises(TypeError):
             BashCompletion("test", "xxx", ".")
 
-    def print(self, c):
-        print(c.prog_name)
-        print(c.script_name)
-        print(c.inject_path)
+        # error prog
+        with pytest.raises(ShellCompletionError):
+            BashCompletion(None, {}, ".")
+
+    def print(self, c: ShellCompletion):
+        assert c.prog_name == "pigit"
+
+        assert c.script_name == f"pigit_{c.SHELL}_comp"
 
         source = c.generate_resource()
-        print(source)
+        # print(source)
 
         c.write_completion(source)
 
-    @analyze_it
     def test_bash(self):
         c = BashCompletion(None, self.complete_vars, self.script_dir)
         self.print(c)
 
     @analyze_it
     def test_zsh(self):
-        c = ZshCompletion("pigit-dev", self.complete_vars, self.script_dir)
+        c = ZshCompletion("pigit", self.complete_vars, self.script_dir)
         self.print(c)
 
     def test_fish(self):
@@ -138,7 +144,7 @@ class TestCompletion:
         self.print(c)
 
     def test_get_shell(self):
-        print(get_shell())
+        assert get_shell() in ["bash", "zsh", "fish", ""]
 
     def test_action(self):
-        shell_complete(self.complete_vars, "bash", "xxx", ".", None, "./test.txt")
+        shell_complete(self.complete_vars, "bash", "xxx", ".", "./test.txt")

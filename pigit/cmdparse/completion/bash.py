@@ -1,22 +1,15 @@
 # -*- coding:utf-8 -*-
 
 from typing import Dict
-import os
 import textwrap
 
 from .base import ShellCompletion
 
 
 class BashCompletion(ShellCompletion):
+    SHELL: str = "bash"
 
-    _SHELL: str = "bash"
-
-    try:
-        _INJECT_PATH: str = os.environ["HOME"] + "/.bashrc"
-    except:
-        _INJECT_PATH: str = ""
-
-    _template_source: str = textwrap.dedent(
+    TEMPLATE_SRC: str = textwrap.dedent(
         """\
         #!/usr/env bash
 
@@ -31,7 +24,7 @@ class BashCompletion(ShellCompletion):
         """
     )
 
-    def generate(self) -> str:
+    def generate_content(self) -> str:
         # TODO:improve `bash` completion script.
         comp_keys = []
 

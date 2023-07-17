@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 
 from typing import Dict, List
-import os
 import textwrap
 
 from .base import ShellCompletion
@@ -53,15 +52,9 @@ __%s_values() {
 
 
 class ZshCompletion(ShellCompletion):
+    SHELL: str = "zsh"
 
-    _SHELL: str = "zsh"
-
-    try:
-        _INJECT_PATH: str = os.environ["HOME"] + "/.zshrc"
-    except:
-        _INJECT_PATH: str = ""
-
-    _template_source: str = _TEMPLATE_ZSH
+    TEMPLATE_SRC: str = _TEMPLATE_ZSH
 
     def _process_arguments(self, _arguments) -> str:
         res = []
@@ -142,15 +135,19 @@ class ZshCompletion(ShellCompletion):
                 for opt_name, opt_args in _sub_opts.items()
             ]
 
-            _sub_opt_str = textwrap.dedent(
-                """
-                ######################
-                # sub-commands helper
-                ######################
-                """
-            ) + _TEMP_V % (
-                "sub_opt",
-                textwrap.indent("\n".join(_subs), "    "),
+            _sub_opt_str = (
+                textwrap.dedent(
+                    """
+                    ######################
+                    # sub-commands helper
+                    ######################
+                    """
+                )
+                + _TEMP_V
+                % (
+                    "sub_opt",
+                    textwrap.indent("\n".join(_subs), "    "),
+                )
             )
 
             self._process_sub_commands(
@@ -178,7 +175,7 @@ class ZshCompletion(ShellCompletion):
 
         arguments_str = _TEMP_A % textwrap.indent("\n".join(_arguments), " " * 2)
 
-        return self._template_source % {
+        return self.TEMPLATE_SRC % {
             "func_name": self.func_name,
             "prog": self.prog_name,
             "tools": "\n".join([*_sub_sub_opt_comps, _sub_opt_str]),

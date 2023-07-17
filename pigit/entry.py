@@ -84,7 +84,7 @@ def pigit(args: 'Namespace', _) -> None:
 
         from .cmdparse.completion import shell_complete
 
-        shell_complete(complete_vars, PIGIT_HOME, inject=True)
+        shell_complete(complete_vars, args.complete)
         return None
 
     elif args.ignore_type:
@@ -126,9 +126,9 @@ tools_group.add_argument("-c", "--count", nargs="?", const=".", type=str, metava
     help="""Count the number of codes and output them in tabular form.
     A given path can be accepted, and the default is the current directory.
     """,)
-tools_group.add_argument( "--create-ignore", type=str, metavar="TYPE", dest="ignore_type",
+tools_group.add_argument("--create-ignore", type=str, metavar="TYPE", dest="ignore_type",
     help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""")
-tools_group.add_argument("-C", "--complete", action="store_true",
+tools_group.add_argument("--complete", nargs='?', const='nil', type=str, metavar='SHELL',
     help="Add shell prompt script and exit. (Supported bash, zsh, fish)")
 tools_group.add_argument("--create-config", action="store_true",
     help="Create a pre-configured file of PIGIT."
