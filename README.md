@@ -87,6 +87,29 @@ The command of `repo` support operate multiple repos at the same time.
 
 Use `pigit repo -h` to get more help.
 
+```
+usage: pigit
+
+ repo [-h] {add,rm,rename,ll,clear,cd,fetch,pull,push} ...
+
+
+positional arguments:
+  {add,rm,rename,ll,clear,cd,fetch,pull,push}
+    add                 add repo(s).
+    rm                  remove repo(s).
+    rename              rename a repo.
+    ll                  display summary of all repos.
+    clear               clear the all repos.
+    cd                  jump to a repo dir.
+    fetch               fetch remote update for repo(s).
+    pull                pull remote updates for repo(s).
+    push                push the local updates for repo(s).
+
+
+options:
+  -h, --help            show this help message and exit
+```
+
 ### Interaction
 
 Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
@@ -115,6 +138,26 @@ make install
 python setup.py install  # On windows
 ```
 
+### Completion
+
+Provides a friendly command-line completion capability, injecting completion through the following methods.
+
+Write it to your shell configuration file：
+
+```sh
+# ~/.zshrc
+
+eval "$(pigit --complete zsh)"
+```
+
+Currently supports `bash`, `zsh` and `fish`.
+
+If no shell is specified, it will try to automatically detect what shell you are using.
+
+```sh
+eval "$(pigit --complete)"
+```
+
 ## Alias
 
 Alias is good way to help you use _pigit_ faster . Open your shell profile and append:
@@ -139,20 +182,20 @@ On windows should be: `C:\\User\\<your username>`
 
 [here](./docs/pigit.conf) is a configuration template.
 
-| config key                  | type  | default                     | desc                                                                                                                        |
-| --------------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| cmd_show_original           | bool  | True                        | Show original git command.                                                                                                  |
-| cmd_recommend               | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
-| tui_help_showtime           | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
-| counter_use_gitignore       | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
-| counter_show_invalid        | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
-| counter_show_icon           | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
-| counter_format              | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
-| git_config_format           | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
-| repo_info_include           | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
-| repo_auto_append            | bool  | False                       | Whether auto append path to repos.                                                                                          |
-| debug_open                  | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
-| log_output                  | bool  | False                       | Whether output log in terminal.                                                                                             |
+| config key            | type  | default                     | desc                                                                                                                        |
+| --------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| cmd_show_original     | bool  | True                        | Show original git command.                                                                                                  |
+| cmd_recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
+| tui_help_showtime     | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
+| counter_use_gitignore | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
+| counter_show_invalid  | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
+| counter_show_icon     | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
+| counter_format        | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
+| git_config_format     | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
+| repo_info_include     | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
+| repo_auto_append      | bool  | False                       | Whether auto append path to repos.                                                                                          |
+| debug_open            | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
+| log_output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 
 ## Extra cmds
 
