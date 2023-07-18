@@ -101,9 +101,33 @@ class ShellCompletion:
         Process self.complete_var to generate completion script content part.
         Due to different shells, the generated formats are different, which
         are finally implemented by subclasses.
+        If this method is not overridden, a string of all commands will be generated.
+        Like: '-h --help cmd repo'.
         """
 
-        raise NotImplementedError()
+        comp_keys = set()
+
+        _arguments, _, _sub_opts = self._parse(self.complete_vars["args"])
+
+        for _argument in _arguments:
+            for handle in _argument[0].split():
+                comp_keys.add(handle)
+
+        sub_q = [_sub_opts]
+        while sub_q:
+            temp: Dict = sub_q.pop(0)
+            for opt_name, p in temp.items():
+                comp_keys.add(opt_name)
+
+                if _arguments := p.get("_arguments"):
+                    for _argument in _arguments:
+                        for handle in _argument[0].split():
+                            comp_keys.add(handle)
+
+                if _opts := p.get("_sub_opts"):
+                    sub_q.insert(-1, _opts)
+
+        return " ".join(comp_keys)
 
     def generate_resource(self) -> str:
         """Generate completion script.

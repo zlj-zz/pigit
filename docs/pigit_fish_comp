@@ -1,7 +1,7 @@
 function _pigit_completion;
     set -l response;
 
-    for value in (env -h --help -i --information -f --config -r --report -v --version -c --count --create-ignore --complete --create-config cmd -h --help -s --show-commands -p --show-part-command -t --types --shell repo -h --help open -h --help -i --issue -c --commit -p --print add -h --help --dry-run rm -h --help --path rename -h --help ll -h --help --reverse --simple clear -h --help cd -h --help fetch -h --help pull -h --help push -h --help b bc bl bL bs bS bm bM bd c ca cA cm co cO cf cF cr cR cs Cl Ca Ce Co CO Ct CT f fc fC fm fr fu fb ia iA iu id iD ir iR ix iX l l1 ls ld lv lc lr m ma mC mF mS mv mt p pf pF pa pA pt pc pp R Rl Ra Rx Rm Ru Rp Rs RS s sp sl sd sD t ta tx ws wS wd wD wr wR wc wC wm wM wx wX Sc Si Su Sd SD savepd ue user email=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
+    for value in (env fu cO sD wr iu l1 --show-commands p fetch mv Si cs pull ls -i fb t sd --print mS --commit Rl mt --types ld iA RS -v mC --report open ix --reverse bS Su --version -c --config cm ll --simple l pp iD --complete cd fc savepd SD wS Rm wD wR pc Sc wx iR mF CO ir sp bL add Ct -s cf ia -f bM Ru --dry-run Rs rename push bl cF pF cr wc --path repo ca wX --help -h CT pt fr bc iX rm lv Rp --count co tx Co bm c bd ue id fC -t wd wM --shell fm -r Cl --information f ws ta Ra cmd lc --create-config Ca clear m user pA b ma --show-part-command lr wm s pf cR bs Ce email wC cA Rx --create-ignore R sl --issue Sd pa -p=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
         set response $response $value;
     end;
 

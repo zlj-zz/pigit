@@ -37,25 +37,4 @@ class FishCompletion(ShellCompletion):
         """
     )
 
-    def generate_content(self) -> str:
-        # TODO:improve `fish` completion script.
-        comp_keys = []
-
-        _arguments, _positions, _sub_opts = self._parse(self.complete_vars["args"])
-
-        for x in _arguments:
-            comp_keys.extend(x[0].split())
-
-        sub_q = [_sub_opts]
-        while sub_q:
-            temp: Dict = sub_q.pop(0)
-            for opt_name, p in temp.items():
-                comp_keys.append(opt_name)
-
-                if _a := p.get("_arguments"):
-                    for x in _a:
-                        comp_keys.extend(x[0].split())
-                if _opts := p.get("_sub_opts"):
-                    sub_q.insert(-1, _opts)
-
-        return " ".join(comp_keys)
+    # TODO:improve `fish` completion script.
