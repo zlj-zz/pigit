@@ -138,7 +138,7 @@ make install
 python setup.py install  # On windows
 ```
 
-### Completion
+## Completion
 
 Provides a friendly command-line completion capability, injecting completion through the following methods.
 
