@@ -8,7 +8,8 @@ from plenty.str_utils import get_width
 from plenty.style import Style
 
 from .console import Term
-from ..common.utils import exec_cmd, confirm
+from ..comm.utils import confirm
+from ..comm.executor import Executor
 
 
 class Widget(ABC):
@@ -69,7 +70,7 @@ class SwitchWidget(Widget):
 
     @abstractmethod
     def process_keyevent(self, key: str) -> Optional[int]:
-        """Costom process keyboard event, instance in sub-class."""
+        """Custom process keyboard event, instance in sub-class."""
 
     def _process_event(self, key: str):
         # If the result of process is int, then switch the page.
@@ -270,12 +271,13 @@ class CmdRunner:
         self.cmd = cmd
         self.auto_run = auto_run
         self.run_path = path
+        self.executor = Executor()
 
         if self.auto_run:
             self.run()
 
     def run(self):
         print(Term.normal_screen)
-        res_code = exec_cmd(self.cmd, cwd=self.run_path, reply=False)
+        res_code, _, _ = self.executor.exec(self.cmd, cwd=self.run_path)
         print(Term.alt_screen)
         return res_code

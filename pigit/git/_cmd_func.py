@@ -16,7 +16,7 @@ Example:
 from typing import List, Tuple, Union
 import re
 
-from ..common.utils import exec_cmd
+from pigit.comm.executor import Executor, WAITING
 
 
 def add(args: Union[List, Tuple]) -> str:
@@ -27,7 +27,7 @@ def add(args: Union[List, Tuple]) -> str:
     """
 
     args_str = " ".join(args) if args else " ."
-    exec_cmd(f"git add {args_str}", reply=False)
+    Executor().exec(f"git add {args_str}", flags=WAITING)
 
     return ":rainbow: Storage file: {0}".format(
         "all" if args_str.strip() == "." else args_str
@@ -40,7 +40,7 @@ def fetch_remote_branch(args: Union[List, Tuple]) -> str:
     branch = args[0] if len(args) > 1 else None
 
     if branch:
-        exec_cmd("git fetch origin {0}:{0} ".format(branch), reply=False)
+        Executor().exec("git fetch origin {0}:{0} ".format(branch), flags=WAITING)
         return ""
     else:
         return "`This option need a branch name.`<error>"
@@ -78,9 +78,10 @@ def set_email_and_username(args: Union[List, Tuple]) -> str:
         else:
             print("ERROR: Bad mailbox format. continue ...")
 
-    if exec_cmd(f"git config user.name {name} {is_global}", reply=False) and exec_cmd(
-        f"git config user.email {email} {is_global}", reply=False
-    ):
+    executor = Executor()
+    if executor.exec(
+        f"git config user.name {name} {is_global}", flags=WAITING
+    ) and executor.exec(f"git config user.email {email} {is_global}", flags=WAITING):
         print("Successfully set.")
     else:
         print("Failed. Please check log.")

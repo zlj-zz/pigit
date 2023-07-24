@@ -13,7 +13,7 @@ from shutil import get_terminal_size
 from plenty.table import Table
 from plenty import get_console
 
-from .common.utils import confirm, get_file_icon, adjudgment_type
+from .comm.utils import confirm, get_file_icon, adjudgment_type
 
 
 Logger = logging.getLogger(__name__)

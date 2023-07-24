@@ -1,4 +1,6 @@
-from pigit.common.utils import exec_cmd
+from typing import Optional
+
+from pigit.comm.executor import Executor, REPLY, DECODE
 
 from .ignore import get_ignore_source, create_gitignore
 from .cmd import get_extra_cmds, SCmd, CommandType, GIT_CMDS
@@ -16,8 +18,19 @@ __all__ = (
 )
 
 
+# _Executor: Optional[Executor] = None
+
+
+# def _get_executor() -> Executor:
+#     global _Executor
+#     if _Executor is None:
+#         _Executor = Executor()
+
+#     return _Executor
+
+
 def git_version() -> str:
     """Get Git version."""
 
-    _, _version = exec_cmd("git --version")
+    _, _, _version = Executor().exec("git --version", flags=REPLY | DECODE)
     return _version.strip() or ""

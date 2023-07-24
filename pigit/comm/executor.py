@@ -16,7 +16,7 @@ import asyncio
 
 
 WAIT_ENTER = 1 << 0  # wait for enter-press afterwards. not support async.
-ENCODING = 1 << 1  # encoding the command result.
+DECODE = 1 << 1  # decoding the command result.
 WAITING = 1 << 2  # waiting util to command ending.
 REDIRECT = 1 << 3  # redirect output to the PIPE.
 REPLY = 1 << 4  # fetch command result and return.
@@ -30,13 +30,13 @@ class ExecFlag:
         self,
         reply: bool = False,
         silent: bool = False,
-        encoding: bool = False,
+        decoding: bool = False,
         waiting: bool = False,
         wait_enter: bool = False,
     ) -> None:
         self.reply = reply
         self.silent = silent
-        self.encoding = encoding
+        self.decoding = decoding
         self.waiting = waiting
         self.wait_enter = wait_enter
 
@@ -69,14 +69,15 @@ class Executor:
             ExecFlag: flag ctx.
         """
 
-        exec_flag = ExecFlag(encoding=bool(flags & ENCODING))
+        exec_flag = ExecFlag(decoding=bool(flags & DECODE))
 
         if flags & REPLY:
+            exec_flag.reply = True
+
             # reply depend to waiting and redirect.
             flags |= REDIRECT
             flags |= WAITING
 
-            exec_flag.reply = True
             if flags & WAIT_ENTER:
                 exec_flag.wait_enter = True
 
@@ -142,7 +143,7 @@ class Executor:
                 if exec_flag.wait_enter:
                     self._press_enter()
 
-                if exec_flag.encoding:
+                if exec_flag.decoding:
                     if _out is not None and not isinstance(_out, str):
                         _out = _out.decode()
                     if _err is not None and not isinstance(_err, str):
@@ -189,7 +190,7 @@ class Executor:
             if proc.returncode != 0:
                 return proc.returncode, args, None
 
-            if exec_flag.encoding:
+            if exec_flag.decoding:
                 return proc.returncode, _err.decode(), _out.decode()
             else:
                 return proc.returncode, _err, _out

@@ -22,8 +22,8 @@ from .const import (
 from .log import setup_logging
 from .config import Config
 from .cmdparse.parser import command, argument
-from .common.utils import confirm
-from .common.func import dynamic_default_attrs, time_it
+from .comm.utils import confirm
+from .comm.func import dynamic_default_attrs, time_it
 from .git import SCmd, GIT_CMDS, get_extra_cmds, Repo, create_gitignore
 from .info import introduce, GitConfig
 
@@ -166,8 +166,8 @@ def _(args: 'Namespace', unknown: List):
 
     git_processor = SCmd(
         extra_cmds=extra_cmd,
-        command_prompt=CONFIG.cmd_recommend,
-        show_original=CONFIG.cmd_show_original,
+        prompt=CONFIG.cmd_recommend,
+        display=CONFIG.cmd_show_original,
     )
 
     if args.shell:

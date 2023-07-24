@@ -29,48 +29,9 @@ def traceback_info(extra_msg: str = "null") -> str:
     )
 
 
-def exec_cmd(
-    *args, cwd: Optional[str] = None, reply: bool = True, decoding: bool = True
-) -> Tuple[Union[str, ByteString, None], ...]:
-    """Run system shell command.
-
-    Args:
-        cwd Option[str]: path of exec cmd. Default is None.
-        reply (bool): whether return execute result. Default is True.
-        decoding (bool): whether decode the return. Default is True.
-    """
-    _stderr: Optional[int] = subprocess.PIPE if reply else None
-    _stdout: Optional[int] = subprocess.PIPE if reply else None
-
-    _err: Union[str, ByteString, None] = None
-    _rlt: Union[str, ByteString, None] = None
-
-    try:
-        # Take over the input stream and get the return information.
-        with subprocess.Popen(
-            " ".join(args), stderr=_stderr, stdout=_stdout, shell=True, cwd=cwd
-        ) as proc:
-            out_res, err_res = proc.communicate()
-    except FileNotFoundError as e:
-        _err = str(e).encode()
-    else:
-        _err, _rlt = err_res, out_res
-
-    if not decoding:
-        return _err, _rlt
-
-    # decode
-    if _err is not None:
-        _err = _err.decode()
-    if _rlt is not None:
-        _rlt = _rlt.decode()
-    return _err, _rlt
-
-
 async def async_run_cmd(
     *args, cwd: Optional[str] = None, msg: Optional[str] = None, output: bool = True
 ):
-
     # receive (program, *args, ...), so must split the full cmd,
     # and unpack incoming.
     proc = await asyncio.create_subprocess_exec(
@@ -162,7 +123,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     # Square of sum of squares of word frequency difference.
     frequency_sum_square: list[Tuple[str, int]] = list(
         map(
-            lambda item: (item[0], int(sqrt(sum(map(lambda i: i ** 2, item[1]))))),
+            lambda item: (item[0], int(sqrt(sum(map(lambda i: i**2, item[1]))))),
             frequency_difference.items(),
         )
     )

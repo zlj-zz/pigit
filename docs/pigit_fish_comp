@@ -1,7 +1,7 @@
 function _pigit_completion;
     set -l response;
 
-    for value in (env cF --commit bd R -h pc -r Rx Rs wm Rl -c ws pa push f cO l1 mF cm add pull user c ld sd --issue wM Si fc savepd --complete wD cr pt --create-ignore --count --dry-run cd --create-config wC ir pA Ra rename --print CO --simple lc Ru -v wc Cl iA clear bm fu pp b cmd -i l SD sl -t ca cR Rp Ce fm lr t --show-commands ls --types lv s Ct --path RS wX Sd iu open wR mt mC fr bL Co ta Ca -p -s iR sD cs rm iD Sc ue --shell --reverse -f CT ia cf email bc wd ll mv iX co ix p pF wx bl cA repo Su fetch --information sp tx fb --config bS m id bs --version pf --show-part-command wr --help mS Rm fC bM --report wS ma=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
+    for value in (env pt Ct Rm cF -h open clear wx --create-config fb wR lv --dry-run --help Ce wC ws --types iD fC mS f --version --information -p RS pa email fetch push m bd pc t wr Sd -v fc --complete fm Ru SD --reverse s ls add c R ir pA iX fu Si wX bc --issue b mv --report ld rename cm --config id Rs wD savepd mt Su cA -t --print cR mC sl CT lr --show-part-command sd wM sD iA cd pF --shell ca Cl bl co iu repo ia --path Rl tx wm l Rp cr pp bm pf cf ma ll --commit Ra p ue cs bS -s cO Co mF --show-commands wS wc cmd --simple user sp -r wd -i bL Ca l1 rm --create-ignore bM bs --count -f lc Rx iR Sc pull ta CO fr ix -c=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
         set response $response $value;
     end;
 

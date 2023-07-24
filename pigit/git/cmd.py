@@ -7,7 +7,8 @@ import random
 import textwrap
 import logging
 
-from ..common.utils import exec_cmd, confirm, similar_command, traceback_info
+from pigit.comm.utils import confirm, similar_command, traceback_info
+from pigit.comm.executor import Executor, WAITING
 from ._cmds import GIT_CMDS, CommandType
 
 Log = logging.getLogger(__name__)
@@ -49,11 +50,13 @@ class SCmd:
     def __init__(
         self,
         extra_cmds: Optional[dict] = None,
-        command_prompt: bool = True,
-        show_original: bool = True,
+        prompt: bool = True,
+        display: bool = True,
     ) -> None:
-        self.prompt = command_prompt
-        self.show_original = show_original
+        self.prompt = prompt
+        self.display = display
+
+        self.executor = Executor()
 
         # Init commands.
         self.cmds = GIT_CMDS
@@ -142,9 +145,9 @@ class SCmd:
         elif isinstance(command, str):
             if args:
                 command = " ".join([command, *args])
-            if self.show_original:
+            if self.display:
                 msgs.append(f":rainbow:  {self.color_command(command)}")
-            exec_cmd(command, reply=False)
+            self.executor.exec(command, flags=WAITING)
         else:
             return 5, "`The type of command not supported.`<error>"
 

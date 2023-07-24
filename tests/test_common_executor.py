@@ -6,8 +6,8 @@ import time
 import textwrap
 from unittest.mock import patch
 
-from pigit.common.executor import (
-    ENCODING,
+from pigit.comm.executor import (
+    DECODE,
     REDIRECT,
     REPLY,
     SILENT,
@@ -28,7 +28,7 @@ class TestExecutor:
         print(self.executor.exec("pwd", flags=WAITING | REDIRECT))
 
         print(self.executor.exec("pwd", flags=REPLY))
-        print(self.executor.exec("pwd", flags=REPLY | ENCODING))
+        print(self.executor.exec("pwd", flags=REPLY | DECODE))
         # # print(self.executor.exec("pwd", flags=REPLY | ENCODING | WAIT_ENTER))
 
         print(self.executor.exec("xxxxxxxx", flags=REPLY))

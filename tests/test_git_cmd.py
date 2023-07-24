@@ -51,12 +51,15 @@ class TestSCmd:
         os.remove(file)
 
 
+exec_patch = "pigit.git._cmd_func.Executor.exec"
+
+
 class TestCmdFunc:
-    @patch("pigit.git._cmd_func.exec_cmd", return_value=None)
+    @patch(exec_patch, return_value=None)
     def test_add(self, _):
         add([])
 
-    @patch("pigit.git._cmd_func.exec_cmd", return_value=None)
+    @patch(exec_patch, return_value=None)
     def test_fetch_remote(self, _):
         fetch_remote_branch([])
 
@@ -70,6 +73,6 @@ class TestCmdFunc:
         ],
     )
     @patch("builtins.input", return_value="abc@gmail.com")
-    @patch("pigit.git._cmd_func.exec_cmd", return_value=False)
+    @patch(exec_patch, return_value=False)
     def test_set_ua(self, _a, _b, args):
         set_email_and_username(args)

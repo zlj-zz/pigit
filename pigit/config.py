@@ -9,8 +9,8 @@ import logging
 
 from plenty.style import Color
 
-from .common.utils import confirm, traceback_info
-from .common.singleton import Singleton
+from .comm.utils import confirm, traceback_info
+from .comm.singleton import Singleton
 
 Logger = logging.getLogger(__name__)
 

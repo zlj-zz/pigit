@@ -4,20 +4,19 @@ import doctest
 from unittest.mock import patch
 from pprint import pprint
 
-from pigit.common.utils import (
+from pigit.comm.utils import (
     traceback_info,
     confirm,
-    exec_cmd,
     async_run_cmd,
     exec_async_tasks,
 )
-from pigit.common.func import dynamic_default_attrs
+from pigit.comm.func import dynamic_default_attrs
 
 
 def test_doctest():
-    import pigit.common.utils
+    import pigit.comm.utils
 
-    doctest.testmod(pigit.common.utils, verbose=True)
+    doctest.testmod(pigit.comm.utils, verbose=True)
 
 
 def test_traceback_info():
@@ -44,23 +43,6 @@ def test_traceback_info():
 def test_confirm(mock_input, input_value: str, return_bool: bool):
     mock_input.return_value = input_value
     assert confirm("confirm:") == return_bool
-
-
-def test_exec_cmd():
-    # has reply
-    print(exec_cmd("pwd"))
-    print(exec_cmd("which", "python3"))
-
-    # output to shell
-    print(exec_cmd("pwd", reply=False))
-    print(exec_cmd("which", "python3", reply=False))
-
-    # don't decoding
-    print(exec_cmd("which", "python3", decoding=False))
-
-    # execute error
-    print(exec_cmd("xxxxxxxxx"))
-    print(exec_cmd("xxxxxxxxx", cwd="xxxxxxxxxxxx"))
 
 
 def test_async_cmd_func():

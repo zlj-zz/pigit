@@ -11,13 +11,13 @@ import textwrap
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
-from pigit.common.utils import (
+from pigit.comm.utils import (
     adjudgment_type,
     async_run_cmd,
     exec_async_tasks,
-    exec_cmd,
     get_file_icon,
 )
+from pigit.comm.executor import WAITING, REPLY, DECODE, Executor
 from .model import File, Commit, Branch
 
 
@@ -31,6 +31,7 @@ class Repo:
     def __init__(
         self, op_path: Optional[str] = None, repo_json_path: Optional[str] = None
     ) -> None:
+        self.executor = Executor()
         self.op_path = op_path
         self.repo_json_path = (
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
@@ -72,7 +73,9 @@ class Repo:
         if not os.path.isdir(path):
             return repo_path, git_conf_path
 
-        err, repo_path = exec_cmd("git rev-parse --git-dir", cwd=path)
+        _, err, repo_path = self.executor.exec(
+            "git rev-parse --git-dir", flags=REPLY | DECODE, cwd=path
+        )
         if err:
             return repo_path, git_conf_path
 
@@ -96,13 +99,14 @@ class Repo:
         """Get current repo head. Return a branch name or a commit sha string."""
 
         path = path or self.op_path
-        _, res = exec_cmd(
+        _, _, head = self.executor.exec(
             "git symbolic-ref -q --short HEAD || git describe --tags --exact-match",
+            flags=REPLY | DECODE,
             cwd=path,
         )
-        if res is not None:
-            res = res.rstrip()
-        return res
+        if head is not None:
+            head = head.rstrip()
+        return head
 
     def get_first_pushed_commit(
         self, path: Optional[str] = None, branch_name: Optional[str] = None
@@ -116,8 +120,8 @@ class Repo:
                 return ""
 
         command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
-        _, resp = exec_cmd(command, cwd=path)
-        return resp.strip()
+        _, _, commit_msg = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
+        return commit_msg.strip()
 
     def get_branches(
         self,
@@ -131,7 +135,11 @@ class Repo:
         include_remote = "--all" if include_remote else ""
         color = "never" if plain else "always"
 
-        err, res = exec_cmd(f"git branch {include_remote} --color={color}", cwd=path)
+        _, _, res = self.executor.exec(
+            f"git branch {include_remote} --color={color}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
 
         if res is None:
             return []
@@ -142,7 +150,9 @@ class Repo:
 
         # Get remote name, exit when error.
         path = path or self.op_path
-        err, res = exec_cmd("git remote show", cwd=path)
+        _, _, res = self.executor.exec(
+            "git remote show", flags=REPLY | DECODE, cwd=path
+        )
 
         return res.strip().split("\n") if res else []
 
@@ -159,7 +169,9 @@ class Repo:
                 return ""
 
         # Get remote url, exit when error.
-        err, remote_url = exec_cmd(f"git ls-remote --get-url {remote_name}", cwd=path)
+        _, err, remote_url = self.executor.exec(
+            f"git ls-remote --get-url {remote_name}", flags=REPLY | DECODE, cwd=path
+        )
 
         if err:
             return ""
@@ -170,8 +182,10 @@ class Repo:
     def get_summary(self, path: Optional[str] = None, plain: bool = True) -> str:
         path = path or self.op_path
         color = "never" if plain else "always"
-        err, summary = exec_cmd(
-            f"git shortlog --summary --numbered --color={color}", cwd=path
+        _, _, summary = self.executor.exec(
+            f"git shortlog --summary --numbered --color={color}",
+            flags=REPLY | DECODE,
+            cwd=path,
         )
         return summary
 
@@ -229,14 +243,15 @@ class Repo:
             )
             gen.append("Branches: \n%s\n" % branches_str)
 
-        # Get the lastest log.
+        # Get the latest log.
         if not include_part or "log" in include_part:
-            err, res = exec_cmd(
+            _, err, res = self.executor.exec(
                 f"git log --stat --oneline --decorate -1 --color={'always' if color else 'never'}",
+                flags=REPLY | DECODE,
                 cwd=path,
             )
             git_log = "\t" + error_str if err else textwrap.indent(res, "\t")
-            gen.append("Lastest log:\n%s\n" % git_log)
+            gen.append("Latest log:\n%s\n" % git_log)
 
         # FIXME: will broken in a init repo.
         # Get git summary.
@@ -251,13 +266,14 @@ class Repo:
     # =============
     def load_branches(self, path: Optional[str] = None) -> List[Branch]:
         path = path or self.op_path
-        command = (
-            "git branch --sort=-committerdate "
-            '--format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" '
-        )
         branches = []
 
-        err, resp = exec_cmd(command, cwd=path)
+        _, _, resp = self.executor.exec(
+            "git branch --sort=-committerdate "
+            '--format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" ',
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
         resp = resp.strip()
         if not resp:
             return branches
@@ -300,8 +316,11 @@ class Repo:
         limit_flag = f"-{limit}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
 
-        command = f"git log {branch_name} {arg_str} {limit_flag}  {filter_flag}"
-        err, resp = exec_cmd(command, cwd=path)
+        _, _, resp = self.executor.exec(
+            f"git log {branch_name} {arg_str} {limit_flag} {filter_flag}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
 
         return "" if resp is None else resp.strip()
 
@@ -324,7 +343,9 @@ class Repo:
         path = path or self.op_path
         file_items = []
 
-        err, files = exec_cmd("git status -s -u --porcelain", cwd=path)
+        _, err, files = self.executor.exec(
+            "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=path
+        )
         if err:
             return file_items
         for file in files.rstrip().split("\n"):
@@ -389,6 +410,7 @@ class Repo:
         """
 
         path = path or self.op_path
+        # TODO: use f-string
         command = "git diff --submodule --no-ext-diff {plain} {cached} {tracked} {file}"
 
         _plain = "--color=never" if plain else "--color=always"
@@ -398,8 +420,9 @@ class Repo:
         if "->" in file:  # rename status.
             file = file.split("->")[-1].strip()
 
-        err, res = exec_cmd(
+        _, err, res = self.executor.exec(
             command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file),
+            flags=REPLY | DECODE,
             cwd=path,
         )
         return "Can't get diff." if err else res.rstrip()
@@ -419,12 +442,10 @@ class Repo:
         """
 
         path = path or self.op_path
-        command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
 
-        _, resp = exec_cmd(command, cwd=path)
-        first_pushed_commit = resp.strip()
-
+        first_pushed_commit = self.get_first_pushed_commit(path, branch_name)
         passed_first_pushed_commit = not first_pushed_commit
+
         commits: List[Commit] = []
 
         # Generate git command.
@@ -432,7 +453,7 @@ class Repo:
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
         command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
 
-        err, resp = exec_cmd(command, cwd=path)
+        _, err, resp = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
         if err:
             return commits  # current is empty list.
 
@@ -487,8 +508,11 @@ class Repo:
         path = path or self.op_path
         color_str = "never" if plain else "always"
 
-        command = f"git show --color={color_str} {commit_sha} {file_name}"
-        _, resp = exec_cmd(command, cwd=path)
+        _, _, resp = self.executor.exec(
+            f"git show --color={color_str} {commit_sha} {file_name}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
         return resp.rstrip()
 
     # ===============
@@ -514,12 +538,14 @@ class Repo:
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
         elif file.has_unstaged_change:
-            exec_cmd(f"git add -- '{file_name}'", cwd=path)
+            self.executor.exec(f"git add -- '{file_name}'", cwd=path)
         elif file.has_staged_change:
             if file.tracked:
-                exec_cmd(f"git reset HEAD -- '{file_name}'", cwd=path)
+                self.executor.exec(f"git reset HEAD -- '{file_name}'", cwd=path)
             else:
-                exec_cmd(f"git rm --cached --force -- '{file_name}'", cwd=path)
+                self.executor.exec(
+                    f"git rm --cached --force -- '{file_name}'", cwd=path
+                )
 
     def discard_file(
         self,
@@ -537,7 +563,7 @@ class Repo:
                 raise RepoError("Please set `tracked` or give a 'File'.") from None
 
         if tracked:
-            exec_cmd(f"git checkout -- {file_name}", cwd=path)
+            self.executor.exec(f"git checkout -- {file_name}", cwd=path)
         else:
             os.remove(os.path.join(path, file_name))
 
@@ -553,7 +579,7 @@ class Repo:
 
     def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> str:
         path = path or self.op_path
-        err, _ = exec_cmd(f"git checkout {branch_name}", cwd=path)
+        _, err, _ = self.executor.exec(f"git checkout {branch_name}", cwd=path)
         return err or "ok"
 
     def open_repo_in_browser(
@@ -652,10 +678,16 @@ class Repo:
                     ]
 
             elif not reverse:
-                _, unstaged = exec_cmd("git diff --stat", cwd=repo_path)
-                _, staged = exec_cmd("git diff --stat --cached", cwd=repo_path)
-                _, untracked = exec_cmd(
-                    "git ls-files -zo --exclude-standard", cwd=repo_path
+                _, _, unstaged = self.executor.exec(
+                    "git diff --stat", flags=REPLY | DECODE, cwd=repo_path
+                )
+                _, _, staged = self.executor.exec(
+                    "git diff --stat --cached", flags=REPLY | DECODE, cwd=repo_path
+                )
+                _, _, untracked = self.executor.exec(
+                    "git ls-files -zo --exclude-standard",
+                    flags=REPLY | DECODE,
+                    cwd=repo_path,
                 )
                 commit_hash = self.get_first_pushed_commit(
                     path=repo_path, branch_name=head
@@ -776,7 +808,7 @@ class Repo:
 
         if repo in exist_repos:
             path = exist_repos[repo]["path"]
-            exec_cmd(command.format(path))
+            self.executor.exec(command.format(path))
         else:
             cur_cache = []
             print("Managed repos include the following:")
@@ -788,7 +820,7 @@ class Repo:
                 input_num = int(input("Please input the index:"))
                 if 0 <= input_num <= len(cur_cache):
                     path = exist_repos[cur_cache[input_num]]["path"]
-                    print(exec_cmd(command.format(path), cwd=".", reply=False))
+                    print(self.executor.exec(command.format(path), cwd="."))
                 else:
                     print("Error: index out of range.")
             except Exception:
@@ -802,10 +834,11 @@ class Repo:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
         if len(exist_repos) >= 1:
+            # TODO; executor not support here
             return exec_async_tasks(
                 async_run_cmd(*cmd.split(), cwd=prop["path"], msg=f":: {prop['path']}")
                 for name, prop in exist_repos.items()
             )
 
         for _, prop in exist_repos.items():
-            exec_cmd(cmd, prop["path"])
+            self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])

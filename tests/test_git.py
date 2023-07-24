@@ -5,23 +5,35 @@ from unittest.mock import patch
 
 from .conftest import TEST_PATH
 
-from pigit.common.utils import exec_cmd
+from pigit.comm.executor import Executor, WAITING
 from pigit.git import git_version
 from pigit.git.repo import Repo
 
 
+exec_patch = "pigit.git._cmd_func.Executor.exec"
+
+
 def create_repo(test_repo: str):
+    executor = Executor()
+
     # re-create test repo
     if os.path.isdir(test_repo):
         shutil.rmtree(test_repo)
     os.makedirs(test_repo, exist_ok=True)
-    print(exec_cmd("git init", cwd=test_repo))
-    print(exec_cmd("git config user.name Zachary", cwd=test_repo))
-    print(exec_cmd("git config user.email zlj19971222@outlook.com", cwd=test_repo))
-    print(exec_cmd("git branch -m A", cwd=test_repo))
+    print(executor.exec("git init", flags=WAITING, cwd=test_repo))
+    print(executor.exec("git config user.name Zachary", flags=WAITING, cwd=test_repo))
     print(
-        exec_cmd(
+        executor.exec(
+            "git config user.email zlj19971222@outlook.com",
+            flags=WAITING,
+            cwd=test_repo,
+        )
+    )
+    print(executor.exec("git branch -m A", flags=WAITING, cwd=test_repo))
+    print(
+        executor.exec(
             "git remote add origin https://github.com/zlj-zz/test-repo.git",
+            flags=WAITING,
             cwd=test_repo,
         )
     )
@@ -29,13 +41,13 @@ def create_repo(test_repo: str):
     # create no.1 file and first commit
     with open(os.path.join(test_repo, "test1.txt"), "w") as f:
         f.write("""This is a test file.""")
-    print(exec_cmd("git add .", cwd=test_repo))
-    print(exec_cmd("git commit -m 'init'", cwd=test_repo))
+    print(executor.exec("git add .", flags=WAITING, cwd=test_repo))
+    print(executor.exec("git commit -m 'init'", flags=WAITING, cwd=test_repo))
 
     # create new branch
     for name in ["B", "C", "D"]:
-        print(exec_cmd(f"git checkout -b {name}", cwd=test_repo))
-    print(exec_cmd("git checkout A", cwd=test_repo))
+        print(executor.exec(f"git checkout -b {name}", flags=WAITING, cwd=test_repo))
+    print(executor.exec("git checkout A", flags=WAITING, cwd=test_repo))
 
     # create no.2 file
     with open(os.path.join(test_repo, "test2.py"), "w") as f:
@@ -89,12 +101,12 @@ class TestRepo:
     @pytest.mark.parametrize(
         ["get_path", "expected"],
         [
-            [("err", ""), ("", "")],
-            [("", "a/b/.git"), ("a/b", "a/b/.git")],
-            [("", "a/b/.git/modules/"), ("a/b/", "a/b/.git/modules/")],
+            [(-1, "err", ""), ("", "")],
+            [(0, "", "a/b/.git"), ("a/b", "a/b/.git")],
+            [(0, "", "a/b/.git/modules/"), ("a/b/", "a/b/.git/modules/")],
         ],
     )
-    @patch("pigit.git.repo.exec_cmd")
+    @patch(exec_patch)
     def test_get_repo_info(self, mock_exec_cmd, get_path, expected):
         mock_exec_cmd.return_value = get_path
         assert self.git.confirm_repo() == expected
