@@ -46,7 +46,7 @@ class Repo:
         if op_path is not None:
             self.op_path = op_path
         if repo_info_path is not None:
-            self.repo_json_path = repo_info_path
+            self.repo_json_path = Path(repo_info_path)
 
         return self
 
@@ -132,11 +132,11 @@ class Repo:
         """Get repo all branch."""
 
         path = path or self.op_path
-        include_remote = "--all" if include_remote else ""
+        include_all = "--all" if include_remote else ""
         color = "never" if plain else "always"
 
         _, _, res = self.executor.exec(
-            f"git branch {include_remote} --color={color}",
+            f"git branch {include_all} --color={color}",
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -397,7 +397,7 @@ class Repo:
         tracked: bool = True,
         cached: bool = False,
         plain: bool = False,
-        path: str = None,
+        path: Optional[str] = None,
     ) -> str:
         """Gets the modification of the file.
         Args:
@@ -410,8 +410,6 @@ class Repo:
         """
 
         path = path or self.op_path
-        # TODO: use f-string
-        command = "git diff --submodule --no-ext-diff {plain} {cached} {tracked} {file}"
 
         _plain = "--color=never" if plain else "--color=always"
         _cached = "--cached" if cached else ""
@@ -421,7 +419,7 @@ class Repo:
             file = file.split("->")[-1].strip()
 
         _, err, res = self.executor.exec(
-            command.format(plain=_plain, cached=_cached, tracked=_tracked, file=file),
+            f"git diff --submodule --no-ext-diff {_plain} {_cached} {_tracked} {file}",
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -531,7 +529,7 @@ class Repo:
 
         return file_name
 
-    def switch_file_status(self, file: Union[File, str], path: Optional[str] = None):
+    def switch_file_status(self, file: File, path: Optional[str] = None):
         path = path or self.op_path
         file_name = self._get_file_str(file)
 
@@ -565,7 +563,7 @@ class Repo:
         if tracked:
             self.executor.exec(f"git checkout -- {file_name}", cwd=path)
         else:
-            os.remove(os.path.join(path, file_name))
+            os.remove(os.path.join(path or "", file_name))
 
     def ignore_file(self, file: Union[File, str], path: Optional[str] = None):
         """Append file to `.gitignore` file."""
@@ -589,7 +587,7 @@ class Repo:
         issue: str = "",
         commit: str = "",
         print: bool = False,
-    ) -> bool:
+    ) -> Tuple[bool, str]:
         path = path or self.op_path
         remote_url = self.get_remote_url(path=path)
 
@@ -619,7 +617,7 @@ class Repo:
     # custom repos option
     # ====================
     @staticmethod
-    def _make_repo_name(path: str, repos: List[str], name_counts: Counter) -> str:
+    def _make_repo_name(path: str, repos: Dict[str, str], name_counts: Counter) -> str:
         """
         Given a new repo `path`, create a repo name. By default, basename is used.
         If name collision exists, further include parent path name.
@@ -764,7 +762,7 @@ class Repo:
             del exist_repos[repo]
 
         self.dump_repos(exist_repos)
-        return zip(del_repos, del_paths)
+        return list(zip(del_repos, del_paths))
 
     def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
         """Rename repo

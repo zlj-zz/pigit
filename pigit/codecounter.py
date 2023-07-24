@@ -197,7 +197,7 @@ class CodeCounter(object):
         """Process handle use by `self.count`."""
         show_invalid = self.show_invalid
 
-        result: dict[str[dict[str, int]]] = {}  # type: dict[str,dict]
+        result: Dict[str, Dict[str, int]] = {}  # type: dict[str,dict]
         valid_counter = invalid_counter = 0
         invalid_list: list[str] = []
         total_size: int = 0
@@ -239,7 +239,7 @@ class CodeCounter(object):
         print("Walk error: {0}".format(e))
         return
 
-    def count(self) -> Tuple[Dict, List, List]:
+    def count(self) -> Tuple[Dict, List, int]:
         """Statistics file and returns the result dictionary for Python3.
 
         Args:
@@ -325,7 +325,7 @@ class CodeCounter(object):
 
                     with self._Lock:
                         for key, values in _result.items():
-                            if result.get(key, None) is None:
+                            if result.get(key) is None:
                                 result[key] = values
                             else:
                                 result[key]["files"] += _result[key]["files"]
@@ -389,7 +389,7 @@ class CodeCounter(object):
 
         return "\n".join(gen)
 
-    def table_output(self, new: Dict, old: Dict) -> Table:
+    def table_output(self, new: Dict[str, Dict], old: Dict[str, Dict]) -> Table:
         use_icon = self.use_icon
         color = self.color
 
@@ -500,7 +500,7 @@ class CodeCounter(object):
         whether_save: Optional[bool] = None,
         color: Optional[bool] = None,
         show_invalid: Optional[bool] = None,
-    ) -> None:
+    ) -> Dict:
         if count_path is not None:
             self.count_path = count_path
         if format_type is not None:

@@ -1,11 +1,12 @@
 from typing import (
     Callable,
     Coroutine,
-    Dict,
-    List,
     Optional,
     Tuple,
     Union,
+    Dict,
+    List,
+    ByteString,
 )
 from subprocess import Popen, PIPE
 import os
@@ -21,6 +22,8 @@ WAITING = 1 << 2  # waiting util to command ending.
 REDIRECT = 1 << 3  # redirect output to the PIPE.
 REPLY = 1 << 4  # fetch command result and return.
 SILENT = 1 << 5  # silent mode. output will be discarded.
+
+ExecResult = Tuple[int, Union[None, str, ByteString], Union[None, str, ByteString]]
 
 
 class ExecFlag:
@@ -150,8 +153,10 @@ class Executor:
                         _err = _err.decode()
 
                 if not exec_flag.reply:
-                    _out and print(_out)
-                    _err and print(_err)
+                    if _out:
+                        print(_out)
+                    if _err:
+                        print(_err)
                     return None, None, None
 
                 return _code, _err, _out
@@ -183,8 +188,10 @@ class Executor:
 
             _out, _err = await proc.communicate()
             if not exec_flag.reply:
-                _out and print(_out.decode())
-                _err and print(_err.decode())
+                if _out:
+                    print(_out.decode())
+                if _err:
+                    print(_err.decode())
                 return None, None, None
 
             if proc.returncode != 0:
@@ -195,7 +202,7 @@ class Executor:
             else:
                 return proc.returncode, _err, _out
 
-        async def _async_tasks(tasks: List[Coroutine]) -> List[str]:
+        async def _async_tasks(tasks: List[Coroutine]) -> List[ExecResult]:
             # The loop argument is deprecated since Python 3.8
             # and scheduled for removal in Python 3.10
             return await asyncio.gather(*tasks)

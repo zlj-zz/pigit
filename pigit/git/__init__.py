@@ -7,7 +7,7 @@ from .cmd import get_extra_cmds, SCmd, CommandType, GIT_CMDS
 from .repo import Repo
 
 __all__ = (
-    "get_version",
+    "git_version",
     "get_ignore_source",
     "create_gitignore",
     "get_extra_cmds",
