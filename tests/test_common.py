@@ -4,12 +4,7 @@ import doctest
 from unittest.mock import patch
 from pprint import pprint
 
-from pigit.comm.utils import (
-    traceback_info,
-    confirm,
-    async_run_cmd,
-    exec_async_tasks,
-)
+from pigit.comm.utils import traceback_info, confirm
 from pigit.comm.func import dynamic_default_attrs
 
 
@@ -43,28 +38,6 @@ def test_traceback_info():
 def test_confirm(mock_input, input_value: str, return_bool: bool):
     mock_input.return_value = input_value
     assert confirm("confirm:") == return_bool
-
-
-def test_async_cmd_func():
-    print()
-
-    code = """\
-# -*- coding:utf-8 -*-
-
-if __name__ == '__main__':
-    import time
-
-    print({0})
-    time.sleep(int({0}))
-    print({0})
-"""
-    tasks = [
-        async_run_cmd(*["python3", "-c", code.format(i)], msg=f"msg {i}.")
-        for i in range(5)
-    ]
-    pprint(tasks)
-    result = exec_async_tasks(tasks)
-    print(result)
 
 
 class TestFunc:

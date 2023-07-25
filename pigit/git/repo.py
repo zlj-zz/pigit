@@ -11,12 +11,7 @@ import textwrap
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
-from pigit.comm.utils import (
-    adjudgment_type,
-    async_run_cmd,
-    exec_async_tasks,
-    get_file_icon,
-)
+from pigit.comm.utils import adjudgment_type, get_file_icon
 from pigit.comm.executor import WAITING, REPLY, DECODE, Executor
 from .model import File, Commit, Branch
 
@@ -832,11 +827,13 @@ class Repo:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
         if len(exist_repos) >= 1:
-            # TODO; executor not support here
-            return exec_async_tasks(
-                async_run_cmd(*cmd.split(), cwd=prop["path"], msg=f":: {prop['path']}")
-                for name, prop in exist_repos.items()
-            )
+            cmds = []
+            orders = []
+            for _, prop in exist_repos.items():
+                cmds.append(cmd)
+                orders.append({"cwd": prop["path"]})
+
+            return self.executor.exec_async(*cmds, orders=orders, flags=WAITING)
 
         for _, prop in exist_repos.items():
             self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])

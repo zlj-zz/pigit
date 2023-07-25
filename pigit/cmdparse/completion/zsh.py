@@ -56,7 +56,7 @@ class ZshCompletion(ShellCompletion):
 
     TEMPLATE_SRC: str = _TEMPLATE_ZSH
 
-    def _process_arguments(self, _arguments) -> str:
+    def _process_arguments(self, _arguments) -> List[str]:
         res = []
 
         for one in _arguments:

@@ -20,6 +20,7 @@ Example:
     }
 """
 
+from typing import Dict
 import enum
 
 from ._cmd_func import *
@@ -53,7 +54,7 @@ _GIT_PRINT_FORMAT = (
 )
 
 
-GIT_CMDS = {
+GIT_CMDS: Dict[str, Dict] = {
     # Branch
     "b": {
         "belong": CommandType.Branch,

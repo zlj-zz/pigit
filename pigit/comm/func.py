@@ -8,7 +8,7 @@ def time_it(fn: Callable) -> Callable:
     When recursive calls exist, only the outermost layer is printed.
     """
     time_it.deep = 0  # Mark recursion levels.
-    time_unit = ["second", "mintue", "hour"]
+    time_unit = ["second", "minute", "hour"]
 
     @wraps(fn)
     def wrap(*args, **kwargs):

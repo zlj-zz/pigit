@@ -32,7 +32,9 @@ class PigitShell(cmd.Cmd):
         for key, values in short_giter.cmds.items():
             func_name = f"do_{key}"
 
-            self.set_instance_method(self.make_fun(key, values.get("help")), func_name)
+            self.set_instance_method(
+                self.make_fun(key, values.get("help", "")), func_name
+            )
 
     # =================
     # cmd tools method

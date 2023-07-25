@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import os
 import re
 import random
@@ -31,6 +31,11 @@ def get_extra_cmds(name: str, path: str) -> Dict:
         try:
             # load a module form location.
             spec = importlib.util.spec_from_file_location(name, path)
+            if spec is None:
+                raise ValueError("spec is None")
+            if spec.loader is None:
+                raise ValueError("spec.loader is None")
+
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
         except Exception:
@@ -78,6 +83,10 @@ class SCmd:
         """
 
         handle = re.match(r"(\w+)\s+(\w+)", command)
+        # Unable to match correctly.
+        if handle is None:
+            return f"Not valid command: '{command}'"
+
         prop = handle[1]
         cmd = handle[2]
         next_position = handle.span()[1]
@@ -113,7 +122,7 @@ class SCmd:
 
         msgs = []
 
-        option: Optional[Dict[str, Dict]] = self.cmds.get(short_cmd, None)
+        option: Optional[Dict] = self.cmds.get(short_cmd)
 
         # Invalid, if need suggest.
         if option is None:
@@ -187,9 +196,9 @@ class SCmd:
         # Get help message and command.
         _help: str = self.cmds[key].get("help", "").strip()
         if _help:
-            _help = textwrap.wrap(_help, msg_max_width)
-            help_msg = _help[0] + "\n"
-            for line in _help[1:]:
+            _wraps = textwrap.wrap(_help, msg_max_width)
+            help_msg = _wraps[0] + "\n"
+            for line in _wraps[1:]:
                 help_msg += "%*s%s\n" % (help_position, "", line)
         else:
             help_msg = ""

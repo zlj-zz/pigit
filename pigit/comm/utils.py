@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, ByteString, Union
-import sys, subprocess, asyncio
+from typing import Iterable, Tuple, Dict
+import sys
 from math import sqrt
 from collections import Counter
 
@@ -27,43 +27,6 @@ def traceback_info(extra_msg: str = "null") -> str:
     return (
         f"File {filename}, line {lineno}, {err_value}:{exc_value}, remark:[{extra_msg}]"
     )
-
-
-async def async_run_cmd(
-    *args, cwd: Optional[str] = None, msg: Optional[str] = None, output: bool = True
-):
-    # receive (program, *args, ...), so must split the full cmd,
-    # and unpack incoming.
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        start_new_session=True,
-        cwd=cwd,
-    )
-    res, err = await proc.communicate()
-
-    if output:
-        msg and print(msg)
-        res and print(res.decode())
-        err and print(err.decode())
-
-    if proc.returncode != 0:
-        return proc.returncode, args, cwd
-    else:
-        return proc.returncode, err.decode(), res.decode()
-
-
-def exec_async_tasks(tasks: List[Callable]) -> List[str]:
-    """Execute tasks asynchronously."""
-
-    # The loop argument is deprecated since Python 3.8
-    # and scheduled for removal in Python 3.10
-    async def main():
-        L = await asyncio.gather(*tasks)
-        return L
-
-    return asyncio.run(main())
 
 
 def confirm(text: str = "", default: bool = True) -> bool:
@@ -183,7 +146,7 @@ SUFFIX_TYPE: Dict[str, str] = {
     "msg": "ROS Message",
     "php": "PHP",
     "plist": "XML",
-    "properties": "Propertie",
+    "properties": "Properties",
     "py": "Python",
     "r": "R",
     "rb": "Ruby",
@@ -230,13 +193,21 @@ def adjudgment_type(file: str, original: bool = False) -> str:
 
     Returns:
         (str): file type.
+
+    Docs test
+        >>> adjudgment_type('py')
+        'Python'
+        >>> adjudgment_type('xx')
+        'unknown'
+        >>> adjudgment_type('xx', True)
+        'xx'
     """
 
-    if pre_type := SPECIAL_NAMES.get(file.lower(), None):
+    if pre_type := SPECIAL_NAMES.get(file.lower()):
         return pre_type
 
     suffix = file.split(".")[-1]
-    if suffix_type := SUFFIX_TYPE.get(suffix.lower(), None):
+    if suffix_type := SUFFIX_TYPE.get(suffix.lower()):
         return suffix_type
     else:
         return suffix if original else "unknown"
@@ -259,7 +230,7 @@ FILE_ICONS: Dict[str, str] = {
     "Kotlin": "",
     "Markdown": "",
     "PHP": "",
-    "Propertie": "",
+    "Properties": "",
     "Python": "",
     "R": "ﳒ",
     "React": "",
@@ -287,6 +258,12 @@ def get_file_icon(file_type: str) -> str:
 
     Returns:
         str: icon.
+
+    Docs test
+        >>> get_file_icon('Python')
+        ''
+        >>> get_file_icon('xx')
+        ''
     """
 
     #     

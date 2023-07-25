@@ -2,7 +2,7 @@
 
 _pigit_completion(){
   if [[ "${COMP_CWORD}" == "1" ]];then
-      COMP_WORD="pt Ct Rm cF -h open clear wx --create-config fb wR lv --dry-run --help Ce wC ws --types iD fC mS f --version --information -p RS pa email fetch push m bd pc t wr Sd -v fc --complete fm Ru SD --reverse s ls add c R ir pA iX fu Si wX bc --issue b mv --report ld rename cm --config id Rs wD savepd mt Su cA -t --print cR mC sl CT lr --show-part-command sd wM sD iA cd pF --shell ca Cl bl co iu repo ia --path Rl tx wm l Rp cr pp bm pf cf ma ll --commit Ra p ue cs bS -s cO Co mF --show-commands wS wc cmd --simple user sp -r wd -i bL Ca l1 rm --create-ignore bM bs --count -f lc Rx iR Sc pull ta CO fr ix -c"
+      COMP_WORD="wd RS --show-commands wm -r CT l --commit f --version wM wC cf ls fr Cl Rs wS ia pp CO fu repo bs id iD m --help ws --report mS sp sd sl Rl cr wr ca clear co --print --path fm --types R mt fb Ru --information --count cF pc --simple -c wD -t ll tx Ce ir bL open wR push Ra b --reverse cs iA --create-config --show-part-command fetch pull --create-ignore Sd Sc cA Rp pa pA -v mv ix rename Si c pF Co --dry-run lv Rx -p bc --shell -h t l1 wc lr pf Ca bd mC iR ma -f user cmd s wx wX bM cO fC mF iu -i cm email Rm Su ue --complete ta cR fc lc p --issue ld bS savepd bl rm sD add SD Ct pt --config bm -s iX cd"
       COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
 }

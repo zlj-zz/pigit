@@ -1,4 +1,5 @@
 from typing import (
+    Any,
     Callable,
     Coroutine,
     Optional,
@@ -103,10 +104,10 @@ class Executor:
 
         return exec_flag
 
-    def __call__(self, cmd: Union[str, List, Tuple], flags: int = 0, **kws) -> Tuple:
-        return self.exec(cmd, flags, **kws)
+    def __call__(self, cmd: Union[str, List, Tuple], *, flags: int = 0, **kws) -> Tuple:
+        return self.exec(cmd, flags=flags, **kws)
 
-    def exec(self, cmd: Union[str, List, Tuple], flags: int = 0, **kws) -> Tuple:
+    def exec(self, cmd: Union[str, List, Tuple], *, flags: int = 0, **kws) -> Tuple:
         """exec command with sync.
         Modify `kws` according to the options of `flags`, and `kws`
         will be transparently transmitted to ~Popen. In the same
@@ -161,15 +162,31 @@ class Executor:
 
                 return _code, _err, _out
 
-    def exec_async(self, *cmds, flags: int = 0, **kws) -> List[Tuple]:
+    def exec_async(
+        self,
+        *cmds,
+        orders: Optional[List[Dict[str, Any]]] = None,
+        flags: int = 0,
+        **kws,
+    ) -> List[Tuple]:
         """exec multi cmds with async.
 
         Args:
+            orders (Optional[List[Dict[str, Any]]]): special `kws` of each
+                cmd, corresponding through subscripts. If repeated, it will
+                be overwritten `kws`.
             flags (int, optional): exec flags. Defaults to 0.
 
         Returns:
-            Any: _description_
+            List[Tuple]: result list.
         """
+
+        popen_orders = []
+        if orders is not None:
+            popen_orders = copy.deepcopy(orders)
+        # len of order not enough, will completion.
+        if len(popen_orders) < len(cmds):
+            popen_orders.extend([{}] * (len(cmds) - len(popen_orders)))
 
         popen_kws = copy.deepcopy(kws)
 
@@ -209,10 +226,12 @@ class Executor:
 
         # Generate tasks and run
         tasks: List[Coroutine] = []
-        for cmd in cmds:
+        for i, cmd in enumerate(cmds):
+            cur_kws = {**popen_kws, **popen_orders[i]}
+
             if isinstance(cmd, str):
-                tasks.append(_async_cmd(*cmd.split(), **popen_kws))
+                tasks.append(_async_cmd(*cmd.split(), **cur_kws))
             else:
-                tasks.append(_async_cmd(*cmd, **popen_kws))
+                tasks.append(_async_cmd(*cmd, **cur_kws))
 
         return asyncio.run(_async_tasks(tasks))

@@ -20,7 +20,7 @@ class ShellCompletion:
     def __init__(
         self,
         prog_name: Optional[str] = None,
-        complete_vars: Dict = None,
+        complete_vars: Optional[Dict] = None,
         script_dir: Optional[str] = None,
         script_name: Optional[str] = None,
     ) -> None:
