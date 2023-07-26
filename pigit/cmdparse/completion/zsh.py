@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, List
 import textwrap
+from typing import Dict, List
 
 from .base import ShellCompletion
 

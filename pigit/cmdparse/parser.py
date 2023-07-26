@@ -1,5 +1,13 @@
 # -*- coding:utf-8 -*-
 
+from argparse import (
+    ArgumentParser,
+    HelpFormatter,
+    Namespace,
+    _SubParsersAction,
+)
+from functools import wraps
+from shutil import get_terminal_size
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -11,24 +19,28 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
+    TypedDict,
     Union,
     overload,
 )
-from argparse import (
-    Namespace,
-    ArgumentParser,
-    HelpFormatter,
-    _SubParsersAction,
-)
-from functools import wraps
-from shutil import get_terminal_size
-from plenty.style import Style
 
+from plenty.style import Style
 
 if TYPE_CHECKING:
     from argparse import Action, FileType, _ArgumentGroup
 
-FormatterStyle = Union[Style, str, None]
+
+class ParserOptions(TypedDict, total=False):
+    title: Optional[str]
+    description: Optional[str]
+    parser_class: Optional["Parser"]
+    action: Optional["Action"]
+    option_string: Optional[str]
+    dest: Optional[str]
+    required: bool
+    help: Optional[str]
+    metavar: Optional[str]
 
 
 class ColorHelpFormatter(HelpFormatter):
@@ -37,10 +49,10 @@ class ColorHelpFormatter(HelpFormatter):
     to complete customization.
     """
 
-    usage_style: FormatterStyle = "bold"
-    text_style: FormatterStyle = "i sky_blue"
-    command_style: FormatterStyle = "ok"
-    help_style: FormatterStyle = "i yellow"
+    usage_style: str = "bold"
+    text_style: str = "i sky_blue"
+    command_style: str = "ok"
+    help_style: str = "i yellow"
 
     def __init__(
         self,
@@ -61,7 +73,7 @@ class ColorHelpFormatter(HelpFormatter):
         self,
         usage: str,
         actions: Iterable["Action"],
-        groups: Iterable["_ArgumentGroup"],
+        groups: Iterable,
         prefix: Optional[str],
     ) -> str:
         return Style.parse(self.usage_style).render(
@@ -82,6 +94,7 @@ class ColorHelpFormatter(HelpFormatter):
         if not action.help:
             tup = self._current_indent, "", action_header
             action_header = "%*s%s\n" % tup
+            indent_first = 0
 
         # short action name; start on the same line and pad two spaces
         elif len(action_header) <= action_width:
@@ -116,8 +129,8 @@ class ColorHelpFormatter(HelpFormatter):
 
         # if there are any sub-actions, add their help as well
         parts.extend(
-            self._format_action(subaction)
-            for subaction in self._iter_indented_subactions(action)
+            self._format_action(sub_action)
+            for sub_action in self._iter_indented_subactions(action)
         )
 
         # return a single string
@@ -135,8 +148,8 @@ class Parser(ArgumentParser):
         usage: Optional[str] = None,
         description: Optional[str] = None,
         epilog: Optional[str] = None,
-        parents: Sequence[ArgumentParser] = None,
-        formatter_class: Sequence[HelpFormatter] = ColorHelpFormatter,
+        parents: Optional[Sequence[ArgumentParser]] = None,
+        formatter_class: Type[HelpFormatter] = ColorHelpFormatter,
         prefix_chars: str = "-",
         fromfile_prefix_chars: Optional[str] = None,
         argument_default: Any = None,
@@ -169,8 +182,10 @@ class Parser(ArgumentParser):
     # ================================
     # overload ~ArgumentParser method
     # ================================
-    def add_subparsers(self, **kwargs):
-        self.subparsers_action = super().add_subparsers(**kwargs)
+    def add_subparsers(self, **kwargs) -> "_SubParsersAction":
+        # cannot have multiple subparser arguments
+        if self.subparsers_action is None:
+            self.subparsers_action = super().add_subparsers(**kwargs)
         return self.subparsers_action
 
     # ============
@@ -213,7 +228,7 @@ class Parser(ArgumentParser):
             handle.add_argument(*names, **args)
 
         def parse_args(handle: "Parser", args: Dict) -> None:
-            sub_parsers: Optional["Parser"] = None
+            sub_parsers: Optional["_SubParsersAction"] = None
 
             for name, prop in args.items():
                 # Get command type.
@@ -242,13 +257,11 @@ class Parser(ArgumentParser):
 
                     sub_args: Dict = prop.pop("args", None)
 
-                    sub_handle: Sequence["Parser"] = sub_parsers.add_parser(
-                        name, **prop
-                    )
+                    sub_handle: "Parser" = sub_parsers.add_parser(name, **prop)
 
                     # If `set_defaults` in args, special treatment is required.
-                    set_defaults: Dict = sub_args.get("set_defaults", None)
-                    if set_defaults:
+                    set_defaults = sub_args.get("set_defaults")
+                    if set_defaults is not None:
                         del sub_args["set_defaults"]
                         sub_handle.set_defaults(**set_defaults)
 
@@ -287,7 +300,7 @@ class Parser(ArgumentParser):
             "help",
         ]
 
-        def _process(parser: Sequence["Parser"], target_dict: Dict) -> Dict:
+        def _process(parser: "Parser", target_dict: Dict) -> Dict:
             # Set parser parameters.
             for name in cmd_names:
                 target_dict[name] = getattr(parser, name, None)
@@ -331,6 +344,7 @@ class Parser(ArgumentParser):
     def sub_parser(
         self,
         prog: str,
+        *,
         title: Optional[str] = None,
         description: Optional[str] = None,
         parser_class: Optional["Parser"] = None,
@@ -340,10 +354,14 @@ class Parser(ArgumentParser):
         required: bool = False,
         help: Optional[str] = None,
         metavar: Optional[str] = None,
-    ) -> "Parser":
+    ) -> Callable[..., "Parser"]:
         ...
 
-    def sub_parser(self, prog: str, **kwargs) -> "Parser":
+    @overload
+    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]:
+        ...
+
+    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]:
         """Create a new ~Parser of subparser and use the decorator use callback.
         This will also automatically attach all decorated :func:`argument` as
         parameters to the parser.
@@ -363,9 +381,6 @@ class Parser(ArgumentParser):
                 f"The name of sub_parser must be str, but given a {type(prog).__name__}."
             ) from None
 
-        if self.subparsers_action is None:
-            self.add_subparsers()
-
         def decorator(fn: Callable[..., Any]) -> "Parser":
             nonlocal kwargs
             attr_params = kwargs.pop("params", None)
@@ -382,7 +397,8 @@ class Parser(ArgumentParser):
             if "description" not in kwargs:
                 kwargs["description"] = fn.__doc__
 
-            parser = self.subparsers_action.add_parser(prog, **kwargs)
+            parser = self.add_subparsers().add_parser(prog, **kwargs)
+
             for args, kwargs in params:
                 parser.add_argument(*args, **kwargs)
 
@@ -398,13 +414,14 @@ class Parser(ArgumentParser):
 # ====================================
 @overload
 def command(
-    prog: Union[str, Callable, None] = None,
-    cls: Sequence[Parser] = None,
+    prog: Optional[str] = None,
+    cls: Optional[Type[Parser]] = None,
+    *,
     usage: Optional[str] = None,
     description: Optional[str] = None,
     epilog: Optional[str] = None,
-    parents: Sequence[Parser] = None,
-    formatter_class: HelpFormatter = HelpFormatter,
+    parents: Optional[Sequence[Parser]] = None,
+    formatter_class: Type[HelpFormatter] = HelpFormatter,
     prefix_chars: str = "-",
     fromfile_prefix_chars: Optional[str] = None,
     argument_default: Any = None,
@@ -413,13 +430,24 @@ def command(
     allow_abbrev: bool = True,
     exit_on_error: bool = True,
     callback: Optional[Callable] = None,
-) -> Parser:
+) -> Callable[..., Parser]:
+    ...
+
+
+@overload
+def command(
+    prog: Optional[str] = None,
+    cls: Optional[Type[Parser]] = None,
+    **attrs,
+) -> Callable[..., Parser]:
     ...
 
 
 def command(
-    prog: Union[str, Callable, None] = None, cls: Sequence[Parser] = None, **attrs
-) -> Parser:
+    prog: Optional[str] = None,
+    cls: Optional[Type[Parser]] = None,
+    **attrs,
+) -> Callable[..., Parser]:
     """Creates a new ~Parser and uses the decorated function as callback.
     This will also automatically attach all decorated :func:`argument` as
     parameters to the parser.
@@ -437,7 +465,6 @@ def command(
         fn = prog
         prog = None
 
-    @wraps(fn)
     def decorator(fn: Callable[..., Any]) -> Parser:
         kwargs = attrs
         attr_params = kwargs.pop("params", None)
@@ -478,6 +505,7 @@ def _param_memo(fn: Callable[..., Any], params) -> None:
 @overload
 def argument(
     name: str,
+    *,
     action: Union[
         Literal[
             "store",
@@ -508,6 +536,11 @@ def argument(
     version: Optional[str] = None,
     **kwargs: Any,
 ) -> Callable:
+    ...
+
+
+@overload
+def argument(name: str, **kwargs) -> Callable:
     ...
 
 

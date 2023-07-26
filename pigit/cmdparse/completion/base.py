@@ -1,8 +1,8 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, Optional, Tuple
 import os
 import re
+from typing import Dict, Optional, Tuple
 
 
 class ShellCompletionError(Exception):

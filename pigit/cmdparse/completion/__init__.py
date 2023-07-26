@@ -1,13 +1,14 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Type
 
+from .base import ShellCompletion
 from .bash import BashCompletion
 from .zsh import ZshCompletion
 from .fish import FishCompletion
 
 
-supported_shell: Dict = {
+_Supported_Shell: Dict[str, Type[ShellCompletion]] = {
     "bash": BashCompletion,
     "zsh": ZshCompletion,
     "fish": FishCompletion,
@@ -34,7 +35,7 @@ def shell_complete(
     # check shell effectiveness
     shell = (
         get_shell()
-        if shell is None or shell not in supported_shell
+        if shell is None or shell not in _Supported_Shell
         else shell.lower().strip()
     )
 
@@ -43,12 +44,12 @@ def shell_complete(
         print("")
         return
 
-    if shell not in supported_shell:
+    if shell not in _Supported_Shell:
         # not support shell
         print("")
         return
 
-    complete_handle = supported_shell[shell](
+    complete_handle = _Supported_Shell[shell](
         prog, complete_vars, script_dir, script_name
     )
 

@@ -144,7 +144,7 @@ class Config(metaclass=Singleton):
         if auto_load:
             self.load_config()
 
-    def output_warnings(self) -> None:
+    def output_warnings(self) -> "Config":
         """Output config warning info and return self object.
 
         Returns:
