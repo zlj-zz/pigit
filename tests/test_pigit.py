@@ -12,7 +12,6 @@ from pigit.entry import pigit
         "--config",  # git config
         "--information",  # git information
         "--count",  # code counter
-        "--create-config",
         "cmd",
         "cmd -s",
         "cmd -t",

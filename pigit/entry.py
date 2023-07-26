@@ -1,49 +1,43 @@
 # -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
 
-from typing import Dict, List, TYPE_CHECKING
 import os
 import textwrap
-import logging
+from typing import TYPE_CHECKING, Dict, List
 
 from plenty import get_console
 
+from .config import Config
 from .const import (
-    VERSION,
-    REPOS_PATH,
-    PIGIT_HOME,
-    LOG_FILE_PATH,
-    EXTRA_CMD_MODULE_NAME,
-    EXTRA_CMD_MODULE_PATH,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
+    EXTRA_CMD_MODULE_NAME,
+    EXTRA_CMD_MODULE_PATH,
     IS_FIRST_RUN,
+    LOG_FILE_PATH,
+    PIGIT_HOME,
+    REPOS_PATH,
+    VERSION,
 )
-from .log import setup_logging
-from .config import Config
-from .cmdparse.parser import command, argument
-from .comm.utils import confirm
+from .cmdparse.parser import argument, command
 from .comm.func import dynamic_default_attrs, time_it
-from .git import SCmd, GIT_CMDS, get_extra_cmds, Repo, create_gitignore
-from .info import introduce, GitConfig
+from .comm.utils import confirm
+from .git import GIT_CMDS, SCmd, Repo, create_gitignore, get_extra_cmds
+from .log import setup_logging
+from .info import GitConfig, introduce
 
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
 
 
-Logger = logging.getLogger(__name__)
-
-
 # ===============
 # Configuration.
 # ===============
-CONFIG = Config(
-    path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
-).output_warnings()
+Conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
 
 setup_logging(
-    debug=CONFIG.debug_open,
-    log_file=None if CONFIG.log_output else LOG_FILE_PATH,
+    debug=Conf.log_debug,
+    log_file=None if Conf.log_output else LOG_FILE_PATH,
 )
 
 
@@ -67,13 +61,14 @@ def pigit(args: 'Namespace', _) -> None:
         console.echo(introduce())
 
     elif args.create_config:
-        return CONFIG.create_config_template()
+        Conf.create_config_template()
+        return
 
     elif args.config:
-        console.echo(GitConfig(format_type=CONFIG.git_config_format).generate())
+        console.echo(GitConfig(format_type=Conf.git_config_format).generate())
 
     elif args.information:
-        console.echo(repo_handler.get_repo_desc(include_part=CONFIG.repo_info_include))
+        console.echo(repo_handler.get_repo_desc(include_part=Conf.repo_info_include))
 
     elif args.complete:
         # Generate completion vars dict.
@@ -97,12 +92,12 @@ def pigit(args: 'Namespace', _) -> None:
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
         CodeCounter(
             count_path=path,
-            use_ignore=CONFIG.counter_use_gitignore,
+            use_ignore=Conf.counter_use_gitignore,
             result_saved_path=COUNTER_DIR_PATH,
-            format_type=CONFIG.counter_format,
-            use_icon=CONFIG.counter_show_icon,
+            format_type=Conf.counter_format,
+            use_icon=Conf.counter_show_icon,
         ).run(
-            show_invalid=CONFIG.counter_show_invalid,
+            show_invalid=Conf.counter_show_invalid,
         )
         return None
 
@@ -116,7 +111,7 @@ def pigit(args: 'Namespace', _) -> None:
             if not confirm("Input `enter` to continue:"):
                 return
 
-        tui_main(CONFIG)
+        tui_main(Conf)
 
 
 pigit.add_argument("-v", "--version", action="version", help="Show version and exit.", version=f"Version:{VERSION}")
@@ -150,7 +145,7 @@ def _(args: 'Namespace', unknown: List):
 
     # If you want to manipulate the current folder with git,
     # try adding it to repos automatically.
-    if CONFIG.repo_auto_append:
+    if Conf.repo_auto_append:
         repo_path, repo_conf = repo_handler.confirm_repo()
         repo_handler.add_repos([repo_path])
 
@@ -166,8 +161,8 @@ def _(args: 'Namespace', unknown: List):
 
     git_processor = SCmd(
         extra_cmds=extra_cmd,
-        prompt=CONFIG.cmd_recommend,
-        display=CONFIG.cmd_show_original,
+        prompt=Conf.cmd_recommend,
+        display=Conf.cmd_display,
     )
 
     if args.shell:
