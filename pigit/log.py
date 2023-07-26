@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
-from typing import Optional
 import os
 import logging
 import logging.handlers
+from typing import Dict, Optional
 
 
 FMT_NORMAL = logging.Formatter(
@@ -46,3 +46,20 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
 
     root_logger.addHandler(log_handle)
     root_logger.setLevel(0)
+
+
+# cache logger, avoid creating loggers with the same name repeatedly.
+_logger_cache: Dict[str, "logging.Logger"] = {}
+
+
+def logger(name: Optional[str] = None) -> "logging.Logger":
+    # not cache no name logger
+    if name is None:
+        return logging.getLogger()
+
+    cache_logger = _logger_cache.get(name)
+    if cache_logger is not None:
+        return cache_logger
+
+    new_logger = _logger_cache[name] = logging.getLogger(name)
+    return new_logger
