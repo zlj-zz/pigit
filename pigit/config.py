@@ -147,11 +147,11 @@ class Config(metaclass=Singleton):
         """
 
         if self._warnings:
-            print("::Config Warning Info::")
-            print("=" * 30)
+            print("#", "::Config Warning Info::")
+            print("#", "=" * 30)
             for warning in self._warnings:
-                print(warning)
-            print("=" * 30)
+                print("#", warning)
+            print("#", "=" * 30)
             self._warnings = []
 
         return self
