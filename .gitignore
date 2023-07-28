@@ -23,13 +23,14 @@ htmlcov/
 
 
 tests/test_repo
+tests/ignore_test
+tests/pigit.conf
+
 
 test.py
 calc.py
 trans.txt
 
-
-tests/ignore_test
 
 debug.log
 xxx_bash_comp
