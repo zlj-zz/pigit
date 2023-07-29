@@ -1,4 +1,4 @@
-from pigit.comm.executor import Executor, REPLY, DECODE
+from pigit.ext.executor import Executor, REPLY, DECODE
 
 from .ignore import get_ignore_source, create_gitignore
 from .cmd import get_extra_cmds, SCmd, CommandType, GIT_CMDS

@@ -1,12 +1,11 @@
 # -*- coding:utf-8 -*-
 
-from pprint import pprint
-import pytest
 import time
 import textwrap
 from unittest.mock import patch
+from pprint import pprint
 
-from pigit.comm.executor import (
+from pigit.ext.executor import (
     DECODE,
     REDIRECT,
     REPLY,

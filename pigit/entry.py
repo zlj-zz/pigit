@@ -21,11 +21,11 @@ from .const import (
     VERSION,
 )
 from .cmdparse.parser import argument, command
-from .comm.func import dynamic_default_attrs, time_it
-from .comm.utils import confirm, get_file_icon
+from .ext.func import dynamic_default_attrs, time_it
+from .ext.utils import confirm, get_file_icon
 from .git import GIT_CMDS, SCmd, Repo, create_gitignore, get_extra_cmds
-from .lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .log import setup_logging
+from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
+from .ext.log import setup_logging
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:

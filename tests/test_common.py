@@ -4,14 +4,14 @@ import doctest
 from unittest.mock import patch
 from pprint import pprint
 
-from pigit.comm.utils import traceback_info, confirm
-from pigit.comm.func import dynamic_default_attrs
+from pigit.ext.utils import traceback_info, confirm
+from pigit.ext.func import dynamic_default_attrs
 
 
 def test_doctest():
-    import pigit.comm.utils
+    import pigit.ext.utils
 
-    doctest.testmod(pigit.comm.utils, verbose=True)
+    doctest.testmod(pigit.ext.utils, verbose=True)
 
 
 def test_traceback_info():

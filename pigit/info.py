@@ -1,6 +1,6 @@
 import os
 import textwrap
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Union
 
 from plenty import box
 from plenty.table import UintTable

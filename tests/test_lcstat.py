@@ -3,7 +3,7 @@ import os
 import time
 import pytest
 
-from pigit.lcstat import Counter
+from pigit.ext.lcstat import Counter
 
 
 @pytest.mark.parametrize(

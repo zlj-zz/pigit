@@ -6,9 +6,9 @@ import textwrap
 from distutils.util import strtobool
 from typing import Any, List, Literal, Dict
 
-from .comm.singleton import Singleton
-from .comm.utils import confirm, traceback_info
-from .log import logger
+from .ext.log import logger
+from .ext.singleton import Singleton
+from .ext.utils import confirm, traceback_info
 
 
 CONF_ERROR = "==error=="

@@ -1,17 +1,15 @@
 # -*- coding:utf-8 -*-
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import os
 import re
 import random
 import textwrap
-import logging
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from pigit.comm.utils import confirm, similar_command, traceback_info
-from pigit.comm.executor import Executor, WAITING
+from pigit.ext.log import logger
+from pigit.ext.utils import confirm, similar_command, traceback_info
+from pigit.ext.executor import Executor, WAITING
 from ._cmds import GIT_CMDS, CommandType
-
-Log = logging.getLogger(__name__)
 
 
 def get_extra_cmds(name: str, path: str) -> Dict:
@@ -39,12 +37,12 @@ def get_extra_cmds(name: str, path: str) -> Dict:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
         except Exception:
-            Log.error(traceback_info(f"Can't load file '{path}'."))
+            logger(__name__).error(traceback_info(f"Can't load file '{path}'."))
         else:
             try:
                 extra_cmds = module.extra_cmds  # type: ignore
             except AttributeError:
-                Log.error("Can't found dict name is 'extra_cmds'.")
+                logger(__name__).error("Can't found dict name is 'extra_cmds'.")
 
     return extra_cmds
 

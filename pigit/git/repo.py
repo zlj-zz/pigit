@@ -11,9 +11,9 @@ from pathlib import Path
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
-from pigit.comm.utils import adjudgment_type, get_file_icon
-from pigit.comm.executor import WAITING, REPLY, DECODE, Executor
-from pigit.log import logger
+from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
+from pigit.ext.log import logger
+from pigit.ext.utils import adjudgment_type, get_file_icon
 from .model import File, Commit, Branch
 
 

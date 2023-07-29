@@ -8,8 +8,8 @@ from plenty.str_utils import get_width
 from plenty.style import Style
 
 from .console import Term
-from ..comm.utils import confirm
-from ..comm.executor import Executor
+from ..ext.utils import confirm
+from ..ext.executor import Executor
 
 
 class Widget(ABC):

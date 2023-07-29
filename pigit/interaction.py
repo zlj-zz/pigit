@@ -1,14 +1,14 @@
 # -*- coding:utf-8 -*-
-from typing import TYPE_CHECKING, List, Optional, Any
 import os
-import logging
 from time import sleep
+from typing import TYPE_CHECKING, List, Optional, Any
 
 from plenty import get_console
 from plenty.style import Style
 
 from .const import IS_WIN
 from .git.repo import Repo
+from .ext.log import logger
 from .tui.event_loop import EventLoop, ExitEventLoop
 from .tui.screen import Screen
 from .tui.widgets import SwitchWidget, RowPanelWidget, CmdRunner, ConfirmWidget
@@ -18,10 +18,8 @@ if TYPE_CHECKING:
     from .config import Config
 
 
-Logger = logging.getLogger(__name__)
-
 # git option handler
-git = Repo()
+repo_handle = Repo()
 console = get_console()
 
 GREEN = "#98FB98"
@@ -32,7 +30,7 @@ YELLOW = "#F0E68C"
 
 class BranchPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Branch"]:
-        return git.load_branches()
+        return repo_handle.load_branches()
 
     def process_raw_data(self, raw_data: List["Branch"]) -> List[str]:
         processed_branches = []
@@ -53,7 +51,7 @@ class BranchPanel(RowPanelWidget):
     def keyevent_help(self) -> str:
         return "space: switch current branch.\n"
 
-    def process_keyevent(self, input_key: str, cursor_row: int) -> bool:
+    def process_keyevent(self, input_key: str, cursor_row: int) -> Optional[int]:
         if input_key == "q":
             raise ExitEventLoop
         elif input_key == " ":
@@ -61,7 +59,7 @@ class BranchPanel(RowPanelWidget):
             if local_branch.is_head:
                 return
 
-            err = git.checkout_branch(local_branch.name)
+            err = repo_handle.checkout_branch(local_branch.name)
             if "error" in err:
                 print(Style(color=RED).render(err), sep="")
                 sleep(2)
@@ -69,10 +67,10 @@ class BranchPanel(RowPanelWidget):
 
 
 class StatusPanel(RowPanelWidget):
-    repo_path, repo_conf = git.confirm_repo()
+    repo_path, repo_conf = repo_handle.confirm_repo()
 
     def get_raw_data(self) -> List["File"]:
-        return git.load_status(self.size[0], icon=self._ex_files_icon)
+        return repo_handle.load_status(self.size[0], icon=self._ex_files_icon)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         return (
@@ -102,15 +100,19 @@ class StatusPanel(RowPanelWidget):
 
     def process_keyevent(self, input_key: str, cursor_row: int) -> Optional[int]:
         if input_key in {"a", " "}:
-            git.switch_file_status(self.raw_data[cursor_row - 1], path=self.repo_path)
+            repo_handle.switch_file_status(
+                self.raw_data[cursor_row - 1], path=self.repo_path
+            )
             self.emit("update")
         elif input_key == "d":
             if ConfirmWidget("discard all changed? [y/n]:").run():
-                git.discard_file(self.raw_data[cursor_row - 1], path=self.repo_path)
+                repo_handle.discard_file(
+                    self.raw_data[cursor_row - 1], path=self.repo_path
+                )
             self.emit("update")
             return cursor_row - 1
         elif input_key == "i":
-            git.ignore_file(self.raw_data[cursor_row - 1])
+            repo_handle.ignore_file(self.raw_data[cursor_row - 1])
             self.emit("update")
         elif input_key == "e":
             # editor = os.environ.get("EDITOR", None)
@@ -140,7 +142,7 @@ class FilePanel(RowPanelWidget):
             self._repo_path = path
 
     def get_raw_data(self) -> List[Any]:
-        return git.load_file_diff(
+        return repo_handle.load_file_diff(
             self._file.name,
             self._file.tracked,
             self._file.has_staged_change,
@@ -160,8 +162,8 @@ class FilePanel(RowPanelWidget):
 
 class CommitPanel(RowPanelWidget):
     def get_raw_data(self) -> List["Commit"]:
-        branch_name = git.get_head()
-        return git.load_commits(branch_name)
+        branch_name = repo_handle.get_head()
+        return repo_handle.load_commits(branch_name)
 
     def process_raw_data(self, raw_data: List[Any]) -> List[str]:
         color_data = []
@@ -200,7 +202,7 @@ class CommitStatusPanel(RowPanelWidget):
             self._commit = commit
 
     def get_raw_data(self) -> List[Any]:
-        return git.load_commit_info(self._commit.sha).split("\n")
+        return repo_handle.load_commit_info(self._commit.sha).split("\n")
 
     def print_line(self, line: str, is_cursor_row: bool) -> None:
         if is_cursor_row:
@@ -229,7 +231,7 @@ def tui_main(config: Optional["Config"] = None, index=None):
         console.echo("`Terminal interaction not support windows now.`<#FF0000>")
         return
 
-    if not git.confirm_repo()[0]:
+    if not repo_handle.confirm_repo()[0]:
         console.echo("`Please run in a git repo dir.`<tomato>")
         return
 

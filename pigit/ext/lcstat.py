@@ -8,8 +8,8 @@ import threading
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
-from pigit.comm.utils import adjudgment_type, confirm
-from pigit.log import logger
+from .log import logger
+from .utils import adjudgment_type, confirm
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
