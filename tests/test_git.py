@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from .conftest import TEST_PATH
 
-from pigit.comm.executor import Executor, WAITING
+from pigit.comm.executor import WAITING, Executor
 from pigit.git import git_version
 from pigit.git.repo import Repo
 
@@ -88,8 +88,9 @@ class TestRepo:
 
         print()
         print(git.get_repo_desc())
+        print(git.get_config())
 
-    def test1(self):
+    def test_api(self):
         git = self.git
         print(git.load_branches())
         print(git.load_log())

@@ -24,9 +24,9 @@ from .cmdparse.parser import argument, command
 from .comm.func import dynamic_default_attrs, time_it
 from .comm.utils import confirm, get_file_icon
 from .git import GIT_CMDS, SCmd, Repo, create_gitignore, get_extra_cmds
-from .log import setup_logging
 from .lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .info import GitConfig, introduce
+from .log import setup_logging
+from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
@@ -78,7 +78,7 @@ def pigit(args: "Namespace", _) -> None:
         return
 
     elif args.config:
-        console.echo(GitConfig(format_type=Conf.git_config_format).generate())
+        console.echo(show_gitconfig(format_type=Conf.git_config_format))
 
     elif args.information:
         console.echo(repo_handler.get_repo_desc(include_part=Conf.repo_info_include))

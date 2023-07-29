@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pigit.comm.executor import Executor, REPLY, DECODE
 
 from .ignore import get_ignore_source, create_gitignore

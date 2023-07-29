@@ -1,36 +1,38 @@
-from typing import Dict, Literal, Optional, Tuple
 import os
-import re
+import textwrap
+from typing import List, Literal, Optional, Tuple, Union
 
-from plenty.table import UintTable
 from plenty import box
+from plenty.table import UintTable
+from plenty.style import Style
 
-from .const import __version__, __url__
-from .git import git_version
-from .git.repo import Repo
+from .const import __url__, __version__
+from .git import Repo, git_version
 
 
 def introduce() -> str:
     """Print the description information."""
 
     # Print version.
-    introduce_str = """\
-` ____ ___ ____ ___ _____
-|  _ \\_ _/ ___|_ _|_   _|
-| |_) | | |  _ | |  | |
-|  __/| | |_| || |  | |
-|_|  |___\\____|___| |_|`<pink> version: {version}
+    introduce_str = textwrap.dedent(
+        """\
+        ` ____ ___ ____ ___ _____
+        |  _ \\_ _/ ___|_ _|_   _|
+        | |_) | | |  _ | |  | |
+        |  __/| | |_| || |  | |
+        |_|  |___\\____|___| |_|`<pink> version: {version}
 
-{git_version}
+        {git_version}
 
-b`Local path`: u`{local_path}`<sky_blue>
+        b`Local path`: u`{local_path}`<sky_blue>
 
-b`Description:`
-  Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
-  The open source path on github: u`{url}`<sky_blue>
+        b`Description:`
+        Terminal tool, help you use git more simple. Support Linux, MacOS and Windows.
+        The open source path on github: u`{url}`<sky_blue>
 
-You can use `-h`<ok> or `--help`<ok> to get help and usage.
-"""
+        You can use `-h`<ok> or `--help`<ok> to get help and usage.
+        """
+    )
 
     # Print git version.
     _git_version = git_version() or "`Don't found Git, maybe need install.`<error>"
@@ -43,64 +45,51 @@ You can use `-h`<ok> or `--help`<ok> to get help and usage.
     )
 
 
-# ============
-# Config info
-# ============
-FormatType = Literal["normal", "table"]
+def show_gitconfig(
+    path: Optional[str] = None,
+    format_type: Literal["normal", "table"] = "table",
+    color: bool = True,
+) -> Union[str, UintTable]:
+    """Return git config info with format.
 
+    Args:
+        path (Optional[str], optional): _description_. Defaults to None.
+        format_type (Literal[&quot;normal&quot;, &quot;table&quot;], optional): _description_. Defaults to "table".
+        color (bool, optional): _description_. Defaults to True.
 
-class GitConfig:
-    def __init__(
-        self,
-        repo_path: Optional[str] = None,
-        format_type: FormatType = "table",
-        color: bool = True,
-    ) -> None:
-        self.repo_path = repo_path or "."
-        self.format_type = format_type
-        self.color = color
+    """
+    repo_handle = Repo(path)
+    repo_path, _ = repo_handle.confirm_repo()
 
-    @property
-    def repo_info(self) -> Tuple[str, str]:
-        return Repo().confirm_repo(self.repo_path)
+    if not repo_path:
+        return (
+            "`This directory is not a git repository yet.`<error>"
+            if color
+            else "This directory is not a git repository yet."
+        )
 
-    def parse_git_config(self, config_context: str) -> Dict:
-        """Return a dict from parsing git local config.
+    config = repo_handle.get_config()
 
-        Args:
-            conf (str): git local config string.
+    if not config:
+        return (
+            "`Error reading configuration file.`<error>"
+            if color
+            else "Error reading configuration file."
+        )
 
-        Returns:
-            dict: git local config dict.
-        """
-        conf_list = re.split(r"\r\n|\r|\n", config_context)
-        config_dict: dict[str, dict[str, str]] = {}
-        config_type: str = ""
+    if format_type == "table":
+        style: List[Union[str, "Style"]] = ["", "pale_green" if color else ""]
 
-        for line in conf_list:
-            line = line.strip()
+        tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
+        for header, values in config.items():
+            tb.add_unit(header, header_style="bold", values=values, values_style=style)
 
-            if not line:
-                continue
+        return tb
 
-            elif line.startswith("["):
-                config_type = line[1:-1].strip()
-                config_dict[config_type] = {}
-
-            elif "=" in line:
-                key, value = line.split("=", 1)
-                config_dict[config_type][key.strip()] = value.strip()
-
-            else:
-                continue
-
-        return config_dict
-
-    def normal_config(self, config_dict: Dict[str, Dict]) -> str:
+    elif format_type == "normal":
         gen = []
-        color = self.color
 
-        for tit, kv in config_dict.items():
+        for tit, kv in config.items():
             gen.append(f"`[{tit}]`<tomato>" if color else f"[{tit}]")
             gen.extend(
                 f"\t`{k}`<sky_blue>=`{v}`<medium_violet_red>" if color else f"\t{k}={v}"
@@ -109,40 +98,5 @@ class GitConfig:
 
         return "\n".join(gen)
 
-    def table_config(self, config_dict: Dict[str, Dict]) -> str:
-        style = ["", "pale_green" if self.color else ""]
-        tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
-
-        for header, values in config_dict.items():
-            tb.add_unit(header, header_style="bold", values=values, values_style=style)
-
-        return tb
-
-    def generate(self) -> str:
-        repo_path, config_path = self.repo_info
-
-        if not repo_path:
-            return (
-                "`This directory is not a git repository yet.`<error>"
-                if self.color
-                else "This directory is not a git repository yet."
-            )
-
-        try:
-            with open(f"{config_path}/config", "r") as cf:
-                context = cf.read()
-        except Exception as e:
-            return (
-                f"`Error reading configuration file; {e}.`<error>"
-                if self.color
-                else f"Error reading configuration file; {e}."
-            )
-        else:
-            config_dict = self.parse_git_config(context)
-            ft = self.format_type
-
-            if ft == "table":
-                return self.table_config(config_dict)
-            else:
-                # Unrecognized types and normal are considered normal.
-                return self.normal_config(config_dict)
+    else:
+        return "Not support format style."

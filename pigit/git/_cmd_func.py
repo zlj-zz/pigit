@@ -16,7 +16,7 @@ Example:
 from typing import List, Tuple, Union
 import re
 
-from pigit.comm.executor import Executor, WAITING
+from pigit.comm.executor import WAITING, Executor
 
 
 def add(args: Union[List, Tuple]) -> str:

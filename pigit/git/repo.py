@@ -1,18 +1,19 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, List, Optional, Tuple, Union, Generator
-from collections import Counter
-from pathlib import Path
 import os
 import re
 import json
 import textwrap
+from typing import Dict, List, Optional, Tuple, Union, Generator
+from collections import Counter
+from pathlib import Path
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
 from pigit.comm.utils import adjudgment_type, get_file_icon
 from pigit.comm.executor import WAITING, REPLY, DECODE, Executor
+from pigit.log import logger
 from .model import File, Commit, Branch
 
 
@@ -24,10 +25,17 @@ class Repo:
     """Git option class."""
 
     def __init__(
-        self, op_path: Optional[str] = None, repo_json_path: Optional[str] = None
+        self, path: Optional[str] = None, repo_json_path: Optional[str] = None
     ) -> None:
+        """
+        Args:
+            path (Optional[str], optional): repo path. Defaults to None.
+            repo_json_path (Optional[str], optional): repos info json path.
+                Defaults to None.
+        """
         self.executor = Executor()
-        self.op_path = op_path
+
+        self.path = path
         self.repo_json_path = (
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
@@ -39,7 +47,7 @@ class Repo:
         self, *, op_path: Optional[str] = None, repo_info_path: Optional[str] = None
     ) -> "Repo":
         if op_path is not None:
-            self.op_path = op_path
+            self.path = op_path
         if repo_info_path is not None:
             self.repo_json_path = Path(repo_info_path)
 
@@ -55,11 +63,10 @@ class Repo:
         Get the current git repository path. If not, the path is empty.
         Get the local git config path. If not, the path is empty.
 
-        Return:
-                (tuple[str, str]): repository path, git config path.
+        Returns:
+            (tuple[str, str]): repository path, git config path.
         """
-
-        path = given_path or self.op_path or "."
+        path = given_path or self.path or "."
         path = os.path.abspath(path)
 
         repo_path: str = ""
@@ -90,10 +97,52 @@ class Repo:
 
         return repo_path, git_conf_path
 
+    def get_config(self, path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+        """Try to read git config and parse, return a config dict.
+
+        Args:
+            path (Optional[str], optional): repo path. Defaults to None.
+
+        Returns:
+            Dict[str, Dict[str, str]]: config dict.
+        """
+        path = path or self.path
+
+        _, config_path = self.confirm_repo(path)
+        try:
+            with open(f"{config_path}/config", "r") as cf:
+                context = cf.read()
+        except Exception as e:
+            logger(__name__).warning(f"Can not read config with: {e}")
+            return {}
+        else:
+            conf_dict: Dict[str, Dict[str, str]] = {}
+            conf_list = re.split(r"\r\n|\r|\n", context)
+            config_type: str = ""
+
+            for line in conf_list:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                elif line.startswith("["):
+                    config_type = line[1:-1].strip()
+                    conf_dict[config_type] = {}
+
+                elif "=" in line:
+                    key, value = line.split("=", 1)
+                    conf_dict[config_type][key.strip()] = value.strip()
+
+                else:
+                    continue
+
+            return conf_dict
+
     def get_head(self, path: Optional[str] = None) -> Optional[str]:
         """Get current repo head. Return a branch name or a commit sha string."""
+        path = path or self.path
 
-        path = path or self.op_path
         _, _, head = self.executor.exec(
             "git symbolic-ref -q --short HEAD || git describe --tags --exact-match",
             flags=REPLY | DECODE,
@@ -106,7 +155,7 @@ class Repo:
     def get_first_pushed_commit(
         self, path: Optional[str] = None, branch_name: Optional[str] = None
     ) -> str:
-        path = path or self.op_path
+        path = path or self.path
 
         if branch_name is None:
             if head := self.get_head(path):
@@ -125,8 +174,8 @@ class Repo:
         plain: bool = True,
     ) -> List[str]:
         """Get repo all branch."""
+        path = path or self.path
 
-        path = path or self.op_path
         include_all = "--all" if include_remote else ""
         color = "never" if plain else "always"
 
@@ -144,7 +193,7 @@ class Repo:
         """Get repo remote url."""
 
         # Get remote name, exit when error.
-        path = path or self.op_path
+        path = path or self.path
         _, _, res = self.executor.exec(
             "git remote show", flags=REPLY | DECODE, cwd=path
         )
@@ -155,8 +204,8 @@ class Repo:
         self, path: Optional[str] = None, remote_name: Optional[str] = None
     ) -> str:
         """Get repo remote url."""
+        path = path or self.path
 
-        path = path or self.op_path
         if remote_name is None:
             if remotes := self.get_remotes(path):
                 remote_name = remotes[0]
@@ -175,7 +224,7 @@ class Repo:
         return remote_url
 
     def get_summary(self, path: Optional[str] = None, plain: bool = True) -> str:
-        path = path or self.op_path
+        path = path or self.path
         color = "never" if plain else "always"
         _, _, summary = self.executor.exec(
             f"git shortlog --summary --numbered --color={color}",
@@ -200,8 +249,7 @@ class Repo:
         Returns:
                 str: desc info.
         """
-
-        path = path or self.op_path
+        path = path or self.path
         error_str = "`Error getting.`<error>"
         gen = ["[b`Repository Information`]" if color else "[Repository Information]"]
         repo_path, _ = self.confirm_repo(path)
@@ -260,7 +308,7 @@ class Repo:
     # Special info
     # =============
     def load_branches(self, path: Optional[str] = None) -> List[Branch]:
-        path = path or self.op_path
+        path = path or self.path
         branches = []
 
         _, _, resp = self.executor.exec(
@@ -306,7 +354,7 @@ class Repo:
         arg_str: str = '--oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" --abbrev=20 --date=unix',
         path: Optional[str] = None,
     ) -> str:
-        path = path or self.op_path
+        path = path or self.path
 
         limit_flag = f"-{limit}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
@@ -328,14 +376,15 @@ class Repo:
         icon: bool = False,
     ) -> List[File]:
         """Get the file tree status of GIT for processing and encapsulation.
+
         Args:
                 max_width (int): The max length of display string.
                 ident (int, option): Number of reserved blank characters in the header.
+
         Returns:
                 (List[File]): Processed file status list.
         """
-
-        path = path or self.op_path
+        path = path or self.path
         file_items = []
 
         _, err, files = self.executor.exec(
@@ -395,16 +444,17 @@ class Repo:
         path: Optional[str] = None,
     ) -> str:
         """Gets the modification of the file.
+
         Args:
                 file (str): file path relative to git.
                 tracked (bool, optional): Defaults to True.
                 cached (bool, optional): Defaults to False.
                 plain (bool, optional): Whether need color. Defaults to False.
+
         Returns:
                 (str): change string.
         """
-
-        path = path or self.op_path
+        path = path or self.path
 
         _plain = "--color=never" if plain else "--color=always"
         _cached = "--cached" if cached else ""
@@ -428,13 +478,13 @@ class Repo:
         path: Optional[str] = None,
     ) -> List[Commit]:
         """Get the all commit of a given branch.
+
         Args:
                 branch_name (str): want branch name.
                 limit (bool): Whether to get only the latest 300.
                 filter_path (str): filter dir path, default is empty.
         """
-
-        path = path or self.op_path
+        path = path or self.path
 
         first_pushed_commit = self.get_first_pushed_commit(path, branch_name)
         passed_first_pushed_commit = not first_pushed_commit
@@ -497,8 +547,7 @@ class Repo:
                 file_name: file name(include full path).
                 plain: whether has color.
         """
-
-        path = path or self.op_path
+        path = path or self.path
         color_str = "never" if plain else "always"
 
         _, _, resp = self.executor.exec(
@@ -525,19 +574,31 @@ class Repo:
         return file_name
 
     def switch_file_status(self, file: File, path: Optional[str] = None):
-        path = path or self.op_path
+        """Change the file stage status.
+
+        Args:
+            file (File): git file object.
+            path (Optional[str], optional): exec path. Defaults to None.
+        """
+        path = path or self.path
         file_name = self._get_file_str(file)
 
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
         elif file.has_unstaged_change:
-            self.executor.exec(f"git add -- '{file_name}'", cwd=path)
+            self.executor.exec(f"git add -- '{file_name}'", flags=WAITING, cwd=path)
         elif file.has_staged_change:
             if file.tracked:
-                self.executor.exec(f"git reset HEAD -- '{file_name}'", cwd=path)
+                self.executor.exec(
+                    f"git reset HEAD -- '{file_name}'",
+                    flags=WAITING,
+                    cwd=path,
+                )
             else:
                 self.executor.exec(
-                    f"git rm --cached --force -- '{file_name}'", cwd=path
+                    f"git rm --cached --force -- '{file_name}'",
+                    flags=WAITING,
+                    cwd=path,
                 )
 
     def discard_file(
@@ -546,7 +607,7 @@ class Repo:
         path: Optional[str] = None,
         tracked: Optional[bool] = None,
     ):
-        path = path or self.op_path
+        path = path or self.path
         file_name = self._get_file_str(file)
 
         if tracked is None:
@@ -563,7 +624,7 @@ class Repo:
     def ignore_file(self, file: Union[File, str], path: Optional[str] = None):
         """Append file to `.gitignore` file."""
 
-        path = path or self.op_path
+        path = path or self.path
         repo_path, _ = self.confirm_repo(path)
         file_name = self._get_file_str(file)
 
@@ -571,7 +632,7 @@ class Repo:
             f.write(f"\n{file_name}")
 
     def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> str:
-        path = path or self.op_path
+        path = path or self.path
         _, err, _ = self.executor.exec(f"git checkout {branch_name}", cwd=path)
         return err or "ok"
 
@@ -583,7 +644,7 @@ class Repo:
         commit: str = "",
         print: bool = False,
     ) -> Tuple[bool, str]:
-        path = path or self.op_path
+        path = path or self.path
         remote_url = self.get_remote_url(path=path)
 
         if branch:
