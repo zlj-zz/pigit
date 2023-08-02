@@ -1,8 +1,14 @@
 # -*- coding:utf-8 -*-
-import os, sys
-import tty, termios, select, fcntl
+import contextlib
+import fcntl
+import os
+import select
+import sys
+import termios
+import tty
 import signal
 from subprocess import Popen, PIPE
+from typing import Optional
 
 
 # ===========
@@ -33,10 +39,8 @@ def detect_encoding():
 
     initial = locale.getlocale()
     try:
-        try:
+        with contextlib.suppress(locale.Error):
             locale.setlocale(locale.LC_ALL, "")
-        except locale.Error:
-            pass
         return locale.getlocale()[1] or ""
     except ValueError as e:
         # with invalid LANG value python will throw ValueError
@@ -45,10 +49,8 @@ def detect_encoding():
         else:
             raise
     finally:
-        try:
+        with contextlib.suppress(locale.Error):
             locale.setlocale(locale.LC_ALL, initial)
-        except locale.Error:
-            pass
 
 
 if "detected_encoding" not in locals():
@@ -82,9 +84,8 @@ def set_encoding(encoding):
         "gbk",
         "big5",
         "cn-gb",
-        "uhc"
+        "uhc",
         # these shouldn't happen, should they?
-        ,
         "eucjp",
         "euckr",
         "euccn",
@@ -100,12 +101,10 @@ def set_encoding(encoding):
 
     # if encoding is valid for conversion from unicode, remember it
     _target_encoding = "ascii"
-    try:
+    with contextlib.suppress(LookupError):
         if encoding:
-            u"".encode(encoding)
+            "".encode(encoding)
             _target_encoding = encoding
-    except LookupError:
-        pass
 
 
 # ==============
@@ -280,7 +279,6 @@ class KeyqueueTrie(object):
         root[ord(s)] = result
 
     def get(self, keys, more_available):
-
         result = self.get_recurse(self.data, keys, more_available)
         if not result:
             result = self.read_cursor_position(keys, more_available)
@@ -313,15 +311,15 @@ class KeyqueueTrie(object):
 
         prefix = ""
         if b & 4:
-            prefix = prefix + "shift "
+            prefix += "shift "
         if b & 8:
-            prefix = prefix + "meta "
+            prefix += "meta "
         if b & 16:
-            prefix = prefix + "ctrl "
+            prefix += "ctrl "
         if (b & MOUSE_MULTIPLE_CLICK_MASK) >> 9 == 1:
-            prefix = prefix + "double "
+            prefix += "double "
         if (b & MOUSE_MULTIPLE_CLICK_MASK) >> 9 == 2:
-            prefix = prefix + "triple "
+            prefix += "triple "
 
         # 0->1, 1->2, 2->3, 64->4, 65->5
         button = ((b & 64) // 64 * 3) + (b & 3) + 1
@@ -380,10 +378,7 @@ class KeyqueueTrie(object):
         y = int(y) - 1
 
         if value[-1] == "M":
-            if int(b) & MOUSE_DRAG_FLAG:
-                action = "drag"
-            else:
-                action = "press"
+            action = "drag" if int(b) & MOUSE_DRAG_FLAG else "press"
         else:
             action = "release"
 
@@ -407,10 +402,10 @@ class KeyqueueTrie(object):
         for k in keys[i:]:
             i += 1
             if k == ord(";"):
-                if not y:
-                    return None
-                else:
+                if y:
                     break
+                else:
+                    return None
             if k < ord("0") or k > ord("9"):
                 return None
             if not y and k == ord("0"):
@@ -425,7 +420,7 @@ class KeyqueueTrie(object):
         for k in keys[i:]:
             i += 1
             if k == ord("R"):
-                return None if not x else (("cursor position", x - 1, y - 1), keys[i:])
+                return (("cursor position", x - 1, y - 1), keys[i:]) if x else None
             if k < ord("0") or k > ord("9"):
                 return None
             if not x and k == ord("0"):
@@ -442,8 +437,8 @@ input_trie = KeyqueueTrie(input_sequences)
 # ===============================================
 
 ESC = "\x1b"
-MOUSE_TRACKING_ON = ESC + "[?1000h" + ESC + "[?1002h" + ESC + "[?1006h"
-MOUSE_TRACKING_OFF = ESC + "[?1006l" + ESC + "[?1002l" + ESC + "[?1000l"
+MOUSE_TRACKING_ON = f"{ESC}[?1000h{ESC}[?1002h{ESC}[?1006h"
+MOUSE_TRACKING_OFF = f"{ESC}[?1006l{ESC}[?1002l{ESC}[?1000l"
 
 _keyconv = {
     -1: None,
@@ -515,9 +510,8 @@ def process_keyqueue(codes, more_available):
     em = get_byte_encoding()
 
     if em == "wide" and code < 256 and within_double_byte(chr(code), 0, 0):
-        if not codes[1:]:
-            if more_available:
-                raise MoreInputRequired()
+        if not codes[1:] and more_available:
+            raise MoreInputRequired()
         if codes[1:] and codes[1] < 256:
             db = chr(code) + chr(codes[1])
             if within_double_byte(db, 0, 1):
@@ -569,14 +563,13 @@ def process_keyqueue(codes, more_available):
             return ["esc"] + run, remaining_codes
         if run[0] == "esc" or run[0].find("meta ") >= 0:
             return ["esc"] + run, remaining_codes
-        return ["meta " + run[0]] + run[1:], remaining_codes
+        return [f"meta {run[0]}"] + run[1:], remaining_codes
 
     return ["esc"], codes[1:]
 
 
-class InputTerminal(object):
+class InputTerminal:
     def __init__(self):
-        super(InputTerminal, self).__init__()
         self._signal_keys_set = False
         self._old_signal_keys = None
 
@@ -648,7 +641,7 @@ class PosixInput(InputTerminal):
     def __init__(self, input=sys.stdin, output=sys.stdout) -> None:
         super().__init__()
 
-        self._keyqueue = []
+        self._key_queue = []
         self.prev_input_resize = 0
         self._partial_codes = None
         self._input_timeout = None
@@ -679,7 +672,12 @@ class PosixInput(InputTerminal):
         else:
             return None
 
-    def set_input_timeouts(self, max_wait=None, complete_wait=0.125, resize_wait=0.125):
+    def set_input_timeouts(
+        self,
+        max_wait: Optional[float] = None,
+        complete_wait: float = 0.125,
+        resize_wait: float = 0.125,
+    ):
         """
         Set the get_input timeout values.  All values are in floating
         point numbers of seconds.
@@ -698,7 +696,7 @@ class PosixInput(InputTerminal):
             if self._next_timeout is None:
                 self._next_timeout = max_wait
             else:
-                self._next_timeout = min(self._next_timeout, self.max_wait)
+                self._next_timeout = min(self._next_timeout, max_wait)
         self.complete_wait = complete_wait
         self.resize_wait = resize_wait
 
@@ -760,6 +758,8 @@ class PosixInput(InputTerminal):
         m = Popen(
             ["/usr/bin/mev", "-e", "158"], stdin=PIPE, stdout=PIPE, close_fds=True
         )
+        if not m.stdout:
+            return
         fcntl.fcntl(m.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         self.gpm_mev = m
 
@@ -866,7 +866,7 @@ class PosixInput(InputTerminal):
             b |= mod
             l.extend([27, ord("["), ord("M"), b + 32, x + 32, y + 32])
 
-        if ev == 20 or ev == 36 or ev == 52:  # press
+        if ev in {20, 36, 52}:  # press
             if b & 4 and last & 1 == 0:
                 append_button(0)
                 next |= 1
@@ -935,11 +935,9 @@ class PosixInput(InputTerminal):
 
         # clean out the pipe used to signal external event loops
         # that a resize has occurred
-        try:
+        with contextlib.suppress(OSError):
             while True:
                 os.read(self._resize_pipe_rd, 1)
-        except OSError:
-            pass
 
         return codes
 
@@ -1006,14 +1004,14 @@ class PosixInput(InputTerminal):
 
     def get_input(self, raw_keys=False):
         """Return pending input as a list.
-        raw_keys -- return raw keycodes as well as translated versions
+        raw_keys -- return raw key-codes as well as translated versions
         This function will immediately return all the input since the
         last time it was called.  If there is no input pending it will
         wait before returning an empty list.  The wait time may be
         configured with the set_input_timeouts function.
         If raw_keys is False (default) this function will return a list
         of keys pressed.  If raw_keys is True this function will return
-        a ( keys pressed, raw keycodes ) tuple instead.
+        a ( keys pressed, raw key-codes ) tuple instead.
         Examples of keys returned:
         * ASCII printable characters:  " ", "a", "0", "A", "-", "/"
         * ASCII control characters:  "tab", "enter"
