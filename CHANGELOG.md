@@ -1,5 +1,8 @@
 # Changelog of pigit
 
+## v1.6.1 (2023-01-25)
+- Use config control file icon in tui mode.
+
 ## v1.6.0 (2022-08-22)
 - Show file icon in tui mode.
 - Use new dependencies -- `plenty`(render).
