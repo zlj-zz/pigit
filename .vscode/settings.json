@@ -28,6 +28,7 @@
         "jfif",
         "keyevent",
         "kwdefaults",
+        "lcstat",
         "levelname",
         "msecs",
         "nargs",
@@ -73,5 +74,4 @@
         "Zhang"
     ],
     "autoDocstring.generateDocstringOnEnter": true,
-    "restructuredtext.confPath": ""
 }

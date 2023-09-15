@@ -1063,7 +1063,7 @@ class PosixInput(InputTerminal):
 
         if raw_keys:
             return keys, raw
-        return keys
+        return keys, None
 
     def write(self, data):
         """Write some data to the terminal.
@@ -1087,5 +1087,5 @@ if __name__ == "__main__":
     handle.set_mouse_tracking()
     handle.set_input_timeouts(0.125)
     while True:
-        res = handle.get_input(raw_keys=True)
+        res = handle.get_input(raw_keys=False)
         print(res)

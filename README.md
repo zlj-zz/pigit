@@ -13,37 +13,41 @@ If you want to use it, you must first know what it can do.
 The command of `pigit -h` or `pigit --help` to get the help message with usage. Like this:
 
 ```bash
-usage: pigit [-h] [-v] [-r] [-f] [-i] [-c [PATH]] [-C] [--create-ignore TYPE]
-             [--create-config]
-             {cmd,repo} ...
+usage: pigit [-h] [-i] [-f] [-r] [-v] [-c [PATH]] [--create-ignore TYPE]
+             [--complete [SHELL]] [--create-config]
+             {cmd,repo,open} ...
 
 Pigit TUI is called automatically if no parameters are followed.
 
+
 positional arguments:
-  {cmd,repo}
+  {cmd,repo,open}
     cmd                 git short command.
-    repo                repo options.
+    repo                repos options.
     open                open remote repository in web browser.
 
-optional arguments:
+
+options:
   -h, --help            show this help message and exit
-  -v, --version         Show version and exit.
-  -r, --report          Report the pigit desc and exit.
-  -f, --config          Display the config of current git repository and exit.
   -i, --information     Show some information about the current git repository.
+  -f, --config          Display the config of current git repository and exit.
+  -r, --report          Report the pigit desc and exit.
+  -v, --version         Show version and exit.
+
 
 tools arguments:
   Auxiliary type commands.
 
   -c [PATH], --count [PATH]
-                        Count the number of codes and output them in tabular form.A given path can be
-                        accepted, and the default is the current directory.
-  -C, --complete        Add shell prompt script and exit.(Supported bash, zsh, fish)
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, support: [android, c++, cpp, c,
-                        dart, elisp, gitbook, go, java, kotlin, lua, maven, node, python, qt, r, ros, ruby,
-                        rust, sass, swift, unity]
-  --create-config       Create a pre-configured file of PIGIT.(If a profile exists, the values available in it
-                        are used)
+                        Count the number of codes and output them in tabular form.
+                        A given path can be accepted, and the default is the
+                        current directory.
+  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, the type
+                        of gitignore.
+  --complete [SHELL]    Add shell prompt script and exit. (Supported bash, zsh,
+                        fish)
+  --create-config       Create a pre-configured file of PIGIT.(If a profile
+                        exists, the values available in it are used)
 ```
 
 ### `cmd`
@@ -184,7 +188,7 @@ On windows should be: `C:\\User\\<your username>`
 
 | config key            | type  | default                     | desc                                                                                                                        |
 | --------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| cmd_show_original     | bool  | True                        | Show original git command.                                                                                                  |
+| cmd_display           | bool  | True                        | Show original git command.                                                                                                  |
 | cmd_recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
 | tui_help_showtime     | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
 | counter_use_gitignore | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
@@ -194,7 +198,7 @@ On windows should be: `C:\\User\\<your username>`
 | git_config_format     | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
 | repo_info_include     | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
 | repo_auto_append      | bool  | False                       | Whether auto append path to repos.                                                                                          |
-| debug_open            | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
+| log_debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
 | log_output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 
 ## Extra cmds
