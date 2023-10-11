@@ -1,39 +1,30 @@
-# -*- coding:utf-8 -*-
+from shutil import get_terminal_size
+from typing import TYPE_CHECKING, Optional
 
-from typing import TYPE_CHECKING
+from .console import Render, Signal, Term
 
 if TYPE_CHECKING:
-    from .screen import Screen
+    from .components import Component
+    from .input import InputTerminal
 
 
 class ExitEventLoop(Exception):
     """Get to exit current event loop."""
 
 
-class EventLoop(object):
-    """
-    Params:
-        screen (Screen): screen to use, default is a new :class:`.screen.Screen`.
-        input_handle (Input): input handle to use, default is a new :class:`.input:PosixInput`.
-        real_time (bool): whether refresh screen real time.
-    """
-
+class EventLoop(Term):
     def __init__(
         self,
-        screen: "Screen" = None,
+        child: "Component",
         input_handle=None,
         real_time: bool = False,
+        alt: bool = True,
         debug: bool = False,
-    ):
+    ) -> None:
+        self._render = Render
+
+        self._child = child
         self._real_time = real_time
-        self.debug = debug
-
-        # Init screen object.
-        if not screen:
-            from .screen import Screen
-
-            screen = Screen()
-        self._screen = screen
 
         # Init keyboard handle object.
         if not input_handle:
@@ -44,32 +35,63 @@ class EventLoop(object):
             # adjust the input whether is a mouse event.
             self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
+        self._alt = alt
 
-    def set_input_timeouts(self, timeout: float):
+        self.debug = debug
+
+    def start(self):
+        if self._alt:
+            self.to_alt_screen()
+
+        self.resize()  # include render.
+
+    def stop(self):
+        if self._alt:
+            self.to_normal_screen()
+
+    def __enter__(self):
+        self.start()
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.stop()
+
+    def resize(self):
+        """When the size has changed, this method will be call by `.loop.Loop` and try to render again."""
+        self._size = get_terminal_size()
+        self._child.resize(self._size)
+        self.render()
+
+    def render(self, resize: bool = False):
+        self.clear_screen()
+        self._child._render()
+
+    def set_input_timeouts(self, timeout: float) -> None:
         self._input_handle.set_input_timeouts(timeout)
 
-    def _loop(self):
+    def _loop(self) -> None:
         """Main loop"""
-        if input_key := self._input_handle.get_input():
-            first_one = input_key[0]
+        if (input_key := self._input_handle.get_input()) and input_key[0]:
+            first_one: str = input_key[0][0]
 
             if first_one == "window resize":
-                self._screen.resize()
+                self._child.resize()
             elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
-                self._screen.process_mouse(first_one)
+                # self._child.process_mouse(first_one)
+                pass
             else:
-                self._screen.process_input(first_one)
+                self._child._handle_event(first_one)
         elif self._real_time:
-            self._screen.render()
+            self._child.render()
 
-    def _run(self):
+    def _run(self) -> None:
         try:
+            self.start()
+            self._input_handle.start()
             while True:
                 self._loop()
         except (ExitEventLoop, KeyboardInterrupt, EOFError):
             self._input_handle.stop()
+            self.stop()
 
-    def run(self):
-        with self._screen:
-            self._input_handle.start()
-            self._run()
+    def run(self) -> None:
+        self._run()
