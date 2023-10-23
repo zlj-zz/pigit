@@ -91,6 +91,11 @@ class Cursor:
 
 class Render:
     @classmethod
+    def clear_screen(cls):
+        _stdout("\033[2J\033[0;0f")
+        Cursor.to(1, 1)
+
+    @classmethod
     def draw(cls, content: List[str], x: int, y: int, size: Tuple[int, int]):
         """Draw content to screen. Using by component."""
         col, row = size

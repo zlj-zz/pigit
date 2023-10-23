@@ -7,9 +7,6 @@ from pigit.ext.log import logger
 from .console import Render
 from .utils import get_width, plain
 
-if TYPE_CHECKING:
-    from .screen import Screen
-
 
 NONE_SIZE = (0, 0)
 
@@ -19,12 +16,15 @@ class ComponentError(Exception):
 
 
 class Component(ABC):
+    BINDINGS: Optional[List[Tuple[str, str]]] = None
+
     def __init__(
         self,
         x: int = 0,
         y: int = 0,
         size: Optional[Tuple[int, int]] = None,
         children: Optional[Dict[str, "Component"]] = None,
+        parent: Optional["Component"] = None,
     ) -> None:
         self._activated = False  # component whether activated state.
 
@@ -32,8 +32,13 @@ class Component(ABC):
         self.y = y
         self._size = size or (0, 0)
 
-        self.parent: Optional["Component"] = None
+        self.parent = parent
         self.children = children
+
+        self._event_map = {}
+        if self.BINDINGS is not None:
+            for b in self.BINDINGS:
+                self._event_map[b[0]] = b[1]
 
     def activate(self):
         self._activated = True
@@ -69,7 +74,9 @@ class Component(ABC):
 
     def notify(self, action, **data):
         """Notify all children."""
-        assert self.children is not None, "Has no children to notifying."
+        assert (
+            self.children is not None
+        ), f"Has no children to notifying; {self.__class__}."
         for child in self.children.values():
             child.update(action, **data)
 
@@ -81,9 +88,19 @@ class Component(ABC):
     def _render(self, size: Optional[Tuple[int, int]] = None):
         """Render the component, overwritten in sub-class."""
 
-    @abstractmethod
     def _handle_event(self, key: str):
         """Event process handle function, overwritten in sub-class."""
+        tg_fn = getattr(self, "on_key", None)
+        if tg_fn is not None and callable(tg_fn):
+            tg_fn(key)
+
+        tg_name = self._event_map.get(key)
+        if tg_name is None:
+            return
+
+        tg_fn = getattr(self, tg_name, None)
+        if tg_fn is not None and callable(tg_fn):
+            tg_fn()
 
 
 class Container(Component):
@@ -95,15 +112,18 @@ class Container(Component):
         x: int = 0,
         y: int = 0,
         size: Optional[Tuple[int, int]] = None,
-        name: Optional[str] = None,
+        start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
     ) -> None:
         super().__init__(x, y, size)
+
         self.children = children
+        for child in children.values():
+            child.parent = self
 
         self.switch_handle = switch_handle
 
-        self.name = name or "main"
+        self.name = start_name or "main"
         if self.name not in children:
             raise ComponentError(
                 "Please set the name, or has a component key is 'main'."
@@ -120,9 +140,9 @@ class Container(Component):
 
     def accept(self, action, **data):
         # sourcery skip: remove-unnecessary-else, swap-if-else-branches
-        if action == "switch":
-            if (name := data.get("name")) is not None:
-                self.switch_child(name)
+        if action == "goto" and (name := data.get("target")) is not None:
+            child = self.switch_child(name)
+            child.update(action, **data)
         else:
             raise ComponentError("Not support action of ~Container.")
 
@@ -147,8 +167,10 @@ class Container(Component):
             logger().debug(f"name: {name}")
             self.switch_child(name)
 
-    def switch_child(self, name: str):
+    def switch_child(self, name: str) -> "Component":
         """Choice which child should be activated."""
+        child = None
+
         if name in self.children:
             # Has component be activated should deactivate.
             for component in self.children.values():
@@ -157,39 +179,51 @@ class Container(Component):
             # Activate the new choice component.
             self.children[name].activate()
             self.children[name]._render()
+            child = self.children[name]
+
+        return child
 
 
 class RowPanel(Component):
     def __init__(
         self,
-        x: int = 0,
-        y: int = 0,
+        x: int = 1,
+        y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         content: Optional[List[str]] = None,
     ) -> None:
         super().__init__(x, y, size)
 
-        self.content = content
+        self._content = content
+        self._range = self._size[1]
+
+        self._index = 0
+
         self._r = [0, self._size[1]]  # display range.
 
     def resize(self, size):
         self._size = size
+        self._range = size[1]
 
         # TODO:
         self.fresh()
 
-    def update(self, action, **data):
-        pass
-
     def _render(self, size: Optional[Tuple[int, int]] = None):
-        if self.content:
-            Render.draw(self.content, self.x, self.y, self._size)
+        if self._content:
+            Render.draw(
+                self._content[self._index : self._index + self._range],
+                self.x,
+                self.y,
+                self._size,
+            )
 
     def scroll_up(self, line: int = 1):
-        pass
+        self._index = max(self._index - line, 0)
+        self._render()
 
     def scroll_down(self, line: int = 1):
-        pass
+        self._index = min(self._index + line, len(self._content) - self._range)
+        self._render()
 
 
 class ItemSelector(Component):
@@ -265,20 +299,6 @@ class ItemSelector(Component):
             self._r_start -= step
 
         self._render()
-
-    def _handle_event(self, key: str):
-        # logger().debug(self._size)
-        target = getattr(self, "on_key", None)
-        if target is not None and callable(target):
-            target(key)
-
-        name = self.event_map.get(key)
-        if name is None:
-            return
-
-        target = getattr(self, name, None)
-        if target is not None and callable(target):
-            target()
 
 
 class Alert(Component):
