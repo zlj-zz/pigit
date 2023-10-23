@@ -109,8 +109,8 @@ class Container(Component):
     def __init__(
         self,
         children: Dict[str, "Component"],
-        x: int = 0,
-        y: int = 0,
+        x: int = 1,
+        y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
