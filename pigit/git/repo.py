@@ -11,7 +11,7 @@ from pathlib import Path
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
-from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
+from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
 from pigit.ext.log import logger
 from pigit.ext.utils import adjudgment_type, get_file_icon
 from .model import File, Commit, Branch
@@ -586,18 +586,20 @@ class Repo:
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
         elif file.has_unstaged_change:
-            self.executor.exec(f"git add -- '{file_name}'", flags=WAITING, cwd=path)
+            self.executor.exec(
+                f"git add -- '{file_name}'", flags=WAITING | SILENT, cwd=path
+            )
         elif file.has_staged_change:
             if file.tracked:
                 self.executor.exec(
                     f"git reset HEAD -- '{file_name}'",
-                    flags=WAITING,
+                    flags=WAITING | SILENT,
                     cwd=path,
                 )
             else:
                 self.executor.exec(
                     f"git rm --cached --force -- '{file_name}'",
-                    flags=WAITING,
+                    flags=WAITING | SILENT,
                     cwd=path,
                 )
 
