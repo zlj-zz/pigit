@@ -1,5 +1,5 @@
 from shutil import get_terminal_size
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from .console import Render, Signal, Term
 
@@ -13,6 +13,8 @@ class ExitEventLoop(Exception):
 
 
 class EventLoop(Term):
+    BINDINGS: Optional[List[Tuple[str, str]]] = None
+
     def __init__(
         self,
         child: "Component",
@@ -36,6 +38,11 @@ class EventLoop(Term):
             self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
         self._alt = alt
+
+        self._event_map = {}
+        if self.BINDINGS is not None:
+            for b in self.BINDINGS:
+                self._event_map[b[0]] = b[1]
 
         self.debug = debug
 
@@ -73,7 +80,12 @@ class EventLoop(Term):
         if (input_key := self._input_handle.get_input()) and input_key[0]:
             first_one: str = input_key[0][0]
 
-            if first_one == "window resize":
+            tg_name = self._event_map.get(first_one)
+            tg_fn = None if tg_name is None else getattr(self, tg_name, None)
+
+            if tg_fn is not None and callable(tg_fn):
+                tg_fn()
+            elif first_one == "window resize":
                 self._child.resize()
             elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
                 # self._child.process_mouse(first_one)
@@ -95,3 +107,6 @@ class EventLoop(Term):
 
     def run(self) -> None:
         self._run()
+
+    def quit(self) -> None:
+        raise ExitEventLoop("Quit")

@@ -163,14 +163,14 @@ def pigit(args: "Namespace", _) -> None:
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
-        from .interaction import tui_main
-
         if IS_FIRST_RUN:
             introduce()
             if not confirm("Input `enter` to continue:"):
                 return
 
-        tui_main(Conf)
+        from .app import App
+
+        App().run()
 
 
 pigit.add_argument(
