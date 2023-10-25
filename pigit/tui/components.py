@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from math import ceil
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
-
-from pigit.ext.log import logger
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .console import Render
 from .utils import get_width, plain
@@ -47,32 +45,33 @@ class Component(ABC):
         self._activated = False
 
     def is_activated(self):
+        """Get current activate status."""
         return self._activated
 
     def fresh(self):
         """Fresh content data."""
         raise NotImplementedError()
 
-    def accept(self, action, **data):
+    def accept(self, action: str, **data):
         """Process emit action of child.
 
         Here is do nothing. If needed, should overwritten in sub-class.
         """
         raise NotImplementedError()
 
-    def emit(self, action, **data):
+    def emit(self, action: str, **data):
         """Emit to parent."""
         assert self.parent is not None, "Has no parent to emitting."
         self.parent.accept(action, **data)
 
-    def update(self, action, **data):
+    def update(self, action: str, **data):
         """Process notify action of parent.
 
         Here is do nothing. If needed, should overwritten in sub-class.
         """
         raise NotImplementedError()
 
-    def notify(self, action, **data):
+    def notify(self, action: str, **data):
         """Notify all children."""
         assert (
             self.children is not None
@@ -81,15 +80,25 @@ class Component(ABC):
             child.update(action, **data)
 
     @abstractmethod
-    def resize(self, size):
-        """Response to the resize event."""
+    def resize(self, size: Tuple[int, int]):
+        """Response to the resize event.
+
+        Here is do nothing. If needed, should overwritten in sub-class.
+        """
 
     @abstractmethod
     def _render(self, size: Optional[Tuple[int, int]] = None):
-        """Render the component, overwritten in sub-class."""
+        """Render the component, overwritten in sub-class.
+
+        Here is do nothing. If needed, should overwritten in sub-class.
+        """
 
     def _handle_event(self, key: str):
-        """Event process handle function, overwritten in sub-class."""
+        """Event process handle function.
+
+        If want to custom handle, instance function `on_key(str)` in sub-class.
+        Or instance attribute `BINDINGS` in sub-class.
+        """
         tg_fn = getattr(self, "on_key", None)
         if tg_fn is not None and callable(tg_fn):
             tg_fn(key)
@@ -131,14 +140,14 @@ class Container(Component):
 
         children[self.name].activate()
 
-    def resize(self, size):
+    def resize(self, size: Tuple[int, int]):
         self._size = size
 
         # let children process resize.
         for child in self.children.values():
             child.resize(size)
 
-    def accept(self, action, **data):
+    def accept(self, action: str, **data):
         # sourcery skip: remove-unnecessary-else, swap-if-else-branches
         if action == "goto" and (name := data.get("target")) is not None:
             child = self.switch_child(name)
@@ -164,7 +173,6 @@ class Container(Component):
 
         if self.switch_handle:
             name = self.switch_handle(key)
-            logger().debug(f"name: {name}")
             self.switch_child(name)
 
     def switch_child(self, name: str) -> "Component":
@@ -201,7 +209,7 @@ class RowPanel(Component):
 
         self._r = [0, self._size[1]]  # display range.
 
-    def resize(self, size):
+    def resize(self, size: Tuple[int, int]):
         self._size = size
         self._range = size[1]
 
@@ -253,13 +261,13 @@ class ItemSelector(Component):
         self.curr_no = 0  # default start with 0.
         self._r_start = 0
 
-    def resize(self, size):
+    def resize(self, size: Tuple[int, int]):
         self._size = size
 
         self.fresh()
         self.content_len = len(self.content) - 1
 
-    def update(self, action, **data):
+    def update(self, action: str, **data):
         pass
 
     def _render(self, size: Optional[Tuple[int, int]] = None):

@@ -1,5 +1,5 @@
 from time import sleep
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from .const import IS_WIN
 from .ext.log import logger, setup_logging
@@ -40,8 +40,6 @@ class StatusPanel(ItemSelector):
         files_str = [file.display_str for file in files]
         self.content = files_str
 
-        self._render()
-
     def on_key(self, key: str):
         f = self.files[self.curr_no]
 
@@ -53,9 +51,11 @@ class StatusPanel(ItemSelector):
         elif key in {"a", " "}:
             repo_handle.switch_file_status(f, self.repo_path)
             self.fresh()
+            self._render()
         elif key == "i":
             repo_handle.ignore_file(f)
             self.fresh()
+            self._render()
 
 
 class BranchPanel(ItemSelector):
@@ -86,7 +86,6 @@ class BranchPanel(ItemSelector):
                 processed_branches.append(f"  {branch.name}")
 
         self.content = processed_branches
-        self._render()
 
     def on_key(self, key: str):
         if key == "j":
@@ -104,6 +103,7 @@ class BranchPanel(ItemSelector):
                 sleep(2)
 
             self.fresh()
+            self._render()
 
 
 class CommitPanel(ItemSelector):

@@ -86,7 +86,7 @@ class EventLoop(Term):
             if tg_fn is not None and callable(tg_fn):
                 tg_fn()
             elif first_one == "window resize":
-                self._child.resize()
+                self.resize()
             elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
                 # self._child.process_mouse(first_one)
                 pass
@@ -104,6 +104,10 @@ class EventLoop(Term):
         except (ExitEventLoop, KeyboardInterrupt, EOFError):
             self._input_handle.stop()
             self.stop()
+        except Exception as e:
+            self._input_handle.stop()
+            self.stop()
+            print(e, e.__traceback__)
 
     def run(self) -> None:
         self._run()
