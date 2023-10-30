@@ -64,12 +64,11 @@ class PigitShell(cmd.Cmd):
     # ==================
     # print help method
     # ==================
-    def default(self, line):
+    def default(self, line: str):
         """Called on an input line when the command prefix is not recognized.
 
         If this method is not overridden, it prints an error message and
         returns.
-
         """
         self.stdout.write(
             get_console().render_str(
@@ -84,9 +83,9 @@ class PigitShell(cmd.Cmd):
             return super().do_help(arg)
 
         args: List[str] = arg.split()
-        for a in args:
-            self.stdout.write(f"{a}: ")
-            super().do_help(a)
+        for value in args:
+            self.stdout.write(f"{value}: ")
+            super().do_help(value)
 
     # ================
     # support command
