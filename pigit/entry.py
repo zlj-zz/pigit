@@ -52,23 +52,12 @@ console = get_console()
 
 # =====================
 # main command `pigit`
-# apf: disable
+# yapf: disable
 # =====================
-@command(
-    "pigit",
-    description="Pigit TUI is called automatically if no parameters are followed.",
-)
+@command("pigit", description="Pigit TUI is called automatically if no parameters are followed.")
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
-@argument(
-    "-f --config",
-    action="store_true",
-    help="Display the config of current git repository and exit.",
-)
-@argument(
-    "-i --information",
-    action="store_true",
-    help="Show some information about the current git repository.",
-)
+@argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
+@argument("-i --information", action="store_true", help="Show some information about the current git repository.")
 def pigit(args: "Namespace", _) -> None:
     if args.report:
         console.echo(introduce())
@@ -173,6 +162,7 @@ def pigit(args: "Namespace", _) -> None:
         App().run()
 
 
+# yapf: enable
 pigit.add_argument(
     "-v",
     "--version",
@@ -392,13 +382,10 @@ for sub_cmd, prop in repo_options.items():
 
 # =============================================
 # sub command `open`
+# yapf: disable
 # =============================================
 @pigit.sub_parser("open", help="open remote repository in web browser.")
-@argument(
-    "-p --print",
-    action="store_true",
-    help="only print the url at the terminal, but do not open it.",
-)
+@argument("-p --print", action="store_true", help="only print the url at the terminal, but do not open it.")
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
@@ -407,6 +394,8 @@ def _(args: "Namespace", _):
         branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
     )
     console.echo(msg)
+
+# yapf: enable
 
 
 # =============================================

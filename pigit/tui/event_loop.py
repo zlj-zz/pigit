@@ -58,6 +58,7 @@ class EventLoop(Term):
 
     def __enter__(self):
         self.start()
+        return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.stop()
@@ -83,7 +84,7 @@ class EventLoop(Term):
             tg_name = self._event_map.get(first_one)
             tg_fn = None if tg_name is None else getattr(self, tg_name, None)
 
-            if callable(tg_fn):
+            if callable(tg_fn):  # sourcery skip: remove-pass-elif
                 tg_fn()
             elif first_one == "window resize":
                 self.resize()

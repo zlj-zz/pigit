@@ -128,9 +128,11 @@ def within_double_byte(text, line_start, pos):
         if pos == line_start:
             return 0
 
-        if ord2(text[pos - 1]) >= 0x81:
-            if within_double_byte(text, line_start, pos - 1) == 1:
-                return 2
+        if (
+            ord2(text[pos - 1]) >= 0x81
+            and within_double_byte(text, line_start, pos - 1) == 1
+        ):
+            return 2
         return 0
 
     if v < 0x80:
@@ -172,6 +174,7 @@ def escape_modifier(digit):
 
 
 # yapf: disable
+# sourcery skip: use-fstring-for-concatenation
 input_sequences = [
     ('[A','up'),('[B','down'),('[C','right'),('[D','left'),
     ('[E','5'),('[F','end'),('[G','5'),('[H','home'),
@@ -237,7 +240,7 @@ input_sequences = [
     ('[<', 'sgrmouse'),
 
     # report status response
-    ('[0n', 'status ok')
+    ('[0n', 'status ok'),
 ]
 # yapf: enable
 
@@ -336,7 +339,7 @@ class KeyqueueTrie(object):
         else:
             action = "press"
 
-        return ((prefix + "mouse " + action, button, x, y), keys[3:])
+        return (f"{prefix}mouse {action}", button, x, y), keys[3:]
 
     def read_sgrmouse_info(self, keys, more_available):
         # Helpful links:
@@ -353,7 +356,7 @@ class KeyqueueTrie(object):
         found_m = False
         for k in keys:
             value = value + chr(k)
-            if (k is ord("M")) or (k is ord("m")):
+            if k in [ord("M"), ord("m")]:
                 found_m = True
                 break
             pos_m += 1
@@ -382,7 +385,7 @@ class KeyqueueTrie(object):
         else:
             action = "release"
 
-        return (("mouse " + action, button, x, y), keys[pos_m + 1 :])
+        return (f"mouse {action}", button, x, y), keys[pos_m + 1 :]
 
     def read_cursor_position(self, keys, more_available):
         """
@@ -503,9 +506,9 @@ def process_keyqueue(codes, more_available):
     if code in _keyconv:
         return [_keyconv[code]], codes[1:]
     if code > 0 and code < 27:
-        return ["ctrl %s" % chr(ord("a") + code - 1)], codes[1:]
+        return [f'ctrl {chr(ord("a") + code - 1)}'], codes[1:]
     if code > 27 and code < 32:
-        return ["ctrl %s" % chr(ord("A") + code - 1)], codes[1:]
+        return [f'ctrl {chr(ord("A") + code - 1)}'], codes[1:]
 
     em = get_byte_encoding()
 
@@ -1082,7 +1085,6 @@ class PosixInput(InputTerminal):
 
 if __name__ == "__main__":
     handle = PosixInput()
-    # handle.set_input_timeouts(0.125)
     handle.start()
     handle.set_mouse_tracking()
     handle.set_input_timeouts(0.125)

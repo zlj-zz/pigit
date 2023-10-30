@@ -76,6 +76,19 @@ def test_loop(input_key, expected):
     assert event_loop.resize.call_count == expected
 
 
+def test_with():
+    mock_child = Mock()
+    event_loop = EventLoop(mock_child)
+    event_loop.start = Mock()
+    event_loop.stop = Mock()
+
+    with event_loop as el:
+        pass
+
+    event_loop.start.assert_called_once()
+    event_loop.stop.assert_called_once()
+
+
 def test_run():
     # Arrange
     mock_child = Mock()
