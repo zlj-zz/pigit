@@ -8,7 +8,7 @@ import termios
 import tty
 import signal
 from subprocess import Popen, PIPE
-from typing import Optional
+from typing import Callable, Dict, Final, List, Optional, Tuple, Union
 
 
 # ===========
@@ -62,7 +62,7 @@ _target_encoding = None
 _use_dec_special = True
 
 
-def set_encoding(encoding):
+def set_encoding(encoding: str):
     """
     Set the byte encoding to assume when processing strings and the
     encoding to use when converting unicode strings.
@@ -71,11 +71,11 @@ def set_encoding(encoding):
 
     global _target_encoding, _use_dec_special
 
-    if encoding in ("utf-8", "utf8", "utf"):
+    if encoding in {"utf-8", "utf8", "utf"}:
         set_byte_encoding("utf8")
 
         _use_dec_special = False
-    elif encoding in (
+    elif encoding in {
         "euc-jp",  # JISX 0208 only
         "euc-kr",
         "euc-cn",
@@ -91,7 +91,7 @@ def set_encoding(encoding):
         "euccn",
         "euctw",
         "cncb",
-    ):
+    }:
         set_byte_encoding("wide")
 
         _use_dec_special = True
@@ -110,7 +110,7 @@ def set_encoding(encoding):
 # ==============
 # Util function
 # ==============
-def within_double_byte(text, line_start, pos):
+def within_double_byte(text, line_start: int, pos: int):
     """Return whether pos is within a double-byte encoded character.
     text -- byte string in question
     line_start -- offset of beginning of line (< pos)
@@ -161,7 +161,7 @@ def is_mouse_press(ev):
 ## Input sequences
 # =================
 class MoreInputRequired(Exception):
-    pass
+    """"""
 
 
 def escape_modifier(digit):
@@ -174,7 +174,6 @@ def escape_modifier(digit):
 
 
 # yapf: disable
-# sourcery skip: use-fstring-for-concatenation
 input_sequences = [
     ('[A','up'),('[B','down'),('[C','right'),('[D','left'),
     ('[E','5'),('[F','end'),('[G','5'),('[H','home'),
@@ -205,7 +204,7 @@ input_sequences = [
     for prefix, modifier in zip('O[', ('meta ', 'shift '))
     for letter, key in zip('abcd', ('up', 'down', 'right', 'left'))
 ] + [
-    ("[" + digit + symbol, modifier + key)
+    (f"[{digit}{symbol}", modifier + key)
     for modifier, symbol in zip(('shift ', 'meta '), '$^')
     for digit, key in zip('235678',
         ('insert', 'delete', 'page up', 'page down', 'home', 'end'))
@@ -220,12 +219,12 @@ input_sequences = [
         ('up','down','right','left','5','end','5','home'))
 ] + [
     # modified F1-F4 keys -- O#X form
-    ("O"+digit+letter, escape_modifier(digit) + key)
+    (f"O{digit}{letter}", escape_modifier(digit) + key)
     for digit in "12345678"
     for letter,key in zip("PQRS",('f1','f2','f3','f4'))
 ] + [
     # modified F1-F13 keys -- [XX;#~ form
-    ("["+str(num)+";"+digit+"~", escape_modifier(digit) + key)
+    (f"[{num};{digit}~", escape_modifier(digit) + key)
     for digit in "12345678"
     for num,key in zip(
         (3,5,6,11,12,13,14,15,17,18,19,20,21,23,24,25,26,28,29,31,32,33,34),
@@ -233,7 +232,7 @@ input_sequences = [
         'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11',
         'f12','f13','f14','f15','f16','f17','f18','f19','f20'))
 ] + [
-    # mouse reporting (special handling done in KeyqueueTrie)
+    # mouse reporting (special handling done in KeyQueueTrie)
     ('[M', 'mouse'),
 
     # mouse reporting for SGR 1006
@@ -262,55 +261,62 @@ MOUSE_MULTIPLE_CLICK_FLAG = 512
 MOUSE_DRAG_FLAG = 32
 
 
-class KeyqueueTrie(object):
-    def __init__(self, sequences):
+class KeyQueueTrie:
+    def __init__(self, sequences: Dict):
         self.data = {}
         for s, result in sequences:
             assert type(result) != dict
             self.add(self.data, s, result)
 
-    def add(self, root, s, result):
+    def add(self, root: Dict, k: str, v: str) -> None:
+        """Add a pair of k-v mappings to the recursive mapping field."""
         assert type(root) == dict, "trie conflict detected"
-        assert len(s) > 0, "trie conflict detected"
+        assert k != "", "trie conflict detected"
 
-        if ord(s[0]) in root:
-            return self.add(root[ord(s[0])], s[1:], result)
-        if len(s) > 1:
+        if ord(k[0]) in root:
+            return self.add(root[ord(k[0])], k[1:], v)
+        if len(k) > 1:
             d = {}
-            root[ord(s[0])] = d
-            return self.add(d, s[1:], result)
-        root[ord(s)] = result
+            root[ord(k[0])] = d
+            return self.add(d, k[1:], v)
+        root[ord(k)] = v
 
-    def get(self, keys, more_available):
-        result = self.get_recurse(self.data, keys, more_available)
+    def get(self, codes: List[int], more_available: bool):
+        result, remaining_codes = self.get_recurse(self.data, codes, more_available)
         if not result:
-            result = self.read_cursor_position(keys, more_available)
-        return result
+            result, remaining_codes = self.read_cursor_position(codes, more_available)
+        return result, remaining_codes
 
-    def get_recurse(self, root, keys, more_available):
+    def get_recurse(
+        self, root, codes: List[int], more_available: bool
+    ) -> Tuple[Optional[Union[str, Tuple]], List[int]]:
         if type(root) != dict:
             if root == "mouse":
-                return self.read_mouse_info(keys, more_available)
+                return self.read_mouse_info(codes, more_available)
             elif root == "sgrmouse":
-                return self.read_sgrmouse_info(keys, more_available)
-            return (root, keys)
-        if not keys:
+                return self.read_sgrmouse_info(codes, more_available)
+            else:
+                return root, codes
+        if not codes:
             # get more keys
             if more_available:
                 raise MoreInputRequired()
-            return None
-        if keys[0] not in root:
-            return None
-        return self.get_recurse(root[keys[0]], keys[1:], more_available)
+            return None, codes
+        if codes[0] not in root:
+            return None, codes
+        return self.get_recurse(root[codes[0]], codes[1:], more_available)
 
-    def read_mouse_info(self, keys, more_available):
-        if len(keys) < 3:
+    def read_mouse_info(
+        self, codes: List[int], more_available: bool
+    ) -> Tuple[Optional[Tuple], List[int]]:
+        """Return mouse info after process codes."""
+        if len(codes) < 3:
             if more_available:
                 raise MoreInputRequired()
-            return None
+            return None, codes
 
-        b = keys[0] - 32
-        x, y = (keys[1] - 33) % 256, (keys[2] - 33) % 256  # supports 0-255
+        b = codes[0] - 32
+        x, y = (codes[1] - 33) % 256, (codes[2] - 33) % 256  # supports 0-255
 
         prefix = ""
         if b & 4:
@@ -339,22 +345,24 @@ class KeyqueueTrie(object):
         else:
             action = "press"
 
-        return (f"{prefix}mouse {action}", button, x, y), keys[3:]
+        return (f"{prefix}mouse {action}", button, x, y), codes[3:]
 
-    def read_sgrmouse_info(self, keys, more_available):
+    def read_sgrmouse_info(
+        self, codes: List[int], more_available: bool
+    ) -> Tuple[Optional[Tuple], List[int]]:
         # Helpful links:
         # https://stackoverflow.com/questions/5966903/how-to-get-mousemove-and-mouseclick-in-bash
         # http://invisible-island.net/xterm/ctlseqs/ctlseqs.pdf
 
-        if not keys:
+        if not codes:
             if more_available:
                 raise MoreInputRequired()
-            return None
+            return None, codes
 
         value = ""
         pos_m = 0
         found_m = False
-        for k in keys:
+        for k in codes:
             value = value + chr(k)
             if k in [ord("M"), ord("m")]:
                 found_m = True
@@ -363,7 +371,7 @@ class KeyqueueTrie(object):
         if not found_m:
             if more_available:
                 raise MoreInputRequired()
-            return None
+            return None, codes
 
         (b, x, y) = value[:-1].split(";")
 
@@ -373,7 +381,7 @@ class KeyqueueTrie(object):
         # implemented by using a timer. This timer can check if the last
         # registered click is below a certain threshold. This threshold
         # is normally set in the operating system itself, so setting one
-        # here will cause an inconsistent behaviour. I do not plan to use
+        # here will cause an inconsistent behavior. I do not plan to use
         # that feature, so I won't implement it.
 
         button = ((int(b) & 64) // 64 * 3) + (int(b) & 3) + 1
@@ -385,63 +393,68 @@ class KeyqueueTrie(object):
         else:
             action = "release"
 
-        return (f"mouse {action}", button, x, y), keys[pos_m + 1 :]
+        return (f"mouse {action}", button, x, y), codes[pos_m + 1 :]
 
-    def read_cursor_position(self, keys, more_available):
+    def read_cursor_position(
+        self, codes: List[int], more_available: bool
+    ) -> Tuple[Optional[Tuple], List[int]]:
         """
         Interpret cursor position information being sent by the
         user's terminal.  Returned as ('cursor position', x, y)
         where (x, y) == (0, 0) is the top left of the screen.
         """
-        if not keys:
+        # TODO: improve method.
+        default = (None, codes)
+
+        if not codes:
             if more_available:
                 raise MoreInputRequired()
-            return None
-        if keys[0] != ord("["):
-            return None
+            return default
+        if codes[0] != ord("["):
+            return default
         # read y value
         y = 0
         i = 1
-        for k in keys[i:]:
+        for k in codes[i:]:
             i += 1
             if k == ord(";"):
                 if y:
                     break
                 else:
-                    return None
+                    return default
             if k < ord("0") or k > ord("9"):
-                return None
+                return default
             if not y and k == ord("0"):
-                return None
+                return default
             y = y * 10 + k - ord("0")
-        if not keys[i:]:
+        if not codes[i:]:
             if more_available:
                 raise MoreInputRequired()
-            return None
+            return default
         # read x value
         x = 0
-        for k in keys[i:]:
+        for k in codes[i:]:
             i += 1
             if k == ord("R"):
-                return (("cursor position", x - 1, y - 1), keys[i:]) if x else None
+                return (("cursor position", x - 1, y - 1), codes[i:]) if x else None
             if k < ord("0") or k > ord("9"):
-                return None
+                return default
             if not x and k == ord("0"):
-                return None
+                return default
             x = x * 10 + k - ord("0")
-        if not keys[i:] and more_available:
+        if not codes[i:] and more_available:
             raise MoreInputRequired()
-        return None
+        return default
 
 
 # ===============================================
 # Build the input trie from input_sequences list
-input_trie = KeyqueueTrie(input_sequences)
+input_trie = KeyQueueTrie(input_sequences)
 # ===============================================
 
 ESC = "\x1b"
-MOUSE_TRACKING_ON = f"{ESC}[?1000h{ESC}[?1002h{ESC}[?1006h"
-MOUSE_TRACKING_OFF = f"{ESC}[?1006l{ESC}[?1002l{ESC}[?1000l"
+MOUSE_TRACKING_ON: Final = f"{ESC}[?1000h{ESC}[?1002h{ESC}[?1006h"
+MOUSE_TRACKING_OFF: Final = f"{ESC}[?1006l{ESC}[?1002l{ESC}[?1000l"
 
 _keyconv = {
     -1: None,
@@ -491,7 +504,9 @@ _keyconv = {
 }
 
 
-def process_keyqueue(codes, more_available):
+def process_key_queue(
+    codes: List[int], more_available: bool
+) -> Tuple[List[str], List[int]]:
     """
     codes -- list of key codes
     more_available -- if True then raise MoreInputRequired when in the
@@ -561,7 +576,7 @@ def process_keyqueue(codes, more_available):
 
     if codes[1:]:
         # Meta keys -- ESC+Key form
-        run, remaining_codes = process_keyqueue(codes[1:], more_available)
+        run, remaining_codes = process_key_queue(codes[1:], more_available)
         if is_mouse_event(run[0]):
             return ["esc"] + run, remaining_codes
         if run[0] == "esc" or run[0].find("meta ") >= 0:
@@ -646,11 +661,11 @@ class PosixInput(InputTerminal):
 
         self._key_queue = []
         self.prev_input_resize = 0
-        self._partial_codes = None
-        self._input_timeout = None
+        self._partial_codes: Optional[List[int]] = None
+        self._input_timeout: Optional[float] = None
         self.set_input_timeouts()
-        self._next_timeout = None
-        self._resized = False
+        self._next_timeout: Optional[float] = None
+        self._resized: bool = False
 
         self.gpm_mev = None
         self.gpm_event_pending = False
@@ -665,10 +680,24 @@ class PosixInput(InputTerminal):
         self._resize_pipe_rd, self._resize_pipe_wr = os.pipe()
         fcntl.fcntl(self._resize_pipe_rd, fcntl.F_SETFL, os.O_NONBLOCK)
 
-    def _input_fileno(self):
+    def write(self, data) -> None:
+        """Write some data to the terminal.
+        You may wish to override this if you're using something other than
+        regular files for input and output.
         """
-        Returns the fileno of the input stream, or None if it doesn't have one.
-        A stream without a fileno can't participate in whatever.
+        self._term_output_file.write(data)
+
+    def flush(self) -> None:
+        """Flush the output buffer.
+        You may wish to override this if you're using something other than
+        regular files for input and output.
+        """
+        self._term_output_file.flush()
+
+    def _input_fileno(self) -> Optional[int]:
+        """Returns the fileno of the input stream.
+        Or None if it doesn't have one. A stream without a fileno can't
+        participate in whatever.
         """
         if hasattr(self._term_input_file, "fileno"):
             return self._term_input_file.fileno()
@@ -743,7 +772,7 @@ class PosixInput(InputTerminal):
         self._mouse_tracking(enable)
         self._mouse_tracking_enabled = enable
 
-    def _mouse_tracking(self, enable):
+    def _mouse_tracking(self, enable: bool):
         if enable:
             self.write(MOUSE_TRACKING_ON)
             self._start_gpm_tracking()
@@ -797,8 +826,10 @@ class PosixInput(InputTerminal):
 
         self._mouse_tracking(False)
 
-    def _wait_for_input_ready(self, timeout):
-        ready = None
+    def _wait_input_ready(self, timeout: float) -> List[int]:
+        """Monitor input fileno until timeout, return a list of prepared input fileno."""
+        ready_fds: Optional[List] = None
+
         fd_list = []
         fd = self._input_fileno()
         if fd is not None:
@@ -806,32 +837,34 @@ class PosixInput(InputTerminal):
         while True:
             try:
                 if timeout is None:
-                    ready, w, err = select.select(fd_list, [], fd_list)
+                    ready_fds, w, err = select.select(fd_list, [], fd_list)
                 else:
-                    ready, w, err = select.select(fd_list, [], fd_list, timeout)
+                    ready_fds, w, err = select.select(fd_list, [], fd_list, timeout)
                 break
             except select.error as e:
                 if e.args[0] != 4:
                     raise
                 if self._resized:
-                    ready = []
+                    ready_fds = []
                     break
-        return ready
+        return ready_fds
 
-    def _getch(self, timeout):
-        ready = self._wait_for_input_ready(timeout)
+    def _getch(self, timeout: float) -> int:
+        """Read one byte from fileno until timeout."""
+        ready = self._wait_input_ready(timeout)
         fd = self._input_fileno()
-        if fd is not None and fd in ready:
-            return ord(os.read(fd, 1))
-        return -1
 
-    def _getch_nodelay(self):
+        return ord(os.read(fd, 1)) if fd in ready else -1
+
+    def _getch_no_delay(self) -> int:
         return self._getch(0)
 
-    def _get_keyboard_codes(self):
-        codes = []
+    def _get_keyboard_codes(self) -> List[int]:
+        """Read byte code util there was no."""
+        codes: List[int] = []
+
         while True:
-            code = self._getch_nodelay()
+            code = self._getch_no_delay()
             if code < 0:
                 break
             codes.append(code)
@@ -944,57 +977,44 @@ class PosixInput(InputTerminal):
 
         return codes
 
-    def parse_input(self, event_loop, callback, codes, wait_for_more=True):
+    def parse_input(
+        self, callback: Optional[Callable], codes: List[int], wait_for_more: bool = True
+    ) -> Optional[Tuple[List[str], List[int]]]:
         """
         Read any available input from get_available_raw_input, parses it into
         keys, and calls the given callback.
-        The current implementation tries to avoid any assumptions about what
-        the screen or event loop look like; it only deals with parsing keycodes
-        and setting a timeout when an incomplete one is detected.
-        `codes` should be a sequence of keycodes, i.e. bytes.  A bytearray is
+        `codes` should be a sequence of key-codes, i.e. bytes.  A bytearray is
         appropriate, but beware of using bytes, which only iterates as integers
         on Python 3.
         """
         # Note: event_loop may be None for 100% synchronous support, only used
         # by get_input.  Not documented because you shouldn't be doing it.
-        if self._input_timeout and event_loop:
-            event_loop.remove_alarm(self._input_timeout)
-            self._input_timeout = None
 
         original_codes = codes
         processed = []
         try:
             while codes:
-                run, codes = process_keyqueue(codes, wait_for_more)
+                # Here will update `codes`.
+                run, codes = process_key_queue(codes, wait_for_more)
                 processed.extend(run)
         except MoreInputRequired:
             # Set a timer to wait for the rest of the input; if it goes off
-            # without any new input having come in, use the partial input
-            k = len(original_codes) - len(codes)
-            processed_codes = original_codes[:k]
+            # without any new input having come in, use the partial input.
+            # sourcery skip: extract-method, inline-immediately-returned-variable
+            pos = len(original_codes) - len(codes)
+            processed_codes = original_codes[:pos]
             self._partial_codes = codes
 
-            def _parse_incomplete_input():
-                self._input_timeout = None
-                self._partial_codes = None
-                self.parse_input(event_loop, callback, codes, wait_for_more=False)
-
-            if event_loop:
-                self._input_timeout = event_loop.alarm(
-                    self.complete_wait, _parse_incomplete_input
-                )
-            else:
-                # When there is no `eventloop`, and turn on `wait more`.
-                run, codes = self.parse_input(
-                    event_loop, callback, codes, wait_for_more=False
-                )
-                processed.extend(run)
-                processed_codes = original_codes
+            # When there is no `event_loop`, and turn on `wait more`.
+            run, codes = self.parse_input(callback, codes, wait_for_more=False)
+            processed.extend(run)
+            processed_codes = original_codes
 
         else:
             processed_codes = original_codes
             self._partial_codes = None
 
+        # Check resize event.
         if self._resized:
             processed.append("window resize")
             self._resized = False
@@ -1005,7 +1025,9 @@ class PosixInput(InputTerminal):
             # For get_input
             return processed, processed_codes
 
-    def get_input(self, raw_keys=False):
+    def get_input(
+        self, raw_keys: bool = False
+    ) -> Tuple[List[str], Optional[List[int]]]:
         """Return pending input as a list.
         raw_keys -- return raw key-codes as well as translated versions
         This function will immediately return all the input since the
@@ -1037,16 +1059,14 @@ class PosixInput(InputTerminal):
                                 ('ctrl mouse release', 0, 17, 23)
         """
 
-        self._wait_for_input_ready(self._next_timeout)
-        keys, raw = self.parse_input(None, None, self.get_available_raw_input())
+        self._wait_input_ready(self._next_timeout)
+        keys, raw = self.parse_input(None, self.get_available_raw_input())
 
         # Avoid pegging CPU at 100% when slowly resizing
         if keys == ["window resize"] and self.prev_input_resize:
             while True:
-                self._wait_for_input_ready(self.resize_wait)
-                keys, raw2 = self.parse_input(
-                    None, None, self.get_available_raw_input()
-                )
+                self._wait_input_ready(self.resize_wait)
+                keys, raw2 = self.parse_input(None, self.get_available_raw_input())
                 raw += raw2
                 # if not keys:
                 #    keys, raw2 = self._get_input(
@@ -1064,23 +1084,7 @@ class PosixInput(InputTerminal):
         else:
             self.prev_input_resize = 0
 
-        if raw_keys:
-            return keys, raw
-        return keys, None
-
-    def write(self, data):
-        """Write some data to the terminal.
-        You may wish to override this if you're using something other than
-        regular files for input and output.
-        """
-        self._term_output_file.write(data)
-
-    def flush(self):
-        """Flush the output buffer.
-        You may wish to override this if you're using something other than
-        regular files for input and output.
-        """
-        self._term_output_file.flush()
+        return (keys, raw) if raw_keys else (keys, None)
 
 
 if __name__ == "__main__":
@@ -1089,5 +1093,5 @@ if __name__ == "__main__":
     handle.set_mouse_tracking()
     handle.set_input_timeouts(0.125)
     while True:
-        res = handle.get_input(raw_keys=False)
+        res = handle.get_input(raw_keys=True)
         print(res)

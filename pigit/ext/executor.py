@@ -2,6 +2,7 @@ from typing import (
     Any,
     Callable,
     Coroutine,
+    Final,
     Optional,
     Tuple,
     Union,
@@ -17,12 +18,12 @@ import contextlib
 import asyncio
 
 
-WAIT_ENTER = 1 << 0  # wait for enter-press afterwards. not support async.
-DECODE = 1 << 1  # decoding the command result.
-WAITING = 1 << 2  # waiting util to command ending.
-REDIRECT = 1 << 3  # redirect output to the PIPE.
-REPLY = 1 << 4  # fetch command result and return.
-SILENT = 1 << 5  # silent mode. output will be discarded.
+WAIT_ENTER: Final = 1 << 0  # wait for enter-press afterwards. not support async.
+DECODE: Final = 1 << 1  # decoding the command result.
+WAITING: Final = 1 << 2  # waiting util to command ending.
+REDIRECT: Final = 1 << 3  # redirect output to the PIPE.
+REPLY: Final = 1 << 4  # fetch command result and return.
+SILENT: Final = 1 << 5  # silent mode. output will be discarded.
 
 ExecResult = Tuple[int, Union[None, str, ByteString], Union[None, str, ByteString]]
 
