@@ -2,7 +2,13 @@ import signal
 import termios
 import pytest
 from unittest.mock import Mock, patch
-from pigit.tui.input import PosixInput, KeyQueueTrie, MoreInputRequired
+from pigit.tui.input import (
+    PosixInput,
+    KeyQueueTrie,
+    MoreInputRequired,
+    process_key_queue,
+    set_byte_encoding,
+)
 
 
 class TestKeyQueueTrie:
@@ -162,6 +168,51 @@ class TestKeyQueueTrie:
                 kqt.read_cursor_position(codes, more_available)
         else:
             assert kqt.read_cursor_position(codes, more_available) == expected
+
+
+# Define a fixture for the MoreInputRequired exception
+@pytest.fixture
+def more_input_required():
+    return MoreInputRequired()
+
+
+# Define the test function
+@pytest.mark.parametrize(
+    "codes, more_available, expected_output, expected_remaining_codes, raises",
+    [
+        # Happy path tests
+        ([65, 66, 67], False, ["A"], [66, 67], None),  # ID: ASCII codes
+        ([27, 65], False, ["meta A"], [], None),  # ID: ESC code
+        ([27, 27, 65], False, ["esc", "meta A"], [], None),  # ID: Multiple ESC codes
+        # Edge cases
+        ([], False, [], [], None),  # ID: Empty codes
+        ([32, 126], False, [" "], [126], None),  # ID: Boundary ASCII codes
+        # Error cases
+        (
+            [240, 201],
+            True,
+            [],
+            [],
+            more_input_required,
+        ),  # ID: MoreInputRequired exception
+    ],
+)
+def test_process_key_queue(
+    codes, more_available, expected_output, expected_remaining_codes, raises
+):
+    # Arrange
+
+    # Act
+    if raises:
+        with pytest.raises(MoreInputRequired):
+            set_byte_encoding("utf8")
+            output, remaining_codes = process_key_queue(codes, more_available)
+    else:
+        output, remaining_codes = process_key_queue(codes, more_available)
+
+        # Assert
+        assert output == expected_output
+        assert remaining_codes == expected_remaining_codes
 
 
 class TestInput:

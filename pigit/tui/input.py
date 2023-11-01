@@ -14,7 +14,6 @@ from typing import Callable, Dict, Final, List, Optional, Tuple, Union
 # ===========
 # Predefined
 # ===========
-ord2 = lambda x: x
 B = lambda x: x.encode("iso8859-1")  # noqa: E731
 
 # ==================
@@ -110,7 +109,7 @@ def set_encoding(encoding: str):
 # ==============
 # Util function
 # ==============
-def within_double_byte(text, line_start: int, pos: int):
+def within_double_byte(text: bytes, line_start: int, pos: int):
     """Return whether pos is within a double-byte encoded character.
     text -- byte string in question
     line_start -- offset of beginning of line (< pos)
@@ -121,32 +120,28 @@ def within_double_byte(text, line_start: int, pos: int):
     2 -- pos is on the 2nd half of a dbe char
     """
     assert isinstance(text, bytes)
-    v = ord2(text[pos])
+    v = text[pos]
 
     if v >= 0x40 and v < 0x7F:
         # might be second half of big5, uhc or gbk encoding
         if pos == line_start:
             return 0
 
-        if (
-            ord2(text[pos - 1]) >= 0x81
-            and within_double_byte(text, line_start, pos - 1) == 1
+        elif (
+            text[pos - 1] >= 0x81 and within_double_byte(text, line_start, pos - 1) == 1
         ):
             return 2
-        return 0
+        else:
+            return 0
 
     if v < 0x80:
         return 0
 
     i = pos - 1
-    while i >= line_start:
-        if ord2(text[i]) < 0x80:
-            break
+    while i >= line_start and text[i] >= 0x80:
         i -= 1
 
-    if (pos - i) & 1:
-        return 1
-    return 2
+    return 1 if (pos - i) & 1 else 2
 
 
 def is_mouse_event(ev):
@@ -456,7 +451,7 @@ ESC = "\x1b"
 MOUSE_TRACKING_ON: Final = f"{ESC}[?1000h{ESC}[?1002h{ESC}[?1006h"
 MOUSE_TRACKING_OFF: Final = f"{ESC}[?1006l{ESC}[?1002l{ESC}[?1000l"
 
-_keyconv = {
+_key_conv = {
     -1: None,
     8: "backspace",
     9: "tab",
@@ -504,9 +499,21 @@ _keyconv = {
 }
 
 
-def process_key_queue(
-    codes: List[int], more_available: bool
-) -> Tuple[List[str], List[int]]:
+def process_one_code(code: int) -> Optional[str]:
+    """Process key code that less than 127."""
+    if code >= 32 and code <= 126:
+        return chr(code)
+    elif code in _key_conv:
+        return _key_conv[code]
+    elif code > 0 and code < 27:
+        return f'ctrl {chr(ord("a") + code - 1)}'
+    elif code > 27 and code < 32:
+        return f'ctrl {chr(ord("A") + code - 1)}'
+    else:
+        return None
+
+
+def process_key_queue(codes: List[int], more_available: bool) -> Tuple[List, List[int]]:
     """
     codes -- list of key codes
     more_available -- if True then raise MoreInputRequired when in the
@@ -514,16 +521,12 @@ def process_key_queue(
         will attempt to send more key codes on the next call.
     returns (list of input, list of remaining key codes).
     """
+    if not codes:
+        return [], []
+
     code = codes[0]
-    if code >= 32 and code <= 126:
-        key = chr(code)
-        return [key], codes[1:]
-    if code in _keyconv:
-        return [_keyconv[code]], codes[1:]
-    if code > 0 and code < 27:
-        return [f'ctrl {chr(ord("a") + code - 1)}'], codes[1:]
-    if code > 27 and code < 32:
-        return [f'ctrl {chr(ord("A") + code - 1)}'], codes[1:]
+    if s := process_one_code(code):
+        return [s], codes[1:]
 
     em = get_byte_encoding()
 
@@ -544,19 +547,18 @@ def process_key_queue(
         else:
             return ["<%d>" % code], codes[1:]
 
+        if len(codes) < need_more + 1:
+            if more_available:
+                raise MoreInputRequired()
+            else:
+                return ["<%d>" % code], codes[1:]
+
         for i in range(need_more):
-            if len(codes) - 1 <= i:
-                if more_available:
-                    raise MoreInputRequired()
-                else:
-                    return ["<%d>" % code], codes[1:]
             k = codes[i + 1]
             if k > 256 or k & 0xC0 != 0x80:
                 return ["<%d>" % code], codes[1:]
 
         s = bytes(codes[: need_more + 1])
-
-        assert isinstance(s, bytes)
         try:
             return [s.decode("utf-8")], codes[need_more + 1 :]
         except UnicodeDecodeError:
@@ -568,12 +570,13 @@ def process_key_queue(
     if code != 27:
         return ["<%d>" % code], codes[1:]
 
-    result = input_trie.get(codes[1:], more_available)
+    # Try get from input trie
+    result, remaining_codes = input_trie.get(codes[1:], more_available)
 
     if result is not None:
-        result, remaining_codes = result
         return [result], remaining_codes
 
+    #  code -- ESC
     if codes[1:]:
         # Meta keys -- ESC+Key form
         run, remaining_codes = process_key_queue(codes[1:], more_available)
