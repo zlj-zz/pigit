@@ -896,7 +896,7 @@ class Repo:
                 cmds.append(cmd)
                 orders.append({"cwd": prop["path"]})
 
-            return self.executor.exec_async(*cmds, orders=orders, flags=WAITING)
+            return self.executor.exec_parallel(*cmds, orders=orders, flags=WAITING)
 
         for _, prop in exist_repos.items():
             self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
