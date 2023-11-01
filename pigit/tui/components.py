@@ -18,8 +18,8 @@ class Component(ABC):
 
     def __init__(
         self,
-        x: int = 0,
-        y: int = 0,
+        x: int = 1,
+        y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         children: Optional[Dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
@@ -240,8 +240,8 @@ class ItemSelector(Component):
 
     def __init__(
         self,
-        x: int = 0,
-        y: int = 0,
+        x: int = 1,
+        y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         content: Optional[List[str]] = None,
     ) -> None:

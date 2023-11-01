@@ -1,8 +1,6 @@
 import sys
 from typing import List, Tuple
 
-from pigit.ext.log import logger
-
 
 def _stdout(*values, sep: str = "", end: str = ""):
     """Output values to screen."""
@@ -96,7 +94,7 @@ class Render:
         Cursor.to(1, 1)
 
     @classmethod
-    def draw(cls, content: List[str], x: int, y: int, size: Tuple[int, int]):
+    def draw(cls, content: List[str], x: int, y: int, size: Tuple[int, int]) -> None:
         """Draw content to screen. Using by component."""
         col, row = size
 
@@ -111,7 +109,7 @@ class Render:
 
             cur_x += 1
 
-        while cur_x < row:
+        while cur_x <= row:
             Cursor.to(cur_x, y)
             _stdout(Signal.term_space * col)
 
