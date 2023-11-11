@@ -20,8 +20,8 @@ Example:
     }
 """
 
-from typing import Dict
 import enum
+from typing import Callable, Dict, List, Union, Tuple, TypedDict
 
 from ._cmd_func import *
 
@@ -45,6 +45,13 @@ class CommandType(enum.Enum):
     Extra = "Extra"  # default
 
 
+class CmdOptions(TypedDict):
+    belong: CommandType
+    command: Union[str, Callable[[Union[List, Tuple]], None]]
+    help: str
+    has_arguments: bool
+
+
 # The custom git output format string.
 #   git ... --pretty={0}.format(GIT_PRINT_FORMAT)
 _GIT_PRINT_FORMAT = (
@@ -54,7 +61,7 @@ _GIT_PRINT_FORMAT = (
 )
 
 
-GIT_CMDS: Dict[str, Dict] = {
+GIT_CMDS: Dict[str, CmdOptions] = {
     # Branch
     "b": {
         "belong": CommandType.Branch,

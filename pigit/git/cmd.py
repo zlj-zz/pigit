@@ -79,7 +79,6 @@ class SCmd:
         Returns:
             str: command with color tags.
         """
-
         handle = re.match(r"(\w+)\s+(\w+)", command)
         # Unable to match correctly.
         if handle is None:
@@ -117,10 +116,8 @@ class SCmd:
                     3: func cmd exec error.
                     5: not supported cmd type.
         """
-
-        msgs = []
-
-        option: Optional[Dict] = self.cmds.get(short_cmd)
+        msgs: List[str] = []
+        option = self.cmds.get(short_cmd)
 
         # Invalid, if need suggest.
         if option is None:
@@ -130,7 +127,7 @@ class SCmd:
                 "please try `--show-commands`<gold>",
             )
 
-        command: Optional[Union[str, Callable]] = option.get("command")
+        command = option.get("command")
 
         # Has no command can be executed.
         if not command:
