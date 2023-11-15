@@ -22,13 +22,13 @@ B = lambda x: x.encode("iso8859-1")  # noqa: E731
 _byte_encoding = None
 
 
-def set_byte_encoding(enc):
-    assert enc in ("utf8", "narrow", "wide")
+def set_byte_encoding(enc: str):
+    assert enc in {"utf8", "narrow", "wide"}
     global _byte_encoding
     _byte_encoding = enc
 
 
-def get_byte_encoding():
+def get_byte_encoding() -> str:
     return _byte_encoding
 
 
@@ -72,28 +72,8 @@ def set_encoding(encoding: str):
 
     if encoding in {"utf-8", "utf8", "utf"}:
         set_byte_encoding("utf8")
-
         _use_dec_special = False
-    elif encoding in {
-        "euc-jp",  # JISX 0208 only
-        "euc-kr",
-        "euc-cn",
-        "euc-tw",  # CNS 11643 plain 1 only
-        "gb2312",
-        "gbk",
-        "big5",
-        "cn-gb",
-        "uhc",
-        # these shouldn't happen, should they?
-        "eucjp",
-        "euckr",
-        "euccn",
-        "euctw",
-        "cncb",
-    }:
-        set_byte_encoding("wide")
 
-        _use_dec_special = True
     else:
         set_byte_encoding("narrow")
         _use_dec_special = True
@@ -109,41 +89,6 @@ def set_encoding(encoding: str):
 # ==============
 # Util function
 # ==============
-def within_double_byte(text: bytes, line_start: int, pos: int):
-    """Return whether pos is within a double-byte encoded character.
-    text -- byte string in question
-    line_start -- offset of beginning of line (< pos)
-    pos -- offset in question
-    Return values:
-    0 -- not within dbe char, or double_byte_encoding == False
-    1 -- pos is on the 1st half of a dbe char
-    2 -- pos is on the 2nd half of a dbe char
-    """
-    assert isinstance(text, bytes)
-    v = text[pos]
-
-    if v >= 0x40 and v < 0x7F:
-        # might be second half of big5, uhc or gbk encoding
-        if pos == line_start:
-            return 0
-
-        elif (
-            text[pos - 1] >= 0x81 and within_double_byte(text, line_start, pos - 1) == 1
-        ):
-            return 2
-        else:
-            return 0
-
-    if v < 0x80:
-        return 0
-
-    i = pos - 1
-    while i >= line_start and text[i] >= 0x80:
-        i -= 1
-
-    return 1 if (pos - i) & 1 else 2
-
-
 def is_mouse_event(ev):
     return type(ev) == tuple and len(ev) == 4 and ev[0].find("mouse") >= 0
 
@@ -156,10 +101,12 @@ def is_mouse_press(ev):
 ## Input sequences
 # =================
 class MoreInputRequired(Exception):
-    """"""
+    """Exception of process input codes.
+    Throw this error to inform the caller that more input characters are needed.
+    """
 
 
-def escape_modifier(digit):
+def _escape_modifier(digit: int):
     mode = ord(digit) - ord("1")
     return (
         "shift " * (mode & 1)
@@ -207,19 +154,19 @@ input_sequences = [
     ('O' + chr(ord('p')+n), str(n)) for n in range(10)
 ] + [
     # modified cursor keys + home, end, 5 -- [#X and [1;#X forms
-    (prefix+digit+letter, escape_modifier(digit) + key)
+    (prefix+digit+letter, _escape_modifier(digit) + key)
     for prefix in ("[", "[1;")
     for digit in "12345678"
     for letter,key in zip("ABCDEFGH",
         ('up','down','right','left','5','end','5','home'))
 ] + [
     # modified F1-F4 keys -- O#X form
-    (f"O{digit}{letter}", escape_modifier(digit) + key)
+    (f"O{digit}{letter}", _escape_modifier(digit) + key)
     for digit in "12345678"
     for letter,key in zip("PQRS",('f1','f2','f3','f4'))
 ] + [
     # modified F1-F13 keys -- [XX;#~ form
-    (f"[{num};{digit}~", escape_modifier(digit) + key)
+    (f"[{num};{digit}~", _escape_modifier(digit) + key)
     for digit in "12345678"
     for num,key in zip(
         (3,5,6,11,12,13,14,15,17,18,19,20,21,23,24,25,26,28,29,31,32,33,34),
@@ -264,7 +211,13 @@ class KeyQueueTrie:
             self.add(self.data, s, result)
 
     def add(self, root: Dict, k: str, v: str) -> None:
-        """Add a pair of k-v mappings to the recursive mapping field."""
+        """Add a pair of k-v mappings to the recursive mapping field.
+
+        Args:
+            root (Dict): The root dictionary.
+            k (str): The key.
+            v (str): The value.
+        """
         assert type(root) == dict, "trie conflict detected"
         assert k != "", "trie conflict detected"
 
@@ -283,8 +236,18 @@ class KeyQueueTrie:
         return result, remaining_codes
 
     def get_recurse(
-        self, root, codes: List[int], more_available: bool
+        self, root: Union[Dict, str], codes: List[int], more_available: bool
     ) -> Tuple[Optional[Union[str, Tuple]], List[int]]:
+        """Recursively get the result and remaining codes.
+
+        Args:
+            root: The root object.
+            codes (List[int]): The codes list.
+            more_available (bool): Indicates if more input is available.
+
+        Returns:
+            Tuple[Optional[Union[str, Tuple]], List[int]]: The result and remaining codes.
+        """
         if type(root) != dict:
             if root == "mouse":
                 return self.read_mouse_info(codes, more_available)
@@ -304,7 +267,15 @@ class KeyQueueTrie:
     def read_mouse_info(
         self, codes: List[int], more_available: bool
     ) -> Tuple[Optional[Tuple], List[int]]:
-        """Return mouse info after process codes."""
+        """Read mouse information after processing codes.
+
+        Args:
+            codes (List[int]): The codes list.
+            more_available (bool): Indicates if more input is available.
+
+        Returns:
+            Tuple[Optional[Tuple], List[int]]: The mouse information and remaining codes.
+        """
         if len(codes) < 3:
             if more_available:
                 raise MoreInputRequired()
@@ -393,10 +364,17 @@ class KeyQueueTrie:
     def read_cursor_position(
         self, codes: List[int], more_available: bool
     ) -> Tuple[Optional[Tuple], List[int]]:
-        """
-        Interpret cursor position information being sent by the
-        user's terminal.  Returned as ('cursor position', x, y)
-        where (x, y) == (0, 0) is the top left of the screen.
+        """Return the cursor position info.
+        Interpret cursor position information being sent by the user's terminal.
+        Returned as ('cursor position', x, y) where (x, y) == (0, 0) is the top
+        left of the screen.
+
+        Args:
+            codes (List[int]): The codes list.
+            more_available (bool): Indicates if more input is available.
+
+        Returns:
+            Tuple[Optional[Tuple], List[int]]: The cursor position information and remaining codes.
         """
         # TODO: improve method.
         default = (None, codes)
@@ -447,7 +425,7 @@ class KeyQueueTrie:
 input_trie = KeyQueueTrie(input_sequences)
 # ===============================================
 
-ESC = "\x1b"
+ESC: Final = "\x1b"
 MOUSE_TRACKING_ON: Final = f"{ESC}[?1000h{ESC}[?1002h{ESC}[?1006h"
 MOUSE_TRACKING_OFF: Final = f"{ESC}[?1006l{ESC}[?1002l{ESC}[?1000l"
 
@@ -500,17 +478,57 @@ _key_conv = {
 
 
 def process_one_code(code: int) -> Optional[str]:
-    """Process key code that less than 127."""
+    """Process key code that less than 127 or code in `_key_conv`."""
+    # ctrl + a-z
+    # FIXME: process enter ot ctrl+j
+    if 0 < code < 27:
+        return f'ctrl {chr(ord("a") + code - 1)}'
+
+    # ctrl + [\]^
+    if 27 < code < 32:
+        return f'ctrl {chr(ord("A") + code - 1)}'
+
+    # (space)!"#$%&'()*+,-./ 0-9 :;<=>?@ A-Z [\]^_` a-z {|}~
     if code >= 32 and code <= 126:
         return chr(code)
-    elif code in _key_conv:
-        return _key_conv[code]
-    elif code > 0 and code < 27:
-        return f'ctrl {chr(ord("a") + code - 1)}'
-    elif code > 27 and code < 32:
-        return f'ctrl {chr(ord("A") + code - 1)}'
-    else:
+
+    return _key_conv[code] if code in _key_conv else None
+
+
+def process_utf8_code(
+    codes: List[int], more_available: bool
+) -> Union[None, Tuple[List[str], List[int]]]:
+    """Process UTF-8 code."""
+    code = codes[0]
+    if not (127 < code < 256):
         return None
+
+    if code & 0xE0 == 0xC0:  # 2-byte form
+        need_more = 1
+    elif code & 0xF0 == 0xE0:  # 3-byte form
+        need_more = 2
+    elif code & 0xF8 == 0xF0:  # 4-byte form
+        need_more = 3
+    else:
+        return ["<%d>" % code], codes[1:]
+
+    if len(codes) < need_more + 1:
+        if more_available:
+            raise MoreInputRequired()
+        else:
+            return ["<%d>" % code], codes[1:]
+
+    for i in range(need_more):
+        k = codes[i + 1]
+        if k > 256 or k & 0xC0 != 0x80:
+            return ["<%d>" % code], codes[1:]
+
+    s = bytes(codes[: need_more + 1])
+    try:
+        # Right process.
+        return [s.decode("utf-8")], codes[need_more + 1 :]
+    except UnicodeDecodeError:
+        return ["<%d>" % code], codes[1:]
 
 
 def process_key_queue(codes: List[int], more_available: bool) -> Tuple[List, List[int]]:
@@ -524,51 +542,24 @@ def process_key_queue(codes: List[int], more_available: bool) -> Tuple[List, Lis
     if not codes:
         return [], []
 
-    code = codes[0]
-    if s := process_one_code(code):
+    c = codes[0]
+    if s := process_one_code(c):
         return [s], codes[1:]
 
     em = get_byte_encoding()
+    em_map = {
+        "utf8": process_utf8_code,
+    }
+    if em in em_map and (
+        result_and_remaining_codes := em_map[em](codes, more_available)
+    ):
+        return result_and_remaining_codes
 
-    if em == "wide" and code < 256 and within_double_byte(chr(code), 0, 0):
-        if not codes[1:] and more_available:
-            raise MoreInputRequired()
-        if codes[1:] and codes[1] < 256:
-            db = chr(code) + chr(codes[1])
-            if within_double_byte(db, 0, 1):
-                return [db], codes[2:]
-    if em == "utf8" and code > 127 and code < 256:
-        if code & 0xE0 == 0xC0:  # 2-byte form
-            need_more = 1
-        elif code & 0xF0 == 0xE0:  # 3-byte form
-            need_more = 2
-        elif code & 0xF8 == 0xF0:  # 4-byte form
-            need_more = 3
-        else:
-            return ["<%d>" % code], codes[1:]
-
-        if len(codes) < need_more + 1:
-            if more_available:
-                raise MoreInputRequired()
-            else:
-                return ["<%d>" % code], codes[1:]
-
-        for i in range(need_more):
-            k = codes[i + 1]
-            if k > 256 or k & 0xC0 != 0x80:
-                return ["<%d>" % code], codes[1:]
-
-        s = bytes(codes[: need_more + 1])
-        try:
-            return [s.decode("utf-8")], codes[need_more + 1 :]
-        except UnicodeDecodeError:
-            return ["<%d>" % code], codes[1:]
-
-    if code > 127 and code < 256:
-        key = chr(code)
+    if c > 127 and c < 256:
+        key = chr(c)
         return [key], codes[1:]
-    if code != 27:
-        return ["<%d>" % code], codes[1:]
+    if c != 27:
+        return ["<%d>" % c], codes[1:]
 
     # Try get from input trie
     result, remaining_codes = input_trie.get(codes[1:], more_available)
@@ -579,12 +570,12 @@ def process_key_queue(codes: List[int], more_available: bool) -> Tuple[List, Lis
     #  code -- ESC
     if codes[1:]:
         # Meta keys -- ESC+Key form
-        run, remaining_codes = process_key_queue(codes[1:], more_available)
-        if is_mouse_event(run[0]):
-            return ["esc"] + run, remaining_codes
-        if run[0] == "esc" or run[0].find("meta ") >= 0:
-            return ["esc"] + run, remaining_codes
-        return [f"meta {run[0]}"] + run[1:], remaining_codes
+        result, remaining_codes = process_key_queue(codes[1:], more_available)
+        if is_mouse_event(result[0]):
+            return ["esc"] + result, remaining_codes
+        if result[0] == "esc" or result[0].find("meta ") >= 0:
+            return ["esc"] + result, remaining_codes
+        return [f"meta {result[0]}"] + result[1:], remaining_codes
 
     return ["esc"], codes[1:]
 
@@ -1091,6 +1082,7 @@ class PosixInput(InputTerminal):
 
 
 if __name__ == "__main__":
+    # set_byte_encoding("utf8")
     handle = PosixInput()
     handle.start()
     handle.set_mouse_tracking()

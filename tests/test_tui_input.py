@@ -7,6 +7,7 @@ from pigit.tui.input import (
     KeyQueueTrie,
     MoreInputRequired,
     process_key_queue,
+    process_one_code,
     set_byte_encoding,
 )
 
@@ -168,6 +169,42 @@ class TestKeyQueueTrie:
                 kqt.read_cursor_position(codes, more_available)
         else:
             assert kqt.read_cursor_position(codes, more_available) == expected
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        (1, "ctrl a"),  # Lower bound of first if condition
+        (26, "ctrl z"),  # Upper bound of first if condition
+        (28, "ctrl \\"),  # Lower bound of second if condition
+        (31, "ctrl _"),  # Upper bound of second if condition
+        (32, " "),  # Lower bound of third if condition
+        (126, "~"),  # Upper bound of third if condition
+        (127, "backspace"),  # Code in _key_conv
+        (128, None),  # Code not in _key_conv
+        (0, None),  # Code less than 1
+    ],
+    ids=[
+        "ctrl_a",
+        "ctrl_z",
+        "ctrl_B",
+        "ctrl_E",
+        "space",
+        "tilde",
+        "backspace",
+        "none",
+        "zero",
+    ],
+)
+def test_process_one_code(code, expected):
+    # Arrange
+    global _key_conv
+
+    # Act
+    result = process_one_code(code)
+
+    # Assert
+    assert result == expected
 
 
 # Define a fixture for the MoreInputRequired exception
