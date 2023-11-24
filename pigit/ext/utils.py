@@ -6,6 +6,35 @@ from math import sqrt
 from collections import Counter
 
 
+def strtobool(s: str) -> bool:
+    """Convert a string representation of truth to true (1) or false (0).
+
+    Raises:
+        ValueError: if val is anything else.
+
+    Returns:
+        bool
+
+    Docs Test:
+        >>> strtobool('y')
+        True
+        >>> strtobool('Y')
+        True
+        >>> strtobool('n')
+        False
+        >>> strtobool('N')
+        False
+    """
+    s = s.lower()
+
+    if s in ("y", "yes", 't', 'ture', "on", "1"):
+        return True
+    elif s in ("n", "no", "f", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError('Not support string.')
+
+
 def traceback_info(extra_msg: str = "null") -> str:
     """Get traceback information.
 
