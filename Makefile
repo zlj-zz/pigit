@@ -6,7 +6,7 @@ ifeq ($(PY),)
 endif
 
 run:
-	$(PY) ./tests/run.py
+	$(PY) ./tools/run.py
 
 test:
 	@if [ ! -f pytest ]; then $(PY) -m pip install pytest; fi
