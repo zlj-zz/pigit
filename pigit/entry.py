@@ -15,6 +15,7 @@ from .const import (
     EXTRA_CMD_MODULE_NAME,
     EXTRA_CMD_MODULE_PATH,
     IS_FIRST_RUN,
+    IS_WIN,
     LOG_FILE_PATH,
     PIGIT_HOME,
     REPOS_PATH,
@@ -157,9 +158,12 @@ def pigit(args: "Namespace", _) -> None:
             if not confirm("Input `enter` to continue:"):
                 return
 
-        from .app import App
+        if IS_WIN:
+            print("Not support windows now.")
+        else:
+            from .app import App
 
-        App().run()
+            App().run()
 
 
 # yapf: enable
