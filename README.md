@@ -54,7 +54,7 @@ tools arguments:
 
 The command of `cmd` support some short sub-command to replace the long git original command.
 
-![demo display](./docs//demo.gif)
+![demo display](./docs/resources/demo.gif)
 
 Use `pigit cmd -s` to check what short command it supported, it will display the corresponding help information and the git original command, like this:
 
@@ -85,9 +85,9 @@ These are short commands that can replace git operations:
 
 The command of `repo` support operate multiple repos at the same time.
 
-![demo display](./docs/demo_repo_1.png)
-![demo display](./docs/demo_repo_2.png)
-![demo display](./docs/demo_repo_3.png)
+![demo display](./docs/resources/demo_repo_1.png)
+![demo display](./docs/resources/demo_repo_2.png)
+![demo display](./docs/resources/demo_repo_3.png)
 
 Use `pigit repo -h` to get more help.
 
@@ -120,7 +120,7 @@ Even if you can use short commands instead of long commands of git, there are st
 
 Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
 
-![interaction demo](./docs/demo_interaction.gif)
+![interaction demo](./docs/resources/demo_interaction.gif)
 
 And in the interaction mode, you can use `?` or `h` to see the help message.
 
