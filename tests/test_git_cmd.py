@@ -2,19 +2,19 @@ import os
 import pytest
 from unittest.mock import patch
 
-from pigit.git.cmd import SCmd, get_extra_cmds
+from pigit.git.proxy import GitProxy, get_extra_cmds
 from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
 
 
 class TestSCmd:
     def test_init_error(self):
         with pytest.raises(TypeError):
-            SCmd(extra_cmds="xxx")
+            GitProxy(extra_cmds="xxx")
 
     @pytest.fixture(scope="module")
     def setup(self):
         extra = {"aa": {"help": "print system user name."}}
-        return SCmd(extra_cmds=extra)
+        return GitProxy(extra_cmds=extra)
 
     @pytest.mark.parametrize(
         "command",

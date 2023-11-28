@@ -13,8 +13,8 @@ Example:
 >>>     return "result msg."
 """
 
-from typing import List, Tuple, Union
 import re
+from typing import List, Tuple, Union
 
 from pigit.ext.executor import WAITING, Executor
 

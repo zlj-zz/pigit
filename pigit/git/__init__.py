@@ -1,7 +1,7 @@
 from pigit.ext.executor import Executor, REPLY, DECODE
 
 from .ignore import get_ignore_source, create_gitignore
-from .cmd import get_extra_cmds, SCmd, CommandType, GIT_CMDS
+from .proxy import get_extra_cmds, GitProxy, GitCommandType, Git_Proxy_Cmds
 from .repo import Repo
 
 __all__ = (
@@ -9,9 +9,9 @@ __all__ = (
     "get_ignore_source",
     "create_gitignore",
     "get_extra_cmds",
-    "SCmd",
-    "CommandType",
-    "GIT_CMDS",
+    "GitProxy",
+    "GitCommandType",
+    "Git_Proxy_Cmds",
     "Repo",
 )
 

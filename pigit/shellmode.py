@@ -6,7 +6,7 @@ import functools
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.git.cmd import SCmd
+    from pigit.git.proxy import GitProxy
 
 
 class PigitShell(cmd.Cmd):
@@ -18,7 +18,7 @@ class PigitShell(cmd.Cmd):
 
     def __init__(
         self,
-        short_giter: "SCmd",
+        short_giter: "GitProxy",
         *,
         completekey: str = "tab",
         stdin: Optional[IO[str]] = None,

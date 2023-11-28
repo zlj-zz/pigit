@@ -6,7 +6,7 @@ from pprint import pprint
 from .conftest import _PIGIT_PATH
 from .utils import analyze_it
 
-from pigit.git._cmds import GIT_CMDS
+from pigit.git._cmds import Git_Proxy_Cmds
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (
@@ -102,13 +102,13 @@ class TestCompletion:
 
             cls.complete_vars = pigit.to_dict()
             cls.complete_vars["args"]["cmd"]["args"].update(
-                {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+                {k: {"help": v["help"], "args": {}} for k, v in Git_Proxy_Cmds.items()}
             )
         else:
             cls.complete_vars = copy.deepcopy(argparse_dict)
             cmd_temp = cls.complete_vars["args"]["cmd"]["args"]
             cmd_temp.update(
-                {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+                {k: {"help": v["help"], "args": {}} for k, v in Git_Proxy_Cmds.items()}
             )
 
     def test_error(self):

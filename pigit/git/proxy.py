@@ -9,7 +9,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 from pigit.ext.log import logger
 from pigit.ext.utils import confirm, similar_command, traceback_info
 from pigit.ext.executor import Executor, WAITING
-from ._cmds import GIT_CMDS, CommandType
+from ._cmds import Git_Proxy_Cmds, GitCommandType
 
 
 def get_extra_cmds(name: str, path: str) -> Dict:
@@ -47,8 +47,8 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     return extra_cmds
 
 
-class SCmd:
-    """Git short command handler."""
+class GitProxy:
+    """Git short command proxy `handler."""
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class SCmd:
         self.executor = Executor()
 
         # Init commands.
-        self.cmds = GIT_CMDS
+        self.cmds = Git_Proxy_Cmds
         if extra_cmds:
             if not isinstance(extra_cmds, dict):
                 raise TypeError("Custom cmds must be a dict.") from None
@@ -235,8 +235,8 @@ class SCmd:
         t = t.capitalize().strip()
 
         # Checking the type whether right.
-        if t not in CommandType.__members__:
-            predicted_type = similar_command(t, CommandType.__members__.keys())
+        if t not in GitCommandType.__members__:
+            predicted_type = similar_command(t, GitCommandType.__members__.keys())
             if self.prompt and confirm(
                 f":TIPS: The wanted type is `{predicted_type}`?[y/n]:"
             ):
@@ -252,9 +252,9 @@ class SCmd:
         msgs = ["These are the orders of {0}".format(t)]
 
         for k, v in self.cmds.items():
-            belong = v.get("belong", CommandType.Extra)
+            belong = v.get("belong", GitCommandType.Extra)
             # Prevent the `belong` attribute from being set in the custom command.
-            if isinstance(belong, CommandType) and belong.value == t:
+            if isinstance(belong, GitCommandType) and belong.value == t:
                 msg = self.generate_help_by_key(k)
                 msgs.append(msg)
 
@@ -265,7 +265,7 @@ class SCmd:
         """Print all command types with random color."""
         msgs = []
 
-        for member in CommandType:
+        for member in GitCommandType:
             color_str = "#{:02X}{:02X}{:02X}".format(
                 random.randint(70, 255),
                 random.randint(70, 255),

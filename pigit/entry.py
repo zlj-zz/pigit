@@ -26,7 +26,7 @@ from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counte
 from .ext.log import setup_logging
 from .ext.func import dynamic_default_attrs, time_it
 from .ext.utils import confirm, get_file_icon
-from .git import GIT_CMDS, SCmd, Repo, create_gitignore, get_extra_cmds
+from .git import Git_Proxy_Cmds, GitProxy, Repo, create_gitignore, get_extra_cmds
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
@@ -77,7 +77,7 @@ def pigit(args: "Namespace", _) -> None:
         # Generate completion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in GIT_CMDS.items()}
+            {k: {"help": v["help"], "args": {}} for k, v in Git_Proxy_Cmds.items()}
         )
 
         from .cmdparse.completion import shell_complete
@@ -253,7 +253,7 @@ def _(args: "Namespace", unknown: List):
     }
     extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
-    git_processor = SCmd(
+    git_processor = GitProxy(
         extra_cmds=extra_cmd,
         prompt=Conf.cmd_recommend,
         display=Conf.cmd_display,
