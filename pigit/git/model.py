@@ -39,6 +39,14 @@ class File:
     # file whether has inline merged conflict.
     has_inline_merged_conflicts: bool
 
+    def get_file_str(self) -> str:
+        """Get the right file path str."""
+        file_name = self.name
+
+        if "->" in file_name:
+            file_name = file_name.split("->")[-1].strip()
+
+        return file_name
 
 @dataclass
 class Commit:

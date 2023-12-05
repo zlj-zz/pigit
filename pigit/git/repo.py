@@ -560,19 +560,6 @@ class Repo:
     # ===============
     # Options of git
     # ===============
-    def _get_file_str(self, file) -> str:
-        if isinstance(file, File):
-            file_name = file.name
-        elif isinstance(file, str):
-            file_name = file
-        else:
-            raise RepoError("`file` only allow 'str' or 'File'.") from None
-
-        if "->" in file_name:
-            file_name = file_name.split("->")[-1].strip()
-
-        return file_name
-
     def switch_file_status(self, file: File, path: Optional[str] = None):
         """Change the file stage status.
 
@@ -581,7 +568,7 @@ class Repo:
             path (Optional[str], optional): exec path. Defaults to None.
         """
         path = path or self.path
-        file_name = self._get_file_str(file)
+        file_name = file.get_file_str()
 
         if file.has_merged_conflicts or file.has_inline_merged_conflicts:
             pass
@@ -610,7 +597,7 @@ class Repo:
         tracked: Optional[bool] = None,
     ):
         path = path or self.path
-        file_name = self._get_file_str(file)
+        file_name = file.get_file_str()
 
         if tracked is None:
             if isinstance(file, File):
@@ -628,7 +615,7 @@ class Repo:
 
         path = path or self.path
         repo_path, _ = self.confirm_repo(path)
-        file_name = self._get_file_str(file)
+        file_name = file.get_file_str()
 
         with open(f"{repo_path}/.gitignore", "a+") as f:
             f.write(f"\n{file_name}")
