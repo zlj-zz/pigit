@@ -169,12 +169,21 @@ Alias is good way to help you use _pigit_ faster . Open your shell profile and a
 ```bash
 if type pigit >/dev/null 2>&1; then
     alias pg="pigit"
-    alias g="pigit cmd"
     alias gr="pigit repo"
 fi
 ```
 
-Then, you can use `pg` to call `pigit` and use `g` to call `pigit cmd`.
+Then, you can use `pg` to call `pigit`.
+
+**Windows**
+
+Check your *PowerShell* config, like this: `echo $profile`. Create it if the path not exist. Then open it, and input:
+
+```ps
+set-alias pg pigit
+```
+
+After completing the above preparations, restart your terminal. If it prompts that you cannot run the configuration, you can refer to the [official website address](https://learn.microsoft.com/zh-cn/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-7.4).
 
 ## Configuration
 

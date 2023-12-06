@@ -401,13 +401,3 @@ def _(args: "Namespace", _):
 
 # yapf: enable
 
-
-# =============================================
-# terminal entry
-# =============================================
-@time_it
-def main():
-    try:
-        pigit()
-    except (KeyboardInterrupt, EOFError):
-        raise SystemExit(0) from None

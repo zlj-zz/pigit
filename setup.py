@@ -65,9 +65,11 @@ setup(
         "Operating System :: Microsoft :: Windows",
     ],
     install_requires=['plenty==1.0.2'],
-    entry_points="""
-        [console_scripts]
-        pigit=pigit.entry:main
-    """,
+    entry_points={
+        "console_scripts": [
+            "pigit=pigit.console:main",
+            "g=pigit.console:g",
+        ]
+    },
     python_requires=">=3.8",
 )
