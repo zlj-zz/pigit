@@ -4,6 +4,7 @@ pylint
 pytest
 pytest-mock
 pytest-cov
+pytest-asyncio
 pyinstrument
 requests
 setuptools

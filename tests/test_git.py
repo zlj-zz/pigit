@@ -1,4 +1,5 @@
 import os
+import stat
 import shutil
 import pytest
 from unittest.mock import patch
@@ -18,7 +19,15 @@ def create_repo(test_repo: str):
 
     # re-create test repo
     if os.path.isdir(test_repo):
-        shutil.rmtree(test_repo)
+        shutil.rmtree(
+            test_repo,
+            onerror=lambda func, path, _: (
+                # Fix `PermissionError` on windows.
+                # Will deprecated `onerror` on Py312.
+                os.chmod(path, stat.S_IWRITE),
+                func(path),
+            ),
+        )
     os.makedirs(test_repo, exist_ok=True)
     print(executor.exec("git init", flags=WAITING, cwd=test_repo))
     print(executor.exec("git config user.name Zachary", flags=WAITING, cwd=test_repo))

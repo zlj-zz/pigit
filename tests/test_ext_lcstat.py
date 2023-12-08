@@ -1,16 +1,20 @@
 from typing import Optional
 import os
 import time
+from pathlib import Path
+
 import pytest
 
+from pigit.const import USER_HOME
 from pigit.ext.lcstat import Counter
 
 
 @pytest.mark.parametrize(
     "path",
     [
-        # os.getcwd(),
-        os.environ["HOME"] + "/.config",
+        os.getcwd(),
+        Path(USER_HOME, ".config")
+        # USER_HOME + "/.config",
         # *os.environ.values(),
     ],
 )

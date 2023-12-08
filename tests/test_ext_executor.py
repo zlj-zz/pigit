@@ -1,3 +1,4 @@
+import sys
 import time
 import textwrap
 import pytest
@@ -12,6 +13,8 @@ from pigit.ext.executor import (
     WAITING,
     Executor,
 )
+
+win_skip_mark = pytest.mark.skipif(sys.platform == "win32", reason="windows skip.")
 
 
 class TestExecutor:
@@ -58,6 +61,7 @@ class TestExecutor:
             assert result == expected
             # mock_popen.assert_called_once_with(args=cmd, **kws)
 
+    @win_skip_mark
     def test_exec_with_more(self):
         print()
 
@@ -111,13 +115,17 @@ class TestExecutor:
             if __name__ == '__main__':
                 import time
 
-                print({0})
+                print({0}, end='')
                 time.sleep(int({0}))
-                print({0})
+                print({0}, end='')
             """
         )
 
-        cmds = [["python3", "-c", code.format(i)] for i in range(3, 0, -1)]
+        cmd = 'python3'
+        if self.executor.exec('python -V', flags=REPLY)[0] == 0 :
+            cmd ='python'
+
+        cmds = [[cmd, "-c", code.format(i)] for i in range(3, 0, -1)]
         # pprint(cmds)
 
         start_t = time.time()
@@ -129,4 +137,4 @@ class TestExecutor:
         assert end_t - start_t < 4
 
         results2 = self.executor.exec_parallel(*cmds, flags=REPLY | DECODE)
-        assert results2 == [(0, "", "{0}\n{0}\n".format(i)) for i in range(3, 0, -1)]
+        assert results2 == [(0, "", "{0}{0}".format(i)) for i in range(3, 0, -1)]

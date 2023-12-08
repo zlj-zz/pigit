@@ -31,6 +31,20 @@ REPLY: Final = 1 << 4  # fetch command result and return.
 SILENT: Final = 1 << 5  # silent mode. output will be discarded.
 
 
+def _detect_encoding(data:ByteString)->str:
+    encodings = ['utf-8', 'gbk','latin-1','iso-8859-1']
+
+    for encoding in encodings:
+        try:
+            #  TODO: It may be possible to decode, but the result is not correct.
+            data.decode(encoding)
+            return encoding
+        except UnicodeDecodeError:
+            continue
+
+    return  ''
+
+
 @dataclasses.dataclass
 class ExecState:
     """State ctx of ~Executor."""
@@ -115,7 +129,11 @@ class Executor:
             The decoded output if decoding is enabled, otherwise the original output.
         """
         if state.decoding and content is not None and not isinstance(content, str):
-            return content.decode()
+            try:
+                return content.decode()
+            except UnicodeDecodeError:
+                # Default encoding may not is 'utf-8' on windows.
+                return content.decode(_detect_encoding(content))
         else:
             return content
 
