@@ -21,6 +21,9 @@ log
 .coverage*
 htmlcov/
 
+# venv
+.pigit_venv
+
 # useless file temp
 useless/
 
