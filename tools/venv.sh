@@ -1,11 +1,17 @@
 #!/usr/bin/env sh
 # run scirpit with `source`.
+#
+# Usage:
+#    create: `source <scirpt>`
+#    activate: `source <scirpt> start`
+#    deactivate: `source <scirpt> stop`
 
-# 检查Python版本
+
+# Check py version.
 version=$(python3 -c 'import sys; sys.exit(sys.version_info < (3, 7))')
 echo $version
 if [[ "$version" ]]; then
-    echo "Python版本必须为3.8或更高版本"
+    echo "Python version should be 3.8 or more higher."
     exit 1
 fi
 

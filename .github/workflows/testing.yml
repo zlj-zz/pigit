@@ -15,7 +15,8 @@ on:
       - '**.gif'
       - '**.yml'
       - 'const.py'
-      - 'tools/'
+      - '.gitignore'
+      - 'tools/*'
 
 jobs:
   build:
