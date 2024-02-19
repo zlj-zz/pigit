@@ -7,7 +7,7 @@
 # looks for the `__main__.py` file in the module.
 # --------------------------------------------------------
 
-from pigit.entry import main
+from pigit.entry import pigit
 
 if __name__ == "__main__":
-    main()
+    pigit()

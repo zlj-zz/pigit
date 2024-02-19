@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
 
-from typing import Iterable, Tuple, Dict
 import sys
-from math import sqrt
 from collections import Counter
+from math import sqrt
+from typing import Iterable, Tuple, Dict
 
 
 def strtobool(s: str) -> bool:
@@ -27,9 +27,9 @@ def strtobool(s: str) -> bool:
     """
     s = s.lower()
 
-    if s in ("y", "yes", 't', 'ture', "on", "1"):
+    if s in {"y", "yes", 't', 'true', "on", "1"}:
         return True
-    elif s in ("n", "no", "f", "false", "off", "0"):
+    elif s in {"n", "no", "f", "false", "off", "0"}:
         return False
     else:
         raise ValueError('Not support string.')
@@ -44,7 +44,6 @@ def traceback_info(extra_msg: str = "null") -> str:
     Returns:
         str: formatted traceback information.
     """
-
     exc_type, exc_value, exc_obj = sys.exc_info()
     if exc_type is None or exc_value is None or exc_obj is None:
         return ""
@@ -67,8 +66,8 @@ def confirm(text: str = "", default: bool = True) -> bool:
     Returns:
         (bool): Confirm result.
     """
-
     input_command: str = input(text).strip().lower()
+
     if input_command in {"n", "no", "N", "No"}:
         return False
     elif input_command in {"y", "yes", "Y", "Yes"}:
@@ -99,7 +98,6 @@ def similar_command(command: str, all_commands: Iterable) -> str:
         >>> similar_command('com', commands)
         'commit'
     """
-
     #  The dictionary of letter frequency of all commands.
     words: dict = {word: dict(Counter(word)) for word in all_commands}
     # Letter frequency of command.
@@ -231,7 +229,6 @@ def adjudgment_type(file: str, original: bool = False) -> str:
         >>> adjudgment_type('xx', True)
         'xx'
     """
-
     if pre_type := SPECIAL_NAMES.get(file.lower()):
         return pre_type
 
@@ -294,7 +291,6 @@ def get_file_icon(file_type: str) -> str:
         >>> get_file_icon('xx')
         ''
     """
-
     #     
     return FILE_ICONS.get(file_type, "")
 
