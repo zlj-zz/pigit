@@ -44,20 +44,18 @@ def standardized_val_name(name: str) -> str:
 def _get(url: str) -> str:
     resp = requests.get(url, verify=False)
 
-    if resp.status_code == 200:
-        # print("content:", resp.content)
-        # print("json:", resp.json())
-        rawlines = resp.json()["payload"]["blob"]["rawLines"]
-        return "\n".join(rawlines)
-    else:
+    if resp.status_code != 200:
         return ""
+
+    # print("content:", resp.content)
+    # print("json:", resp.json())
+    rawlines = resp.json()["payload"]["blob"]["rawLines"]
+    return "\n".join(rawlines)
 
 
 def _generate_val(v: str, t: str) -> str:
     content = _get(_target_url.format(t))
-    code = _val_template.format(standardized_val_name(v), content).strip()
-
-    return code
+    return _val_template.format(standardized_val_name(v), content).strip()
 
 
 def _generate_code(targets: Dict) -> str:
@@ -70,8 +68,7 @@ def _generate_code(targets: Dict) -> str:
         print(f"{t} ", end="", flush=True)
     print("")
 
-    code = _code_template % {"vals": "\n\n\n".join(vals), "kvs": "\n".join(kvs)}
-    return code
+    return _code_template % {"vals": "\n\n\n".join(vals), "kvs": "\n".join(kvs)}
 
 
 ignore_targets = {
