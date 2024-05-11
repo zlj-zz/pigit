@@ -7,8 +7,10 @@ from .console import Render
 from .utils import get_width, plain
 
 
-_Log = logging.getLogger(f'PIGIT.{__name__}')
 NONE_SIZE = (0, 0)
+
+_Log = logging.getLogger(f"PIGIT.{__name__}")
+_Namespace = set()  # Global attr to save component name.
 
 
 class ComponentError(Exception):
@@ -16,6 +18,7 @@ class ComponentError(Exception):
 
 
 class Component(ABC):
+    NAME: str = ""
     BINDINGS: Optional[List[Tuple[str, str]]] = None
 
     def __init__(
@@ -26,6 +29,12 @@ class Component(ABC):
         children: Optional[Dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
     ) -> None:
+        assert self.NAME, "The name attribute cannot be empty."
+        assert (
+            self.NAME not in _Namespace
+        ), f"The name attribute must be unique: '{self.NAME}'."
+        _Namespace.add(self.NAME)
+
         self._activated = False  # component whether activated state.
 
         self.x = x
@@ -99,19 +108,17 @@ class Component(ABC):
         """Event process handle function.
 
         If want to custom handle, instance function `on_key(str)` in sub-class.
-        Or instance attribute `BINDINGS` in sub-class.
+        Or instance attribute `BINDINGS` in sub-class. Support effectiveness both.
         """
-        tg_fn = getattr(self, "on_key", None)
-        if tg_fn is not None and callable(tg_fn):
-            tg_fn(key)
-
         tg_name = self._event_map.get(key)
-        if tg_name is None:
-            return
+        if tg_name is not None:
+            tg_fn = getattr(self, tg_name, None)
+            if tg_fn is not None and callable(tg_fn):
+                tg_fn()
 
-        tg_fn = getattr(self, tg_name, None)
-        if tg_fn is not None and callable(tg_fn):
-            tg_fn()
+        on_key = getattr(self, "on_key", None)
+        if on_key is not None and callable(on_key):
+            on_key(key)
 
 
 class Container(Component):
@@ -194,7 +201,7 @@ class Container(Component):
         return child
 
 
-class RowPanel(Component):
+class LineTextBrowser(Component):
     def __init__(
         self,
         x: int = 1,
@@ -207,7 +214,7 @@ class RowPanel(Component):
         self._content = content
         self._max_line = self._size[1]
 
-        self._i = 0 # start display line index of content.
+        self._i = 0  # start display line index of content.
 
         self._r = [0, self._size[1]]  # display range.
 
@@ -238,7 +245,6 @@ class RowPanel(Component):
 
 class ItemSelector(Component):
     CURSOR: str = ""
-    BINDINGS: Optional[List[Tuple]] = None
 
     def __init__(
         self,

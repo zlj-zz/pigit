@@ -1,19 +1,18 @@
+import logging
 from time import sleep
 from typing import List, Optional, Tuple
 
-from .const import IS_WIN
-from .ext.log import logger, setup_logging
 from .git.repo import Repo
-from .tui.components import Container, RowPanel, ItemSelector
+from .tui.components import Container, LineTextBrowser, ItemSelector
 from .tui.event_loop import EventLoop
 
 
-# setup_logging(debug=True, log_file="./tui_test.log")
-
+_Log = logging.getLogger(f"PIGIT.{__name__}")
 repo_handle = Repo()
 
 
 class StatusPanel(ItemSelector):
+    NAME = "status"
     CURSOR = "→"
     BINDINGS = [
         ("j", "next"),
@@ -29,7 +28,6 @@ class StatusPanel(ItemSelector):
     ) -> None:
         super().__init__(x, y, size, content)
 
-        self.name = "status"
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
 
     def fresh(self):
@@ -47,7 +45,7 @@ class StatusPanel(ItemSelector):
             c = repo_handle.load_file_diff(
                 f.name, f.tracked, f.has_staged_change, path=self.repo_path
             ).split("\n")
-            self.emit("goto", target="display_panel", source=self.name, content=c)
+            self.emit("goto", target="display_panel", source=self.NAME, key=f.name, content=c)
         elif key in {"a", " "}:
             repo_handle.switch_file_status(f, self.repo_path)
             self.fresh()
@@ -59,6 +57,7 @@ class StatusPanel(ItemSelector):
 
 
 class BranchPanel(ItemSelector):
+    NAME = "branch"
     CURSOR = "→"
 
     def __init__(
@@ -70,7 +69,6 @@ class BranchPanel(ItemSelector):
     ) -> None:
         super().__init__(x, y, size, content)
 
-        self.name = "branch"
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
 
     def fresh(self):
@@ -107,6 +105,7 @@ class BranchPanel(ItemSelector):
 
 
 class CommitPanel(ItemSelector):
+    NAME = "commit"
     CURSOR = "→"
     BINDINGS = [
         ("j", "next"),
@@ -122,7 +121,6 @@ class CommitPanel(ItemSelector):
     ) -> None:
         super().__init__(x, y, size, content)
 
-        self.name = "commit"
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
 
     def fresh(self):
@@ -143,10 +141,12 @@ class CommitPanel(ItemSelector):
         if key == "enter":
             commit = self.commits[self.curr_no]
             content = repo_handle.load_commit_info(commit.sha).split("\n")
-            self.emit("goto", target="display_panel", source=self.name, content=content)
+            self.emit("goto", target="display_panel", source=self.NAME, content=content)
 
 
-class ContentDisplay(RowPanel):
+class ContentDisplay(LineTextBrowser):
+    NAME = "display_panel"
+
     def __init__(
         self,
         x: int = 1,
@@ -155,21 +155,26 @@ class ContentDisplay(RowPanel):
     ) -> None:
         super().__init__(x, y, size, "")
 
-        self.name = "display_panel"
         self.come_from = ""
+        self.i_cache_key = ''
+        self.i_cache = {}
 
     def fresh(self):
         pass
 
     def update(self, action, **data):
         if action == "goto":
+            self.i_cache[self.i_cache_key] = self._i
+
             self.come_from = data.get("source", "")
+            self.i_cache_key = data.get('key', '')
             self._content = data.get("content", "")
-            self._index = 0
+
+            self._i = self.i_cache.get(self.i_cache_key, 0)
             self._render()
 
     def on_key(self, key: str):
-        if key == "esc":
+        if key in {"esc", "q"}:
             self.emit("goto", target=self.come_from)
         elif key == "j":
             self.scroll_down()
@@ -182,6 +187,8 @@ class ContentDisplay(RowPanel):
 
 
 class PanelContainer(Container):
+    NAME = "container"
+
     def __init__(self) -> None:
         status_panel = StatusPanel()
         branch_panel = BranchPanel()
@@ -189,16 +196,21 @@ class PanelContainer(Container):
         display_panel = ContentDisplay()
 
         children = {
-            status_panel.name: status_panel,
-            branch_panel.name: branch_panel,
-            commit_panel.name: commit_panel,
-            display_panel.name: display_panel,
+            status_panel.NAME: status_panel,
+            branch_panel.NAME: branch_panel,
+            commit_panel.NAME: commit_panel,
+            display_panel.NAME: display_panel,
         }
+        # print(children)
 
         def get_name(key: str):
-            return {"1": "status", "2": "branch", "3": "commit"}.get(key, "")
+            return {
+                "1": status_panel.NAME,
+                "2": branch_panel.NAME,
+                "3": commit_panel.NAME,
+            }.get(key, "")
 
-        super().__init__(children, start_name=status_panel.name, switch_handle=get_name)
+        super().__init__(children, start_name=status_panel.NAME, switch_handle=get_name)
 
 
 class App(EventLoop):
@@ -210,10 +222,3 @@ class App(EventLoop):
         super().__init__(PanelContainer())
 
         self.set_input_timeouts(0.125)
-
-    def run(self) -> None:
-        if IS_WIN:
-            print("Not support windows now.")
-            return
-
-        super().run()
