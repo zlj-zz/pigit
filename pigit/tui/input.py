@@ -479,8 +479,11 @@ _key_conv = {
 
 def process_one_code(code: int) -> Optional[str]:
     """Process key code that less than 127 or code in `_key_conv`."""
+    # Using `_key_conv` as the first step. The code of 'enter' and 'ctrl+j' both 10.
+    if code in _key_conv:
+        return _key_conv[code]
+
     # ctrl + a-z
-    # FIXME: process enter ot ctrl+j
     if 0 < code < 27:
         return f'ctrl {chr(ord("a") + code - 1)}'
 
@@ -489,10 +492,7 @@ def process_one_code(code: int) -> Optional[str]:
         return f'ctrl {chr(ord("A") + code - 1)}'
 
     # (space)!"#$%&'()*+,-./ 0-9 :;<=>?@ A-Z [\]^_` a-z {|}~
-    if code >= 32 and code <= 126:
-        return chr(code)
-
-    return _key_conv[code] if code in _key_conv else None
+    return chr(code) if code >= 32 and code <= 126 else None
 
 
 def process_utf8_code(
@@ -1082,7 +1082,7 @@ class PosixInput(InputTerminal):
 
 
 if __name__ == "__main__":
-    # set_byte_encoding("utf8")
+    set_byte_encoding("utf8")
     handle = PosixInput()
     handle.start()
     handle.set_mouse_tracking()
