@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from math import ceil
 from typing import Callable, Dict, List, Optional, Tuple
@@ -6,6 +7,7 @@ from .console import Render
 from .utils import get_width, plain
 
 
+_Log = logging.getLogger(f'PIGIT.{__name__}')
 NONE_SIZE = (0, 0)
 
 
@@ -203,15 +205,15 @@ class RowPanel(Component):
         super().__init__(x, y, size)
 
         self._content = content
-        self._range = self._size[1]
+        self._max_line = self._size[1]
 
-        self._index = 0
+        self._i = 0 # start display line index of content.
 
         self._r = [0, self._size[1]]  # display range.
 
     def resize(self, size: Tuple[int, int]):
         self._size = size
-        self._range = size[1]
+        self._max_line = size[1]
 
         # TODO:
         self.fresh()
@@ -219,18 +221,18 @@ class RowPanel(Component):
     def _render(self, size: Optional[Tuple[int, int]] = None):
         if self._content:
             Render.draw(
-                self._content[self._index : self._index + self._range],
+                self._content[self._i : self._i + self._max_line],
                 self.x,
                 self.y,
                 self._size,
             )
 
     def scroll_up(self, line: int = 1):
-        self._index = max(self._index - line, 0)
+        self._i = max(self._i - line, 0)
         self._render()
 
     def scroll_down(self, line: int = 1):
-        self._index = min(self._index + line, len(self._content) - self._range)
+        self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
         self._render()
 
 
