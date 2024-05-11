@@ -1,4 +1,5 @@
 import sys
+from shutil import get_terminal_size
 from typing import List, Tuple
 
 
@@ -35,6 +36,9 @@ class Term:
 
     def clear_screen(self):
         _stdout(Signal.clear_screen)  # Clear full screen and cursor goto top.
+
+    def get_term_size(self):
+        return get_terminal_size()
 
 
 class Cursor:

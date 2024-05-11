@@ -1,4 +1,3 @@
-from shutil import get_terminal_size
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from .console import Render, Signal, Term
@@ -21,7 +20,6 @@ class EventLoop(Term):
         input_handle: Optional["InputTerminal"] = None,
         real_time: bool = False,
         alt: bool = True,
-        debug: bool = False,
     ) -> None:
         self._render = Render
 
@@ -41,10 +39,8 @@ class EventLoop(Term):
 
         self._event_map = {}
         if self.BINDINGS is not None:
-            for b in self.BINDINGS:
-                self._event_map[b[0]] = b[1]
-
-        self.debug = debug
+            for ev in self.BINDINGS:
+                self._event_map[ev[0]] = ev[1]
 
     def start(self):
         if self._alt:
@@ -63,13 +59,13 @@ class EventLoop(Term):
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.stop()
 
-    def resize(self):
+    def resize(self) -> None:
         """When the size has changed, this method will be call by `.loop.Loop` and try to render again."""
-        self._size = get_terminal_size()
+        self._size = self.get_term_size()
         self._child.resize(self._size)
         self.render()
 
-    def render(self, resize: bool = False):
+    def render(self) -> None:
         self.clear_screen()
         self._child._render()
 
@@ -78,30 +74,30 @@ class EventLoop(Term):
 
     def _loop(self) -> None:
         """Main loop"""
-        if (input_key := self._input_handle.get_input()) and input_key[0]:
-            first_one: str = input_key[0][0]
+        while True:
+            if (input_key := self._input_handle.get_input()) and input_key[0]:
+                first_one: str = input_key[0][0]
 
-            tg_name = self._event_map.get(first_one)
-            tg_fn = None if tg_name is None else getattr(self, tg_name, None)
+                tg_name = self._event_map.get(first_one)
+                tg_fn = None if tg_name is None else getattr(self, tg_name, None)
 
-            if callable(tg_fn):  # sourcery skip: remove-pass-elif
-                tg_fn()
-            elif first_one == "window resize":
-                self.resize()
-            elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
-                # self._child.process_mouse(first_one)
-                pass
-            else:  # default is keyboard event.
-                self._child._handle_event(first_one)
-        elif self._real_time:
-            self._child.render()
+                if callable(tg_fn):  # sourcery skip: remove-pass-elif
+                    tg_fn()
+                elif first_one == "window resize":
+                    self.resize()
+                elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
+                    # self._child.process_mouse(first_one)
+                    pass
+                else:  # default is keyboard event.
+                    self._child._handle_event(first_one)
+            elif self._real_time:
+                self._child.render()
 
-    def _run(self) -> None:
+    def run(self) -> None:
         try:
             self.start()
             self._input_handle.start()
-            while True:
-                self._loop()
+            self._loop()
         except (ExitEventLoop, KeyboardInterrupt, EOFError):
             self._input_handle.stop()
             self.stop()
@@ -109,9 +105,6 @@ class EventLoop(Term):
             self._input_handle.stop()
             self.stop()
             print(e, e.__traceback__)
-
-    def run(self) -> None:
-        self._run()
 
     def quit(self) -> None:
         raise ExitEventLoop("Quit")
