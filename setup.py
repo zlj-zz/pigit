@@ -67,8 +67,8 @@ setup(
     install_requires=['plenty==1.0.2'],
     entry_points={
         "console_scripts": [
-            "pigit=pigit.console:main",
-            "g=pigit.console:g",
+            "pigit=pigit.console_scripts:main",
+            "g=pigit.console_scripts:g",
         ]
     },
     python_requires=">=3.8",

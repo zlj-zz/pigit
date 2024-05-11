@@ -16,6 +16,9 @@ log
 
 *.tmp
 
+# log file
+*.log
+
 # pytest
 .pytest_cache
 .coverage*
@@ -26,9 +29,6 @@ htmlcov/
 
 # useless file temp
 useless/
-
-# log file
-debug.log
 
 # other
 tests/test_repo

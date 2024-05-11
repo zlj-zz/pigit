@@ -6,7 +6,7 @@ from pigit.ext.func import time_it
 
 
 @time_it
-def _active(prefixes:Optional[List]):
+def _active(prefixes:Optional[List] = None):
     try:
         _args = (prefixes or []) + sys.argv[1:]
         pigit(_args)
