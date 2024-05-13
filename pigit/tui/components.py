@@ -29,10 +29,10 @@ class Component(ABC):
         children: Optional[Dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
     ) -> None:
-        assert self.NAME, "The name attribute cannot be empty."
+        assert self.NAME, "The `NAME` attribute cannot be empty."
         assert (
             self.NAME not in _Namespace
-        ), f"The name attribute must be unique: '{self.NAME}'."
+        ), f"The `NAME` attribute must be unique: '{self.NAME}'."
         _Namespace.add(self.NAME)
 
         self._activated = False  # component whether activated state.
@@ -159,8 +159,10 @@ class Container(Component):
     def accept(self, action: str, **data):
         # sourcery skip: remove-unnecessary-else, swap-if-else-branches
         if action == "goto" and (name := data.get("target")) is not None:
-            child = self.switch_child(name)
-            child.update(action, **data)
+            if child := self.switch_child(name):  # switch and fetch next child.
+                child.update(action, **data)
+            else:
+                _Log.warning(f"Not found child: {name}.")
         else:
             raise ComponentError("Not support action of ~Container.")
 
@@ -184,7 +186,7 @@ class Container(Component):
             name = self.switch_handle(key)
             self.switch_child(name)
 
-    def switch_child(self, name: str) -> "Component":
+    def switch_child(self, name: str) -> Optional["Component"]:
         """Choice which child should be activated."""
         child = None
 
