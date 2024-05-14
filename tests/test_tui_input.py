@@ -2,6 +2,8 @@ import signal
 import termios
 import pytest
 from unittest.mock import Mock, patch
+
+import pigit.tui
 from pigit.tui.input import (
     PosixInput,
     KeyQueueTrie,
@@ -9,7 +11,43 @@ from pigit.tui.input import (
     process_key_queue,
     process_one_code,
     set_byte_encoding,
+    set_encoding,
 )
+
+
+@pytest.mark.parametrize(
+    "encoding, expected_byte_encoding, expected_dec_special, expected_target_encoding",
+    [
+        # Happy path tests
+        ("utf-8", "utf8", False, "utf-8"),
+        ("UTF8", "utf8", False, "utf8"),
+        ("utf", "utf8", False, "utf"),
+        ("ascii", "narrow", True, "ascii"),
+        ("ISO-8859-1", "narrow", True, "iso-8859-1"),
+        # Edge cases
+        ("", "narrow", True, "ascii"),
+        # Error cases are not applicable as the function handles all strings without raising exceptions
+    ],
+)
+def test_set_encoding(
+    encoding,
+    expected_byte_encoding,
+    expected_dec_special,
+    expected_target_encoding,
+    mocker,
+):
+    # Arrange
+    mocker.patch("pigit.tui.input.set_byte_encoding")
+    mocker.patch("pigit.tui.input._target_encoding", "ascii")
+    mocker.patch("pigit.tui.input._use_dec_special", True)
+
+    # Act
+    set_encoding(encoding)
+
+    # Assert
+    pigit.tui.input.set_byte_encoding.assert_called_with(expected_byte_encoding)
+    assert pigit.tui.input._use_dec_special == expected_dec_special
+    assert pigit.tui.input._target_encoding == expected_target_encoding
 
 
 class TestKeyQueueTrie:
@@ -49,6 +87,15 @@ class TestKeyQueueTrie:
                 False,
                 ("value", []),
             ),  # Test case ID: 5
+        ],
+    )
+    def test_get(self, sequences, codes, more_available, expected):
+        kqt = KeyQueueTrie(sequences)
+        assert kqt.get(codes, more_available) == expected
+
+    @pytest.mark.parametrize(
+        "sequences, codes, more_available, expected",
+        [
             (
                 (("abc", "value"),),
                 [ord("a"), ord("b")],
@@ -57,16 +104,11 @@ class TestKeyQueueTrie:
             ),  # Test case ID: 6
         ],
     )
-    def test_get(self, sequences, codes, more_available, expected):
-        # Arrange
+    def test_get_with_more(self, sequences, codes, more_available, expected):
         kqt = KeyQueueTrie(sequences)
 
-        # Act & Assert
-        if isinstance(expected, type) and issubclass(expected, Exception):
-            with pytest.raises(expected):
-                kqt.get(codes, more_available)
-        else:
-            assert kqt.get(codes, more_available) == expected
+        with pytest.raises(expected):
+            kqt.get(codes, more_available)
 
     # Test for get_recurse method
     @pytest.mark.parametrize(
@@ -180,6 +222,7 @@ class TestKeyQueueTrie:
         (31, "ctrl _"),  # Upper bound of second if condition
         (32, " "),  # Lower bound of third if condition
         (126, "~"),  # Upper bound of third if condition
+        (10, "enter"),  # Code in _key_conv
         (127, "backspace"),  # Code in _key_conv
         (128, None),  # Code not in _key_conv
         (0, None),  # Code less than 1
@@ -191,19 +234,14 @@ class TestKeyQueueTrie:
         "ctrl_E",
         "space",
         "tilde",
+        "enter",
         "backspace",
-        "none",
-        "zero",
+        "128",
+        "0",
     ],
 )
 def test_process_one_code(code, expected):
-    # Arrange
-    global _key_conv
-
-    # Act
     result = process_one_code(code)
-
-    # Assert
     assert result == expected
 
 
@@ -215,44 +253,34 @@ def more_input_required():
 
 # Define the test function
 @pytest.mark.parametrize(
-    "codes, more_available, expected_output, expected_remaining_codes, raises",
+    "codes, more_available, expected_output, expected_remaining_codes",
     [
         # Happy path tests
-        ([65, 66, 67], False, ["A"], [66, 67], None),  # ID: ASCII codes
-        ([27, 65], False, ["meta A"], [], None),  # ID: ESC code
-        ([27, 27, 65], False, ["esc", "meta A"], [], None),  # ID: Multiple ESC codes
+        ([65, 66, 67], False, ["A"], [66, 67]),  # ID: ASCII codes
+        ([27, 65], False, ["meta A"], []),  # ID: ESC code
+        ([27, 27, 65], False, ["esc", "meta A"], []),  # ID: Multiple ESC codes
         # Edge cases
-        ([], False, [], [], None),  # ID: Empty codes
-        ([32, 126], False, [" "], [126], None),  # ID: Boundary ASCII codes
-        # Error cases
-        (
-            [240, 201],
-            True,
-            [],
-            [],
-            more_input_required,
-        ),  # ID: MoreInputRequired exception
+        ([], False, [], []),  # ID: Empty codes
+        ([32, 126], False, [" "], [126]),  # ID: Boundary ASCII codes
     ],
 )
 def test_process_key_queue(
-    codes, more_available, expected_output, expected_remaining_codes, raises
+    codes, more_available, expected_output, expected_remaining_codes
 ):
-    # Arrange
+    output, remaining_codes = process_key_queue(codes, more_available)
 
-    # Act
-    if raises:
-        with pytest.raises(MoreInputRequired):
-            set_byte_encoding("utf8")
-            output, remaining_codes = process_key_queue(codes, more_available)
-    else:
-        output, remaining_codes = process_key_queue(codes, more_available)
-
-        # Assert
-        assert output == expected_output
-        assert remaining_codes == expected_remaining_codes
+    # Assert
+    assert output == expected_output
+    assert remaining_codes == expected_remaining_codes
 
 
-class TestInput:
+def test_process_key_queue_with_exception():
+    with pytest.raises(MoreInputRequired):
+        set_byte_encoding("utf8")
+        output, remaining_codes = process_key_queue([240, 201], True)
+
+
+class TestPosixInput:
     # Test for PosixInput.write method
     @pytest.mark.parametrize(
         "data, id",

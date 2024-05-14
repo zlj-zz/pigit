@@ -1,8 +1,8 @@
 import pytest
 
-from .conftest import TEST_PATH
-
 from pigit.git.ignore import get_ignore_source, create_gitignore, IGNORE_TEMPLATE
+
+from .conftest import TEST_PATH
 
 
 def test_iter_ignore():

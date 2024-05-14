@@ -1,11 +1,12 @@
 # -*- coding:utf-8 -*-
 import pytest
 import doctest
+import time
 from unittest.mock import patch
 from pprint import pprint
 
 from pigit.ext.utils import traceback_info, confirm
-from pigit.ext.func import dynamic_default_attrs
+from pigit.ext.func import dynamic_default_attrs, time_it
 
 
 def test_doctest():
@@ -53,3 +54,32 @@ class TestFunc:
             return (a, b, c, d)
 
         assert dynamic_default_attrs(bp, **da)(1, 2, 0) == (1, 2, 0, 4)
+
+    @pytest.mark.parametrize(
+        "test_input, expected_output, expected_time_unit, msg",
+        [
+            (lambda x: x + 1, 2, "second", ""),
+            (lambda _: time.sleep(1.2), None, "second", ""),
+            (lambda _: time.sleep(61), None, "minute", ""),
+            # (lambda _: time.sleep(3600), None, "hour", ""),
+            (lambda x, y: x * y, 20, "second", "multiplication"),
+        ],
+    )
+    # `capsys ` is a builtin fixture，like sys.stdout and sys.stderr.
+    def test_time_it_happy_path(
+        self, monkeypatch, capsys, test_input, expected_output, expected_time_unit, msg
+    ):
+        # Arrange
+        decorated_function = time_it(test_input)
+
+        # Act
+        result = (
+            decorated_function(2, 10)
+            if "multiplication" in msg
+            else decorated_function(1)
+        )
+
+        # Assert
+        captured = capsys.readouterr()
+        assert expected_output == result
+        assert expected_time_unit in captured.out

@@ -121,9 +121,11 @@ class TestExecutor:
             """
         )
 
-        cmd = 'python3'
-        if self.executor.exec('python -V', flags=REPLY)[0] == 0 :
-            cmd ='python'
+        cmd = (
+            "python"
+            if self.executor.exec("python -V", flags=REPLY)[0] == 0
+            else "python3"
+        )
 
         cmds = [[cmd, "-c", code.format(i)] for i in range(3, 0, -1)]
         # pprint(cmds)
