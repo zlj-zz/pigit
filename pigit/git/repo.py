@@ -851,7 +851,7 @@ class Repo:
 
         if repo in exist_repos:
             path = exist_repos[repo]["path"]
-            self.executor.exec(command.format(path))
+            self.executor.exec(command.format(path), flags=WAITING)
         else:
             cur_cache = []
             print("Managed repos include the following:")
@@ -863,7 +863,7 @@ class Repo:
                 input_num = int(input("Please input the index:"))
                 if 0 <= input_num <= len(cur_cache):
                     path = exist_repos[cur_cache[input_num]]["path"]
-                    print(self.executor.exec(command.format(path), cwd="."))
+                    print(self.executor.exec(command.format(path), cwd=".", flags=WAITING))
                 else:
                     print("Error: index out of range.")
             except Exception:
