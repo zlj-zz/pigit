@@ -1,5 +1,13 @@
 # Changelog of pigit
 
+## v1.7.0 (2024-05-15)
+- Fix command completion generate multi key.
+- Use `eval "$(pigit --complete zsh)"` to take effect manually command completion.
+- Adjust generate way of '.gitignore', and more faster.
+- Improve code counter and improve operating speed.
+- Refactor the structure of TUI model, support better experience.
+- Add `repo cd` to quickly jump to managed repos.
+
 ## v1.6.1 (2023-01-25)
 - Use config control file icon in tui mode.
 
