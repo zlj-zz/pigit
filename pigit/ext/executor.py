@@ -31,8 +31,8 @@ REPLY: Final = 1 << 4  # fetch command result and return.
 SILENT: Final = 1 << 5  # silent mode. output will be discarded.
 
 
-def _detect_encoding(data:ByteString)->str:
-    encodings = ['utf-8', 'gbk','latin-1','iso-8859-1']
+def _detect_encoding(data: ByteString) -> str:
+    encodings = ["utf-8", "gbk", "latin-1", "iso-8859-1"]
 
     for encoding in encodings:
         try:
@@ -42,7 +42,7 @@ def _detect_encoding(data:ByteString)->str:
         except UnicodeDecodeError:
             continue
 
-    return  ''
+    return ""
 
 
 @dataclasses.dataclass

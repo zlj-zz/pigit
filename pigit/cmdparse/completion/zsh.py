@@ -135,19 +135,15 @@ class ZshCompletion(ShellCompletion):
                 for opt_name, opt_args in _sub_opts.items()
             ]
 
-            _sub_opt_str = (
-                textwrap.dedent(
-                    """
+            _sub_opt_str = textwrap.dedent(
+                """
                     ######################
                     # sub-commands helper
                     ######################
                     """
-                )
-                + _TEMP_V
-                % (
-                    "sub_opt",
-                    textwrap.indent("\n".join(_subs), "    "),
-                )
+            ) + _TEMP_V % (
+                "sub_opt",
+                textwrap.indent("\n".join(_subs), "    "),
             )
 
             self._process_sub_commands(

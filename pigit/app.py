@@ -23,8 +23,8 @@ class StatusPanel(ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Tuple[int, int] | None = None,
-        content: List[str] | None = None,
+        size: Optional[Tuple[int, int]] = None,
+        content: Optional[List[str]] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
@@ -45,7 +45,9 @@ class StatusPanel(ItemSelector):
             c = repo_handle.load_file_diff(
                 f.name, f.tracked, f.has_staged_change, path=self.repo_path
             ).split("\n")
-            self.emit("goto", target="display_panel", source=self.NAME, key=f.name, content=c)
+            self.emit(
+                "goto", target="display_panel", source=self.NAME, key=f.name, content=c
+            )
         elif key in {"a", " "}:
             repo_handle.switch_file_status(f, self.repo_path)
             self.fresh()
@@ -64,8 +66,8 @@ class BranchPanel(ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Tuple[int, int] | None = None,
-        content: List[str] | None = None,
+        size: Optional[Tuple[int, int]] = None,
+        content: Optional[List[str]] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
@@ -116,8 +118,8 @@ class CommitPanel(ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Tuple[int, int] | None = None,
-        content: List[str] | None = None,
+        size: Optional[Tuple[int, int]] = None,
+        content: Optional[List[str]] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
@@ -156,7 +158,7 @@ class ContentDisplay(LineTextBrowser):
         super().__init__(x, y, size, "")
 
         self.come_from = ""
-        self.i_cache_key = ''
+        self.i_cache_key = ""
         self.i_cache = {}
 
     def fresh(self):
@@ -167,7 +169,7 @@ class ContentDisplay(LineTextBrowser):
             self.i_cache[self.i_cache_key] = self._i
 
             self.come_from = data.get("source", "")
-            self.i_cache_key = data.get('key', '')
+            self.i_cache_key = data.get("key", "")
             self._content = data.get("content", "")
 
             self._i = self.i_cache.get(self.i_cache_key, 0)

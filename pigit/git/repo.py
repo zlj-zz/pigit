@@ -863,7 +863,9 @@ class Repo:
                 input_num = int(input("Please input the index:"))
                 if 0 <= input_num <= len(cur_cache):
                     path = exist_repos[cur_cache[input_num]]["path"]
-                    print(self.executor.exec(command.format(path), cwd=".", flags=WAITING))
+                    print(
+                        self.executor.exec(command.format(path), cwd=".", flags=WAITING)
+                    )
                 else:
                     print("Error: index out of range.")
             except Exception:

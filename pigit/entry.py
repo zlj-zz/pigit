@@ -400,4 +400,3 @@ def _(args: "Namespace", _):
     console.echo(msg)
 
 # yapf: enable
-

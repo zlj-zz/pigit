@@ -6,7 +6,7 @@ from pigit.ext.func import time_it
 
 
 @time_it
-def _active(prefixes:Optional[List] = None):
+def _active(prefixes: Optional[List] = None):
     try:
         _args = (prefixes or []) + sys.argv[1:]
         pigit(_args)
@@ -17,6 +17,6 @@ def _active(prefixes:Optional[List] = None):
 # =============================================
 # terminal entry
 # =============================================
-main = lambda :_active()
-g = lambda :_active(["cmd"])
-r = lambda :_active(["repo"])
+main = lambda: _active()
+g = lambda: _active(["cmd"])
+r = lambda: _active(["repo"])

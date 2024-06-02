@@ -27,12 +27,12 @@ def strtobool(s: str) -> bool:
     """
     s = s.lower()
 
-    if s in {"y", "yes", 't', 'true', "on", "1"}:
+    if s in {"y", "yes", "t", "true", "on", "1"}:
         return True
     elif s in {"n", "no", "f", "false", "off", "0"}:
         return False
     else:
-        raise ValueError('Not support string.')
+        raise ValueError("Not support string.")
 
 
 def traceback_info(extra_msg: str = "null") -> str:
@@ -113,7 +113,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     # Square of sum of squares of word frequency difference.
     frequency_sum_square: list[Tuple[str, int]] = list(
         map(
-            lambda item: (item[0], int(sqrt(sum(map(lambda i: i**2, item[1]))))),
+            lambda item: (item[0], int(sqrt(sum(map(lambda i: i ** 2, item[1]))))),
             frequency_difference.items(),
         )
     )

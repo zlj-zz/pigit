@@ -7,7 +7,7 @@ from typing import Any, List, Literal, Dict
 
 from .ext.log import logger
 from .ext.singleton import Singleton
-from .ext.utils import confirm, strtobool ,traceback_info
+from .ext.utils import confirm, strtobool, traceback_info
 
 
 CONF_ERROR = "==error=="

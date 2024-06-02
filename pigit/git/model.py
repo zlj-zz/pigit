@@ -48,6 +48,7 @@ class File:
 
         return file_name
 
+
 @dataclass
 class Commit:
     """Model class of a git commit."""
