@@ -55,6 +55,9 @@ class GitProxyOptions(TypedDict):
     has_arguments: bool
 
 
+GitProxyOptionsGroup = Dict[str, GitProxyOptions]
+
+
 # The custom git output format string.
 #   git ... --pretty={0}.format(GIT_PRINT_FORMAT)
 _GIT_PRINT_FORMAT = (
@@ -63,8 +66,7 @@ _GIT_PRINT_FORMAT = (
     '%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"'
 )
 
-
-Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
+_branch_group: GitProxyOptionsGroup = {
     # Branch
     "b": {
         "belong": GitCommandType.Branch,
@@ -117,6 +119,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "delete a local branch by name.",
         "has_arguments": True,
     },
+}
+
+_commit_group: GitProxyOptionsGroup = {
     # Commit
     "c": {
         "belong": GitCommandType.Commit,
@@ -179,6 +184,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "shows one or more objects (blobs, trees, tags and commits).",
         "has_arguments": True,
     },
+}
+
+_conflict_group: GitProxyOptionsGroup = {
     # Conflict(C)
     "Cl": {
         "belong": GitCommandType.Conflict,
@@ -216,6 +224,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "command": "git checkout --theirs -- git --no-pager diff --diff-filter=U --name-only",
         "help": "checks out their changes for all unmerged paths.",
     },
+}
+
+_fetch_group: GitProxyOptionsGroup = {
     # Fetch(f)
     "f": {
         "belong": GitCommandType.Fetch,
@@ -259,6 +270,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "command": fetch_remote_branch,
         "help": "fetch other branch to local as same name.",
     },
+}
+
+_index_group: GitProxyOptionsGroup = {
     # Index(i)
     "ia": {
         "belong": GitCommandType.Index,
@@ -314,6 +328,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "removes files from the index (recursively and forced).",
         "has_arguments": True,
     },
+}
+
+_log_group: GitProxyOptionsGroup = {
     # Log(l)
     "l": {
         "belong": GitCommandType.Log,
@@ -351,6 +368,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "manages reflog information.",
         "has_arguments": True,
     },
+}
+
+_merge_group: GitProxyOptionsGroup = {
     # Merge(m)
     "m": {
         "belong": GitCommandType.Merge,
@@ -396,6 +416,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "runs the merge conflict resolution tools to resolve conflicts.",
         "has_arguments": True,
     },
+}
+
+_push_group: GitProxyOptionsGroup = {
     # Push(p)
     "p": {
         "belong": GitCommandType.Push,
@@ -443,6 +466,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         ),
         "help": "pulls and pushes the current branch from origin to origin.",
     },
+}
+
+_remote_group: GitProxyOptionsGroup = {
     # Remote(R)
     "R": {
         "belong": GitCommandType.Remote,
@@ -498,6 +524,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "changes URLs for a remote.",
         "has_arguments": True,
     },
+}
+
+_stash_group: GitProxyOptionsGroup =  {
     # Stash(s)
     "s": {
         "belong": GitCommandType.Stash,
@@ -527,6 +556,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "display stash list with detail.",
         "has_arguments": True,
     },
+}
+
+_tag_group: GitProxyOptionsGroup = {
     # Tag (t)
     "t": {
         "belong": GitCommandType.Tag,
@@ -546,6 +578,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "deletes tags with given names.",
         "has_arguments": True,
     },
+}
+
+_working_tree_group: GitProxyOptionsGroup = {
     # Working tree(w)
     "ws": {
         "belong": GitCommandType.WorkingTree,
@@ -620,6 +655,9 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "and forced).",
         "has_arguments": True,
     },
+}
+
+_submodule_group: GitProxyOptionsGroup = {
     # Submodule
     "Sc": {
         "belong": GitCommandType.Submodule,
@@ -654,6 +692,22 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "Inverse initialization submodule, clear the dir.",
         "has_arguments": True,
     },
+}
+
+Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
+    **_branch_group,
+    **_commit_group,
+    **_conflict_group,
+    **_fetch_group,
+    **_index_group,
+    **_log_group,
+    **_merge_group,
+    **_push_group,
+    **_remote_group,
+    **_stash_group,
+    **_tag_group,
+    **_working_tree_group,
+    **_submodule_group,
     # Setting
     "savepd": {
         "belong": GitCommandType.Setting,
