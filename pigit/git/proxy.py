@@ -12,39 +12,9 @@ from pigit.ext.executor import Executor, WAITING
 from ._cmds import Git_Proxy_Cmds, GitCommandType
 
 
-def get_extra_cmds(name: str, path: str) -> Dict:
-    """Get custom cmds.
+PROMPT_WITH_TIPS = 1  # Prompt for possible commands and try again
 
-    Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
-    exists, and return it. If not have, return a empty dict.
-
-    Returns:
-        (dict[str,str]): extra cmds dict.
-    """
-    import importlib.util
-
-    extra_cmds = {}
-
-    if os.path.isfile(path):
-        try:
-            # load a module form location.
-            spec = importlib.util.spec_from_file_location(name, path)
-            if spec is None:
-                raise ValueError("spec is None")
-            if spec.loader is None:
-                raise ValueError("spec.loader is None")
-
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        except Exception:
-            logger(__name__).error(traceback_info(f"Can't load file '{path}'."))
-        else:
-            try:
-                extra_cmds = module.extra_cmds  # type: ignore
-            except AttributeError:
-                logger(__name__).error("Can't found dict name is 'extra_cmds'.")
-
-    return extra_cmds
+PROMPT_WITH_SAME_OUT = 2  # Output all possible command information that
 
 
 class GitProxy:
@@ -54,9 +24,11 @@ class GitProxy:
         self,
         extra_cmds: Optional[dict] = None,
         prompt: bool = True,
+        prompt_type: int = PROMPT_WITH_SAME_OUT,
         display: bool = True,
     ) -> None:
         self.prompt = prompt
+        self.prompt_type = prompt_type
         self.display = display
 
         self.executor = Executor()
@@ -163,9 +135,20 @@ class GitProxy:
         code, msg = self.process_command(short_cmd, args)
 
         if code == 1 and self.prompt:  # check config.
-            predicted_command = similar_command(short_cmd, self.cmds.keys())
-            if confirm(f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"):
-                return self.do(predicted_command, args=args)
+            if self.prompt_type == PROMPT_WITH_TIPS:
+                predicted_command = similar_command(short_cmd, self.cmds.keys())
+                if confirm(f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"):
+                    return self.do(predicted_command, args=args)
+            elif self.prompt_type == PROMPT_WITH_SAME_OUT:
+                msgs = [msg, "These are maybe you want:"]
+
+                for key in self.cmds.keys():
+                    if not key.startswith(short_cmd):
+                        continue
+                    msg = self.generate_help_by_key(key)
+                    msgs.append(msg)
+
+                return "\n".join(msgs)
 
         return msg
 
@@ -275,3 +258,38 @@ class GitProxy:
             msgs.append(f"`{member.value}`<{color_str}>")
 
         return " ".join(msgs)
+
+
+def get_extra_cmds(name: str, path: str) -> Dict:
+    """Get custom cmds.
+
+    Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`
+    exists, and return it. If not have, return a empty dict.
+
+    Returns:
+        (dict[str,str]): extra cmds dict.
+    """
+    import importlib.util
+
+    extra_cmds = {}
+
+    if os.path.isfile(path):
+        try:
+            # load a module form location.
+            spec = importlib.util.spec_from_file_location(name, path)
+            if spec is None:
+                raise ValueError("spec is None")
+            if spec.loader is None:
+                raise ValueError("spec.loader is None")
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except Exception:
+            logger(__name__).error(traceback_info(f"Can't load file '{path}'."))
+        else:
+            try:
+                extra_cmds = module.extra_cmds  # type: ignore
+            except AttributeError:
+                logger(__name__).error("Can't found dict name is 'extra_cmds'.")
+
+    return extra_cmds

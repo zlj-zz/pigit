@@ -20,42 +20,8 @@ Example:
     }
 """
 
-import enum
-from typing import Callable, Dict, List, Union, Tuple, TypedDict
-
+from .define import GitCommandType, GitProxyOptionsGroup
 from ._cmd_func import *
-
-
-@enum.unique
-class GitCommandType(enum.Enum):
-    Branch = "Branch"
-    Commit = "Commit"
-    Conflict = "Conflict"
-    Fetch = "Fetch"
-    Index = "Index"
-    Log = "Log"
-    Merge = "Merge"
-    Push = "Push"
-    Remote = "Remote"
-    Stash = "Stash"
-    Tag = "Tag"
-    WorkingTree = "Working tree"
-    Submodule = "Submodule"
-    Setting = "Setting"
-    Extra = "Extra"  # default
-
-
-GitCommand = Union[str, Callable[[Union[List, Tuple]], None]]
-
-
-class GitProxyOptions(TypedDict):
-    belong: GitCommandType
-    command: GitCommand
-    help: str
-    has_arguments: bool
-
-
-GitProxyOptionsGroup = Dict[str, GitProxyOptions]
 
 
 # The custom git output format string.
@@ -66,8 +32,8 @@ _GIT_PRINT_FORMAT = (
     '%C(bold)Commit: %C(blue)%cn <%ce> %C(reset)%C(cyan)%ci (%cr)%C(reset)%n%+B"'
 )
 
+# Branch(b)
 _branch_group: GitProxyOptionsGroup = {
-    # Branch
     "b": {
         "belong": GitCommandType.Branch,
         "command": "git branch",
@@ -121,8 +87,8 @@ _branch_group: GitProxyOptionsGroup = {
     },
 }
 
+# Commit(c)
 _commit_group: GitProxyOptionsGroup = {
-    # Commit
     "c": {
         "belong": GitCommandType.Commit,
         "command": "git commit --verbose",
@@ -186,8 +152,8 @@ _commit_group: GitProxyOptionsGroup = {
     },
 }
 
+# Conflict(C)
 _conflict_group: GitProxyOptionsGroup = {
-    # Conflict(C)
     "Cl": {
         "belong": GitCommandType.Conflict,
         "command": "git --no-pager diff --diff-filter=U --name-only",
@@ -226,8 +192,8 @@ _conflict_group: GitProxyOptionsGroup = {
     },
 }
 
+# Fetch(f)
 _fetch_group: GitProxyOptionsGroup = {
-    # Fetch(f)
     "f": {
         "belong": GitCommandType.Fetch,
         "command": "git fetch",
@@ -272,8 +238,8 @@ _fetch_group: GitProxyOptionsGroup = {
     },
 }
 
+# Index(i)
 _index_group: GitProxyOptionsGroup = {
-    # Index(i)
     "ia": {
         "belong": GitCommandType.Index,
         "command": add,
@@ -330,8 +296,8 @@ _index_group: GitProxyOptionsGroup = {
     },
 }
 
+# Log(l)
 _log_group: GitProxyOptionsGroup = {
-    # Log(l)
     "l": {
         "belong": GitCommandType.Log,
         "command": "git log --graph --all --decorate",
@@ -370,8 +336,8 @@ _log_group: GitProxyOptionsGroup = {
     },
 }
 
+# Merge(m)
 _merge_group: GitProxyOptionsGroup = {
-    # Merge(m)
     "m": {
         "belong": GitCommandType.Merge,
         "command": "git merge",
@@ -418,8 +384,8 @@ _merge_group: GitProxyOptionsGroup = {
     },
 }
 
+# Push(p)
 _push_group: GitProxyOptionsGroup = {
-    # Push(p)
     "p": {
         "belong": GitCommandType.Push,
         "command": "git push",
@@ -468,8 +434,8 @@ _push_group: GitProxyOptionsGroup = {
     },
 }
 
+# Remote(R)
 _remote_group: GitProxyOptionsGroup = {
-    # Remote(R)
     "R": {
         "belong": GitCommandType.Remote,
         "command": "git remote",
@@ -526,8 +492,8 @@ _remote_group: GitProxyOptionsGroup = {
     },
 }
 
-_stash_group: GitProxyOptionsGroup =  {
-    # Stash(s)
+# Stash(s)
+_stash_group: GitProxyOptionsGroup = {
     "s": {
         "belong": GitCommandType.Stash,
         "command": "git stash",
@@ -558,8 +524,8 @@ _stash_group: GitProxyOptionsGroup =  {
     },
 }
 
+# Tag (t)
 _tag_group: GitProxyOptionsGroup = {
-    # Tag (t)
     "t": {
         "belong": GitCommandType.Tag,
         "command": "git tag",
@@ -580,8 +546,8 @@ _tag_group: GitProxyOptionsGroup = {
     },
 }
 
+# Working tree(w)
 _working_tree_group: GitProxyOptionsGroup = {
-    # Working tree(w)
     "ws": {
         "belong": GitCommandType.WorkingTree,
         "command": "git status --short",
@@ -657,8 +623,8 @@ _working_tree_group: GitProxyOptionsGroup = {
     },
 }
 
+# Submodule(S)
 _submodule_group: GitProxyOptionsGroup = {
-    # Submodule
     "Sc": {
         "belong": GitCommandType.Submodule,
         "command": "git clone --recursive",
@@ -694,7 +660,7 @@ _submodule_group: GitProxyOptionsGroup = {
     },
 }
 
-Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
+Git_Proxy_Cmds: GitProxyOptionsGroup = {
     **_branch_group,
     **_commit_group,
     **_conflict_group,
@@ -733,4 +699,4 @@ Git_Proxy_Cmds: Dict[str, GitProxyOptions] = {
         "help": "set user email.",
         "has_arguments": True,
     },
-}  # type: dict[str,dict]
+}
