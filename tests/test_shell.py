@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
-from pigit.shellmode import PigitShell
+from pigit.shell_mode import PigitShell
 
 
 # Test for PigitShell.__init__

@@ -354,12 +354,10 @@ class Parser(ArgumentParser):
         required: bool = False,
         help: Optional[str] = None,
         metavar: Optional[str] = None,
-    ) -> Callable[..., "Parser"]:
-        ...
+    ) -> Callable[..., "Parser"]: ...
 
     @overload
-    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]:
-        ...
+    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]: ...
 
     def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]:
         """Create a new ~Parser of subparser and use the decorator use callback.
@@ -430,8 +428,7 @@ def command(
     allow_abbrev: bool = True,
     exit_on_error: bool = True,
     callback: Optional[Callable] = None,
-) -> Callable[..., Parser]:
-    ...
+) -> Callable[..., Parser]: ...
 
 
 @overload
@@ -439,8 +436,7 @@ def command(
     prog: Optional[str] = None,
     cls: Optional[Type[Parser]] = None,
     **attrs,
-) -> Callable[..., Parser]:
-    ...
+) -> Callable[..., Parser]: ...
 
 
 def command(
@@ -535,13 +531,11 @@ def argument(
     dest: Optional[str] = None,
     version: Optional[str] = None,
     **kwargs: Any,
-) -> Callable:
-    ...
+) -> Callable: ...
 
 
 @overload
-def argument(name: str, **kwargs) -> Callable:
-    ...
+def argument(name: str, **kwargs) -> Callable: ...
 
 
 def argument(name: str, **kwargs) -> Callable:

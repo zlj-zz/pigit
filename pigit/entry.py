@@ -260,7 +260,7 @@ def _(args: "Namespace", unknown: List):
     )
 
     if args.shell:
-        from .shellmode import PigitShell
+        from .shell_mode import PigitShell
 
         shell_ = PigitShell(git_processor)
         # print(shell_.__dir__())

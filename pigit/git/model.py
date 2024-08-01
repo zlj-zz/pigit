@@ -5,6 +5,7 @@
 from typing import List
 from dataclasses import dataclass
 
+
 # flake8: noqa
 @dataclass
 class File:

@@ -137,7 +137,9 @@ class GitProxy:
         if code == 1 and self.prompt:  # check config.
             if self.prompt_type == PROMPT_WITH_TIPS:
                 predicted_command = similar_command(short_cmd, self.cmds.keys())
-                if confirm(f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"):
+                if confirm(
+                    f":TIPS: The wanted command is `{predicted_command}`?[y/n]:"
+                ):
                     return self.do(predicted_command, args=args)
             elif self.prompt_type == PROMPT_WITH_SAME_OUT:
                 msgs = [msg, "These are maybe you want:"]

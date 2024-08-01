@@ -1,9 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
 from math import ceil
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Literal
 
-from .console import Render
+from .console import Render, Cursor, Term
 from .utils import get_width, plain
 
 
@@ -11,6 +11,8 @@ NONE_SIZE = (0, 0)
 
 _Log = logging.getLogger(f"PIGIT.{__name__}")
 _Namespace = set()  # Global attr to save component name.
+
+ActionLiteral = Literal["goto"]
 
 
 class ComponentError(Exception):
@@ -63,26 +65,26 @@ class Component(ABC):
         """Fresh content data."""
         raise NotImplementedError()
 
-    def accept(self, action: str, **data):
+    def accept(self, action: ActionLiteral, **data):
         """Process emit action of child.
 
         Here is do nothing. If needed, should overwritten in sub-class.
         """
         raise NotImplementedError()
 
-    def emit(self, action: str, **data):
+    def emit(self, action: ActionLiteral, **data):
         """Emit to parent."""
         assert self.parent is not None, "Has no parent to emitting."
         self.parent.accept(action, **data)
 
-    def update(self, action: str, **data):
+    def update(self, action: ActionLiteral, **data):
         """Process notify action of parent.
 
         Here is do nothing. If needed, should overwritten in sub-class.
         """
         raise NotImplementedError()
 
-    def notify(self, action: str, **data):
+    def notify(self, action: ActionLiteral, **data):
         """Notify all children."""
         assert (
             self.children is not None
@@ -156,7 +158,7 @@ class Container(Component):
         for child in self.children.values():
             child.resize(size)
 
-    def accept(self, action: str, **data):
+    def accept(self, action: ActionLiteral, **data):
         # sourcery skip: remove-unnecessary-else, swap-if-else-branches
         if action == "goto" and (name := data.get("target")) is not None:
             if child := self.switch_child(name):  # switch and fetch next child.
@@ -277,7 +279,7 @@ class ItemSelector(Component):
         self.fresh()
         self.content_len = len(self.content) - 1
 
-    def update(self, action: str, **data):
+    def update(self, action: ActionLiteral, **data):
         pass
 
     def _render(self, size: Optional[Tuple[int, int]] = None):

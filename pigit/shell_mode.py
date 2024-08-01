@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, Callable, List, Optional, IO
 import os
 import cmd
 import functools
+from typing import TYPE_CHECKING, Callable, List, Optional, IO
 
 from plenty import get_console
 
@@ -14,17 +14,17 @@ class PigitShell(cmd.Cmd):
         "b`Welcome come PIGIT shell.`<khaki>\n"
         "`You can use short commands directly. Input '?' to get help.`<khaki>\n"
     )
-    prompt: str = "(pigit)> "
+    prompt: str = "(pigit:cmd)> "
 
     def __init__(
         self,
         short_giter: "GitProxy",
         *,
-        completekey: str = "tab",
+        complete_key: str = "tab",
         stdin: Optional[IO[str]] = None,
         stdout: Optional[IO[str]] = None,
     ) -> None:
-        super().__init__(completekey, stdin, stdout)
+        super().__init__(complete_key, stdin, stdout)
 
         self.console = get_console()
         self.short_giter = short_giter
@@ -33,13 +33,15 @@ class PigitShell(cmd.Cmd):
             func_name = f"do_{key}"
 
             self.set_instance_method(
-                self.make_fun(key, values.get("help", "")), func_name
+                self.make_fun(key, values.get("help", "")),
+                func_name,
             )
 
     # =================
     # cmd tools method
     # =================
     def make_fun(self, key: str, doc: str):
+        """make func for proxy command."""
         _key = key
 
         def func(args: str):
@@ -87,8 +89,12 @@ class PigitShell(cmd.Cmd):
             self.stdout.write(f"{value}: ")
             super().do_help(value)
 
+    def do_quit(self, arg: str):
+        "Return `True` to break cmdloop"
+        return True
+
     # ================
-    # support command
+    # special command
     # ================
     def do_shell(self, args: str):
         """Run a shell command.
@@ -100,6 +106,6 @@ class PigitShell(cmd.Cmd):
 
     do_sh = do_shell
 
-    def do_all(self, args: str):
+    def do_all_help(self, args: str):
         """Show all short git cmds help."""
         get_console().echo(self.short_giter.get_help())

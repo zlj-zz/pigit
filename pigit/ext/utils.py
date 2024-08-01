@@ -113,7 +113,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
     # Square of sum of squares of word frequency difference.
     frequency_sum_square: list[Tuple[str, int]] = list(
         map(
-            lambda item: (item[0], int(sqrt(sum(map(lambda i: i ** 2, item[1]))))),
+            lambda item: (item[0], int(sqrt(sum(map(lambda i: i**2, item[1]))))),
             frequency_difference.items(),
         )
     )

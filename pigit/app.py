@@ -3,7 +3,7 @@ from time import sleep
 from typing import List, Optional, Tuple
 
 from .git.repo import Repo
-from .tui.components import Container, LineTextBrowser, ItemSelector
+from .tui.components import ActionLiteral, Container, LineTextBrowser, ItemSelector
 from .tui.event_loop import EventLoop
 
 
@@ -164,7 +164,7 @@ class ContentDisplay(LineTextBrowser):
     def fresh(self):
         pass
 
-    def update(self, action, **data):
+    def update(self, action: ActionLiteral, **data):
         if action == "goto":
             self.i_cache[self.i_cache_key] = self._i
 
