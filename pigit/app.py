@@ -2,6 +2,7 @@ import logging
 from time import sleep
 from typing import List, Optional, Tuple
 
+from .ext.utils import confirm
 from .git.repo import Repo
 from .tui.components import ActionLiteral, Container, LineTextBrowser, ItemSelector
 from .tui.event_loop import EventLoop
@@ -48,14 +49,19 @@ class StatusPanel(ItemSelector):
             self.emit(
                 "goto", target="display_panel", source=self.NAME, key=f.name, content=c
             )
+            return
         elif key in {"a", " "}:
             repo_handle.switch_file_status(f, self.repo_path)
-            self.fresh()
-            self._render()
         elif key == "i":
             repo_handle.ignore_file(f)
-            self.fresh()
+        elif key == "d":
+            self.clear_items()
             self._render()
+            if confirm(f"Discard '{f.name}'? [y/n]:"):
+                repo_handle.discard_file(f, self.repo_path)
+
+        self.fresh()
+        self._render()
 
 
 class BranchPanel(ItemSelector):

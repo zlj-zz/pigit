@@ -10,7 +10,7 @@ from .utils import get_width, plain
 NONE_SIZE = (0, 0)
 
 _Log = logging.getLogger(f"PIGIT.{__name__}")
-_Namespace = set()  # Global attr to save component name.
+_NamespaceComp = set()  # Global attr to save component name.
 
 ActionLiteral = Literal["goto"]
 
@@ -33,9 +33,9 @@ class Component(ABC):
     ) -> None:
         assert self.NAME, "The `NAME` attribute cannot be empty."
         assert (
-            self.NAME not in _Namespace
+            self.NAME not in _NamespaceComp
         ), f"The `NAME` attribute must be unique: '{self.NAME}'."
-        _Namespace.add(self.NAME)
+        _NamespaceComp.add(self.NAME)
 
         self._activated = False  # component whether activated state.
 
@@ -272,6 +272,10 @@ class ItemSelector(Component):
 
         self.curr_no = 0  # default start with 0.
         self._r_start = 0
+
+    def clear_items(self):
+        self.content = [""]
+        self.content_len = len(self.content) - 1
 
     def resize(self, size: Tuple[int, int]):
         self._size = size

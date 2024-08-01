@@ -1,6 +1,6 @@
 import pytest
 from pigit.tui.components import (
-    _Namespace,
+    _NamespaceComp,
     Container,
     Component,
     ComponentError,
@@ -47,7 +47,7 @@ class TestContainer:
     )
     def test_container_init_and_switch(self, start_name, switch_key, expected_active):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         children = {
             "main": MockComponent("main"),
             "secondary": MockComponent("secondary"),
@@ -75,7 +75,7 @@ class TestContainer:
     )
     def test_container_accept_errors(self, action, data, expected_exception):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         children = {"main": MockComponent("main")}
         container = MockContainer(children=children)
 
@@ -114,7 +114,7 @@ class TestLineTextBrowser:
     def test_LineTextBrowser_init(
         self, mocker, x, y, size, content, expected_position, expected_content
     ):
-        _Namespace.clear()
+        _NamespaceComp.clear()
         # Arrange
         mocker.patch("pigit.tui.components.Render.draw")
 
@@ -137,7 +137,7 @@ class TestLineTextBrowser:
     )
     def test_resize(self, mocker, initial_size, new_size, expected_size):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         browser = MockLineTextBrowser(size=initial_size)
         mocker.patch.object(browser, "fresh")
 
@@ -160,7 +160,7 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         browser = MockLineTextBrowser(content=content, size=[0, 1])
         browser._i = initial_index
         mocker.patch.object(browser, "_render")
@@ -184,7 +184,7 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         browser = MockLineTextBrowser(content=content)
         browser._i = initial_index
         mocker.patch.object(browser, "_render")
@@ -222,7 +222,7 @@ class TestItemSelector:
     )
     def test_ItemSelector_init(self, x, y, size, content):
         # Arrange
-        _Namespace.clear()
+        _NamespaceComp.clear()
         MockItemSelector.CURSOR = "*"
 
         # Act
@@ -247,7 +247,7 @@ class TestItemSelector:
         ids=["resize_larger", "resize_smaller"],
     )
     def test_ItemSelector_resize(self, initial_size, new_size):
-        _Namespace.clear()
+        _NamespaceComp.clear()
         selector = MockItemSelector(size=initial_size)
 
         selector.resize(new_size)
@@ -264,7 +264,7 @@ class TestItemSelector:
         ids=["next_single_step", "next_multiple_steps", "next_beyond_end"],
     )
     def test_ItemSelector_next(self, content, initial_pos, step, expected_pos):
-        _Namespace.clear()
+        _NamespaceComp.clear()
         selector = MockItemSelector(content=content)
         selector.curr_no = initial_pos
 
@@ -282,7 +282,7 @@ class TestItemSelector:
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
     def test_ItemSelector_forward(self, content, initial_pos, step, expected_pos):
-        _Namespace.clear()
+        _NamespaceComp.clear()
         selector = MockItemSelector(content=content)
         selector.curr_no = initial_pos
 

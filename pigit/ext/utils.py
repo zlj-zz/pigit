@@ -57,7 +57,7 @@ def traceback_info(extra_msg: str = "null") -> str:
     )
 
 
-def confirm(text: str = "", default: bool = True) -> bool:
+def confirm(text: str = "Confirm[y/n]:", default: bool = True) -> bool:
     """Obtain confirmation results.
     Args:
         text (str): Confirmation prompt.
