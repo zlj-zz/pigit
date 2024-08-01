@@ -17,6 +17,7 @@ class EventLoop(Term):
     def __init__(
         self,
         child: "Component",
+        input_takeover: bool = False,
         input_handle: Optional["InputTerminal"] = None,
         real_time: bool = False,
         alt: bool = True,
@@ -27,6 +28,7 @@ class EventLoop(Term):
         self._real_time = real_time
 
         # Init keyboard handle object.
+        self._input_takeover = input_takeover
         if not input_handle:
             # XXX: now not support windows.
             from .input import PosixInput, is_mouse_event
@@ -35,6 +37,7 @@ class EventLoop(Term):
             # adjust the input whether is a mouse event.
             self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
+
         self._alt = alt
 
         self._event_map = {}
@@ -42,15 +45,25 @@ class EventLoop(Term):
             for ev in self.BINDINGS:
                 self._event_map[ev[0]] = ev[1]
 
+    def after_start(self):
+        """The hook for user to define custom option after ready to start"""
+
     def start(self):
         if self._alt:
             self.to_alt_screen()
 
+        if self._input_takeover and self._input_handle is not None:
+            self._input_handle.start()
+
         self.resize()  # include render.
+        self.after_start()
 
     def stop(self):
         if self._alt:
             self.to_normal_screen()
+
+        if self._input_takeover and self._input_handle is not None:
+            self._input_handle.stop()
 
     def __enter__(self):
         self.start()
@@ -96,15 +109,13 @@ class EventLoop(Term):
     def run(self) -> None:
         try:
             self.start()
-            self._input_handle.start()
             self._loop()
-        except (ExitEventLoop, KeyboardInterrupt, EOFError):
-            self._input_handle.stop()
+        except (ExitEventLoop, KeyboardInterrupt, EOFError) as e:
             self.stop()
+            print(e)
         except Exception as e:
-            self._input_handle.stop()
             self.stop()
             print(e, e.__traceback__)
 
-    def quit(self) -> None:
-        raise ExitEventLoop("Quit")
+    def quit(self, msg: str = "Quit") -> None:
+        raise ExitEventLoop(msg)

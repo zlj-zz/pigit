@@ -15,18 +15,22 @@ class ComponentMock:
         pass
 
 
-@pytest.mark.parametrize("real_time, alt, expected_start_calls", [
-    (True, True, "to_alt_screen"),  # ID: real_time-true_alt-true
-    (False, False, "to_normal_screen"),  # ID: real_time-false_alt-false
-    (True, False, None),  # ID: real_time-true_alt-false
-    (False, True, "to_alt_screen"),  # ID: real_time-false_alt-true
-])
+@pytest.mark.parametrize(
+    "real_time, alt, expected_start_calls",
+    [
+        (True, True, "to_alt_screen"),  # ID: real_time-true_alt-true
+        (False, False, "to_normal_screen"),  # ID: real_time-false_alt-false
+        (True, False, None),  # ID: real_time-true_alt-false
+        (False, True, "to_alt_screen"),  # ID: real_time-false_alt-true
+    ],
+)
 def test_start_stop(real_time, alt, expected_start_calls):
     # Arrange
     component = ComponentMock()
     event_loop = EventLoop(component, real_time=real_time, alt=alt)
-    with patch.object(EventLoop, 'to_alt_screen') as mock_to_alt_screen, \
-         patch.object(EventLoop, 'to_normal_screen') as mock_to_normal_screen:
+    with patch.object(EventLoop, "to_alt_screen") as mock_to_alt_screen, patch.object(
+        EventLoop, "to_normal_screen"
+    ) as mock_to_normal_screen:
 
         # Act
         event_loop.start()

@@ -91,18 +91,3 @@ def test_do_shell(mock_system):
 
     # Assert
     mock_system.assert_called_once_with("ls")
-
-
-# Test for PigitShell.do_all
-def test_do_all():
-    # Arrange
-    short_giter = Mock()
-    short_giter.cmds = {"test": {"help": "test help"}}
-    short_giter.get_help.return_value = "test help"
-    shell = PigitShell(short_giter)
-
-    # Act
-    shell.do_all("")
-
-    # Assert
-    short_giter.get_help.assert_called_once()

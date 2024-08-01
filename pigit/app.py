@@ -227,6 +227,10 @@ class App(EventLoop):
     ]
 
     def __init__(self) -> None:
-        super().__init__(PanelContainer())
+        super().__init__(PanelContainer(), input_takeover=True)
 
         self.set_input_timeouts(0.125)
+
+    def after_start(self):
+        if self._size.columns < 65 or self._size.lines < 20:
+            self.quit("No enough space to running.")

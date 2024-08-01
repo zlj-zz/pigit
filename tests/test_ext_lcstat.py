@@ -13,7 +13,7 @@ from pigit.ext.lcstat import Counter
     "path",
     [
         os.getcwd(),
-        Path(USER_HOME, ".config")
+        Path(USER_HOME, ".config"),
         # USER_HOME + "/.config",
         # *os.environ.values(),
     ],
