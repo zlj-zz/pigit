@@ -1,10 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-from math import ceil
 from typing import Callable, Dict, List, Optional, Tuple, Literal
 
 from .console import Render, Cursor, Term
-from .utils import get_width, plain
 
 
 NONE_SIZE = (0, 0)
@@ -39,9 +37,8 @@ class Component(ABC):
 
         self._activated = False  # component whether activated state.
 
-        self.x = x
-        self.y = y
-        self._size = size or (0, 0)
+        self.x, self.y = x, y
+        self._size = size or NONE_SIZE
 
         self.parent = parent
         self.children = children

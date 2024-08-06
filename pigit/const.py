@@ -35,17 +35,23 @@ else:
     USER_HOME = os.environ["HOME"]
     PIGIT_HOME = os.path.join(USER_HOME, ".config", __project__)
 
+# Log file path
 LOG_FILE_PATH: str = f"{PIGIT_HOME}/log/{__project__}.log"
 
+# Config file path
 CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
 
+# Code counter file path
 COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 
+# User custom cmd path
 EXTRA_CMD_MODULE_NAME: str = "extra_cmds"
 EXTRA_CMD_MODULE_PATH: str = f"{PIGIT_HOME}/{EXTRA_CMD_MODULE_NAME}.py"
 
+# Multi repos config file
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 
+# Flag of first running
 IS_FIRST_RUN: bool = not os.path.isdir(PIGIT_HOME)
 if IS_FIRST_RUN:
     os.makedirs(PIGIT_HOME, exist_ok=True)

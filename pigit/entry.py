@@ -17,7 +17,6 @@ from .const import (
     IS_FIRST_RUN,
     IS_WIN,
     LOG_FILE_PATH,
-    PIGIT_HOME,
     REPOS_PATH,
     VERSION,
 )

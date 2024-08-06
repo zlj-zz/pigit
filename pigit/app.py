@@ -232,5 +232,5 @@ class App(EventLoop):
         self.set_input_timeouts(0.125)
 
     def after_start(self):
-        if self._size.columns < 65 or self._size.lines < 20:
+        if self._size.columns < 65 or self._size.lines < 10:
             self.quit("No enough space to running.")
