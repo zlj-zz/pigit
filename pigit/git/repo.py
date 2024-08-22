@@ -4,7 +4,7 @@ import os
 import re
 import json
 import textwrap
-from typing import  Callable, Dict, List, Optional, Tuple, Union, Generator
+from typing import Callable, Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
 from pathlib import Path
 

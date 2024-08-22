@@ -112,7 +112,7 @@ class EventLoop(Term):
             self._loop()
         except (ExitEventLoop, KeyboardInterrupt, EOFError) as e:
             self.stop()
-            print(e)
+            print(e, e.__traceback__)
         except Exception as e:
             self.stop()
             print(e, e.__traceback__)

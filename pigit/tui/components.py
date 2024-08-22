@@ -59,7 +59,10 @@ class Component(ABC):
         return self._activated
 
     def fresh(self):
-        """Fresh content data."""
+        """Fresh content data.
+
+        Here is do nothing. If needed, should overwritten in sub-class.
+        """
         raise NotImplementedError()
 
     def accept(self, action: ActionLiteral, **data):
@@ -89,12 +92,22 @@ class Component(ABC):
         for child in self.children.values():
             child.update(action, **data)
 
-    @abstractmethod
     def resize(self, size: Tuple[int, int]):
         """Response to the resize event.
 
-        Here is do nothing. If needed, should overwritten in sub-class.
+        Re-set the size of component. And refresh the content.
+        If has children, let children process resize.
         """
+        self._size = size
+        self.fresh()
+
+        # if has no children, None or {}
+        if not self.children:
+            return
+
+        # let children process resize.
+        for child in self.children.values():
+            child.resize(size)
 
     @abstractmethod
     def _render(self, size: Optional[Tuple[int, int]] = None):
@@ -148,12 +161,8 @@ class Container(Component):
 
         children[self.name].activate()
 
-    def resize(self, size: Tuple[int, int]):
-        self._size = size
-
-        # let children process resize.
-        for child in self.children.values():
-            child.resize(size)
+    def fresh(self):
+        pass  # do nothing
 
     def accept(self, action: ActionLiteral, **data):
         # sourcery skip: remove-unnecessary-else, swap-if-else-branches
@@ -220,11 +229,8 @@ class LineTextBrowser(Component):
         self._r = [0, self._size[1]]  # display range.
 
     def resize(self, size: Tuple[int, int]):
-        self._size = size
         self._max_line = size[1]
-
-        # TODO:
-        self.fresh()
+        super().resize(size)
 
     def _render(self, size: Optional[Tuple[int, int]] = None):
         if self._content:
@@ -276,11 +282,6 @@ class ItemSelector(Component):
 
     def clear_items(self):
         self.set_content([""])
-
-    def resize(self, size: Tuple[int, int]):
-        self._size = size
-
-        self.fresh()
 
     def update(self, action: ActionLiteral, **data):
         pass
