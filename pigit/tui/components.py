@@ -270,15 +270,17 @@ class ItemSelector(Component):
         self.curr_no = 0  # default start with 0.
         self._r_start = 0
 
-    def clear_items(self):
-        self.content = [""]
+    def set_content(self, content: List[str]):
+        self.content = content
         self.content_len = len(self.content) - 1
+
+    def clear_items(self):
+        self.set_content([""])
 
     def resize(self, size: Tuple[int, int]):
         self._size = size
 
         self.fresh()
-        self.content_len = len(self.content) - 1
 
     def update(self, action: ActionLiteral, **data):
         pass

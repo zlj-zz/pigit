@@ -1,9 +1,9 @@
 import logging
 from time import sleep
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from .ext.utils import confirm
-from .git.repo import Repo
+from .git.repo import GitFileT, GitFuncT, Repo
 from .tui.components import ActionLiteral, Container, LineTextBrowser, ItemSelector
 from .tui.event_loop import EventLoop
 
@@ -37,7 +37,7 @@ class StatusPanel(ItemSelector):
             return ["No status changed."]
 
         files_str = [file.display_str for file in files]
-        self.content = files_str
+        self.set_content(files_str)
 
     def on_key(self, key: str):
         f = self.files[self.curr_no]
@@ -53,15 +53,25 @@ class StatusPanel(ItemSelector):
         elif key in {"a", " "}:
             repo_handle.switch_file_status(f, self.repo_path)
         elif key == "i":
-            repo_handle.ignore_file(f)
+            self.double_check(repo_handle.ignore_file, f, msg=f"Ignore file")
         elif key == "d":
-            self.clear_items()
-            self._render()
-            if confirm(f"Discard '{f.name}'? [y/n]:"):
-                repo_handle.discard_file(f, self.repo_path)
+            self.double_check(repo_handle.discard_file, f, msg=f"Discard file")
 
         self.fresh()
         self._render()
+
+    def double_check(
+        self,
+        callee: GitFuncT,
+        file: GitFileT,
+        path: Optional[str] = None,
+        msg: str = "",
+    ):
+        self.clear_items()
+        self._render()
+        if confirm(f"{msg} '{str(file)}'? [y/n]:"):
+            callee(file, path=path)
+            self.forward()
 
 
 class BranchPanel(ItemSelector):

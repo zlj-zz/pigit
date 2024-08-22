@@ -4,7 +4,7 @@ import os
 import re
 import json
 import textwrap
-from typing import Dict, List, Optional, Tuple, Union, Generator
+from typing import  Callable, Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
 from pathlib import Path
 
@@ -15,6 +15,10 @@ from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
 from pigit.ext.log import logger
 from pigit.ext.utils import adjudgment_type, get_file_icon
 from .model import File, Commit, Branch
+
+
+GitFileT = Union[File, str]
+GitFuncT = Callable[[GitFileT, Optional[str]], None]
 
 
 class RepoError(Exception):
@@ -606,7 +610,9 @@ class Repo:
                 raise RepoError("Please set `tracked` or give a 'File'.") from None
 
         if tracked:
-            self.executor.exec(f"git checkout -- {file_name}", cwd=path)
+            self.executor.exec(
+                f"git checkout -- {file_name}", flags=WAITING | SILENT, cwd=path
+            )
         else:
             os.remove(os.path.join(path or "", file_name))
 

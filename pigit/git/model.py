@@ -49,6 +49,9 @@ class File:
 
         return file_name
 
+    def __str__(self) -> str:
+        return self.get_file_str()
+
 
 @dataclass
 class Commit:
