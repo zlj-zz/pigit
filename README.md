@@ -206,7 +206,7 @@ On windows should be: `C:\\User\\<your username>`
 | counter_format        | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
 | git_config_format     | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
 | repo_info_include     | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
-| repo_auto_append      | bool  | False                       | Whether auto append path to repos.                                                                                          |
+| repo_auto_append      | bool  | True                        | Whether auto append path to repos.                                                                                          |
 | log_debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
 | log_output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 

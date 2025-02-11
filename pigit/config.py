@@ -119,7 +119,7 @@ class Config(metaclass=Singleton):
     repo_info_include: List[str] = ["remote", "branch", "log"]
 
     # repo conf
-    repo_auto_append: bool = False
+    repo_auto_append: bool = True
 
     # setting conf
     log_debug: bool = False

@@ -360,6 +360,19 @@ repo.sub_parser("clear", help="clear the all repos.")(
 )
 
 
+@repo.sub_parser("report", help="genereate report of all repos.")
+@argument("--author", type=str, required=True, help="select author of commits.")
+@argument("--since",  type=str,default='', help="start range of commits.")
+@argument("--util",  type=str,default='', help="end range of commmits.")
+def repo_report(args, _):
+    report = repo_handler.report_repos(
+        author=args.author,
+        since=args.since,
+        util=args.util,
+    )
+    console.echo(report)
+
+
 @repo.sub_parser("cd", help="jump to a repo dir.")
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):

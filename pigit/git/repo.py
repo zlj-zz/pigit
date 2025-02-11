@@ -7,6 +7,7 @@ import textwrap
 from typing import Callable, Dict, List, Optional, Tuple, Union, Generator
 from collections import Counter
 from pathlib import Path
+import pprint
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -710,6 +711,49 @@ class Repo:
 
     def clear_repos(self) -> None:
         self.repo_json_path.unlink(missing_ok=True)
+
+    def report_repos(self, author: str, since: str, util: str) -> str:
+        """Generate report of repos.
+
+        range e.g.:
+            git log --since="2023-01-01"  --until="2023-12-31"
+            git log --since="1 month ago" --until="1 day ago"
+            git log --since="1672531200"  --until="1675212800"
+        """
+        exist_repos = self.load_repos()
+        if len(exist_repos) == 0:
+            return "No repo(s) managed."
+
+        command = f"git log --color=never --oneline"
+        if author != "":
+            command += f' --author="{author}"'
+        if since != "":
+            command += f' --since="{since}"'
+        if util != "":
+            command += f' --grep="{util}"'
+        if since == "" and util == "":
+            command += " -30"
+
+        report_dict = {}
+        for repo_name, prop in exist_repos.items():
+            repo_path = prop["path"]
+            _, err, resp = self.executor.exec(
+                command, flags=REPLY | DECODE, cwd=repo_path
+            )
+
+            commits = []
+            for line in resp.split("\n"):
+                if line == "":
+                    continue
+
+                line = line.split(" ", maxsplit=1)[1]
+                if line.startswith("Merge branch"):
+                    continue
+
+                commits.append(line)
+
+            report_dict[repo_name] = commits
+        pprint.pprint(report_dict)
 
     def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
         exist_repos = self.load_repos()
