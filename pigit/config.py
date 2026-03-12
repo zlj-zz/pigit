@@ -203,6 +203,35 @@ class Config(metaclass=Singleton):
                     f'Config key "{key}" should be a list literal, got `{value}`.'
                 )
 
+    @staticmethod
+    def _remove_inline_comment(line: str) -> str:
+        """Remove comments while preserving '#' inside quoted strings."""
+        in_single_quote = False
+        in_double_quote = False
+        escaped = False
+
+        for idx, ch in enumerate(line):
+            if escaped:
+                escaped = False
+                continue
+
+            if ch == "\\" and (in_single_quote or in_double_quote):
+                escaped = True
+                continue
+
+            if ch == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+                continue
+
+            if ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                continue
+
+            if ch == "#" and not in_single_quote and not in_double_quote:
+                return line[:idx].rstrip()
+
+        return line
+
     def read_config(self) -> None:
         config = self.conf
         config_file = self.config_file_path
@@ -225,8 +254,9 @@ class Config(metaclass=Singleton):
                     continue
 
                 # remove line comment.
-                if line_comment_idx := line.find("#") > 0:
-                    line = line[:line_comment_idx]
+                line = self._remove_inline_comment(line)
+                if "=" not in line:
+                    continue
 
                 # processing.
                 key_str, value_str = line.split("=", maxsplit=1)

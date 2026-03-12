@@ -61,3 +61,36 @@ def test_list_config_rejects_non_literal_expression():
 
     assert "repo_info_include" not in c.conf
     assert any("invalid list literal" in warning for warning in c._warnings)
+
+
+def test_read_config_parse_inline_comments_and_hash_in_string(tmp_path):
+    config_path = tmp_path / "pigit-inline-comment.conf"
+    config_path.write_text(
+        "\n".join(
+            [
+                "#? Config file for pigit v. test",
+                "# full line comment",
+                "cmd_display=true",
+                "cmd_recommend=false # line-end comment",
+                'counter_format="simple"',
+                'repo_info_include=["path#hash", "remote"] # keep hash in string',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    c = Config(
+        TEST_CONFIG,
+        version="test",
+        auto_load=False,
+    )
+    c.config_file_path = str(config_path)
+    c.conf = {}
+    c._warnings = []
+
+    c.read_config()
+
+    assert c.conf["cmd_display"] is True
+    assert c.conf["cmd_recommend"] is False
+    assert c.conf["counter_format"] == "simple"
+    assert c.conf["repo_info_include"] == ["path#hash", "remote"]
