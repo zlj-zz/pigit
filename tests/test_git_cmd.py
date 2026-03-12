@@ -59,9 +59,24 @@ class TestCmdFunc:
     def test_add(self, _):
         add([])
 
+    @pytest.mark.parametrize(
+        "args, expected_cmd",
+        [
+            ([], None),
+            (["feature/test"], "git fetch origin feature/test:feature/test "),
+            (["feature/test", "ignored"], "git fetch origin feature/test:feature/test "),
+        ],
+    )
     @patch(exec_patch, return_value=None)
-    def test_fetch_remote(self, _):
-        fetch_remote_branch([])
+    def test_fetch_remote(self, mock_exec, args, expected_cmd):
+        result = fetch_remote_branch(args)
+        if expected_cmd is None:
+            assert result == "`This option need a branch name.`<error>"
+            mock_exec.assert_not_called()
+        else:
+            assert result == ""
+            mock_exec.assert_called_once()
+            assert mock_exec.call_args.args[0] == expected_cmd
 
     @pytest.mark.parametrize(
         "args",

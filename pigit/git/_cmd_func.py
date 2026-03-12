@@ -37,7 +37,7 @@ def add(args: Union[List, Tuple]) -> str:
 def fetch_remote_branch(args: Union[List, Tuple]) -> str:
     "Fetch a remote branch to local and with the same name."
 
-    branch = args[0] if len(args) > 1 else None
+    branch = args[0] if args else None
 
     if branch:
         Executor().exec("git fetch origin {0}:{0} ".format(branch), flags=WAITING)
