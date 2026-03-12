@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import ast
 import os
 import re
 import textwrap
@@ -187,10 +188,20 @@ class Config(metaclass=Singleton):
             else:
                 config[key] = value
         elif v_type == list:
-            if re.match(r"^\[[\w\s0-9\'\"_]+,?([\s\w0-9\'\"_]+,?)*\]$", value):
-                config[key] = eval(value)
+            try:
+                parsed_value = ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                self._warnings.append(
+                    f'Config key "{key}" has invalid list literal: `{value}`.'
+                )
+                return
+
+            if isinstance(parsed_value, list):
+                config[key] = parsed_value
             else:
-                self._warnings.append(f'Config key "{key}" not support `{value}`.')
+                self._warnings.append(
+                    f'Config key "{key}" should be a list literal, got `{value}`.'
+                )
 
     def read_config(self) -> None:
         config = self.conf
