@@ -31,6 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "setuptools>=64",
     "black",
     "flake8",
     "pylint",
