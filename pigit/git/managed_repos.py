@@ -171,12 +171,12 @@ class ManagedRepos:
         """
 
         exist_repos = self.load_repos()
-        exist_paths = [r["path"] for r in exist_repos.values()]
+        exist_paths_set = {r["path"] for r in exist_repos.values()}
 
         new_git_paths = []
         for path in paths:
             repo_path, _ = self.confirm_repo(path)
-            if repo_path and repo_path not in exist_paths:
+            if repo_path and repo_path not in exist_paths_set:
                 new_git_paths.append(repo_path)
 
         if new_git_paths and not dry_run:

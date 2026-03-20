@@ -2,6 +2,7 @@
 
 import os
 import re
+import time
 import shutil
 import textwrap
 from typing import Dict, List, Optional, Tuple, Union
@@ -28,6 +29,13 @@ def _file_path_for_cmd(file: Union[File, str]) -> str:
 
 class LocalGit:
     """Single working-copy git operations (optional default `path`)."""
+
+    _RE_CONFIG_NEWLINE = re.compile(r"\r\n|\r|\n")
+    _RE_CONFIG_URL = re.compile(r"url\s=\s(.*)")
+    _RE_BRANCH_AHEAD = re.compile(r"ahead (\d+)")
+    _RE_BRANCH_BEHIND = re.compile(r"behind (\d+)")
+    _RE_COMMIT_TAG = re.compile(r"tag: ([^,\\]+)")
+    _LOAD_STATUS_CACHE_TTL = 0.3
 
     def __init__(self, executor: Executor, path: Optional[str] = None) -> None:
         self.executor = executor
@@ -104,7 +112,7 @@ class LocalGit:
             return {}
         else:
             conf_dict: Dict[str, Dict[str, str]] = {}
-            conf_list = re.split(r"\r\n|\r|\n", context)
+            conf_list = re.split(self._RE_CONFIG_NEWLINE, context)
             config_type: str = ""
 
             for line in conf_list:
@@ -257,7 +265,7 @@ class LocalGit:
             except Exception:
                 remote = error_str
             else:
-                res = re.findall(r"url\s=\s(.*)", config)
+                res = re.findall(self._RE_CONFIG_URL, config)
                 remote = "\n".join(
                     [f"\ti`{x}`<sky_blue>" if color else f"\t{x}" for x in res]
                 )
@@ -325,10 +333,12 @@ class LocalGit:
             branch.upstream_name = upstream_name
 
             track = items[3]
-            _re = re.compile(r"ahead (\d+)")
-            branch.ahead = str(match[1]) if (match := _re.search(track)) else "0"
-            _re = re.compile(r"behind (\d+)")
-            branch.behind = str(match[1]) if (match := _re.search(track)) else "0"
+            branch.ahead = (
+                str(m[1]) if (m := self._RE_BRANCH_AHEAD.search(track)) else "0"
+            )
+            branch.behind = (
+                str(m[1]) if (m := self._RE_BRANCH_BEHIND.search(track)) else "0"
+            )
             branches.append(branch)
 
         return branches
@@ -354,6 +364,39 @@ class LocalGit:
 
         return "" if resp is None else resp.strip()
 
+    @staticmethod
+    def _find_dot_git_dir(cwd: str) -> Optional[str]:
+        cur = os.path.abspath(cwd)
+        while True:
+            git = os.path.join(cur, ".git")
+            if os.path.isdir(git):
+                return git
+            if os.path.isfile(git):
+                return None
+            parent = os.path.dirname(cur)
+            if parent == cur:
+                return None
+            cur = parent
+
+    def _load_status_cache_signature(self, cwd: str) -> Optional[Tuple[int, int, int, int, bool]]:
+        git_dir = self._find_dot_git_dir(cwd)
+        if not git_dir:
+            return None
+
+        def st(p: str) -> Tuple[int, int]:
+            try:
+                s = os.stat(p)
+                return (s.st_mtime_ns, s.st_size)
+            except OSError:
+                return (0, 0)
+
+        index_p = os.path.join(git_dir, "index")
+        head_p = os.path.join(git_dir, "HEAD")
+        merge = os.path.join(git_dir, "MERGE_HEAD")
+        i0, i1 = st(index_p)
+        h0, h1 = st(head_p)
+        return (i0, i1, h0, h1, os.path.exists(merge))
+
     def load_status(
         self,
         max_width: int = 80,
@@ -361,21 +404,43 @@ class LocalGit:
         plain: bool = False,
         path: Optional[str] = None,
         icon: bool = False,
+        use_cache: bool = True,
     ) -> List[File]:
         """Get the file tree status of GIT for processing and encapsulation.
 
         Args:
                 max_width (int): The max length of display string.
                 ident (int, option): Number of reserved blank characters in the header.
+                use_cache (bool): When True, reuse recent result if git metadata unchanged
+                    and within a short TTL (see class constant ``_LOAD_STATUS_CACHE_TTL``).
 
         Returns:
                 (List[File]): Processed file status list.
         """
         path = path or self.path
+        if path is None or path == "":
+            workdir = os.path.abspath(".")
+        else:
+            workdir = os.path.abspath(path)
+
+        key = (workdir, max_width, ident, plain, icon)
+        now = time.monotonic()
+        cache_sig = self._load_status_cache_signature(workdir) if use_cache else None
+
+        if use_cache and cache_sig is not None:
+            c = getattr(self, "_load_status_cache", None)
+            if (
+                c
+                and c["key"] == key
+                and c["sig"] == cache_sig
+                and (now - c["time"] < self._LOAD_STATUS_CACHE_TTL)
+            ):
+                return c["files"]
+
         file_items = []
 
         _, err, files = self.executor.exec(
-            "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=path
+            "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=workdir
         )
         if err:
             return file_items
@@ -420,6 +485,13 @@ class LocalGit:
 
             file_items.append(file_)
 
+        if use_cache and cache_sig is not None:
+            self._load_status_cache = {
+                "key": key,
+                "sig": cache_sig,
+                "time": now,
+                "files": file_items,
+            }
         return file_items
 
     def load_file_diff(
@@ -500,8 +572,7 @@ class LocalGit:
 
             tag = []
             if extra_info:
-                _re = re.compile(r"tag: ([^,\\]+)")
-                if match := _re.search(extra_info):
+                if match := self._RE_COMMIT_TAG.search(extra_info):
                     tag.append(match[1])
 
             if sha == first_pushed_commit:
