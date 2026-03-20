@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
 
-import os
 import logging
 import logging.handlers
+import os
+import sys
+import threading
 from typing import Dict, Optional
 
 
@@ -46,6 +48,40 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
 
     root_logger.addHandler(log_handle)
     root_logger.setLevel(0)
+
+    install_uncaught_exception_logging()
+
+
+def install_uncaught_exception_logging() -> None:
+    """Send uncaught exceptions through the root logger (same handlers as ``setup_logging``)."""
+
+    _sys_hook = sys.excepthook
+
+    def _excepthook(
+        exc_type: type,
+        exc_value: BaseException,
+        exc_tb: Optional[object],
+    ) -> None:
+        logging.getLogger().error(
+            "Uncaught exception",
+            exc_info=(exc_type, exc_value, exc_tb),
+        )
+        _sys_hook(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _excepthook
+
+    if hasattr(threading, "excepthook"):
+        _thread_hook = threading.excepthook
+
+        def _thread_excepthook(args) -> None:
+            logging.getLogger().error(
+                "Uncaught exception in thread %r",
+                args.thread.name,
+                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+            )
+            _thread_hook(args)
+
+        threading.excepthook = _thread_excepthook
 
 
 # cache logger, avoid creating loggers with the same name repeatedly.

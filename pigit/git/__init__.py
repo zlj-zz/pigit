@@ -2,7 +2,7 @@ from pigit.ext.executor import Executor, REPLY, DECODE
 
 from .ignore import get_ignore_source, create_gitignore
 from .proxy import get_extra_cmds, GitProxy, GitCommandType, Git_Proxy_Cmds
-from .repo import Repo
+from .repo import LocalGit, ManagedRepos, Repo
 
 __all__ = (
     "git_version",
@@ -12,6 +12,8 @@ __all__ = (
     "GitProxy",
     "GitCommandType",
     "Git_Proxy_Cmds",
+    "LocalGit",
+    "ManagedRepos",
     "Repo",
 )
 

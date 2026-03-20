@@ -8,6 +8,7 @@ from .conftest import TEST_PATH
 
 from pigit.ext.executor import WAITING, Executor
 from pigit.git import git_version
+from pigit.git.model import File
 from pigit.git.repo import Repo
 
 
@@ -109,16 +110,24 @@ class TestRepo:
         print(git.load_commit_info())
 
     @pytest.mark.parametrize(
-        ["get_path", "expected"],
+        ["side_effect", "expected"],
         [
-            [(-1, "err", ""), ("", "")],
-            [(0, "", "a/b/.git"), ("a/b", "a/b/.git")],
-            [(0, "", "a/b/.git/modules/"), ("a/b/", "a/b/.git/modules/")],
+            (
+                [(0, "", "")],
+                ("", ""),
+            ),
+            (
+                [
+                    (0, "", "/fake/work\n"),
+                    (0, "", "/fake/work/.git\n"),
+                ],
+                ("/fake/work", "/fake/work/.git"),
+            ),
         ],
     )
     @patch(exec_patch)
-    def test_get_repo_info(self, mock_exec_cmd, get_path, expected):
-        mock_exec_cmd.return_value = get_path
+    def test_get_repo_info(self, mock_exec_cmd, side_effect, expected):
+        mock_exec_cmd.side_effect = side_effect
         assert self.git.confirm_repo() == expected
 
     def test_get_repo_info_2(self):
@@ -126,3 +135,43 @@ class TestRepo:
         test_repo = self.test_repo
         assert git.confirm_repo() == (test_repo, os.path.join(test_repo, ".git"))
         assert git.confirm_repo("xxxxxxx") == ("", "")
+
+    def test_discard_untracked_from_subdir_cwd_binds_repo_root(self):
+        test_repo = self.test_repo
+        nested = os.path.join(test_repo, "nested")
+        os.makedirs(nested, exist_ok=True)
+        untracked = os.path.join(nested, "to_discard.txt")
+        with open(untracked, "w", encoding="utf-8") as f:
+            f.write("x")
+
+        old = os.getcwd()
+        try:
+            os.chdir(nested)
+            git = Repo().bind_path(test_repo)
+            files = git.load_status(path=test_repo)
+            ut = next(f for f in files if "to_discard" in f.name)
+            git.discard_file(ut)
+        finally:
+            os.chdir(old)
+
+        assert not os.path.isfile(untracked)
+
+    def test_discard_untracked_missing_no_raise(self):
+        git = self.git
+        test_repo = self.test_repo
+        nested = os.path.join(test_repo, "nested2")
+        os.makedirs(nested, exist_ok=True)
+        rel = "nested2/ghost.txt"
+        fake_file = File(
+            name=rel,
+            display_str=rel,
+            short_status="??",
+            has_staged_change=False,
+            has_unstaged_change=True,
+            tracked=False,
+            deleted=False,
+            added=True,
+            has_merged_conflicts=False,
+            has_inline_merged_conflicts=False,
+        )
+        git.discard_file(fake_file, path=test_repo)
