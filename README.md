@@ -81,6 +81,21 @@ These are short commands that can replace git operations:
 ......
 ```
 
+#### Shell Mode
+
+Pigit also provides an interactive shell mode for continuous git operations. Use `pigit cmd --shell` to enter the shell mode.
+
+In shell mode, you can use short commands directly without the `pigit cmd` prefix. For example:
+
+```
+(pigit:cmd)> s
+(pigit:cmd)> b
+(pigit:cmd)> shell ls
+(pigit:cmd)> quit
+```
+
+This mode is useful for performing multiple git operations in sequence.
+
 ### `repo`
 
 The command of `repo` support operate multiple repos at the same time.
