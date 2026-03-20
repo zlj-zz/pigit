@@ -64,7 +64,7 @@ class ManagedRepos:
     def clear_repos(self) -> None:
         self.repo_json_path.unlink(missing_ok=True)
 
-    def report_repos(self, author: str, since: str, util: str) -> str:
+    def report_repos(self, author: str, since: str, until: str) -> str:
         """Generate report of repos.
 
         range e.g.:
@@ -81,9 +81,9 @@ class ManagedRepos:
             command += f' --author="{author}"'
         if since != "":
             command += f' --since="{since}"'
-        if util != "":
-            command += f' --grep="{util}"'
-        if since == "" and util == "":
+        if until != "":
+            command += f' --until="{until}"'
+        if since == "" and until == "":
             command += " -30"
 
         report_dict = {}
