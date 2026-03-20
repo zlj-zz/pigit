@@ -159,6 +159,15 @@ __clear_values() {
   && ret=0
 }
 
+__report_values() {
+  _values '' \
+    {-h,--help}'[show this help message and exit]' \
+    '--util[end range of commmits.]' \
+    '--since[start range of commits.]' \
+    '--author[select author of commits.]' \
+  && ret=0
+}
+
 __cd_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
@@ -191,6 +200,7 @@ __repo_values() {
     'rename[rename a repo.]' \
     'll[display summary of all repos.]' \
     'clear[clear the all repos.]' \
+    'report[genereate report of all repos.]' \
     'cd[jump to a repo dir.]' \
     'fetch[fetch remote update for repo(s).]' \
     'pull[pull remote updates for repo(s).]' \
@@ -252,6 +262,7 @@ _pigit_completion(){
           rename) __rename_values ;;
           ll) __ll_values ;;
           clear) __clear_values ;;
+          report) __report_values ;;
           cd) __cd_values ;;
           fetch) __fetch_values ;;
           pull) __pull_values ;;

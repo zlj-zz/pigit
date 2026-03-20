@@ -42,12 +42,12 @@ jobs:
       if: matrix.os != 'windows-latest'
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e ".[dev]"
     - name: Install dependencies on Windows
       if: matrix.os == 'windows-latest'
       run: |
         python -m pip install --upgrade pip
-        if (Test-Path -Path '.\requirements.txt' -PathType Leaf) {pip install -r requirements.txt}
+        pip install -e ".[dev]"
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names

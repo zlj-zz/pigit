@@ -142,6 +142,16 @@ make install
 python setup.py install  # On windows
 ```
 
+### Development (editable install)
+
+Runtime and dev dependencies are declared in `pyproject.toml`. After cloning:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This replaces the old flat `requirements.txt` list; `requirements.txt` now points at the same extra for compatibility with `pip install -r requirements.txt`.
+
 ## Completion
 
 Provides a friendly command-line completion capability, injecting completion through the following methods.

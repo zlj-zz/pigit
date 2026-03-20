@@ -1,11 +1,4 @@
-flake8
-black
-pylint
-pytest
-pytest-mock
-pytest-cov
-pytest-asyncio
-pyinstrument
-requests
-setuptools
-plenty==1.0.2
+# Canonical deps: pyproject.toml (runtime + [project.optional-dependencies.dev])
+# Install locally or in CI:
+#   pip install -e ".[dev]"
+-e .[dev]

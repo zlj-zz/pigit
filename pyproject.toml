@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pigit"
+description = "Simple terminal tool of Git."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.8"
+license = { file="LICENSE" }
+authors = [
+    { name = "Zachary Zhang", email = "zlj19971222@outlook.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: System :: Shells",
+    "Topic :: Software Development",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+]
+dynamic = ["version"]
+dependencies = [
+    "plenty==1.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "pylint",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    "pyinstrument",
+    "requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/zlj-zz/pigit.git"
+
+[project.scripts]
+pigit = "pigit.console_scripts:main"
+g = "pigit.console_scripts:g"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "pigit.const.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
