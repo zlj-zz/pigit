@@ -8,7 +8,8 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from pigit.ext.log import logger
 from pigit.ext.utils import confirm, similar_command, traceback_info
-from pigit.ext.executor import Executor, WAITING
+from pigit.ext.executor import WAITING
+from pigit.ext.executor_factory import ExecutorFactory
 from ._cmds import Git_Proxy_Cmds, GitCommandType
 
 
@@ -31,7 +32,7 @@ class GitProxy:
         self.prompt_type = prompt_type
         self.display = display
 
-        self.executor = Executor()
+        self.executor = ExecutorFactory.get()
 
         # Init commands.
         self.cmds = Git_Proxy_Cmds

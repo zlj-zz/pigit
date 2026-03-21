@@ -51,7 +51,7 @@ class TestSCmd:
         os.remove(file)
 
 
-exec_patch = "pigit.git._cmd_func.Executor.exec"
+exec_patch = "pigit.ext.executor.Executor.exec"
 
 
 class TestCmdFunc:

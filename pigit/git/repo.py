@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Callable, Optional, Union
 
-from pigit.ext.executor import Executor
+from pigit.ext.executor_factory import ExecutorFactory
 
 from .local_git import LocalGit, RepoError
 from .managed_repos import ManagedRepos
@@ -19,7 +19,7 @@ class Repo(LocalGit, ManagedRepos):
     def __init__(
         self, path: Optional[str] = None, repo_json_path: Optional[str] = None
     ) -> None:
-        executor = Executor()
+        executor = ExecutorFactory.get()
         LocalGit.__init__(self, executor, path)
         ManagedRepos.__init__(self, executor, repo_json_path)
 

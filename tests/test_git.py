@@ -12,7 +12,7 @@ from pigit.git.model import File
 from pigit.git.repo import Repo
 
 
-exec_patch = "pigit.git._cmd_func.Executor.exec"
+exec_patch = "pigit.ext.executor.Executor.exec"
 
 
 def create_repo(test_repo: str):
