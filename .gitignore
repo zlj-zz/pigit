@@ -35,6 +35,7 @@ useless/
 tests/test_repo
 tests/ignore_test
 tests/pigit.conf
+coverage.json
 
 test.py
 calc.py

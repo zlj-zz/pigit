@@ -2,8 +2,7 @@
 # The PIGIT terminal tool entry file.
 
 import os
-import textwrap
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, List
 
 from plenty import get_console
 from plenty.table import Table
@@ -14,8 +13,6 @@ from .const import (
     COUNTER_DIR_PATH,
     EXTRA_CMD_MODULE_NAME,
     EXTRA_CMD_MODULE_PATH,
-    IS_FIRST_RUN,
-    IS_WIN,
     LOG_FILE_PATH,
     REPOS_PATH,
     VERSION,
@@ -23,9 +20,10 @@ from .const import (
 from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
 from .ext.log import setup_logging
-from .ext.func import dynamic_default_attrs, time_it
-from .ext.utils import confirm, get_file_icon
-from .git import Git_Proxy_Cmds, GitProxy, Repo, create_gitignore, get_extra_cmds
+from .ext.func import dynamic_default_attrs
+from .ext.utils import get_file_icon
+from .git import Git_Proxy_Cmds, Repo, create_gitignore
+from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
@@ -152,17 +150,9 @@ def pigit(args: "Namespace", _) -> None:
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
-        if IS_FIRST_RUN:
-            introduce()
-            if not confirm("Input `enter` to continue:"):
-                return
-
-        if IS_WIN:
-            print("Not support windows now.")
-        else:
-            from .app import App
-
-            App().run()
+        handler = TuiHandler(Conf, repo_handler)
+        if handler.preprocess():
+            handler.execute()
 
 
 # yapf: enable
@@ -236,53 +226,7 @@ tools_group.add_argument(
 def _(args: "Namespace", unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
-    # If you want to manipulate the current folder with git,
-    # try adding it to repos automatically.
-    if Conf.repo_auto_append:
-        repo_path, repo_conf = repo_handler.confirm_repo()
-        repo_handler.add_repos([repo_path])
-
-    # Init extra custom cmds.
-    extra_cmd: Dict = {
-        # "shell": {
-        #     "command": lambda _: shell_mode(git_processor),
-        #     "type": "func",
-        #     "help": "Into PIGIT shell mode.",
-        # },  # only for tips.
-    }
-    extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
-
-    git_processor = GitProxy(
-        extra_cmds=extra_cmd,
-        prompt=Conf.cmd_recommend,
-        display=Conf.cmd_display,
-    )
-
-    if args.shell:
-        from .shell_mode import PigitShell
-
-        shell_ = PigitShell(git_processor)
-        # print(shell_.__dir__())
-        shell_.cmdloop()
-        return
-
-    if args.show_commands:
-        # return git_processor.print_help()
-        return console.echo(git_processor.get_help())
-
-    if args.command_type:
-        return console.echo(git_processor.get_help_by_type(args.command_type))
-
-    if args.types:
-        return console.echo(git_processor.get_types())
-
-    if args.command:
-        short_cmd = args.command
-        args.args.extend(unknown)
-        console.echo(git_processor.do(short_cmd, args.args))
-        return None
-    else:
-        console.echo("`pigit cmd -h`<ok> for help.")
+    CmdHandler(Conf, repo_handler, args, unknown).execute()
 
 
 # =============================================
@@ -295,68 +239,32 @@ repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h h
 @argument("--dry-run", action="store_true", help="dry run.")
 @argument("paths", nargs="+", help="path of reps(s).")
 def repo_add(args, _):
-    if added := repo_handler.add_repos(args.paths, args.dry_run):
-        console.echo(f"Found {len(added)} new repo(s).")
-        for path in added:
-            console.echo(f"\t`{path}`<sky_blue>")
-    else:
-        console.echo("`No new repos found!`<tomato>")
+    RepoCommandHandler(Conf, repo_handler).add(args)
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
 @argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
-    res = repo_handler.rm_repos(args.repos, args.path)
-    for one in res:
-        console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
+    RepoCommandHandler(Conf, repo_handler).rm(args)
 
 
 @repo.sub_parser("rename", help="rename a repo.")
 @argument("new_name", help="the new name of repo.")
 @argument("repo", help="the name of repo.")
 def repo_rename(args, _):
-    success, msg = repo_handler.rename_repo(args.repo, args.new_name)
-    console.echo(msg)
+    RepoCommandHandler(Conf, repo_handler).rename(args)
 
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 def repo_ll(args, _):
-    simple = args.simple
-    reverse = args.reverse
-
-    for info in repo_handler.ll_repos(reverse=reverse):
-        if simple:
-            if reverse:
-                console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
-            else:
-                console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
-        else:
-            if reverse:
-                summary_string = textwrap.dedent(
-                    f"""\
-                    b`{info[0][0]}`
-                        {info[1][0]}: `{info[1][1]}`<sky_blue>
-                    """
-                )
-            else:
-                summary_string = textwrap.dedent(
-                    f"""\
-                    b`{info[0][0]}`
-                        {info[1][0]}: {info[1][1]}
-                        {info[2][0]}: {info[2][1]}
-                        {info[3][0]}: `{info[3][1]}`<khaki>
-                        {info[4][0]}: `{info[4][1]}`<ok>
-                        {info[5][0]}: `{info[5][1]}`<sky_blue>
-                    """
-                )
-            console.echo(summary_string)
+    RepoCommandHandler(Conf, repo_handler).ll(args)
 
 
 repo.sub_parser("clear", help="clear the all repos.")(
-    lambda _, __: repo_handler.clear_repos()
+    lambda _, __: RepoCommandHandler(Conf, repo_handler).clear()
 )
 
 
@@ -365,18 +273,13 @@ repo.sub_parser("clear", help="clear the all repos.")(
 @argument("--since",  type=str,default='', help="start range of commits.")
 @argument("--until",  type=str,default='', help="end range of commits.")
 def repo_report(args, _):
-    report = repo_handler.report_repos(
-        author=args.author,
-        since=args.since,
-        until=args.until,
-    )
-    console.echo(report)
+    RepoCommandHandler(Conf, repo_handler).report(args)
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
-    repo_handler.cd_repo(args.repo)
+    RepoCommandHandler(Conf, repo_handler).cd(args)
 
 
 repo_options = {
@@ -389,7 +292,9 @@ for sub_cmd, prop in repo_options.items():
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: repo_handler.process_repos_option(args.repos, cmd),
+                lambda args, _, cmd: RepoCommandHandler(
+                    Conf, repo_handler
+                ).process_repos_option(args.repos, cmd),
                 cmd=prop["cmd"],
             )
         )
@@ -406,9 +311,6 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: "Namespace", _):
-    code, msg = repo_handler.open_repo_in_browser(
-        branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
-    )
-    console.echo(msg)
+    RepoCommandHandler(Conf, repo_handler).open_browser(args)
 
 # yapf: enable
