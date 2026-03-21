@@ -8,6 +8,7 @@ from .base_handler import BaseHandler
 
 if TYPE_CHECKING:
     from ..cmdparse.parser import Namespace
+    from ..context import Context
 
 
 class CmdHandler(BaseHandler):
@@ -15,12 +16,11 @@ class CmdHandler(BaseHandler):
 
     def __init__(
         self,
-        config,
-        repo,
+        ctx: "Context",
         args: "Namespace",
         unknown: List[str],
     ) -> None:
-        super().__init__(config, repo)
+        super().__init__(ctx)
         self.args = args
         self.unknown = unknown
 

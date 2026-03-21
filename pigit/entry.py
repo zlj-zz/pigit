@@ -8,11 +8,10 @@ from plenty import get_console
 from plenty.table import Table
 
 from .config import Config
+from .context import Context
 from .const import (
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
-    EXTRA_CMD_MODULE_NAME,
-    EXTRA_CMD_MODULE_PATH,
     LOG_FILE_PATH,
     REPOS_PATH,
     VERSION,
@@ -22,7 +21,7 @@ from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counte
 from .ext.log import setup_logging
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
-from .git import Git_Proxy_Cmds, Repo, create_gitignore
+from .git import Git_Proxy_Cmds, create_gitignore
 from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
@@ -44,7 +43,8 @@ setup_logging(
 # ==============
 # Global handle
 # ==============
-repo_handler = Repo(repo_json_path=REPOS_PATH)
+ctx = Context.bootstrap(config=Conf, repo_json_path=REPOS_PATH)
+Context.install(ctx)
 console = get_console()
 
 
@@ -61,14 +61,14 @@ def pigit(args: "Namespace", _) -> None:
         console.echo(introduce())
 
     elif args.create_config:
-        Conf.create_config_template()
+        ctx.config.create_config_template()
         return
 
     elif args.config:
-        console.echo(show_gitconfig(format_type=Conf.git_config_format))
+        console.echo(show_gitconfig(format_type=ctx.config.git_config_format))
 
     elif args.information:
-        console.echo(repo_handler.get_repo_desc(include_part=Conf.repo_info_include))
+        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.repo_info_include))
 
     elif args.complete:
         # Generate completion vars dict.
@@ -89,9 +89,9 @@ def pigit(args: "Namespace", _) -> None:
     elif args.count:
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
         total_size, diff_result, invalids = Counter(
-            saved_dir=COUNTER_DIR_PATH, show_invalid=Conf.counter_show_invalid
-        ).diff_count(path, Conf.counter_use_gitignore)
-        if Conf.counter_format == "simple":
+            saved_dir=COUNTER_DIR_PATH, show_invalid=ctx.config.counter_show_invalid
+        ).diff_count(path, ctx.config.counter_use_gitignore)
+        if ctx.config.counter_format == "simple":
             for k, v in diff_result.items():
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
@@ -122,7 +122,9 @@ def pigit(args: "Namespace", _) -> None:
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"`{get_file_icon(k)} {k}`<cyan>" if Conf.counter_show_icon else k
+                    f"`{get_file_icon(k)} {k}`<cyan>"
+                    if ctx.config.counter_show_icon
+                    else k
                 )
 
                 f_num_str = f"`{v[FILES_NUM]}`<{color_index(v[FILES_NUM])}>"
@@ -150,7 +152,7 @@ def pigit(args: "Namespace", _) -> None:
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
-        handler = TuiHandler(Conf, repo_handler)
+        handler = TuiHandler(ctx)
         if handler.preprocess():
             handler.execute()
 
@@ -226,7 +228,7 @@ tools_group.add_argument(
 def _(args: "Namespace", unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
-    CmdHandler(Conf, repo_handler, args, unknown).execute()
+    CmdHandler(ctx.current(), args, unknown).execute()
 
 
 # =============================================
@@ -239,32 +241,32 @@ repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h h
 @argument("--dry-run", action="store_true", help="dry run.")
 @argument("paths", nargs="+", help="path of reps(s).")
 def repo_add(args, _):
-    RepoCommandHandler(Conf, repo_handler).add(args)
+    RepoCommandHandler(ctx.current()).add(args)
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
 @argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
-    RepoCommandHandler(Conf, repo_handler).rm(args)
+    RepoCommandHandler(ctx.current()).rm(args)
 
 
 @repo.sub_parser("rename", help="rename a repo.")
 @argument("new_name", help="the new name of repo.")
 @argument("repo", help="the name of repo.")
 def repo_rename(args, _):
-    RepoCommandHandler(Conf, repo_handler).rename(args)
+    RepoCommandHandler(ctx.current()).rename(args)
 
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 def repo_ll(args, _):
-    RepoCommandHandler(Conf, repo_handler).ll(args)
+    RepoCommandHandler(ctx.current()).ll(args)
 
 
 repo.sub_parser("clear", help="clear the all repos.")(
-    lambda _, __: RepoCommandHandler(Conf, repo_handler).clear()
+    lambda _, __: RepoCommandHandler(ctx.current()).clear()
 )
 
 
@@ -273,13 +275,13 @@ repo.sub_parser("clear", help="clear the all repos.")(
 @argument("--since",  type=str,default='', help="start range of commits.")
 @argument("--until",  type=str,default='', help="end range of commits.")
 def repo_report(args, _):
-    RepoCommandHandler(Conf, repo_handler).report(args)
+    RepoCommandHandler(ctx.current()).report(args)
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
-    RepoCommandHandler(Conf, repo_handler).cd(args)
+    RepoCommandHandler(ctx.current()).cd(args)
 
 
 repo_options = {
@@ -293,7 +295,7 @@ for sub_cmd, prop in repo_options.items():
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
                 lambda args, _, cmd: RepoCommandHandler(
-                    Conf, repo_handler
+                    ctx.current()
                 ).process_repos_option(args.repos, cmd),
                 cmd=prop["cmd"],
             )
@@ -311,6 +313,6 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: "Namespace", _):
-    RepoCommandHandler(Conf, repo_handler).open_browser(args)
+    RepoCommandHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

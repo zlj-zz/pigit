@@ -5,19 +5,21 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..cmdparse.parser import Namespace
-    from ..config import Config
-    from ..git.repo import Repo
+    from ..context import Context
 
 
 class RepoCommandHandler:
     """``pigit repo`` / ``pigit open`` — multi-repo registry and bulk git."""
 
-    def __init__(self, config: "Config", repo: "Repo") -> None:
+    def __init__(self, ctx: "Context") -> None:
         from plenty import get_console
 
-        self.config = config
-        self.repo = repo
+        self.ctx = ctx
         self.console = get_console()
+
+    @property
+    def repo(self):
+        return self.ctx.repo
 
     def add(self, args: "Namespace") -> None:
         if added := self.repo.add_repos(args.paths, args.dry_run):

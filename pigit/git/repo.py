@@ -1,9 +1,12 @@
 # -*- coding:utf-8 -*-
 
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, TYPE_CHECKING
 
 from pigit.ext.executor_factory import ExecutorFactory
+
+if TYPE_CHECKING:
+    from pigit.ext.executor_factory import ExecutorStrategy
 
 from .local_git import LocalGit, RepoError
 from .managed_repos import ManagedRepos
@@ -17,9 +20,13 @@ class Repo(LocalGit, ManagedRepos):
     """Git helpers: single-repo commands (`LocalGit`) + multi-repo registry (`ManagedRepos`)."""
 
     def __init__(
-        self, path: Optional[str] = None, repo_json_path: Optional[str] = None
+        self,
+        path: Optional[str] = None,
+        repo_json_path: Optional[str] = None,
+        executor: Optional["ExecutorStrategy"] = None,
     ) -> None:
-        executor = ExecutorFactory.get()
+        if executor is None:
+            executor = ExecutorFactory.get()
         LocalGit.__init__(self, executor, path)
         ManagedRepos.__init__(self, executor, repo_json_path)
 
