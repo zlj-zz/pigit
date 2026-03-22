@@ -5,7 +5,7 @@ import re
 import time
 import shutil
 import textwrap
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -529,45 +529,46 @@ class LocalGit:
         )
         return "Can't get diff." if err else res.rstrip()
 
-    def load_commits(
+    def iter_commits(
         self,
         branch_name: str,
         limit: bool = True,
+        max_commits: int = 300,
         filter_path: str = "",
         path: Optional[str] = None,
-    ) -> List[Commit]:
-        """Get the all commit of a given branch.
+    ) -> Iterator[Commit]:
+        """Yield commits for ``branch_name`` while reading ``git log`` as a stream.
 
         Args:
-                branch_name (str): want branch name.
-                limit (bool): Whether to get only the latest 300.
-                filter_path (str): filter dir path, default is empty.
+            branch_name: Branch ref to log.
+            limit: When True, cap at ``max_commits`` (``git log -n``).
+            max_commits: Max entries when ``limit`` is True.
+            filter_path: Optional path filter (``--follow``).
+            path: Repo root; defaults to :attr:`path`.
         """
         path = path or self.path
 
         first_pushed_commit = self.get_first_pushed_commit(path, branch_name)
         passed_first_pushed_commit = not first_pushed_commit
 
-        commits: List[Commit] = []
-
-        # Generate git command.
-        limit_flag = "-300" if limit else ""
+        limit_flag = f"-n {max_commits}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
-        command = f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" {limit_flag} --abbrev=20 --date=unix {filter_flag}'
+        command = (
+            f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" '
+            f"{limit_flag} --abbrev=20 --date=unix {filter_flag}"
+        ).strip()
 
-        _, err, resp = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
-        if err:
-            return commits  # current is empty list.
-
-        # Process data.
-        for line in resp.split("\n"):
+        for line in self.executor.exec_stream(command, cwd=path):
+            if not line.strip():
+                continue
             split_ = line.split("|")
+            if len(split_) < 6:
+                continue
 
             sha = split_[0]
             unix_timestamp = int(split_[1])
             author = split_[2]
             extra_info = (split_[3]).strip()
-            # parent_hashes = split_[4]
             message = "|".join(split_[5:])
 
             tag = []
@@ -579,7 +580,7 @@ class LocalGit:
                 passed_first_pushed_commit = True
             status = {True: "unpushed", False: "pushed"}[not passed_first_pushed_commit]
 
-            commit_ = Commit(
+            yield Commit(
                 sha=sha,
                 msg=message,
                 author=author,
@@ -588,9 +589,25 @@ class LocalGit:
                 extra_info=extra_info,
                 tag=tag,
             )
-            commits.append(commit_)
 
-        return commits
+    def load_commits(
+        self,
+        branch_name: str,
+        limit: bool = True,
+        filter_path: str = "",
+        path: Optional[str] = None,
+        max_commits: int = 300,
+    ) -> List[Commit]:
+        """Get commits for a branch (materializes :meth:`iter_commits`)."""
+        return list(
+            self.iter_commits(
+                branch_name,
+                limit=limit,
+                max_commits=max_commits,
+                filter_path=filter_path,
+                path=path,
+            )
+        )
 
     def load_commit_info(
         self,

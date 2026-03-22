@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
-from .executor import Executor, ExecResult
+from .executor import DECODE, Executor, ExecResult, REPLY
 
 CmdT = Union[str, List[Any], Tuple[Any, ...]]
 
@@ -34,6 +34,15 @@ class ExecutorStrategy(ABC):
         **kws: Any,
     ) -> List[ExecResult]:
         ...
+
+    def exec_stream(self, cmd: CmdT, **kws: Any) -> Iterator[str]:
+        """Fallback: buffer full stdout via :meth:`exec` (tests and non-streaming strategies)."""
+        _, err, out = self.exec(cmd, flags=REPLY | DECODE, **kws)
+        if err:
+            return
+        if not out:
+            return
+        yield from out.splitlines()
 
 
 class LocalExecutor(Executor, ExecutorStrategy):

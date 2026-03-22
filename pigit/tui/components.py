@@ -252,6 +252,8 @@ class LineTextBrowser(Component):
 
 class ItemSelector(Component):
     CURSOR: str = ""
+    # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
+    PAGE_SIZE: int = 100
 
     def __init__(
         self,
@@ -276,6 +278,16 @@ class ItemSelector(Component):
         self.curr_no = 0  # default start with 0.
         self._r_start = 0
 
+    @property
+    def visible_row_count(self) -> int:
+        """Viewport height in rows (how many list lines are painted per frame)."""
+        return self._size[1]
+
+    @property
+    def visible_items(self):
+        """Content rows in the current scroll window (pagination / virtual window)."""
+        return self.content[self._r_start : self._r_start + self.visible_row_count]
+
     def set_content(self, content: List[str]):
         self.content = content
         self.content_len = len(self.content) - 1
@@ -291,10 +303,7 @@ class ItemSelector(Component):
             return
 
         dis = []
-        for no, item in enumerate(
-            self.content[self._r_start : self._r_start + self._size[1]],
-            start=self._r_start,
-        ):
+        for no, item in enumerate(self.visible_items, start=self._r_start):
             if no == self.curr_no:
                 dis.append(f"{self.CURSOR}{item}")
             else:

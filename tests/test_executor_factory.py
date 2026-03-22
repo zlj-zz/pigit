@@ -52,6 +52,27 @@ def test_mock_exec_records_and_responds():
     assert mock.exec_calls[0][0] == "git status"
 
 
+def test_mock_exec_stream_splits_buffered_stdout():
+    ex = MockExecutor(
+        responses={
+            "git log": (
+                0,
+                "",
+                "a|1|x||||m1\nb|2|y||||m2",
+            )
+        }
+    )
+    assert list(ex.exec_stream("git log", cwd="/r")) == [
+        "a|1|x||||m1",
+        "b|2|y||||m2",
+    ]
+
+
+def test_mock_exec_stream_empty_on_stderr():
+    ex = MockExecutor(responses={"bad": (0, "e", "out")})
+    assert list(ex.exec_stream("bad")) == []
+
+
 def test_mock_exec_parallel_merges_orders():
     mock = MockExecutor(responses={"a": (0, "", "A"), "b": (0, "", "B")})
     ExecutorFactory.set_strategy(mock)

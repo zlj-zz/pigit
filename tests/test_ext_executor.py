@@ -2,7 +2,7 @@ import sys
 import time
 import textwrap
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from pigit.ext.executor import (
     DECODE,
@@ -60,6 +60,21 @@ class TestExecutor:
             # Assert
             assert result == expected
             # mock_popen.assert_called_once_with(args=cmd, **kws)
+
+    def test_exec_stream_yields_decoded_lines(self):
+        with patch("pigit.ext.executor.Popen") as mock_popen:
+            mock_proc = MagicMock()
+            mock_popen.return_value = mock_proc
+            mock_proc.__enter__.return_value = mock_proc
+            mock_proc.__exit__.return_value = None
+            mock_proc.stdout = iter([b"one\n", b"two\n"])
+            mock_proc.stderr.read.return_value = b""
+            mock_proc.returncode = 0
+
+            executor = Executor()
+            lines = list(executor.exec_stream("git log", cwd="/tmp"))
+
+        assert lines == ["one", "two"]
 
     @win_skip_mark
     def test_exec_with_more(self):

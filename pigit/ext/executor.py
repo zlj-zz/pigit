@@ -8,14 +8,15 @@ import sys
 from subprocess import Popen, PIPE
 from typing import (
     Any,
+    ByteString,
     Callable,
+    Dict,
     Final,
+    Iterator,
+    List,
     Optional,
     Tuple,
     Union,
-    Dict,
-    List,
-    ByteString,
 )
 
 # Type defined
@@ -212,6 +213,57 @@ class Executor:
                     return None, None, None
 
                 return _code, _err, _out
+
+    def exec_stream(
+        self,
+        cmd: Union[str, List, Tuple],
+        *,
+        flags: int = 0,
+        **kws: Any,
+    ) -> Iterator[str]:
+        """Yield decoded stdout lines as they arrive (no trailing newline).
+
+        Forces :data:`REDIRECT`, :data:`WAITING`, and :data:`DECODE`. Stderr is read
+        after stdout EOF to avoid pipe back-pressure; non-zero exit is logged.
+
+        Args:
+            cmd: Same as :meth:`exec`.
+            flags: Extra flag bits merged into the stream run (rarely needed).
+            **kws: Passed to :class:`~subprocess.Popen` (``cwd``, ``shell``, …).
+
+        Yields:
+            str: One logical line per stdout read.
+        """
+        kws = dict(kws)
+        if "shell" not in kws:
+            kws["shell"] = isinstance(cmd, str)
+        kws["args"] = cmd
+        stream_flags = REDIRECT | WAITING | DECODE | flags
+        es = self.generate_popen_state(stream_flags, kws)
+        try:
+            with Popen(**kws) as proc:
+                if proc.stdout is None:
+                    return
+                for raw in proc.stdout:
+                    decoded = self._try_decode(raw, es)
+                    if isinstance(decoded, str):
+                        yield decoded.rstrip("\r\n")
+                    else:
+                        chunk = decoded.rstrip(b"\r\n") if isinstance(decoded, bytes) else decoded
+                        if isinstance(chunk, bytes):
+                            yield chunk.decode("utf-8", errors="replace")
+                        else:
+                            yield str(chunk).rstrip("\r\n")
+                err_raw = proc.stderr.read() if proc.stderr is not None else None
+            code = proc.returncode
+            if code not in (0, None):
+                self._log(f"exec_stream exited {code}: {cmd!r}")
+            if err_raw:
+                err_text = self._try_decode(err_raw, es)
+                if err_text:
+                    self._log(f"exec_stream stderr: {err_text!r}")
+        except Exception as e:
+            self._log(f"Failed to exec_stream: {cmd!r}\n{e}")
 
     def _asyncio_spawn_kw(self, cur_kws: Dict[str, Any]) -> Dict[str, Any]:
         """Build kwargs for :func:`asyncio.create_subprocess_exec` / shell helpers.

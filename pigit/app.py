@@ -102,7 +102,7 @@ class BranchPanel(ItemSelector):
             else:
                 processed_branches.append(f"  {branch.name}")
 
-        self.content = processed_branches
+        self.set_content(processed_branches)
 
     def on_key(self, key: str):
         if key == "j":
@@ -155,7 +155,7 @@ class CommitPanel(ItemSelector):
             state_flag = "   " if commit.is_pushed() else " ? "
             processed_commits.append(f"{state_flag}{commit.sha[:7]} {commit.msg}")
 
-        self.content = processed_commits
+        self.set_content(processed_commits)
 
     def on_key(self, key: str):
         if key == "enter":
