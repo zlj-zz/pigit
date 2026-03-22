@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import logging
 import os
 import re
 import time
@@ -11,7 +12,6 @@ from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
-from pigit.ext.log import logger
 from pigit.ext.utils import adjudgment_type, get_file_icon
 from .model import File, Commit, Branch
 
@@ -37,8 +37,14 @@ class LocalGit:
     _RE_COMMIT_TAG = re.compile(r"tag: ([^,\\]+)")
     _LOAD_STATUS_CACHE_TTL = 0.3
 
-    def __init__(self, executor: Executor, path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        executor: Executor,
+        path: Optional[str] = None,
+        log: Optional[logging.Logger] = None,
+    ) -> None:
         self.executor = executor
+        self.log = log
         self.path = path
 
     def confirm_repo(
@@ -108,7 +114,7 @@ class LocalGit:
             with open(f"{config_path}/config", "r") as cf:
                 context = cf.read()
         except Exception as e:
-            logger(__name__).warning(f"Can not read config with: {e}")
+            self.log.warning(f"Can not read config with: {e}")
             return {}
         else:
             conf_dict: Dict[str, Dict[str, str]] = {}
@@ -378,7 +384,9 @@ class LocalGit:
                 return None
             cur = parent
 
-    def _load_status_cache_signature(self, cwd: str) -> Optional[Tuple[int, int, int, int, bool]]:
+    def _load_status_cache_signature(
+        self, cwd: str
+    ) -> Optional[Tuple[int, int, int, int, bool]]:
         git_dir = self._find_dot_git_dir(cwd)
         if not git_dir:
             return None
@@ -695,14 +703,14 @@ class LocalGit:
                 cwd=repo_root,
             )
             if code is None:
-                logger(__name__).error(
+                self.log.error(
                     "git checkout failed to run (executor error) path=%r cwd=%r",
                     file_name,
                     repo_root,
                 )
             elif code != 0:
                 detail = (err or out or "").strip() or "(no output)"
-                logger(__name__).error(
+                self.log.error(
                     "git checkout failed (exit %s) path=%r cwd=%r: %s",
                     code,
                     file_name,
@@ -712,9 +720,7 @@ class LocalGit:
         else:
             abs_file = os.path.normpath(os.path.join(repo_root, file_name))
             if not os.path.lexists(abs_file):
-                logger(__name__).info(
-                    "discard_file: skip missing untracked path %r", abs_file
-                )
+                self.log.info("discard_file: skip missing untracked path %r", abs_file)
                 return
             if os.path.isdir(abs_file) and not os.path.islink(abs_file):
                 shutil.rmtree(abs_file)
@@ -768,4 +774,3 @@ class LocalGit:
             return False, f"Failed to open the repo; {e}"
         else:
             return True, "Successfully opened repo."
-

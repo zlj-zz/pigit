@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import logging
 from pathlib import Path
 from typing import Callable, Optional, Union, TYPE_CHECKING
 
@@ -24,11 +25,14 @@ class Repo(LocalGit, ManagedRepos):
         path: Optional[str] = None,
         repo_json_path: Optional[str] = None,
         executor: Optional["ExecutorStrategy"] = None,
+        log: Optional[logging.Logger] = None,
     ) -> None:
         if executor is None:
             executor = ExecutorFactory.get()
-        LocalGit.__init__(self, executor, path)
-        ManagedRepos.__init__(self, executor, repo_json_path)
+        if log is None:
+            log = logging.getLogger()
+        LocalGit.__init__(self, executor, path, log)
+        ManagedRepos.__init__(self, executor, repo_json_path, log)
 
     def update_setting(
         self, *, op_path: Optional[str] = None, repo_info_path: Optional[str] = None

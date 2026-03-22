@@ -1,12 +1,12 @@
 # -*- coding:utf-8 -*-
 
 import ast
+import logging
 import os
 import re
 import textwrap
 from typing import Any, List, Literal, Dict
 
-from .ext.log import logger
 from .ext.singleton import Singleton
 from .ext.utils import confirm, strtobool, traceback_info
 
@@ -135,6 +135,7 @@ class Config(metaclass=Singleton):
         self.config_file_path: str = path
         self.current_version: str = version
         self.conf: Dict[str, Any] = {}
+        self.log = logging.getLogger()
 
         if auto_load:
             self.load_config()
@@ -237,7 +238,7 @@ class Config(metaclass=Singleton):
         config_file = self.config_file_path
 
         if not os.path.isfile(config_file):
-            logger(__name__).info("Has no custom config file.")
+            self.log.info("Has no custom config file.")
             return
 
         with open(config_file) as cf:
@@ -313,7 +314,7 @@ class Config(metaclass=Singleton):
         try:
             self.read_config()
         except Exception:
-            logger(__name__).error(traceback_info())
+            self.log.error(traceback_info())
             self._warnings.append(
                 f"Can not load the config file. Path: {self.config_file_path}"
             )
@@ -351,7 +352,7 @@ class Config(metaclass=Singleton):
             ) as f:
                 f.write(self.CONFIG_TEMPLATE.format(**self.conf))
         except Exception:
-            logger(__name__).error(traceback_info())
+            self.log.error(traceback_info())
             print("Fail to create config.")
             return False
         else:

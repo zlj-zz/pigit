@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import json
+import logging
 import os
 import pprint
 from collections import Counter
@@ -25,8 +26,14 @@ class ManagedRepos:
             return max(1, min(int(raw), 32))
         return 4
 
-    def __init__(self, executor: Executor, repo_json_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        executor: Executor,
+        repo_json_path: Optional[str] = None,
+        log: Optional[logging.Logger] = None,
+    ) -> None:
         self.executor = executor
+        self.log = log
         self.repo_json_path = (
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
@@ -70,7 +77,8 @@ class ManagedRepos:
             with self.repo_json_path.open(mode="w+") as fp:
                 json.dump(repos, fp, indent=2)
                 return True
-        except Exception:
+        except Exception as e:
+            self.log.error(f"Failed to dump repos: {e}")
             return False
 
     def clear_repos(self) -> None:

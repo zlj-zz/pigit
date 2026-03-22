@@ -1,12 +1,12 @@
 # -*- coding:utf-8 -*-
 
+import logging
 import os
 import re
 import random
 import textwrap
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from pigit.ext.log import logger
 from pigit.ext.utils import confirm, similar_command, traceback_info
 from pigit.ext.executor import WAITING
 from pigit.ext.executor_factory import ExecutorFactory
@@ -33,12 +33,11 @@ class GitProxy:
         self.display = display
 
         self.executor = ExecutorFactory.get()
+        self.log = logging.getLogger()
 
         # Init commands.
         self.cmds = Git_Proxy_Cmds
         if extra_cmds:
-            if not isinstance(extra_cmds, dict):
-                raise TypeError("Custom cmds must be a dict.") from None
             self.cmds.update(extra_cmds)
 
     @staticmethod
@@ -274,6 +273,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     """
     import importlib.util
 
+    log = logging.getLogger()
     extra_cmds = {}
 
     if os.path.isfile(path):
@@ -288,11 +288,11 @@ def get_extra_cmds(name: str, path: str) -> Dict:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
         except Exception:
-            logger(__name__).error(traceback_info(f"Can't load file '{path}'."))
+            log.error(traceback_info(f"Can't load file '{path}'."))
         else:
             try:
                 extra_cmds = module.extra_cmds  # type: ignore
             except AttributeError:
-                logger(__name__).error("Can't found dict name is 'extra_cmds'.")
+                log.error("Can't found dict name is 'extra_cmds'.")
 
     return extra_cmds

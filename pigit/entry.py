@@ -30,13 +30,13 @@ if TYPE_CHECKING:
 # ===============
 # Configuration.
 # ===============
-Conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
+conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
 
 
 # ==============
 # Global handle
 # ==============
-ctx = Context.bootstrap(config=Conf, repo_json_path=REPOS_PATH)
+ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
 console = get_console()
 
@@ -88,7 +88,7 @@ def pigit(args: "Namespace", _) -> None:
             for k, v in diff_result.items():
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
-        elif Conf.counter_format == "table":
+        elif conf.counter_format == "table":
 
             def color_index(
                 count: int,
