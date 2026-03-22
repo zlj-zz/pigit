@@ -1,6 +1,9 @@
 # Changelog of pigit
 
-## 1.7.1
+## 1.7.2 (2026-03-23)
+- Update `.gitignore` template
+
+## 1.7.1 (2026-03-23)
 - Rename git modules: `_cmd_func.py` → `cmd_func.py`, `proxy.py` → `cmd_proxy.py`, `_cmds.py` → `cmd_builtin.py` (public re-exports in `pigit.git` unchanged).
 - **CLI (`pigit cmd`) discoverability**: `-l`/`--list` replaces the old full-table `-s`; `-s`/`--search <query>` adds case-insensitive substring search; `-p`/`--pick` adds a built-in TTY picker (j/k, Enter, `/` filter, q); `-t`/`--type` merges “list types” and “list by type” (`-t` vs `-t Branch`). Friendly errors and `-h` epilog point to the new flags. `GitProxy` lists/search/pick share `CommandEntry` via `cmd_catalog.py`; `extra_cmds` rows show an `[extra]` prefix in list/search/pick output.
 - Optimize load_status cache: use stat tuple of .git/index/HEAD/MERGE_HEAD as signature (no watchdog/FSEvents), merge repeated calls via _LOAD_STATUS_CACHE_TTL (0.3s), skip cache for worktree with gitdir:.
