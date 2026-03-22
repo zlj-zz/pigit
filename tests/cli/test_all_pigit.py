@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import pytest
-from .utils import analyze_it
+from utils import analyze_it
 
 import pigit.entry as entry_mod
 from pigit.entry import pigit

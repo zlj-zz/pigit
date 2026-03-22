@@ -2,15 +2,17 @@
 import os
 import sys
 
-# Add source environment.
-_PIGIT_PATH = os.path.dirname(os.path.dirname(__file__))
-sys.path.insert(0, _PIGIT_PATH)
+from .paths import PROJECT_ROOT, TEST_PATH  # noqa: E402
 
-TEST_PATH = os.path.dirname(__file__)
+# Add source environment (package under test).
+sys.path.insert(0, TEST_PATH)
+sys.path.insert(0, PROJECT_ROOT)
+
+_PIGIT_PATH = PROJECT_ROOT
 
 # Not support.
 if sys.platform == "win32":
-    collect_ignore_glob = ["test_tui_input.py", "test_tui_eventloop.py"]
+    collect_ignore_glob = ["**/test_tui_input.py", "**/test_tui_eventloop.py"]
 
 PYTHON_VERSION = sys.version_info[:3]
 if PYTHON_VERSION < (3, 8, 5):

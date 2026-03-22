@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from pigit.config import Config
 
-from .conftest import TEST_PATH
+from paths import TEST_PATH
 
 
 TEST_CONFIG = f"{TEST_PATH}/pigit.conf"

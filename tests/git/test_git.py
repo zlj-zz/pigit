@@ -4,7 +4,7 @@ import shutil
 import pytest
 from unittest.mock import patch
 
-from .conftest import TEST_PATH
+from paths import TEST_PATH
 
 from pigit.ext.executor import WAITING, Executor
 from pigit.git import git_version

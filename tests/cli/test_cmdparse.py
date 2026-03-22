@@ -3,10 +3,10 @@ import os
 import copy
 from pprint import pprint
 
-from .conftest import _PIGIT_PATH
-from .utils import analyze_it
+from paths import PROJECT_ROOT as _PIGIT_PATH
+from utils import analyze_it
 
-from pigit.git.builtin_cmds import Git_Proxy_Cmds
+from pigit.git.cmd_builtin import Git_Proxy_Cmds
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (

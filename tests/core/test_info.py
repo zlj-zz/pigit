@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import pytest
-from .utils import analyze_it
+from utils import analyze_it
 
 from pigit.info import introduce, show_gitconfig
 from plenty import get_console
