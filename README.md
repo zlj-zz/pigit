@@ -56,7 +56,14 @@ The command of `cmd` support some short sub-command to replace the long git orig
 
 ![demo display](./docs/resources/demo.gif)
 
-Use `pigit cmd -s` to check what short command it supported, it will display the corresponding help information and the git original command, like this:
+**Discovery**
+
+- `pigit cmd -l` — full table of short commands, help text, and underlying `git` lines (same idea as the old list flag).
+- `pigit cmd -s <query>` / `--search <query>` — case-insensitive substring filter over names, help, and command text.
+- `pigit cmd -t` — print supported types; `pigit cmd -t Branch` (etc.) — commands in that type.
+- `pigit cmd -p` / `--pick` — built-in interactive picker (TTY only): `j` / `k` move, `Enter` run, `/` then a line to filter, `q` quit, or type a number and `Enter`. If a command accepts arguments, you get a `pigit cmd <short> ` line and an empty-line prompt for extra args (then one run).
+
+Use `pigit cmd -l` to check what short command it supported, it will display the corresponding help information and the git original command, like this:
 
 ```
 These are short commands that can replace git operations:
@@ -258,6 +265,8 @@ extra_cmds = {
 ```
 
 The `extra_cmds` dict is must. And the structure is command key and command info.
+
+In `pigit cmd -l`, search, and `--pick`, entries loaded from `extra_cmds` are prefixed with `[extra]` so you can tell them apart from built-ins.
 
 The command info has some options:
 

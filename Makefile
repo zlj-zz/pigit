@@ -9,18 +9,18 @@ run:
 	$(PY) ./tools/run.py
 
 test:
-	@if [ ! -f pytest ]; then $(PY) -m pip install pytest; fi
-	pytest ./tests
+	@$(PY) -c "import pytest" 2>/dev/null || $(PY) -m pip install pytest
+	$(PY) -m pytest ./tests
 	# pytest ./tests --cov=pigit --cov-report=html
 
 lint:
-	@if [ ! -f flake8 ]; then $(PY) -m pip install flake8; fi
-	@flake8 -v --ignore=W503,F403,F405,E501,E402,E203,E741,E401 --show-source ./pigit
+	@$(PY) -c "import flake8" 2>/dev/null || $(PY) -m pip install flake8
+	@$(PY) -m flake8 -v --ignore=W503,F403,F405,E501,E402,E203,E741,E401 --show-source ./pigit
 	@echo
 
 clear:
 	# clear code cache
-	@find . -type f -name *.pyc -delete
+	@find . -type f -name '*.pyc' -delete
 	@find . -type d -name __pycache__ -delete
 
 del: clear
@@ -34,14 +34,14 @@ del: clear
 
 	# del cov file
 	@if [ -d ./htmlcov ]; then rm -r ./htmlcov; fi
-	@find . -type f -name *.coverage* -delete
+	@find . -type f -name '*.coverage*' -delete
 
 release: del
 	$(PY) setup.py sdist bdist_wheel
 	twine upload dist/*
 
 install: del
-	$(PY) -m pip uninstall pigit
+	$(PY) -m pip uninstall -y pigit 2>/dev/null || true
 	$(PY) setup.py install
 
 todo:

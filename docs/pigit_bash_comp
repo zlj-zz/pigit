@@ -2,7 +2,7 @@
 
 _pigit_completion(){
   if [[ "${COMP_CWORD}" == "1" ]];then
-      COMP_WORD="l Si pc CO push iu --config Ru wM lr --since --create-ignore pf iX ta wd mC ir tx c sl open cr add cf bd cm rm co wC -p mt -f -l --issue p fc iD ia wm lc ls cO cd --simple bS Rs ue wS --reverse sd -t cR wD CT fetch Co cA fu Ra fb wr l1 --search mF pt --complete pp clear Rp m user pa cs pF --pick ll bM sp -r -s s ld cF SD --help --report Ct f wc bs Cl R ws mv sD fC Rl fr --dry-run --list ca --information -v --version Ce --shell pA RS savepd fm Rm pull t Sc iR bc Ca id wx report email bl --print --create-config ix -h -c --count wR -i ma --path rename --type repo Sd mS --commit Rx b lv --author cmd Su --until bL bm iA wX"
+      COMP_WORD="fm cs bs cA pc --simple ir -i lv ma Sc ia --config fr bl Cl --author -h --commit push co wM Si --pick wx --print wC --shell wD cr pA cf -f -l pt --since pull email Sd wR iD cO rm ls --until CT -c l wX -t --dry-run -v --report R id iu --count lr cR --reverse c Rm s Rx add --complete repo ca Ca ld fetch --issue t pa CO Rl iX rename sd bL user fC Ce pf --create-ignore iR wc --list cd b fu open mF cmd mS --create-config ll Ct ws bM mv SD cF --information Su f wd -p wS --version wr pp tx sl report mC Ru bc bm -r Co lc fb sp ta ix --path m ue --search Ra Rp RS -s savepd pF Rs p mt iA bd --type clear l1 --help bS fc sD cm wm"
       COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
 }
