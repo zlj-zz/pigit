@@ -10,6 +10,7 @@ from plenty.table import Table
 from .config import Config
 from .context import Context
 from .const import (
+    CMD_TYPE_LIST_SENTINEL,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
     REPOS_PATH,
@@ -201,18 +202,35 @@ tools_group.add_argument(
 # =============================================
 @pigit.sub_parser("cmd", help="git short command.")
 @argument("--shell", action="store_true", help="Go to the pigit shell mode.")
-@argument("-t --types", action="store_true", help="List all command types and exit.")
 @argument(
-    "-p --show-part-command",
-    type=str,
-    metavar="TYPE",
-    dest="command_type",
-    help="According to given type to list available short command and wealth and exit.",
+    "-l --list",
+    action="store_true",
+    dest="cmd_list",
+    help="List all short commands and help (full table).",
 )
 @argument(
-    "-s --show-commands",
+    "-s --search",
+    dest="cmd_search",
+    nargs=1,
+    metavar="QUERY",
+    help="Search commands by keyword (substring, case-insensitive). "
+    "For the complete table use -l / --list instead.",
+)
+@argument(
+    "-p --pick",
     action="store_true",
-    help="List all available short command and wealth and exit.",
+    dest="cmd_pick",
+    help="Interactively pick and run a short command (requires a TTY).",
+)
+@argument(
+    "-t --type",
+    nargs="?",
+    const=CMD_TYPE_LIST_SENTINEL,
+    default=None,
+    dest="cmd_type",
+    metavar="TYPE",
+    help="Without TYPE: list supported command types. "
+    "With TYPE: list short commands in that type (e.g. Branch).",
 )
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument(

@@ -6,7 +6,7 @@ from pprint import pprint
 from .conftest import _PIGIT_PATH
 from .utils import analyze_it
 
-from pigit.git._cmds import Git_Proxy_Cmds
+from pigit.git.builtin_cmds import Git_Proxy_Cmds
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (
@@ -69,9 +69,29 @@ argparse_dict = {
                     "type": str,
                     "help": "Command parameter list.",
                 },
-                "-t --types": {
+                "-l --list": {
                     "action": "store_true",
-                    "help": "List all command types and exit.",
+                    "dest": "cmd_list",
+                    "help": "List all short commands and help (full table).",
+                },
+                "-s --search": {
+                    "nargs": 1,
+                    "dest": "cmd_search",
+                    "metavar": "QUERY",
+                    "help": "Search commands by keyword.",
+                },
+                "-p --pick": {
+                    "action": "store_true",
+                    "dest": "cmd_pick",
+                    "help": "Interactively pick and run a short command (TTY).",
+                },
+                "-t --type": {
+                    "nargs": "?",
+                    "const": "__LIST_TYPES__",
+                    "default": None,
+                    "dest": "cmd_type",
+                    "metavar": "TYPE",
+                    "help": "List types or commands in a type.",
                 },
                 "set_defaults": {"func": range},
             },

@@ -2,7 +2,7 @@
 
 _pigit_completion(){
   if [[ "${COMP_CWORD}" == "1" ]];then
-      COMP_WORD="cm m SD wx cR pull cmd --show-commands fr iR iX cF Cl ue --show-part-command bs --complete sd ll bm lc b --simple ls mv --help tx savepd Sd --config --commit RS cf ix ma --since bS mt ld cA push Ru Su pp -t --print mF -f Ra open Si --create-config sl t -r --issue user CT lr wC wr --shell fetch repo email f s p sD --report ws --path lv pt pA add R Co Ca Rl cO iu report mC iD -h fc co bd cd ia wR Rm --util wS bM --version -s fm l1 mS pa rm fu rename CO clear pc -c --count -i bc -p bL -v fb wM Rs --information cr sp Sc --create-ignore l id --reverse Ce fC Ct wD wc --types c --author cs wm iA ta wX ca Rp bl Rx pF --dry-run wd ir pf"
+      COMP_WORD="l Si pc CO push iu --config Ru wM lr --since --create-ignore pf iX ta wd mC ir tx c sl open cr add cf bd cm rm co wC -p mt -f -l --issue p fc iD ia wm lc ls cO cd --simple bS Rs ue wS --reverse sd -t cR wD CT fetch Co cA fu Ra fb wr l1 --search mF pt --complete pp clear Rp m user pa cs pF --pick ll bM sp -r -s s ld cF SD --help --report Ct f wc bs Cl R ws mv sD fC Rl fr --dry-run --list ca --information -v --version Ce --shell pA RS savepd fm Rm pull t Sc iR bc Ca id wx report email bl --print --create-config ix -h -c --count wR -i ma --path rename --type repo Sd mS --commit Rx b lv --author cmd Su --until bL bm iA wX"
       COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
   fi
 }

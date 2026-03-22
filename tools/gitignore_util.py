@@ -47,8 +47,9 @@ def _get(url: str) -> str:
     if resp.status_code != 200:
         return ""
 
-    # print("content:", resp.content)
+    print("content:", resp.content)
     # print("json:", resp.json())
+    exit(0)
     rawlines = resp.json()["payload"]["blob"]["rawLines"]
     return "\n".join(rawlines)
 

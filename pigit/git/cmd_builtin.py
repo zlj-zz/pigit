@@ -21,7 +21,7 @@ Example:
 """
 
 from .define import GitCommandType, GitProxyOptionsGroup
-from ._cmd_func import *
+from .cmd_func import *
 
 
 # The custom git output format string.

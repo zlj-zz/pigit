@@ -21,11 +21,10 @@ def _ensure_pigit_context():
         "--information",  # git information
         "--count",  # code counter
         "cmd",
-        "cmd -s",
+        "cmd -l",
         "cmd -t",
-        "cmd -p branch",
+        "cmd -t Branch",
         "cmd ws",
-        "cmd -t",
         "repo ll",
     ],
 )

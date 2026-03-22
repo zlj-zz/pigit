@@ -2,7 +2,8 @@ from pigit.ext.executor import REPLY, DECODE
 from pigit.ext.executor_factory import ExecutorFactory
 
 from .ignore import get_ignore_source, create_gitignore
-from .proxy import get_extra_cmds, GitProxy, GitCommandType, Git_Proxy_Cmds
+from .cmd_builtin import Git_Proxy_Cmds
+from .cmd_proxy import get_extra_cmds, GitProxy, GitCommandType
 from .repo import LocalGit, ManagedRepos, Repo
 
 __all__ = (

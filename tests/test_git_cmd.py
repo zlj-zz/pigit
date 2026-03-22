@@ -2,8 +2,8 @@ import os
 import pytest
 from unittest.mock import patch
 
-from pigit.git.proxy import GitProxy, get_extra_cmds
-from pigit.git._cmd_func import add, set_email_and_username, fetch_remote_branch
+from pigit.git.cmd_proxy import GitProxy, get_extra_cmds
+from pigit.git.cmd_func import add, set_email_and_username, fetch_remote_branch
 
 
 class TestSCmd:

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, IO
 from plenty import get_console
 
 if TYPE_CHECKING:
-    from pigit.git.proxy import GitProxy
+    from pigit.git.cmd_proxy import GitProxy
 
 
 class PigitShell(cmd.Cmd):

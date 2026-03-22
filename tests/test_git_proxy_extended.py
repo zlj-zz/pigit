@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Extra :class:`~pigit.git.proxy.GitProxy` coverage for process/help/do paths."""
+"""Extra :class:`~pigit.git.cmd_proxy.GitProxy` coverage for process/help/do paths."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from pigit.git.define import GitCommandType
-from pigit.git.proxy import PROMPT_WITH_SAME_OUT, PROMPT_WITH_TIPS, GitProxy
+from pigit.git.cmd_proxy import PROMPT_WITH_SAME_OUT, PROMPT_WITH_TIPS, GitProxy
 
 
 def test_process_unknown_command():
@@ -71,8 +71,8 @@ def test_process_unsupported_command_type():
 
 def test_do_prompt_tips_confirm(monkeypatch):
     g = GitProxy(prompt=True, prompt_type=PROMPT_WITH_TIPS)
-    with patch("pigit.git.proxy.similar_command", return_value="ws"):
-        with patch("pigit.git.proxy.confirm", return_value=True):
+    with patch("pigit.git.cmd_proxy.similar_command", return_value="ws"):
+        with patch("pigit.git.cmd_proxy.confirm", return_value=True):
             with patch.object(GitProxy, "process_command", side_effect=[(1, "x"), (0, "done")]) as pc:
                 out = g.do("wx", None)
     assert out == "done"
@@ -112,8 +112,17 @@ def test_get_help_and_get_types():
     g = GitProxy(extra_cmds={"zz": {"command": "git zz", "help": "z"}})
     h = g.get_help()
     assert "zz" in h
+    assert "[extra]" in g.generate_help_by_key("zz")
     t = GitProxy.get_types()
     assert "`" in t
+    assert "pigit cmd -t" in t
+
+
+def test_search_commands_hits_and_miss():
+    g = GitProxy(extra_cmds={"zz": {"command": "git zz", "help": "special zed"}})
+    out = g.search_commands("zed")
+    assert "Matches" in out and "zz" in out
+    assert g.search_commands("no_such_token_xyz_999") == ""
 
 
 def test_get_help_by_type_valid():
@@ -125,15 +134,15 @@ def test_get_help_by_type_valid():
 
 def test_get_help_by_type_invalid_confirm():
     g = GitProxy(prompt=True)
-    with patch("pigit.git.proxy.similar_command", return_value=GitCommandType.Branch.value):
-        with patch("pigit.git.proxy.confirm", return_value=True):
+    with patch("pigit.git.cmd_proxy.similar_command", return_value=GitCommandType.Branch.value):
+        with patch("pigit.git.cmd_proxy.confirm", return_value=True):
             out = g.get_help_by_type("nope")
     assert "orders" in out.lower() or "Branch" in out
 
 
 def test_get_help_by_type_invalid_reject():
     g = GitProxy(prompt=True)
-    with patch("pigit.git.proxy.similar_command", return_value="Branch"):
-        with patch("pigit.git.proxy.confirm", return_value=False):
+    with patch("pigit.git.cmd_proxy.similar_command", return_value="Branch"):
+        with patch("pigit.git.cmd_proxy.confirm", return_value=False):
             out = g.get_help_by_type("nope")
-    assert "no such type" in out.lower() or "types" in out.lower()
+    assert "no such type" in out.lower() or "pigit cmd -t" in out
