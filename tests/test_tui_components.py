@@ -1,9 +1,10 @@
 import pytest
 from pigit.tui.components import (
     _NamespaceComp,
-    Container,
     Component,
     ComponentError,
+    Container,
+    GitPanelLazyResizeMixin,
     ItemSelector,
     LineTextBrowser,
 )
@@ -288,3 +289,49 @@ class TestItemSelector:
 
         selector.forward(step=step)
         assert selector.curr_no == expected_pos
+
+
+class TestGitPanelLazyResizeMixin:
+    def test_inactive_resize_skips_fresh_shows_placeholder(self):
+        _NamespaceComp.clear()
+
+        class DemoPanel(GitPanelLazyResizeMixin, ItemSelector):
+            NAME = "demo_lazy_git_panel"
+            CURSOR = ">"
+            fresh_calls = 0
+
+            def fresh(self):
+                DemoPanel.fresh_calls += 1
+                self.set_content(["ready"])
+
+        p = DemoPanel(size=(12, 4))
+        p.deactivate()
+        p.resize((12, 4))
+        assert DemoPanel.fresh_calls == 0
+        assert p.content == ["Loading..."]
+
+        p.activate()
+        p.resize((12, 4))
+        assert DemoPanel.fresh_calls == 1
+        assert p.content == ["ready"]
+
+    def test_inactive_after_load_keeps_content_on_resize(self):
+        _NamespaceComp.clear()
+
+        class DemoPanel2(GitPanelLazyResizeMixin, ItemSelector):
+            NAME = "demo_lazy_git_panel_2"
+            CURSOR = ">"
+            fresh_calls = 0
+
+            def fresh(self):
+                DemoPanel2.fresh_calls += 1
+                self.set_content(["a", "b"])
+
+        p = DemoPanel2(size=(12, 4))
+        p.activate()
+        p.resize((12, 4))
+        assert DemoPanel2.fresh_calls == 1
+        p.deactivate()
+        p.resize((20, 10))
+        assert DemoPanel2.fresh_calls == 1
+        assert p.content == ["a", "b"]

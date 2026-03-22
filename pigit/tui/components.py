@@ -194,19 +194,32 @@ class Container(Component):
             name = self.switch_handle(key)
             self.switch_child(name)
 
-    def switch_child(self, name: str) -> Optional["Component"]:
-        """Choice which child should be activated."""
+    def switch_child(self, name: str) -> Optional[Component]:
+        """Activate ``name`` if present, refresh it, then render.
+
+        Calls :meth:`Component.fresh` when implemented; :exc:`NotImplementedError`
+        is ignored so simple test doubles keep working. Panels using
+        :class:`GitPanelLazyResizeMixin` get ``_panel_loaded`` set after a successful
+        switch so lazy resize stays consistent.
+        """
         child = None
 
         if name in self.children:
-            # Has component be activated should deactivate.
             for component in self.children.values():
                 if component.is_activated():
                     component.deactivate()
-            # Activate the new choice component.
-            self.children[name].activate()
-            self.children[name]._render()
-            child = self.children[name]
+            target = self.children[name]
+            target.activate()
+            fresh_fn = getattr(target, "fresh", None)
+            if callable(fresh_fn):
+                try:
+                    fresh_fn()
+                except NotImplementedError:
+                    pass
+            if hasattr(target, "_panel_loaded"):
+                target._panel_loaded = True
+            target._render()
+            child = target
 
         return child
 
@@ -332,6 +345,28 @@ class ItemSelector(Component):
             self._r_start -= step
 
         self._render()
+
+
+class GitPanelLazyResizeMixin:
+    """Defer expensive :meth:`fresh` until the panel is activated.
+
+    Inactive panels show a one-line placeholder until first shown, so startup
+    ``resize`` avoids running git for every tab. Pair with a container that
+    calls :meth:`fresh` when switching to the child (see ``PanelContainer`` in
+    :meth:`Container.switch_child`).
+    """
+
+    _panel_loaded: bool = False
+
+    def resize(self, size: Tuple[int, int]) -> None:
+        self._size = size
+        if self.is_activated():
+            self.fresh()
+            self._panel_loaded = True
+        elif not self._panel_loaded:
+            self.set_content(["Loading..."])
+            self.curr_no = 0
+            self._r_start = 0
 
 
 class Alert(Component):

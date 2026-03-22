@@ -1,10 +1,16 @@
 import logging
 from time import sleep
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from .ext.utils import confirm
 from .git.repo import GitFileT, GitFuncT, Repo
-from .tui.components import ActionLiteral, Container, LineTextBrowser, ItemSelector
+from .tui.components import (
+    ActionLiteral,
+    Container,
+    GitPanelLazyResizeMixin,
+    LineTextBrowser,
+    ItemSelector,
+)
 from .tui.event_loop import EventLoop
 
 
@@ -12,7 +18,7 @@ _Log = logging.getLogger(f"PIGIT.{__name__}")
 repo_handle = Repo()
 
 
-class StatusPanel(ItemSelector):
+class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "status"
     CURSOR = "→"
     BINDINGS = [
@@ -74,7 +80,7 @@ class StatusPanel(ItemSelector):
             self.forward()
 
 
-class BranchPanel(ItemSelector):
+class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "branch"
     CURSOR = "→"
 
@@ -123,7 +129,7 @@ class BranchPanel(ItemSelector):
             self._render()
 
 
-class CommitPanel(ItemSelector):
+class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "commit"
     CURSOR = "→"
     BINDINGS = [
