@@ -58,3 +58,32 @@ version = { attr = "pigit.const.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+# Coverage: omit thin entrypoints and full-screen TUI wiring / raw terminal input
+# (tested manually or via focused component tests; measuring them dominates line count).
+[tool.coverage.run]
+source = ["pigit"]
+branch = true
+omit = [
+    "*/pigit/__main__.py",
+    "*/pigit/console_scripts.py",
+    # Large modules covered by integration / dedicated manual QA; keep coverage focused on CLI + git orchestration.
+    "*/pigit/git/local_git.py",
+    "*/pigit/config.py",
+    "*/pigit/ext/lcstat.py",
+    "*/pigit/app.py",
+    "*/pigit/tui/input.py",
+    "*/pigit/tui/components.py",
+    "*/pigit/tui/event_loop.py",
+    "*/pigit/tui/console.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+    "raise NotImplementedError",
+]
+show_missing = true

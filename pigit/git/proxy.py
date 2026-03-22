@@ -35,9 +35,14 @@ class GitProxy:
         self.executor = ExecutorFactory.get()
         self.log = logging.getLogger()
 
-        # Init commands.
-        self.cmds = Git_Proxy_Cmds
-        if extra_cmds:
+        # Init commands (copy base map so instances do not mutate Git_Proxy_Cmds).
+        self.cmds = dict(Git_Proxy_Cmds)
+        if extra_cmds is not None:
+            if not isinstance(extra_cmds, dict):
+                raise TypeError(
+                    "extra_cmds must be a dict or None, "
+                    f"not {type(extra_cmds).__name__}"
+                )
             self.cmds.update(extra_cmds)
 
     @staticmethod
