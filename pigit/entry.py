@@ -12,13 +12,11 @@ from .context import Context
 from .const import (
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
-    LOG_FILE_PATH,
     REPOS_PATH,
     VERSION,
 )
 from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .ext.log import setup_logging
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
 from .git import Git_Proxy_Cmds, create_gitignore
@@ -33,11 +31,6 @@ if TYPE_CHECKING:
 # Configuration.
 # ===============
 Conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
-
-setup_logging(
-    debug=Conf.log_debug,
-    log_file=None if Conf.log_output else LOG_FILE_PATH,
-)
 
 
 # ==============

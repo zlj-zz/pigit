@@ -1,3 +1,4 @@
+import logging
 import sys
 import time
 import textwrap
@@ -17,10 +18,18 @@ from pigit.ext.executor import (
 win_skip_mark = pytest.mark.skipif(sys.platform == "win32", reason="windows skip.")
 
 
+def _verbose_executor_logger(name: str) -> logging.Logger:
+    lg = logging.getLogger(name)
+    if not lg.handlers:
+        lg.addHandler(logging.StreamHandler(sys.stdout))
+    lg.setLevel(logging.INFO)
+    return lg
+
+
 class TestExecutor:
     @classmethod
     def setup_class(cls):
-        cls.executor = Executor(print)
+        cls.executor = Executor(log=_verbose_executor_logger("pigit.tests.executor"))
 
     @pytest.mark.parametrize(
         "cmd, flags, kws, expected",
@@ -46,7 +55,7 @@ class TestExecutor:
     )
     def test_exec(self, cmd, flags, kws, expected):
         # Arrange
-        executor = Executor(print)
+        executor = Executor(log=_verbose_executor_logger("pigit.tests.executor.exec"))
 
         with patch("pigit.ext.executor.Popen") as mock_popen:
             mock_proc = mock_popen.return_value

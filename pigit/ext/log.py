@@ -1,4 +1,10 @@
 # -*- coding:utf-8 -*-
+"""
+Module: pigit/ext/log.py
+Description: Root logging setup, named loggers, and uncaught-exception forwarding.
+Author: Project Team
+Date: 2024-01-01
+"""
 
 import logging
 import logging.handlers
@@ -7,20 +13,37 @@ import sys
 import threading
 from typing import Dict, Optional
 
+_PIGIT_HANDLER_ATTR = "_pigit_log_handler"
+_UNCAUGHT_HOOKS_INSTALLED = False
 
 FMT_NORMAL = logging.Formatter(
     fmt="%(asctime)s %(levelname).4s %(message)s", datefmt="%H:%M:%S"
 )
 
 FMT_DEBUG = logging.Formatter(
-    fmt="%(asctime)s.%(msecs)03d %(levelname).4s [%(name)s] %(message)s",
+    fmt=(
+        "%(asctime)s.%(msecs)03d %(levelname).4s [%(name)s] "
+        "%(pathname)s:%(lineno)d %(message)s"
+    ),
     datefmt="%H:%M:%S",
 )
 
 
-def setup_logging(debug: bool = False, log_file: Optional[str] = None):
+def _remove_pigit_handlers(root_logger: logging.Logger) -> None:
+    """Drop handlers previously added by :func:`setup_logging` (safe repeat bootstrap)."""
+    stale = [h for h in root_logger.handlers if getattr(h, _PIGIT_HANDLER_ATTR, False)]
+    for handler in stale:
+        root_logger.removeHandler(handler)
+        handler.close()
+
+
+def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> None:
+    """Configure the root logger and install uncaught-exception logging once."""
+
+    # logging.getLogger() with no args returns the root logger (global parent of all loggers)
+    # All custom loggers (e.g. logger("pigit")) inherit configuration from the root logger
     root_logger = logging.getLogger()
-    # print(log_file)
+    _remove_pigit_handlers(root_logger)
 
     if debug:
         log_level = logging.DEBUG
@@ -30,9 +53,8 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
         formatter = FMT_NORMAL
 
     if log_file is None:
-        log_handle = logging.StreamHandler()
+        log_handle: logging.Handler = logging.StreamHandler()
     else:
-        # try create dir of log.
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
         try:
@@ -45,6 +67,7 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
 
     log_handle.setFormatter(formatter)
     log_handle.setLevel(log_level)
+    setattr(log_handle, _PIGIT_HANDLER_ATTR, True)
 
     root_logger.addHandler(log_handle)
     root_logger.setLevel(0)
@@ -53,7 +76,15 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None):
 
 
 def install_uncaught_exception_logging() -> None:
-    """Send uncaught exceptions through the root logger (same handlers as ``setup_logging``)."""
+    """Send uncaught exceptions through the root logger (same handlers as ``setup_logging``).
+
+    Idempotent: only wraps ``sys.excepthook`` / ``threading.excepthook`` once per process.
+    """
+
+    global _UNCAUGHT_HOOKS_INSTALLED
+    if _UNCAUGHT_HOOKS_INSTALLED:
+        return
+    _UNCAUGHT_HOOKS_INSTALLED = True
 
     _sys_hook = sys.excepthook
 

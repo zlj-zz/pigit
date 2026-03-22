@@ -2,6 +2,7 @@ import asyncio
 import copy
 import contextlib
 import dataclasses
+import logging
 import os
 import shlex
 import sys
@@ -9,7 +10,6 @@ from subprocess import Popen, PIPE
 from typing import (
     Any,
     ByteString,
-    Callable,
     Dict,
     Final,
     Iterator,
@@ -73,18 +73,18 @@ class ExecState:
 
 
 class Executor:
-    def __init__(self, log_func: Optional[Callable] = None) -> None:
-        self.log_func = log_func
+    def __init__(self, log: Optional[logging.Logger] = None) -> None:
+        self.log = log
 
-    def _log(self, msg: str) -> None:
-        """Log function
+    def _log_warning(self, msg: object, *args: object) -> None:
+        """Emit a diagnostic line when a logger was configured.
 
         Args:
             msg (str): The message to log.
         """
-        if self.log_func is not None:
+        if self.log is not None:
             with contextlib.suppress(Exception):
-                self.log_func(msg)
+                self.log.warning(msg, *args)
 
     def _press_enter(self) -> None:
         """Wait for enter-press."""
@@ -199,7 +199,7 @@ class Executor:
                     _out, _err = proc.communicate()
                     _code = proc.returncode
             except Exception as e:
-                self._log(f"Failed to run: {cmd}\n{e}")
+                self._log_warning(f"Failed to run: {cmd}, {e}")
                 return None, None, None
             else:
                 if es.wait_enter:
@@ -249,7 +249,11 @@ class Executor:
                     if isinstance(decoded, str):
                         yield decoded.rstrip("\r\n")
                     else:
-                        chunk = decoded.rstrip(b"\r\n") if isinstance(decoded, bytes) else decoded
+                        chunk = (
+                            decoded.rstrip(b"\r\n")
+                            if isinstance(decoded, bytes)
+                            else decoded
+                        )
                         if isinstance(chunk, bytes):
                             yield chunk.decode("utf-8", errors="replace")
                         else:
@@ -257,13 +261,13 @@ class Executor:
                 err_raw = proc.stderr.read() if proc.stderr is not None else None
             code = proc.returncode
             if code not in (0, None):
-                self._log(f"exec_stream exited {code}: {cmd!r}")
+                self._log_warning(f"exec_stream exited {code}: {cmd!r}")
             if err_raw:
                 err_text = self._try_decode(err_raw, es)
                 if err_text:
-                    self._log(f"exec_stream stderr: {err_text!r}")
+                    self._log_warning(f"exec_stream stderr: {err_text!r}")
         except Exception as e:
-            self._log(f"Failed to exec_stream: {cmd!r}\n{e}")
+            self._log_warning(f"Failed to exec_stream: {cmd!r}\n{e}")
 
     def _asyncio_spawn_kw(self, cur_kws: Dict[str, Any]) -> Dict[str, Any]:
         """Build kwargs for :func:`asyncio.create_subprocess_exec` / shell helpers.
@@ -308,17 +312,17 @@ class Executor:
             elif isinstance(cmd, str):
                 parts = _split_cmd_argv(cmd)
                 if not parts:
-                    self._log(f"Empty argv after split: {cmd!r}")
+                    self._log_warning(f"Empty argv after split: {cmd!r}")
                     return (1, "", "") if es.reply else (None, None, None)
                 proc = await asyncio.create_subprocess_exec(parts[0], *parts[1:], **sk)
             else:
                 argv = list(cmd)
                 if not argv:
-                    self._log("Empty argv for subprocess_exec")
+                    self._log_warning("Empty argv for subprocess_exec")
                     return (1, "", "") if es.reply else (None, None, None)
                 proc = await asyncio.create_subprocess_exec(argv[0], *argv[1:], **sk)
         except Exception as e:
-            self._log(f"Failed to run: {cmd}\n{e}")
+            self._log_warning(f"Failed to run: {cmd}, {e}")
             return None, None, None
 
         if not es.waiting:

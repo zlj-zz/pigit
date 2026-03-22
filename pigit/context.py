@@ -40,8 +40,8 @@ class Context:
         c = _ctx_var.get()
         if c is None:
             raise RuntimeError(
-                "No PigitContext is active; use PigitContext.install() or "
-                "'with PigitContext(...):' before calling current()."
+                "No PigitContext is active; use Context.install() or "
+                "'with Context(...):' before calling current()."
             )
         return c
 
@@ -72,17 +72,24 @@ class Context:
         repo_json_path: str,
         log_name: str = "pigit",
     ) -> "Context":
-        """Build default context: shared :class:`~pigit.ext.executor_factory.LocalExecutor`, :class:`Repo`, logger."""
+        """Build default context: logging, shared executor, :class:`Repo`, and named logger."""
+        from .const import LOG_FILE_PATH
         from .ext.executor_factory import ExecutorFactory, LocalExecutor
-        from .ext.log import logger
+        from .ext.log import logger, setup_logging
         from .git.repo import Repo
 
-        executor = LocalExecutor()
+        setup_logging(
+            debug=config.log_debug,
+            log_file=None if config.log_output else LOG_FILE_PATH,
+        )
+
+        app_log = logger(log_name)
+        executor = LocalExecutor(log=app_log)
         ExecutorFactory.set_strategy(executor)
         repo = Repo(repo_json_path=repo_json_path, executor=executor)
         return cls(
             config=config,
             executor=executor,
             repo=repo,
-            log=logger(log_name),
+            log=app_log,
         )
