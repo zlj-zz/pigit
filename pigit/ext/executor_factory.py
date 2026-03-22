@@ -30,6 +30,7 @@ class ExecutorStrategy(ABC):
         *cmds: CmdT,
         orders: Optional[List[Dict[str, Any]]] = None,
         flags: int = 0,
+        max_concurrent: Optional[int] = None,
         **kws: Any,
     ) -> List[ExecResult]:
         ...
@@ -56,7 +57,9 @@ class MockExecutor(ExecutorStrategy):
         self.responses = dict(responses) if responses else {}
         self.default = default
         self.exec_calls: List[Tuple[CmdT, int, Dict[str, Any]]] = []
-        self.parallel_calls: List[Tuple[Tuple[CmdT, ...], Optional[List[Dict[str, Any]]], int, Dict[str, Any]]] = []
+        self.parallel_calls: List[
+            Tuple[Tuple[CmdT, ...], Optional[List[Dict[str, Any]]], int, Optional[int], Dict[str, Any]]
+        ] = []
 
     def exec(self, cmd: CmdT, *, flags: int = 0, **kws: Any) -> ExecResult:
         self.exec_calls.append((cmd, flags, dict(kws)))
@@ -70,9 +73,10 @@ class MockExecutor(ExecutorStrategy):
         *cmds: CmdT,
         orders: Optional[List[Dict[str, Any]]] = None,
         flags: int = 0,
+        max_concurrent: Optional[int] = None,
         **kws: Any,
     ) -> List[ExecResult]:
-        self.parallel_calls.append((cmds, orders, flags, dict(kws)))
+        self.parallel_calls.append((cmds, orders, flags, max_concurrent, dict(kws)))
         popen_orders = copy.deepcopy(orders) if orders is not None else []
         if len(popen_orders) < len(cmds):
             popen_orders.extend([{}] * (len(cmds) - len(popen_orders)))

@@ -13,6 +13,18 @@ from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 class ManagedRepos:
     """Persisted multi-repo registry (`repos.json`) and bulk commands."""
 
+    @staticmethod
+    def _repo_parallel_workers() -> int:
+        """Max concurrent subprocesses for multi-repo commands.
+
+        Override with env ``PIGIT_REPO_MAX_WORKERS`` (integer, clamped to 1..32).
+        Default ``4`` keeps load predictable; see ``docs/optimization.md``.
+        """
+        raw = os.environ.get("PIGIT_REPO_MAX_WORKERS", "").strip()
+        if raw.isdigit():
+            return max(1, min(int(raw), 32))
+        return 4
+
     def __init__(self, executor: Executor, repo_json_path: Optional[str] = None) -> None:
         self.executor = executor
         self.repo_json_path = (
@@ -86,15 +98,21 @@ class ManagedRepos:
         if since == "" and until == "":
             command += " -30"
 
-        report_dict = {}
-        for repo_name, prop in exist_repos.items():
-            repo_path = prop["path"]
-            _, err, resp = self.executor.exec(
-                command, flags=REPLY | DECODE, cwd=repo_path
-            )
+        items = list(exist_repos.items())
+        workers = self._repo_parallel_workers()
+        orders = [{"cwd": prop["path"]} for _, prop in items]
+        cmds = [command] * len(items)
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE,
+            max_concurrent=workers,
+        )
 
+        report_dict = {}
+        for (repo_name, _prop), (_code, _err, resp) in zip(items, results):
             commits = []
-            for line in resp.split("\n"):
+            for line in (resp or "").split("\n"):
                 if line == "":
                     continue
 
@@ -287,7 +305,12 @@ class ManagedRepos:
                 cmds.append(cmd)
                 orders.append({"cwd": prop["path"]})
 
-            return self.executor.exec_parallel(*cmds, orders=orders, flags=WAITING)
+            return self.executor.exec_parallel(
+                *cmds,
+                orders=orders,
+                flags=WAITING,
+                max_concurrent=self._repo_parallel_workers(),
+            )
 
         for _, prop in exist_repos.items():
             self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
