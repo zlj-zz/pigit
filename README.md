@@ -113,6 +113,8 @@ The command of `repo` support operate multiple repos at the same time.
 
 Use `pigit repo -h` to get more help.
 
+**`repo cd` / `repo cd --pick`**: With a managed repo name that exists in `repos.json`, `pigit repo cd <name>` jumps into that working tree (same as before). Use **`pigit repo cd --pick`** (`-p`) in a real terminal to open the built-in list picker (j/k, `/` filter, Enter to confirm, q/Esc to quit). If you pass a name that is not an exact key, the picker opens with the filter pre-filled so you can narrow the list. Scripts and CI should pass an explicit name or avoid `--pick`; the picker requires stdin and stdout to be TTYs. Details: `docs/technical_repo_cd_interactive.md`.
+
 ```
 usage: pigit
 

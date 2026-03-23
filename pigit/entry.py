@@ -290,6 +290,12 @@ def repo_report(args, _):
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
+@argument(
+    "-p --pick",
+    action="store_true",
+    dest="repo_cd_pick",
+    help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
+)
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)

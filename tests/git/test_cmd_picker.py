@@ -44,9 +44,10 @@ def test_run_command_picker_terminal_too_small(monkeypatch):
     g = GitProxy(extra_cmds={})
 
     def tiny():
+        # Header (3) + bottom status + input (2) + list (>=1) => need >=6 rows.
         return (80, 5)
 
-    monkeypatch.setattr("pigit.git.cmd_picker._terminal_size", tiny)
+    monkeypatch.setattr("pigit.interactive.list_picker.terminal_size", tiny)
     with patch("pigit.git.cmd_picker._tty_ok", return_value=True):
         code, msg = run_command_picker(
             g, read_char=lambda: "q", write=lambda s: None, flush=lambda: None

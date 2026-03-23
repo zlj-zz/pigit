@@ -14,6 +14,7 @@ from pigit.handlers.tui_handler import TuiHandler
 @pytest.fixture
 def mock_ctx():
     repo = MagicMock()
+    repo.cd_repo.return_value = (0, None)
     repo.add_repos.return_value = ["/a", "/b"]
     repo.rm_repos.return_value = [("n", "/p")]
     repo.rename_repo.return_value = (True, "ok")
@@ -74,7 +75,7 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         )
     mock_ctx.repo.clear_repos.assert_called_once()
     mock_ctx.repo.report_repos.assert_called_once()
-    mock_ctx.repo.cd_repo.assert_called_once_with("r")
+    mock_ctx.repo.cd_repo.assert_called_once_with("r", pick=False)
     mock_ctx.repo.process_repos_option.assert_called_once()
     mock_ctx.repo.open_repo_in_browser.assert_called_once()
 
@@ -151,6 +152,17 @@ def test_cmd_handler_search_no_match(cmd_ctx):
             with pytest.raises(SystemExit) as exc:
                 CmdHandler(cmd_ctx, args, []).execute()
     assert exc.value.code == 1
+
+
+def test_repo_handler_cd_pick_no_tty(mock_ctx):
+    echo = MagicMock()
+    mock_ctx.repo.cd_repo.return_value = (1, "needs tty")
+    args = SimpleNamespace(repo=None, repo_cd_pick=True)
+    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+        with pytest.raises(SystemExit) as exc:
+            RepoCommandHandler(mock_ctx).cd(args)
+    assert exc.value.code == 1
+    echo.assert_called_once_with("needs tty")
 
 
 def test_cmd_handler_pick_no_tty(cmd_ctx):

@@ -81,7 +81,12 @@ class RepoCommandHandler:
         self.console.echo(report)
 
     def cd(self, args: "Namespace") -> None:
-        self.repo.cd_repo(args.repo)
+        pick = getattr(args, "repo_cd_pick", False)
+        code, msg = self.repo.cd_repo(args.repo, pick=pick)
+        if code != 0:
+            if msg:
+                self.console.echo(msg)
+            raise SystemExit(code)
 
     def process_repos_option(self, repos, cmd: str) -> None:
         self.repo.process_repos_option(repos, cmd)
