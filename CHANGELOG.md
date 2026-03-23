@@ -1,5 +1,20 @@
 # Changelog of pigit
 
+## 1.7.2 (2026-03-23)
+- Update `.gitignore` template
+
+## 1.7.1 (2026-03-23)
+- Rename git modules: `_cmd_func.py` → `cmd_func.py`, `proxy.py` → `cmd_proxy.py`, `_cmds.py` → `cmd_builtin.py` (public re-exports in `pigit.git` unchanged).
+- **CLI (`pigit cmd`) discoverability**: `-l`/`--list` replaces the old full-table `-s`; `-s`/`--search <query>` adds case-insensitive substring search; `-p`/`--pick` adds a built-in TTY picker (j/k, Enter, `/` filter, q); `-t`/`--type` merges “list types” and “list by type” (`-t` vs `-t Branch`). Friendly errors and `-h` epilog point to the new flags. `GitProxy` lists/search/pick share `CommandEntry` via `cmd_catalog.py`; `extra_cmds` rows show an `[extra]` prefix in list/search/pick output.
+- Optimize load_status cache: use stat tuple of .git/index/HEAD/MERGE_HEAD as signature (no watchdog/FSEvents), merge repeated calls via _LOAD_STATUS_CACHE_TTL (0.3s), skip cache for worktree with gitdir:.
+- Improve add_repos performance: change exist_paths to set (O(1) member detection), keep confirm_repo call for each path.
+- TuiHandler takes over first-launch guidance + App().run(), preprocess() handles Windows unsupported branches; RepoCommandHandler has no inheritance with BaseHandler; top-level pigit still processes report/config/count/complete parameters.
+- Adjust ExecutorFactory: LocalExecutor uses multiple inheritance (Executor + ExecutorStrategy) to keep exec/exec_parallel behavior consistent; add reset() fixture for ExecutorFactory in unit tests to avoid singleton pollution.
+- Optimize PigitContext: keep ExecutorFactory.get() logic unchanged to avoid test semantic conflicts; Config remains Singleton; repo_handler is retained as compatible alias for app_ctx.repo.
+- Evolve multi-repo parallelism: ManagedRepos uses exec_parallel(..., max_concurrent=…) based on asyncio; map PIGIT_REPO_MAX_WORKERS to max_concurrent (default 4).
+- Optimize streaming log & ItemSelector viewport: parse git log incrementally via exec_stream; fix j/k navigation error in BranchPanel/CommitPanel by using set_content.
+- Implement progressive TUI: GitPanelLazyResizeMixin optimizes Component.resize logic; PanelContainer.switch_child ensures tab data refresh; no background thread async git to avoid rendering race.
+
 ## v1.7.0 (2024-05-15)
 - Fix command completion generate multi key.
 - Use `eval "$(pigit --complete zsh)"` to take effect manually command completion.

@@ -15,9 +15,10 @@
 __cmd_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
-    {-s,--show-commands}'[List all available short command and wealth and exit.]' \
-    {-p,--show-part-command}'[According to given type to list available short command and wealth and exit.]' \
-    {-t,--types}'[List all command types and exit.]' \
+    {-t,--type}'[Without TYPE: list supported command types. With TYPE: list short commands in that type (e.g. Branch).]' \
+    {-p,--pick}'[Interactively pick and run a short command (requires a TTY).]' \
+    {-s,--search}'[Search commands by keyword (substring, case-insensitive). For the complete table use -l / --list instead.]' \
+    {-l,--list}'[List all short commands and help (full table).]' \
     '--shell[Go to the pigit shell mode.]' \
     'b[lists, creates, renames, and deletes branches.]' \
     'bc[creates a new branch.]' \
@@ -162,7 +163,7 @@ __clear_values() {
 __report_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
-    '--util[end range of commmits.]' \
+    '--until[end range of commits.]' \
     '--since[start range of commits.]' \
     '--author[select author of commits.]' \
   && ret=0

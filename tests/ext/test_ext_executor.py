@@ -1,8 +1,9 @@
+import logging
 import sys
 import time
 import textwrap
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from pigit.ext.executor import (
     DECODE,
@@ -17,10 +18,18 @@ from pigit.ext.executor import (
 win_skip_mark = pytest.mark.skipif(sys.platform == "win32", reason="windows skip.")
 
 
+def _verbose_executor_logger(name: str) -> logging.Logger:
+    lg = logging.getLogger(name)
+    if not lg.handlers:
+        lg.addHandler(logging.StreamHandler(sys.stdout))
+    lg.setLevel(logging.INFO)
+    return lg
+
+
 class TestExecutor:
     @classmethod
     def setup_class(cls):
-        cls.executor = Executor(print)
+        cls.executor = Executor(log=_verbose_executor_logger("pigit.tests.executor"))
 
     @pytest.mark.parametrize(
         "cmd, flags, kws, expected",
@@ -46,7 +55,7 @@ class TestExecutor:
     )
     def test_exec(self, cmd, flags, kws, expected):
         # Arrange
-        executor = Executor(print)
+        executor = Executor(log=_verbose_executor_logger("pigit.tests.executor.exec"))
 
         with patch("pigit.ext.executor.Popen") as mock_popen:
             mock_proc = mock_popen.return_value
@@ -60,6 +69,21 @@ class TestExecutor:
             # Assert
             assert result == expected
             # mock_popen.assert_called_once_with(args=cmd, **kws)
+
+    def test_exec_stream_yields_decoded_lines(self):
+        with patch("pigit.ext.executor.Popen") as mock_popen:
+            mock_proc = MagicMock()
+            mock_popen.return_value = mock_proc
+            mock_proc.__enter__.return_value = mock_proc
+            mock_proc.__exit__.return_value = None
+            mock_proc.stdout = iter([b"one\n", b"two\n"])
+            mock_proc.stderr.read.return_value = b""
+            mock_proc.returncode = 0
+
+            executor = Executor()
+            lines = list(executor.exec_stream("git log", cwd="/tmp"))
+
+        assert lines == ["one", "two"]
 
     @win_skip_mark
     def test_exec_with_more(self):
@@ -83,29 +107,42 @@ class TestExecutor:
 
     @pytest.mark.asyncio
     async def test_exec_async(self, monkeypatch):
-        # Arrange
-        mock_create_subprocess_exec = AsyncMock()
-        mock_create_subprocess_exec.return_value.communicate.return_value = (
+        # String command defaults to shell=True → create_subprocess_shell (aligned with sync exec).
+        mock_shell = AsyncMock()
+        mock_shell.return_value.communicate.return_value = (
             b"output",
             b"error",
         )
-        mock_create_subprocess_exec.return_value.returncode = 0
-        monkeypatch.setattr(
-            "asyncio.create_subprocess_exec", mock_create_subprocess_exec
-        )
+        mock_shell.return_value.returncode = 0
+        monkeypatch.setattr("asyncio.create_subprocess_shell", mock_shell)
 
         executor = Executor()
 
-        # Act
         result = await executor.exec_async(
             "ls -l", flags=DECODE | REPLY | REDIRECT | WAITING
         )
 
-        # Assert
         assert result == [(0, "error", "output")]
-        mock_create_subprocess_exec.assert_called_once_with(
-            "ls", "-l", shell=False, start_new_session=True, stdout=-1, stderr=-1
+        mock_shell.assert_called_once_with(
+            "ls -l", start_new_session=True, stdout=-1, stderr=-1
         )
+
+    @pytest.mark.asyncio
+    async def test_exec_async_string_shell_false_uses_shlex_exec(self, monkeypatch):
+        mock_exec = AsyncMock()
+        mock_exec.return_value.communicate.return_value = (b"x", b"")
+        mock_exec.return_value.returncode = 0
+        monkeypatch.setattr("asyncio.create_subprocess_exec", mock_exec)
+
+        executor = Executor()
+        await executor.exec_async(
+            'echo "hello world"',
+            flags=DECODE | REPLY | REDIRECT | WAITING,
+            shell=False,
+        )
+
+        mock_exec.assert_called_once()
+        assert mock_exec.call_args[0][:2] == ("echo", "hello world")
 
     def test_exec_parallel(self):
         code = textwrap.dedent(

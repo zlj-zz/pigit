@@ -35,9 +35,12 @@ useless/
 tests/test_repo
 tests/ignore_test
 tests/pigit.conf
+coverage.json
 
 test.py
 calc.py
 trans.txt
 
 xxx_bash_comp
+
+_Users_haha_projects_pigit

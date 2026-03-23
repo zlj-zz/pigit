@@ -6,7 +6,7 @@ import platform
 
 
 __project__ = "pigit"
-__version__ = "1.7.1-dev"
+__version__ = "1.7.2"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -47,6 +47,9 @@ COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 # User custom cmd path
 EXTRA_CMD_MODULE_NAME: str = "extra_cmds"
 EXTRA_CMD_MODULE_PATH: str = f"{PIGIT_HOME}/{EXTRA_CMD_MODULE_NAME}.py"
+
+# argparse: ``pigit cmd -t`` / ``--type`` with no TYPE argument
+CMD_TYPE_LIST_SENTINEL: str = "__LIST_TYPES__"
 
 # Multi repos config file
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"

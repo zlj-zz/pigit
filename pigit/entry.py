@@ -2,30 +2,26 @@
 # The PIGIT terminal tool entry file.
 
 import os
-import textwrap
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, List
 
 from plenty import get_console
 from plenty.table import Table
 
 from .config import Config
+from .context import Context
 from .const import (
+    CMD_TYPE_LIST_SENTINEL,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
-    EXTRA_CMD_MODULE_NAME,
-    EXTRA_CMD_MODULE_PATH,
-    IS_FIRST_RUN,
-    IS_WIN,
-    LOG_FILE_PATH,
     REPOS_PATH,
     VERSION,
 )
 from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .ext.log import setup_logging
-from .ext.func import dynamic_default_attrs, time_it
-from .ext.utils import confirm, get_file_icon
-from .git import Git_Proxy_Cmds, GitProxy, Repo, create_gitignore, get_extra_cmds
+from .ext.func import dynamic_default_attrs
+from .ext.utils import get_file_icon
+from .git import Git_Proxy_Cmds, create_gitignore
+from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
@@ -35,18 +31,14 @@ if TYPE_CHECKING:
 # ===============
 # Configuration.
 # ===============
-Conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
-
-setup_logging(
-    debug=Conf.log_debug,
-    log_file=None if Conf.log_output else LOG_FILE_PATH,
-)
+conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
 
 
 # ==============
 # Global handle
 # ==============
-repo_handler = Repo(repo_json_path=REPOS_PATH)
+ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
+Context.install(ctx)
 console = get_console()
 
 
@@ -63,14 +55,14 @@ def pigit(args: "Namespace", _) -> None:
         console.echo(introduce())
 
     elif args.create_config:
-        Conf.create_config_template()
+        ctx.config.create_config_template()
         return
 
     elif args.config:
-        console.echo(show_gitconfig(format_type=Conf.git_config_format))
+        console.echo(show_gitconfig(format_type=ctx.config.git_config_format))
 
     elif args.information:
-        console.echo(repo_handler.get_repo_desc(include_part=Conf.repo_info_include))
+        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.repo_info_include))
 
     elif args.complete:
         # Generate completion vars dict.
@@ -91,13 +83,13 @@ def pigit(args: "Namespace", _) -> None:
     elif args.count:
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
         total_size, diff_result, invalids = Counter(
-            saved_dir=COUNTER_DIR_PATH, show_invalid=Conf.counter_show_invalid
-        ).diff_count(path, Conf.counter_use_gitignore)
-        if Conf.counter_format == "simple":
+            saved_dir=COUNTER_DIR_PATH, show_invalid=ctx.config.counter_show_invalid
+        ).diff_count(path, ctx.config.counter_use_gitignore)
+        if ctx.config.counter_format == "simple":
             for k, v in diff_result.items():
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
-        elif Conf.counter_format == "table":
+        elif conf.counter_format == "table":
 
             def color_index(
                 count: int,
@@ -124,7 +116,9 @@ def pigit(args: "Namespace", _) -> None:
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"`{get_file_icon(k)} {k}`<cyan>" if Conf.counter_show_icon else k
+                    f"`{get_file_icon(k)} {k}`<cyan>"
+                    if ctx.config.counter_show_icon
+                    else k
                 )
 
                 f_num_str = f"`{v[FILES_NUM]}`<{color_index(v[FILES_NUM])}>"
@@ -152,17 +146,9 @@ def pigit(args: "Namespace", _) -> None:
     # Don't have invalid command list.
     # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
-        if IS_FIRST_RUN:
-            introduce()
-            if not confirm("Input `enter` to continue:"):
-                return
-
-        if IS_WIN:
-            print("Not support windows now.")
-        else:
-            from .app import App
-
-            App().run()
+        handler = TuiHandler(ctx)
+        if handler.preprocess():
+            handler.execute()
 
 
 # yapf: enable
@@ -216,18 +202,35 @@ tools_group.add_argument(
 # =============================================
 @pigit.sub_parser("cmd", help="git short command.")
 @argument("--shell", action="store_true", help="Go to the pigit shell mode.")
-@argument("-t --types", action="store_true", help="List all command types and exit.")
 @argument(
-    "-p --show-part-command",
-    type=str,
-    metavar="TYPE",
-    dest="command_type",
-    help="According to given type to list available short command and wealth and exit.",
+    "-l --list",
+    action="store_true",
+    dest="cmd_list",
+    help="List all short commands and help (full table).",
 )
 @argument(
-    "-s --show-commands",
+    "-s --search",
+    dest="cmd_search",
+    nargs=1,
+    metavar="QUERY",
+    help="Search commands by keyword (substring, case-insensitive). "
+    "For the complete table use -l / --list instead.",
+)
+@argument(
+    "-p --pick",
     action="store_true",
-    help="List all available short command and wealth and exit.",
+    dest="cmd_pick",
+    help="Interactively pick and run a short command (requires a TTY).",
+)
+@argument(
+    "-t --type",
+    nargs="?",
+    const=CMD_TYPE_LIST_SENTINEL,
+    default=None,
+    dest="cmd_type",
+    metavar="TYPE",
+    help="Without TYPE: list supported command types. "
+    "With TYPE: list short commands in that type (e.g. Branch).",
 )
 @argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument(
@@ -236,53 +239,7 @@ tools_group.add_argument(
 def _(args: "Namespace", unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
-    # If you want to manipulate the current folder with git,
-    # try adding it to repos automatically.
-    if Conf.repo_auto_append:
-        repo_path, repo_conf = repo_handler.confirm_repo()
-        repo_handler.add_repos([repo_path])
-
-    # Init extra custom cmds.
-    extra_cmd: Dict = {
-        # "shell": {
-        #     "command": lambda _: shell_mode(git_processor),
-        #     "type": "func",
-        #     "help": "Into PIGIT shell mode.",
-        # },  # only for tips.
-    }
-    extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
-
-    git_processor = GitProxy(
-        extra_cmds=extra_cmd,
-        prompt=Conf.cmd_recommend,
-        display=Conf.cmd_display,
-    )
-
-    if args.shell:
-        from .shell_mode import PigitShell
-
-        shell_ = PigitShell(git_processor)
-        # print(shell_.__dir__())
-        shell_.cmdloop()
-        return
-
-    if args.show_commands:
-        # return git_processor.print_help()
-        return console.echo(git_processor.get_help())
-
-    if args.command_type:
-        return console.echo(git_processor.get_help_by_type(args.command_type))
-
-    if args.types:
-        return console.echo(git_processor.get_types())
-
-    if args.command:
-        short_cmd = args.command
-        args.args.extend(unknown)
-        console.echo(git_processor.do(short_cmd, args.args))
-        return None
-    else:
-        console.echo("`pigit cmd -h`<ok> for help.")
+    CmdHandler(ctx.current(), args, unknown).execute()
 
 
 # =============================================
@@ -295,88 +252,47 @@ repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h h
 @argument("--dry-run", action="store_true", help="dry run.")
 @argument("paths", nargs="+", help="path of reps(s).")
 def repo_add(args, _):
-    if added := repo_handler.add_repos(args.paths, args.dry_run):
-        console.echo(f"Found {len(added)} new repo(s).")
-        for path in added:
-            console.echo(f"\t`{path}`<sky_blue>")
-    else:
-        console.echo("`No new repos found!`<tomato>")
+    RepoCommandHandler(ctx.current()).add(args)
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
 @argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
-    res = repo_handler.rm_repos(args.repos, args.path)
-    for one in res:
-        console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
+    RepoCommandHandler(ctx.current()).rm(args)
 
 
 @repo.sub_parser("rename", help="rename a repo.")
 @argument("new_name", help="the new name of repo.")
 @argument("repo", help="the name of repo.")
 def repo_rename(args, _):
-    success, msg = repo_handler.rename_repo(args.repo, args.new_name)
-    console.echo(msg)
+    RepoCommandHandler(ctx.current()).rename(args)
 
 
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 def repo_ll(args, _):
-    simple = args.simple
-    reverse = args.reverse
-
-    for info in repo_handler.ll_repos(reverse=reverse):
-        if simple:
-            if reverse:
-                console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
-            else:
-                console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
-        else:
-            if reverse:
-                summary_string = textwrap.dedent(
-                    f"""\
-                    b`{info[0][0]}`
-                        {info[1][0]}: `{info[1][1]}`<sky_blue>
-                    """
-                )
-            else:
-                summary_string = textwrap.dedent(
-                    f"""\
-                    b`{info[0][0]}`
-                        {info[1][0]}: {info[1][1]}
-                        {info[2][0]}: {info[2][1]}
-                        {info[3][0]}: `{info[3][1]}`<khaki>
-                        {info[4][0]}: `{info[4][1]}`<ok>
-                        {info[5][0]}: `{info[5][1]}`<sky_blue>
-                    """
-                )
-            console.echo(summary_string)
+    RepoCommandHandler(ctx.current()).ll(args)
 
 
 repo.sub_parser("clear", help="clear the all repos.")(
-    lambda _, __: repo_handler.clear_repos()
+    lambda _, __: RepoCommandHandler(ctx.current()).clear()
 )
 
 
 @repo.sub_parser("report", help="genereate report of all repos.")
 @argument("--author", type=str, required=True, help="select author of commits.")
 @argument("--since",  type=str,default='', help="start range of commits.")
-@argument("--util",  type=str,default='', help="end range of commmits.")
+@argument("--until",  type=str,default='', help="end range of commits.")
 def repo_report(args, _):
-    report = repo_handler.report_repos(
-        author=args.author,
-        since=args.since,
-        util=args.util,
-    )
-    console.echo(report)
+    RepoCommandHandler(ctx.current()).report(args)
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
-    repo_handler.cd_repo(args.repo)
+    RepoCommandHandler(ctx.current()).cd(args)
 
 
 repo_options = {
@@ -389,7 +305,9 @@ for sub_cmd, prop in repo_options.items():
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: repo_handler.process_repos_option(args.repos, cmd),
+                lambda args, _, cmd: RepoCommandHandler(
+                    ctx.current()
+                ).process_repos_option(args.repos, cmd),
                 cmd=prop["cmd"],
             )
         )
@@ -406,9 +324,6 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: "Namespace", _):
-    code, msg = repo_handler.open_repo_in_browser(
-        branch=args.branch, issue=args.issue, commit=args.commit, print=args.print
-    )
-    console.echo(msg)
+    RepoCommandHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

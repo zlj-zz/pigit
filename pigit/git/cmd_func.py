@@ -16,7 +16,8 @@ Example:
 import re
 from typing import List, Tuple, Union
 
-from pigit.ext.executor import WAITING, Executor
+from pigit.ext.executor import WAITING
+from pigit.ext.executor_factory import ExecutorFactory
 
 
 def add(args: Union[List, Tuple]) -> str:
@@ -27,7 +28,7 @@ def add(args: Union[List, Tuple]) -> str:
     """
 
     args_str = " ".join(args) if args else " ."
-    Executor().exec(f"git add {args_str}", flags=WAITING)
+    ExecutorFactory.get().exec(f"git add {args_str}", flags=WAITING)
 
     return ":rainbow: Storage file: {0}".format(
         "all" if args_str.strip() == "." else args_str
@@ -40,7 +41,9 @@ def fetch_remote_branch(args: Union[List, Tuple]) -> str:
     branch = args[0] if args else None
 
     if branch:
-        Executor().exec("git fetch origin {0}:{0} ".format(branch), flags=WAITING)
+        ExecutorFactory.get().exec(
+            "git fetch origin {0}:{0} ".format(branch), flags=WAITING
+        )
         return ""
     else:
         return "`This option need a branch name.`<error>"
@@ -78,7 +81,7 @@ def set_email_and_username(args: Union[List, Tuple]) -> str:
         else:
             print("ERROR: Bad mailbox format. continue ...")
 
-    executor = Executor()
+    executor = ExecutorFactory.get()
     if executor.exec(
         f"git config user.name {name} {is_global}", flags=WAITING
     ) and executor.exec(f"git config user.email {email} {is_global}", flags=WAITING):

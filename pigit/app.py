@@ -1,10 +1,16 @@
 import logging
 from time import sleep
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from .ext.utils import confirm
 from .git.repo import GitFileT, GitFuncT, Repo
-from .tui.components import ActionLiteral, Container, LineTextBrowser, ItemSelector
+from .tui.components import (
+    ActionLiteral,
+    Container,
+    GitPanelLazyResizeMixin,
+    LineTextBrowser,
+    ItemSelector,
+)
 from .tui.event_loop import EventLoop
 
 
@@ -12,7 +18,7 @@ _Log = logging.getLogger(f"PIGIT.{__name__}")
 repo_handle = Repo()
 
 
-class StatusPanel(ItemSelector):
+class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "status"
     CURSOR = "→"
     BINDINGS = [
@@ -30,9 +36,10 @@ class StatusPanel(ItemSelector):
         super().__init__(x, y, size, content)
 
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
+        self.git = repo_handle.bind_path(self.repo_path)
 
     def fresh(self):
-        self.files = files = repo_handle.load_status(self._size[0])
+        self.files = files = self.git.load_status(self._size[0])
         if not files:
             return ["No status changed."]
 
@@ -43,19 +50,19 @@ class StatusPanel(ItemSelector):
         f = self.files[self.curr_no]
 
         if key == "enter":
-            c = repo_handle.load_file_diff(
-                f.name, f.tracked, f.has_staged_change, path=self.repo_path
+            c = self.git.load_file_diff(
+                f.name, f.tracked, f.has_staged_change
             ).split("\n")
             self.emit(
                 "goto", target="display_panel", source=self.NAME, key=f.name, content=c
             )
             return
         elif key in {"a", " "}:
-            repo_handle.switch_file_status(f, self.repo_path)
+            self.git.switch_file_status(f)
         elif key == "i":
-            self.double_check(repo_handle.ignore_file, f, msg=f"Ignore file")
+            self.double_check(self.git.ignore_file, f, msg=f"Ignore file")
         elif key == "d":
-            self.double_check(repo_handle.discard_file, f, msg=f"Discard file")
+            self.double_check(self.git.discard_file, f, msg=f"Discard file")
 
         self.fresh()
         self._render()
@@ -64,17 +71,16 @@ class StatusPanel(ItemSelector):
         self,
         callee: GitFuncT,
         file: GitFileT,
-        path: Optional[str] = None,
         msg: str = "",
     ):
         self.clear_items()
         self._render()
         if confirm(f"{msg} '{str(file)}'? [y/n]:"):
-            callee(file, path=path)
+            callee(file)
             self.forward()
 
 
-class BranchPanel(ItemSelector):
+class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "branch"
     CURSOR = "→"
 
@@ -88,9 +94,10 @@ class BranchPanel(ItemSelector):
         super().__init__(x, y, size, content)
 
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
+        self.git = repo_handle.bind_path(self.repo_path)
 
     def fresh(self):
-        self.branches = branches = repo_handle.load_branches()
+        self.branches = branches = self.git.load_branches()
         if not branches:
             return ["No status changed."]
 
@@ -101,7 +108,7 @@ class BranchPanel(ItemSelector):
             else:
                 processed_branches.append(f"  {branch.name}")
 
-        self.content = processed_branches
+        self.set_content(processed_branches)
 
     def on_key(self, key: str):
         if key == "j":
@@ -113,7 +120,7 @@ class BranchPanel(ItemSelector):
             if local_branch.is_head:
                 return
 
-            err = repo_handle.checkout_branch(local_branch.name)
+            err = self.git.checkout_branch(local_branch.name)
             if "error" in err:
                 print(err, sep="", flush=True)
                 sleep(2)
@@ -122,7 +129,7 @@ class BranchPanel(ItemSelector):
             self._render()
 
 
-class CommitPanel(ItemSelector):
+class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "commit"
     CURSOR = "→"
     BINDINGS = [
@@ -140,10 +147,11 @@ class CommitPanel(ItemSelector):
         super().__init__(x, y, size, content)
 
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
+        self.git = repo_handle.bind_path(self.repo_path)
 
     def fresh(self):
-        branch_name = repo_handle.get_head()
-        self.commits = commits = repo_handle.load_commits(branch_name)
+        branch_name = self.git.get_head()
+        self.commits = commits = self.git.load_commits(branch_name or "")
 
         if not commits:
             return ["No status changed."]
@@ -153,12 +161,12 @@ class CommitPanel(ItemSelector):
             state_flag = "   " if commit.is_pushed() else " ? "
             processed_commits.append(f"{state_flag}{commit.sha[:7]} {commit.msg}")
 
-        self.content = processed_commits
+        self.set_content(processed_commits)
 
     def on_key(self, key: str):
         if key == "enter":
             commit = self.commits[self.curr_no]
-            content = repo_handle.load_commit_info(commit.sha).split("\n")
+            content = self.git.load_commit_info(commit.sha).split("\n")
             self.emit("goto", target="display_panel", source=self.NAME, content=content)
 
 

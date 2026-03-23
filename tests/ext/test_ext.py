@@ -12,7 +12,7 @@ from pigit.ext.func import dynamic_default_attrs, time_it
 def test_doctest():
     import pigit.ext.utils
 
-    doctest.testmod(pigit.ext.utils, verbose=True)
+    doctest.testmod(pigit.ext.utils, verbose=False)
 
 
 def test_traceback_info():

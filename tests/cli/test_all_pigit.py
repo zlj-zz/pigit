@@ -1,8 +1,16 @@
 # -*- coding:utf-8 -*-
 import pytest
-from .utils import analyze_it
+from utils import analyze_it
 
+import pigit.entry as entry_mod
 from pigit.entry import pigit
+
+
+@pytest.fixture(autouse=True)
+def _ensure_pigit_context():
+    """Re-attach context: collection may import entry before test_context detach clears ContextVar."""
+    entry_mod.Context.install(entry_mod.ctx)
+    yield
 
 
 @pytest.mark.parametrize(
@@ -13,11 +21,10 @@ from pigit.entry import pigit
         "--information",  # git information
         "--count",  # code counter
         "cmd",
-        "cmd -s",
+        "cmd -l",
         "cmd -t",
-        "cmd -p branch",
+        "cmd -t Branch",
         "cmd ws",
-        "cmd -t",
         "repo ll",
     ],
 )

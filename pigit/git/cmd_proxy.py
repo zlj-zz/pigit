@@ -1,15 +1,18 @@
 # -*- coding:utf-8 -*-
 
+import logging
 import os
 import re
 import random
 import textwrap
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from pigit.ext.log import logger
 from pigit.ext.utils import confirm, similar_command, traceback_info
-from pigit.ext.executor import Executor, WAITING
-from ._cmds import Git_Proxy_Cmds, GitCommandType
+from pigit.ext.executor import WAITING
+from pigit.ext.executor_factory import ExecutorFactory
+from .cmd_builtin import Git_Proxy_Cmds
+from .define import GitCommandType
+from .cmd_catalog import iter_command_entries
 
 
 PROMPT_WITH_TIPS = 1  # Prompt for possible commands and try again
@@ -31,14 +34,25 @@ class GitProxy:
         self.prompt_type = prompt_type
         self.display = display
 
-        self.executor = Executor()
+        self.executor = ExecutorFactory.get()
+        self.log = logging.getLogger()
 
-        # Init commands.
-        self.cmds = Git_Proxy_Cmds
-        if extra_cmds:
+        # Init commands (copy base map so instances do not mutate Git_Proxy_Cmds).
+        self.cmds = dict(Git_Proxy_Cmds)
+        if extra_cmds is not None:
             if not isinstance(extra_cmds, dict):
-                raise TypeError("Custom cmds must be a dict.") from None
+                raise TypeError(
+                    "extra_cmds must be a dict or None, "
+                    f"not {type(extra_cmds).__name__}"
+                )
             self.cmds.update(extra_cmds)
+
+        self.extra_cmd_keys: frozenset = frozenset(
+            (extra_cmds or {}).keys()
+        )
+
+    def _is_extra_key(self, key: str) -> bool:
+        return key in self.extra_cmd_keys
 
     @staticmethod
     def color_command(command: str) -> str:
@@ -95,8 +109,10 @@ class GitProxy:
         if option is None:
             return (
                 1,
-                f"Don't support this command: `{short_cmd}`<error>, "
-                "please try `--show-commands`<gold>",
+                f"Don't support this command: `{short_cmd}`<error>. "
+                "Use `pigit cmd -l`<gold> for the full command table, or "
+                "`pigit cmd -s <query>` / `pigit cmd --search <query>`<gold> "
+                "to search by keyword. See `pigit cmd -h`<ok>.",
             )
 
         command = option.get("command")
@@ -189,10 +205,16 @@ class GitProxy:
 
         command_msg = "%*s%s" % (help_position, "", _command) if help_msg else _command
 
+        extra_prefix = "[extra] " if self._is_extra_key(key) else ""
         if use_color:
+            if extra_prefix:
+                return (
+                    f"  {extra_prefix}`{key:<11}`<ok>{help_msg}`{command_msg}`<gold>"
+                )
             return f"  `{key:<13}`<ok>{help_msg}`{command_msg}`<gold>"
-        else:
-            return f"  {key:<12} {_help}{command_msg}"
+        if extra_prefix:
+            return f"  {extra_prefix}{key:<11} {_help}{command_msg}"
+        return f"  {key:<12} {_help}{command_msg}"
 
     def get_help(self) -> str:
         """Get all help message."""
@@ -204,6 +226,25 @@ class GitProxy:
             msgs.append(msg)
 
         return "\n".join(msgs)
+
+    def search_commands(self, query: str) -> str:
+        """Return formatted help lines matching a case-insensitive substring query."""
+        q = (query or "").strip().lower()
+        if not q:
+            return ""
+        matches = [
+            e
+            for e in iter_command_entries(self.cmds, self.extra_cmd_keys)
+            if q in e.name.lower()
+            or q in e.help_text.lower()
+            or q in e.command_repr.lower()
+        ]
+        if not matches:
+            return ""
+        lines = [f"Matches for {query.strip()!r}:"]
+        for entry in matches:
+            lines.append(self.generate_help_by_key(entry.name))
+        return "\n".join(lines)
 
     def get_help_by_type(self, t: str) -> str:
         """Print a part of help message.
@@ -230,7 +271,8 @@ class GitProxy:
             else:
                 return (
                     "`There is no such type.`<error>\n"
-                    "Please use `--types`<ok> to view the supported types."
+                    "Run `pigit cmd -t`<ok> (or `pigit cmd --type`) "
+                    "to list supported types."
                 )
 
         # Get help.
@@ -259,7 +301,12 @@ class GitProxy:
 
             msgs.append(f"`{member.value}`<{color_str}>")
 
-        return " ".join(msgs)
+        body = " ".join(msgs)
+        return (
+            f"{body}\n"
+            "Use `pigit cmd -t <TYPE>`<ok> (example: `pigit cmd -t Branch`) "
+            "to list short commands for that type."
+        )
 
 
 def get_extra_cmds(name: str, path: str) -> Dict:
@@ -273,6 +320,7 @@ def get_extra_cmds(name: str, path: str) -> Dict:
     """
     import importlib.util
 
+    log = logging.getLogger()
     extra_cmds = {}
 
     if os.path.isfile(path):
@@ -287,11 +335,11 @@ def get_extra_cmds(name: str, path: str) -> Dict:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
         except Exception:
-            logger(__name__).error(traceback_info(f"Can't load file '{path}'."))
+            log.error(traceback_info(f"Can't load file '{path}'."))
         else:
             try:
                 extra_cmds = module.extra_cmds  # type: ignore
             except AttributeError:
-                logger(__name__).error("Can't found dict name is 'extra_cmds'.")
+                log.error("Can't found dict name is 'extra_cmds'.")
 
     return extra_cmds
