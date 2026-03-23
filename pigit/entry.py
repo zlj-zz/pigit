@@ -20,7 +20,7 @@ from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
-from .git import Git_Proxy_Cmds, create_gitignore
+from .git import builtin_cmds, create_gitignore
 from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
@@ -68,7 +68,7 @@ def pigit(args: "Namespace", _) -> None:
         # Generate completion vars dict.
         complete_vars = pigit.to_dict()
         complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in Git_Proxy_Cmds.items()}
+            {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
         )
 
         from .cmdparse.completion import shell_complete

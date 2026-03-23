@@ -660,7 +660,7 @@ _submodule_group: GitProxyOptionsGroup = {
     },
 }
 
-Git_Proxy_Cmds: GitProxyOptionsGroup = {
+builtin_cmds: GitProxyOptionsGroup = {
     **_branch_group,
     **_commit_group,
     **_conflict_group,

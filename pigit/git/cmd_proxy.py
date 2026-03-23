@@ -10,8 +10,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 from pigit.ext.utils import confirm, similar_command, traceback_info
 from pigit.ext.executor import WAITING
 from pigit.ext.executor_factory import ExecutorFactory
-from .cmd_builtin import Git_Proxy_Cmds
-from .define import GitCommandType
+from .cmd_builtin import builtin_cmds, GitCommandType
 from .cmd_catalog import iter_command_entries
 
 
@@ -38,7 +37,7 @@ class GitProxy:
         self.log = logging.getLogger()
 
         # Init commands (copy base map so instances do not mutate Git_Proxy_Cmds).
-        self.cmds = dict(Git_Proxy_Cmds)
+        self.cmds = dict(builtin_cmds)
         if extra_cmds is not None:
             if not isinstance(extra_cmds, dict):
                 raise TypeError(
