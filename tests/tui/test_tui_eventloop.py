@@ -1,5 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
+
+from pigit.termui.tui_input_bridge import TermuiInputBridge
 from pigit.tui.event_loop import EventLoop, ExitEventLoop
 from pigit.tui.input import InputTerminal, PosixInput
 
@@ -61,6 +63,13 @@ def test_init_input_handle(input_handle, expected_instance):
 
     # Assert
     assert isinstance(event_loop._input_handle, expected_instance)
+
+
+def test_init_use_termui_keyboard_uses_bridge_and_session_flag():
+    component = ComponentMock()
+    loop = EventLoop(component, input_takeover=True, use_termui_keyboard=True, alt=False)
+    assert isinstance(loop._input_handle, TermuiInputBridge)
+    assert loop._session_wrap is True
 
 
 @pytest.mark.parametrize(

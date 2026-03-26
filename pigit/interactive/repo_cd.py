@@ -14,7 +14,7 @@ from typing import Callable, Optional, Sequence, Tuple, TYPE_CHECKING
 from pigit.ext.executor import WAITING
 
 from .list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
-from .tty_primitives import read_char_raw, tty_ok
+from .tty_primitives import tty_ok
 
 if TYPE_CHECKING:
     from pigit.ext.executor import Executor
@@ -40,10 +40,11 @@ def run_repo_cd_picker(
     executor: "Executor",
     *,
     initial_filter: str = "",
-    read_char: Callable[[], str] = read_char_raw,
+    read_char: Optional[Callable[[], str]] = None,
     write: Callable[[str], None] = sys.stdout.write,
     flush: Callable[[], None] = sys.stdout.flush,
     read_line: Callable[[str], str] = lambda p: input(p),
+    pick_alt_screen: bool = False,
 ) -> Tuple[int, Optional[str]]:
     """
     Interactive repo directory picker; on confirm runs shell ``cd`` + ``exec $SHELL``.
@@ -83,6 +84,7 @@ def run_repo_cd_picker(
             write=write,
             flush=flush,
             read_line=read_line,
+            alt_screen=pick_alt_screen,
         )
     except KeyboardInterrupt:
         write("\n")

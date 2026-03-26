@@ -123,7 +123,7 @@ def _ensure_pigit_context():
 def test_entry_repo_cd_passes_pick_flag():
     with patch.object(entry_mod.ctx.repo, "cd_repo", return_value=(0, None)) as m:
         entry_mod.pigit("repo cd --pick".split())
-    m.assert_called_once_with(None, pick=True)
+    m.assert_called_once_with(None, pick=True, pick_alt_screen=False)
 
 
 @pytest.mark.parametrize("stdin_tty,stdout_tty", [(True, False), (False, True)])

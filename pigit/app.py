@@ -245,7 +245,11 @@ class App(EventLoop):
     ]
 
     def __init__(self) -> None:
-        super().__init__(PanelContainer(), input_takeover=True)
+        super().__init__(
+            PanelContainer(),
+            input_takeover=True,
+            use_termui_keyboard=True,
+        )
 
         self.set_input_timeouts(0.125)
 

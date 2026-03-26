@@ -2,9 +2,15 @@
 """
 Module: pigit/interactive/__init__.py
 Description: Public surface for TTY primitives, layout helpers, and list/repo pickers.
+
+Deprecated:
+    Import ``pigit.termui`` for new code. This package remains for one release cycle
+    as a compatibility shim; see CHANGELOG.
 Author: Project Team
 Date: 2026-03-23
 """
+
+from pigit.termui.deprecation import warn_package_deprecated
 
 from .layout import (
     PICKER_FOOTER_ROWS,
@@ -44,3 +50,11 @@ __all__ = [
     "truncate_line",
     "tty_ok",
 ]
+
+warn_package_deprecated(
+    key="pigit.interactive",
+    message=(
+        "pigit.interactive is deprecated; use pigit.termui for new code "
+        "(see CHANGELOG and docs/termui_testing.md)."
+    ),
+)

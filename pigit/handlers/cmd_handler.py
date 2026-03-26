@@ -99,7 +99,10 @@ class CmdHandler(BaseHandler):
             return
 
         if getattr(self.args, "cmd_pick", False):
-            code, out = run_command_picker(git_processor)
+            code, out = run_command_picker(
+                git_processor,
+                pick_alt_screen=getattr(self.args, "cmd_pick_alt_screen", False),
+            )
             if code != 0:
                 if out:
                     self.console.echo(out)

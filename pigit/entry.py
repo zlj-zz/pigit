@@ -223,6 +223,12 @@ tools_group.add_argument(
     help="Interactively pick and run a short command (requires a TTY).",
 )
 @argument(
+    "--pick-alt-screen",
+    action="store_true",
+    dest="cmd_pick_alt_screen",
+    help="Use the terminal alternate screen buffer for the picker (with --pick).",
+)
+@argument(
     "-t --type",
     nargs="?",
     const=CMD_TYPE_LIST_SENTINEL,
@@ -295,6 +301,12 @@ def repo_report(args, _):
     action="store_true",
     dest="repo_cd_pick",
     help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
+)
+@argument(
+    "--pick-alt-screen",
+    action="store_true",
+    dest="repo_cd_pick_alt_screen",
+    help="Use alternate screen for the repo picker (with --pick).",
 )
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):

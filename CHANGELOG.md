@@ -1,5 +1,10 @@
 # Changelog of pigit
 
+## 1.7.3 (2026-03-26)
+- **Unified term UI (`pigit.termui`)**: Session, Renderer, KeyboardInput (semantic keys), list picker on `Session` + `KeyboardInput`, optional `--pick-alt-screen` for `pigit cmd` / `pigit repo cd --pick`.
+- **Main TUI (`App`)**: `EventLoop(..., use_termui_keyboard=True)` runs inside `pigit.termui.session.Session` with `TermuiInputBridge` over `KeyboardInput` (legacy `PosixInput` remains the default for `EventLoop` when the flag is off).
+- **Deprecation (P3)**: Importing `pigit.interactive` emits a one-time `DeprecationWarning` directing new code to `pigit.termui`. The `pigit.tui` package is documented as legacy (no runtime warning) because `pigit.termui.text` still imports `pigit.tui.utils` for a single `get_width` / `plain` implementation.
+
 ## 1.7.2 (2026-03-23)
 - Update `.gitignore` template
 

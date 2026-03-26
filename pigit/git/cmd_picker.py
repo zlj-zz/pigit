@@ -13,7 +13,7 @@ import sys
 from typing import Callable, List, Optional, Tuple, TYPE_CHECKING
 
 from pigit.interactive.list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
-from pigit.interactive.tty_primitives import read_char_raw, read_line_cancellable, tty_ok
+from pigit.interactive.tty_primitives import read_line_cancellable, tty_ok
 
 from .cmd_catalog import CommandEntry, iter_command_entries
 
@@ -77,10 +77,11 @@ def _execute_command_entry(
 def run_command_picker(
     proxy: "GitProxy",
     *,
-    read_char: Callable[[], str] = read_char_raw,
+    read_char: Optional[Callable[[], str]] = None,
     write: Callable[[str], None] = sys.stdout.write,
     flush: Callable[[], None] = sys.stdout.flush,
     read_line: Callable[[str], str] = lambda p: input(p),
+    pick_alt_screen: bool = False,
 ) -> Tuple[int, Optional[str]]:
     """
     Interactive picker over ``proxy`` commands.
@@ -128,6 +129,7 @@ def run_command_picker(
             write=write,
             flush=flush,
             read_line=read_line,
+            alt_screen=pick_alt_screen,
         )
     except KeyboardInterrupt:
         write("\n")

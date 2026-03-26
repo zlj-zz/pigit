@@ -278,6 +278,7 @@ class ManagedRepos:
         repo: Optional[str] = None,
         *,
         pick: bool = False,
+        pick_alt_screen: bool = False,
     ) -> Tuple[int, Optional[str]]:
         """Quick jump to repo dir.
 
@@ -313,6 +314,7 @@ class ManagedRepos:
                 rows,
                 self.executor,
                 initial_filter=initial_filter,
+                pick_alt_screen=pick_alt_screen,
             )
 
         if repo is not None and repo in exist_repos:

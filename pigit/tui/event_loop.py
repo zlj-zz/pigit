@@ -21,6 +21,7 @@ class EventLoop(Term):
         input_handle: Optional["InputTerminal"] = None,
         real_time: bool = False,
         alt: bool = True,
+        use_termui_keyboard: bool = False,
     ) -> None:
         self._render = Render
 
@@ -29,13 +30,19 @@ class EventLoop(Term):
 
         # Init keyboard handle object.
         self._input_takeover = input_takeover
+        self._session_wrap = False
         if not input_handle:
-            # XXX: now not support windows.
-            from .input import PosixInput, is_mouse_event
+            if use_termui_keyboard:
+                from pigit.termui.tui_input_bridge import TermuiInputBridge
 
-            input_handle = PosixInput()
-            # adjust the input whether is a mouse event.
-            self.is_mouse_event = is_mouse_event
+                input_handle = TermuiInputBridge()
+                self._session_wrap = True
+            else:
+                # Legacy: full PosixInput (incl. mouse paths); Windows still weak here.
+                from .input import PosixInput, is_mouse_event
+
+                input_handle = PosixInput()
+                self.is_mouse_event = is_mouse_event
         self._input_handle = input_handle
 
         self._alt = alt
@@ -49,6 +56,12 @@ class EventLoop(Term):
         """The hook for user to define custom option after ready to start"""
 
     def start(self):
+        if self._session_wrap:
+            # Session already switched screen + termios; do not duplicate Term signals.
+            self.resize()
+            self.after_start()
+            return
+
         if self._alt:
             self.to_alt_screen()
 
@@ -59,6 +72,9 @@ class EventLoop(Term):
         self.after_start()
 
     def stop(self):
+        if self._session_wrap:
+            return
+
         if self._alt:
             self.to_normal_screen()
 
@@ -106,7 +122,7 @@ class EventLoop(Term):
             elif self._real_time:
                 self._child.render()
 
-    def run(self) -> None:
+    def _run_impl(self) -> None:
         try:
             self.start()
             self._loop()
@@ -116,6 +132,15 @@ class EventLoop(Term):
         except Exception as e:
             self.stop()
             print(e, e.__traceback__)
+
+    def run(self) -> None:
+        if self._session_wrap:
+            from pigit.termui.session import Session
+
+            with Session(alt_screen=self._alt):
+                self._run_impl()
+        else:
+            self._run_impl()
 
     def quit(self, msg: str = "Quit") -> None:
         raise ExitEventLoop(msg)
