@@ -1,7 +1,15 @@
-import re
-from functools import lru_cache
-from typing import List, Tuple, Pattern
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/termui/wcwidth_table.py
+Description: Display-width lookup table for terminal column counting (moved from legacy ``tui.utils``).
+Author: Project Team
+Date: 2026-03-27
+"""
 
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import List, Tuple
 
 WIDTHS: List[Tuple[int, int]] = [
     (126, 1),
@@ -47,16 +55,8 @@ WIDTHS: List[Tuple[int, int]] = [
 
 @lru_cache(maxsize=1024)
 def get_width(r: int) -> int:
-    """Gets the width occupied by characters on the command line."""
+    """Return the display width (columns) for a single Unicode code point."""
 
     if r in {0xE, 0xF}:
         return 0
     return next((wid for num, wid in WIDTHS if r <= num), 1)
-
-
-_STYLE_ANSI_RE: Pattern[str] = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m|\033\[\d+m")
-
-
-def plain(text: str):
-    """Remove color ansi code from text."""
-    return _STYLE_ANSI_RE.sub("", text)

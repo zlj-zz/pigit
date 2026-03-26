@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/interactive/tty_primitives.py
-Description: Low-level TTY helpers (cbreak, raw reads, escape sequences, viewport math).
+Module: pigit/termui/tty_io.py
+Description: Low-level TTY helpers for picker scenes (cbreak reads, escape sequences, viewport math).
 Author: Project Team
-Date: 2026-03-23
+Date: 2026-03-27
 """
 
 from __future__ import annotations

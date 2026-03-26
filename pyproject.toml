@@ -72,10 +72,9 @@ omit = [
     "*/pigit/config.py",
     "*/pigit/ext/lcstat.py",
     "*/pigit/app.py",
-    "*/pigit/tui/input.py",
-    "*/pigit/tui/components.py",
-    "*/pigit/tui/event_loop.py",
-    "*/pigit/tui/console.py",
+    "*/pigit/termui/legacy_input.py",
+    "*/pigit/termui/components.py",
+    "*/pigit/termui/event_loop.py",
 ]
 
 [tool.coverage.report]

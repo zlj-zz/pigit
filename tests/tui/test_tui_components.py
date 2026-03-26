@@ -1,5 +1,5 @@
 import pytest
-from pigit.tui.components import (
+from pigit.termui.components import (
     _NamespaceComp,
     Component,
     ComponentError,
@@ -8,7 +8,6 @@ from pigit.tui.components import (
     ItemSelector,
     LineTextBrowser,
 )
-from pigit.tui.console import Render
 
 
 # Mock Component to use in tests
@@ -117,17 +116,19 @@ class TestLineTextBrowser:
     ):
         _NamespaceComp.clear()
         # Arrange
-        mocker.patch("pigit.tui.components.Render.draw")
+        mock_renderer = mocker.MagicMock()
 
         # Act
-        browser = MockLineTextBrowser(x, y, size, content)
+        browser = MockLineTextBrowser(x, y, size, content, renderer=mock_renderer)
 
         # Assert
         assert browser.x == expected_position[0]
         assert browser.y == expected_position[1]
         if content:
             browser._render()
-            Render.draw.assert_called_with(expected_content, *expected_position, size)
+            mock_renderer.draw_panel.assert_called_with(
+                expected_content, *expected_position, size
+            )
 
     @pytest.mark.parametrize(
         "initial_size, new_size, expected_size",

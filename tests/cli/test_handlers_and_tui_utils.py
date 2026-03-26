@@ -209,7 +209,7 @@ def test_cmd_handler_type_list_sentinel(cmd_ctx):
 
 
 def test_tui_utils_get_width_and_plain():
-    from pigit.tui.utils import get_width, plain
+    from pigit.termui.text import get_width, plain
 
     assert get_width(0xE) == 0
     assert get_width(0xF) == 0

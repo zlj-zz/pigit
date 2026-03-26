@@ -2,8 +2,11 @@ import pytest
 from unittest.mock import Mock, patch
 
 from pigit.termui.tui_input_bridge import TermuiInputBridge
-from pigit.tui.event_loop import EventLoop, ExitEventLoop
-from pigit.tui.input import InputTerminal, PosixInput
+from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
+from pigit.termui.input_terminal import InputTerminal
+from pigit.termui.legacy_input import PosixInput
+
+EventLoop = AppEventLoop
 
 
 class ComponentMock:

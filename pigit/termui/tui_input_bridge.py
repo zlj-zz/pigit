@@ -10,14 +10,13 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from pigit.tui.input import InputTerminal
-
 from pigit.termui.input_keyboard import KeyboardInput
+from pigit.termui.input_terminal import InputTerminal
 
 
 class TermuiInputBridge(InputTerminal):
     """
-    Feed :class:`KeyboardInput` semantic keys into the legacy ``EventLoop`` / ``get_input`` API.
+    Feed :class:`KeyboardInput` semantic keys into :class:`~pigit.termui.event_loop.AppEventLoop` / ``get_input`` API.
 
     ``start()`` / ``stop()`` are no-ops: terminal attributes are owned by :class:`pigit.termui.session.Session`.
     """

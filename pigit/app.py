@@ -4,14 +4,14 @@ from typing import List, Optional, Tuple
 
 from .ext.utils import confirm
 from .git.repo import GitFileT, GitFuncT, Repo
-from .tui.components import (
+from .termui.components import (
     ActionLiteral,
     Container,
     GitPanelLazyResizeMixin,
     LineTextBrowser,
     ItemSelector,
 )
-from .tui.event_loop import EventLoop
+from .termui.event_loop import AppEventLoop
 
 
 _Log = logging.getLogger(f"PIGIT.{__name__}")
@@ -239,7 +239,7 @@ class PanelContainer(Container):
         super().__init__(children, start_name=status_panel.NAME, switch_handle=get_name)
 
 
-class App(EventLoop):
+class App(AppEventLoop):
     BINDINGS = [
         ("Q", "quit"),
     ]

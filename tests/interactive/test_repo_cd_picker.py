@@ -10,8 +10,8 @@ import pigit.entry as entry_mod
 
 from pigit.ext.executor import WAITING
 from pigit.git.managed_repos import ManagedRepos
-from pigit.interactive.list_picker import PickerRow
-from pigit.interactive.repo_cd import (
+from pigit.termui.scenes.list_picker import PickerRow
+from pigit.termui.scenes.repo_cd import (
     EMPTY_MANAGED_REPOS_MSG,
     REPO_CD_NO_TTY_MSG,
     run_repo_cd_picker,
@@ -38,7 +38,7 @@ def test_run_repo_cd_picker_empty_rows():
 def test_run_repo_cd_picker_no_tty():
     ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.interactive.repo_cd.tty_ok", return_value=False):
+    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=False):
         code, msg = run_repo_cd_picker(rows, ex)
     assert code == 1
     assert msg == REPO_CD_NO_TTY_MSG
@@ -48,7 +48,7 @@ def test_run_repo_cd_picker_no_tty():
 def test_run_repo_cd_picker_quit():
     ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.interactive.repo_cd.tty_ok", return_value=True):
+    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=True):
         code, msg = run_repo_cd_picker(
             rows,
             ex,
@@ -64,7 +64,7 @@ def test_run_repo_cd_picker_quit():
 def test_run_repo_cd_picker_confirm():
     ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.interactive.repo_cd.tty_ok", return_value=True):
+    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=True):
         code, msg = run_repo_cd_picker(
             rows,
             ex,

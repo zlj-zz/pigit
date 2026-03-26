@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/loop.py
-Description: Lightweight event loop helpers (P0: key echo for manual verification).
+Module: pigit/termui/key_echo.py
+Description: Debug helper: read semantic keys and echo them via a :class:`Renderer`.
 Author: Project Team
-Date: 2026-03-26
+Date: 2026-03-27
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def run_key_echo(
     max_ticks: Optional[int] = None,
 ) -> None:
     """
-    Read semantic keys and print them on the renderer (debug / P0 smoke).
+    Read semantic keys and print them on the renderer (debug / smoke).
 
     Stops when ``should_stop`` returns True, ``max_ticks`` is reached, or ``q`` / ``ctrl c``.
     """

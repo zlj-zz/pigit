@@ -1,8 +1,19 @@
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/termui/components.py
+Description: Git TUI component tree; drawing uses an injected :class:`~pigit.termui.render.Renderer`.
+Author: Project Team
+Date: 2026-03-27
+"""
+
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional, Tuple, Literal
+from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple
 
-from .console import Render, Cursor, Term
+if TYPE_CHECKING:
+    from pigit.termui.render import Renderer
 
 
 NONE_SIZE = (0, 0)
@@ -28,6 +39,7 @@ class Component(ABC):
         size: Optional[Tuple[int, int]] = None,
         children: Optional[Dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
+        renderer: Optional["Renderer"] = None,
     ) -> None:
         assert self.NAME, "The `NAME` attribute cannot be empty."
         assert (
@@ -42,6 +54,7 @@ class Component(ABC):
 
         self.parent = parent
         self.children = children
+        self._renderer = renderer
 
         self._event_map = {}
         if self.BINDINGS is not None:
@@ -144,8 +157,9 @@ class Container(Component):
         size: Optional[Tuple[int, int]] = None,
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
+        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, renderer=renderer)
 
         self.children = children
         for child in children.values():
@@ -231,8 +245,9 @@ class LineTextBrowser(Component):
         y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         content: Optional[List[str]] = None,
+        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, renderer=renderer)
 
         self._content = content
         self._max_line = self._size[1]
@@ -246,8 +261,8 @@ class LineTextBrowser(Component):
         super().resize(size)
 
     def _render(self, size: Optional[Tuple[int, int]] = None):
-        if self._content:
-            Render.draw(
+        if self._content and self._renderer is not None:
+            self._renderer.draw_panel(
                 self._content[self._i : self._i + self._max_line],
                 self.x,
                 self.y,
@@ -274,8 +289,9 @@ class ItemSelector(Component):
         y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         content: Optional[List[str]] = None,
+        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, renderer=renderer)
 
         if len(self.CURSOR) > 1:
             raise ComponentError("error")
@@ -312,7 +328,7 @@ class ItemSelector(Component):
         pass
 
     def _render(self, size: Optional[Tuple[int, int]] = None):
-        if not self.content:
+        if not self.content or self._renderer is None:
             return
 
         dis = []
@@ -322,7 +338,7 @@ class ItemSelector(Component):
             else:
                 dis.append(f" {item}")
 
-        Render.draw(dis, self.x, self.y, self._size)
+        self._renderer.draw_panel(dis, self.x, self.y, self._size)
 
     def next(self, step: int = 1):
         tmp_no = self.curr_no + step

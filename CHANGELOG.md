@@ -1,5 +1,15 @@
 # Changelog of pigit
 
+## 1.7.4 (2026-03-27)
+
+- **Breaking**: Removed legacy packages `pigit.tui` and `pigit.interactive`. Terminal UI lives under `pigit.termui` only.
+- **Migration**:
+  - `pigit.tui.components` / `pigit.tui.event_loop` → `pigit.termui.components` / `pigit.termui.event_loop` (class `EventLoop` renamed to `AppEventLoop`).
+  - `pigit.tui.utils` (`get_width`, `plain`) → `pigit.termui.text` (same symbols).
+  - `pigit.tui.input` → `pigit.termui.legacy_input` (`PosixInput` and helpers).
+  - `pigit.interactive.list_picker` / `repo_cd` / layout / tty helpers → `pigit.termui.scenes.list_picker`, `pigit.termui.scenes.repo_cd`, `pigit.termui.picker_layout`, `pigit.termui.tty_io`.
+- **Implementation**: `Renderer.draw_panel` replaces static `Render.draw`; `AppEventLoop` injects a single `Renderer` into the component tree. `get_width` / `plain` are implemented in `termui/text.py` + `termui/wcwidth_table.py`.
+
 ## 1.7.3 (2026-03-26)
 - **Unified term UI (`pigit.termui`)**: Session, Renderer, KeyboardInput (semantic keys), list picker on `Session` + `KeyboardInput`, optional `--pick-alt-screen` for `pigit cmd` / `pigit repo cd --pick`.
 - **Main TUI (`App`)**: `EventLoop(..., use_termui_keyboard=True)` runs inside `pigit.termui.session.Session` with `TermuiInputBridge` over `KeyboardInput` (legacy `PosixInput` remains the default for `EventLoop` when the flag is off).

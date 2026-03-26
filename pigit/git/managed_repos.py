@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
-from pigit.interactive.list_picker import PickerRow
-from pigit.interactive.repo_cd import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
+from pigit.termui.scenes.list_picker import PickerRow
+from pigit.termui.scenes.repo_cd import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
 
 
 def iter_managed_repo_names(repos: Dict[str, dict]) -> List[str]:

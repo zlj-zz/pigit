@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/interactive/repo_cd.py
+Module: pigit/termui/scenes/repo_cd.py
 Description: TTY picker for ``pigit repo cd --pick`` (no ManagedRepos import).
 Author: Project Team
-Date: 2026-03-23
+Date: 2026-03-27
 """
 
 from __future__ import annotations
 
 import sys
-from typing import Callable, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Tuple
 
 from pigit.ext.executor import WAITING
 
-from .list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
-from .tty_primitives import tty_ok
+from pigit.termui.scenes.list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
+from pigit.termui.tty_io import tty_ok
 
 if TYPE_CHECKING:
     from pigit.ext.executor import Executor

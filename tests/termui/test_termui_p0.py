@@ -10,15 +10,15 @@ from unittest import mock
 
 import pytest
 
-import pigit.tui.utils as tui_utils
 from pigit.termui import KeyboardInput, keys
 from pigit.termui import text as termui_text
 from pigit.termui.geometry import TerminalSize
+from pigit.termui import wcwidth_table
 
 
-def test_get_width_plain_are_single_source_with_tui_utils():
-    assert termui_text.get_width is tui_utils.get_width
-    assert termui_text.plain is tui_utils.plain
+def test_get_width_plain_are_single_source_with_wcwidth_table():
+    assert termui_text.get_width is wcwidth_table.get_width
+    assert "pigit.termui.text" in (termui_text.plain.__module__ or "")
 
 
 @pytest.mark.parametrize(

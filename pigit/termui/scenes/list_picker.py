@@ -12,13 +12,13 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence, Tuple
 
-from pigit.interactive.layout import (
+from pigit.termui.picker_layout import (
     filter_input_line,
     footer_status_line,
     picker_terminal_ok,
     picker_viewport,
 )
-from pigit.interactive.tty_primitives import (
+from pigit.termui.tty_io import (
     lone_esc_or_consume_sequence,
     terminal_size,
     truncate_line,

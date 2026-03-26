@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/interactive/layout.py
+Module: pigit/termui/picker_layout.py
 Description: Picker viewport math, pinned-row footer text, and visual truncation helpers.
 Author: Project Team
-Date: 2026-03-23
+Date: 2026-03-27
 """
 
 from __future__ import annotations
 
-from .tty_primitives import MIN_LIST_ROWS, truncate_line
+from pigit.termui.tty_io import MIN_LIST_ROWS, truncate_line
 
 PICKER_HEADER_ROWS = 3
 PICKER_FOOTER_ROWS = 2

@@ -12,8 +12,8 @@ import shlex
 import sys
 from typing import Callable, List, Optional, Tuple, TYPE_CHECKING
 
-from pigit.interactive.list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
-from pigit.interactive.tty_primitives import read_line_cancellable, tty_ok
+from pigit.termui.scenes.list_picker import PICK_EXIT_CTRL_C, PickerRow, run_list_picker
+from pigit.termui.tty_io import read_line_cancellable, tty_ok
 
 from .cmd_catalog import CommandEntry, iter_command_entries
 

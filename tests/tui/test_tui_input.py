@@ -3,11 +3,11 @@ import termios
 import pytest
 from unittest.mock import Mock, patch
 
-import pigit.tui
-from pigit.tui.input import (
-    PosixInput,
+import pigit.termui.legacy_input as legacy_input_mod
+from pigit.termui.legacy_input import (
     KeyQueueTrie,
     MoreInputRequired,
+    PosixInput,
     process_key_queue,
     process_one_code,
     set_byte_encoding,
@@ -36,18 +36,18 @@ def test_set_encoding(
     expected_target_encoding,
     mocker,
 ):
-    # Arrange
-    mocker.patch("pigit.tui.input.set_byte_encoding")
-    mocker.patch("pigit.tui.input._target_encoding", "ascii")
-    mocker.patch("pigit.tui.input._use_dec_special", True)
+    # Arrange (implementation module — ``pigit.tui.input`` is a thin re-export)
+    mocker.patch("pigit.termui.legacy_input.set_byte_encoding")
+    mocker.patch("pigit.termui.legacy_input._target_encoding", "ascii")
+    mocker.patch("pigit.termui.legacy_input._use_dec_special", True)
 
     # Act
     set_encoding(encoding)
 
     # Assert
-    pigit.tui.input.set_byte_encoding.assert_called_with(expected_byte_encoding)
-    assert pigit.tui.input._use_dec_special == expected_dec_special
-    assert pigit.tui.input._target_encoding == expected_target_encoding
+    legacy_input_mod.set_byte_encoding.assert_called_with(expected_byte_encoding)
+    assert legacy_input_mod._use_dec_special == expected_dec_special
+    assert legacy_input_mod._target_encoding == expected_target_encoding
 
 
 class TestKeyQueueTrie:
