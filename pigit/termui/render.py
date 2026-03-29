@@ -1,38 +1,29 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/termui/render.py
-Description: Session- or stdout-bound Renderer for ANSI drawing (1-based row/column).
+Description: Session-bound Renderer for ANSI drawing (1-based row/column).
 Author: Project Team
 Date: 2026-03-26
 """
 
 from __future__ import annotations
 
-import sys
-from typing import TYPE_CHECKING, List, Optional, Sequence, TextIO, Tuple, Union
+from typing import TYPE_CHECKING, List, Sequence, Tuple
 
 if TYPE_CHECKING:
     from pigit.termui.session import Session
-
-
-class _StdoutWrapper:
-    """Bind :class:`Renderer` to a :class:`~io.TextIO` stream without a live :class:`Session`."""
-
-    __slots__ = ("stdout",)
-
-    def __init__(self, stdout: TextIO) -> None:
-        self.stdout = stdout
 
 
 class Renderer:
     """
     All terminal painting for the Git TUI goes through this type.
 
-    ``draw_panel`` matches the legacy ``tui.console.Render.draw`` contract used by list views.
+    Instances are always tied to a live :class:`~pigit.termui.session.Session`
+    (``Session.renderer``).
     """
 
-    def __init__(self, sink: Union["Session", _StdoutWrapper]) -> None:
-        self._out = sink.stdout
+    def __init__(self, session: "Session") -> None:
+        self._out = session.stdout
 
     def write(self, text: str) -> None:
         self._out.write(text)
@@ -41,7 +32,7 @@ class Renderer:
         self._out.flush()
 
     def clear_screen(self) -> None:
-        # Same sequence as legacy Render.clear_screen: full clear then CUP (1,1).
+        # Full clear then CUP (1,1), aligned with historical full-screen Git TUI.
         self._out.write("\033[2J\033[0;0f")
         self.move_cursor(1, 1)
         self.flush()
@@ -61,9 +52,13 @@ class Renderer:
         self, lines: Sequence[str], row: int, col: int, width: int, height: int
     ) -> None:
         """
-        Fill a rectangular area with lines, clipping to ``width``/``height``.
+        Fill a rectangular area with lines, clipping to ``width`` / ``height``.
 
-        Prefer :meth:`draw_panel` for component tree drawing (matches old ``Render.draw``).
+        Use this for a fixed viewport: each line is truncated or padded to
+        ``width`` within ``height`` rows. Prefer :meth:`draw_panel` for block
+        regions that mirror the historical full-screen component contract (erase
+        full width per row, then paint content and blank trailing rows up to a
+        last row index).
         """
 
         cur = row
@@ -76,9 +71,17 @@ class Renderer:
 
     def draw_panel(self, content: List[str], x: int, y: int, size: Tuple[int, int]) -> None:
         """
-        Block draw compatible with legacy ``Render.draw`` (row ``x``, column ``y``, ``size`` = width + last row).
+        Draw a multi-line block in the style of the historical Git TUI ``Render.draw``.
 
-        For each row: move cursor, erase full width with spaces, write the line; then blank any remaining rows.
+        For each content row: move to ``(x + row_index, y)``, erase the full
+        logical width with spaces, then write the line. Rows from below the
+        content through ``size[1]`` (last row index) are blanked the same way.
+        ``size`` is ``(column_width, last_row_1_based)`` as in the legacy API.
+
+        Do not substitute :meth:`draw_block` here: ``draw_block`` clips to a
+        height/width window with ``ljust`` truncation; ``draw_panel`` erases
+        the full width per row and uses the second component of ``size`` as an
+        inclusive end row for blanking.
         """
 
         col_width, row_end = size
@@ -94,9 +97,3 @@ class Renderer:
             self._out.write(" " * col_width)
             cur_row += 1
         self.flush()
-
-
-def renderer_for_stdout(stdout: Optional[TextIO] = None) -> Renderer:
-    """Renderer for the non-session path (legacy ``PosixInput`` / tests)."""
-
-    return Renderer(_StdoutWrapper(stdout if stdout is not None else sys.stdout))

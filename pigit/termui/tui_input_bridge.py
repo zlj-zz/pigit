@@ -8,6 +8,7 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
+import math
 from typing import List, Optional, Tuple
 
 from pigit.termui.input_keyboard import KeyboardInput
@@ -33,8 +34,12 @@ class TermuiInputBridge(InputTerminal):
         return
 
     def set_input_timeouts(self, timeout: Optional[float]) -> None:
-        if timeout is not None:
-            self._timeout = float(timeout)
+        if timeout is None:
+            return
+        t = float(timeout)
+        if not math.isfinite(t) or t < 0:
+            raise ValueError("timeout must be a non-negative finite float")
+        self._timeout = t
 
     def get_input(
         self, raw_keys: bool = False

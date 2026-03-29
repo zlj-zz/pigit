@@ -1,10 +1,9 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from pigit.termui.tui_input_bridge import TermuiInputBridge
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 from pigit.termui.input_terminal import InputTerminal
-from pigit.termui.legacy_input import PosixInput
 
 EventLoop = AppEventLoop
 
@@ -21,83 +20,70 @@ class ComponentMock:
 
 
 @pytest.mark.parametrize(
-    "real_time, alt, expected_start_calls",
+    "real_time, alt",
     [
-        (True, True, "to_alt_screen"),  # ID: real_time-true_alt-true
-        (False, False, "to_normal_screen"),  # ID: real_time-false_alt-false
-        (True, False, None),  # ID: real_time-true_alt-false
-        (False, True, "to_alt_screen"),  # ID: real_time-false_alt-true
+        (True, True),
+        (False, False),
+        (True, False),
+        (False, True),
     ],
 )
-def test_start_stop(real_time, alt, expected_start_calls):
-    # Arrange
+def test_start_stop_does_not_toggle_alt_outside_session(real_time, alt):
+    """Alternate screen is applied inside ``Session`` in ``run()``, not in ``start()``."""
+
     component = ComponentMock()
     event_loop = EventLoop(component, real_time=real_time, alt=alt)
     with patch.object(EventLoop, "to_alt_screen") as mock_to_alt_screen, patch.object(
         EventLoop, "to_normal_screen"
     ) as mock_to_normal_screen:
 
-        # Act
         event_loop.start()
         event_loop.stop()
 
-        # Assert
-        if expected_start_calls == "to_alt_screen":
-            mock_to_alt_screen.assert_called_once()
-            mock_to_normal_screen.assert_called_once()
-        else:
-            mock_to_alt_screen.assert_not_called()
-            mock_to_normal_screen.assert_not_called()
+        mock_to_alt_screen.assert_not_called()
+        mock_to_normal_screen.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "input_handle, expected_instance",
-    [
-        (None, PosixInput),  # ID: input_handle-none
-        (Mock(spec=InputTerminal), InputTerminal),  # ID: input_handle-mock
-    ],
-)
-def test_init_input_handle(input_handle, expected_instance):
-    # Arrange
+def test_init_default_input_is_termui_bridge():
     component = ComponentMock()
-
-    # Act
-    event_loop = EventLoop(component, input_handle=input_handle, alt=False)
-
-    # Assert
-    assert isinstance(event_loop._input_handle, expected_instance)
-
-
-def test_init_use_termui_keyboard_uses_bridge_and_session_flag():
-    component = ComponentMock()
-    loop = EventLoop(component, input_takeover=True, use_termui_keyboard=True, alt=False)
+    loop = EventLoop(component, alt=False)
     assert isinstance(loop._input_handle, TermuiInputBridge)
-    assert loop._session_wrap is True
+
+
+def test_init_respects_injected_input_handle():
+    component = ComponentMock()
+    mock_handle = Mock(spec=InputTerminal)
+    loop = EventLoop(component, input_handle=mock_handle, alt=False)
+    assert loop._input_handle is mock_handle
 
 
 @pytest.mark.parametrize(
     "exception, expected_stop_calls",
     [
-        (ExitEventLoop, 1),  # ID: exception-ExitEventLoop
-        (KeyboardInterrupt, 1),  # ID: exception-KeyboardInterrupt
-        (EOFError, 1),  # ID: exception-EOFError
-        (Exception, 1),  # ID: exception-Other
+        (ExitEventLoop, 1),
+        (KeyboardInterrupt, 1),
+        (EOFError, 1),
+        (Exception, 1),
     ],
 )
-def test_run_exception_handling(exception, expected_stop_calls):
-    # Arrange
-    print("eeeexcepiton:", exception)
+@patch("pigit.termui.event_loop.Session")
+def test_run_exception_handling(mock_session_cls, exception, expected_stop_calls):
+    session_cm = MagicMock()
+    session_inner = MagicMock()
+    session_inner.renderer = MagicMock()
+    session_cm.__enter__.return_value = session_inner
+    session_cm.__exit__.return_value = None
+    mock_session_cls.return_value = session_cm
+
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop._loop = Mock(side_effect=exception())
     event_loop.start = Mock()
     event_loop.stop = Mock()
 
-    # Act
     with pytest.raises(exception):
         event_loop._loop()
 
-    # Assert
     event_loop.run()
     assert event_loop.stop.call_count == expected_stop_calls
 
@@ -105,40 +91,34 @@ def test_run_exception_handling(exception, expected_stop_calls):
 @pytest.mark.parametrize(
     "size, expected_resize_calls",
     [
-        ((80, 24), 1),  # ID: size-80x24
-        ((100, 40), 1),  # ID: size-100x40
+        ((80, 24), 1),
+        ((100, 40), 1),
     ],
 )
 def test_resize(size, expected_resize_calls):
-    # Arrange
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop.get_term_size = Mock(return_value=size)
     event_loop._child.resize = Mock()
 
-    # Act
     event_loop.resize()
 
-    # Assert
     event_loop._child.resize.assert_called_once_with(size)
 
 
 @pytest.mark.parametrize(
     "timeout, expected_set_timeout_calls",
     [
-        (0.1, 1),  # ID: timeout-0.1
-        (1.0, 1),  # ID: timeout-1.0
-        (5.0, 1),  # ID: timeout-5.0
+        (0.1, 1),
+        (1.0, 1),
+        (5.0, 1),
     ],
 )
 def test_set_input_timeouts(timeout, expected_set_timeout_calls):
-    # Arrange
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop._input_handle.set_input_timeouts = Mock()
 
-    # Act
     event_loop.set_input_timeouts(timeout)
 
-    # Assert
     event_loop._input_handle.set_input_timeouts.assert_called_once_with(timeout)

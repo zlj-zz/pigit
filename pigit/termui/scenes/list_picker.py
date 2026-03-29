@@ -47,8 +47,13 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> List[PickerRo
     return [r for r in rows if q in r.title.lower() or q in (r.detail or "").lower()]
 
 
-def _legacy_char_to_semantic(ch: str) -> str:
-    """Map one raw TTY character to a semantic key (KeyboardInput-compatible)."""
+def _raw_tty_char_to_semantic(ch: str) -> str:
+    """
+    Map one raw TTY character to a semantic key string.
+
+    Aligns with :meth:`KeyboardInput.read_keys` for ASCII and common controls
+    (used when tests inject ``read_char`` instead of ``KeyboardInput``).
+    """
 
     if ch in ("\r", "\n"):
         return "enter"
@@ -205,7 +210,7 @@ def _run_list_picker_impl(
                 if lone_esc_or_consume_sequence():
                     return "esc"
                 continue
-            return _legacy_char_to_semantic(ch)
+            return _raw_tty_char_to_semantic(ch)
 
     def _sync_scroll(viewport: int) -> None:
         nonlocal scroll_offset

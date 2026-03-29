@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/termui/event_loop.py
-Description: Full-screen TUI main loop (``AppEventLoop``); pairs with :class:`~pigit.termui.session.Session` when using ``KeyboardInput``.
+Description: Full-screen TUI main loop (``AppEventLoop``); runs inside :class:`~pigit.termui.session.Session`.
 Author: Project Team
 Date: 2026-03-27
 """
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from pigit.termui.components import Component
-from pigit.termui.render import Renderer, renderer_for_stdout
+from pigit.termui.keys import is_mouse_event
+from pigit.termui.render import Renderer
+from pigit.termui.session import Session
 
 if TYPE_CHECKING:
     from pigit.termui.input_terminal import InputTerminal
@@ -26,8 +27,10 @@ class AppEventLoop:
     """
     Application-level keyboard loop over a component tree.
 
-    ``_renderer`` is the single drawing surface: created from :class:`~pigit.termui.session.Session`
-    when ``use_termui_keyboard=True``, else bound to ``sys.stdout`` for legacy ``PosixInput`` runs.
+    ``run()`` always enters :class:`~pigit.termui.session.Session` and binds
+    ``session.renderer`` to the whole component tree. When ``input_handle`` is
+    omitted, a :class:`~pigit.termui.tui_input_bridge.TermuiInputBridge` over
+    :class:`~pigit.termui.input_keyboard.KeyboardInput` is used.
     """
 
     BINDINGS: Optional[List[Tuple[str, str]]] = None
@@ -39,7 +42,6 @@ class AppEventLoop:
         input_handle: Optional["InputTerminal"] = None,
         real_time: bool = False,
         alt: bool = True,
-        use_termui_keyboard: bool = False,
     ) -> None:
         self._renderer: Optional[Renderer] = None
 
@@ -47,18 +49,11 @@ class AppEventLoop:
         self._real_time = real_time
 
         self._input_takeover = input_takeover
-        self._session_wrap = False
-        if not input_handle:
-            if use_termui_keyboard:
-                from pigit.termui.tui_input_bridge import TermuiInputBridge
 
-                input_handle = TermuiInputBridge()
-                self._session_wrap = True
-            else:
-                from pigit.termui.legacy_input import PosixInput, is_mouse_event
+        if input_handle is None:
+            from pigit.termui.tui_input_bridge import TermuiInputBridge
 
-                input_handle = PosixInput()
-                self.is_mouse_event = is_mouse_event
+            input_handle = TermuiInputBridge()
         self._input_handle = input_handle
 
         self._alt = alt
@@ -103,29 +98,13 @@ class AppEventLoop:
         return get_terminal_size()
 
     def start(self):
-        if self._session_wrap:
-            self.resize()
-            self.after_start()
-            return
-
-        if self._alt:
-            self.to_alt_screen()
-
-        if self._input_takeover and self._input_handle is not None:
-            self._input_handle.start()
+        """Prepare layout; alternate screen and termios are owned by :class:`Session` inside ``run()``."""
 
         self.resize()
         self.after_start()
 
     def stop(self):
-        if self._session_wrap:
-            return
-
-        if self._alt:
-            self.to_normal_screen()
-
-        if self._input_takeover and self._input_handle is not None:
-            self._input_handle.stop()
+        """Terminal restoration is performed by :class:`Session` when ``run()`` exits."""
 
     def __enter__(self):
         self.start()
@@ -150,20 +129,21 @@ class AppEventLoop:
 
     def _loop(self) -> None:
         while True:
-            if (input_key := self._input_handle.get_input()) and input_key[0]:
-                first_one: str = input_key[0][0]
+            input_key = self._input_handle.get_input()
+            if input_key and input_key[0]:
+                first = input_key[0][0]
+                if isinstance(first, str):
+                    tg_name = self._event_map.get(first)
+                    tg_fn = None if tg_name is None else getattr(self, tg_name, None)
 
-                tg_name = self._event_map.get(first_one)
-                tg_fn = None if tg_name is None else getattr(self, tg_name, None)
-
-                if callable(tg_fn):
-                    tg_fn()
-                elif first_one == "window resize":
-                    self.resize()
-                elif hasattr(self, "is_mouse_event") and self.is_mouse_event(first_one):
+                    if callable(tg_fn):
+                        tg_fn()
+                    elif first == "window resize":
+                        self.resize()
+                    else:
+                        self._child._handle_event(first)
+                elif is_mouse_event(first):
                     pass
-                else:
-                    self._child._handle_event(first_one)
             elif self._real_time:
                 self._child._render()
 
@@ -179,16 +159,9 @@ class AppEventLoop:
             print(e, e.__traceback__)
 
     def run(self) -> None:
-        if self._session_wrap:
-            from pigit.termui.session import Session
-
-            with Session(alt_screen=self._alt) as session:
-                self._renderer = session.renderer
-                self._bind_renderer_tree(self._child, session.renderer)
-                self._run_impl()
-        else:
-            self._renderer = renderer_for_stdout(sys.stdout)
-            self._bind_renderer_tree(self._child, self._renderer)
+        with Session(alt_screen=self._alt) as session:
+            self._renderer = session.renderer
+            self._bind_renderer_tree(self._child, session.renderer)
             self._run_impl()
 
     def quit(self, msg: str = "Quit") -> None:

@@ -72,7 +72,6 @@ omit = [
     "*/pigit/config.py",
     "*/pigit/ext/lcstat.py",
     "*/pigit/app.py",
-    "*/pigit/termui/legacy_input.py",
     "*/pigit/termui/components.py",
     "*/pigit/termui/event_loop.py",
 ]

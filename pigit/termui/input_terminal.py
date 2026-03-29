@@ -19,7 +19,7 @@ class InputTerminal:
     """
     Minimal terminal-input surface for ``tty_signal_keys`` and subclass lifecycle.
 
-    ``TermuiInputBridge`` and ``PosixInput`` extend this type; ``get_input`` is defined on subclasses.
+    ``TermuiInputBridge`` and custom injected drivers extend this type; ``get_input`` is defined on subclasses.
     """
 
     def __init__(self) -> None:

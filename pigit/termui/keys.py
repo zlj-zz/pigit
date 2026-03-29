@@ -94,3 +94,19 @@ WIN_EXT_TO_SEMANTIC: Dict[bytes, str] = {
     b"\x00K": KEY_LEFT,
     b"\x00M": KEY_RIGHT,
 }
+
+
+def is_mouse_event(ev: object) -> bool:
+    """
+    Return True if ``ev`` is a legacy 4-tuple mouse event from a custom
+    :class:`~pigit.termui.input_terminal.InputTerminal`.
+
+    ``KeyboardInput`` / :class:`~pigit.termui.tui_input_bridge.TermuiInputBridge`
+    emit semantic strings only; tuple events are optional for injected terminals
+    that still mirror the old Urwid-style mouse shape.
+    """
+
+    if not isinstance(ev, tuple) or len(ev) != 4:
+        return False
+    head = ev[0]
+    return isinstance(head, str) and "mouse" in head

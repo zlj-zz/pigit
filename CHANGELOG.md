@@ -1,5 +1,11 @@
 # Changelog of pigit
 
+## 1.7.5 (2026-03-29)
+
+- **Breaking (internal TUI)**: `AppEventLoop` always runs inside `pigit.termui.session.Session` with `TermuiInputBridge` + `KeyboardInput` when `input_handle` is omitted. Removed `use_termui_keyboard`, default `PosixInput` / `pigit.termui.legacy_input`, and the non-session `renderer_for_stdout` path.
+- **Extensions**: Custom `InputTerminal` implementations may still emit legacy 4-tuple mouse events; they are ignored via `pigit.termui.keys.is_mouse_event` (same shape as before). String semantic keys remain the supported contract for `KeyboardInput` / `TermuiInputBridge`.
+- **Other**: `Renderer` is only constructed from a live `Session`; `TermuiInputBridge.set_input_timeouts` rejects non-finite or negative values. List picker test hook mapping renamed to `_raw_tty_char_to_semantic`.
+
 ## 1.7.4 (2026-03-27)
 
 - **Breaking**: Removed legacy packages `pigit.tui` and `pigit.interactive`. Terminal UI lives under `pigit.termui` only.

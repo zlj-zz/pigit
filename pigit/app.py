@@ -50,9 +50,9 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         f = self.files[self.curr_no]
 
         if key == "enter":
-            c = self.git.load_file_diff(
-                f.name, f.tracked, f.has_staged_change
-            ).split("\n")
+            c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split(
+                "\n"
+            )
             self.emit(
                 "goto", target="display_panel", source=self.NAME, key=f.name, content=c
             )
@@ -248,7 +248,6 @@ class App(AppEventLoop):
         super().__init__(
             PanelContainer(),
             input_takeover=True,
-            use_termui_keyboard=True,
         )
 
         self.set_input_timeouts(0.125)
