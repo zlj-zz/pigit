@@ -3,13 +3,15 @@
 Module: pigit/termui/event_loop.py
 Description: Full-screen TUI main loop (``AppEventLoop``); runs inside :class:`~pigit.termui.session.Session`.
 Author: Project Team
-Date: 2026-03-27
+Date: 2026-03-29
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Tuple
+import logging
+from typing import TYPE_CHECKING, Literal, Optional
 
+from pigit.termui.bindings import BindingsList, resolve_key_handlers
 from pigit.termui.components import Component
 from pigit.termui.keys import is_mouse_event
 from pigit.termui.render import Renderer
@@ -17,6 +19,9 @@ from pigit.termui.session import Session
 
 if TYPE_CHECKING:
     from pigit.termui.input_terminal import InputTerminal
+
+
+KeyDispatchOutcome = Literal["binding", "resize", "child"]
 
 
 class ExitEventLoop(Exception):
@@ -33,7 +38,7 @@ class AppEventLoop:
     :class:`~pigit.termui.input_keyboard.KeyboardInput` is used.
     """
 
-    BINDINGS: Optional[List[Tuple[str, str]]] = None
+    BINDINGS: Optional[BindingsList] = None
 
     def __init__(
         self,
@@ -58,10 +63,7 @@ class AppEventLoop:
 
         self._alt = alt
 
-        self._event_map = {}
-        if self.BINDINGS is not None:
-            for ev in self.BINDINGS:
-                self._event_map[ev[0]] = ev[1]
+        self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
 
     def _bind_renderer_tree(self, component: Component, renderer: Renderer) -> None:
         """Attach one shared :class:`Renderer` to the whole component tree."""
@@ -76,17 +78,11 @@ class AppEventLoop:
     def after_start(self):
         """Hook invoked after the loop is ready (subclasses may override)."""
 
-    def to_alt_screen(self) -> None:
-        if self._renderer is None:
-            return
-        self._renderer.write("\033[?1049h\033[?25l")
-        self._renderer.flush()
+    def before_dispatch_key(self, key: str) -> None:
+        """Hook before dispatching a string semantic key (subclasses may override)."""
 
-    def to_normal_screen(self) -> None:
-        if self._renderer is None:
-            return
-        self._renderer.write("\033[?1049l\033[?25h")
-        self._renderer.flush()
+    def after_dispatch_key(self, key: str, outcome: KeyDispatchOutcome) -> None:
+        """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
     def clear_screen(self) -> None:
         if self._renderer is not None:
@@ -133,17 +129,22 @@ class AppEventLoop:
             if input_key and input_key[0]:
                 first = input_key[0][0]
                 if isinstance(first, str):
-                    tg_name = self._event_map.get(first)
-                    tg_fn = None if tg_name is None else getattr(self, tg_name, None)
-
-                    if callable(tg_fn):
-                        tg_fn()
+                    self.before_dispatch_key(first)
+                    handler = self._key_handlers.get(first)
+                    if handler is not None:
+                        handler()
+                        outcome: KeyDispatchOutcome = "binding"
                     elif first == "window resize":
                         self.resize()
+                        outcome = "resize"
                     else:
                         self._child._handle_event(first)
-                elif is_mouse_event(first):
-                    pass
+                        outcome = "child"
+                    self.after_dispatch_key(first, outcome)
+                    continue
+                if is_mouse_event(first):
+                    continue
+                continue
             elif self._real_time:
                 self._child._render()
 
@@ -151,12 +152,16 @@ class AppEventLoop:
         try:
             self.start()
             self._loop()
-        except (ExitEventLoop, KeyboardInterrupt, EOFError) as e:
+        except ExitEventLoop as e:
             self.stop()
-            print(e, e.__traceback__)
+            logging.getLogger().debug("AppEventLoop exit: %s", e)
+        except (KeyboardInterrupt, EOFError):
+            self.stop()
         except Exception as e:
             self.stop()
-            print(e, e.__traceback__)
+            logging.getLogger().exception(
+                "AppEventLoop: unhandled exception in main loop: %s", e
+            )
 
     def run(self) -> None:
         with Session(alt_screen=self._alt) as session:

@@ -12,16 +12,17 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple
 
+from pigit.termui.bindings import BindingsList, resolve_key_handlers
+
 if TYPE_CHECKING:
     from pigit.termui.render import Renderer
 
 
 NONE_SIZE = (0, 0)
 
-_Log = logging.getLogger(f"PIGIT.{__name__}")
-_NamespaceComp = set()  # Global attr to save component name.
 
 ActionLiteral = Literal["goto"]
+KeyRouting = Literal["child_first", "switch_first"]
 
 
 class ComponentError(Exception):
@@ -30,7 +31,7 @@ class ComponentError(Exception):
 
 class Component(ABC):
     NAME: str = ""
-    BINDINGS: Optional[List[Tuple[str, str]]] = None
+    BINDINGS: Optional[BindingsList] = None
 
     def __init__(
         self,
@@ -42,10 +43,6 @@ class Component(ABC):
         renderer: Optional["Renderer"] = None,
     ) -> None:
         assert self.NAME, "The `NAME` attribute cannot be empty."
-        assert (
-            self.NAME not in _NamespaceComp
-        ), f"The `NAME` attribute must be unique: '{self.NAME}'."
-        _NamespaceComp.add(self.NAME)
 
         self._activated = False  # component whether activated state.
 
@@ -56,10 +53,7 @@ class Component(ABC):
         self.children = children
         self._renderer = renderer
 
-        self._event_map = {}
-        if self.BINDINGS is not None:
-            for b in self.BINDINGS:
-                self._event_map[b[0]] = b[1]
+        self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
 
     def activate(self):
         self._activated = True
@@ -135,11 +129,9 @@ class Component(ABC):
         If want to custom handle, instance function `on_key(str)` in sub-class.
         Or instance attribute `BINDINGS` in sub-class. Support effectiveness both.
         """
-        tg_name = self._event_map.get(key)
-        if tg_name is not None:
-            tg_fn = getattr(self, tg_name, None)
-            if tg_fn is not None and callable(tg_fn):
-                tg_fn()
+        handler = self._key_handlers.get(key)
+        if handler is not None:
+            handler()
 
         on_key = getattr(self, "on_key", None)
         if on_key is not None and callable(on_key):
@@ -157,6 +149,7 @@ class Container(Component):
         size: Optional[Tuple[int, int]] = None,
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
+        key_routing: KeyRouting = "child_first",
         renderer: Optional["Renderer"] = None,
     ) -> None:
         super().__init__(x, y, size, renderer=renderer)
@@ -166,6 +159,7 @@ class Container(Component):
             child.parent = self
 
         self.switch_handle = switch_handle
+        self._key_routing = key_routing
 
         self.name = start_name or "main"
         if self.name not in children:
@@ -184,7 +178,7 @@ class Container(Component):
             if child := self.switch_child(name):  # switch and fetch next child.
                 child.update(action, **data)
             else:
-                _Log.warning(f"Not found child: {name}.")
+                logging.getLogger().warning(f"Not found child: {name}.")
         else:
             raise ComponentError("Not support action of ~Container.")
 
@@ -198,15 +192,23 @@ class Container(Component):
                 break
 
     def _handle_event(self, key: str):
-        # The input will be transparently passed to the
-        # child component for processing.
+        """Route ``key`` to the active child, then optionally switch tabs.
+
+        With ``key_routing="child_first"`` (default), the active child receives
+        the key first; ``switch_handle`` / ``switch_child`` run afterward (same
+        as historical behavior). With ``key_routing="switch_first"``, tab
+        switching runs first when ``switch_handle`` is set, then the (possibly
+        new) active child receives the key.
+        """
+        if self._key_routing == "switch_first" and self.switch_handle:
+            self.switch_child(self.switch_handle(key))
+
         for component in self.children.values():
             if component.is_activated():
                 component._handle_event(key)
 
-        if self.switch_handle:
-            name = self.switch_handle(key)
-            self.switch_child(name)
+        if self._key_routing == "child_first" and self.switch_handle:
+            self.switch_child(self.switch_handle(key))
 
     def switch_child(self, name: str) -> Optional[Component]:
         """Activate ``name`` if present, refresh it, then render.
@@ -295,11 +297,6 @@ class ItemSelector(Component):
 
         if len(self.CURSOR) > 1:
             raise ComponentError("error")
-
-        self.event_map = {}
-        if self.BINDINGS is not None:
-            for b in self.BINDINGS:
-                self.event_map[b[0]] = b[1]
 
         self.content = content or [""]
         self.content_len = len(self.content) - 1

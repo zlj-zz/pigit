@@ -1,8 +1,16 @@
 # Changelog of pigit
 
+## 1.7.6 (2026-03-29)
+
+- **Internal TUI** (`docs/technical_termui_event_loop_components_phase1.md`): Centralized `BINDINGS` resolution in `pigit.termui.bindings.resolve_key_handlers`; `Component` and `AppEventLoop` store `Dict[str, Callable]` as `_key_handlers` (construction-time errors for bad string targets). `ItemSelector` no longer duplicates a separate `event_map`.
+- **Internal**: Removed process-wide `NAME` uniqueness (`_NamespaceComp`); `NAME` remains required and non-empty; routing stays keyed by `Container.children` and `emit("goto", ...)`.
+- **`AppEventLoop`**: Optional hooks `before_dispatch_key` / `after_dispatch_key` with `KeyDispatchOutcome` (`"binding"` | `"resize"` | `"child"`) on string-key dispatch only; default `PanelContainer` behavior unchanged (`Container.key_routing="child_first"`).
+- **Tests**: `tests/tui/test_termui_bindings.py`; extended event-loop and container coverage for hooks, callable bindings, and `key_routing`.
+
 ## 1.7.5 (2026-03-29)
 
 - **Breaking (internal TUI)**: `AppEventLoop` always runs inside `pigit.termui.session.Session` with `TermuiInputBridge` + `KeyboardInput` when `input_handle` is omitted. Removed `use_termui_keyboard`, default `PosixInput` / `pigit.termui.legacy_input`, and the non-session `renderer_for_stdout` path.
+- **Internal**: `AppEventLoop._run_impl` uses `logging` (`PIGIT.pigit.termui.event_loop`): `ExitEventLoop` → debug line; `KeyboardInterrupt` / `EOFError` silent after `stop()`; other exceptions → `logging.exception` (no stdout traceback prints).
 - **Extensions**: Custom `InputTerminal` implementations may still emit legacy 4-tuple mouse events; they are ignored via `pigit.termui.keys.is_mouse_event` (same shape as before). String semantic keys remain the supported contract for `KeyboardInput` / `TermuiInputBridge`.
 - **Other**: `Renderer` is only constructed from a live `Session`; `TermuiInputBridge.set_input_timeouts` rejects non-finite or negative values. List picker test hook mapping renamed to `_raw_tty_char_to_semantic`.
 

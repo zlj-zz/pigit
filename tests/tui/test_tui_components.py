@@ -1,6 +1,5 @@
 import pytest
 from pigit.termui.components import (
-    _NamespaceComp,
     Component,
     ComponentError,
     Container,
@@ -36,6 +35,66 @@ class MockContainer(Container):
 
 
 class TestContainer:
+    def test_duplicate_component_name_allowed(self):
+        a = MockComponent("dup")
+        b = MockComponent("dup")
+        assert a.NAME == "dup"
+        assert b.NAME == "dup"
+
+    def test_container_key_routing_switch_first_vs_child_first(self):
+        received: list = []
+
+        class RecordingChild(Component):
+            NAME = "rc"
+
+            def __init__(self, label: str) -> None:
+                self._label = label
+                super().__init__()
+
+            def _handle_event(self, key: str) -> None:
+                received.append((self._label, key))
+
+            def _render(self) -> None:
+                pass
+
+            def resize(self, size) -> None:
+                pass
+
+        class RoutingContainer(Container):
+            NAME = "routing-c"
+
+            def update(self, action: str, **data) -> None:
+                pass
+
+        def switch_tab(key: str) -> str:
+            return "secondary" if key == "2" else ""
+
+        main = RecordingChild("main")
+        secondary = RecordingChild("secondary")
+        children = {"main": main, "secondary": secondary}
+
+        switch_first = RoutingContainer(
+            children=dict(children),
+            start_name="main",
+            switch_handle=switch_tab,
+            key_routing="switch_first",
+        )
+        received.clear()
+        switch_first._handle_event("2")
+        assert received == [("secondary", "2")]
+
+        main2 = RecordingChild("main")
+        sec2 = RecordingChild("secondary")
+        child_first = RoutingContainer(
+            children={"main": main2, "secondary": sec2},
+            start_name="main",
+            switch_handle=switch_tab,
+            key_routing="child_first",
+        )
+        received.clear()
+        child_first._handle_event("2")
+        assert received == [("main", "2")]
+
     @pytest.mark.parametrize(
         "start_name, switch_key, expected_active",
         [
@@ -47,7 +106,6 @@ class TestContainer:
     )
     def test_container_init_and_switch(self, start_name, switch_key, expected_active):
         # Arrange
-        _NamespaceComp.clear()
         children = {
             "main": MockComponent("main"),
             "secondary": MockComponent("secondary"),
@@ -75,7 +133,6 @@ class TestContainer:
     )
     def test_container_accept_errors(self, action, data, expected_exception):
         # Arrange
-        _NamespaceComp.clear()
         children = {"main": MockComponent("main")}
         container = MockContainer(children=children)
 
@@ -114,7 +171,6 @@ class TestLineTextBrowser:
     def test_LineTextBrowser_init(
         self, mocker, x, y, size, content, expected_position, expected_content
     ):
-        _NamespaceComp.clear()
         # Arrange
         mock_renderer = mocker.MagicMock()
 
@@ -139,7 +195,6 @@ class TestLineTextBrowser:
     )
     def test_resize(self, mocker, initial_size, new_size, expected_size):
         # Arrange
-        _NamespaceComp.clear()
         browser = MockLineTextBrowser(size=initial_size)
         mocker.patch.object(browser, "fresh")
 
@@ -162,7 +217,6 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        _NamespaceComp.clear()
         browser = MockLineTextBrowser(content=content, size=[0, 1])
         browser._i = initial_index
         mocker.patch.object(browser, "_render")
@@ -186,7 +240,6 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        _NamespaceComp.clear()
         browser = MockLineTextBrowser(content=content)
         browser._i = initial_index
         mocker.patch.object(browser, "_render")
@@ -224,7 +277,6 @@ class TestItemSelector:
     )
     def test_ItemSelector_init(self, x, y, size, content):
         # Arrange
-        _NamespaceComp.clear()
         MockItemSelector.CURSOR = "*"
 
         # Act
@@ -249,7 +301,6 @@ class TestItemSelector:
         ids=["resize_larger", "resize_smaller"],
     )
     def test_ItemSelector_resize(self, initial_size, new_size):
-        _NamespaceComp.clear()
         selector = MockItemSelector(size=initial_size)
 
         selector.resize(new_size)
@@ -266,7 +317,6 @@ class TestItemSelector:
         ids=["next_single_step", "next_multiple_steps", "next_beyond_end"],
     )
     def test_ItemSelector_next(self, content, initial_pos, step, expected_pos):
-        _NamespaceComp.clear()
         selector = MockItemSelector(content=content)
         selector.curr_no = initial_pos
 
@@ -284,7 +334,6 @@ class TestItemSelector:
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
     def test_ItemSelector_forward(self, content, initial_pos, step, expected_pos):
-        _NamespaceComp.clear()
         selector = MockItemSelector(content=content)
         selector.curr_no = initial_pos
 
@@ -294,7 +343,6 @@ class TestItemSelector:
 
 class TestGitPanelLazyResizeMixin:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
-        _NamespaceComp.clear()
 
         class DemoPanel(GitPanelLazyResizeMixin, ItemSelector):
             NAME = "demo_lazy_git_panel"
@@ -317,7 +365,6 @@ class TestGitPanelLazyResizeMixin:
         assert p.content == ["ready"]
 
     def test_inactive_after_load_keeps_content_on_resize(self):
-        _NamespaceComp.clear()
 
         class DemoPanel2(GitPanelLazyResizeMixin, ItemSelector):
             NAME = "demo_lazy_git_panel_2"
