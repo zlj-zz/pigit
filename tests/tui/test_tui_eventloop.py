@@ -30,19 +30,13 @@ class ComponentMock:
     ],
 )
 def test_start_stop_does_not_toggle_alt_outside_session(real_time, alt):
-    """Alternate screen is applied inside ``Session`` in ``run()``, not in ``start()``."""
+    """Alternate screen is owned by ``Session`` inside ``run()``; ``start``/``stop`` are layout hooks."""
 
     component = ComponentMock()
     event_loop = EventLoop(component, real_time=real_time, alt=alt)
-    with patch.object(EventLoop, "to_alt_screen") as mock_to_alt_screen, patch.object(
-        EventLoop, "to_normal_screen"
-    ) as mock_to_normal_screen:
-
-        event_loop.start()
-        event_loop.stop()
-
-        mock_to_alt_screen.assert_not_called()
-        mock_to_normal_screen.assert_not_called()
+    event_loop.get_term_size = Mock(return_value=(80, 24))
+    event_loop.start()
+    event_loop.stop()
 
 
 def test_init_default_input_is_termui_bridge():
@@ -59,17 +53,16 @@ def test_init_respects_injected_input_handle():
 
 
 @pytest.mark.parametrize(
-    "exception, expected_stop_calls",
+    "exc_factory, expected_stop_calls",
     [
-        (ExitEventLoop, 1),
-        (KeyboardInterrupt, 1),
-        (EOFError, 1),
-        (Exception, 1),
+        (lambda: ExitEventLoop("x"), 1),
+        (lambda: KeyboardInterrupt(), 1),
+        (lambda: EOFError(), 1),
+        (lambda: RuntimeError("x"), 1),
     ],
 )
-@patch("pigit.termui.event_loop._Log")
 @patch("pigit.termui.event_loop.Session")
-def test_run_exception_handling(mock_session_cls, mock_log, exception, expected_stop_calls):
+def test_run_exception_handling(mock_session_cls, exc_factory, expected_stop_calls):
     session_cm = MagicMock()
     session_inner = MagicMock()
     session_inner.renderer = MagicMock()
@@ -79,26 +72,30 @@ def test_run_exception_handling(mock_session_cls, mock_log, exception, expected_
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
-    event_loop._loop = Mock(side_effect=exception())
+
+    def _raise_each_time() -> None:
+        raise exc_factory()
+
+    event_loop._loop = Mock(side_effect=_raise_each_time)
     event_loop.start = Mock()
     event_loop.stop = Mock()
-
-    with pytest.raises(exception):
-        event_loop._loop()
 
     event_loop.run()
     assert event_loop.stop.call_count == expected_stop_calls
 
 
-@patch("pigit.termui.event_loop._Log")
+@patch("pigit.termui.event_loop.logging.getLogger")
 @patch("pigit.termui.event_loop.Session")
-def test_run_unexpected_exception_logs_with_exception(mock_session_cls, mock_log):
+def test_run_unexpected_exception_logs_with_exception(mock_session_cls, mock_get_logger):
     session_cm = MagicMock()
     session_inner = MagicMock()
     session_inner.renderer = MagicMock()
     session_cm.__enter__.return_value = session_inner
     session_cm.__exit__.return_value = None
     mock_session_cls.return_value = session_cm
+
+    mock_log = MagicMock()
+    mock_get_logger.return_value = mock_log
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)

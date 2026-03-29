@@ -1,5 +1,26 @@
 # Changelog of pigit
 
+## 1.7.7 (2026-03-29)
+
+- **Breaking (CLI pickers / termui)**
+  - Removed `pigit.termui.scenes` (and `run_list_picker`). Full-screen pickers use **`AppEventLoop`** + **`SearchableListPicker`** only.
+  - **Types / helpers**: `PickerRow`, `PICK_EXIT_CTRL_C`, `apply_picker_filter` → `from pigit.termui.component_list_picker import …`
+  - **`repo cd --pick` glue** → `pigit.git.repo_cd_picker` (`run_repo_cd_picker`, `EMPTY_MANAGED_REPOS_MSG`, `REPO_CD_NO_TTY_MSG`, …).
+  - **`pigit cmd --pick` / `repo cd --pick`**: require a real TTY; no headless or fake-input test harness in product code.
+- **Migration (copy-paste)**:
+  ```text
+  # Old (removed)
+  from pigit.termui.scenes.list_picker import run_list_picker, PickerRow
+
+  # New — data / component
+  from pigit.termui.component_list_picker import PickerRow, PICK_EXIT_CTRL_C, apply_picker_filter
+
+  # New — product entrypoints stay in git
+  from pigit.git.cmd_picker import run_command_picker
+  from pigit.git.repo_cd_picker import run_repo_cd_picker, EMPTY_MANAGED_REPOS_MSG
+  ```
+- **Internal**: `pigit.termui.picker_event_loop.PickerAppEventLoop` (pickers run only inside a real TTY `Session`), `Renderer.draw_absolute_row` / `erase_line_to_end`; `ExitEventLoop` carries optional `exit_code` / `result_message`; `AppEventLoop.quit(..., exit_code=, result_message=)`.
+
 ## 1.7.6 (2026-03-29)
 
 - **Internal TUI** (`docs/technical_termui_event_loop_components_phase1.md`): Centralized `BINDINGS` resolution in `pigit.termui.bindings.resolve_key_handlers`; `Component` and `AppEventLoop` store `Dict[str, Callable]` as `_key_handlers` (construction-time errors for bad string targets). `ItemSelector` no longer duplicates a separate `event_map`.

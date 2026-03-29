@@ -8,14 +8,13 @@ import pytest
 
 import pigit.entry as entry_mod
 
-from pigit.ext.executor import WAITING
 from pigit.git.managed_repos import ManagedRepos
-from pigit.termui.scenes.list_picker import PickerRow
-from pigit.termui.scenes.repo_cd import (
+from pigit.git.repo_cd_picker import (
     EMPTY_MANAGED_REPOS_MSG,
     REPO_CD_NO_TTY_MSG,
     run_repo_cd_picker,
 )
+from pigit.termui.component_list_picker import PickerRow
 
 
 class MockExecutor:
@@ -38,44 +37,11 @@ def test_run_repo_cd_picker_empty_rows():
 def test_run_repo_cd_picker_no_tty():
     ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=False):
+    with patch("pigit.git.repo_cd_picker.tty_ok", return_value=False):
         code, msg = run_repo_cd_picker(rows, ex)
     assert code == 1
     assert msg == REPO_CD_NO_TTY_MSG
     assert not ex.exec_calls
-
-
-def test_run_repo_cd_picker_quit():
-    ex = MockExecutor()
-    rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=True):
-        code, msg = run_repo_cd_picker(
-            rows,
-            ex,
-            read_char=lambda: "q",
-            write=lambda s: None,
-            flush=lambda: None,
-            read_line=lambda p: "",
-        )
-    assert (code, msg) == (0, None)
-    assert not ex.exec_calls
-
-
-def test_run_repo_cd_picker_confirm():
-    ex = MockExecutor()
-    rows = [PickerRow(title="a", detail="/p", ref="/p")]
-    with patch("pigit.termui.scenes.repo_cd.tty_ok", return_value=True):
-        code, msg = run_repo_cd_picker(
-            rows,
-            ex,
-            read_char=lambda: "\r",
-            write=lambda s: None,
-            flush=lambda: None,
-            read_line=lambda p: "",
-        )
-    assert (code, msg) == (0, None)
-    assert ex.exec_calls
-    assert ex.exec_calls[0][1].get("flags") == WAITING
 
 
 def test_cd_repo_pick_empty_repos(tmp_path):

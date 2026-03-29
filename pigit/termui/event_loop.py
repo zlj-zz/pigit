@@ -25,7 +25,23 @@ KeyDispatchOutcome = Literal["binding", "resize", "child"]
 
 
 class ExitEventLoop(Exception):
-    """Raised to exit the current event loop."""
+    """
+    Raised to exit the current event loop.
+
+    Pickers attach ``exit_code`` / ``result_message`` for CLI-style
+    ``(exit_code, message)`` returns; the main Git TUI uses defaults only.
+    """
+
+    def __init__(
+        self,
+        msg: str = "Quit",
+        *,
+        exit_code: int = 0,
+        result_message: Optional[str] = None,
+    ) -> None:
+        super().__init__(msg)
+        self.exit_code = exit_code
+        self.result_message = result_message
 
 
 class AppEventLoop:
@@ -169,5 +185,11 @@ class AppEventLoop:
             self._bind_renderer_tree(self._child, session.renderer)
             self._run_impl()
 
-    def quit(self, msg: str = "Quit") -> None:
-        raise ExitEventLoop(msg)
+    def quit(
+        self,
+        msg: str = "Quit",
+        *,
+        exit_code: int = 0,
+        result_message: Optional[str] = None,
+    ) -> None:
+        raise ExitEventLoop(msg, exit_code=exit_code, result_message=result_message)

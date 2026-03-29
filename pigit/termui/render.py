@@ -42,6 +42,23 @@ class Renderer:
 
         self._out.write(f"\033[{row};{col}f")
 
+    def erase_line_to_end(self) -> None:
+        """Erase from cursor to end of line (EL0); used by full-screen list picker."""
+
+        self._out.write("\033[K")
+
+    def draw_absolute_row(self, row: int, text: str) -> None:
+        """
+        Paint one logical line at a fixed 1-based terminal row.
+
+        Current caller: :class:`~pigit.termui.component_list_picker.SearchableListPicker`
+        (status/footer pinning). May generalize to other full-screen UIs later.
+        """
+
+        self.move_cursor(row, 1)
+        self.erase_line_to_end()
+        self._out.write(text)
+
     def hide_cursor(self) -> None:
         self._out.write("\033[?25l")
 
