@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from pigit.termui.bindings import BindingsList, resolve_key_handlers
+from pigit.termui.bindings import BindingsList, list_bindings, resolve_key_handlers_merged
+from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
     from pigit.termui.render import Renderer
@@ -23,6 +24,16 @@ NONE_SIZE = (0, 0)
 
 ActionLiteral = Literal["goto"]
 KeyRouting = Literal["child_first", "switch_first"]
+
+
+def _looks_like_overlay_host(candidate: object) -> bool:
+    """Duck-type check for a component that owns app-wide overlay session state."""
+
+    return (
+        callable(getattr(candidate, "begin_popup_session", None))
+        and callable(getattr(candidate, "end_popup_session", None))
+        and hasattr(candidate, "overlay_kind")
+    )
 
 
 class ComponentError(Exception):
@@ -53,7 +64,25 @@ class Component(ABC):
         self.children = children
         self._renderer = renderer
 
-        self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
+        self._key_handlers = resolve_key_handlers_merged(
+            self, type(self), self.BINDINGS
+        )
+
+    def nearest_overlay_host(self) -> Optional["Component"]:
+        """
+        Walk parents toward the tree root; return the first ancestor that manages
+        overlay sessions (``begin_popup_session`` / ``end_popup_session`` / ``overlay_kind``).
+
+        Callers that open modal overlays should use this instead of assuming ``self.parent``
+        is the event-loop root (cf. Flutter ``findAncestorStateOfType`` / SwiftUI environment).
+        """
+
+        current: Optional["Component"] = self.parent
+        while current is not None:
+            if _looks_like_overlay_host(current):
+                return current
+            current = current.parent
+        return None
 
     def activate(self):
         self._activated = True
@@ -136,6 +165,58 @@ class Component(ABC):
         on_key = getattr(self, "on_key", None)
         if on_key is not None and callable(on_key):
             on_key(key)
+
+    def has_overlay_open(self) -> bool:
+        """True when this component is the loop root and an overlay is active."""
+
+        return False
+
+    def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
+        """
+        Handle ``key`` for the active overlay only; must not be used when
+        :meth:`has_overlay_open` is false (defensive default).
+        """
+
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
+    def get_help_entries(self) -> List[Tuple[str, str]]:
+        """
+        Return ``(key display, description)`` rows for the help panel.
+
+        Default: derived from :func:`~pigit.termui.bindings.list_bindings` (same
+        keys as runtime handlers), with short English placeholders when no docstring.
+        """
+
+        return _default_help_entries(self)
+
+
+def _truncate_help_line(text: str, max_len: int = 120) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1] + "\u2026"
+
+
+def _default_help_entries(component: "Component") -> List[Tuple[str, str]]:
+    cls = type(component)
+    rows: List[Tuple[str, str]] = []
+    for semantic_key, target in list_bindings(component, cls)[:64]:
+        desc = _describe_binding_target(component, target)
+        rows.append((semantic_key, _truncate_help_line(desc)))
+    return rows
+
+
+def _describe_binding_target(
+    owner: "Component",
+    target: Union[str, Callable[..., object]],
+) -> str:
+    if isinstance(target, str):
+        fn = getattr(owner, target, None)
+        if callable(fn):
+            doc = getattr(fn, "__doc__", None)
+            if doc and doc.strip():
+                return doc.strip().splitlines()[0].strip()
+        return f"{target} action"
+    return "bound command"
 
 
 class Container(Component):
@@ -281,7 +362,7 @@ class LineTextBrowser(Component):
 
 
 class ItemSelector(Component):
-    CURSOR: str = ""
+    CURSOR: str = "\u2192"
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
 
@@ -365,8 +446,7 @@ class GitPanelLazyResizeMixin:
 
     Inactive panels show a one-line placeholder until first shown, so startup
     ``resize`` avoids running git for every tab. Pair with a container that
-    calls :meth:`fresh` when switching to the child (see ``PanelContainer`` in
-    :meth:`Container.switch_child`).
+    calls :meth:`fresh` when switching to the active child (:meth:`Container.switch_child`).
     """
 
     _panel_loaded: bool = False
@@ -382,5 +462,3 @@ class GitPanelLazyResizeMixin:
             self._r_start = 0
 
 
-class Alert(Component):
-    pass

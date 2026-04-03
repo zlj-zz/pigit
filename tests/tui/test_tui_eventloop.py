@@ -19,6 +19,14 @@ class ComponentMock:
     def _handle_event(self, event):
         pass
 
+    def has_overlay_open(self):
+        return False
+
+    def try_dispatch_overlay(self, key):
+        from pigit.termui.overlay_kinds import OverlayDispatchResult
+
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
 
 @pytest.mark.parametrize(
     "real_time, alt",
@@ -218,6 +226,75 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks():
     loop.after_dispatch_key.assert_not_called()
 
 
+def test_loop_overlay_open_uses_try_dispatch_overlay_not_child():
+    """When the root reports an open overlay, keys go to overlay dispatch only."""
+
+    class _OverlayRoot(ComponentMock):
+        def has_overlay_open(self):
+            return True
+
+        def try_dispatch_overlay(self, key):
+            from pigit.termui.overlay_kinds import OverlayDispatchResult
+
+            assert key == "k"
+            return OverlayDispatchResult.HANDLED_IMPLICIT
+
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_OverlayRoot(), alt=False)
+            self.trace: list = []
+
+        def after_dispatch_key(self, key: str, outcome: str) -> None:
+            self.trace.append((key, outcome))
+
+    loop = _Hooked()
+    loop._renderer = MagicMock()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._child._handle_event = Mock()
+
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [[["k"]], KeyboardInterrupt()]
+
+    loop._run_impl()
+
+    loop._child._handle_event.assert_not_called()
+    assert ("k", "overlay_implicit") in loop.trace
+
+
+def test_loop_overlay_closed_after_error_maps_to_hook_outcome():
+    """``CLOSED_AFTER_ERROR`` must surface as ``overlay_closed_after_error`` for hooks/metrics."""
+
+    class _OverlayRoot(ComponentMock):
+        def has_overlay_open(self):
+            return True
+
+        def try_dispatch_overlay(self, key):
+            from pigit.termui.overlay_kinds import OverlayDispatchResult
+
+            assert key == "k"
+            return OverlayDispatchResult.CLOSED_AFTER_ERROR
+
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_OverlayRoot(), alt=False)
+            self.trace: list = []
+
+        def after_dispatch_key(self, key: str, outcome: str) -> None:
+            self.trace.append((key, outcome))
+
+    loop = _Hooked()
+    loop._renderer = MagicMock()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._child._handle_event = Mock()
+
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [[["k"]], KeyboardInterrupt()]
+
+    loop._run_impl()
+
+    assert ("k", "overlay_closed_after_error") in loop.trace
+
+
 def test_app_event_loop_accepts_callable_binding():
     def quit_cb() -> None:
         raise ExitEventLoop("bye")
@@ -232,3 +309,49 @@ def test_app_event_loop_accepts_callable_binding():
     loop._input_handle.get_input.side_effect = [[["q"]], KeyboardInterrupt()]
 
     loop._run_impl()
+
+
+def test_overlay_controller_returns_closed_after_error_when_dispatch_raises() -> None:
+    """Fatal errors during overlay dispatch must clear the slot and return a distinct result."""
+
+    from pigit.termui.overlay_controller import OverlayController
+    from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
+
+    class _BrokenSurface:
+        open = True
+
+        def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+            raise RuntimeError("simulated overlay handler failure")
+
+        def hide(self) -> None:
+            pass
+
+        def _render(self, size=None) -> None:
+            pass
+
+    host = MagicMock()
+    host.overlay_kind = OverlayKind.POPUP
+    host._active_popup = _BrokenSurface()
+    host.force_close_overlay_after_error = Mock()
+
+    ctrl = OverlayController()
+    assert ctrl.dispatch(host, "x") is OverlayDispatchResult.CLOSED_AFTER_ERROR
+    host.force_close_overlay_after_error.assert_called_once()
+
+
+def test_overlay_controller_question_mark_toggles_help_when_help_open() -> None:
+    """``?`` must close help while help is open (App-level binding is not run in overlay mode)."""
+
+    from pigit.termui.overlay_controller import OverlayController
+    from pigit.termui.components_overlay import HelpPanel, Popup
+    from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
+
+    root = MagicMock()
+    root.overlay_kind = OverlayKind.POPUP
+    help_panel = HelpPanel()
+    popup = Popup(help_panel, session_owner=root)
+    root._active_popup = popup
+
+    ctrl = OverlayController()
+    assert ctrl.dispatch(root, "?") is OverlayDispatchResult.HANDLED_IMPLICIT
+    root.end_popup_session.assert_called_once()

@@ -7,6 +7,7 @@ from pigit.termui.components import (
     ItemSelector,
     LineTextBrowser,
 )
+from pigit.termui.overlay_kinds import OverlayKind
 
 
 # Mock Component to use in tests
@@ -383,3 +384,42 @@ class TestGitPanelLazyResizeMixin:
         p.resize((20, 10))
         assert DemoPanel2.fresh_calls == 1
         assert p.content == ["a", "b"]
+
+
+class TestNearestOverlayHost:
+    def test_walks_parents_to_first_overlay_host(self) -> None:
+        class OverlayHost(Component):
+            NAME = "overlay_host"
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.overlay_kind = OverlayKind.NONE
+
+            def begin_popup_session(self, popup: object) -> None:
+                pass
+
+            def end_popup_session(self) -> None:
+                pass
+
+            def fresh(self) -> None:
+                raise NotImplementedError
+
+            def _render(self, size=None) -> None:
+                pass
+
+        host = OverlayHost()
+        mid = MockComponent("mid")
+        leaf = MockComponent("leaf")
+        leaf.parent = mid
+        mid.parent = host
+        host.parent = None
+
+        assert leaf.nearest_overlay_host() is host
+
+    def test_returns_none_when_no_host_in_chain(self) -> None:
+        root = MockComponent("root")
+        leaf = MockComponent("leaf")
+        leaf.parent = root
+        root.parent = None
+
+        assert leaf.nearest_overlay_host() is None

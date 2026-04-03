@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
-from pigit.termui.bindings import BindingsList, resolve_key_handlers
+from pigit.termui.bindings import BindingsList, resolve_key_handlers_merged
+from pigit.termui.overlay_kinds import OverlayDispatchResult
 from pigit.termui.components import Component
 from pigit.termui.keys import is_mouse_event
 from pigit.termui.render import Renderer
@@ -21,7 +22,22 @@ if TYPE_CHECKING:
     from pigit.termui.input_terminal import InputTerminal
 
 
-KeyDispatchOutcome = Literal["binding", "resize", "child"]
+KeyDispatchOutcome = Literal[
+    "binding",
+    "resize",
+    "child",
+    "overlay_explicit",
+    "overlay_implicit",
+    "overlay_drop",
+    "overlay_closed_after_error",
+]
+
+_OVERLAY_TO_OUTCOME = {
+    OverlayDispatchResult.HANDLED_EXPLICIT: "overlay_explicit",
+    OverlayDispatchResult.HANDLED_IMPLICIT: "overlay_implicit",
+    OverlayDispatchResult.DROPPED_UNBOUND: "overlay_drop",
+    OverlayDispatchResult.CLOSED_AFTER_ERROR: "overlay_closed_after_error",
+}
 
 
 class ExitEventLoop(Exception):
@@ -79,17 +95,18 @@ class AppEventLoop:
 
         self._alt = alt
 
-        self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
+        self._key_handlers = resolve_key_handlers_merged(
+            self, type(self), self.BINDINGS
+        )
 
     def _bind_renderer_tree(self, component: Component, renderer: Renderer) -> None:
         """Attach one shared :class:`Renderer` to the whole component tree."""
 
         component._renderer = renderer
         children = getattr(component, "children", None)
-        if not children:
-            return
-        for child in children.values():
-            self._bind_renderer_tree(child, renderer)
+        if children:
+            for child in children.values():
+                self._bind_renderer_tree(child, renderer)
 
     def after_start(self):
         """Hook invoked after the loop is ready (subclasses may override)."""
@@ -142,27 +159,46 @@ class AppEventLoop:
     def _loop(self) -> None:
         while True:
             input_key = self._input_handle.get_input()
-            if input_key and input_key[0]:
-                first = input_key[0][0]
-                if isinstance(first, str):
-                    self.before_dispatch_key(first)
-                    handler = self._key_handlers.get(first)
-                    if handler is not None:
-                        handler()
-                        outcome: KeyDispatchOutcome = "binding"
-                    elif first == "window resize":
-                        self.resize()
-                        outcome = "resize"
-                    else:
-                        self._child._handle_event(first)
-                        outcome = "child"
-                    self.after_dispatch_key(first, outcome)
-                    continue
-                if is_mouse_event(first):
-                    continue
+            if not input_key or not input_key[0]:
+                if self._real_time:
+                    self._child._render()
                 continue
-            elif self._real_time:
-                self._child._render()
+            first = input_key[0][0]
+            if isinstance(first, str):
+                outcome = self._dispatch_semantic_string(first)
+                self.after_dispatch_key(first, outcome)
+                continue
+            if is_mouse_event(first):
+                continue
+
+    def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
+        self.before_dispatch_key(key)
+        if key == "window resize":
+            self.resize()
+            return "resize"
+        if self._child.has_overlay_open():
+            return self._dispatch_while_overlay_open(key)
+        return self._dispatch_while_overlay_closed(key)
+
+    def _dispatch_while_overlay_open(self, key: str) -> KeyDispatchOutcome:
+        ores = self._child.try_dispatch_overlay(key)
+        if (
+            ores is OverlayDispatchResult.DROPPED_UNBOUND
+            and logging.getLogger().isEnabledFor(logging.DEBUG)
+        ):
+            logging.getLogger(__name__).debug("Overlay dropped unbound key: %r", key)
+        self.render()
+        return _OVERLAY_TO_OUTCOME[ores]
+
+    def _dispatch_while_overlay_closed(self, key: str) -> KeyDispatchOutcome:
+        handler = self._key_handlers.get(key)
+        if handler is not None:
+            handler()
+            return "binding"
+        self._child._handle_event(key)
+        if self._child.has_overlay_open():
+            self.render()
+        return "child"
 
     def _run_impl(self) -> None:
         try:

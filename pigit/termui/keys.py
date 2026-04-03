@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Dict, Iterator, List, Tuple
 
 # Stable semantic tokens (public documentation; values match existing app conventions).
+KEY_SPACE = " "
 KEY_TAB = "tab"
 KEY_ENTER = "enter"
 KEY_BACKSPACE = "backspace"

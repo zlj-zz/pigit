@@ -1,30 +1,32 @@
-import logging
 from time import sleep
 from typing import List, Optional, Tuple
 
-from .ext.utils import confirm
 from .git.repo import GitFileT, GitFuncT, Repo
-from .termui.components import (
+from .termui import (
     ActionLiteral,
+    AlertDialog,
+    AppEventLoop,
+    bind_keys,
     Container,
     GitPanelLazyResizeMixin,
-    LineTextBrowser,
+    HelpPanel,
     ItemSelector,
+    LineTextBrowser,
+    OverlayHostMixin,
+    OverlayKind,
+    Popup,
+    keys,
 )
-from .termui.event_loop import AppEventLoop
 
-
-_Log = logging.getLogger(f"PIGIT.{__name__}")
 repo_handle = Repo()
+
+
+def _noop_alert_result(_: bool) -> None:
+    """Placeholder until :meth:`~pigit.termui.components_overlay.AlertDialog.alert` supplies a callback."""
 
 
 class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "status"
-    CURSOR = "→"
-    BINDINGS = [
-        ("j", "next"),
-        ("k", "forward"),
-    ]
 
     def __init__(
         self,
@@ -32,11 +34,31 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         y: int = 1,
         size: Optional[Tuple[int, int]] = None,
         content: Optional[List[str]] = None,
+        *,
+        alert_inner_width: Optional[int] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
         self.git = repo_handle.bind_path(self.repo_path)
+
+        self._alert_dialog = AlertDialog(
+            self,
+            x=x,
+            y=y,
+            size=size,
+            inner_width=alert_inner_width,
+            on_result=_noop_alert_result,
+        )
+        self._alert_popup = self._alert_dialog
+
+    @bind_keys("j")
+    def next(self, step: int = 1) -> None:
+        super().next(step)
+
+    @bind_keys("k")
+    def forward(self, step: int = 1) -> None:
+        super().forward(step)
 
     def fresh(self):
         self.files = files = self.git.load_status(self._size[0])
@@ -46,10 +68,14 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         files_str = [file.display_str for file in files]
         self.set_content(files_str)
 
+    def resize(self, size: Tuple[int, int]) -> None:
+        super().resize(size)
+        self._alert_popup.resize(size)
+
     def on_key(self, key: str):
         f = self.files[self.curr_no]
 
-        if key == "enter":
+        if key == keys.KEY_ENTER:
             c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split(
                 "\n"
             )
@@ -57,32 +83,50 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
                 "goto", target="display_panel", source=self.NAME, key=f.name, content=c
             )
             return
-        elif key in {"a", " "}:
+        elif key in {keys.KEY_SPACE, "a"}:
             self.git.switch_file_status(f)
         elif key == "i":
-            self.double_check(self.git.ignore_file, f, msg=f"Ignore file")
+            if self._check_via_alert(self.git.ignore_file, f, msg="Ignore file"):
+                return
         elif key == "d":
-            self.double_check(self.git.discard_file, f, msg=f"Discard file")
+            if self._check_via_alert(self.git.discard_file, f, msg="Discard file"):
+                return
 
         self.fresh()
         self._render()
 
-    def double_check(
+    def _check_via_alert(
         self,
         callee: GitFuncT,
         file: GitFileT,
         msg: str = "",
-    ):
-        self.clear_items()
-        self._render()
-        if confirm(f"{msg} '{str(file)}'? [y/n]:"):
+    ) -> bool:
+        """
+        Ask for confirmation via this panel's :class:`~pigit.termui.components_overlay.AlertDialog`.
+
+        Returns:
+            True if the dialog was shown (caller should skip its own refresh).
+            False if the root cannot host an alert session (no-op).
+        """
+
+        text = f"{msg} '{file}' ?"
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                self.fresh()
+                self._render()
+                return
             callee(file)
-            self.forward()
+            self.fresh()
+            if self.files:
+                self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
+            self._render()
+
+        return self._alert_dialog.alert(text, on_result)
 
 
 class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "branch"
-    CURSOR = "→"
 
     def __init__(
         self,
@@ -110,12 +154,16 @@ class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
 
         self.set_content(processed_branches)
 
+    @bind_keys("j")
+    def next(self, step: int = 1) -> None:
+        super().next(step)
+
+    @bind_keys("k")
+    def forward(self, step: int = 1) -> None:
+        super().forward(step)
+
     def on_key(self, key: str):
-        if key == "j":
-            self.next()
-        elif key == "k":
-            self.forward()
-        elif key == " ":
+        if key == keys.KEY_SPACE:
             local_branch = self.branches[self.curr_no]
             if local_branch.is_head:
                 return
@@ -131,11 +179,6 @@ class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
 
 class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
     NAME = "commit"
-    CURSOR = "→"
-    BINDINGS = [
-        ("j", "next"),
-        ("k", "forward"),
-    ]
 
     def __init__(
         self,
@@ -148,6 +191,14 @@ class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
 
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
         self.git = repo_handle.bind_path(self.repo_path)
+
+    @bind_keys("j")
+    def next(self, step: int = 1) -> None:
+        super().next(step)
+
+    @bind_keys("k")
+    def forward(self, step: int = 1) -> None:
+        super().forward(step)
 
     def fresh(self):
         branch_name = self.git.get_head()
@@ -199,24 +250,41 @@ class ContentDisplay(LineTextBrowser):
             self._i = self.i_cache.get(self.i_cache_key, 0)
             self._render()
 
-    def on_key(self, key: str):
-        if key in {"esc", "q"}:
-            self.emit("goto", target=self.come_from)
-        elif key == "j":
-            self.scroll_down()
-        elif key == "k":
-            self.scroll_up()
-        elif key == "J":
-            self.scroll_down(5)
-        elif key == "K":
-            self.scroll_up(5)
+    @bind_keys("esc", "q")
+    def _leave_display(self) -> None:
+        self.emit("goto", target=self.come_from)
+
+    @bind_keys("j")
+    def _scroll_line_down(self) -> None:
+        self.scroll_down()
+
+    @bind_keys("k")
+    def _scroll_line_up(self) -> None:
+        self.scroll_up()
+
+    @bind_keys("J")
+    def _scroll_page_down(self) -> None:
+        self.scroll_down(5)
+
+    @bind_keys("K")
+    def _scroll_page_up(self) -> None:
+        self.scroll_up(5)
 
 
-class PanelContainer(Container):
+class GitTuiRoot(OverlayHostMixin, Container):
+    """Git full-screen root: tabbed panels plus one overlay (help or alert)."""
+
     NAME = "container"
 
-    def __init__(self) -> None:
-        status_panel = StatusPanel()
+    def __init__(
+        self,
+        *,
+        help_popup_width: Optional[int] = None,
+        help_popup_height: Optional[int] = None,
+        help_offset: Optional[Tuple[int, int]] = None,
+        alert_inner_width: Optional[int] = None,
+    ) -> None:
+        status_panel = StatusPanel(alert_inner_width=alert_inner_width)
         branch_panel = BranchPanel()
         commit_panel = CommitPanel()
         display_panel = ContentDisplay()
@@ -227,7 +295,6 @@ class PanelContainer(Container):
             commit_panel.NAME: commit_panel,
             display_panel.NAME: display_panel,
         }
-        # print(children)
 
         def get_name(key: str):
             return {
@@ -236,7 +303,49 @@ class PanelContainer(Container):
                 "3": commit_panel.NAME,
             }.get(key, "")
 
-        super().__init__(children, start_name=status_panel.NAME, switch_handle=get_name)
+        Container.__init__(
+            self,
+            children,
+            start_name=status_panel.NAME,
+            switch_handle=get_name,
+        )
+
+        self._init_overlay_host_state()
+        self._help_panel = HelpPanel(
+            inner_width=help_popup_width,
+            inner_height=help_popup_height,
+        )
+        self._help_popup = Popup(
+            self._help_panel,
+            session_owner=self,
+            offset=help_offset,
+            exit_key=keys.KEY_ESC,
+        )
+
+    @bind_keys("?")
+    def _toggle_help_popup(self) -> None:
+        help_open = (
+            self.overlay_kind == OverlayKind.POPUP
+            and self._active_popup is self._help_popup
+        )
+        if not help_open:
+            self._help_panel.merge_help_entries_from_host_children(self)
+        self._help_popup.toggle()
+
+    def _handle_event(self, key: str) -> None:
+        handler = self._key_handlers.get(key)
+        if handler is not None:
+            handler()
+            return
+        super()._handle_event(key)
+
+    def resize(self, size: Tuple[int, int]) -> None:
+        super().resize(size)
+        self._help_popup.resize(size)
+
+    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+        super()._render(size)
+        self._render_termui_overlays()
 
 
 class App(AppEventLoop):
@@ -246,7 +355,7 @@ class App(AppEventLoop):
 
     def __init__(self) -> None:
         super().__init__(
-            PanelContainer(),
+            GitTuiRoot(),
             input_takeover=True,
         )
 
