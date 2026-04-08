@@ -54,7 +54,6 @@ class RepoCdPickerLoop(PickerAppEventLoop):
         pick_alt_screen: bool = False,
     ) -> None:
         self._terminal_too_small_msg = _REPO_CD_TERMINAL_TOO_SMALL_MSG
-        shell_cd = "$SHELL -c 'cd {0} && exec $SHELL'"
 
         def render_line(r: PickerRow) -> str:
             return f"{r.title}  {r.detail}"
@@ -62,8 +61,9 @@ class RepoCdPickerLoop(PickerAppEventLoop):
         def on_confirm(r: PickerRow) -> Optional[Tuple[int, Optional[str]]]:
             path = r.ref
             assert isinstance(path, str)
-            executor.exec(shell_cd.format(path), flags=WAITING)
-            return 0, None
+            # Return path via result_message; executor will run after Session exits
+            # to ensure terminal is properly restored (alt screen, cursor, termios)
+            return 0, path
 
         title = (
             "pigit repo cd --pick  [j/k scroll  Enter cd  / filter  q/Esc quit  "
@@ -126,7 +126,14 @@ def run_repo_cd_picker(
             initial_filter=initial_filter,
             pick_alt_screen=pick_alt_screen,
         )
-        return loop.run_with_result()
+        exit_code, result = loop.run_with_result()
+        # After Session exits, execute shell command if a repo was selected.
+        # This ensures terminal is properly restored (alt screen, cursor, termios)
+        # before spawning the interactive shell.
+        if exit_code == 0 and result is not None:
+            shell_cd = "$SHELL -c 'cd {0} && exec $SHELL'"
+            executor.exec(shell_cd.format(result), flags=WAITING)
+        return exit_code, None
     except KeyboardInterrupt:
         sys.stdout.write("\n")
         sys.stdout.flush()
