@@ -21,7 +21,7 @@ from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counte
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
 from .git import builtin_cmds, create_gitignore
-from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
+from .handlers import CmdHandler, CmdNewHandler, RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
@@ -70,6 +70,15 @@ def pigit(args: "Namespace", _) -> None:
         complete_vars["args"]["cmd"]["args"].update(
             {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
         )
+
+        # Add cmd_new commands to completion
+        from .git.cmds import get_registry
+        registry = get_registry()
+        cmd_new_commands = {
+            c.meta.short: {"help": c.meta.help, "args": {}}
+            for c in registry.get_all()
+        }
+        complete_vars["args"]["cmd_new"]["args"].update(cmd_new_commands)
 
         from .cmdparse.completion import shell_complete
 
@@ -246,6 +255,45 @@ def _(args: "Namespace", unknown: List):
     """If you want to use some original git commands, please use -- to indicate."""
 
     CmdHandler(ctx.current(), args, unknown).execute()
+
+
+# =============================================
+# sub command `cmd_new`
+# =============================================
+@pigit.sub_parser("cmd_new", help="new git short command system (parallel to cmd).")
+@argument(
+    "-l --list",
+    action="store_true",
+    help="List all commands.",
+)
+@argument(
+    "-d --dangerous",
+    action="store_true",
+    help="List only dangerous commands.",
+)
+@argument(
+    "-t --type",
+    dest="type",
+    metavar="CATEGORY",
+    help="Filter by category (branch, commit, index, etc.).",
+)
+@argument(
+    "-s --search",
+    dest="search",
+    metavar="QUERY",
+    help="Search commands by keyword.",
+)
+@argument(
+    "command",
+    nargs="*",
+    help="Command to execute with arguments.",
+)
+def _(args: "Namespace", _):
+    """Execute new short git commands."""
+    from .handlers.cmd_new_handler import handle_cmd_new
+    exit_code = handle_cmd_new(args)
+    if exit_code != 0:
+        raise SystemExit(exit_code)
 
 
 # =============================================
