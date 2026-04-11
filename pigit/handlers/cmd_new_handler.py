@@ -34,6 +34,30 @@ class CmdNewHandler:
         Returns:
             Exit code
         """
+        # Interactive picker
+        if args.pick:
+            from ..git.cmds._picker import run_cmd_new_picker
+
+            category = None if args.pick is True else args.pick
+
+            # Validate category if provided
+            if category:
+                try:
+                    CommandCategory(category)
+                except ValueError:
+                    console.echo(f"`Unknown category: {category}`<tomato>")
+                    console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                    return 1
+
+            exit_code, message = run_cmd_new_picker(
+                self._processor,
+                pick_alt_screen=True,
+                category=category,
+            )
+            if message:
+                console.echo(message)
+            return exit_code
+
         # List commands
         if args.list or args.dangerous:
             if args.dangerous:
@@ -43,7 +67,7 @@ class CmdNewHandler:
                     category = CommandCategory(args.type)
                     help_text = self._processor.get_help(category=category)
                 except ValueError:
-                    console.echo(f"Unknown category: {args.type}", style="red")
+                    console.echo(f"`Unknown category: {args.type}`<tomato>")
                     console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
                     return 1
             else:

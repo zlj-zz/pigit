@@ -284,6 +284,14 @@ def _(args: "Namespace", unknown: List):
     help="Search commands by keyword.",
 )
 @argument(
+    "-p --pick",
+    dest="pick",
+    metavar="CATEGORY",
+    nargs="?",
+    const=True,
+    help="Interactively pick and run a command (requires a TTY). Optional CATEGORY to filter.",
+)
+@argument(
     "command",
     nargs="*",
     help="Command to execute with arguments.",
