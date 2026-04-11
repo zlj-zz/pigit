@@ -210,7 +210,7 @@ class Executor:
 
                 if not es.reply:
                     self._print(_out, _err)
-                    return None, None, None
+                    return _code, _err, None
 
                 return _code, _err, _out
 
