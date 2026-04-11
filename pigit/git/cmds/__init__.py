@@ -22,6 +22,7 @@ from . import merge
 from . import conflict
 from . import submodule
 from . import settings
+from . import rebase
 
 # Core exports
 from ._models import (

@@ -37,7 +37,7 @@ def log(args: list[str]) -> str:
 )
 def log_oneline(args: list[str]) -> str:
     """Show one-line log."""
-    base = "git log --oneline"
+    base = "git log --oneline --decorate"
     if args:
         return f"{base} {' '.join(args)}"
     return base
@@ -86,6 +86,22 @@ def log_stat(args: list[str]) -> str:
 def log_patch(args: list[str]) -> str:
     """Show log with patches."""
     base = "git log -p"
+    if args:
+        return f"{base} {' '.join(args)}"
+    return base
+
+
+@command(
+    short="l.c",
+    category=CommandCategory.LOG,
+    help="Show contributor statistics (commit count per contributor).",
+    has_args=True,
+    examples=["pigit cmd_new l.c", "pigit cmd_new l.c -n 10"],
+    related=["l", "l.s"],
+)
+def log_contributors(args: list[str]) -> str:
+    """Show contributor statistics."""
+    base = "git shortlog --summary --numbered"
     if args:
         return f"{base} {' '.join(args)}"
     return base
@@ -196,7 +212,7 @@ def stash_clear(args: list[str]) -> str:
 )
 def stash_show(args: list[str]) -> str:
     """Show stash."""
-    base = "git stash show"
+    base = "git stash show --stat"
     if args:
         return f"{base} {' '.join(args)}"
     return base
@@ -274,6 +290,7 @@ alias("lo", "l.o")
 alias("lg", "l.g")
 alias("ls", "l.s")
 alias("lp", "l.p")
+alias("lc", "l.c")
 alias("sl", "s.l")
 alias("sp", "s.p")
 alias("sa", "s.a")

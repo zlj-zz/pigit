@@ -59,22 +59,22 @@ def commit_message(args: list[str]) -> str:
 @command(
     short="c.f",
     category=CommandCategory.COMMIT,
-    help="Create a fixup commit (for autosquash).",
-    has_args=True,
-    examples=["pigit cmd_new c.f HEAD~1", "pigit cmd_new c.f abc123"],
+    help="Amend the last commit reusing the same log message as HEAD.",
+    dangerous=True,
+    confirm_msg="Amend last commit reusing HEAD message? This rewrites history.",
+    security_level=SecurityLevel.DANGEROUS,
+    examples=["pigit cmd_new c.f"],
     related=["c.F", "c"],
 )
 def commit_fixup(args: list[str]) -> str:
-    """Create fixup commit."""
-    if args:
-        return f"git commit --fixup {' '.join(args)}"
-    return "git commit --fixup"
+    """Amend last commit reusing HEAD message (equivalent to cf in old system)."""
+    return "git commit --amend --reuse-message HEAD"
 
 
 @command(
     short="c.F",
     category=CommandCategory.COMMIT,
-    help="Amend the previous commit.",
+    help="Amend the previous commit with verbose output.",
     has_args=True,
     dangerous=True,
     confirm_msg="Amend last commit? This rewrites history.",
@@ -83,11 +83,41 @@ def commit_fixup(args: list[str]) -> str:
     related=["c.f", "c"],
 )
 def commit_amend(args: list[str]) -> str:
-    """Amend last commit."""
-    base = "git commit --amend"
+    """Amend last commit with verbose output (equivalent to cF in old system)."""
+    base = "git commit --verbose --amend"
     if args:
         return f"{base} {' '.join(args)}"
     return base
+
+
+@command(
+    short="c.fix",
+    category=CommandCategory.COMMIT,
+    help="Create a fixup commit (for autosquash rebase).",
+    has_args=True,
+    examples=["pigit cmd_new c.fix HEAD~1", "pigit cmd_new c.fix abc123"],
+    related=["c", "c.s"],
+)
+def commit_fixup_target(args: list[str]) -> str:
+    """Create fixup commit targeting a specific commit."""
+    if args:
+        return f"git commit --fixup {' '.join(args)}"
+    return "git commit --fixup"
+
+
+@command(
+    short="c.s",
+    category=CommandCategory.COMMIT,
+    help="Create a squash commit (for autosquash rebase).",
+    has_args=True,
+    examples=["pigit cmd_new c.s HEAD~1", "pigit cmd_new c.s abc123"],
+    related=["c", "c.fix"],
+)
+def commit_squash(args: list[str]) -> str:
+    """Create squash commit targeting a specific commit."""
+    if args:
+        return f"git commit --squash {' '.join(args)}"
+    return "git commit --squash"
 
 
 @command(
