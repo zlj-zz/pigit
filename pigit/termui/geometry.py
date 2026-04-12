@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/geometry.py
 Description: Terminal column/row sizes aligned with shutil.get_terminal_size.
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_models.py
 Description: Tests for cmd_new data models.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

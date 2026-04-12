@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_integration.py
 Description: Integration tests for cmd_new system.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_registry.py
 Description: Command registry core for cmd_new.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/session.py
 Description: Terminal session — cbreak/raw only here; alternate screen and cursor.
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

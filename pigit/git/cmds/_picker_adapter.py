@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_picker_adapter.py
 Description: Command source adapter for cmd_new --pick functionality.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

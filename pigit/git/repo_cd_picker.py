@@ -2,7 +2,7 @@
 """
 Module: pigit/git/repo_cd_picker.py
 Description: TTY picker for ``pigit repo cd --pick`` (executor / shell cd live in git, not termui).
-Author: Project Team
+Author: Zev
 Date: 2026-03-29
 """
 

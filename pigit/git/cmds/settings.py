@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/settings.py
 Description: Git settings commands for cmd_new (set.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

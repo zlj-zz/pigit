@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/overlay_controller.py
 Description: Delegates overlay keys to the active :class:`~pigit.termui.overlay_kinds.OverlaySurface` shell.
-Author: Project Team
+Author: Zev
 Date: 2026-04-01
 """
 

@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/rebase.py
 Description: Rebase commands for cmd_new (rb.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

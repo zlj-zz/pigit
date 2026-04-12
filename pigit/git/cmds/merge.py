@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/merge.py
 Description: Merge commands for cmd_new (m.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

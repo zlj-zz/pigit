@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/tty_io.py
 Description: Low-level TTY helpers for picker scenes (cbreak reads, escape sequences, viewport math).
-Author: Project Team
+Author: Zev
 Date: 2026-03-27
 """
 

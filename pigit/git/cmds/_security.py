@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_security.py
 Description: Secure command execution and dangerous command handling.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

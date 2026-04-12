@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/working_tree.py
 Description: Working tree commands for cmd_new (w.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

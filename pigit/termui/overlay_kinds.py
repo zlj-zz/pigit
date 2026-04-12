@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/overlay_kinds.py
 Description: Overlay modality enums and structural protocols for the single-slot modal shell.
-Author: Project Team
+Author: Zev
 Date: 2026-04-01
 """
 

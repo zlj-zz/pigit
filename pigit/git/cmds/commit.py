@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/commit.py
 Description: Commit commands for cmd_new (c.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

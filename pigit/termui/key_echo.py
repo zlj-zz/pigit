@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/key_echo.py
 Description: Debug helper: read semantic keys and echo them via a :class:`Renderer`.
-Author: Project Team
+Author: Zev
 Date: 2026-03-27
 """
 

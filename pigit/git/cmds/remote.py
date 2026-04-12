@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/remote.py
 Description: Remote commands for cmd_new (r.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

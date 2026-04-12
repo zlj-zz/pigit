@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_resolver.py
 Description: Command resolver with hierarchical naming and alias resolution.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

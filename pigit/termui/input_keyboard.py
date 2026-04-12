@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/input_keyboard.py
 Description: Cross-platform semantic keyboard input (timeout read; no termios here).
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

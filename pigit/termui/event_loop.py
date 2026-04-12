@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/event_loop.py
 Description: Full-screen TUI main loop (``AppEventLoop``); runs inside :class:`~pigit.termui.session.Session`.
-Author: Project Team
+Author: Zev
 Date: 2026-03-29
 """
 

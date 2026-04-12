@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/conftest.py
 Description: Pytest fixtures for cmd_new tests.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

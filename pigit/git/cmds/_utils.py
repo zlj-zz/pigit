@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_utils.py
 Description: Utility functions for cmd_new.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

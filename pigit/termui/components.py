@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/components.py
 Description: Git TUI component tree; drawing uses an injected :class:`~pigit.termui.render.Renderer`.
-Author: Project Team
+Author: Zev
 Date: 2026-03-27
 """
 

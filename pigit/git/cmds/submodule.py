@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/submodule.py
 Description: Submodule commands for cmd_new (S.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

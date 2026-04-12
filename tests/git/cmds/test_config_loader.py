@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_config_loader.py
 Description: Tests for cmd_new config loader.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

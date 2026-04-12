@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/component_list_picker.py
 Description: Full-screen searchable list picker as a Component driven by AppEventLoop.
-Author: Project Team
+Author: Zev
 Date: 2026-03-29
 """
 

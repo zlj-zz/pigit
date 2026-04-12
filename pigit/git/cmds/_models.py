@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_models.py
 Description: Data models for cmd_new command system.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

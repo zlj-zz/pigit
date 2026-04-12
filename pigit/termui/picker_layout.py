@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/picker_layout.py
 Description: Picker viewport math, pinned-row footer text, and visual truncation helpers.
-Author: Project Team
+Author: Zev
 Date: 2026-03-27
 """
 

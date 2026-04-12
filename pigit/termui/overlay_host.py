@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/overlay_host.py
 Description: Reusable single-slot popup session for a Container-style loop root.
-Author: Project Team
+Author: Zev
 Date: 2026-04-01
 """
 

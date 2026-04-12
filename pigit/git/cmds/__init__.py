@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/__init__.py
 Description: cmd_new command system - unified exports and main processor.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

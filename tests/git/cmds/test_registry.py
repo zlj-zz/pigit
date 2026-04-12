@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_registry.py
 Description: Tests for cmd_new registry.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

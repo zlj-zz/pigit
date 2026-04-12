@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_validators.py
 Description: Tests for cmd_new validators.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

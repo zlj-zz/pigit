@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmd_picker.py
 Description: Built-in TTY command picker for ``pigit cmd --pick`` (j/k, filter, execute).
-Author: Project Team
+Author: Zev
 Date: 2026-03-22
 """
 

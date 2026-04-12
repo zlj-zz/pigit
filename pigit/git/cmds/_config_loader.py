@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_config_loader.py
 Description: User configuration loading for cmd_new aliases and overrides.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

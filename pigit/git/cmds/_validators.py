@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_validators.py
 Description: Command validation system for cmd_new.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

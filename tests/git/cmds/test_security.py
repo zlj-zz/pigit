@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_security.py
 Description: Tests for cmd_new security module.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

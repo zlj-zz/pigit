@@ -2,7 +2,7 @@
 """
 Module: tests/git/cmds/test_resolver.py
 Description: Tests for cmd_new resolver.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

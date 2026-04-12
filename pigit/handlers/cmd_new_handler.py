@@ -2,7 +2,7 @@
 """
 Module: pigit/handlers/cmd_new_handler.py
 Description: Handler for cmd_new subcommand.
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

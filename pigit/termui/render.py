@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/render.py
 Description: Session-bound Renderer for ANSI drawing (1-based row/column).
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

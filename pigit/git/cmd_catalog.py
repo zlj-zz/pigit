@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmd_catalog.py
 Description: Normalized command entries for list, search, and interactive pick.
-Author: Project Team
+Author: Zev
 Date: 2026-03-22
 """
 

@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/components_overlay.py
 Description: Popup (layout/control), bordered HelpPanel, and Alert overlay parts.
-Author: Project Team
+Author: Zev
 Date: 2026-04-01
 """
 

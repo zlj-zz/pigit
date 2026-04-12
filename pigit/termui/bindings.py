@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/bindings.py
 Description: Resolve declarative ``BINDINGS`` and ``@bind_keys`` into key handlers.
-Author: Project Team
+Author: Zev
 Date: 2026-03-29
 
 Decorator metadata is read after the class body completes; runtime mutation of

@@ -2,7 +2,7 @@
 """
 Module: pigit/ext/log.py
 Description: Root logging setup, named loggers, and uncaught-exception forwarding.
-Author: Project Team
+Author: Zev
 Date: 2024-01-01
 """
 

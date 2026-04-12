@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/input_trie.py
 Description: Escape-sequence matching (CSI/SS3) for KeyboardInput — one trie-style path.
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

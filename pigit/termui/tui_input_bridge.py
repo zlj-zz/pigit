@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/tui_input_bridge.py
 Description: InputTerminal-compatible adapter over KeyboardInput (Session owns termios).
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

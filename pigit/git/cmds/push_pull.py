@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/push_pull.py
 Description: Push and pull commands for cmd_new (p.*, f.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

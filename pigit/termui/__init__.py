@@ -2,7 +2,7 @@
 """
 Package: pigit.termui
 Description: Unified lightweight terminal UI (keyboard semantics, session, renderer).
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

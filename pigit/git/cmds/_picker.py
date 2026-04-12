@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/_picker.py
 Description: Interactive picker for cmd_new commands (--pick functionality).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

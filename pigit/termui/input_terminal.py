@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/input_terminal.py
 Description: Base class for terminal input drivers used by ``AppEventLoop`` and bridges.
-Author: Project Team
+Author: Zev
 Date: 2026-03-27
 """
 

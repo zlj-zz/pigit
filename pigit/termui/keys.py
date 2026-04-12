@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/keys.py
 Description: Semantic key strings and golden escape-sequence tables for KeyboardInput.
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/text.py
 Description: Display width and ANSI stripping — single implementation (no legacy import).
-Author: Project Team
+Author: Zev
 Date: 2026-03-26
 """
 

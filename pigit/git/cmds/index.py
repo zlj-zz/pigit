@@ -2,7 +2,7 @@
 """
 Module: pigit/git/cmds/index.py
 Description: Index/staging commands for cmd_new (i.* namespace).
-Author: Project Team
+Author: Zev
 Date: 2026-04-10
 """
 

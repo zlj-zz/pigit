@@ -2,7 +2,7 @@
 """
 Module: pigit/termui/picker_event_loop.py
 Description: AppEventLoop variant for full-screen pickers that return (exit_code, message).
-Author: Project Team
+Author: Zev
 Date: 2026-03-29
 """
 
