@@ -8,7 +8,7 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import Dict, Iterator, List, Tuple
+from typing import Iterator
 
 # Stable semantic tokens (public documentation; values match existing app conventions).
 KEY_SPACE = " "
@@ -29,7 +29,7 @@ KEY_INSERT = "insert"
 KEY_WINDOW_RESIZE = "window resize"
 
 # CSI / SS3 sequences (bytes -> semantic). Longest-match wins at parse time.
-ESC_TO_SEMANTIC: Dict[bytes, str] = {
+ESC_TO_SEMANTIC: dict[bytes, str] = {
     # Arrow keys (CSI)
     b"\x1b[A": KEY_UP,
     b"\x1b[B": KEY_DOWN,
@@ -63,10 +63,10 @@ ESC_TO_SEMANTIC: Dict[bytes, str] = {
 }
 
 
-def iter_esc_sequences_longest_first() -> Iterator[Tuple[bytes, str]]:
+def iter_esc_sequences_longest_first() -> Iterator[tuple[bytes, str]]:
     """Yield (sequence, semantic) with longest byte sequences first for prefix-safe matching."""
 
-    items: List[Tuple[bytes, str]] = list(ESC_TO_SEMANTIC.items())
+    items: list[tuple[bytes, str]] = list(ESC_TO_SEMANTIC.items())
     items.sort(key=lambda x: len(x[0]), reverse=True)
     yield from items
 
@@ -79,7 +79,7 @@ def ctrl_letter_semantic(byte: int) -> str:
 
 # Windows msvcrt: extended scancode after prefix b'\\x00' or b'\\xe0'
 # Second byte maps to semantic string (aligned with POSIX names).
-WIN_EXT_TO_SEMANTIC: Dict[bytes, str] = {
+WIN_EXT_TO_SEMANTIC: dict[bytes, str] = {
     b"\xe0H": KEY_UP,
     b"\xe0P": KEY_DOWN,
     b"\xe0K": KEY_LEFT,

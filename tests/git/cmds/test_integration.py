@@ -72,6 +72,8 @@ class TestGitCommandNewIntegration:
 
         # Mock confirmation to return False
         monkeypatch.setattr("builtins.input", lambda _: "n")
+        # Ensure CI environment is not set, otherwise confirmation is skipped
+        monkeypatch.delenv("CI", raising=False)
 
         exit_code, output = processor.execute("b.d", ["test-branch"])
         assert exit_code == 1

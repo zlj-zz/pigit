@@ -8,7 +8,7 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional
 
 from pigit.termui import keys
 
@@ -37,7 +37,7 @@ def _csi_or_ss3_byte_count(buf: bytes) -> int:
     return 0
 
 
-def match_esc_sequence(buf: bytes) -> Tuple[Optional[str], int, bool]:
+def match_esc_sequence(buf: bytes) -> tuple[Optional[str], int, bool]:
     """
     Match a leading escape sequence.
 

@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 from contextlib import contextmanager
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Optional
 
 # Raw stdin bytes this module recognizes (see also inline comments at each ``if``):
 #   \x1b (27)     ESC — starts ANSI/ECMA-48 escapes (CSI ``ESC [``, SS3 ``ESC O``, etc.).
@@ -165,7 +165,7 @@ def _echo_erase_last_char(
 def _posix_handle_esc_in_line(
     write: Callable[[str], None],
     flush: Callable[[], None],
-    buf: List[str],
+    buf: list[str],
 ) -> bool:
     """
     Handle the byte after ``ESC`` during raw line read.
@@ -184,7 +184,7 @@ def _posix_handle_esc_in_line(
     if not c2:
         return True
     if c2 == "[":  # CSI
-        parts: List[str] = []
+        parts: list[str] = []
         while True:
             ck = sys.stdin.read(1)
             if not ck:
@@ -232,7 +232,7 @@ def read_line_cancellable(
     """
     write(prompt)
     flush()
-    buf: List[str] = []
+    buf: list[str] = []
 
     if sys.platform == "win32":
         import msvcrt
@@ -305,7 +305,7 @@ def tty_ok() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
-def terminal_size() -> Tuple[int, int]:
+def terminal_size() -> tuple[int, int]:
     """Return (columns, rows). Fallback if ioctl fails."""
     try:
         sz = shutil.get_terminal_size()

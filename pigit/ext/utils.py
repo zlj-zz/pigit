@@ -3,7 +3,7 @@
 import sys
 from collections import Counter
 from math import sqrt
-from typing import Iterable, Tuple, Dict
+from typing import Iterable
 
 
 def strtobool(s: str) -> bool:
@@ -111,7 +111,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
         for word in words
     }
     # Square of sum of squares of word frequency difference.
-    frequency_sum_square: list[Tuple[str, int]] = list(
+    frequency_sum_square: list[tuple[str, int]] = list(
         map(
             lambda item: (item[0], int(sqrt(sum(map(lambda i: i**2, item[1]))))),
             frequency_difference.items(),
@@ -139,7 +139,7 @@ def similar_command(command: str, all_commands: Iterable) -> str:
 
 # Mark the type corresponding to the file suffix.
 # abcdefg hijklmn opq rst uvw xyz
-SUFFIX_TYPE: Dict[str, str] = {
+SUFFIX_TYPE: dict[str, str] = {
     "": "",
     "bat": "Batch",
     "c": "C",
@@ -200,7 +200,7 @@ SUFFIX_TYPE: Dict[str, str] = {
 }
 
 # Mark the type of some special files.
-SPECIAL_NAMES: Dict[str, str] = {
+SPECIAL_NAMES: dict[str, str] = {
     "license": "LICENSE",
     "requirements.txt": "Pip requirement",
     "vimrc": "Vim Script",
@@ -239,7 +239,7 @@ def adjudgment_type(file: str, original: bool = False) -> str:
         return suffix if original else "unknown"
 
 
-FILE_ICONS: Dict[str, str] = {
+FILE_ICONS: dict[str, str] = {
     "": "",
     "Batch": "",
     "C": "",

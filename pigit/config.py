@@ -5,11 +5,10 @@ import logging
 import os
 import re
 import textwrap
-from typing import Any, List, Literal, Dict
+from typing import Any, Literal
 
 from .ext.singleton import Singleton
 from .ext.utils import confirm, strtobool, traceback_info
-
 
 CONF_ERROR = "==error=="
 
@@ -78,7 +77,7 @@ class Config(metaclass=Singleton):
         """
     )
 
-    _KEYS: List[str] = [
+    _KEYS: list[str] = [
         "cmd_display",
         "cmd_recommend",
         "tui_help_showtime",
@@ -111,13 +110,13 @@ class Config(metaclass=Singleton):
     counter_show_invalid: bool = False
     counter_show_icon: bool = False
     counter_format: Literal["table", "simple"] = "table"
-    _counter_format_candidate: List = ["table", "simple"]
+    _counter_format_candidate: list = ["table", "simple"]
 
     # info conf
     git_config_format: Literal["normal", "table"] = "table"
-    _git_config_format_candidate: List = ["normal", "table"]
+    _git_config_format_candidate: list = ["normal", "table"]
 
-    repo_info_include: List[str] = ["remote", "branch", "log"]
+    repo_info_include: list[str] = ["remote", "branch", "log"]
 
     # repo conf
     repo_auto_append: bool = True
@@ -127,14 +126,14 @@ class Config(metaclass=Singleton):
     log_output: bool = False
 
     # Store warning messages.
-    _warnings: List = []
+    _warnings: list = []
 
     def __init__(
         self, path: str, version: str = "unknown", auto_load: bool = True
     ) -> None:
         self.config_file_path: str = path
         self.current_version: str = version
-        self.conf: Dict[str, Any] = {}
+        self.conf: dict[str, Any] = {}
         self.log = logging.getLogger()
 
         if auto_load:
@@ -157,7 +156,7 @@ class Config(metaclass=Singleton):
 
         return self
 
-    def check_and_set_value(self, key: str, value: str, config: Dict) -> None:
+    def check_and_set_value(self, key: str, value: str, config: dict) -> None:
         if key not in self._KEYS:
             self._warnings.append(f"'{key}' is not be supported!")
             return
@@ -346,10 +345,7 @@ class Config(metaclass=Singleton):
 
         # Write config with already exist custom settings.
         try:
-            with open(
-                self.config_file_path,
-                "w" if os.path.isfile(self.config_file_path) else "x",
-            ) as f:
+            with open(self.config_file_path, "w") as f:
                 f.write(self.CONFIG_TEMPLATE.format(**self.conf))
         except Exception:
             self.log.error(traceback_info())

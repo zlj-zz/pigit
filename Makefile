@@ -1,8 +1,8 @@
 Project = pigit
-PY ?= $(shell (python3 -c 'import sys; sys.exit(sys.version_info < (3, 8))' && which python3) )
+PY ?= $(shell (python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' && which python3) )
 
 ifeq ($(PY),)
-  $(error No suitable python found(>=3.8).)
+  $(error No suitable python found(>=3.9).)
 endif
 
 run:

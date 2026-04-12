@@ -7,10 +7,8 @@ Date: 2026-04-12
 """
 
 import textwrap
-from typing import Dict, List, Set
 
 from .base import ShellCompletion
-
 
 # Git helper functions template for zsh
 GIT_HELPERS_TEMPLATE = """\
@@ -116,8 +114,8 @@ class ZshCompletion(ShellCompletion):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._used_git_helpers: Set[str] = set()
-        self._arg_completion_funcs: List[str] = []
+        self._used_git_helpers: set[str] = set()
+        self._arg_completion_funcs: list[str] = []
 
     def _get_zsh_completion_func(self, comp_type: str) -> str:
         """Get zsh completion function for a completion type."""
@@ -132,7 +130,7 @@ class ZshCompletion(ShellCompletion):
         }
         return completion_map.get(comp_type, "")
 
-    def _process_arguments(self, _arguments) -> List[str]:
+    def _process_arguments(self, _arguments) -> list[str]:
         res = []
 
         for one in _arguments:
@@ -150,7 +148,7 @@ class ZshCompletion(ShellCompletion):
         return res
 
     def _process_sub_commands(
-        self, _sub_opts: Dict, _sub_opt_comps: List, relationship: List, idx: int = 1
+        self, _sub_opts: dict, _sub_opt_comps: list, relationship: list, idx: int = 1
     ):
         relation_str = ""
         arg_completion_cases = []
@@ -173,7 +171,9 @@ class ZshCompletion(ShellCompletion):
                         nested_zsh_func = self._get_zsh_completion_func(nested_arg_comp)
                         if nested_zsh_func:
                             self._used_git_helpers.add(nested_arg_comp)
-                self._process_sub_commands(_sub_c, _sub_opt_comps, relationship, idx + 1)
+                self._process_sub_commands(
+                    _sub_c, _sub_opt_comps, relationship, idx + 1
+                )
 
             if zsh_func:
                 # Has arg_completion - create case statement for it
@@ -206,9 +206,9 @@ class ZshCompletion(ShellCompletion):
             return ""
         return GIT_HELPERS_TEMPLATE
 
-    def args2complete(self, args_dict: Dict) -> str:
+    def args2complete(self, args_dict: dict) -> str:
         prog_handle: str = args_dict["prog"]
-        args: Dict = args_dict["args"]
+        args: dict = args_dict["args"]
 
         _arguments, _positions, _sub_opts = self._parse(args)
         _arguments = self._process_arguments(_arguments)
@@ -231,11 +231,12 @@ class ZshCompletion(ShellCompletion):
                     ######################
                     """
                 )
-                + _TEMP_V
-                % ("sub_opt", textwrap.indent("\n".join(_subs), "    "))
+                + _TEMP_V % ("sub_opt", textwrap.indent("\n".join(_subs), "    "))
             )
 
-            self._process_sub_commands(_sub_opts, _sub_sub_opt_comps, _sub_relationship, idx=1)
+            self._process_sub_commands(
+                _sub_opts, _sub_sub_opt_comps, _sub_relationship, idx=1
+            )
 
         _opt_case_str = ""
 

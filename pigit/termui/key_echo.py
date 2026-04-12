@@ -8,7 +8,7 @@ Date: 2026-03-27
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from pigit.termui.input_keyboard import KeyboardInput
@@ -19,7 +19,7 @@ def run_key_echo(
     keyboard: "KeyboardInput",
     renderer: "Renderer",
     *,
-    should_stop: Optional[Callable[[List[str]], bool]] = None,
+    should_stop: Optional[Callable[[list[str]], bool]] = None,
     timeout: float = 0.125,
     max_ticks: Optional[int] = None,
 ) -> None:

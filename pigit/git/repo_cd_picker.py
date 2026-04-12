@@ -9,11 +9,15 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from pigit.ext.executor import WAITING
 
-from pigit.termui.component_list_picker import PICK_EXIT_CTRL_C, PickerRow, SearchableListPicker
+from pigit.termui.component_list_picker import (
+    PICK_EXIT_CTRL_C,
+    PickerRow,
+    SearchableListPicker,
+)
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
@@ -58,7 +62,7 @@ class RepoCdPickerLoop(PickerAppEventLoop):
         def render_line(r: PickerRow) -> str:
             return f"{r.title}  {r.detail}"
 
-        def on_confirm(r: PickerRow) -> Optional[Tuple[int, Optional[str]]]:
+        def on_confirm(r: PickerRow) -> Optional[tuple[int, Optional[str]]]:
             path = r.ref
             assert isinstance(path, str)
             # Return path via result_message; executor will run after Session exits
@@ -105,7 +109,7 @@ def run_repo_cd_picker(
     *,
     initial_filter: str = "",
     pick_alt_screen: bool = False,
-) -> Tuple[int, Optional[str]]:
+) -> tuple[int, Optional[str]]:
     """
     Interactive repo directory picker; on confirm runs shell ``cd`` + ``exec $SHELL``.
 

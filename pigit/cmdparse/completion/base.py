@@ -9,7 +9,7 @@ Date: 2026-04-12
 import os
 import re
 from enum import Enum
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 
 class CompletionType(Enum):
@@ -52,7 +52,7 @@ class ShellCompletion:
     def __init__(
         self,
         prog_name: Optional[str] = None,
-        complete_vars: Optional[Dict] = None,
+        complete_vars: Optional[dict] = None,
         script_dir: Optional[str] = None,
         script_name: Optional[str] = None,
     ) -> None:
@@ -94,14 +94,13 @@ class ShellCompletion:
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
-    def _parse(self, args: Dict) -> Tuple:
+    def _parse(self, args: dict) -> tuple:
         """Parse args dict and extract completion metadata.
 
         Args:
             args: Dictionary of command arguments and properties.
 
-        Returns:
-            Tuple of (arguments, positions, sub_opts) with completion metadata.
+        Returns: tuple of (arguments, positions, sub_opts) with completion metadata.
         """
         _arguments = []
         _positions = []
@@ -124,7 +123,9 @@ class ShellCompletion:
                     "_positions": p,
                     "_sub_opts": s,
                     "help": prop.get("help", "_").replace("\n", ""),
-                    "arg_completion": prop.get("arg_completion", ""),  # NEW: extract arg_completion
+                    "arg_completion": prop.get(
+                        "arg_completion", ""
+                    ),  # NEW: extract arg_completion
                 }
             elif name.startswith("-"):
                 _arguments.append((name, prop.get("help", "_").replace("\n", "")))
@@ -153,7 +154,7 @@ class ShellCompletion:
 
         sub_q = [_sub_opts]
         while sub_q:
-            temp: Dict = sub_q.pop(0)
+            temp: dict = sub_q.pop(0)
             for opt_name, p in temp.items():
                 comp_keys.add(opt_name)
 

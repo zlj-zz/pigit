@@ -1,12 +1,12 @@
 import sys
-from typing import List, Optional
+from typing import Optional
 
 from pigit.entry import pigit
 from pigit.ext.func import time_it
 
 
 @time_it
-def _active(prefixes: Optional[List] = None):
+def _active(prefixes: Optional[list] = None):
     try:
         _args = (prefixes or []) + sys.argv[1:]
         pigit(_args)

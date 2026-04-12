@@ -9,7 +9,7 @@ Date: 2026-03-26
 from __future__ import annotations
 
 import re
-from typing import List, Pattern
+from typing import Pattern
 
 from pigit.termui.wcwidth_table import get_width
 
@@ -32,7 +32,7 @@ def sanitize_for_display(text: str, max_scalars: int = 4096) -> str:
     """
 
     stripped = plain(text.replace("\x1b", ""))
-    out: List[str] = []
+    out: list[str] = []
     n = 0
     for ch in stripped:
         o = ord(ch)

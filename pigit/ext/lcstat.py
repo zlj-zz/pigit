@@ -6,7 +6,7 @@ import re
 import stat
 import threading
 from concurrent.futures import ProcessPoolExecutor
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Optional
 
 from .log import logger
 from .utils import adjudgment_type, confirm
@@ -14,13 +14,12 @@ from .utils import adjudgment_type, confirm
 if TYPE_CHECKING:
     from concurrent.futures import Future
 
-
 FILES_NUM = "1"
 LINES_NUM = "2"
 FILES_CHANGE = "3"
 LINES_CHANGE = "4"
 
-Absolute_Rules: List[Dict] = [
+Absolute_Rules: list[dict] = [
     # Exclude `.git` folder.
     {"pattern": re.compile(r"\.git$|\.git\/"), "include": False},
     {
@@ -207,16 +206,16 @@ class Counter:
         # selected_rule = max(res, key=lambda rule: len(str(rule["pattern"])))
 
     def count_files(
-        self, root: str, files: List[str]
-    ) -> Tuple[int, Dict[str, Dict[str, int]], List[str], int, int]:
+        self, root: str, files: list[str]
+    ) -> tuple[int, dict[str, dict[str, int]], list[str], int, int]:
         """Statistics files.
 
         Args:
             root (str): Absolute or relative path to the directory.
-            files (List[str]): The list of all file names under the `root` path.
+            files (list[str]): The list of all file names under the `root` path.
 
         Returns:
-            Tuple[int, Dict, List[str], int, int]: total size of file,
+            tuple[int, Dict, list[str], int, int]: total size of file,
                 result dict, invalid file list, invalid file num, valid file num.
         """
         total_size = 0
@@ -260,7 +259,7 @@ class Counter:
 
         return total_size, result, invalids, invalid_num, valid_num
 
-    def update_dfd(self, src_d: Dict, d: Dict):
+    def update_dfd(self, src_d: dict, d: dict):
         if not d:
             return
 
@@ -279,7 +278,7 @@ class Counter:
 
     def count_with_multiprocessing(
         self, root_path: str, use_ignore: bool
-    ) -> Tuple[int, Dict[str, Dict[str, int]], List[str]]:
+    ) -> tuple[int, dict[str, dict[str, int]], list[str]]:
         """
         Args:
             root_path (str): The directory path to be counted.
@@ -287,12 +286,12 @@ class Counter:
                 directories need to be recognized, and rules generated.
 
         Returns:
-            Tuple[int, Dict[str, Dict[str, int]], List]: total size,
+            tuple[int, dict[str, dict[str, int]], List]: total size,
                 result dict, invalid file list.
         """
         total_size: int = 0
-        result: Dict[str, Dict[str, int]] = {}
-        invalids: List[str] = []
+        result: dict[str, dict[str, int]] = {}
+        invalids: list[str] = []
         invalid_num: int = 0
         valid_num: int = 0
 
@@ -315,9 +314,10 @@ class Counter:
 
         max_queue: int = (os.cpu_count() or 1) * 50
 
-        with CounterLockManage(self), ProcessPoolExecutor(
-            max_workers=(os.cpu_count() or 1) + 4
-        ) as pool:
+        with (
+            CounterLockManage(self),
+            ProcessPoolExecutor(max_workers=(os.cpu_count() or 1) + 4) as pool,
+        ):
             for root, _, files in os.walk(root_path, onerror=self.walk_err_cb):
                 if not files:
                     continue
@@ -353,18 +353,18 @@ class Counter:
         file_name = root_path.replace("/", "_").replace("\\", "_").replace(".", "_")
         return os.path.join(self.saved_dir, file_name)
 
-    def load(self, root_path: str) -> Dict[str, Dict[str, int]]:
+    def load(self, root_path: str) -> dict[str, dict[str, int]]:
         """Load count result."""
         file_path = self._saved_path(root_path)
 
         try:
             with open(file_path, "r") as f:
-                res: Dict = json.load(f)
+                res: dict = json.load(f)
                 return res
         except Exception:
             return {}
 
-    def dump(self, root_path: str, result: Dict) -> bool:
+    def dump(self, root_path: str, result: dict) -> bool:
         """Save count result.
 
         Args:
@@ -386,7 +386,7 @@ class Counter:
 
     def diff_count(
         self, root_path: str, use_ignore: bool
-    ) -> Tuple[str, Dict[str, Dict[str, int]], List[str]]:
+    ) -> tuple[str, dict[str, dict[str, int]], list[str]]:
         total_size, result, invalids = self.count(root_path, use_ignore)
         result_old = self.load(root_path)
 

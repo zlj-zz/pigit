@@ -9,7 +9,7 @@ Date: 2026-03-26
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from pigit.termui.input_keyboard import KeyboardInput
 from pigit.termui.input_terminal import InputTerminal
@@ -43,6 +43,6 @@ class TermuiInputBridge(InputTerminal):
 
     def get_input(
         self, raw_keys: bool = False
-    ) -> Tuple[List[str], Optional[List[int]]]:
+    ) -> tuple[list[str], Optional[list[int]]]:
         keys = self._kb.read_keys(timeout=self._timeout)
         return (keys, None) if not raw_keys else (keys, None)

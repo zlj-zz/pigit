@@ -8,7 +8,7 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Sequence, Tuple
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from pigit.termui.session import Session
@@ -86,7 +86,9 @@ class Renderer:
             cur += 1
         self.flush()
 
-    def draw_panel(self, content: List[str], x: int, y: int, size: Tuple[int, int]) -> None:
+    def draw_panel(
+        self, content: list[str], x: int, y: int, size: tuple[int, int]
+    ) -> None:
         """
         Draw a multi-line block in the style of the historical Git TUI ``Render.draw``.
 

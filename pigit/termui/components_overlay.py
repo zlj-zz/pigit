@@ -9,7 +9,7 @@ Date: 2026-04-01
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, ClassVar, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Optional
 
 from pigit.termui.bindings import resolve_key_handlers_merged
 from pigit.termui.components import Component, _looks_like_overlay_host
@@ -19,7 +19,7 @@ from pigit.termui.text import sanitize_for_display
 
 _LOG = logging.getLogger(__name__)
 
-HelpEntry = Tuple[str, str]
+HelpEntry = tuple[str, str]
 
 # Box-drawing (UTF-8).
 _BOX_H = "\u2500"
@@ -49,7 +49,7 @@ class HelpPanel(Component):
 
     NAME = "help"
 
-    TOGGLE_HELP_SEMANTIC_KEYS: ClassVar[Tuple[str, ...]] = ("?",)
+    TOGGLE_HELP_SEMANTIC_KEYS: ClassVar[tuple[str, ...]] = ("?",)
 
     BINDINGS = [
         (keys.KEY_DOWN, "scroll_down"),
@@ -64,20 +64,20 @@ class HelpPanel(Component):
         inner_height: Optional[int] = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
         renderer: Any = None,
     ) -> None:
         super().__init__(x=x, y=y, size=size, renderer=renderer)
         self._inner_w_cfg = inner_width
         self._inner_h_cfg = inner_height
-        self._lines: List[str] = []
+        self._lines: list[str] = []
         self._offset = 0
         self._inner_w = 40
         self._scroll_h = 6
         self._outer_w = 42
         self.outer_row_count = 10
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         tw, th = int(size[0]), int(size[1])
         inner_w = (
             self._inner_w_cfg if self._inner_w_cfg is not None else max(24, tw // 2)
@@ -94,8 +94,8 @@ class HelpPanel(Component):
         self.outer_row_count = inner_rows + 2
         self.fresh()
 
-    def set_entries(self, entries: List[HelpEntry]) -> None:
-        lines: List[str] = []
+    def set_entries(self, entries: list[HelpEntry]) -> None:
+        lines: list[str] = []
         for key_disp, desc in entries:
             lines.append(f"{key_disp}  {desc}")
         self._lines = lines
@@ -118,7 +118,7 @@ class HelpPanel(Component):
             raise TypeError(
                 "Host must expose a non-optional `children` mapping (e.g. Container root)."
             )
-        rows: List[HelpEntry] = []
+        rows: list[HelpEntry] = []
         for panel in children.values():
             rows.extend(panel.get_help_entries())
         self.set_entries(rows[:max_rows])
@@ -133,14 +133,14 @@ class HelpPanel(Component):
     def fresh(self) -> None:
         pass
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         if self._renderer is None:
             return
         inner = self._inner_w
         ow = self._outer_w
         title = " Help   esc close "
         title_vis = title[:inner].ljust(inner)
-        frame: List[str] = []
+        frame: list[str] = []
         frame.append(_BOX_TL + _BOX_H * (ow - 2) + _BOX_TR)
         frame.append(_BOX_V + title_vis + _BOX_V)
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
@@ -180,11 +180,11 @@ class Popup(Component):
         child: Component,
         *,
         session_owner: Optional[Component] = None,
-        offset: Optional[Tuple[int, int]] = None,
+        offset: Optional[tuple[int, int]] = None,
         exit_key: str = keys.KEY_ESC,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
         renderer: Any = None,
     ) -> None:
         self._child = child
@@ -192,7 +192,7 @@ class Popup(Component):
         self.exit_key = exit_key
         self._session_owner = session_owner
         self.open = False
-        self._term_size: Tuple[int, int] = (80, 24)
+        self._term_size: tuple[int, int] = (80, 24)
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size, renderer=renderer)
@@ -302,7 +302,7 @@ class Popup(Component):
     def hide(self) -> None:
         self.open = False
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         self._term_size = (int(size[0]), int(size[1]))
         self._child.resize(size)
         self._layout_content()
@@ -339,7 +339,7 @@ class Popup(Component):
                 "Subclass Popup without session_owner must override _on_exit_key."
             )
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         self._sync_renderer_from_session_owner()
         if not self.open or self._renderer is None:
             return
@@ -361,7 +361,7 @@ class AlertDialogBody(Component):
         shell: "AlertDialog",
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
         message: str = "",
         on_result: Optional[Callable[[bool], None]] = None,
         inner_width: Optional[int] = None,
@@ -383,7 +383,7 @@ class AlertDialogBody(Component):
         self._inner_w = 40
         self._outer_w = 42
         self.outer_row_count = 8
-        self._frame_lines: List[str] = []
+        self._frame_lines: list[str] = []
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size, renderer=renderer)
 
@@ -401,7 +401,7 @@ class AlertDialogBody(Component):
     def reset_state(self) -> None:
         self.open = False
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         self._term_cols = int(size[0])
         self._term_lines = int(size[1])
         self._rebuild_frame()
@@ -425,18 +425,18 @@ class AlertDialogBody(Component):
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         if not self.open or self._renderer is None:
             return
         if not self._frame_lines:
             self._rebuild_frame()
         self._renderer.draw_panel(self._frame_lines, self.x, self.y, self._size)
 
-    def _build_bordered_frame(self) -> List[str]:
+    def _build_bordered_frame(self) -> list[str]:
         inner = self._inner_w
         ow = inner + 2
         body = sanitize_for_display(self._message)
-        wrapped: List[str] = []
+        wrapped: list[str] = []
         for raw in body.splitlines() or [body]:
             seg = raw
             while seg:
@@ -445,12 +445,12 @@ class AlertDialogBody(Component):
         if not wrapped:
             wrapped = [""]
         footer = f"[{self._confirm_key}] OK  [{self._cancel_key}] Cancel"
-        footer_lines: List[str] = []
+        footer_lines: list[str] = []
         rest = footer
         while rest:
             footer_lines.append(rest[:inner])
             rest = rest[inner:]
-        frame: List[str] = []
+        frame: list[str] = []
         frame.append(_BOX_TL + _BOX_H * (ow - 2) + _BOX_TR)
         title_vis = " Alert "[:inner].ljust(inner)
         frame.append(_BOX_V + title_vis + _BOX_V)
@@ -483,7 +483,7 @@ class AlertDialog(Popup):
         session_owner: Component,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
         inner_width: Optional[int] = None,
         on_result: Optional[Callable[[bool], None]] = None,
         confirm_key: str = keys.KEY_ENTER,
@@ -559,5 +559,5 @@ class AlertDialog(Popup):
         self.hide()
         self._pane.reset_state()
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)

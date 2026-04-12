@@ -2,7 +2,6 @@
 
 """This file save some model class of git info class."""
 
-from typing import List
 from dataclasses import dataclass
 
 
@@ -76,7 +75,7 @@ class Commit:
     extra_info: str
 
     # Tag list of the commit.
-    tag: List
+    tag: list
 
     action: str = ""
 

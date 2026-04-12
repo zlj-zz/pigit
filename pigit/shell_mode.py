@@ -1,7 +1,7 @@
 import os
 import cmd
 import functools
-from typing import TYPE_CHECKING, Callable, List, Optional, IO
+from typing import TYPE_CHECKING, Callable, Optional, IO
 
 from plenty import get_console
 
@@ -84,7 +84,7 @@ class PigitShell(cmd.Cmd):
         if not arg:
             return super().do_help(arg)
 
-        args: List[str] = arg.split()
+        args: list[str] = arg.split()
         for value in args:
             self.stdout.write(f"{value}: ")
             super().do_help(value)

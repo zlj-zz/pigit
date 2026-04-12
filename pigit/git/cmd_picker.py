@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import shlex
 import sys
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
-from pigit.termui.component_list_picker import PICK_EXIT_CTRL_C, PickerRow, SearchableListPicker
+from pigit.termui.component_list_picker import (
+    PICK_EXIT_CTRL_C,
+    PickerRow,
+    SearchableListPicker,
+)
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import read_line_cancellable, terminal_size, tty_ok
@@ -56,7 +60,7 @@ class CommandPickerLoop(PickerAppEventLoop):
         self._terminal_too_small_msg = _TERMINAL_TOO_SMALL_MSG
 
         all_entries = iter_command_entries(proxy.cmds, proxy.extra_cmd_keys)
-        rows: List[PickerRow] = [
+        rows: list[PickerRow] = [
             PickerRow(
                 title=e.name,
                 detail=f"{e.help_text} {e.command_repr}".strip(),
@@ -70,7 +74,7 @@ class CommandPickerLoop(PickerAppEventLoop):
             assert isinstance(ent, CommandEntry)
             return proxy.generate_help_by_key(ent.name, use_color=False)
 
-        def on_confirm(r: PickerRow) -> Optional[Tuple[int, Optional[str]]]:
+        def on_confirm(r: PickerRow) -> Optional[tuple[int, Optional[str]]]:
             ent = r.ref
             assert isinstance(ent, CommandEntry)
             return _execute_command_entry(proxy, ent)
@@ -111,7 +115,7 @@ class CommandPickerLoop(PickerAppEventLoop):
 def _execute_command_entry(
     proxy: "GitProxy",
     entry: CommandEntry,
-) -> Optional[Tuple[int, Optional[str]]]:
+) -> Optional[tuple[int, Optional[str]]]:
     """Run one command entry; ``None`` means stay in picker (sub-prompt cancelled)."""
     write = sys.stdout.write
     flush = sys.stdout.flush
@@ -149,7 +153,7 @@ def run_command_picker(
     proxy: "GitProxy",
     *,
     pick_alt_screen: bool = False,
-) -> Tuple[int, Optional[str]]:
+) -> tuple[int, Optional[str]]:
     """
     Interactive picker over ``proxy`` commands (requires a real TTY).
 

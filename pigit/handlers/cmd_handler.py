@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import sys
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 from ..const import CMD_TYPE_LIST_SENTINEL, EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH
 from ..git import GitProxy, get_extra_cmds
@@ -20,15 +20,15 @@ class CmdHandler(BaseHandler):
         self,
         ctx: "Context",
         args: "Namespace",
-        unknown: List[str],
+        unknown: list[str],
     ) -> None:
         super().__init__(ctx)
         self.args = args
         self.unknown = unknown
 
-    def _exclusive_mode_labels(self) -> List[str]:
+    def _exclusive_mode_labels(self) -> list[str]:
         """Human-readable labels for mutually exclusive ``cmd`` modes."""
-        modes: List[str] = []
+        modes: list[str] = []
         if self.args.shell:
             modes.append("--shell")
         if getattr(self.args, "cmd_list", False):
@@ -48,7 +48,7 @@ class CmdHandler(BaseHandler):
             repo_path, _repo_conf = self.repo.confirm_repo()
             self.repo.add_repos([repo_path])
 
-        extra_cmd: Dict = {}
+        extra_cmd: dict = {}
         extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
 
         git_processor = GitProxy(

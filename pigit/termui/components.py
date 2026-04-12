@@ -10,17 +10,19 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
-from pigit.termui.bindings import BindingsList, list_bindings, resolve_key_handlers_merged
+from pigit.termui.bindings import (
+    BindingsList,
+    list_bindings,
+    resolve_key_handlers_merged,
+)
 from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
     from pigit.termui.render import Renderer
 
-
 NONE_SIZE = (0, 0)
-
 
 ActionLiteral = Literal["goto"]
 KeyRouting = Literal["child_first", "switch_first"]
@@ -48,8 +50,8 @@ class Component(ABC):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        children: Optional[Dict[str, "Component"]] = None,
+        size: Optional[tuple[int, int]] = None,
+        children: Optional[dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
         renderer: Optional["Renderer"] = None,
     ) -> None:
@@ -128,7 +130,7 @@ class Component(ABC):
         for child in self.children.values():
             child.update(action, **data)
 
-    def resize(self, size: Tuple[int, int]):
+    def resize(self, size: tuple[int, int]):
         """Response to the resize event.
 
         Re-set the size of component. And refresh the content.
@@ -146,7 +148,7 @@ class Component(ABC):
             child.resize(size)
 
     @abstractmethod
-    def _render(self, size: Optional[Tuple[int, int]] = None):
+    def _render(self, size: Optional[tuple[int, int]] = None):
         """Render the component, overwritten in sub-class.
 
         Here is do nothing. If needed, should overwritten in sub-class.
@@ -179,7 +181,7 @@ class Component(ABC):
 
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def get_help_entries(self) -> List[Tuple[str, str]]:
+    def get_help_entries(self) -> list[tuple[str, str]]:
         """
         Return ``(key display, description)`` rows for the help panel.
 
@@ -196,9 +198,9 @@ def _truncate_help_line(text: str, max_len: int = 120) -> str:
     return text[: max_len - 1] + "\u2026"
 
 
-def _default_help_entries(component: "Component") -> List[Tuple[str, str]]:
+def _default_help_entries(component: "Component") -> list[tuple[str, str]]:
     cls = type(component)
-    rows: List[Tuple[str, str]] = []
+    rows: list[tuple[str, str]] = []
     for semantic_key, target in list_bindings(component, cls)[:64]:
         desc = _describe_binding_target(component, target)
         rows.append((semantic_key, _truncate_help_line(desc)))
@@ -224,10 +226,10 @@ class Container(Component):
 
     def __init__(
         self,
-        children: Dict[str, "Component"],
+        children: dict[str, "Component"],
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
         key_routing: KeyRouting = "child_first",
@@ -263,7 +265,7 @@ class Container(Component):
         else:
             raise ComponentError("Not support action of ~Container.")
 
-    def _render(self, size: Optional[Tuple[int, int]] = None):
+    def _render(self, size: Optional[tuple[int, int]] = None):
         """Only render the activated child component."""
         for component in self.children.values():
             if component.is_activated():
@@ -326,8 +328,8 @@ class LineTextBrowser(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        content: Optional[List[str]] = None,
+        size: Optional[tuple[int, int]] = None,
+        content: Optional[list[str]] = None,
         renderer: Optional["Renderer"] = None,
     ) -> None:
         super().__init__(x, y, size, renderer=renderer)
@@ -339,11 +341,11 @@ class LineTextBrowser(Component):
 
         self._r = [0, self._size[1]]  # display range.
 
-    def resize(self, size: Tuple[int, int]):
+    def resize(self, size: tuple[int, int]):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render(self, size: Optional[Tuple[int, int]] = None):
+    def _render(self, size: Optional[tuple[int, int]] = None):
         if self._content and self._renderer is not None:
             self._renderer.draw_panel(
                 self._content[self._i : self._i + self._max_line],
@@ -370,8 +372,8 @@ class ItemSelector(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        content: Optional[List[str]] = None,
+        size: Optional[tuple[int, int]] = None,
+        content: Optional[list[str]] = None,
         renderer: Optional["Renderer"] = None,
     ) -> None:
         super().__init__(x, y, size, renderer=renderer)
@@ -395,7 +397,7 @@ class ItemSelector(Component):
         """Content rows in the current scroll window (pagination / virtual window)."""
         return self.content[self._r_start : self._r_start + self.visible_row_count]
 
-    def set_content(self, content: List[str]):
+    def set_content(self, content: list[str]):
         self.content = content
         self.content_len = len(self.content) - 1
 
@@ -405,7 +407,7 @@ class ItemSelector(Component):
     def update(self, action: ActionLiteral, **data):
         pass
 
-    def _render(self, size: Optional[Tuple[int, int]] = None):
+    def _render(self, size: Optional[tuple[int, int]] = None):
         if not self.content or self._renderer is None:
             return
 
@@ -451,7 +453,7 @@ class GitPanelLazyResizeMixin:
 
     _panel_loaded: bool = False
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         self._size = size
         if self.is_activated():
             self.fresh()
@@ -460,5 +462,3 @@ class GitPanelLazyResizeMixin:
             self.set_content(["Loading..."])
             self.curr_no = 0
             self._r_start = 0
-
-

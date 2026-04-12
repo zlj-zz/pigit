@@ -2,7 +2,7 @@
 # The PIGIT terminal tool entry file.
 
 import os
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from plenty import get_console
 from plenty.table import Table
@@ -27,12 +27,10 @@ from .info import introduce, show_gitconfig
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
 
-
 # ===============
 # Configuration.
 # ===============
 conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
-
 
 # ==============
 # Global handle
@@ -40,7 +38,6 @@ conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_war
 ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
 console = get_console()
-
 
 # =====================
 # main command `pigit`
@@ -78,7 +75,7 @@ def pigit(args: "Namespace", _) -> None:
 
         for cmd_def in registry.get_all():
             meta = cmd_def.meta
-            # Handle Union[CompletionType, List[CompletionType]]
+            # Handle Union[CompletionType, list[CompletionType]]
             if meta.arg_completion is None:
                 arg_comp_value = ""
             elif isinstance(meta.arg_completion, list):
@@ -173,7 +170,6 @@ def pigit(args: "Namespace", _) -> None:
         if handler.preprocess():
             handler.execute()
 
-
 # yapf: enable
 pigit.add_argument(
     "-v",
@@ -265,7 +261,7 @@ tools_group.add_argument(
 @argument(
     "command", nargs="?", type=str, default=None, help="Short git command or other."
 )
-def _(args: "Namespace", unknown: List):
+def _(args: "Namespace", unknown: list):
     """If you want to use some original git commands, please use -- to indicate."""
 
     CmdHandler(ctx.current(), args, unknown).execute()
@@ -313,6 +309,7 @@ def _(args: "Namespace", unknown: List):
 def _(args: "Namespace", _):
     """Execute new short git commands."""
     from .handlers.cmd_new_handler import handle_cmd_new
+
     exit_code = handle_cmd_new(args)
     if exit_code != 0:
         raise SystemExit(exit_code)
@@ -359,8 +356,8 @@ repo.sub_parser("clear", help="clear the all repos.")(
 
 @repo.sub_parser("report", help="genereate report of all repos.")
 @argument("--author", type=str, required=True, help="select author of commits.")
-@argument("--since",  type=str,default='', help="start range of commits.")
-@argument("--until",  type=str,default='', help="end range of commits.")
+@argument("--since", type=str, default="", help="start range of commits.")
+@argument("--until", type=str, default="", help="end range of commits.")
 def repo_report(args, _):
     RepoCommandHandler(ctx.current()).report(args)
 
@@ -400,7 +397,6 @@ for sub_cmd, prop in repo_options.items():
             )
         )
     )
-
 
 # =============================================
 # sub command `open`

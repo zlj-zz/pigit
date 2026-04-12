@@ -9,7 +9,7 @@ Date: 2026-04-01
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Protocol, Tuple
+from typing import Optional, Protocol
 
 
 class OverlayKind(Enum):
@@ -51,5 +51,5 @@ class OverlaySurface(Protocol):
     def hide(self) -> None:
         """Release visible state for this shell."""
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         """Draw this shell when active (framework calls from the host)."""

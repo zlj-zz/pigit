@@ -9,9 +9,8 @@ Date: 2026-03-27
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List, Tuple
 
-WIDTHS: List[Tuple[int, int]] = [
+WIDTHS: list[tuple[int, int]] = [
     (126, 1),
     (159, 0),
     (687, 1),

@@ -9,7 +9,7 @@ Date: 2026-03-29
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Callable, Optional, Sequence, TYPE_CHECKING
 
 from pigit.termui.components import Component
 from pigit.termui.picker_layout import (
@@ -36,7 +36,7 @@ class PickerRow:
     ref: object = None
 
 
-def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> List[PickerRow]:
+def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRow]:
     """Case-insensitive substring match on ``title`` and ``detail``."""
 
     if not needle.strip():
@@ -90,7 +90,7 @@ class SearchableListPicker(Component):
         *,
         title_line: str,
         render_line: Callable[[PickerRow], str],
-        on_confirm: Callable[[PickerRow], Optional[Tuple[int, Optional[str]]]],
+        on_confirm: Callable[[PickerRow], Optional[tuple[int, Optional[str]]]],
         terminal_too_small_msg: str,
         initial_filter: str = "",
     ) -> None:
@@ -102,7 +102,7 @@ class SearchableListPicker(Component):
         self._terminal_too_small_msg = terminal_too_small_msg
 
         self._needle = initial_filter
-        self._filtered: List[PickerRow] = apply_picker_filter(
+        self._filtered: list[PickerRow] = apply_picker_filter(
             self._all_rows, self._needle
         )
         self._index = 0
@@ -140,7 +140,7 @@ class SearchableListPicker(Component):
         assert self._loop is not None
         self._loop.quit("picker", exit_code=exit_code, result_message=message)
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         r = self._renderer
         assert r is not None
 

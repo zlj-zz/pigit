@@ -1,5 +1,5 @@
 from time import sleep
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from .git.repo import GitFileT, GitFuncT, Repo
 from .termui import (
@@ -32,8 +32,8 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        content: Optional[List[str]] = None,
+        size: Optional[tuple[int, int]] = None,
+        content: Optional[list[str]] = None,
         *,
         alert_inner_width: Optional[int] = None,
     ) -> None:
@@ -68,7 +68,7 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         files_str = [file.display_str for file in files]
         self.set_content(files_str)
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._alert_popup.resize(size)
 
@@ -132,8 +132,8 @@ class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        content: Optional[List[str]] = None,
+        size: Optional[tuple[int, int]] = None,
+        content: Optional[list[str]] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
@@ -184,8 +184,8 @@ class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
-        content: Optional[List[str]] = None,
+        size: Optional[tuple[int, int]] = None,
+        content: Optional[list[str]] = None,
     ) -> None:
         super().__init__(x, y, size, content)
 
@@ -228,7 +228,7 @@ class ContentDisplay(LineTextBrowser):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[Tuple[int, int]] = None,
+        size: Optional[tuple[int, int]] = None,
     ) -> None:
         super().__init__(x, y, size, "")
 
@@ -281,7 +281,7 @@ class GitTuiRoot(OverlayHostMixin, Container):
         *,
         help_popup_width: Optional[int] = None,
         help_popup_height: Optional[int] = None,
-        help_offset: Optional[Tuple[int, int]] = None,
+        help_offset: Optional[tuple[int, int]] = None,
         alert_inner_width: Optional[int] = None,
     ) -> None:
         status_panel = StatusPanel(alert_inner_width=alert_inner_width)
@@ -339,11 +339,11 @@ class GitTuiRoot(OverlayHostMixin, Container):
             return
         super()._handle_event(key)
 
-    def resize(self, size: Tuple[int, int]) -> None:
+    def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._help_popup.resize(size)
 
-    def _render(self, size: Optional[Tuple[int, int]] = None) -> None:
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         super()._render(size)
         self._render_termui_overlays()
 

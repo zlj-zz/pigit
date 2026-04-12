@@ -5,14 +5,13 @@ import os
 import re
 import random
 import textwrap
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 from pigit.ext.utils import confirm, similar_command, traceback_info
 from pigit.ext.executor import WAITING
 from pigit.ext.executor_factory import ExecutorFactory
 from .cmd_builtin import builtin_cmds, GitCommandType
 from .cmd_catalog import iter_command_entries
-
 
 PROMPT_WITH_TIPS = 1  # Prompt for possible commands and try again
 
@@ -46,9 +45,7 @@ class GitProxy:
                 )
             self.cmds.update(extra_cmds)
 
-        self.extra_cmd_keys: frozenset = frozenset(
-            (extra_cmds or {}).keys()
-        )
+        self.extra_cmd_keys: frozenset = frozenset((extra_cmds or {}).keys())
 
     def _is_extra_key(self, key: str) -> bool:
         return key in self.extra_cmd_keys
@@ -84,8 +81,8 @@ class GitProxy:
         return color_command
 
     def process_command(
-        self, short_cmd: str, args: Optional[Union[List, Tuple]] = None
-    ) -> Tuple[int, str]:
+        self, short_cmd: str, args: Optional[Union[list, tuple]] = None
+    ) -> tuple[int, str]:
         """Process command and arguments.
 
         Args:
@@ -93,7 +90,7 @@ class GitProxy:
             args (list|None, optional): command arguments. Defaults to None.
 
         Returns:
-            Tuple[int, str]: (code, msg)
+            tuple[int, str]: (code, msg)
                 code:
                     0: successful with msg.
                     1: has no option item.
@@ -101,7 +98,7 @@ class GitProxy:
                     3: func cmd exec error.
                     5: not supported cmd type.
         """
-        msgs: List[str] = []
+        msgs: list[str] = []
         option = self.cmds.get(short_cmd)
 
         # Invalid, if need suggest.
@@ -144,7 +141,7 @@ class GitProxy:
 
         return 0, "\n".join(msgs)
 
-    def do(self, short_cmd: str, args: Optional[Union[List, Tuple]] = None) -> str:
+    def do(self, short_cmd: str, args: Optional[Union[list, tuple]] = None) -> str:
         """Process command and arguments."""
 
         code, msg = self.process_command(short_cmd, args)
@@ -207,9 +204,7 @@ class GitProxy:
         extra_prefix = "[extra] " if self._is_extra_key(key) else ""
         if use_color:
             if extra_prefix:
-                return (
-                    f"  {extra_prefix}`{key:<11}`<ok>{help_msg}`{command_msg}`<gold>"
-                )
+                return f"  {extra_prefix}`{key:<11}`<ok>{help_msg}`{command_msg}`<gold>"
             return f"  `{key:<13}`<ok>{help_msg}`{command_msg}`<gold>"
         if extra_prefix:
             return f"  {extra_prefix}{key:<11} {_help}{command_msg}"
@@ -308,7 +303,7 @@ class GitProxy:
         )
 
 
-def get_extra_cmds(name: str, path: str) -> Dict:
+def get_extra_cmds(name: str, path: str) -> dict:
     """Get custom cmds.
 
     Load the `extra_cmds.py` file under PIGIT HOME, check whether `extra_cmds`

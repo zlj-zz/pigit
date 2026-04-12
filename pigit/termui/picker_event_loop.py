@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Optional, Tuple
+from typing import Optional
 
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
@@ -42,7 +42,7 @@ class PickerAppEventLoop(AppEventLoop):
                 "PickerAppEventLoop: unhandled exception in main loop: %s", e
             )
 
-    def run_with_result(self) -> Tuple[int, Optional[str]]:
+    def run_with_result(self) -> tuple[int, Optional[str]]:
         """
         Same as :meth:`AppEventLoop.run` (``Session`` + ``self._alt`` + renderer bind),
         but map normal picker exit to ``(exit_code, message)`` via re-raised :exc:`ExitEventLoop`.

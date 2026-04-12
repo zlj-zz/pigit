@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import BinaryIO, Callable, List, Optional, Tuple
+from typing import BinaryIO, Callable, Optional
 
 from pigit.termui import keys
 from pigit.termui.geometry import TerminalSize
@@ -100,7 +100,7 @@ class KeyboardInput:
             time.sleep(0.001)
         return b""
 
-    def _consume_one(self) -> Tuple[Optional[str], int]:
+    def _consume_one(self) -> tuple[Optional[str], int]:
         buf = self._buffer
         if not buf:
             return None, 0
@@ -157,8 +157,8 @@ class KeyboardInput:
         except UnicodeDecodeError:
             return chr(chunk[0]), ln
 
-    def _drain_buffer(self) -> List[str]:
-        out: List[str] = []
+    def _drain_buffer(self) -> list[str]:
+        out: list[str] = []
         while True:
             key, n = self._consume_one()
             if n == 0:
@@ -167,7 +167,7 @@ class KeyboardInput:
                 out.append(key)
         return out
 
-    def _resize_events(self) -> List[str]:
+    def _resize_events(self) -> list[str]:
         cur = TerminalSize.from_os()
         if self._last_size is None:
             self._last_size = cur
@@ -177,7 +177,7 @@ class KeyboardInput:
             return [keys.KEY_WINDOW_RESIZE]
         return []
 
-    def read_keys(self, timeout: float = 0.1) -> List[str]:
+    def read_keys(self, timeout: float = 0.1) -> list[str]:
         """
         Block up to ``timeout`` seconds for input, then return semantic keys.
 

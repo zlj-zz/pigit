@@ -65,8 +65,8 @@ class CommandMeta:
         arg_completion: Completion type for arguments (single or list for multi-param)
         dangerous: Whether this is a dangerous operation
         confirm_msg: Custom confirmation prompt message
-        examples: List of usage examples
-        related: List of related commands
+        examples: list of usage examples
+        related: list of related commands
         deprecated: Whether command is deprecated
         deprecated_use: Alternative command to use instead
         security_level: Security classification level

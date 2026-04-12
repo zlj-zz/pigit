@@ -14,13 +14,13 @@ Example:
 """
 
 import re
-from typing import List, Tuple, Union
+from typing import Union
 
 from pigit.ext.executor import WAITING
 from pigit.ext.executor_factory import ExecutorFactory
 
 
-def add(args: Union[List, Tuple]) -> str:
+def add(args: Union[list, tuple]) -> str:
     """git add option.
 
     Args:
@@ -35,7 +35,7 @@ def add(args: Union[List, Tuple]) -> str:
     )
 
 
-def fetch_remote_branch(args: Union[List, Tuple]) -> str:
+def fetch_remote_branch(args: Union[list, tuple]) -> str:
     "Fetch a remote branch to local and with the same name."
 
     branch = args[0] if args else None
@@ -49,7 +49,7 @@ def fetch_remote_branch(args: Union[List, Tuple]) -> str:
         return "`This option need a branch name.`<error>"
 
 
-def set_email_and_username(args: Union[List, Tuple]) -> str:
+def set_email_and_username(args: Union[list, tuple]) -> str:
     """Set git username and email with interaction.
 
     Args:

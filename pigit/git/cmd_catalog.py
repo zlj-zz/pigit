@@ -9,7 +9,7 @@ Date: 2026-03-22
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Literal, Union
+from typing import Callable, Literal, Union
 
 from .define import GitCommandType
 
@@ -38,11 +38,11 @@ def command_repr_value(command: Union[str, Callable, None]) -> str:
 
 
 def iter_command_entries(
-    cmds: Dict[str, dict],
+    cmds: dict[str, dict],
     extra_cmd_keys: frozenset[str],
-) -> List[CommandEntry]:
+) -> list[CommandEntry]:
     """Build sorted command entries with builtin vs extra source."""
-    out: List[CommandEntry] = []
+    out: list[CommandEntry] = []
     for name in sorted(cmds.keys()):
         spec = cmds[name]
         belong = spec.get("belong", GitCommandType.Extra)

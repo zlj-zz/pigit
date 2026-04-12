@@ -6,14 +6,14 @@ import os
 import pprint
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Generator, Optional
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
 from pigit.termui.component_list_picker import PickerRow
 
 
-def iter_managed_repo_names(repos: Dict[str, dict]) -> List[str]:
+def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     """Return managed repo names sorted by Unicode code points (stable across platforms)."""
 
     return sorted(repos.keys())
@@ -48,7 +48,7 @@ class ManagedRepos:
         self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _make_repo_name(path: str, repos: Dict[str, str], name_counts: Counter) -> str:
+    def _make_repo_name(path: str, repos: dict[str, str], name_counts: Counter) -> str:
         """
         Given a new repo `path`, create a repo name. By default, basename is used.
         If name collision exists, further include parent path name.
@@ -69,7 +69,7 @@ class ManagedRepos:
             return os.path.join(par_name, name)
         return name
 
-    def load_repos(self) -> Dict:
+    def load_repos(self) -> dict:
         """Load repos info from cache file."""
 
         if not self.repo_json_path.is_file():
@@ -78,7 +78,7 @@ class ManagedRepos:
         with self.repo_json_path.open(mode="r") as fp:
             return json.load(fp)
 
-    def dump_repos(self, repos: Dict) -> bool:
+    def dump_repos(self, repos: dict) -> bool:
         """Dump repos info to cache file, re-write mode."""
 
         try:
@@ -141,7 +141,7 @@ class ManagedRepos:
             report_dict[repo_name] = commits
         pprint.pprint(report_dict)
 
-    def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
+    def ll_repos(self, reverse: bool = False) -> Generator[list[tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name in iter_managed_repo_names(exist_repos):
@@ -195,7 +195,7 @@ class ManagedRepos:
                     ("Local Path", repo_path),
                 ]
 
-    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
+    def add_repos(self, paths: list[str], dry_run: bool = False) -> list:
         """Traverse the incoming paths. If it is not saved and is a git
         directory, add it to repos.
 
@@ -227,7 +227,7 @@ class ManagedRepos:
 
         return new_git_paths
 
-    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
+    def rm_repos(self, repos: list[str], use_path: bool = False) -> list[tuple]:
         exist_repos = self.load_repos()
 
         del_repos = []
@@ -246,7 +246,7 @@ class ManagedRepos:
         self.dump_repos(exist_repos)
         return list(zip(del_repos, del_paths))
 
-    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
+    def rename_repo(self, repo: str, name: str) -> tuple[bool, str]:
         """Rename repo
 
         Args:
@@ -254,7 +254,7 @@ class ManagedRepos:
             name (str): new name
 
         Returns:
-            Tuple[bool, str]: whether rename successful, tip msg.
+            tuple[bool, str]: whether rename successful, tip msg.
         """
 
         exist_repos = self.load_repos()
@@ -279,7 +279,7 @@ class ManagedRepos:
         *,
         pick: bool = False,
         pick_alt_screen: bool = False,
-    ) -> Tuple[int, Optional[str]]:
+    ) -> tuple[int, Optional[str]]:
         """Quick jump to repo dir.
 
         Args:
@@ -338,7 +338,7 @@ class ManagedRepos:
             print("Error: index need input a number.")
         return 0, None
 
-    def process_repos_option(self, repos: Optional[List[str]], cmd: str):
+    def process_repos_option(self, repos: Optional[list[str]], cmd: str):
         exist_repos = self.load_repos()
         print(f":: {cmd}\n")
 

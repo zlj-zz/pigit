@@ -1,5 +1,5 @@
 import enum
-from typing import Callable, Dict, List, Tuple, TypedDict, Union
+from typing import Callable, TypedDict, Union
 
 
 @enum.unique
@@ -21,7 +21,7 @@ class GitCommandType(enum.Enum):
     Extra = "Extra"  # default
 
 
-GitCommand = Union[str, Callable[[Union[List, Tuple]], None]]
+GitCommand = Union[str, Callable[[Union[list, tuple]], None]]
 
 
 class GitProxyOptions(TypedDict):
@@ -31,4 +31,4 @@ class GitProxyOptions(TypedDict):
     has_arguments: bool
 
 
-GitProxyOptionsGroup = Dict[str, GitProxyOptions]
+GitProxyOptionsGroup = dict[str, GitProxyOptions]

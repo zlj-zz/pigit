@@ -6,7 +6,7 @@ import re
 import time
 import shutil
 import textwrap
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Iterator, Optional, Union
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -49,7 +49,7 @@ class LocalGit:
 
     def confirm_repo(
         self, given_path: Optional[str] = None, exclude_submodule: bool = False
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Confirm given path whether a git repo. And return repo path info.
         Get the current git repository path. If not, the path is empty.
         Get the local git config path. If not, the path is empty.
@@ -98,14 +98,14 @@ class LocalGit:
 
         return repo_path, git_conf_path
 
-    def get_config(self, path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    def get_config(self, path: Optional[str] = None) -> dict[str, dict[str, str]]:
         """Try to read git config and parse, return a config dict.
 
         Args:
             path (Optional[str], optional): repo path. Defaults to None.
 
         Returns:
-            Dict[str, Dict[str, str]]: config dict.
+            dict[str, dict[str, str]]: config dict.
         """
         path = path or self.path
 
@@ -117,7 +117,7 @@ class LocalGit:
             self.log.warning(f"Can not read config with: {e}")
             return {}
         else:
-            conf_dict: Dict[str, Dict[str, str]] = {}
+            conf_dict: dict[str, dict[str, str]] = {}
             conf_list = re.split(self._RE_CONFIG_NEWLINE, context)
             config_type: str = ""
 
@@ -173,7 +173,7 @@ class LocalGit:
         path: Optional[str] = None,
         include_remote: bool = False,
         plain: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get repo all branch."""
         path = path or self.path
 
@@ -190,7 +190,7 @@ class LocalGit:
             return []
         return [branch[2:] for branch in res.rstrip().split("\n")]
 
-    def get_remotes(self, path: Optional[str] = None) -> List[str]:
+    def get_remotes(self, path: Optional[str] = None) -> list[str]:
         """Get repo remote url."""
 
         # Get remote name, exit when error.
@@ -236,7 +236,7 @@ class LocalGit:
 
     def get_repo_desc(
         self,
-        include_part: Optional[List] = None,
+        include_part: Optional[list] = None,
         path: Optional[str] = None,
         color: bool = True,
     ) -> str:
@@ -308,7 +308,7 @@ class LocalGit:
     # =============
     # Special info
     # =============
-    def load_branches(self, path: Optional[str] = None) -> List[Branch]:
+    def load_branches(self, path: Optional[str] = None) -> list[Branch]:
         path = path or self.path
         branches = []
 
@@ -386,12 +386,12 @@ class LocalGit:
 
     def _load_status_cache_signature(
         self, cwd: str
-    ) -> Optional[Tuple[int, int, int, int, bool]]:
+    ) -> Optional[tuple[int, int, int, int, bool]]:
         git_dir = self._find_dot_git_dir(cwd)
         if not git_dir:
             return None
 
-        def st(p: str) -> Tuple[int, int]:
+        def st(p: str) -> tuple[int, int]:
             try:
                 s = os.stat(p)
                 return (s.st_mtime_ns, s.st_size)
@@ -413,7 +413,7 @@ class LocalGit:
         path: Optional[str] = None,
         icon: bool = False,
         use_cache: bool = True,
-    ) -> List[File]:
+    ) -> list[File]:
         """Get the file tree status of GIT for processing and encapsulation.
 
         Args:
@@ -423,7 +423,7 @@ class LocalGit:
                     and within a short TTL (see class constant ``_LOAD_STATUS_CACHE_TTL``).
 
         Returns:
-                (List[File]): Processed file status list.
+                (list[File]): Processed file status list.
         """
         path = path or self.path
         if path is None or path == "":
@@ -605,7 +605,7 @@ class LocalGit:
         filter_path: str = "",
         path: Optional[str] = None,
         max_commits: int = 300,
-    ) -> List[Commit]:
+    ) -> list[Commit]:
         """Get commits for a branch (materializes :meth:`iter_commits`)."""
         return list(
             self.iter_commits(
@@ -749,7 +749,7 @@ class LocalGit:
         issue: str = "",
         commit: str = "",
         print: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         path = path or self.path
         remote_url = self.get_remote_url(path=path)
 

@@ -12,11 +12,11 @@ Decorator metadata is read after the class body completes; runtime mutation of
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 BindingTarget = Union[str, Callable[[], Any]]
-BindingEntry = Tuple[str, BindingTarget]
-BindingsList = List[BindingEntry]
+BindingEntry = tuple[str, BindingTarget]
+BindingsList = list[BindingEntry]
 
 _PIGIT_BINDING_ATTR = "_pigit_binding_keys"
 
@@ -123,7 +123,7 @@ def _resolve_one_target(
 def resolve_key_handlers(
     owner: object,
     bindings: Optional[Sequence[BindingEntry]],
-) -> Dict[str, Callable[..., Any]]:
+) -> dict[str, Callable[..., Any]]:
     """
     Build ``semantic_key -> callable`` from a declarative binding list.
 
@@ -132,7 +132,7 @@ def resolve_key_handlers(
 
     if not bindings:
         return {}
-    result: Dict[str, Callable[..., Any]] = {}
+    result: dict[str, Callable[..., Any]] = {}
     for semantic_key, target in bindings:
         result[semantic_key] = _resolve_one_target(owner, semantic_key, target)
     return result
@@ -142,7 +142,7 @@ def resolve_key_handlers_merged(
     owner: object,
     cls: type,
     bindings: Optional[Sequence[BindingEntry]],
-) -> Dict[str, Callable[..., Any]]:
+) -> dict[str, Callable[..., Any]]:
     """
     Merge ``@bind_keys`` metadata with ``BINDINGS``, then resolve to callables.
 
@@ -153,8 +153,8 @@ def resolve_key_handlers_merged(
     merged = merge_binding_entries(collect_decorator_bindings(cls), bindings)
     if not merged:
         return {}
-    result: Dict[str, Callable[..., Any]] = {}
-    first_target_for_key: Dict[str, BindingTarget] = {}
+    result: dict[str, Callable[..., Any]] = {}
+    first_target_for_key: dict[str, BindingTarget] = {}
     for semantic_key, target in merged:
         call = _resolve_one_target(owner, semantic_key, target)
         existing = result.get(semantic_key)

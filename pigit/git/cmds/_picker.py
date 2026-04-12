@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import shlex
 import sys
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
-from pigit.termui.component_list_picker import PICK_EXIT_CTRL_C, PickerRow, SearchableListPicker
+from pigit.termui.component_list_picker import (
+    PICK_EXIT_CTRL_C,
+    PickerRow,
+    SearchableListPicker,
+)
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import read_line_cancellable, terminal_size, tty_ok
@@ -70,7 +74,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
             category_lower = category.lower()
             entries = [e for e in entries if e.category.lower() == category_lower]
 
-        rows: List[PickerRow] = [
+        rows: list[PickerRow] = [
             PickerRow(
                 title=e.name,
                 detail=f"[{e.category}] {e.help_text}",
@@ -85,7 +89,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
             prefix = "⚠️ " if ent.is_dangerous else "  "
             return f"{prefix} {ent.name:<15} {ent.help_text}"
 
-        def on_confirm(r: PickerRow) -> Optional[Tuple[int, Optional[str]]]:
+        def on_confirm(r: PickerRow) -> Optional[tuple[int, Optional[str]]]:
             ent = r.ref
             assert isinstance(ent, CmdNewEntry)
             return self._execute_command(ent, processor)
@@ -130,7 +134,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         self,
         entry: CmdNewEntry,
         processor: GitCommandNew,
-    ) -> Optional[Tuple[int, Optional[str]]]:
+    ) -> Optional[tuple[int, Optional[str]]]:
         """Execute selected command with optional arguments.
 
         Args:
@@ -144,9 +148,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         flush = sys.stdout.flush
 
         if entry.has_args:
-            write(
-                f"\nArguments for `{entry.name}` (empty = none, Esc = cancel):\n"
-            )
+            write(f"\nArguments for `{entry.name}` (empty = none, Esc = cancel):\n")
             flush()
             extra_raw = read_line_cancellable(
                 write=write, flush=flush, prompt=f"{entry.name} "
@@ -166,7 +168,7 @@ def run_cmd_new_picker(
     *,
     pick_alt_screen: bool = False,
     category: Optional[str] = None,
-) -> Tuple[int, Optional[str]]:
+) -> tuple[int, Optional[str]]:
     """Run interactive picker for cmd_new commands.
 
     Args:
