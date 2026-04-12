@@ -7,8 +7,11 @@ Date: 2026-04-10
 """
 
 from dataclasses import dataclass, field
-from typing import Union, Optional, Callable, Protocol
+from typing import Union, Optional, Callable, Protocol, TYPE_CHECKING
 from enum import Enum, auto
+
+if TYPE_CHECKING:
+    from ...cmdparse.completion.base import CompletionType
 
 
 class CommandCategory(Enum):
@@ -59,6 +62,7 @@ class CommandMeta:
         category: Command category for grouping
         help: Help text describing command purpose
         has_args: Whether command accepts arguments
+        arg_completion: Completion type for arguments (single or list for multi-param)
         dangerous: Whether this is a dangerous operation
         confirm_msg: Custom confirmation prompt message
         examples: List of usage examples
@@ -74,6 +78,7 @@ class CommandMeta:
     category: CommandCategory
     help: str
     has_args: bool = False
+    arg_completion: Union["CompletionType", list["CompletionType"]] = None
     dangerous: bool = False
     confirm_msg: str = ""
     examples: list[str] = field(default_factory=list)

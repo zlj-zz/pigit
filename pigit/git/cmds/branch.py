@@ -8,6 +8,7 @@ Date: 2026-04-10
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
+from ...cmdparse.completion.base import CompletionType
 
 
 @command(
@@ -43,6 +44,7 @@ def branch_create(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Delete a local branch.",
     has_args=True,
+    arg_completion=CompletionType.BRANCH,
     dangerous=True,
     confirm_msg="Delete branch? Unmerged changes may be lost.",
     security_level=SecurityLevel.DANGEROUS,
@@ -61,6 +63,7 @@ def branch_delete(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Force delete a branch (even if unmerged).",
     has_args=True,
+    arg_completion=CompletionType.BRANCH,
     dangerous=True,
     confirm_msg="Force delete branch? Unmerged changes WILL be lost!",
     security_level=SecurityLevel.DESTRUCTIVE,
@@ -79,6 +82,7 @@ def branch_force_delete(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Rename (move) a branch.",
     has_args=True,
+    arg_completion=[CompletionType.BRANCH, CompletionType.BRANCH],
     examples=["pigit cmd_new b.m old-name new-name"],
     related=["b.M", "b"],
 )
@@ -94,6 +98,7 @@ def branch_move(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Force rename a branch (overwrite if exists).",
     has_args=True,
+    arg_completion=[CompletionType.BRANCH, CompletionType.BRANCH],
     dangerous=True,
     confirm_msg="Force rename branch? Target branch will be overwritten.",
     security_level=SecurityLevel.DANGEROUS,
@@ -136,6 +141,7 @@ def branch_all(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Checkout (switch to) a branch.",
     has_args=True,
+    arg_completion=CompletionType.BRANCH,
     examples=["pigit cmd_new b.o main", "pigit cmd_new b.o -b new-branch"],
     related=["b.c", "b"],
 )

@@ -2,10 +2,21 @@
 
 from typing import Dict, Optional, Type
 
-from .base import ShellCompletion
+from .base import ShellCompletion, CompletionType
 from .bash import BashCompletion
 from .zsh import ZshCompletion
 from .fish import FishCompletion
+
+
+__all__ = [
+    "ShellCompletion",
+    "CompletionType",
+    "BashCompletion",
+    "ZshCompletion",
+    "FishCompletion",
+    "shell_complete",
+    "get_shell",
+]
 
 
 _Supported_Shell: Dict[str, Type[ShellCompletion]] = {

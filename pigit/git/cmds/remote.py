@@ -8,6 +8,7 @@ Date: 2026-04-10
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
+from ...cmdparse.completion.base import CompletionType
 
 
 @command(
@@ -58,6 +59,7 @@ def remote_add(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Remove a remote.",
     has_args=True,
+    arg_completion=CompletionType.REMOTE,
     dangerous=True,
     confirm_msg="Remove remote?",
     security_level=SecurityLevel.DANGEROUS,
@@ -76,6 +78,7 @@ def remote_remove(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Rename a remote.",
     has_args=True,
+    arg_completion=[CompletionType.REMOTE, CompletionType.NONE],
     examples=["pigit cmd_new r.rn old-name new-name"],
     related=["r", "r.a"],
 )
@@ -91,6 +94,7 @@ def remote_rename(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Update remote branches.",
     has_args=True,
+    arg_completion=CompletionType.REMOTE,
     examples=["pigit cmd_new r.u", "pigit cmd_new r.u origin"],
     related=["f", "r"],
 )
@@ -107,6 +111,7 @@ def remote_update(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Show remote information.",
     has_args=True,
+    arg_completion=CompletionType.REMOTE,
     examples=["pigit cmd_new r.s origin"],
     related=["r", "r.v"],
 )
@@ -123,6 +128,7 @@ def remote_show(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Prune stale remote-tracking branches.",
     has_args=True,
+    arg_completion=CompletionType.REMOTE,
     dangerous=True,
     confirm_msg="Prune stale remote branches?",
     security_level=SecurityLevel.DANGEROUS,

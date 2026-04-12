@@ -8,6 +8,7 @@ Date: 2026-04-10
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
+from ...cmdparse.completion.base import CompletionType
 
 
 @command(
@@ -15,6 +16,7 @@ from ._models import CommandCategory, SecurityLevel
     category=CommandCategory.INDEX,
     help="Add file contents to the index (stage files).",
     has_args=True,
+    arg_completion=CompletionType.FILE,
     examples=["pigit cmd_new i", "pigit cmd_new i file.txt"],
     related=["i.a", "i.p", "i.r"],
 )
@@ -42,6 +44,7 @@ def index_all(args: list[str]) -> str:
     category=CommandCategory.INDEX,
     help="Add changes interactively (patch mode).",
     has_args=True,
+    arg_completion=CompletionType.FILE,
     examples=["pigit cmd_new i.p", "pigit cmd_new i.p file.txt"],
     related=["i", "i.a"],
 )
@@ -69,6 +72,7 @@ def index_update(args: list[str]) -> str:
     category=CommandCategory.INDEX,
     help="Reset (unstage) files from the index.",
     has_args=True,
+    arg_completion=CompletionType.FILE,
     dangerous=True,
     confirm_msg="Unstage files? Changes will remain in working tree.",
     security_level=SecurityLevel.NORMAL,

@@ -8,6 +8,7 @@ Date: 2026-04-10
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
+from ...cmdparse.completion.base import CompletionType
 
 
 # Log commands
@@ -141,6 +142,7 @@ def stash_list(args: list[str]) -> str:
     category=CommandCategory.STASH,
     help="Pop stash (apply and remove).",
     has_args=True,
+    arg_completion=CompletionType.STASH,
     examples=["pigit cmd_new s.p", "pigit cmd_new s.p stash@{1}"],
     related=["s", "s.a"],
 )
@@ -157,6 +159,7 @@ def stash_pop(args: list[str]) -> str:
     category=CommandCategory.STASH,
     help="Apply stash (keep in stash list).",
     has_args=True,
+    arg_completion=CompletionType.STASH,
     examples=["pigit cmd_new s.a", "pigit cmd_new s.a stash@{0}"],
     related=["s", "s.p"],
 )
@@ -173,6 +176,7 @@ def stash_apply(args: list[str]) -> str:
     category=CommandCategory.STASH,
     help="Drop a stash.",
     has_args=True,
+    arg_completion=CompletionType.STASH,
     dangerous=True,
     confirm_msg="Drop stash? Changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
@@ -256,6 +260,7 @@ def tag_annotated(args: list[str]) -> str:
     category=CommandCategory.TAG,
     help="Delete a tag.",
     has_args=True,
+    arg_completion=CompletionType.TAG,
     dangerous=True,
     confirm_msg="Delete tag?",
     security_level=SecurityLevel.DANGEROUS,

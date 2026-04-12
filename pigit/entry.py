@@ -71,14 +71,28 @@ def pigit(args: "Namespace", _) -> None:
             {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
         )
 
-        # Add cmd_new commands to completion
+        # Add cmd_new commands to completion with arg_completion metadata
         from .git.cmds import get_registry
+        from .cmdparse.completion.base import CompletionType
         registry = get_registry()
-        cmd_new_commands = {
-            c.meta.short: {"help": c.meta.help, "args": {}}
-            for c in registry.get_all()
-        }
-        complete_vars["args"]["cmd_new"]["args"].update(cmd_new_commands)
+
+        for cmd_def in registry.get_all():
+            meta = cmd_def.meta
+            # Handle Union[CompletionType, List[CompletionType]]
+            if meta.arg_completion is None:
+                arg_comp_value = ""
+            elif isinstance(meta.arg_completion, list):
+                # Take first completion type as primary (for multi-param scenarios)
+                arg_comp_value = meta.arg_completion[0].value if meta.arg_completion else ""
+            else:
+                arg_comp_value = meta.arg_completion.value
+
+            cmd_entry = {
+                "help": meta.help,
+                "args": {},
+                "arg_completion": arg_comp_value,
+            }
+            complete_vars["args"]["cmd_new"]["args"][meta.short] = cmd_entry
 
         from .cmdparse.completion import shell_complete
 

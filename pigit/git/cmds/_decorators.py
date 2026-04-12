@@ -15,6 +15,7 @@ from ._registry import get_registry
 
 if TYPE_CHECKING:
     from ._security import SecureExecutor
+    from ...cmdparse.completion.base import CompletionType
 
 
 def command(
@@ -22,6 +23,7 @@ def command(
     category: CommandCategory,
     help: str,
     has_args: bool = False,
+    arg_completion: Union["CompletionType", list["CompletionType"]] = None,
     dangerous: bool = False,
     confirm_msg: str = "",
     examples: Optional[list[str]] = None,
@@ -37,6 +39,7 @@ def command(
         category: Command category
         help: Help text
         has_args: Whether command accepts arguments
+        arg_completion: Completion type for arguments (single or list for multi-param)
         dangerous: Whether this is a dangerous operation
         confirm_msg: Custom confirmation message
         examples: Usage examples
@@ -55,6 +58,7 @@ def command(
             category=category,
             help=help,
             has_args=has_args,
+            arg_completion=arg_completion,
             dangerous=dangerous,
             confirm_msg=confirm_msg,
             examples=examples or [],
