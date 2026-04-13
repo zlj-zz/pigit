@@ -7,6 +7,7 @@ Date: 2026-04-10
 """
 
 import os
+import string
 
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
@@ -53,6 +54,10 @@ from ._utils import is_truthy
 # Import for type checking
 if TYPE_CHECKING:
     pass
+
+
+# Constants
+SHELL_COMMAND_PREFIX = "!:"
 
 
 class GitCommandNew:
@@ -227,6 +232,8 @@ class GitCommandNew:
         Supports:
         - Shell commands (starting with !:): executed directly via shell
         - cmd_new commands: executed through cmd_new system
+        - Environment variables set via export in shell commands are preserved
+          for subsequent steps
 
         Args:
             script: ScriptConfig instance
@@ -236,92 +243,145 @@ class GitCommandNew:
             Tuple of (exit_code, output)
         """
         import subprocess
-        import os
 
         outputs = []
-        # Environment for shell commands (inherits current environment)
         script_env = os.environ.copy()
 
         for step in script.steps:
-            # Expand positional args
-            expanded_step = self._expand_positional_args(step, args)
+            expanded_step = self._expand_script_vars(step, args, script_env)
 
-            # Check if it's a shell command (starts with !:)
-            if expanded_step.startswith("!:"):
-                # Execute as shell command
-                shell_cmd = expanded_step[2:].strip()  # Remove leading !:
+            if expanded_step.startswith(SHELL_COMMAND_PREFIX):
+                shell_cmd = expanded_step[len(SHELL_COMMAND_PREFIX) :].strip()
                 try:
+                    # Run command in subshell and capture env changes
                     result = subprocess.run(
-                        shell_cmd,
+                        f"{{ {shell_cmd}; }} && env -0",
                         shell=True,
                         capture_output=True,
                         text=True,
                         env=script_env,
                     )
-                    # stderr is captured but not returned as error for shell commands
-                    # (commands like export produce no output but succeed)
-                    if result.stderr:
-                        outputs.append(result.stderr)
-                    if result.stdout:
-                        outputs.append(result.stdout)
 
                     if result.returncode != 0:
-                        return (
-                            result.returncode,
-                            f"Script failed at step '{step}' with return code {result.returncode}:\n"
-                            + "\n".join(outputs),
-                        )
-                except Exception as e:
+                        if result.stderr:
+                            outputs.append(result.stderr)
+                        return self._script_error(step, result.returncode, outputs)
+
+                    # Parse env output and extract non-env output
+                    output_lines = self._parse_env_output(result.stdout, script_env)
+                    if output_lines:
+                        outputs.append("\n".join(output_lines))
+
+                except subprocess.SubprocessError as e:
                     return 1, f"Script failed at step '{step}' with error: {e}"
             else:
-                # Parse step as cmd_new command + args
                 parts = expanded_step.split()
                 if not parts:
                     continue
 
                 step_cmd = parts[0]
-                step_args = parts[1:] if len(parts) > 1 else []
+                step_args = parts[1:]
 
-                # Execute the step
                 exit_code, output = self.execute(step_cmd, step_args)
                 if output:
                     outputs.append(output)
 
                 if exit_code != 0:
-                    return (
-                        exit_code,
-                        f"Script failed at step '{step}' with return code {exit_code}:\n"
-                        + "\n".join(outputs),
-                    )
+                    return self._script_error(step, exit_code, outputs)
 
         return 0, "\n".join(outputs)
 
-    def _expand_positional_args(self, step: str, args: list[str]) -> str:
-        """Expand positional arguments in script step.
+    def _parse_env_output(self, stdout: str, script_env: dict) -> list[str]:
+        """Parse env -0 output, updating script_env and returning non-env lines.
+
+        The format is: [command_output]\n[VAR=value\x00]+
+        Command output (if any) appears before the first env var and has no '='.
+        But echo adds \n, so we need to handle: "output\nVAR=value\x00..."
+
+        Args:
+            stdout: Output from env -0 command
+            script_env: Environment dict to update with new variables
+
+        Returns:
+            List of non-environment variable output lines
+        """
+        lines = stdout.rstrip("\x00").split("\x00")
+        output_lines = []
+
+        for line in lines:
+            if "=" not in line:
+                # Lines without '=' are actual command output
+                if line:
+                    output_lines.append(line)
+                continue
+
+            # This line looks like VAR=value, but could be "cmd_output\nVAR=value"
+            # if the command output ended with newline. Split by first '=' and check.
+            key, _, value = line.partition("=")
+
+            # If key contains newline, the part after last newline is the real key,
+            # and everything before (including the newline) is command output
+            if "\n" in key:
+                parts = key.rsplit("\n", 1)
+                cmd_output = parts[0]
+                real_key = parts[1]
+                if cmd_output:
+                    output_lines.append(cmd_output)
+                key = real_key
+                # Now check if this env var is new/changed
+                orig_value = os.environ.get(key)
+                if orig_value is None or orig_value != value:
+                    script_env[key] = value
+            else:
+                # Normal env var line
+                orig_value = os.environ.get(key)
+                if orig_value is None or orig_value != value:
+                    script_env[key] = value
+
+        return output_lines
+
+    def _script_error(
+        self, step: str, exit_code: int, outputs: list[str]
+    ) -> tuple[int, str]:
+        """Build error message for script failure.
+
+        Args:
+            step: Failed step
+            exit_code: Return code
+            outputs: Collected outputs so far
+
+        Returns:
+            Error tuple (exit_code, message)
+        """
+        return (
+            exit_code,
+            f"Script failed at step '{step}' with return code {exit_code}:\n"
+            + "\n".join(outputs),
+        )
+
+    def _expand_script_vars(self, step: str, args: list[str], script_env: dict) -> str:
+        """Expand variables in script step.
 
         Supports:
         - $1, $2, ... - positional arguments
         - $* - all arguments
-
-        Environment variables should be handled by the shell (!: prefix)
-        using standard $VAR or ${VAR} syntax.
+        - $VAR, ${VAR} - environment variables from script_env
 
         Args:
             step: Script step with possible variables
-            args: Arguments to substitute
+            args: Positional arguments to substitute
+            script_env: Environment variables dictionary
 
         Returns:
             Expanded step
         """
-        # Expand positional args
+        # Build combined mapping for string.Template
+        mapping = dict(script_env)
         for i, arg in enumerate(args, 1):
-            step = step.replace(f"${i}", arg)
+            mapping[str(i)] = arg
+        mapping["*"] = " ".join(args) if args else ""
 
-        # Expand $*
-        if args:
-            step = step.replace("$*", " ".join(args))
-
-        return step
+        return string.Template(step).safe_substitute(mapping)
 
     def _should_skip_confirmation(self) -> bool:
         """Check if confirmation should be skipped.
