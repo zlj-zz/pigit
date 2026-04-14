@@ -44,13 +44,6 @@ CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
 # Code counter file path
 COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 
-# User custom cmd path
-EXTRA_CMD_MODULE_NAME: str = "extra_cmds"
-EXTRA_CMD_MODULE_PATH: str = f"{PIGIT_HOME}/{EXTRA_CMD_MODULE_NAME}.py"
-
-# argparse: ``pigit cmd -t`` / ``--type`` with no TYPE argument
-CMD_TYPE_LIST_SENTINEL: str = "__LIST_TYPES__"
-
 # Multi repos config file
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 

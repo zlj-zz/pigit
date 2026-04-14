@@ -10,7 +10,6 @@ from plenty.table import Table
 from .config import Config
 from .context import Context
 from .const import (
-    CMD_TYPE_LIST_SENTINEL,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
     REPOS_PATH,
@@ -20,8 +19,8 @@ from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
-from .git import builtin_cmds, create_gitignore
-from .handlers import CmdHandler, CmdNewHandler, RepoCommandHandler, TuiHandler
+from .git import create_gitignore
+from .handlers import RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
@@ -64,11 +63,8 @@ def pigit(args: "Namespace", _) -> None:
     elif args.complete:
         # Generate completion vars dict.
         complete_vars = pigit.to_dict()
-        complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
-        )
 
-        # Add cmd_new commands to completion with arg_completion metadata
+        # Add cmd commands to completion with arg_completion metadata
         from .git.cmds import get_registry, register_user_commands
         from .cmdparse.completion.base import CompletionType
         register_user_commands()
@@ -90,7 +86,7 @@ def pigit(args: "Namespace", _) -> None:
                 "args": {},
                 "arg_completion": arg_comp_value,
             }
-            complete_vars["args"]["cmd_new"]["args"][meta.short] = cmd_entry
+            complete_vars["args"]["cmd"]["args"][meta.short] = cmd_entry
 
         # Add user-defined aliases to completion
         for alias_name, target in registry.get_aliases().items():
@@ -99,7 +95,7 @@ def pigit(args: "Namespace", _) -> None:
                 "args": {},
                 "arg_completion": "",
             }
-            complete_vars["args"]["cmd_new"]["args"][alias_name] = cmd_entry
+            complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
 
         from .cmdparse.completion import shell_complete
 
@@ -229,58 +225,7 @@ tools_group.add_argument(
 # =============================================
 # sub command `cmd`
 # =============================================
-@pigit.sub_parser("cmd", help="git short command.")
-@argument("--shell", action="store_true", help="Go to the pigit shell mode.")
-@argument(
-    "-l --list",
-    action="store_true",
-    dest="cmd_list",
-    help="List all short commands and help (full table).",
-)
-@argument(
-    "-s --search",
-    dest="cmd_search",
-    nargs=1,
-    metavar="QUERY",
-    help="Search commands by keyword (substring, case-insensitive). "
-    "For the complete table use -l / --list instead.",
-)
-@argument(
-    "-p --pick",
-    action="store_true",
-    dest="cmd_pick",
-    help="Interactively pick and run a short command (requires a TTY).",
-)
-@argument(
-    "--pick-alt-screen",
-    action="store_true",
-    dest="cmd_pick_alt_screen",
-    help="Use the terminal alternate screen buffer for the picker (with --pick).",
-)
-@argument(
-    "-t --type",
-    nargs="?",
-    const=CMD_TYPE_LIST_SENTINEL,
-    default=None,
-    dest="cmd_type",
-    metavar="TYPE",
-    help="Without TYPE: list supported command types. "
-    "With TYPE: list short commands in that type (e.g. Branch).",
-)
-@argument("args", nargs="*", type=str, help="Command parameter list.")
-@argument(
-    "command", nargs="?", type=str, default=None, help="Short git command or other."
-)
-def _(args: "Namespace", unknown: list):
-    """If you want to use some original git commands, please use -- to indicate."""
-
-    CmdHandler(ctx.current(), args, unknown).execute()
-
-
-# =============================================
-# sub command `cmd_new`
-# =============================================
-@pigit.sub_parser("cmd_new", help="new git short command system (parallel to cmd).")
+@pigit.sub_parser("cmd", help="git short command system.")
 @argument(
     "-l --list",
     action="store_true",
@@ -317,10 +262,10 @@ def _(args: "Namespace", unknown: list):
     help="Command to execute with arguments.",
 )
 def _(args: "Namespace", _):
-    """Execute new short git commands."""
-    from .handlers.cmd_new_handler import handle_cmd_new
+    """Execute short git commands."""
+    from .handlers.cmd_handler import handle_cmd
 
-    exit_code = handle_cmd_new(args)
+    exit_code = handle_cmd(args)
     if exit_code != 0:
         raise SystemExit(exit_code)
 

@@ -1,133 +1,120 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/handlers/cmd_handler.py
+Description: Handler for cmd subcommand.
+Author: Zev
+Date: 2026-04-10
+"""
 
-import sys
 from typing import TYPE_CHECKING
 
-from ..const import CMD_TYPE_LIST_SENTINEL, EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH
-from ..git import GitProxy, get_extra_cmds
-from ..git.cmd_picker import run_command_picker
-from .base_handler import BaseHandler
+from plenty import get_console
+
+from ..git.cmds import GitCommandNew, CommandCategory
 
 if TYPE_CHECKING:
     from ..cmdparse.parser import Namespace
-    from ..context import Context
 
 
-class CmdHandler(BaseHandler):
-    """``pigit cmd`` — short git commands, help, and optional shell mode."""
+console = get_console()
 
-    def __init__(
-        self,
-        ctx: "Context",
-        args: "Namespace",
-        unknown: list[str],
-    ) -> None:
-        super().__init__(ctx)
-        self.args = args
-        self.unknown = unknown
 
-    def _exclusive_mode_labels(self) -> list[str]:
-        """Human-readable labels for mutually exclusive ``cmd`` modes."""
-        modes: list[str] = []
-        if self.args.shell:
-            modes.append("--shell")
-        if getattr(self.args, "cmd_list", False):
-            modes.append("-l/--list")
-        if getattr(self.args, "cmd_search", None) is not None:
-            modes.append("-s/--search")
-        if getattr(self.args, "cmd_pick", False):
-            modes.append("-p/--pick")
-        if getattr(self.args, "cmd_type", None) is not None:
-            modes.append("-t/--type")
-        if self.args.command:
-            modes.append("COMMAND")
-        return modes
+class CmdHandler:
+    """Handler for cmd subcommand."""
 
-    def execute(self) -> None:
-        if self.config.repo_auto_append:
-            repo_path, _repo_conf = self.repo.confirm_repo()
-            self.repo.add_repos([repo_path])
+    def __init__(self):
+        self._processor = GitCommandNew()
 
-        extra_cmd: dict = {}
-        extra_cmd.update(get_extra_cmds(EXTRA_CMD_MODULE_NAME, EXTRA_CMD_MODULE_PATH))
+    def handle(self, args: "Namespace") -> int:
+        """Handle cmd subcommand.
 
-        git_processor = GitProxy(
-            extra_cmds=extra_cmd,
-            prompt=self.config.cmd_recommend,
-            display=self.config.cmd_display,
-        )
+        Args:
+            args: Parsed arguments
 
-        modes = self._exclusive_mode_labels()
-        if len(modes) > 1:
-            self.console.echo(
-                f"These options cannot be combined (pick one): {', '.join(modes)}.\n"
-                "Use `pigit cmd -l` for the full table, `pigit cmd -s <query>` to search, "
-                "or `pigit cmd -h` for help."
+        Returns:
+            Exit code
+        """
+        # Interactive picker
+        if args.pick:
+            from ..git.cmds._picker import run_cmd_new_picker
+
+            category = None if args.pick is True else args.pick
+
+            # Validate category if provided
+            if category:
+                try:
+                    CommandCategory(category)
+                except ValueError:
+                    console.echo(f"`Unknown category: {category}`<tomato>")
+                    console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                    return 1
+
+            exit_code, message = run_cmd_new_picker(
+                self._processor,
+                pick_alt_screen=True,
+                category=category,
             )
-            raise SystemExit(2)
+            if message:
+                console.echo(message)
+            return exit_code
 
-        if self.args.shell:
-            from ..shell_mode import PigitShell
-
-            PigitShell(git_processor).cmdloop()
-            return
-
-        if getattr(self.args, "cmd_list", False):
-            self.console.echo(git_processor.get_help())
-            return
-
-        search_bits = getattr(self.args, "cmd_search", None)
-        if search_bits is not None:
-            query = (search_bits[0] or "").strip()
-            if not query:
-                self.console.echo(
-                    "`--search` / `-s` needs a non-empty QUERY.\n"
-                    "Use `pigit cmd -l` for the full table, or "
-                    "`pigit cmd -s <query>` with a keyword.\n"
-                    "See `pigit cmd -h`."
-                )
-                raise SystemExit(2)
-            text = git_processor.search_commands(query)
-            if not text:
-                self.console.echo(
-                    f"No commands match {query!r}. Try `pigit cmd -l`, "
-                    "a different keyword, or `pigit cmd --pick` in a TTY.\n"
-                    "See `pigit cmd -h`."
-                )
-                raise SystemExit(1)
-            self.console.echo(text)
-            return
-
-        if getattr(self.args, "cmd_pick", False):
-            code, out = run_command_picker(
-                git_processor,
-                pick_alt_screen=getattr(self.args, "cmd_pick_alt_screen", False),
-            )
-            if code != 0:
-                if out:
-                    self.console.echo(out)
-                raise SystemExit(code)
-            if out is not None:
-                self.console.echo(out)
-            return
-
-        cmd_type = getattr(self.args, "cmd_type", None)
-        if cmd_type is not None:
-            if cmd_type == CMD_TYPE_LIST_SENTINEL:
-                self.console.echo(git_processor.get_types())
+        # List commands
+        if args.list or args.dangerous:
+            if args.dangerous:
+                help_text = self._processor.get_help(dangerous_only=True)
+            elif args.type:
+                try:
+                    category = CommandCategory(args.type)
+                    help_text = self._processor.get_help(category=category)
+                except ValueError:
+                    console.echo(f"`Unknown category: {args.type}`<tomato>")
+                    console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                    return 1
             else:
-                self.console.echo(git_processor.get_help_by_type(cmd_type))
-            return
+                help_text = self._processor.get_help()
+            console.echo(help_text)
+            return 0
 
-        if self.args.command:
-            short_cmd = self.args.command
-            self.args.args.extend(self.unknown)
-            self.console.echo(git_processor.do(short_cmd, self.args.args))
-            return
+        # Search commands
+        if args.search:
+            results = self._processor.search(args.search)
+            if not results:
+                console.echo(f"No commands found for: {args.search}")
+                return 0
 
-        self.console.echo(
-            "`pigit cmd -h`<ok> for help. \n"
-            "Try `pigit cmd -l` for all short commands, \n"
-            "`pigit cmd -s <query>` to search, \n"
-            "`pigit cmd -t` for types, or `pigit cmd --pick` (TTY) to choose."
-        )
+            console.echo(f"\nSearch results for '{args.search}':\n")
+            for cmd_def in results:
+                meta = cmd_def.meta
+                dangerous_mark = "⚠️ " if meta.dangerous else "  "
+                console.echo(f"  {dangerous_mark}{meta.short:<12} {meta.help}")
+                if meta.examples:
+                    for ex in meta.examples[:2]:
+                        console.echo(f"               Example: {ex}")
+            console.echo("")
+            return 0
+
+        # Execute command
+        if args.command:
+            cmd_name = args.command[0]
+            cmd_args = args.command[1:] if len(args.command) > 1 else []
+            exit_code, output = self._processor.execute(cmd_name, cmd_args)
+            if output:
+                console.echo(output)
+            return exit_code
+
+        # Default: show help
+        console.echo(self._processor.get_help())
+        return 0
+
+
+def handle_cmd(args: "Namespace") -> int:
+    """Entry point for cmd subcommand.
+
+    Args:
+        args: Parsed arguments
+
+    Returns:
+        Exit code
+    """
+    handler = CmdHandler()
+    return handler.handle(args)

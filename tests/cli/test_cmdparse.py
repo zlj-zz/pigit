@@ -6,7 +6,6 @@ from pprint import pprint
 from paths import PROJECT_ROOT as _PIGIT_PATH
 from utils import analyze_it
 
-from pigit.git.cmd_builtin import builtin_cmds
 from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (
@@ -55,49 +54,76 @@ argparse_dict = {
         },
         "cmd": {
             "type": "sub",
-            "help": "git short command.",
-            "description": "If you want to use some original git commands, please use -- to indicate.",
+            "help": "git short command system.",
+            "description": "Execute short git commands.",
             "args": {
                 "command": {
-                    "nargs": "?",
-                    "type": str,
-                    "default": None,
-                    "help": "Short git command or other.",
-                },
-                "args": {
                     "nargs": "*",
-                    "type": str,
-                    "help": "Command parameter list.",
+                    "help": "Command to execute with arguments.",
                 },
                 "-l --list": {
                     "action": "store_true",
-                    "dest": "cmd_list",
-                    "help": "List all short commands and help (full table).",
+                    "help": "List all commands.",
+                },
+                "-d --dangerous": {
+                    "action": "store_true",
+                    "help": "List only dangerous commands.",
                 },
                 "-s --search": {
-                    "nargs": 1,
-                    "dest": "cmd_search",
+                    "dest": "search",
                     "metavar": "QUERY",
                     "help": "Search commands by keyword.",
                 },
                 "-p --pick": {
-                    "action": "store_true",
-                    "dest": "cmd_pick",
-                    "help": "Interactively pick and run a short command (TTY).",
+                    "dest": "pick",
+                    "metavar": "CATEGORY",
+                    "nargs": "?",
+                    "const": True,
+                    "help": "Interactively pick and run a command (TTY). Optional CATEGORY to filter.",
                 },
                 "-t --type": {
-                    "nargs": "?",
-                    "const": "__LIST_TYPES__",
-                    "default": None,
-                    "dest": "cmd_type",
-                    "metavar": "TYPE",
-                    "help": "List types or commands in a type.",
+                    "dest": "type",
+                    "metavar": "CATEGORY",
+                    "help": "Filter by category (branch, commit, index, etc.).",
                 },
                 "set_defaults": {"func": range},
             },
         },
     },
 }
+
+
+def _inject_registry_commands(complete_vars):
+    """Inject cmd_new registry commands into cmd completion, mirroring entry.py."""
+    from pigit.git.cmds import get_registry, register_user_commands
+    from pigit.cmdparse.completion.base import CompletionType
+
+    register_user_commands()
+    registry = get_registry()
+
+    for cmd_def in registry.get_all():
+        meta = cmd_def.meta
+        if meta.arg_completion is None:
+            arg_comp_value = ""
+        elif isinstance(meta.arg_completion, list):
+            arg_comp_value = meta.arg_completion[0].value if meta.arg_completion else ""
+        else:
+            arg_comp_value = meta.arg_completion.value
+
+        cmd_entry = {
+            "help": meta.help,
+            "args": {},
+            "arg_completion": arg_comp_value,
+        }
+        complete_vars["args"]["cmd"]["args"][meta.short] = cmd_entry
+
+    for alias_name, target in registry.get_aliases().items():
+        cmd_entry = {
+            "help": f"Alias for {target}",
+            "args": {},
+            "arg_completion": "",
+        }
+        complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
 
 
 def test_generate_about_dict():
@@ -121,15 +147,9 @@ class TestCompletion:
             from pigit.entry import pigit
 
             cls.complete_vars = pigit.to_dict()
-            cls.complete_vars["args"]["cmd"]["args"].update(
-                {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
-            )
+            _inject_registry_commands(cls.complete_vars)
         else:
             cls.complete_vars = copy.deepcopy(argparse_dict)
-            cmd_temp = cls.complete_vars["args"]["cmd"]["args"]
-            cmd_temp.update(
-                {k: {"help": v["help"], "args": {}} for k, v in builtin_cmds.items()}
-            )
 
     def test_error(self):
         # error complete_vars

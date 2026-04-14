@@ -22,8 +22,7 @@ def _ensure_pigit_context():
         "--count",  # code counter
         "cmd",
         "cmd -l",
-        "cmd -t",
-        "cmd -t Branch",
+        "cmd -t branch",
         "cmd ws",
         "repo ll",
     ],

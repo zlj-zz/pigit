@@ -59,21 +59,21 @@ class BashCompletion(ShellCompletion):
                 cword=$COMP_CWORD
             fi
 
-            # Find cmd_new position
-            local cmd_new_depth=0
+            # Find cmd position
+            local cmd_depth=0
             local i
             for ((i=1; i < cword; i++)); do
-                if [[ "${words[i]}" == "cmd_new" ]]; then
-                    cmd_new_depth=$i
+                if [[ "${words[i]}" == "cmd" ]]; then
+                    cmd_depth=$i
                     break
                 fi
             done
 
-            # Handle cmd_new subcommand completion
-            if [[ $cmd_new_depth -gt 0 ]]; then
+            # Handle cmd subcommand completion with git-aware arguments
+            if [[ $cmd_depth -gt 0 ]]; then
                 local subcmd=""
-                # Find subcommand after cmd_new
-                for ((i=cmd_new_depth+1; i < cword; i++)); do
+                # Find subcommand after cmd
+                for ((i=cmd_depth+1; i < cword; i++)); do
                     if [[ "${words[i]}" != -* ]]; then
                         subcmd="${words[i]}"
                         break
@@ -82,12 +82,12 @@ class BashCompletion(ShellCompletion):
 
                 # Complete subcommand name or its arguments
                 if [[ -z "$subcmd" || "$subcmd" == "$cur" && "$cur" != -* ]]; then
-                    COMPREPLY=($(compgen -W "%(cmd_new_commands)s" -- "$cur"))
+                    COMPREPLY=($(compgen -W "%(cmd_commands)s" -- "$cur"))
                     return 0
                 fi
 
                 case "$subcmd" in
-%(cmd_new_arg_cases)s
+%(cmd_arg_cases)s
                     *)
                         COMPREPLY=()
                         ;;
@@ -95,7 +95,7 @@ class BashCompletion(ShellCompletion):
                 return 0
             fi
 
-            # Handle subcommand completion for cmd and cmd_new
+            # Handle top-level completion
             local first_word=""
             for ((i=1; i < cword; i++)); do
                 if [[ "${words[i]}" != -* ]]; then
@@ -105,17 +105,6 @@ class BashCompletion(ShellCompletion):
             done
 
             case "$first_word" in
-                cmd)
-                    if [[ "$cur" != -* ]]; then
-                        COMPREPLY=($(compgen -W "%(cmd_commands)s" -- "$cur"))
-                    else
-                        COMPREPLY=($(compgen -W "%(cmd_options)s" -- "$cur"))
-                    fi
-                    return 0
-                    ;;
-                cmd_new)
-                    return 0
-                    ;;
                 *)
                     case "$cur" in
                         -*)
@@ -172,16 +161,16 @@ class BashCompletion(ShellCompletion):
         comp_vars = self.complete_vars
         args = comp_vars.get("args", {})
 
-        # Extract cmd_new subcommands
-        cmd_new_args = args.get("cmd_new", {}).get("args", {})
+        # Extract cmd subcommands with git-aware argument completion
+        cmd_args = args.get("cmd", {}).get("args", {})
 
-        cmd_new_commands = []
-        cmd_new_arg_cases = []
+        cmd_commands = []
+        cmd_arg_cases = []
         used_completions = set()
 
-        for cmd_name, cmd_info in cmd_new_args.items():
-            if not cmd_name.startswith("-"):
-                cmd_new_commands.append(cmd_name)
+        for cmd_name, cmd_info in cmd_args.items():
+            if not cmd_name.startswith("-") and cmd_name != "args":
+                cmd_commands.append(cmd_name)
 
                 # Check if command has argument completion
                 arg_comp = cmd_info.get("arg_completion", "")
@@ -191,7 +180,7 @@ class BashCompletion(ShellCompletion):
                     helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
                     # Escape case pattern to handle wildcards like '.' in 'b.o'
                     escaped_pattern = self._escape_case_pattern(cmd_name)
-                    cmd_new_arg_cases.append(
+                    cmd_arg_cases.append(
                         f'''        {escaped_pattern})
                         COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
                         ;;'''
@@ -206,26 +195,14 @@ class BashCompletion(ShellCompletion):
             else:
                 top_commands.append(name)
 
-        # Extract cmd subcommands and options
-        cmd_args = args.get("cmd", {}).get("args", {})
-        cmd_commands = []
-        cmd_options = []
-        for name, prop in cmd_args.items():
-            if name.startswith("-"):
-                cmd_options.append(name.split()[0])
-            elif name != "args":  # Skip positional args
-                cmd_commands.append(name)
-
         return {
             "helper_functions": self._generate_helpers(used_completions),
             "func_name": self.func_name,
             "prop": self.prog_name,
-            "cmd_new_commands": " ".join(sorted(cmd_new_commands)),
-            "cmd_new_arg_cases": "\n".join(cmd_new_arg_cases),
+            "cmd_commands": " ".join(sorted(cmd_commands)),
+            "cmd_arg_cases": "\n".join(cmd_arg_cases),
             "top_options": " ".join(sorted(top_options)),
             "top_commands": " ".join(sorted(top_commands)),
-            "cmd_commands": " ".join(sorted(cmd_commands)),
-            "cmd_options": " ".join(sorted(cmd_options)),
         }
 
     def generate_resource(self) -> str:
