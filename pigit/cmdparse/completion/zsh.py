@@ -9,55 +9,53 @@ Date: 2026-04-12
 import textwrap
 
 from .base import ShellCompletion
+from .widgets import WIDGETS
 
-# Git helper functions template for zsh
-GIT_HELPERS_TEMPLATE = """\
-#--------------------------------------------------------------------
-# Git helper functions for completion
-#--------------------------------------------------------------------
-
+# Git helper functions for zsh
+ZSH_HELPERS = {
+    "branch": """\
 _git_branches() {
     local -a branches
     branches=(${(f)"$(git branch -a 2>/dev/null | sed 's/^[\\* ]*//' | sed 's|^remotes/||' | sort -u)"})
     (( $#branches )) && compadd -a branches
-}
-
+}""",
+    "file": """\
 _git_files() {
     local -a files
     files=(${(f)"$(git ls-files 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | sort -u)"})
     (( $#files )) && compadd -a files
-}
-
+}""",
+    "remote": """\
 _git_remotes() {
     local -a remotes
     remotes=(${(f)"$(git remote 2>/dev/null | sort -u)"})
     (( $#remotes )) && compadd -a remotes
-}
-
+}""",
+    "tag": """\
 _git_tags() {
     local -a tags
     tags=(${(f)"$(git tag 2>/dev/null | sort -u)"})
     (( $#tags )) && compadd -a tags
-}
-
+}""",
+    "commit": """\
 _git_commits() {
     local -a commits
     commits=(${(f)"$(git log --oneline 2>/dev/null | cut -d' ' -f1)"})
     (( $#commits )) && compadd -a commits
-}
-
+}""",
+    "stash": """\
 _git_stashes() {
     local -a stashes
     stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
     (( $#stashes )) && compadd -a stashes
-}
-
+}""",
+    "ref": """\
 _git_refs() {
     local -a refs
     refs=(${(f)"$(git for-each-ref --format='%(refname:short)' 2>/dev/null | sort -u)"})
     (( $#refs )) && compadd -a refs
+}""",
 }
-"""
 
 _TEMPLATE_ZSH: str = """\
 #compdef %(prog)s
@@ -89,6 +87,8 @@ _TEMPLATE_ZSH: str = """\
 }
 
 compdef %(func_name)s %(prog)s
+
+%(widget)s
 """
 
 _TEMP_A: str = """
@@ -115,7 +115,6 @@ class ZshCompletion(ShellCompletion):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._used_git_helpers: set[str] = set()
-        self._arg_completion_funcs: list[str] = []
 
     def _get_zsh_completion_func(self, comp_type: str) -> str:
         """Get zsh completion function for a completion type."""
@@ -204,7 +203,8 @@ class ZshCompletion(ShellCompletion):
         """Generate git helper function definitions."""
         if not self._used_git_helpers:
             return ""
-        return GIT_HELPERS_TEMPLATE
+        helpers = [ZSH_HELPERS[comp] for comp in self._used_git_helpers if comp in ZSH_HELPERS]
+        return "\n\n".join(helpers) + "\n"
 
     def args2complete(self, args_dict: dict) -> str:
         prog_handle: str = args_dict["prog"]
@@ -266,6 +266,7 @@ class ZshCompletion(ShellCompletion):
             "tools": "\n".join([*_sub_sub_opt_comps, _sub_opt_str]),
             "arguments": textwrap.indent(arguments_str, " " * 2),
             "cases": textwrap.indent(_opt_case_str, " " * 2),
+            "widget": WIDGETS["zsh"],
         }
 
     def generate_resource(self) -> str:

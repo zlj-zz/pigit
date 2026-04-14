@@ -257,6 +257,19 @@ tools_group.add_argument(
     help="Interactively pick and run a command (requires a TTY). Optional CATEGORY to filter.",
 )
 @argument(
+    "--pick-print",
+    dest="pick_print",
+    metavar="CATEGORY",
+    nargs="?",
+    const=True,
+    help="Interactively pick a command and print it to stdout instead of running.",
+)
+@argument(
+    "--widget",
+    choices=("bash", "zsh", "fish"),
+    help="Print a shell widget for Alt+G picker integration.",
+)
+@argument(
     "command",
     nargs="*",
     help="Command to execute with arguments.",

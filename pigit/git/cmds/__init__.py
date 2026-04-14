@@ -49,6 +49,7 @@ from ._security import SecureExecutor, SecurityPolicy, SecurityError
 from ._config_loader import UserCommandConfig, load_user_config
 from ._decorators import command, alias, dangerous
 from ._utils import is_truthy
+from ._mru import record_command_use
 
 
 # Import for type checking
@@ -129,7 +130,10 @@ class GitCommandNew:
 
         # Check for override first
         if override := self._config.get_override(cmd):
-            return self._execute_override(override, args)
+            exit_code, output = self._execute_override(override, args)
+            if exit_code == 0:
+                record_command_use(cmd)
+            return exit_code, output
 
         try:
             resolved = self._resolver.resolve(cmd)
@@ -146,7 +150,10 @@ class GitCommandNew:
                     return 1, "Cancelled"
 
             # Execute handler
-            return self._execute_handler(handler, args)
+            exit_code, output = self._execute_handler(handler, args)
+            if exit_code == 0:
+                record_command_use(resolved.resolved)
+            return exit_code, output
 
         except ResolverError as e:
             suggestions = self._resolver.suggest(cmd)
@@ -418,11 +425,11 @@ class GitCommandNew:
             # Command line
             prefix = ""
             if meta.is_user_defined:
-                prefix = "  📝"
+                prefix = "  *"
             elif meta.dangerous:
-                prefix = "  ⚠️"
+                prefix = "  ▲"
             else:
-                prefix = "     "
+                prefix = "   "
 
             lines.append(f"{prefix} {meta.short:<12} {meta.help}")
 

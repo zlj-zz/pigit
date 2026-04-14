@@ -7,10 +7,11 @@ Date: 2026-04-10
 """
 
 import re
+from collections import deque
 from dataclasses import dataclass
 from typing import Union, Optional, Callable
 
-from pigit.ext.executor import Executor
+from pigit.ext.executor import Executor, WAITING, REPLY
 from pigit.ext.executor_factory import ExecutorFactory
 
 
@@ -61,7 +62,7 @@ class SecureExecutor:
 
     def __init__(self, base_executor: Optional[Executor] = None):
         self._base = base_executor or ExecutorFactory.get()
-        self._audit_log: list[dict] = []
+        self._audit_log: deque[dict] = deque(maxlen=self._MAX_AUDIT_LOG_SIZE)
 
     def exec(
         self,
@@ -98,11 +99,6 @@ class SecureExecutor:
                     "policy": policy,
                 }
             )
-            # Prevent unbounded growth
-            if len(self._audit_log) > self._MAX_AUDIT_LOG_SIZE:
-                self._audit_log = self._audit_log[-self._MAX_AUDIT_LOG_SIZE :]
-
-        from pigit.ext.executor import WAITING
 
         cmd_str = " ".join(parts)
         exit_code, stderr, stdout = self._base.exec(cmd_str, flags=WAITING)

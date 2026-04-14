@@ -47,6 +47,9 @@ COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"
 # Multi repos config file
 REPOS_PATH: str = f"{PIGIT_HOME}/repos.json"
 
+# Command MRU history file
+CMD_MRU_PATH: str = f"{PIGIT_HOME}/cmd_mru.json"
+
 # Flag of first running
 IS_FIRST_RUN: bool = not os.path.isdir(PIGIT_HOME)
 if IS_FIRST_RUN:

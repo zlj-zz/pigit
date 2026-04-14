@@ -1,10 +1,168 @@
-#!/usr/env bash
+        #!/usr/bin/env bash
+        # PIGIT shell completion script
+        # Generated for bash
 
-_pigit_completion(){
-  if [[ "${COMP_CWORD}" == "1" ]];then
-      COMP_WORD="fm cs bs cA pc --simple ir -i lv ma Sc ia --config fr bl Cl --author -h --commit push co wM Si --pick wx --print wC --shell wD cr pA cf -f -l pt --since pull email Sd wR iD cO rm ls --until CT -c l wX -t --dry-run -v --report R id iu --count lr cR --reverse c Rm s Rx add --complete repo ca Ca ld fetch --issue t pa CO Rl iX rename sd bL user fC Ce pf --create-ignore iR wc --list cd b fu open mF cmd mS --create-config ll Ct ws bM mv SD cF --information Su f wd -p wS --version wr pp tx sl report mC Ru bc bm -r Co lc fb sp ta ix --path m ue --search Ra Rp RS -s savepd pF Rs p mt iA bd --type clear l1 --help bS fc sD cm wm"
-      COMPREPLY=($(compgen -W "$COMP_WORD" -- ${COMP_WORDS[${COMP_CWORD}]}))
-  fi
+        # Git helper functions for completion
+        _git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }
+
+_git_branches() { git branch -a 2>/dev/null | sed "s/^[\* ]*//" | sed "s|^remotes/||" | sort -u; }
+
+_git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }
+
+_git_remotes() { git remote 2>/dev/null | sort -u; }
+
+_git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }
+
+_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }
+
+_git_tags() { git tag 2>/dev/null | sort -u; }
+
+
+        # Main completion function
+        _pigit_completion() {
+            local cur prev words cword
+
+            # Initialize completion variables (compatible with/without bash-completion)
+            if type _init_completion &>/dev/null; then
+                _init_completion || return
+            else
+                cur="${COMP_WORDS[COMP_CWORD]}"
+                prev="${COMP_WORDS[COMP_CWORD-1]}"
+                words=("${COMP_WORDS[@]}")
+                cword=$COMP_CWORD
+            fi
+
+            # Find cmd position
+            local cmd_depth=0
+            local i
+            for ((i=1; i < cword; i++)); do
+                if [[ "${words[i]}" == "cmd" ]]; then
+                    cmd_depth=$i
+                    break
+                fi
+            done
+
+            # Handle cmd subcommand completion with git-aware arguments
+            if [[ $cmd_depth -gt 0 ]]; then
+                local subcmd=""
+                # Find subcommand after cmd
+                for ((i=cmd_depth+1; i < cword; i++)); do
+                    if [[ "${words[i]}" != -* ]]; then
+                        subcmd="${words[i]}"
+                        break
+                    fi
+                done
+
+                # Complete subcommand name or its arguments
+                if [[ -z "$subcmd" || "$subcmd" == "$cur" && "$cur" != -* ]]; then
+                    COMPREPLY=($(compgen -W " C C.d C.l C.mark C.ours C.theirs C.tool Cd Cl S S.a S.f S.s S.u Sa Su b b.D b.M b.a b.c b.d b.m b.o b.v bD bL bM bc bd bl bm c c.F c.O c.R c.a c.empty c.f c.fix c.m c.o c.s cF cO ca cf cm co f f.C f.a f.c f.m f.p f.r f.t f.u fC fa fc fm fp fr fu i i.R i.a i.d i.ds i.p i.r i.u iA iR ia ir l l.c l.g l.o l.p l.s lc lg lo lp ls m m.a m.c m.ff m.no m.s m.squash ma mc ms p p.F p.d p.f p.tags p.u pF pf pu r r.a r.prune r.rm r.rn r.s r.u r.v ra rb rb.a rb.c rb.i rb.m rb.s rba rbc rbi rbm rbs rrm rrn rs ru rv s s.a s.c s.d s.l s.p s.s sa sd set set.e set.g set.l sete setg setl sl sp t t.a t.d t.p ta td update_prod update_test w w.R w.S w.c w.check w.d w.ds w.r w.s w.stash wR wS wd wds ws" -- "$cur"))
+                    return 0
+                fi
+
+                case "$subcmd" in
+        "b.d")
+                        COMPREPLY=($(_git_branches | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "b.D")
+                        COMPREPLY=($(_git_branches | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "b.m")
+                        COMPREPLY=($(_git_branches | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "b.M")
+                        COMPREPLY=($(_git_branches | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "b.o")
+                        COMPREPLY=($(_git_branches | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "c.fix")
+                        COMPREPLY=($(_git_commits | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "c.s")
+                        COMPREPLY=($(_git_commits | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "c.o")
+                        COMPREPLY=($(_git_refs | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        i)
+                        COMPREPLY=($(_git_files | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "i.p")
+                        COMPREPLY=($(_git_files | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "i.r")
+                        COMPREPLY=($(_git_files | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "r.rm")
+                        COMPREPLY=($(_git_remotes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "r.rn")
+                        COMPREPLY=($(_git_remotes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "r.u")
+                        COMPREPLY=($(_git_remotes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "r.s")
+                        COMPREPLY=($(_git_remotes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "r.prune")
+                        COMPREPLY=($(_git_remotes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "s.p")
+                        COMPREPLY=($(_git_stashes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "s.a")
+                        COMPREPLY=($(_git_stashes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "s.d")
+                        COMPREPLY=($(_git_stashes | grep -i "^$cur" 2>/dev/null))
+                        ;;
+        "t.d")
+                        COMPREPLY=($(_git_tags | grep -i "^$cur" 2>/dev/null))
+                        ;;
+                    *)
+                        COMPREPLY=()
+                        ;;
+                esac
+                return 0
+            fi
+
+            # Handle top-level completion
+            local first_word=""
+            for ((i=1; i < cword; i++)); do
+                if [[ "${words[i]}" != -* ]]; then
+                    first_word="${words[i]}"
+                    break
+                fi
+            done
+
+            case "$first_word" in
+                *)
+                    case "$cur" in
+                        -*)
+                            COMPREPLY=($(compgen -W "--complete --create-config --create-ignore -c -f -h -i -r -v" -- "$cur"))
+                            ;;
+                        *)
+                            COMPREPLY=($(compgen -W "cmd open repo" -- "$cur"))
+                            ;;
+                    esac
+                    ;;
+            esac
+        }
+
+        complete -F _pigit_completion pigit
+
+# PIGIT cmd picker widget (Ctrl+G)
+_pigit_cmd_widget() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    PIGIT_WIDGET_OUTPUT="$tmpfile" pigit cmd --pick-print < /dev/tty > /dev/tty 2>&1
+    if [[ -s "$tmpfile" ]]; then
+        READLINE_LINE="$(<"$tmpfile")"
+    READLINE_POINT=${#READLINE_LINE}
+    fi
+    rm -f "$tmpfile"
+
 }
+bind -x '"\C-g": _pigit_cmd_widget'
 
-complete -F _pigit_completion pigit

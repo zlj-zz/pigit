@@ -1,21 +1,33 @@
-function _pigit_completion;
-    set -l response;
+        function _pigit_completion;
+            set -l response;
 
-    for value in (env fm cs bs cA pc --simple ir -i lv ma Sc ia --config fr bl Cl --author -h --commit push co wM Si --pick wx --print wC --shell wD cr pA cf -f -l pt --since pull email Sd wR iD cO rm ls --until CT -c l wX -t --dry-run -v --report R id iu --count lr cR --reverse c Rm s Rx add --complete repo ca Ca ld fetch --issue t pa CO Rl iX rename sd bL user fC Ce pf --create-ignore iR wc --list cd b fu open mF cmd mS --create-config ll Ct ws bM mv SD cF --information Su f wd -p wS --version wr pp tx sl report mC Ru bc bm -r Co lc fb sp ta ix --path m ue --search Ra Rp RS -s savepd pF Rs p mt iA bd --type clear l1 --help bS fc sD cm wm=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
-        set response $response $value;
-    end;
+            for value in (env rm lc s.c r.s ls set.e bD Cd l.g i.a cmd w.stash f.c fa fu --config w.R r.rm --type p.d l ia --issue i.p ir -c i.ds rbi cF -p p bc -s w.d fc c.s sp w.r --path c.empty c.m rrn iR sa --help ma sete pF l.p -l C --reverse r.v wR b.o --dangerous ta r.u m.no rb.c rba bL i.r pu ll m.c ws l.o w.s ms C.theirs lo --until p.u --print c.fix fetch b.d wd --author --simple rbm b cf rbs --commit update_test s.l b.D l.s S.a rbc fm S.u r.a f.r Sa add --since cd -h bM open rb.a push S set.l m.ff report p.F iA l.c clear C.d rv -t f.a C.mark b.m i.u mc --information cO s.p f.C rb.s p.tags set.g i p.f ca --create-config S.s r.rn s c.f set setg c.o s.a t.p --search repo s.d --complete r f.m fC lg m.a --create-ignore m.squash --pick-print --dry-run td rb ra r.prune --pick-alt-screen t.d update_prod c.a sd s.s C.tool C.l b.a m.s w.c bl -v i.R bm m ru f wds rrm -i rename co pf lp rb.m setl rs sl w.check Su c.R wS fr rb.i --pick w.S c.O --version -d S.f pull Cl C.ours w t f.p bd t.a -f b.c f.t cm b.M b.v --widget --report -r w.ds --count --list fp f.u i.d c c.F=fish_complete COMP_WORDS=(commandline -cp)         COMP_CWORD=(commandline -t) pigit);
+                set response $response $value;
+            end;
 
-    for completion in $response;
-        set -l metadata (string split "," $completion);
+            for completion in $response;
+                set -l metadata (string split "," $completion);
 
-        if test $metadata[1] = "dir";
-            __fish_complete_directories $metadata[2];
-        else if test $metadata[1] = "file";
-            __fish_complete_path $metadata[2];
-        else if test $metadata[1] = "plain";
-            print $metadata[2];
+                if test $metadata[1] = "dir";
+                    __fish_complete_directories $metadata[2];
+                else if test $metadata[1] = "file";
+                    __fish_complete_path $metadata[2];
+                else if test $metadata[1] = "plain";
+                    print $metadata[2];
+                end;
+            end;
         end;
-    end;
-end;
 
-complete --no-files --command pigit --arguments         "(_pigit_completion)";
+        complete --no-files --command pigit --arguments         "(_pigit_completion)";
+
+# PIGIT cmd picker widget (Ctrl+G)
+function __pigit_cmd_widget
+    set -l tmpfile (mktemp)
+    PIGIT_WIDGET_OUTPUT="$tmpfile" pigit cmd --pick-print < /dev/tty > /dev/tty 2>&1
+    if test -s "$tmpfile"
+        commandline -r (cat "$tmpfile")
+    end
+    rm -f "$tmpfile"
+end
+bind \cg __pigit_cmd_widget
+

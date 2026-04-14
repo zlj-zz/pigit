@@ -12,117 +12,232 @@
 #
 #--------------------------------------------------------------------
 
+_git_commits() {
+    local -a commits
+    commits=(${(f)"$(git log --oneline 2>/dev/null | cut -d' ' -f1)"})
+    (( $#commits )) && compadd -a commits
+}
+
+_git_branches() {
+    local -a branches
+    branches=(${(f)"$(git branch -a 2>/dev/null | sed 's/^[\* ]*//' | sed 's|^remotes/||' | sort -u)"})
+    (( $#branches )) && compadd -a branches
+}
+
+_git_stashes() {
+    local -a stashes
+    stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
+    (( $#stashes )) && compadd -a stashes
+}
+
+_git_remotes() {
+    local -a remotes
+    remotes=(${(f)"$(git remote 2>/dev/null | sort -u)"})
+    (( $#remotes )) && compadd -a remotes
+}
+
+_git_files() {
+    local -a files
+    files=(${(f)"$(git ls-files 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | sort -u)"})
+    (( $#files )) && compadd -a files
+}
+
+_git_refs() {
+    local -a refs
+    refs=(${(f)"$(git for-each-ref --format='%(refname:short)' 2>/dev/null | sort -u)"})
+    (( $#refs )) && compadd -a refs
+}
+
+_git_tags() {
+    local -a tags
+    tags=(${(f)"$(git tag 2>/dev/null | sort -u)"})
+    (( $#tags )) && compadd -a tags
+}
+
+
 __cmd_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
-    {-t,--type}'[Without TYPE: list supported command types. With TYPE: list short commands in that type (e.g. Branch).]' \
-    {-p,--pick}'[Interactively pick and run a short command (requires a TTY).]' \
-    {-s,--search}'[Search commands by keyword (substring, case-insensitive). For the complete table use -l / --list instead.]' \
-    {-l,--list}'[List all short commands and help (full table).]' \
-    '--shell[Go to the pigit shell mode.]' \
-    'b[lists, creates, renames, and deletes branches.]' \
-    'bc[creates a new branch.]' \
-    'bl[lists branches and their commits.]' \
-    'bL[lists local and remote branches and their commits.]' \
-    'bs[lists branches and their commits with ancestry graphs.]' \
-    'bS[lists local and remote branches and their commits with ancestry graphs.]' \
-    'bm[renames a branch.]' \
-    'bM[renames a branch even if the new branch name already exists.]' \
-    'bd[delete a local branch by name.]' \
-    'c[records changes to the repository.]' \
-    'ca[commits all modified and deleted files.]' \
-    'cA[commits all modified and deleted files interactively]' \
-    'cm[commits with the given message.]' \
-    'co[checks out a branch or paths to the working tree.]' \
-    'cO[checks out hunks from the index or the tree interactively.]' \
-    'cf[amends the tip of the current branch reusing the same log message as HEAD.]' \
-    'cF[amends the tip of the current branch.]' \
-    'cr[reverts existing commits by reverting patches and recording new commits.]' \
-    'cR[removes the HEAD commit.]' \
-    'cs[shows one or more objects (blobs, trees, tags and commits).]' \
-    'Cl[lists unmerged files.]' \
-    'Ca[adds unmerged file contents to the index.]' \
-    'Ce[executes merge-tool on all unmerged files.]' \
-    'Co[checks out our changes for unmerged paths.]' \
-    'CO[checks out our changes for all unmerged paths.]' \
-    'Ct[checks out their changes for unmerged paths.]' \
-    'CT[checks out their changes for all unmerged paths.]' \
-    'f[downloads objects and references from another repository.]' \
-    'fc[clones a repository into a new directory.]' \
-    'fC[clones a repository into a new directory clearly(depth:1).]' \
-    'fm[fetches from and merges with another repository or local branch.]' \
-    'fr[fetches from and rebase on top of another repository or local branch.]' \
-    'fu[removes un-existing remote-tracking references, fetches all remotes and merges.]' \
-    'fb[fetch other branch to local as same name.]' \
-    'ia[adds file contents to the index(default: all files).]' \
-    'iA[adds file contents to the index interactively.]' \
-    'iu[adds file contents to the index (updates only known files).]' \
-    'id[displays changes between the index and a named commit (diff).]' \
-    'iD[displays changes between the index and a named commit (word diff).]' \
-    'ir[resets the current HEAD to the specified state.]' \
-    'iR[resets the current index interactively.]' \
-    'ix[removes files from the index (recursively).]' \
-    'iX[removes files from the index (recursively and forced).]' \
-    'l[display the log with good format.]' \
-    'l1[display the log with one-line.]' \
-    'ls[displays the stats log.]' \
-    'ld[displays the diff log.]' \
-    'lv[displays the log, verifying the GPG signature of commits.]' \
-    'lc[displays the commit count for each contributor in descending order.]' \
-    'lr[manages reflog information.]' \
-    'm[joins two or more development histories together.]' \
-    'ma[aborts the conflict resolution, and reconstructs the pre-merge state.]' \
-    'mC[performs the merge but does not commit.]' \
-    'mF[creates a merge commit even if the merge could be resolved as a fast-forward.]' \
-    'mS[performs the merge and GPG-signs the resulting commit.]' \
-    'mv[verifies the GPG signature of the tip commit of the side branch being merged.]' \
-    'mt[runs the merge conflict resolution tools to resolve conflicts.]' \
-    'p[updates remote refs along with associated objects.]' \
-    'pf[forces a push safely (with "lease").]' \
-    'pF[forces a push.]' \
-    'pa[pushes all branches.]' \
-    'pA[pushes all branches and tags.]' \
-    'pt[pushes all tags.]' \
-    'pc[pushes the current branch and adds origin as an upstream reference for it.]' \
-    'pp[pulls and pushes the current branch from origin to origin.]' \
-    'R[manages tracked repositories.]' \
-    'Rl[lists remote names and their URLs.]' \
-    'Ra[adds a new remote.]' \
-    'Rx[removes a remote.]' \
-    'Rm[renames a remote.]' \
-    'Ru[fetches remotes updates.]' \
-    'Rp[prunes all stale remote tracking branches.]' \
-    'Rs[shows information about a given remote.]' \
-    'RS[changes URLs for a remote.]' \
-    's[stashes the changes of the dirty working directory.]' \
-    'sp[removes and applies a single stashed state from the stash list.]' \
-    'sl[lists stashed states.]' \
-    'sd[display stash list.]' \
-    'sD[display stash list with detail.]' \
-    't[creates, lists, deletes or verifies a tag object signed with GPG.]' \
-    'ta[create a new tag.]' \
-    'tx[deletes tags with given names.]' \
-    'ws[displays working-tree status in the short format.]' \
-    'wS[displays working-tree status.]' \
-    'wd[displays changes between the working tree and the index (diff).]' \
-    'wD[displays changes between the working tree and the index (word diff).]' \
-    'wr[resets the current HEAD to the specified state, does not touch the index nor the working tree.]' \
-    'wR[resets the current HEAD, index and working tree to the specified state.]' \
-    'wc[cleans untracked files from the working tree (dry-run).]' \
-    'wC[cleans untracked files from the working tree.]' \
-    'wm[moves or renames files.]' \
-    'wM[moves or renames files (forced).]' \
-    'wx[removes files from the working tree and from the index (recursively).]' \
-    'wX[removes files from the working tree and from the index (recursively and forced).]' \
-    'Sc[Clone a repository as a submodule.]' \
-    'Si[Pull the submodule for the first time.]' \
-    'Su[Update git submodule.]' \
-    'Sd[Remove submodule from repository.]' \
-    'SD[Inverse initialization submodule, clear the dir.]' \
-    'savepd[Remember your account and password.]' \
-    'ue[set email and username interactively.]' \
-    'user[set username.]' \
-    'email[set user email.]' \
+    '--widget[Print a shell widget for Alt+G picker integration.]' \
+    '--pick-print[Interactively pick a command and print it to stdout instead of running.]' \
+    {-p,--pick}'[Interactively pick and run a command (requires a TTY). Optional CATEGORY to filter.]' \
+    {-s,--search}'[Search commands by keyword.]' \
+    {-t,--type}'[Filter by category (branch, commit, index, etc.).]' \
+    {-d,--dangerous}'[List only dangerous commands.]' \
+    {-l,--list}'[List all commands.]' \
+    'b[List, create, rename, and delete branches.]' \
+    'b.c[Create a new branch.]' \
+    'b.d[Delete a local branch.]' \
+    'b.D[Force delete a branch (even if unmerged).]' \
+    'b.m[Rename (move) a branch.]' \
+    'b.M[Force rename a branch (overwrite if exists).]' \
+    'b.v[List branches with verbose output (upstream, last commit).]' \
+    'b.a[List all branches (local and remote).]' \
+    'b.o[Checkout (switch to) a branch.]' \
+    'c[Record changes to the repository.]' \
+    'c.a[Commit all modified files.]' \
+    'c.m[Commit with a message.]' \
+    'c.f[Amend the last commit reusing the same log message as HEAD.]' \
+    'c.F[Amend the previous commit with verbose output.]' \
+    'c.fix[Create a fixup commit (for autosquash rebase).]' \
+    'c.s[Create a squash commit (for autosquash rebase).]' \
+    'c.o[Checkout a branch or paths.]' \
+    'c.O[Checkout interactively.]' \
+    'c.R[Revert/undo the last commit (soft reset).]' \
+    'c.empty[Create an empty commit.]' \
+    'i[Add file contents to the index (stage files).]' \
+    'i.a[Add all changes to the index.]' \
+    'i.p[Add changes interactively (patch mode).]' \
+    'i.u[Add only updated/modified files (not new files).]' \
+    'i.r[Reset (unstage) files from the index.]' \
+    'i.R[Hard reset index and working tree.]' \
+    'i.d[Show differences between index and working tree.]' \
+    'i.ds[Show diff of staged changes.]' \
+    'w[Show working tree status.]' \
+    'w.s[Show short status.]' \
+    'w.S[Show full status with details.]' \
+    'w.d[Show changes in working tree.]' \
+    'w.ds[Show diff stat summary.]' \
+    'w.c[Clean untracked files.]' \
+    'w.r[Restore working tree files.]' \
+    'w.R[Hard reset working tree to HEAD.]' \
+    'w.stash[Stash changes.]' \
+    'w.check[Check for whitespace errors.]' \
+    'p[Push commits to remote.]' \
+    'p.f[Force push with lease (safe force push).]' \
+    'p.F[Force push (destructive, no lease check).]' \
+    'p.u[Push and set upstream for current branch.]' \
+    'p.d[Delete remote branch.]' \
+    'p.tags[Push all tags.]' \
+    'f[Fetch from remote.]' \
+    'f.a[Fetch from all remotes.]' \
+    'f.p[Prune deleted remote branches.]' \
+    'f.t[Fetch tags.]' \
+    'f.m[Fetch and merge (pull).]' \
+    'f.r[Fetch and rebase (pull --rebase).]' \
+    'f.u[Update: fetch all remotes, prune, and fast-forward merge.]' \
+    'f.c[Clone a repository.]' \
+    'f.C[Shallow clone (depth=1) for quick checkout.]' \
+    'r[Manage remote repositories.]' \
+    'r.v[Show remote URLs.]' \
+    'r.a[Add a remote.]' \
+    'r.rm[Remove a remote.]' \
+    'r.rn[Rename a remote.]' \
+    'r.u[Update remote branches.]' \
+    'r.s[Show remote information.]' \
+    'r.prune[Prune stale remote-tracking branches.]' \
+    'l[Show commit log.]' \
+    'l.o[Show one-line log.]' \
+    'l.g[Show log with graph.]' \
+    'l.s[Show log with stats.]' \
+    'l.p[Show log with patches.]' \
+    'l.c[Show contributor statistics (commit count per contributor).]' \
+    's[Stash changes.]' \
+    's.l[List stashes.]' \
+    's.p[Pop stash (apply and remove).]' \
+    's.a[Apply stash (keep in stash list).]' \
+    's.d[Drop a stash.]' \
+    's.c[Clear all stashes.]' \
+    's.s[Show stash diff.]' \
+    't[List or create tags.]' \
+    't.a[Create an annotated tag.]' \
+    't.d[Delete a tag.]' \
+    't.p[Push tags to remote.]' \
+    'm[Merge changes from another branch.]' \
+    'm.a[Abort current merge.]' \
+    'm.c[Continue merge after resolving conflicts.]' \
+    'm.s[Show merge status.]' \
+    'm.no[Merge without fast-forward (create merge commit).]' \
+    'm.ff[Merge with fast-forward only (fail if not possible).]' \
+    'm.squash[Squash merge (combine all commits into one).]' \
+    'C[Show conflict status.]' \
+    'C.l[List conflicted files.]' \
+    'C.d[Show conflict diff.]' \
+    'C.ours[Checkout our version of conflicted files.]' \
+    'C.theirs[Checkout their version of conflicted files.]' \
+    'C.mark[Mark file as resolved (add to index).]' \
+    'C.tool[Launch merge tool.]' \
+    'S[Initialize, update or inspect submodules.]' \
+    'S.a[Add a submodule.]' \
+    'S.u[Update submodules.]' \
+    'S.f[Deinit and remove submodule (force).]' \
+    'S.s[Show submodule summary.]' \
+    'set[Get or set git configuration.]' \
+    'set.l[List all git configuration.]' \
+    'set.g[Get a config value.]' \
+    'set.e[Edit git config file.]' \
+    'rb[Rebase current branch onto another branch.]' \
+    'rb.c[Continue rebase after resolving conflicts.]' \
+    'rb.a[Abort rebase and restore original branch.]' \
+    'rb.s[Skip current commit during rebase.]' \
+    'rb.i[Interactive rebase (reorder, edit, squash commits).]' \
+    'rb.m[Rebase with autosquash (merge fixup commits).]' \
+    'update_test[User script: !:export SAVED_BRANCH=$(git br...]' \
+    'update_prod[User script: !:export SAVED_BRANCH=$(git br...]' \
+    'bc[Alias for b.c]' \
+    'bd[Alias for b.d]' \
+    'bD[Alias for b.D]' \
+    'bm[Alias for b.m]' \
+    'bM[Alias for b.M]' \
+    'bl[Alias for b.v]' \
+    'bL[Alias for b.a]' \
+    'co[Alias for b.o]' \
+    'ca[Alias for c.a]' \
+    'cm[Alias for c.m]' \
+    'cf[Alias for c.f]' \
+    'cF[Alias for c.F]' \
+    'cO[Alias for c.O]' \
+    'ia[Alias for i.a]' \
+    'iA[Alias for i.p]' \
+    'ir[Alias for i.r]' \
+    'iR[Alias for i.R]' \
+    'ws[Alias for w.s]' \
+    'wS[Alias for w.S]' \
+    'wd[Alias for w.d]' \
+    'wds[Alias for w.ds]' \
+    'wR[Alias for w.R]' \
+    'pf[Alias for p.f]' \
+    'pF[Alias for p.F]' \
+    'pu[Alias for p.u]' \
+    'fa[Alias for f.a]' \
+    'fp[Alias for f.p]' \
+    'fm[Alias for f.m]' \
+    'fr[Alias for f.r]' \
+    'fu[Alias for f.u]' \
+    'fc[Alias for f.c]' \
+    'fC[Alias for f.C]' \
+    'rv[Alias for r.v]' \
+    'ra[Alias for r.a]' \
+    'rrm[Alias for r.rm]' \
+    'rrn[Alias for r.rn]' \
+    'ru[Alias for r.u]' \
+    'rs[Alias for r.s]' \
+    'lo[Alias for l.o]' \
+    'lg[Alias for l.g]' \
+    'ls[Alias for l.s]' \
+    'lp[Alias for l.p]' \
+    'lc[Alias for l.c]' \
+    'sl[Alias for s.l]' \
+    'sp[Alias for s.p]' \
+    'sa[Alias for s.a]' \
+    'sd[Alias for s.d]' \
+    'ta[Alias for t.a]' \
+    'td[Alias for t.d]' \
+    'ma[Alias for m.a]' \
+    'mc[Alias for m.c]' \
+    'ms[Alias for m.s]' \
+    'Cl[Alias for C.l]' \
+    'Cd[Alias for C.d]' \
+    'Sa[Alias for S.a]' \
+    'Su[Alias for S.u]' \
+    'setl[Alias for set.l]' \
+    'setg[Alias for set.g]' \
+    'sete[Alias for set.e]' \
+    'rbc[Alias for rb.c]' \
+    'rba[Alias for rb.a]' \
+    'rbs[Alias for rb.s]' \
+    'rbi[Alias for rb.i]' \
+    'rbm[Alias for rb.m]' \
   && ret=0
 }
 
@@ -172,6 +287,8 @@ __report_values() {
 __cd_values() {
   _values '' \
     {-h,--help}'[show this help message and exit]' \
+    '--pick-alt-screen[Use alternate screen for the repo picker (with --pick).]' \
+    {-p,--pick}'[Interactive picker (TTY only). Exact repo name still cds without TUI.]' \
   && ret=0
 }
 
@@ -224,7 +341,7 @@ __open_values() {
 ######################
 __sub_opt_values() {
   _values '' \
-    'cmd[git short command.]' \
+    'cmd[git short command system.]' \
     'repo[repos options.]' \
     'open[open remote repository in web browser.]' \
   && ret=0
@@ -258,6 +375,32 @@ _pigit_completion(){
 
       if [[ ${#line} -eq 3 ]]; then
         case $line[2] in
+          b.d) _git_branches ;;
+          b.D) _git_branches ;;
+          b.m) _git_branches ;;
+          b.M) _git_branches ;;
+          b.o) _git_branches ;;
+          c.fix) _git_commits ;;
+          c.s) _git_commits ;;
+          c.o) _git_refs ;;
+          i) _path_files -/ ;;
+          i.p) _path_files -/ ;;
+          i.r) _path_files -/ ;;
+          r.rm) _git_remotes ;;
+          r.rn) _git_remotes ;;
+          r.u) _git_remotes ;;
+          r.s) _git_remotes ;;
+          r.prune) _git_remotes ;;
+          s.p) _git_stashes ;;
+          s.a) _git_stashes ;;
+          s.d) _git_stashes ;;
+          t.d) _git_tags ;;
+        esac
+      fi
+
+
+      if [[ ${#line} -eq 3 ]]; then
+        case $line[2] in
           add) __add_values ;;
           rm) __rm_values ;;
           rename) __rename_values ;;
@@ -268,7 +411,6 @@ _pigit_completion(){
           fetch) __fetch_values ;;
           pull) __pull_values ;;
           push) __push_values ;;
-
         esac
       fi
 
@@ -278,7 +420,6 @@ _pigit_completion(){
           cmd) __cmd_values ;;
           repo) __repo_values ;;
           open) __open_values ;;
-
         esac
       fi
   esac
@@ -287,3 +428,20 @@ _pigit_completion(){
 }
 
 compdef _pigit_completion pigit
+
+# PIGIT cmd picker widget (Ctrl+G)
+_pigit_cmd_widget() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    PIGIT_WIDGET_OUTPUT="$tmpfile" pigit cmd --pick-print < /dev/tty > /dev/tty 2>&1
+    if [[ -s "$tmpfile" ]]; then
+        BUFFER="$(<"$tmpfile")"
+    CURSOR=${#BUFFER}
+    fi
+    rm -f "$tmpfile"
+
+    zle redisplay
+}
+zle -N _pigit_cmd_widget
+bindkey '^G' _pigit_cmd_widget
+

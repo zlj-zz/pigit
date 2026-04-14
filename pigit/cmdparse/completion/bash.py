@@ -9,24 +9,19 @@ Date: 2026-04-12
 import textwrap
 
 from .base import ShellCompletion
+from .widgets import WIDGETS
 
 
 # Git helper functions for bash completion
-BASH_HELPERS_TEMPLATE = """\
-_git_branches() { git branch -a 2>/dev/null | sed "s/^[\\* ]*//" | sed "s|^remotes/||" | sort -u; }
-
-_git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }
-
-_git_remotes() { git remote 2>/dev/null | sort -u; }
-
-_git_tags() { git tag 2>/dev/null | sort -u; }
-
-_git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }
-
-_git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }
-
-_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }
-"""
+BASH_HELPERS = {
+    "branch": '_git_branches() { git branch -a 2>/dev/null | sed "s/^[\\* ]*//" | sed "s|^remotes/||" | sort -u; }',
+    "file": '_git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }',
+    "remote": '_git_remotes() { git remote 2>/dev/null | sort -u; }',
+    "tag": '_git_tags() { git tag 2>/dev/null | sort -u; }',
+    "commit": '_git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }',
+    "stash": '_git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }',
+    "ref": '_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }',
+}
 
 
 
@@ -119,6 +114,8 @@ class BashCompletion(ShellCompletion):
         }
 
         complete -F %(func_name)s %(prop)s
+
+%(widget)s
         """
     )
 
@@ -150,7 +147,8 @@ class BashCompletion(ShellCompletion):
         """
         if not used_completions:
             return ""
-        return BASH_HELPERS_TEMPLATE
+        helpers = [BASH_HELPERS[comp] for comp in used_completions if comp in BASH_HELPERS]
+        return "\n\n".join(helpers) + "\n"
 
     def generate_content(self) -> dict:
         """Generate template variables for bash completion.
@@ -203,6 +201,7 @@ class BashCompletion(ShellCompletion):
             "cmd_arg_cases": "\n".join(cmd_arg_cases),
             "top_options": " ".join(sorted(top_options)),
             "top_commands": " ".join(sorted(top_commands)),
+            "widget": WIDGETS["bash"],
         }
 
     def generate_resource(self) -> str:
