@@ -69,8 +69,9 @@ def pigit(args: "Namespace", _) -> None:
         )
 
         # Add cmd_new commands to completion with arg_completion metadata
-        from .git.cmds import get_registry
+        from .git.cmds import get_registry, register_user_commands
         from .cmdparse.completion.base import CompletionType
+        register_user_commands()
         registry = get_registry()
 
         for cmd_def in registry.get_all():
@@ -90,6 +91,15 @@ def pigit(args: "Namespace", _) -> None:
                 "arg_completion": arg_comp_value,
             }
             complete_vars["args"]["cmd_new"]["args"][meta.short] = cmd_entry
+
+        # Add user-defined aliases to completion
+        for alias_name, target in registry.get_aliases().items():
+            cmd_entry = {
+                "help": f"Alias for {target}",
+                "args": {},
+                "arg_completion": "",
+            }
+            complete_vars["args"]["cmd_new"]["args"][alias_name] = cmd_entry
 
         from .cmdparse.completion import shell_complete
 

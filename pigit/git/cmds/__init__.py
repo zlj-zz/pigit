@@ -56,6 +56,31 @@ if TYPE_CHECKING:
     pass
 
 
+def register_user_commands(
+    registry: Optional[CommandRegistry] = None,
+    config: Optional[UserCommandConfig] = None,
+) -> None:
+    """Register user-defined aliases and scripts into the command registry.
+
+    Args:
+        registry: Command registry instance
+        config: User configuration
+    """
+    registry = registry or get_registry()
+    config = config or load_user_config()
+
+    for cmd_def in config.to_command_defs():
+        try:
+            if cmd_def.meta.source == CommandSource.ALIAS and isinstance(
+                cmd_def.handler, str
+            ):
+                registry.add_alias(cmd_def.meta.short, cmd_def.handler)
+            registry.register(cmd_def)
+        except RegistryError:
+            # Skip conflicting entries
+            pass
+
+
 # Constants
 SHELL_COMMAND_PREFIX = "!:"
 
@@ -88,54 +113,7 @@ class GitCommandNew:
         self._executor = executor or SecureExecutor()
 
         # Load user commands from config
-        self._register_user_commands()
-
-    def _register_user_commands(self) -> None:
-        """Register user-defined aliases and scripts as standard commands."""
-        from ._models import CommandDef, CommandMeta, CommandCategory, CommandSource
-
-        # Register aliases as standard commands
-        for alias_name, target in self._config.aliases.items():
-            try:
-                # Register as alias in resolver
-                self._registry.add_alias(alias_name, target)
-
-                # Also register as a command for completion
-                cmd_def = CommandDef(
-                    meta=CommandMeta(
-                        short=alias_name,
-                        category=CommandCategory.ALIAS,
-                        help=f"Alias for {target}",
-                        source=CommandSource.ALIAS,
-                        is_user_defined=True,
-                    ),
-                    handler=target,
-                )
-                self._registry.register(cmd_def)
-            except RegistryError:
-                # Skip conflicting aliases
-                pass
-
-        # Register scripts as standard commands
-        for name, script in self._config.scripts.items():
-            try:
-                cmd_def = CommandDef(
-                    meta=CommandMeta(
-                        short=name,
-                        category=CommandCategory(script.category),
-                        help=script.help or f"User script: {name}",
-                        dangerous=script.dangerous,
-                        confirm_msg=script.confirm_msg,
-                        examples=script.examples,
-                        source=CommandSource.SCRIPT,
-                        is_user_defined=True,
-                    ),
-                    handler=script,
-                )
-                self._registry.register(cmd_def)
-            except RegistryError:
-                # Skip conflicting scripts
-                pass
+        register_user_commands(self._registry, self._config)
 
     def execute(self, cmd: str, args: Optional[list[str]] = None) -> tuple[int, str]:
         """Execute a command.
