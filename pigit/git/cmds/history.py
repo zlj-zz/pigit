@@ -22,7 +22,7 @@ from ...cmdparse.completion.base import CompletionType
 )
 def log(args: list[str]) -> str:
     """Show commit log."""
-    base = "git log"
+    base = "git log --all --decorate --graph"
     if args:
         return f"{base} {' '.join(args)}"
     return base
