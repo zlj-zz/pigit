@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_picker.py
-Description: Interactive picker for cmd_new commands (--pick functionality).
+Description: Interactive picker for cmd commands (--pick functionality).
 Author: Zev
 Date: 2026-04-10
 """
@@ -28,16 +28,16 @@ if TYPE_CHECKING:
     from . import GitCommandNew
 
 NO_TTY_MSG = (
-    "`pigit cmd_new --pick`<error> needs an interactive terminal.\n"
-    "Use `pigit cmd_new -l` for the full list or "
-    "`pigit cmd_new -s <query>` to search.\n"
-    "See `pigit cmd_new -h` for more options."
+    "`pigit cmd --pick`<error> needs an interactive terminal.\n"
+    "Use `pigit cmd -l` for the full list or "
+    "`pigit cmd -s <query>` to search.\n"
+    "See `pigit cmd -h` for more options."
 )
 
 _TERMINAL_TOO_SMALL_MSG = (
-    "Terminal is too small for `pigit cmd_new --pick` (need room for a fixed header, "
+    "Terminal is too small for `pigit cmd --pick` (need room for a fixed header, "
     "at least one list row, and a footer line). Enlarge the window or use "
-    "`pigit cmd_new -l` / `pigit cmd_new -s <query>`."
+    "`pigit cmd -l` / `pigit cmd -s <query>`."
 )
 
 # Tests can patch this
@@ -45,7 +45,7 @@ _tty_ok = tty_ok
 
 
 class CmdNewPickerLoop(PickerAppEventLoop):
-    """Event loop for cmd_new command picker."""
+    """Event loop for cmd command picker."""
 
     BINDINGS = [
         ("Q", "binding_quit_picker"),
@@ -97,7 +97,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         # Build title with optional category filter
         pick_suffix = f" {category}" if category else ""
         title = (
-            f"pigit cmd_new --pick{pick_suffix}  [j/k scroll  Enter run  / filter  "
+            f"pigit cmd --pick{pick_suffix}  [j/k scroll  Enter run  / filter  "
             f"q/Esc quit  Ctrl+C abort  1-9+Enter]"
         )
         picker = SearchableListPicker(
@@ -169,7 +169,7 @@ def run_cmd_new_picker(
     pick_alt_screen: bool = False,
     category: Optional[str] = None,
 ) -> tuple[int, Optional[str]]:
-    """Run interactive picker for cmd_new commands.
+    """Run interactive picker for cmd commands.
 
     Args:
         processor: GitCommandNew instance (created if None)

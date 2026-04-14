@@ -20,7 +20,6 @@ def _ensure_pigit_context():
         "--config",  # git config
         "--information",  # git information
         "--count",  # code counter
-        "cmd",
         "cmd -l",
         "cmd -t branch",
         "cmd ws",

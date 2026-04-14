@@ -25,6 +25,28 @@ class CmdHandler:
     def __init__(self):
         self._processor = GitCommandNew()
 
+    def _run_picker(self, category=None) -> int:
+        """Run interactive picker."""
+        from ..git.cmds._picker import run_cmd_new_picker
+
+        # Validate category if provided
+        if category:
+            try:
+                CommandCategory(category)
+            except ValueError:
+                console.echo(f"`Unknown category: {category}`<tomato>")
+                console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                return 1
+
+        exit_code, message = run_cmd_new_picker(
+            self._processor,
+            pick_alt_screen=True,
+            category=category,
+        )
+        if message:
+            console.echo(message)
+        return exit_code
+
     def handle(self, args: "Namespace") -> int:
         """Handle cmd subcommand.
 
@@ -36,30 +58,11 @@ class CmdHandler:
         """
         # Interactive picker
         if args.pick:
-            from ..git.cmds._picker import run_cmd_new_picker
-
             category = None if args.pick is True else args.pick
-
-            # Validate category if provided
-            if category:
-                try:
-                    CommandCategory(category)
-                except ValueError:
-                    console.echo(f"`Unknown category: {category}`<tomato>")
-                    console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
-                    return 1
-
-            exit_code, message = run_cmd_new_picker(
-                self._processor,
-                pick_alt_screen=True,
-                category=category,
-            )
-            if message:
-                console.echo(message)
-            return exit_code
+            return self._run_picker(category)
 
         # List commands
-        if args.list or args.dangerous:
+        if args.list or args.dangerous or args.type:
             if args.dangerous:
                 help_text = self._processor.get_help(dangerous_only=True)
             elif args.type:
@@ -102,9 +105,8 @@ class CmdHandler:
                 console.echo(output)
             return exit_code
 
-        # Default: show help
-        console.echo(self._processor.get_help())
-        return 0
+        # Default: launch interactive picker
+        return self._run_picker()
 
 
 def handle_cmd(args: "Namespace") -> int:
