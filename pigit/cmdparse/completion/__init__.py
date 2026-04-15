@@ -2,14 +2,13 @@
 
 from typing import Optional, Type
 
-from .base import ShellCompletion, CompletionType
+from .base import ShellCompletion
 from .bash import BashCompletion
 from .zsh import ZshCompletion
 from .fish import FishCompletion
 
 __all__ = [
     "ShellCompletion",
-    "CompletionType",
     "BashCompletion",
     "ZshCompletion",
     "FishCompletion",

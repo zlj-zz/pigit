@@ -8,7 +8,7 @@ Date: 2026-04-10
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
-from ...cmdparse.completion.base import CompletionType
+from ._completion_types import CompletionType
 
 
 @command(

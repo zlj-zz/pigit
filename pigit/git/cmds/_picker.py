@@ -20,22 +20,14 @@ from pigit.termui.component_list_picker import (
 )
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
-from pigit.termui.tty_io import (
-    read_line_cancellable,
-    read_line_with_completion,
-    terminal_size,
-    tty_ok,
-)
+from pigit.termui.tty_io import terminal_size, tty_ok
 from pigit.termui.tui_input_bridge import TermuiInputBridge
-from pigit.context import Context
 
-from ._picker_adapter import iter_cmd_new_entries, CmdNewEntry
+from ._completion import make_candidate_provider
 from ._mru import load_mru
-
-
-def _dim_hint(text: str) -> str:
-    """Dim hint text via ANSI SGR."""
-    return f"\033[2m{text}\033[0m"
+from ._picker_adapter import iter_cmd_new_entries, CmdNewEntry
+from ._picker_prompt import ArgumentPrompter
+from ._picker_sorter import build_context_signals, sort_picker_entries
 
 if TYPE_CHECKING:
     from . import GitCommandNew
@@ -55,83 +47,6 @@ _TERMINAL_TOO_SMALL_MSG = (
 
 # Tests can patch this
 _tty_ok = tty_ok
-
-
-def _build_context_signals() -> dict[str, bool]:
-    """Detect working-tree context signals from current repo.
-
-    Returns:
-        Dict with keys has_unstaged, has_staged, has_conflict
-    """
-    signals = {
-        "has_unstaged": False,
-        "has_staged": False,
-        "has_conflict": False,
-    }
-    ctx = Context.try_current()
-    if ctx is None:
-        return signals
-    try:
-        files = ctx.repo.load_status()
-    except Exception:
-        return signals
-
-    for f in files:
-        if f.has_unstaged_change or not f.tracked:
-            signals["has_unstaged"] = True
-        if f.has_staged_change:
-            signals["has_staged"] = True
-        if f.has_merged_conflicts:
-            signals["has_conflict"] = True
-    return signals
-
-
-def _context_score(entry: CmdNewEntry, signals: dict[str, bool]) -> int:
-    """Compute context-aware priority score for an entry.
-
-    Args:
-        entry: Command entry
-        signals: Context signals from _build_context_signals
-
-    Returns:
-        Priority score (higher = more relevant)
-    """
-    cat = entry.category.lower()
-    score = 0
-    if signals.get("has_unstaged") and cat == "index":
-        score += 100
-    if signals.get("has_staged") and cat == "commit":
-        score += 100
-    if signals.get("has_conflict") and cat in ("conflict", "merge"):
-        score += 100
-    return score
-
-
-def _sort_picker_entries(
-    entries: list[CmdNewEntry],
-    mru: list[str],
-    signals: dict[str, bool],
-) -> list[CmdNewEntry]:
-    """Sort entries by MRU, context relevance, then name.
-
-    Args:
-        entries: Command entries
-        mru: MRU command names in order
-        signals: Context signals
-
-    Returns:
-        Sorted entries
-    """
-    mru_index = {name: idx for idx, name in enumerate(mru)}
-
-    def sort_key(e: CmdNewEntry) -> tuple[int, int, str]:
-        return (
-            mru_index.get(e.name, 999),
-            -_context_score(e, signals),
-            e.name,
-        )
-
-    return sorted(entries, key=sort_key)
 
 
 class CmdNewPickerLoop(PickerAppEventLoop):
@@ -169,8 +84,8 @@ class CmdNewPickerLoop(PickerAppEventLoop):
 
         # Load MRU and context signals, then sort entries
         mru = load_mru()
-        signals = _build_context_signals()
-        entries = _sort_picker_entries(entries, mru, signals)
+        signals = build_context_signals()
+        entries = sort_picker_entries(entries, mru, signals)
         mru_set = set(mru) if mru else set()
 
         rows: list[PickerRow] = [
@@ -258,24 +173,9 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         flush = sys.stdout.flush
 
         if entry.has_args:
-            self._renderer.show_cursor()
-            flush()
-            write(f"\nArguments for `{entry.name}` (empty = none, Esc = cancel):\n")
-            flush()
-            if entry.arg_completion:
-                extra_raw = read_line_with_completion(
-                    write=write,
-                    flush=flush,
-                    prompt=f"{entry.name} ",
-                    completion_type=entry.arg_completion,
-                    hint_styler=_dim_hint,
-                )
-            else:
-                extra_raw = read_line_cancellable(
-                    write=write, flush=flush, prompt=f"{entry.name} "
-                )
-            self._renderer.hide_cursor()
-            flush()
+            provider = make_candidate_provider(entry.arg_completion)
+            prompter = ArgumentPrompter(self._renderer, write, flush)
+            extra_raw = prompter.prompt(entry.name, provider)
             if extra_raw is None:
                 return None
             extra_args = shlex.split(extra_raw.strip()) if extra_raw.strip() else []

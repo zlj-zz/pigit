@@ -66,7 +66,7 @@ def pigit(args: "Namespace", _) -> None:
 
         # Add cmd commands to completion with arg_completion metadata
         from .git.cmds import get_registry, register_user_commands
-        from .cmdparse.completion.base import CompletionType
+        from .git.cmds._completion_types import CompletionType
         register_user_commands()
         registry = get_registry()
 

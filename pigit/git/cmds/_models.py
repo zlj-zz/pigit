@@ -7,11 +7,10 @@ Date: 2026-04-10
 """
 
 from dataclasses import dataclass, field
-from typing import Union, Optional, Callable, Protocol, TYPE_CHECKING
+from typing import Union, Optional, Callable, Protocol
 from enum import Enum, auto
 
-if TYPE_CHECKING:
-    from ...cmdparse.completion.base import CompletionType
+from ._completion_types import CompletionType
 
 
 class CommandCategory(Enum):
@@ -78,7 +77,7 @@ class CommandMeta:
     category: CommandCategory
     help: str
     has_args: bool = False
-    arg_completion: Union["CompletionType", list["CompletionType"]] = None
+    arg_completion: Union[CompletionType, list[CompletionType]] = None
     dangerous: bool = False
     confirm_msg: str = ""
     examples: list[str] = field(default_factory=list)

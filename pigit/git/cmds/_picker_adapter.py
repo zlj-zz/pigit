@@ -9,8 +9,7 @@ Date: 2026-04-10
 from dataclasses import dataclass
 from typing import Iterator, Optional
 
-from pigit.cmdparse.completion.base import CompletionType
-
+from ._completion_types import CompletionType
 from ._registry import get_registry
 
 

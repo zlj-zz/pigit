@@ -96,7 +96,7 @@ argparse_dict = {
 def _inject_registry_commands(complete_vars):
     """Inject cmd_new registry commands into cmd completion, mirroring entry.py."""
     from pigit.git.cmds import get_registry, register_user_commands
-    from pigit.cmdparse.completion.base import CompletionType
+    from pigit.git.cmds._completion_types import CompletionType
 
     register_user_commands()
     registry = get_registry()

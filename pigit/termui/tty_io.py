@@ -9,13 +9,10 @@ Date: 2026-03-27
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 import time
 from contextlib import contextmanager
 from typing import Callable, Optional
-
-from pigit.cmdparse.completion.base import CompletionType
 
 # Raw stdin bytes this module recognizes (see also inline comments at each ``if``):
 #   \x1b (27)     ESC — starts ANSI/ECMA-48 escapes (CSI ``ESC [``, SS3 ``ESC O``, etc.).
@@ -304,80 +301,33 @@ def read_line_cancellable(
             buf.append(c)
 
 
-def _git_run_text(args: list[str]) -> str:
-    """Run a git command and return its stdout text."""
-    result = subprocess.run(["git", *args], capture_output=True, text=True)
-    return result.stdout
-
-
-def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
-    """Fetch git completion candidates for a given completion type."""
-    if comp_type == CompletionType.BRANCH:
-        stdout = _git_run_text(["branch", "-a"])
-        lines = [
-            ln.strip().lstrip("* ").replace("remotes/", "")
-            for ln in stdout.splitlines()
-            if ln.strip()
-        ]
-        return sorted(set(lines))
-
-    if comp_type == CompletionType.FILE:
-        stdout1 = _git_run_text(["status", "--porcelain"])
-        stdout2 = _git_run_text(["ls-files", "--others", "--exclude-standard"])
-        lines = []
-        for ln in stdout1.splitlines():
-            if len(ln) > 3:
-                lines.append(ln[3:].strip())
-        lines.extend(ln.strip() for ln in stdout2.splitlines() if ln.strip())
-        return sorted(set(lines))
-
-    if comp_type == CompletionType.COMMIT:
-        stdout = _git_run_text(["log", "--oneline", "--max-count=1000"])
-        return [
-            ln.split(None, 1)[0]
-            for ln in stdout.splitlines()
-            if ln.strip()
-        ]
-
-    if comp_type == CompletionType.REMOTE:
-        stdout = _git_run_text(["remote"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
-
-    if comp_type == CompletionType.TAG:
-        stdout = _git_run_text(["tag"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
-
-    if comp_type == CompletionType.STASH:
-        stdout = _git_run_text(["stash", "list"])
-        return [ln.split(":", 1)[0] for ln in stdout.splitlines() if ln.strip()]
-
-    if comp_type == CompletionType.REF:
-        stdout = _git_run_text(["for-each-ref", "--format=%(refname:short)"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
-
-    return []
-
-
 def read_line_with_completion(
     *,
     write: Callable[[str], None],
     flush: Callable[[], None],
     prompt: str,
-    completion_type: CompletionType,
+    candidate_provider: Callable[[str], list[str]],
     hint_styler: Optional[Callable[[str], str]] = None,
 ) -> Optional[str]:
-    """Read a line with Tab completion for git entities.
+    """Read a line with Tab completion.
 
     Args:
         write: Output writer.
         flush: Output flusher.
         prompt: Prompt string.
-        completion_type: Completion type value (e.g., CompletionType.BRANCH).
+        candidate_provider: Callback that takes a prefix and returns candidates.
         hint_styler: Optional callback to style the completion hint text.
 
     Returns:
         The entered line, or None if cancelled with ESC.
+
+    Note:
+        On Windows this falls back to read_line_cancellable because raw cbreak
+        with Tab handling is only implemented for POSIX TTYs.
     """
+    if sys.platform == "win32":
+        return read_line_cancellable(write=write, flush=flush, prompt=prompt)
+
     write(prompt)
     flush()
     buf: list[str] = []
@@ -440,7 +390,7 @@ def read_line_with_completion(
                 prefix = "".join(buf)
                 if candidate_index == -1 or not candidates:
                     if all_candidates is None:
-                        all_candidates = _git_completion_candidates(completion_type)
+                        all_candidates = candidate_provider("")
                     candidates = [can for can in all_candidates if can.startswith(prefix)]
                     candidate_index = -1
                 if candidates:

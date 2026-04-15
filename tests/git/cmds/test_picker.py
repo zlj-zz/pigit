@@ -14,10 +14,10 @@ import pytest
 from pigit.config import Config
 from pigit.context import Context
 from pigit.ext.executor_factory import ExecutorFactory, MockExecutor
-from pigit.git.cmds._picker import (
-    _build_context_signals,
-    _context_score,
-    _sort_picker_entries,
+from pigit.git.cmds._picker_sorter import (
+    build_context_signals,
+    context_score,
+    sort_picker_entries,
 )
 from pigit.git.cmds._picker_adapter import CmdNewEntry
 from pigit.git.model import File
@@ -35,7 +35,7 @@ def _isolate_context_and_factory():
 
 class TestBuildContextSignals:
     def test_no_context_returns_all_false(self):
-        signals = _build_context_signals()
+        signals = build_context_signals()
         assert signals == {
             "has_unstaged": False,
             "has_staged": False,
@@ -89,7 +89,7 @@ class TestBuildContextSignals:
         ]
         monkeypatch.setattr(repo, "load_status", lambda: mock_files)
 
-        signals = _build_context_signals()
+        signals = build_context_signals()
         assert signals["has_unstaged"] is True
         assert signals["has_staged"] is True
         assert signals["has_conflict"] is True
@@ -102,7 +102,7 @@ class TestBuildContextSignals:
         Context.install(ctx)
 
         # repo.load_status may raise without a real git repo
-        signals = _build_context_signals()
+        signals = build_context_signals()
         assert signals["has_unstaged"] is False
         assert signals["has_staged"] is False
         assert signals["has_conflict"] is False
@@ -112,27 +112,27 @@ class TestContextScore:
     def test_index_boosted_when_unstaged(self):
         entry = CmdNewEntry(name="i.a", help_text="add all", category="index", is_dangerous=False, has_args=False)
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
-        assert _context_score(entry, signals) == 100
+        assert context_score(entry, signals) == 100
 
     def test_commit_boosted_when_staged(self):
         entry = CmdNewEntry(name="c", help_text="commit", category="commit", is_dangerous=False, has_args=False)
         signals = {"has_unstaged": False, "has_staged": True, "has_conflict": False}
-        assert _context_score(entry, signals) == 100
+        assert context_score(entry, signals) == 100
 
     def test_conflict_boosted_when_conflict(self):
         entry = CmdNewEntry(name="C.r", help_text="resolve", category="conflict", is_dangerous=False, has_args=False)
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": True}
-        assert _context_score(entry, signals) == 100
+        assert context_score(entry, signals) == 100
 
     def test_merge_boosted_when_conflict(self):
         entry = CmdNewEntry(name="m.a", help_text="abort", category="merge", is_dangerous=False, has_args=False)
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": True}
-        assert _context_score(entry, signals) == 100
+        assert context_score(entry, signals) == 100
 
     def test_no_boost_when_no_signal(self):
         entry = CmdNewEntry(name="b", help_text="branch", category="branch", is_dangerous=False, has_args=False)
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
-        assert _context_score(entry, signals) == 0
+        assert context_score(entry, signals) == 0
 
 
 class TestSortPickerEntries:
@@ -144,7 +144,7 @@ class TestSortPickerEntries:
         ]
         mru = ["c", "a"]
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": False}
-        sorted_entries = _sort_picker_entries(entries, mru, signals)
+        sorted_entries = sort_picker_entries(entries, mru, signals)
         assert [e.name for e in sorted_entries] == ["c", "a", "b"]
 
     def test_context_score_breaks_tie(self):
@@ -154,7 +154,7 @@ class TestSortPickerEntries:
         ]
         mru = []
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
-        sorted_entries = _sort_picker_entries(entries, mru, signals)
+        sorted_entries = sort_picker_entries(entries, mru, signals)
         assert [e.name for e in sorted_entries] == ["i", "b"]
 
     def test_mru_overrides_context_score(self):
@@ -164,7 +164,7 @@ class TestSortPickerEntries:
         ]
         mru = ["b"]
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
-        sorted_entries = _sort_picker_entries(entries, mru, signals)
+        sorted_entries = sort_picker_entries(entries, mru, signals)
         # b is in MRU, so it comes before i even though i has context boost
         assert [e.name for e in sorted_entries] == ["b", "i"]
 
@@ -175,14 +175,14 @@ class TestSortPickerEntries:
         ]
         mru = []
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": False}
-        sorted_entries = _sort_picker_entries(entries, mru, signals)
+        sorted_entries = sort_picker_entries(entries, mru, signals)
         assert [e.name for e in sorted_entries] == ["a", "z"]
 
 
 class TestPickerCompletionDelegation:
     def test_execute_uses_completion_when_arg_completion_present(self, monkeypatch):
         """_execute_command delegates to read_line_with_completion when arg_completion is set."""
-        from pigit.cmdparse.completion.base import CompletionType
+        from pigit.git.cmds._completion_types import CompletionType
         from pigit.git.cmds import GitCommandNew
         from pigit.git.cmds._picker import CmdNewPickerLoop
 
@@ -202,9 +202,9 @@ class TestPickerCompletionDelegation:
 
         captured = {}
         monkeypatch.setattr(
-            "pigit.git.cmds._picker.read_line_with_completion",
-            lambda *, write, flush, prompt, completion_type, hint_styler=None: (
-                captured.update({"type": completion_type}) or "main"
+            "pigit.git.cmds._picker_prompt.read_line_with_completion",
+            lambda *, write, flush, prompt, candidate_provider, hint_styler=None: (
+                captured.update({"provider": candidate_provider}) or "main"
             ),
         )
 
@@ -218,7 +218,7 @@ class TestPickerCompletionDelegation:
         assert result == (0, "ok")
         assert captured["name"] == "b.d"
         assert captured["args"] == ["main"]
-        assert captured["type"] == CompletionType.BRANCH
+        assert captured["provider"] is not None
 
     def test_execute_falls_back_to_cancellable_when_no_arg_completion(self, monkeypatch):
         """_execute_command uses read_line_cancellable when arg_completion is absent."""
@@ -241,7 +241,7 @@ class TestPickerCompletionDelegation:
 
         captured = {}
         monkeypatch.setattr(
-            "pigit.git.cmds._picker.read_line_cancellable",
+            "pigit.git.cmds._picker_prompt.read_line_cancellable",
             lambda *, write, flush, prompt: (
                 captured.update({"used": True}) or "value"
             ),

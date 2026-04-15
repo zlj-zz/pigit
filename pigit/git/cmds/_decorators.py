@@ -15,7 +15,7 @@ from ._registry import get_registry
 
 if TYPE_CHECKING:
     from ._security import SecureExecutor
-    from ...cmdparse.completion.base import CompletionType
+    from ._completion_types import CompletionType
 
 
 def command(

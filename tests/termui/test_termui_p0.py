@@ -137,34 +137,44 @@ def test_picker_preview_key_calls_on_preview():
     assert picker._renderer.rows  # preview text was drawn
 
 
-def test_git_branch_completion_candidates(monkeypatch):
-    from pigit.cmdparse.completion.base import CompletionType
-    from pigit.termui.tty_io import _git_completion_candidates
+def test_read_line_with_completion_uses_provider(monkeypatch):
+    """Tab completion uses candidate_provider without subprocess or git."""
+    from pigit.termui.tty_io import read_line_with_completion
 
-    class FakeResult:
-        stdout = "  main\n* feature\n  remotes/origin/dev\n"
+    writes = []
+    flushes = []
 
-    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeResult())
-    assert _git_completion_candidates(CompletionType.BRANCH) == ["feature", "main", "origin/dev"]
+    def fake_flush():
+        flushes.append(True)
 
+    def fake_read(_n):
+        # Simulate: type 'f', then Tab, then Enter
+        chars = test_read_line_with_completion_uses_provider.chars
+        if not chars:
+            return ""
+        return chars.pop(0)
 
-def test_git_file_completion_candidates(monkeypatch):
-    from pigit.cmdparse.completion.base import CompletionType
-    from pigit.termui.tty_io import _git_completion_candidates
+    test_read_line_with_completion_uses_provider.chars = ["f", "\t", "\n"]
 
-    class FakeStatus:
-        stdout = " M src/main.py\n?? README.md\n"
+    monkeypatch.setattr("sys.stdin.read", fake_read)
+    monkeypatch.setattr(
+        "pigit.termui.tty_io.terminal_size", lambda: (80, 24)
+    )
 
-    class FakeLs:
-        stdout = "config.yml\n"
+    from contextlib import contextmanager
 
-    def fake_run(cmd, **kwargs):
-        if cmd[:2] == ["git", "status"]:
-            return FakeStatus()
-        return FakeLs()
+    @contextmanager
+    def noop_cbreak(fd):
+        yield
 
-    monkeypatch.setattr("subprocess.run", fake_run)
-    result = _git_completion_candidates(CompletionType.FILE)
-    assert "src/main.py" in result
-    assert "README.md" in result
-    assert "config.yml" in result
+    monkeypatch.setattr("pigit.termui.tty_io._posix_cbreak", noop_cbreak)
+
+    provider = lambda prefix: [c for c in ["foo", "bar"] if c.startswith(prefix)]
+
+    result = read_line_with_completion(
+        write=writes.append,
+        flush=fake_flush,
+        prompt="> ",
+        candidate_provider=provider,
+    )
+    assert result == "foo"

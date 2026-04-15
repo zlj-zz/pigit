@@ -1,28 +1,14 @@
 # -*- coding:utf-8 -*-
 """
 Module: pigit/cmdparse/completion/base.py
-Description: Base shell completion class with CompletionType enum.
+Description: Base shell completion class.
 Author: Zev
 Date: 2026-04-12
 """
 
 import os
 import re
-from enum import Enum
 from typing import Optional
-
-
-class CompletionType(Enum):
-    """Parameter completion types for shell completion."""
-
-    NONE = ""  # No special completion
-    BRANCH = "branch"  # Git branch names
-    FILE = "file"  # File paths (git tracked/untracked)
-    REMOTE = "remote"  # Remote names
-    TAG = "tag"  # Tag names
-    COMMIT = "commit"  # Commit hashes
-    STASH = "stash"  # Stash entries
-    REF = "ref"  # Any git ref (branch/tag/commit)
 
 
 class ShellCompletionError(Exception):

@@ -42,7 +42,7 @@ class TestPickerPrintOnly:
         monkeypatch.setattr(sys.stdout, "write", captured.write)
         monkeypatch.setattr(sys.stdout, "flush", lambda: None)
         monkeypatch.setattr(
-            "pigit.git.cmds._picker.read_line_cancellable",
+            "pigit.git.cmds._picker_prompt.read_line_cancellable",
             lambda *, write, flush, prompt: "feature bugfix",
         )
 
@@ -63,7 +63,7 @@ class TestPickerPrintOnly:
     def test_execute_command_cancellation_returns_none(self, monkeypatch):
         """Esc during arg prompt returns None even in print_only."""
         monkeypatch.setattr(
-            "pigit.git.cmds._picker.read_line_cancellable",
+            "pigit.git.cmds._picker_prompt.read_line_cancellable",
             lambda *, write, flush, prompt: None,
         )
 
