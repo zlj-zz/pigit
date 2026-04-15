@@ -22,7 +22,7 @@ from pigit.termui.tty_io import terminal_size, truncate_line
 
 if TYPE_CHECKING:
     from pigit.termui.event_loop import AppEventLoop
-    from pigit.termui.render import Renderer
+    from pigit.termui.surface import Surface
 
 PICK_EXIT_CTRL_C = 130
 
@@ -45,39 +45,6 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRo
     return [r for r in rows if q in r.title.lower() or q in (r.detail or "").lower()]
 
 
-def _draw_picker_header(renderer: "Renderer", title_line: str, cols: int) -> None:
-    sep = "=" * min(72, cols)
-    renderer.write(sep + "\n")
-    renderer.write(truncate_line(title_line, cols) + "\n")
-    renderer.write(sep + "\n")
-
-
-def _pin_bottom_rows(
-    renderer: "Renderer",
-    term_rows: int,
-    cols: int,
-    foot: str,
-    needle: str,
-    has_filter: bool,
-    filter_editing: bool,
-    preview_text: Optional[str] = None,
-) -> None:
-    status_row = term_rows - 1
-    input_row = term_rows
-    if preview_text:
-        renderer.draw_absolute_row(status_row, truncate_line(preview_text, cols))
-    else:
-        renderer.draw_absolute_row(
-            status_row,
-            footer_status_line(foot, needle, has_filter, filter_editing, cols),
-        )
-    renderer.draw_absolute_row(
-        input_row,
-        filter_input_line(needle, cols) if filter_editing else "",
-    )
-    renderer.flush()
-
-
 class SearchableListPicker(Component):
     """
     Root component for ``cmd --pick`` / ``repo cd --pick``: filter, scroll, confirm.
@@ -87,6 +54,7 @@ class SearchableListPicker(Component):
     """
 
     NAME = "searchable_list_picker"
+    _uses_surface_render = True
 
     def __init__(
         self,
@@ -147,10 +115,7 @@ class SearchableListPicker(Component):
         assert self._loop is not None
         self._loop.quit("picker", exit_code=exit_code, result_message=message)
 
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        r = self._renderer
-        assert r is not None
-
+    def _render_surface(self, surface: "Surface") -> None:
         cols, term_rows = terminal_size()
         has_filter = bool(self._needle) or self._filter_editing
         if not picker_terminal_ok(term_rows):
@@ -158,52 +123,40 @@ class SearchableListPicker(Component):
             return
 
         vp = picker_viewport(term_rows)
-        needle = self._needle
         filtered = self._filtered
 
+        # Header
+        sep = "=" * min(72, cols)
+        surface.draw_text(0, 0, sep)
+        surface.draw_text(1, 0, truncate_line(self._title_line, cols))
+        surface.draw_text(2, 0, sep)
+
         if not filtered:
-            r.clear_screen()
-            _draw_picker_header(r, self._title_line, cols)
             msg = (
                 "No matches. Press / to edit filter, q or Esc to quit, "
                 "Ctrl+C to abort."
             )
-            for _ in range(vp):
-                r.write(truncate_line(msg, cols) + "\n")
-                msg = ""
-            _pin_bottom_rows(
-                r,
-                term_rows,
-                cols,
-                "--",
-                needle,
-                has_filter,
-                self._filter_editing,
-                self._preview_text,
-            )
-            return
+            for row in range(3, 3 + vp):
+                surface.draw_row(row, msg if row == 3 else "")
+        else:
+            if self._index >= len(filtered):
+                self._index = len(filtered) - 1
+            if self._index < 0:
+                self._index = 0
 
-        if self._index >= len(filtered):
-            self._index = len(filtered) - 1
-        if self._index < 0:
-            self._index = 0
+            self._sync_scroll(vp)
+            for row in range(vp):
+                li = self._scroll_offset + row
+                if li >= len(filtered):
+                    surface.draw_row(3 + row, "")
+                    continue
+                ent = filtered[li]
+                prefix = "> " if li == self._index else "  "
+                raw = self._render_line(ent).lstrip()
+                body = truncate_line(raw, cols - len(prefix))
+                surface.draw_row(3 + row, prefix + body)
 
-        self._sync_scroll(vp)
-
-        r.clear_screen()
-        _draw_picker_header(r, self._title_line, cols)
-
-        for row in range(vp):
-            li = self._scroll_offset + row
-            if li >= len(filtered):
-                r.write("\n")
-                continue
-            ent = filtered[li]
-            prefix = "> " if li == self._index else "  "
-            raw = self._render_line(ent).lstrip()
-            body = truncate_line(raw, cols - len(prefix))
-            r.write(prefix + body + "\n")
-
+        # Footer
         n = len(filtered)
         if n > vp:
             lo = self._scroll_offset + 1
@@ -211,16 +164,18 @@ class SearchableListPicker(Component):
             foot = f"-- rows {lo}-{hi} of {n} (j/k scroll) --"
         else:
             foot = f"-- {n} row(s) --"
-        _pin_bottom_rows(
-            r,
-            term_rows,
-            cols,
-            foot,
-            needle,
-            has_filter,
-            self._filter_editing,
-            self._preview_text,
-        )
+
+        status_row = term_rows - 2
+        input_row = term_rows - 1
+        if self._preview_text:
+            surface.draw_row(status_row, truncate_line(self._preview_text, cols))
+        else:
+            surface.draw_row(
+                status_row,
+                footer_status_line(foot, self._needle, has_filter, self._filter_editing, cols),
+            )
+        if self._filter_editing:
+            surface.draw_row(input_row, filter_input_line(self._needle, cols))
 
     def _echo_number_at_bottom(self, number_buf: str) -> None:
         r = self._renderer

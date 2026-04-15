@@ -8,9 +8,12 @@ Date: 2026-04-01
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from pigit.termui.overlay_controller import OverlayController
+
+if TYPE_CHECKING:
+    from pigit.termui.surface import Surface
 from pigit.termui.overlay_kinds import (
     OverlayDispatchResult,
     OverlayKind,
@@ -66,7 +69,15 @@ class OverlayHostMixin:
                 reset()
         self._active_popup = None
 
+    def _render_active_overlay_surface(self, surface: "Surface") -> None:
+        if self.overlay_kind != OverlayKind.POPUP:
+            return
+        ap = self._active_popup
+        if ap is not None and getattr(ap, "open", False):
+            ap._render_surface(surface)
+
     def _render_termui_overlays(self) -> None:
+        """Legacy overlay render path for components not yet on _render_surface."""
         if self.overlay_kind != OverlayKind.POPUP:
             return
         ap = self._active_popup

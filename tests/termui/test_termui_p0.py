@@ -131,7 +131,16 @@ def test_picker_preview_key_calls_on_preview():
         def flush(self):
             pass
 
+        def render_surface(self, surface):
+            for row_idx, row in enumerate(surface._rows, start=1):
+                line = "".join(cell.char for cell in row).rstrip()
+                if line:
+                    self.rows[row_idx] = line
+                elif row_idx in self.rows:
+                    del self.rows[row_idx]
+
     picker._renderer = FakeRenderer()
+    picker.resize((80, 24))
     picker.on_key("?")
     assert calls == ["a"]
     assert picker._renderer.rows  # preview text was drawn

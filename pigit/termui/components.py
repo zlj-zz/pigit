@@ -9,7 +9,7 @@ Date: 2026-03-27
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 from pigit.termui.bindings import (
@@ -21,6 +21,7 @@ from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
     from pigit.termui.render import Renderer
+    from pigit.termui.surface import Surface
 
 NONE_SIZE = (0, 0)
 
@@ -147,12 +148,26 @@ class Component(ABC):
         for child in self.children.values():
             child.resize(size)
 
-    @abstractmethod
-    def _render(self, size: Optional[tuple[int, int]] = None):
-        """Render the component, overwritten in sub-class.
+    def _render_surface(self, surface: "Surface") -> None:
+        """Render this component into the given Surface.
 
-        Here is do nothing. If needed, should overwritten in sub-class.
+        New components should implement this instead of `_render`.  Old
+        components that still override `_render` can leave this as a no-op.
         """
+        pass
+
+    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
+        """Legacy imperative render path.
+
+        Deprecated: new components should implement `_render_surface`.
+        """
+        if self._renderer is None:
+            return
+        from pigit.termui.surface import Surface as _Surface
+
+        s = _Surface(self._size[0], self._size[1])
+        self._render_surface(s)
+        self._renderer.render_surface(s)
 
     def _handle_event(self, key: str):
         """Event process handle function.
@@ -264,6 +279,13 @@ class Container(Component):
                 logging.getLogger().warning(f"Not found child: {name}.")
         else:
             raise ComponentError("Not support action of ~Container.")
+
+    def _render_surface(self, surface: "Surface") -> None:
+        """Render the activated child component into the given Surface."""
+        for component in self.children.values():
+            if component.is_activated():
+                component._render_surface(surface)
+                break
 
     def _render(self, size: Optional[tuple[int, int]] = None):
         """Only render the activated child component."""

@@ -150,8 +150,23 @@ class AppEventLoop:
         self.render()
 
     def render(self) -> None:
-        self.clear_screen()
-        self._child._render()
+        if getattr(self._child, "_uses_surface_render", False):
+            from pigit.termui.surface import Surface
+
+            cols, rows = self._size
+            surface = Surface(cols, rows)
+            # 1. New-style unified pass
+            self._child._render_surface(surface)
+            # 2. Render overlays if the root supports them
+            if hasattr(self._child, "_render_active_overlay_surface"):
+                self._child._render_active_overlay_surface(surface)
+            # 3. Composite to terminal
+            if self._renderer is not None:
+                self._renderer.render_surface(surface)
+        else:
+            # Legacy path for old components
+            self.clear_screen()
+            self._child._render()
 
     def set_input_timeouts(self, timeout: float) -> None:
         self._input_handle.set_input_timeouts(timeout)

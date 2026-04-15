@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from pigit.termui.session import Session
+    from pigit.termui.surface import Surface
 
 
 class Renderer:
@@ -115,4 +116,21 @@ class Renderer:
             self.move_cursor(cur_row, y)
             self._out.write(" " * col_width)
             cur_row += 1
+        self.flush()
+
+    def render_surface(self, surface: "Surface") -> None:
+        """Draw a full Surface to the terminal, row by row.
+
+        Future optimization: diff against previous frame and only update changed rows.
+        """
+        self.clear_screen()
+        for row_idx, row in enumerate(surface.rows(), start=1):
+            self.move_cursor(row_idx, 1)
+            self.erase_line_to_end()
+            for cell in row:
+                if cell.style:
+                    self._out.write(cell.style)
+                self._out.write(cell.char if cell.char else " ")
+                if cell.style:
+                    self._out.write("\033[0m")
         self.flush()

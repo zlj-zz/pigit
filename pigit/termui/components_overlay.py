@@ -9,10 +9,14 @@ Date: 2026-04-01
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, ClassVar, Optional
+from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
 from pigit.termui.bindings import resolve_key_handlers_merged
+
+if TYPE_CHECKING:
+    from pigit.termui.surface import Surface
 from pigit.termui.components import Component, _looks_like_overlay_host
+from pigit.termui.frame_primitives import BoxFrame
 from pigit.termui import keys
 from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
 from pigit.termui.text import sanitize_for_display
@@ -133,25 +137,15 @@ class HelpPanel(Component):
     def fresh(self) -> None:
         pass
 
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        if self._renderer is None:
-            return
-        inner = self._inner_w
-        ow = self._outer_w
-        title = " Help   esc close "
-        title_vis = title[:inner].ljust(inner)
-        frame: list[str] = []
-        frame.append(_BOX_TL + _BOX_H * (ow - 2) + _BOX_TR)
-        frame.append(_BOX_V + title_vis + _BOX_V)
+    def _render_surface(self, surface: "Surface") -> None:
+        frame = BoxFrame(self._inner_w, self._scroll_h, title="Help   esc close")
+        frame.draw_onto(surface, self.x, self.y)
+
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
         padded = list(chunk)
         while len(padded) < self._scroll_h:
             padded.append("")
-        for row in padded:
-            inner_line = row[:inner].ljust(inner)
-            frame.append(_BOX_V + inner_line + _BOX_V)
-        frame.append(_BOX_BL + _BOX_H * (ow - 2) + _BOX_BR)
-        self._renderer.draw_panel(frame, self.x, self.y, self._size)
+        frame.draw_content(surface, self.x, self.y, padded)
 
 
 class Popup(Component):
@@ -339,6 +333,12 @@ class Popup(Component):
                 "Subclass Popup without session_owner must override _on_exit_key."
             )
 
+    def _render_surface(self, surface: "Surface") -> None:
+        if not self.open:
+            return
+        self._layout_content()
+        self._child._render_surface(surface)
+
     def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         self._sync_renderer_from_session_owner()
         if not self.open or self._renderer is None:
@@ -384,6 +384,8 @@ class AlertDialogBody(Component):
         self._outer_w = 42
         self.outer_row_count = 8
         self._frame_lines: list[str] = []
+        self._content_lines: list[str] = []
+        self._needs_rebuild = True
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size, renderer=renderer)
 
@@ -396,7 +398,7 @@ class AlertDialogBody(Component):
         self._message = sanitize_for_display(message)
         self._on_result = on_result
         self.open_alert()
-        self._rebuild_frame()
+        self._needs_rebuild = True
 
     def reset_state(self) -> None:
         self.open = False
@@ -404,7 +406,7 @@ class AlertDialogBody(Component):
     def resize(self, size: tuple[int, int]) -> None:
         self._term_cols = int(size[0])
         self._term_lines = int(size[1])
-        self._rebuild_frame()
+        self._needs_rebuild = True
         super().resize(size)
 
     def _rebuild_frame(self) -> None:
@@ -415,9 +417,11 @@ class AlertDialogBody(Component):
         )
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
+        self._content_lines = self._build_content_lines()
         self._frame_lines = self._build_bordered_frame()
         self._outer_w = inner_w + 2
         self.outer_row_count = len(self._frame_lines)
+        self._needs_rebuild = False
 
     def fresh(self) -> None:
         pass
@@ -425,16 +429,25 @@ class AlertDialogBody(Component):
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
 
+    def _render_surface(self, surface: "Surface") -> None:
+        if not self.open:
+            return
+        if self._needs_rebuild:
+            self._rebuild_frame()
+        inner_h = len(self._content_lines)
+        frame = BoxFrame(self._inner_w, inner_h, title="Alert")
+        frame.draw_onto(surface, self.x, self.y)
+        frame.draw_content(surface, self.x, self.y, self._content_lines)
+
     def _render(self, size: Optional[tuple[int, int]] = None) -> None:
         if not self.open or self._renderer is None:
             return
-        if not self._frame_lines:
+        if self._needs_rebuild:
             self._rebuild_frame()
         self._renderer.draw_panel(self._frame_lines, self.x, self.y, self._size)
 
-    def _build_bordered_frame(self) -> list[str]:
+    def _build_content_lines(self) -> list[str]:
         inner = self._inner_w
-        ow = inner + 2
         body = sanitize_for_display(self._message)
         wrapped: list[str] = []
         for raw in body.splitlines() or [body]:
@@ -450,15 +463,24 @@ class AlertDialogBody(Component):
         while rest:
             footer_lines.append(rest[:inner])
             rest = rest[inner:]
+        lines: list[str] = []
+        for line in wrapped:
+            lines.append(line[:inner].ljust(inner))
+        lines.append(" " * inner)
+        for fl in footer_lines:
+            lines.append(fl[:inner].ljust(inner))
+        return lines
+
+    def _build_bordered_frame(self) -> list[str]:
+        inner = self._inner_w
+        ow = inner + 2
+        content = self._content_lines
         frame: list[str] = []
         frame.append(_BOX_TL + _BOX_H * (ow - 2) + _BOX_TR)
         title_vis = " Alert "[:inner].ljust(inner)
         frame.append(_BOX_V + title_vis + _BOX_V)
-        for line in wrapped:
-            frame.append(_BOX_V + line[:inner].ljust(inner) + _BOX_V)
-        frame.append(_BOX_V + " " * inner + _BOX_V)
-        for fl in footer_lines:
-            frame.append(_BOX_V + fl[:inner].ljust(inner) + _BOX_V)
+        for line in content:
+            frame.append(_BOX_V + line + _BOX_V)
         frame.append(_BOX_BL + _BOX_H * (ow - 2) + _BOX_BR)
         return frame
 
