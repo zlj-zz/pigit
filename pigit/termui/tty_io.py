@@ -9,10 +9,13 @@ Date: 2026-03-27
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 import time
 from contextlib import contextmanager
 from typing import Callable, Optional
+
+from pigit.cmdparse.completion.base import CompletionType
 
 # Raw stdin bytes this module recognizes (see also inline comments at each ``if``):
 #   \x1b (27)     ESC — starts ANSI/ECMA-48 escapes (CSI ``ESC [``, SS3 ``ESC O``, etc.).
@@ -299,6 +302,156 @@ def read_line_cancellable(
             write(c)
             flush()
             buf.append(c)
+
+
+def _git_run_text(args: list[str]) -> str:
+    """Run a git command and return its stdout text."""
+    result = subprocess.run(["git", *args], capture_output=True, text=True)
+    return result.stdout
+
+
+def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
+    """Fetch git completion candidates for a given completion type."""
+    if comp_type == CompletionType.BRANCH:
+        stdout = _git_run_text(["branch", "-a"])
+        lines = [
+            ln.strip().lstrip("* ").replace("remotes/", "")
+            for ln in stdout.splitlines()
+            if ln.strip()
+        ]
+        return sorted(set(lines))
+
+    if comp_type == CompletionType.FILE:
+        stdout1 = _git_run_text(["status", "--porcelain"])
+        stdout2 = _git_run_text(["ls-files", "--others", "--exclude-standard"])
+        lines = []
+        for ln in stdout1.splitlines():
+            if len(ln) > 3:
+                lines.append(ln[3:].strip())
+        lines.extend(ln.strip() for ln in stdout2.splitlines() if ln.strip())
+        return sorted(set(lines))
+
+    if comp_type == CompletionType.COMMIT:
+        stdout = _git_run_text(["log", "--oneline", "--max-count=1000"])
+        return [
+            ln.split(None, 1)[0]
+            for ln in stdout.splitlines()
+            if ln.strip()
+        ]
+
+    if comp_type == CompletionType.REMOTE:
+        stdout = _git_run_text(["remote"])
+        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+
+    if comp_type == CompletionType.TAG:
+        stdout = _git_run_text(["tag"])
+        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+
+    if comp_type == CompletionType.STASH:
+        stdout = _git_run_text(["stash", "list"])
+        return [ln.split(":", 1)[0] for ln in stdout.splitlines() if ln.strip()]
+
+    if comp_type == CompletionType.REF:
+        stdout = _git_run_text(["for-each-ref", "--format=%(refname:short)"])
+        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+
+    return []
+
+
+def read_line_with_completion(
+    *,
+    write: Callable[[str], None],
+    flush: Callable[[], None],
+    prompt: str,
+    completion_type: CompletionType,
+    hint_styler: Optional[Callable[[str], str]] = None,
+) -> Optional[str]:
+    """Read a line with Tab completion for git entities.
+
+    Args:
+        write: Output writer.
+        flush: Output flusher.
+        prompt: Prompt string.
+        completion_type: Completion type value (e.g., CompletionType.BRANCH).
+        hint_styler: Optional callback to style the completion hint text.
+
+    Returns:
+        The entered line, or None if cancelled with ESC.
+    """
+    write(prompt)
+    flush()
+    buf: list[str] = []
+    candidates: list[str] = []
+    candidate_index: int = -1
+    all_candidates: Optional[list[str]] = None
+    cols, _ = terminal_size()
+
+    def refresh_input(show_hint: bool = False) -> None:
+        core = prompt + "".join(buf)
+        write("\r")
+        write(" " * cols)
+        write("\r")
+        write(core)
+        if show_hint and candidates:
+            total = len(candidates)
+            hint_body = f" → {candidates[candidate_index]} ({candidate_index + 1}/{total})"
+            if total > 5:
+                hint_body += f" [+{total - 5} more]"
+            else:
+                others = [c for i, c in enumerate(candidates) if i != candidate_index]
+                if others:
+                    hint_body += f" [{', '.join(others)}]"
+            styler = hint_styler or (lambda s: s)
+            if len(core) + len(hint_body) <= cols:
+                write(styler(hint_body))
+            elif cols - len(core) > 3:
+                write(styler(hint_body[: cols - len(core)]))
+        flush()
+
+    def set_candidate(cand: str) -> None:
+        nonlocal candidate_index
+        buf[:] = list(cand)
+        candidate_index = candidates.index(cand)
+        refresh_input(show_hint=True)
+
+    fd = sys.stdin.fileno()
+    with _posix_cbreak(fd):
+        while True:
+            c = sys.stdin.read(1)
+            if not c:
+                return "".join(buf)
+            if c == "\x03":  # Ctrl+C
+                raise KeyboardInterrupt
+            if c in ("\r", "\n"):
+                write("\n")
+                flush()
+                return "".join(buf)
+            if c == "\x1b":
+                if not _posix_handle_esc_in_line(write, flush, buf):
+                    return None
+                continue
+            if c in ("\x7f", "\x08"):  # Backspace
+                if buf:
+                    buf.pop()
+                    candidate_index = -1
+                    refresh_input()
+                continue
+            if c == "\t":  # Tab
+                prefix = "".join(buf)
+                if candidate_index == -1 or not candidates:
+                    if all_candidates is None:
+                        all_candidates = _git_completion_candidates(completion_type)
+                    candidates = [can for can in all_candidates if can.startswith(prefix)]
+                    candidate_index = -1
+                if candidates:
+                    candidate_index = (candidate_index + 1) % len(candidates)
+                    set_candidate(candidates[candidate_index])
+                continue
+            if len(c) == 1 and c.isprintable() and ord(c) >= 32:
+                buf.append(c)
+                candidate_index = -1
+                refresh_input()
+                continue
 
 
 def tty_ok() -> bool:

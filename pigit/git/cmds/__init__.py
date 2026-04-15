@@ -165,6 +165,56 @@ class GitCommandNew:
         except Exception as e:
             return 1, f"Error executing command: {e}"
 
+    def preview(self, cmd: str, args: Optional[list[str]] = None) -> tuple[int, str]:
+        """Resolve and format a command without executing it.
+
+        Args:
+            cmd: Command name (may include aliases)
+            args: Command arguments
+
+        Returns:
+            Tuple of (exit_code, formatted_command_string or error_message)
+        """
+        args = args or []
+
+        # Check for override first
+        if override := self._config.get_override(cmd):
+            full_cmd = f"{override} {' '.join(args)}" if args else override
+            return 0, full_cmd
+
+        try:
+            resolved = self._resolver.resolve(cmd)
+            handler = resolved.definition.handler
+
+            if isinstance(handler, ScriptConfig):
+                steps_preview = " | ".join(handler.steps[:3])
+                if len(handler.steps) > 3:
+                    steps_preview += " | ..."
+                return 0, f"script: {steps_preview}"
+
+            if isinstance(handler, str):
+                full_cmd = f"{handler} {' '.join(args)}" if args else handler
+                return 0, full_cmd
+
+            if callable(handler):
+                try:
+                    result = handler(args)
+                    if isinstance(result, str):
+                        return 0, result
+                    return 0, str(result)
+                except Exception as exc:
+                    return 1, f"Preview error in handler: {exc}"
+
+            return 1, f"Unsupported handler type: {type(handler)}"
+
+        except ResolverError as exc:
+            suggestions = self._resolver.suggest(cmd)
+            if suggestions:
+                return 1, f"Error: {exc}. Did you mean: {', '.join(suggestions)}?"
+            return 1, f"Error: {exc}"
+        except Exception as exc:
+            return 1, f"Error previewing command: {exc}"
+
     def _execute_handler(
         self, handler: Union[str, Callable, ScriptConfig], args: list[str]
     ) -> tuple[int, str]:

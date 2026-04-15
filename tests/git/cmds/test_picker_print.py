@@ -8,6 +8,7 @@ Date: 2026-04-15
 
 import io
 import sys
+from unittest import mock
 
 import pytest
 
@@ -52,6 +53,7 @@ class TestPickerPrintOnly:
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
         loop._alt = False
+        loop._renderer = mock.Mock()
 
         result = loop._execute_command(entry, None)
         assert result == (0, None)
@@ -72,6 +74,7 @@ class TestPickerPrintOnly:
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
         loop._alt = False
+        loop._renderer = mock.Mock()
 
         result = loop._execute_command(entry, None)
         assert result is None

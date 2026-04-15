@@ -20,12 +20,22 @@ from pigit.termui.component_list_picker import (
 )
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
-from pigit.termui.tty_io import read_line_cancellable, terminal_size, tty_ok
+from pigit.termui.tty_io import (
+    read_line_cancellable,
+    read_line_with_completion,
+    terminal_size,
+    tty_ok,
+)
 from pigit.termui.tui_input_bridge import TermuiInputBridge
 from pigit.context import Context
 
 from ._picker_adapter import iter_cmd_new_entries, CmdNewEntry
 from ._mru import load_mru
+
+
+def _dim_hint(text: str) -> str:
+    """Dim hint text via ANSI SGR."""
+    return f"\033[2m{text}\033[0m"
 
 if TYPE_CHECKING:
     from . import GitCommandNew
@@ -184,18 +194,27 @@ class CmdNewPickerLoop(PickerAppEventLoop):
             assert isinstance(ent, CmdNewEntry)
             return self._execute_command(ent, processor)
 
+        def on_preview(r: PickerRow) -> Optional[str]:
+            ent = r.ref
+            assert isinstance(ent, CmdNewEntry)
+            exit_code, output = processor.preview(ent.name, [])
+            if exit_code != 0:
+                return f"error: {output}"
+            return output
+
         # Build title with optional category filter
         pick_suffix = f" {category}" if category else ""
         mode_hint = "print" if print_only else "run"
         title = (
-            f"pigit cmd --pick{pick_suffix}  [j/k scroll  Enter {mode_hint}  / filter  "
-            f"q/Esc quit  Ctrl+C abort  1-9+Enter]"
+            f"pigit cmd --pick{pick_suffix}  [j/k scroll  Enter {mode_hint}  ? preview  "
+            f"/ filter  q/Esc quit  Ctrl+C abort  1-9+Enter]"
         )
         picker = SearchableListPicker(
             rows,
             title_line=title,
             render_line=render_line,
             on_confirm=on_confirm,
+            on_preview=on_preview,
             terminal_too_small_msg=self._terminal_too_small_msg,
         )
         super().__init__(
@@ -239,21 +258,33 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         flush = sys.stdout.flush
 
         if entry.has_args:
+            self._renderer.show_cursor()
+            flush()
             write(f"\nArguments for `{entry.name}` (empty = none, Esc = cancel):\n")
             flush()
-            extra_raw = read_line_cancellable(
-                write=write, flush=flush, prompt=f"{entry.name} "
-            )
+            if entry.arg_completion:
+                extra_raw = read_line_with_completion(
+                    write=write,
+                    flush=flush,
+                    prompt=f"{entry.name} ",
+                    completion_type=entry.arg_completion,
+                    hint_styler=_dim_hint,
+                )
+            else:
+                extra_raw = read_line_cancellable(
+                    write=write, flush=flush, prompt=f"{entry.name} "
+                )
+            self._renderer.hide_cursor()
+            flush()
             if extra_raw is None:
                 return None
             extra_args = shlex.split(extra_raw.strip()) if extra_raw.strip() else []
         else:
             extra_args = []
 
-        # We are committed to running the command; leave the alternate screen
-        # so output appears on the normal terminal.
         if self._alt:
-            write("\033[?1049l\033[?25h")
+            write("\033[?1049l")
+            self._renderer.show_cursor()
             flush()
 
         if self._print_only:

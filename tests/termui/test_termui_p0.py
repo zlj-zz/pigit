@@ -91,3 +91,80 @@ def test_windows_arrow_mapping():
 
     kb = KeyboardInput(read_hook=read_hook)
     assert kb.read_keys(0.01) == ["up"]
+
+
+def test_picker_preview_key_calls_on_preview():
+    from pigit.termui.component_list_picker import SearchableListPicker, PickerRow
+
+    calls = []
+
+    def on_confirm(row):
+        return 0, None
+
+    def on_preview(row):
+        calls.append(row.title)
+        return f"would run {row.title}"
+
+    picker = SearchableListPicker(
+        [PickerRow(title="a", detail="d", ref=None)],
+        title_line="t",
+        render_line=lambda r: r.title,
+        on_confirm=on_confirm,
+        on_preview=on_preview,
+        terminal_too_small_msg="",
+    )
+
+    class FakeRenderer:
+        def __init__(self):
+            self.rows = {}
+            self._written = []
+
+        def clear_screen(self):
+            pass
+
+        def write(self, text):
+            self._written.append(text)
+
+        def draw_absolute_row(self, row, text):
+            self.rows[row] = text
+
+        def flush(self):
+            pass
+
+    picker._renderer = FakeRenderer()
+    picker.on_key("?")
+    assert calls == ["a"]
+    assert picker._renderer.rows  # preview text was drawn
+
+
+def test_git_branch_completion_candidates(monkeypatch):
+    from pigit.cmdparse.completion.base import CompletionType
+    from pigit.termui.tty_io import _git_completion_candidates
+
+    class FakeResult:
+        stdout = "  main\n* feature\n  remotes/origin/dev\n"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeResult())
+    assert _git_completion_candidates(CompletionType.BRANCH) == ["feature", "main", "origin/dev"]
+
+
+def test_git_file_completion_candidates(monkeypatch):
+    from pigit.cmdparse.completion.base import CompletionType
+    from pigit.termui.tty_io import _git_completion_candidates
+
+    class FakeStatus:
+        stdout = " M src/main.py\n?? README.md\n"
+
+    class FakeLs:
+        stdout = "config.yml\n"
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:2] == ["git", "status"]:
+            return FakeStatus()
+        return FakeLs()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    result = _git_completion_candidates(CompletionType.FILE)
+    assert "src/main.py" in result
+    assert "README.md" in result
+    assert "config.yml" in result

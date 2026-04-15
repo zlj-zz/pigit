@@ -208,3 +208,53 @@ class TestGitCommandNewIntegration:
         registry = get_registry()
         # Note: In real usage, commands are registered at import time
         # We just verify the modules can be imported without errors
+
+
+class TestGitCommandNewPreview:
+    def test_preview_string_handler(self, fresh_registry):
+        """Preview returns templated string for string handlers."""
+        fresh_registry.register(CommandDef(
+            meta=CommandMeta(
+                short="s",
+                category=CommandCategory.BRANCH,
+                help="status",
+            ),
+            handler="git status",
+        ))
+        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        assert processor.preview("s") == (0, "git status")
+
+    def test_preview_with_args(self, fresh_registry):
+        """Preview formats command with arguments."""
+        fresh_registry.register(CommandDef(
+            meta=CommandMeta(
+                short="b.c",
+                category=CommandCategory.BRANCH,
+                help="create",
+            ),
+            handler=lambda args: f"git checkout -b {args[0]}" if args else "git checkout -b",
+        ))
+        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        assert processor.preview("b.c", ["feature"]) == (0, "git checkout -b feature")
+
+    def test_preview_override(self, fresh_registry):
+        """Preview respects config overrides."""
+        config = create_mock_config()
+        config.overrides["s"] = "git status --short"
+        processor = GitCommandNew(registry=fresh_registry, config=config)
+        assert processor.preview("s") == (0, "git status --short")
+
+    def test_preview_unknown_command(self, fresh_registry):
+        """Preview returns error for unknown commands with suggestions."""
+        fresh_registry.register(CommandDef(
+            meta=CommandMeta(
+                short="status",
+                category=CommandCategory.BRANCH,
+                help="status",
+            ),
+            handler="git status",
+        ))
+        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        exit_code, output = processor.preview("st")
+        assert exit_code == 1
+        assert "Did you mean" in output

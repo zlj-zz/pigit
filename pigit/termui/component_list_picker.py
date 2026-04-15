@@ -60,13 +60,17 @@ def _pin_bottom_rows(
     needle: str,
     has_filter: bool,
     filter_editing: bool,
+    preview_text: Optional[str] = None,
 ) -> None:
     status_row = term_rows - 1
     input_row = term_rows
-    renderer.draw_absolute_row(
-        status_row,
-        footer_status_line(foot, needle, has_filter, filter_editing, cols),
-    )
+    if preview_text:
+        renderer.draw_absolute_row(status_row, truncate_line(preview_text, cols))
+    else:
+        renderer.draw_absolute_row(
+            status_row,
+            footer_status_line(foot, needle, has_filter, filter_editing, cols),
+        )
     renderer.draw_absolute_row(
         input_row,
         filter_input_line(needle, cols) if filter_editing else "",
@@ -93,12 +97,14 @@ class SearchableListPicker(Component):
         on_confirm: Callable[[PickerRow], Optional[tuple[int, Optional[str]]]],
         terminal_too_small_msg: str,
         initial_filter: str = "",
+        on_preview: Optional[Callable[[PickerRow], Optional[str]]] = None,
     ) -> None:
         super().__init__()
         self._all_rows = list(all_rows)
         self._title_line = title_line
         self._render_line = render_line
         self._on_confirm = on_confirm
+        self._on_preview = on_preview
         self._terminal_too_small_msg = terminal_too_small_msg
 
         self._needle = initial_filter
@@ -110,6 +116,7 @@ class SearchableListPicker(Component):
         self._filter_editing = False
         self._number_prefix: Optional[str] = None
         self._saved_needle_for_filter = ""
+        self._preview_text: Optional[str] = None
 
         self._loop: Optional["AppEventLoop"] = None
 
@@ -165,7 +172,14 @@ class SearchableListPicker(Component):
                 r.write(truncate_line(msg, cols) + "\n")
                 msg = ""
             _pin_bottom_rows(
-                r, term_rows, cols, "--", needle, has_filter, self._filter_editing
+                r,
+                term_rows,
+                cols,
+                "--",
+                needle,
+                has_filter,
+                self._filter_editing,
+                self._preview_text,
             )
             return
 
@@ -198,7 +212,14 @@ class SearchableListPicker(Component):
         else:
             foot = f"-- {n} row(s) --"
         _pin_bottom_rows(
-            r, term_rows, cols, foot, needle, has_filter, self._filter_editing
+            r,
+            term_rows,
+            cols,
+            foot,
+            needle,
+            has_filter,
+            self._filter_editing,
+            self._preview_text,
         )
 
     def _echo_number_at_bottom(self, number_buf: str) -> None:
@@ -268,6 +289,16 @@ class SearchableListPicker(Component):
             r.write("\n")
             r.flush()
             self._quit(PICK_EXIT_CTRL_C, None)
+            return
+
+        if key == "?":
+            if not self._filtered or self._on_preview is None:
+                return
+            preview_text = self._on_preview(self._filtered[self._index])
+            if preview_text:
+                self._preview_text = f"preview: {preview_text}"
+                self._render()
+                self._preview_text = None
             return
 
         if len(key) == 1 and key.isdigit():
