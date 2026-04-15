@@ -250,6 +250,12 @@ class CmdNewPickerLoop(PickerAppEventLoop):
         else:
             extra_args = []
 
+        # We are committed to running the command; leave the alternate screen
+        # so output appears on the normal terminal.
+        if self._alt:
+            write("\033[?1049l\033[?25h")
+            flush()
+
         if self._print_only:
             cmd_parts = ["pigit", "cmd", entry.name, *extra_args]
             output_line = " ".join(shlex.quote(p) for p in cmd_parts) + "\n"

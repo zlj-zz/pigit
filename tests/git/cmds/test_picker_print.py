@@ -29,6 +29,7 @@ class TestPickerPrintOnly:
         )
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
+        loop._alt = False
 
         result = loop._execute_command(entry, None)
         assert result == (0, None)
@@ -50,6 +51,7 @@ class TestPickerPrintOnly:
         )
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
+        loop._alt = False
 
         result = loop._execute_command(entry, None)
         assert result == (0, None)
@@ -69,6 +71,7 @@ class TestPickerPrintOnly:
         )
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
+        loop._alt = False
 
         result = loop._execute_command(entry, None)
         assert result is None
@@ -91,6 +94,7 @@ class TestPickerPrintOnly:
         )
         loop = CmdNewPickerLoop.__new__(CmdNewPickerLoop)
         loop._print_only = True
+        loop._alt = False
 
         result = loop._execute_command(entry, None)
         assert result == (0, None)

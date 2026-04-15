@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Union, Optional, Callable
 
-from pigit.ext.executor import Executor, WAITING, REPLY
+from pigit.ext.executor import Executor, WAITING
 from pigit.ext.executor_factory import ExecutorFactory
 
 
