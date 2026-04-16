@@ -8,11 +8,11 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 if TYPE_CHECKING:
     from pigit.termui.session import Session
-    from pigit.termui.surface import Surface
+    from pigit.termui.surface import Cell, Surface
 
 
 class Renderer:
@@ -25,6 +25,8 @@ class Renderer:
 
     def __init__(self, session: "Session") -> None:
         self._out = session.stdout
+        self._prev_frame: Optional[list[str]] = None
+        self._prev_size: Optional[tuple[int, int]] = None
 
     def write(self, text: str) -> None:
         self._out.write(text)
@@ -118,19 +120,45 @@ class Renderer:
             cur_row += 1
         self.flush()
 
-    def render_surface(self, surface: "Surface") -> None:
-        """Draw a full Surface to the terminal, row by row.
+    def _row_to_str(self, row: list["Cell"]) -> str:
+        parts = []
+        last_style = ""
+        for cell in row:
+            if cell.char == "":
+                continue
+            if cell.style != last_style:
+                if last_style:
+                    parts.append("\033[0m")
+                if cell.style:
+                    parts.append(cell.style)
+                last_style = cell.style
+            parts.append(cell.char)
+        if last_style:
+            parts.append("\033[0m")
+        return "".join(parts)
 
-        Future optimization: diff against previous frame and only update changed rows.
-        """
-        self.clear_screen()
-        for row_idx, row in enumerate(surface.rows(), start=1):
-            self.move_cursor(row_idx, 1)
-            self.erase_line_to_end()
-            for cell in row:
-                if cell.style:
-                    self._out.write(cell.style)
-                self._out.write(cell.char if cell.char else " ")
-                if cell.style:
-                    self._out.write("\033[0m")
+    def render_surface(self, surface: "Surface") -> None:
+        """Draw a full Surface to the terminal using row-level diff."""
+        lines = [self._row_to_str(row) for row in surface.rows()]
+        curr_size = (surface.width, surface.height)
+
+        if self._prev_frame is None or len(self._prev_frame) != len(lines) or self._prev_size != curr_size:
+            self.clear_screen()
+            for idx, line in enumerate(lines, start=1):
+                self.move_cursor(idx, 1)
+                self._out.write(line)
+        else:
+            for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
+                if old != new:
+                    self.move_cursor(idx, 1)
+                    self.erase_line_to_end()
+                    self._out.write(new)
+
+        self._prev_frame = lines
+        self._prev_size = curr_size
         self.flush()
+
+    def clear_cache(self) -> None:
+        """Invalidate the incremental-render frame cache."""
+        self._prev_frame = None
+        self._prev_size = None

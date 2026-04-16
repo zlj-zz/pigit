@@ -14,6 +14,8 @@ import time
 from contextlib import contextmanager
 from typing import Callable, Optional
 
+from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+
 # Raw stdin bytes this module recognizes (see also inline comments at each ``if``):
 #   \x1b (27)     ESC — starts ANSI/ECMA-48 escapes (CSI ``ESC [``, SS3 ``ESC O``, etc.).
 #   \x03 (3)      ETX — Ctrl+C; turned into KeyboardInterrupt.
@@ -422,8 +424,9 @@ def truncate_line(text: str, max_cols: int) -> str:
     one = " ".join(text.split())
     if max_cols <= 0:
         return ""
-    if len(one) <= max_cols:
+    one_width = wcswidth(one)
+    if one_width <= max_cols:
         return one
     if max_cols <= 1:
-        return one[:max_cols]
-    return one[: max_cols - 1] + "…"
+        return truncate_by_width(one, max_cols)
+    return truncate_by_width(one, max_cols - 1) + "…"

@@ -9,6 +9,7 @@ Date: 2026-03-27
 from __future__ import annotations
 
 from pigit.termui.tty_io import MIN_LIST_ROWS, truncate_line
+from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 PICKER_HEADER_ROWS = 3
 PICKER_FOOTER_ROWS = 2
@@ -28,14 +29,14 @@ def picker_terminal_ok(term_rows: int) -> bool:
 
 def truncate_visual(text: str, max_cols: int) -> str:
     """Trim to width without collapsing internal spaces (unlike ``truncate_line``)."""
-
     if max_cols <= 0:
         return ""
-    if len(text) <= max_cols:
+    text_width = wcswidth(text)
+    if text_width <= max_cols:
         return text
     if max_cols == 1:
-        return text[0]
-    return text[: max_cols - 1] + "…"
+        return truncate_by_width(text, max_cols)
+    return truncate_by_width(text, max_cols - 1) + "…"
 
 
 def normalize_filter_text(needle: str) -> str:

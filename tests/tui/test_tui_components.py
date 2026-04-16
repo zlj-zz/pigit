@@ -186,12 +186,11 @@ class TestLineTextBrowser:
         if content:
             from pigit.termui.surface import Surface
 
-            # Allocate enough rows to cover x + content length (1-based x)
-            surface_rows = max(size[1], x + len(expected_content))
-            s = Surface(size[0], surface_rows)
+            # Components render at local (0,0) coordinates into the surface.
+            s = Surface(size[0], size[1])
             browser._render_surface(s)
             for idx, expected in enumerate(expected_content):
-                assert expected in s.lines()[expected_position[0] - 1 + idx]
+                assert expected in s.lines()[idx]
 
     @pytest.mark.parametrize(
         "initial_size, new_size, expected_size",

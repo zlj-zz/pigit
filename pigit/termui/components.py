@@ -270,7 +270,17 @@ class Container(Component):
         """Render the activated child component into the given Surface."""
         for component in self.children.values():
             if component.is_activated():
-                component._render_surface(surface)
+                w, h = component._size
+                if w > 0 and h > 0:
+                    if component.x < 1 or component.y < 1:
+                        logging.getLogger(__name__).warning(
+                            "Container switch to %s with invalid 1-based coords (%s, %s)",
+                            component.NAME, component.x, component.y
+                        )
+                    sub = surface.subsurface(
+                        max(0, component.x - 1), max(0, component.y - 1), w, h
+                    )
+                    component._render_surface(sub)
                 break
 
     def _handle_event(self, key: str):
@@ -349,8 +359,8 @@ class LineTextBrowser(Component):
             return
         chunk = self._content[self._i : self._i + self._max_line]
         chunk = chunk[: max(0, self._size[1] - self.x + 1)]
-        for row_idx, line in enumerate(chunk, start=self.x):
-            surface.draw_text(row_idx - 1, self.y - 1, line)
+        for idx, line in enumerate(chunk):
+            surface.draw_text(idx, 0, line)
 
     def scroll_up(self, line: int = 1):
         self._i = max(self._i - line, 0)
@@ -407,10 +417,10 @@ class ItemSelector(Component):
         if not self.content:
             return
         visible = self.visible_items[: max(0, self._size[1] - self.x + 1)]
-        for row_idx, item in enumerate(visible, start=self.x):
-            no = self._r_start + (row_idx - self.x)
+        for idx, item in enumerate(visible):
+            no = self._r_start + idx
             prefix = self.CURSOR if no == self.curr_no else " "
-            surface.draw_text(row_idx - 1, self.y - 1, f"{prefix}{item}")
+            surface.draw_text(idx, 0, f"{prefix}{item}")
 
     def next(self, step: int = 1):
         tmp_no = self.curr_no + step

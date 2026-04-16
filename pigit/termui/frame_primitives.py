@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
+from pigit.termui.wcwidth_table import pad_by_width, truncate_by_width
+
 if TYPE_CHECKING:
     from pigit.termui.surface import Surface
 
@@ -48,5 +50,5 @@ class BoxFrame:
         while len(padded) < self.inner_height:
             padded.append("")
         for i, line in enumerate(padded):
-            text = line[: self.inner_width].ljust(self.inner_width)
+            text = pad_by_width(truncate_by_width(line, self.inner_width), self.inner_width)
             surface.draw_text(content_row + i, content_col, text)

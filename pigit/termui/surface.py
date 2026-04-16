@@ -9,7 +9,14 @@ Date: 2026-04-16
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
+
+from pigit.termui.wcwidth_table import (
+    _char_width,
+    pad_by_width,
+    truncate_by_width,
+    wcswidth,
+)
 
 # Box-drawing (UTF-8).
 _BOX_H = "\u2500"
@@ -35,6 +42,65 @@ class Cell:
     style: str = ""
 
 
+_BLANK_CELL = Cell()
+
+
+class _Subsurface:
+    """Proxy that translates local coordinates to a parent Surface."""
+
+    def __init__(
+        self, parent: "Surface", row: int, col: int, width: int, height: int
+    ) -> None:
+        self._parent = parent
+        self._row = row
+        self._col = col
+        self.width = max(0, width)
+        self.height = max(0, height)
+
+    def _to_parent(self, row: int, col: int) -> tuple[int, int]:
+        return self._row + row, self._col + col
+
+    def _clip(
+        self, row: int, col: int, width: int, height: int
+    ) -> tuple[int, int, int, int] | None:
+        r, c = self._to_parent(row, col)
+        w = min(width, self.width - col)
+        h = min(height, self.height - row)
+        if w <= 0 or h <= 0:
+            return None
+        return r, c, w, h
+
+    def draw_text(self, row: int, col: int, text: str) -> None:
+        if row < 0 or row >= self.height or col >= self.width:
+            return
+        r, c = self._to_parent(row, col)
+        self._parent.draw_text(r, c, text)
+
+    def draw_row(self, row: int, text: str, align: Literal["left", "center"] = "left") -> None:
+        if row < 0 or row >= self.height:
+            return
+        self._parent.draw_row(self._row + row, text, align)
+
+    def draw_box(
+        self, row: int, col: int, width: int, height: int, title=None
+    ) -> None:
+        clipped = self._clip(row, col, width, height)
+        if clipped is None:
+            return
+        self._parent.draw_box(*clipped, title)
+
+    def fill_rect(
+        self, row: int, col: int, width: int, height: int, char: str = " "
+    ) -> None:
+        clipped = self._clip(row, col, width, height)
+        if clipped is None:
+            return
+        self._parent.fill_rect(*clipped, char)
+
+    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+        return _Subsurface(self._parent, self._row + row, self._col + col, width, height)
+
+
 class Surface:
     """2-D character buffer for declarative terminal drawing.
 
@@ -55,40 +121,35 @@ class Surface:
         """Reset every cell to a blank space."""
         for row in self._rows:
             for i in range(self.width):
-                row[i] = Cell()
+                row[i] = _BLANK_CELL
 
     def draw_text(self, row: int, col: int, text: str) -> None:
-        """Write text starting at (row, col), clipping to bounds.
-
-        Control characters (``\n``, ``\t``, ``\r``) are treated as ordinary
-        printable characters and drawn inline. Callers must split multi-line
-        text before calling this method.
-        """
+        """Write text starting at (row, col), clipping to bounds."""
         if row < 0 or row >= self.height:
             return
-        for i, ch in enumerate(text):
-            c = col + i
-            if 0 <= c < self.width:
-                self._rows[row][c] = Cell(ch)
+        cur_col = col
+        for ch in text:
+            w = _char_width(ord(ch))
+            if cur_col >= self.width:
+                break
+            if cur_col >= 0 and cur_col + w <= self.width:
+                self._rows[row][cur_col] = Cell(ch)
+                if w == 2:
+                    self._rows[row][cur_col + 1] = Cell("")
+            cur_col += w
 
-    def draw_row(self, row: int, text: str, align: str = "left") -> None:
-        """Write a full-width row, truncated or padded with spaces.
-
-        .. note::
-           Current implementation uses ``len(text)`` as the display width.
-           Wide characters (CJK) are not handled yet and should be addressed
-           in a future phase (e.g. by integrating ``wcwidth``).
-        """
+    def draw_row(self, row: int, text: str, align: Literal["left", "center"] = "left") -> None:
+        """Write a full-width row, truncated or padded with spaces."""
         if row < 0 or row >= self.height or self.width <= 0:
             return
-        if len(text) > self.width:
-            text = text[: self.width - 1] + "…" if self.width > 1 else text[:self.width]
+        text_width = wcswidth(text)
+        if text_width > self.width:
+            text = truncate_by_width(text, self.width - 1) + "…"
         if align == "center":
-            pad_left = max(0, (self.width - len(text)) // 2)
+            pad_left = max(0, (self.width - wcswidth(text)) // 2)
             text = " " * pad_left + text
-        padded = text.ljust(self.width)[: self.width]
-        for i, ch in enumerate(padded):
-            self._rows[row][i] = Cell(ch)
+        padded = pad_by_width(text, self.width)
+        self.draw_text(row, 0, padded)
 
     def draw_box(
         self,
@@ -112,8 +173,8 @@ class Surface:
 
         if title:
             title_text = f" {title[: max(0, width - 4)]} "
-            title_text = title_text[: max(0, width - 2)]
-            pad = max(0, (width - len(title_text)) // 2)
+            title_text = truncate_by_width(title_text, max(0, width - 2))
+            pad = max(0, (width - wcswidth(title_text)) // 2)
             self.draw_text(row, col + 1 + pad, title_text)
 
     def fill_rect(
@@ -121,10 +182,15 @@ class Surface:
     ) -> None:
         """Fill a rectangular area starting at (row, col)."""
         ch = char[0] if char else " "
+        cell = Cell(ch)
         for r in range(row, min(row + height, self.height)):
             for c in range(col, min(col + width, self.width)):
                 if 0 <= r < self.height and 0 <= c < self.width:
-                    self._rows[r][c] = Cell(ch)
+                    self._rows[r][c] = cell
+
+    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+        """Return a proxy that translates local coordinates to this surface."""
+        return _Subsurface(self, row, col, width, height)
 
     def rows(self) -> list[list[Cell]]:
         """Return the internal row buffers for Renderer output.

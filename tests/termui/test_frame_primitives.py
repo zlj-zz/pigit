@@ -36,3 +36,22 @@ class TestBoxFrame:
         lines = s.lines()
         # outer_width = 2, so just left/right borders
         assert lines[0] == "┌┐  "
+
+    def test_draw_content_pads_cjk_by_display_width(self):
+        s = Surface(8, 4)
+        frame = BoxFrame(inner_width=4, inner_height=1)
+        frame.draw_onto(s, 0, 0)
+        frame.draw_content(s, 0, 0, ["中"])
+        lines = s.lines()
+        # "中" is width 2, so it should be padded to 4 columns with 2 trailing spaces
+        assert lines[1].startswith("│中  │")
+
+    def test_draw_content_truncates_cjk_by_display_width(self):
+        s = Surface(8, 4)
+        frame = BoxFrame(inner_width=4, inner_height=1)
+        frame.draw_onto(s, 0, 0)
+        frame.draw_content(s, 0, 0, ["中文长"])
+        lines = s.lines()
+        # Should truncate to 3 display columns + ellipsis or pad to exactly inner_width
+        assert "中" in lines[1]
+        assert len(lines[1]) == 6  # │ + 4 inner + │

@@ -147,6 +147,8 @@ class AppEventLoop:
 
         self._size = self.get_term_size()
         self._child.resize(self._size)
+        if self._renderer is not None:
+            self._renderer.clear_cache()
         self.render()
 
     def render(self) -> None:

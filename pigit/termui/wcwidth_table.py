@@ -59,3 +59,45 @@ def get_width(r: int) -> int:
     if r in {0xE, 0xF}:
         return 0
     return next((wid for num, wid in WIDTHS if r <= num), 1)
+
+
+def _char_width(o: int) -> int:
+    """Return display width for a single code point, with control-char fallback."""
+    if o < 32 or o == 0x7F:
+        return 1
+    w = get_width(o)
+    return 1 if w < 0 else w
+
+
+def wcswidth(text: str) -> int:
+    """Return display width of *text* in terminal columns.
+
+    Control characters and unprintable code points are treated as width 1.
+    Zero-width characters (e.g. U+200B, U+200D) and combining sequences are
+    a known limitation: this function only guarantees correctness for common
+    CJK and basic ASCII ranges.
+    """
+    return sum(_char_width(ord(cp)) for cp in text)
+
+
+def truncate_by_width(text: str, max_width: int) -> str:
+    """Truncate text so that its display width <= max_width."""
+    if max_width <= 0:
+        return ""
+    width = 0
+    parts = []
+    for cp in text:
+        w = _char_width(ord(cp))
+        if width + w > max_width:
+            break
+        parts.append(cp)
+        width += w
+    return "".join(parts)
+
+
+def pad_by_width(text: str, width: int) -> str:
+    """Pad text with spaces on the right to reach the given display width."""
+    pad = width - wcswidth(text)
+    if pad > 0:
+        return text + " " * pad
+    return text

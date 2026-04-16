@@ -12,22 +12,16 @@
 #
 #--------------------------------------------------------------------
 
-_git_files() {
-    local -a files
-    files=(${(f)"$(git ls-files 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | sort -u)"})
-    (( $#files )) && compadd -a files
-}
-
 _git_branches() {
     local -a branches
     branches=(${(f)"$(git branch -a 2>/dev/null | sed 's/^[\* ]*//' | sed 's|^remotes/||' | sort -u)"})
     (( $#branches )) && compadd -a branches
 }
 
-_git_stashes() {
-    local -a stashes
-    stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
-    (( $#stashes )) && compadd -a stashes
+_git_remotes() {
+    local -a remotes
+    remotes=(${(f)"$(git remote 2>/dev/null | sort -u)"})
+    (( $#remotes )) && compadd -a remotes
 }
 
 _git_tags() {
@@ -42,16 +36,22 @@ _git_refs() {
     (( $#refs )) && compadd -a refs
 }
 
-_git_remotes() {
-    local -a remotes
-    remotes=(${(f)"$(git remote 2>/dev/null | sort -u)"})
-    (( $#remotes )) && compadd -a remotes
+_git_stashes() {
+    local -a stashes
+    stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
+    (( $#stashes )) && compadd -a stashes
 }
 
 _git_commits() {
     local -a commits
     commits=(${(f)"$(git log --oneline 2>/dev/null | cut -d' ' -f1)"})
     (( $#commits )) && compadd -a commits
+}
+
+_git_files() {
+    local -a files
+    files=(${(f)"$(git ls-files 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | sort -u)"})
+    (( $#files )) && compadd -a files
 }
 
 
