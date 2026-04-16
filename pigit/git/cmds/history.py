@@ -22,7 +22,7 @@ from ._completion_types import CompletionType
 )
 def log(args: list[str]) -> str:
     """Show commit log."""
-    base = "git log --all --decorate --graph"
+    base = "git log --decorate --graph"
     if args:
         return f"{base} {' '.join(args)}"
     return base
