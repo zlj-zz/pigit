@@ -143,6 +143,12 @@ def test_picker_preview_key_calls_on_preview():
     picker.resize((80, 24))
     picker.on_key("?")
     assert calls == ["a"]
+    # Preview is rendered by the event loop; simulate it manually
+    from pigit.termui.surface import Surface
+
+    s = Surface(80, 24)
+    picker._render_surface(s)
+    picker._renderer.render_surface(s)
     assert picker._renderer.rows  # preview text was drawn
 
 

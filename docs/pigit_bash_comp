@@ -3,19 +3,19 @@
         # Generated for bash
 
         # Git helper functions for completion
-        _git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }
-
-_git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }
+        _git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }
 
 _git_branches() { git branch -a 2>/dev/null | sed "s/^[\* ]*//" | sed "s|^remotes/||" | sort -u; }
 
+_git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }
+
 _git_tags() { git tag 2>/dev/null | sort -u; }
 
-_git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }
+_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }
 
 _git_remotes() { git remote 2>/dev/null | sort -u; }
 
-_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }
+_git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }
 
 
         # Main completion function

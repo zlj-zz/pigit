@@ -18,7 +18,7 @@ class MockComponent(Component):
         self.NAME = name
         super().__init__()
 
-    def _render(self):
+    def _render_surface(self, surface):
         pass
 
     def resize(self, size):
@@ -55,7 +55,7 @@ class TestContainer:
             def _handle_event(self, key: str) -> None:
                 received.append((self._label, key))
 
-            def _render(self) -> None:
+            def _render_surface(self, surface) -> None:
                 pass
 
             def resize(self, size) -> None:
@@ -111,7 +111,9 @@ class TestContainer:
             "main": MockComponent("main"),
             "secondary": MockComponent("secondary"),
         }
-        switch_handle = lambda key: switch_key or start_name
+
+        def switch_handle(key):
+            return switch_key or start_name
 
         # Act
         container = MockContainer(
@@ -158,7 +160,7 @@ class TestLineTextBrowser:
                 (1, 1),
                 ["line1", "line2"],
             ),  # ID: Test-1
-            (2, 3, (5, 1), ["a", "b", "c", "d"], (2, 3), ["a"]),  # ID: Test-2
+            (2, 3, (5, 3), ["a", "b", "c", "d"], (2, 3), ["a"]),  # ID: Test-2
             (
                 0,
                 0,
@@ -182,10 +184,14 @@ class TestLineTextBrowser:
         assert browser.x == expected_position[0]
         assert browser.y == expected_position[1]
         if content:
-            browser._render()
-            mock_renderer.draw_panel.assert_called_with(
-                expected_content, *expected_position, size
-            )
+            from pigit.termui.surface import Surface
+
+            # Allocate enough rows to cover x + content length (1-based x)
+            surface_rows = max(size[1], x + len(expected_content))
+            s = Surface(size[0], surface_rows)
+            browser._render_surface(s)
+            for idx, expected in enumerate(expected_content):
+                assert expected in s.lines()[expected_position[0] - 1 + idx]
 
     @pytest.mark.parametrize(
         "initial_size, new_size, expected_size",
@@ -220,14 +226,12 @@ class TestLineTextBrowser:
         # Arrange
         browser = MockLineTextBrowser(content=content, size=[0, 1])
         browser._i = initial_index
-        mocker.patch.object(browser, "_render")
 
         # Act
         browser.scroll_down(scroll_lines)
 
         # Assert
         assert browser._i == expected_index
-        browser._render.assert_called_once()
 
     @pytest.mark.parametrize(
         "content, initial_index, scroll_lines, expected_index",
@@ -243,14 +247,12 @@ class TestLineTextBrowser:
         # Arrange
         browser = MockLineTextBrowser(content=content)
         browser._i = initial_index
-        mocker.patch.object(browser, "_render")
 
         # Act
         browser.scroll_up(scroll_lines)
 
         # Assert
         assert browser._i == expected_index
-        browser._render.assert_called_once()
 
 
 class MockItemSelector(ItemSelector):
@@ -404,7 +406,7 @@ class TestNearestOverlayHost:
             def fresh(self) -> None:
                 raise NotImplementedError
 
-            def _render(self, size=None) -> None:
+            def _render_surface(self, surface) -> None:
                 pass
 
         host = OverlayHost()

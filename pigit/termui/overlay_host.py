@@ -75,11 +75,3 @@ class OverlayHostMixin:
         ap = self._active_popup
         if ap is not None and getattr(ap, "open", False):
             ap._render_surface(surface)
-
-    def _render_termui_overlays(self) -> None:
-        """Legacy overlay render path for components not yet on _render_surface."""
-        if self.overlay_kind != OverlayKind.POPUP:
-            return
-        ap = self._active_popup
-        if ap is not None and getattr(ap, "open", False):
-            ap._render()

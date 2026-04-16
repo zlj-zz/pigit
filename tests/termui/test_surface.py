@@ -69,6 +69,19 @@ class TestSurface:
         s.draw_text(0, 3, "abc")
         assert s.lines() == ["   ", "   "]
 
+    def test_draw_text_basic(self):
+        s = Surface(10, 3)
+        s.draw_text(1, 2, "hello")
+        assert s.lines()[1] == "  hello   "
+
+    def test_draw_box_with_title(self):
+        s = Surface(10, 4)
+        s.draw_box(0, 0, 10, 4, title="Test")
+        lines = s.lines()
+        assert "Test" in lines[0]
+        assert lines[0].startswith("┌")
+        assert lines[-1].startswith("└")
+
     def test_draw_text_partially_visible_from_negative_col(self):
         s = Surface(3, 1)
         s.draw_text(0, -1, "abc")

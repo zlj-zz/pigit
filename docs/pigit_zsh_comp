@@ -12,12 +12,6 @@
 #
 #--------------------------------------------------------------------
 
-_git_stashes() {
-    local -a stashes
-    stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
-    (( $#stashes )) && compadd -a stashes
-}
-
 _git_files() {
     local -a files
     files=(${(f)"$(git ls-files 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | sort -u)"})
@@ -30,16 +24,22 @@ _git_branches() {
     (( $#branches )) && compadd -a branches
 }
 
+_git_stashes() {
+    local -a stashes
+    stashes=(${(f)"$(git stash list 2>/dev/null | cut -d':' -f1)"})
+    (( $#stashes )) && compadd -a stashes
+}
+
 _git_tags() {
     local -a tags
     tags=(${(f)"$(git tag 2>/dev/null | sort -u)"})
     (( $#tags )) && compadd -a tags
 }
 
-_git_commits() {
-    local -a commits
-    commits=(${(f)"$(git log --oneline 2>/dev/null | cut -d' ' -f1)"})
-    (( $#commits )) && compadd -a commits
+_git_refs() {
+    local -a refs
+    refs=(${(f)"$(git for-each-ref --format='%(refname:short)' 2>/dev/null | sort -u)"})
+    (( $#refs )) && compadd -a refs
 }
 
 _git_remotes() {
@@ -48,10 +48,10 @@ _git_remotes() {
     (( $#remotes )) && compadd -a remotes
 }
 
-_git_refs() {
-    local -a refs
-    refs=(${(f)"$(git for-each-ref --format='%(refname:short)' 2>/dev/null | sort -u)"})
-    (( $#refs )) && compadd -a refs
+_git_commits() {
+    local -a commits
+    commits=(${(f)"$(git log --oneline 2>/dev/null | cut -d' ' -f1)"})
+    (( $#commits )) && compadd -a commits
 }
 
 

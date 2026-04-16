@@ -25,14 +25,6 @@ _LOG = logging.getLogger(__name__)
 
 HelpEntry = tuple[str, str]
 
-# Box-drawing (UTF-8).
-_BOX_H = "\u2500"
-_BOX_V = "\u2502"
-_BOX_TL = "\u250c"
-_BOX_TR = "\u2510"
-_BOX_BL = "\u2514"
-_BOX_BR = "\u2518"
-
 
 class HelpPanel(Component):
     """
@@ -142,10 +134,7 @@ class HelpPanel(Component):
         frame.draw_onto(surface, self.x, self.y)
 
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
-        padded = list(chunk)
-        while len(padded) < self._scroll_h:
-            padded.append("")
-        frame.draw_content(surface, self.x, self.y, padded)
+        frame.draw_content(surface, self.x, self.y, chunk)
 
 
 class Popup(Component):
@@ -339,13 +328,6 @@ class Popup(Component):
         self._layout_content()
         self._child._render_surface(surface)
 
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        self._sync_renderer_from_session_owner()
-        if not self.open or self._renderer is None:
-            return
-        self._child._renderer = self._renderer
-        self._child._render()
-
 
 class AlertDialogBody(Component):
     """
@@ -383,7 +365,6 @@ class AlertDialogBody(Component):
         self._inner_w = 40
         self._outer_w = 42
         self.outer_row_count = 8
-        self._frame_lines: list[str] = []
         self._content_lines: list[str] = []
         self._needs_rebuild = True
         self.BINDINGS = [(self._confirm_key, "_confirm")]
@@ -418,9 +399,8 @@ class AlertDialogBody(Component):
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
         self._content_lines = self._build_content_lines()
-        self._frame_lines = self._build_bordered_frame()
         self._outer_w = inner_w + 2
-        self.outer_row_count = len(self._frame_lines)
+        self.outer_row_count = len(self._content_lines) + 2
         self._needs_rebuild = False
 
     def fresh(self) -> None:
@@ -438,13 +418,6 @@ class AlertDialogBody(Component):
         frame = BoxFrame(self._inner_w, inner_h, title="Alert")
         frame.draw_onto(surface, self.x, self.y)
         frame.draw_content(surface, self.x, self.y, self._content_lines)
-
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        if not self.open or self._renderer is None:
-            return
-        if self._needs_rebuild:
-            self._rebuild_frame()
-        self._renderer.draw_panel(self._frame_lines, self.x, self.y, self._size)
 
     def _build_content_lines(self) -> list[str]:
         inner = self._inner_w
@@ -470,19 +443,6 @@ class AlertDialogBody(Component):
         for fl in footer_lines:
             lines.append(fl[:inner].ljust(inner))
         return lines
-
-    def _build_bordered_frame(self) -> list[str]:
-        inner = self._inner_w
-        ow = inner + 2
-        content = self._content_lines
-        frame: list[str] = []
-        frame.append(_BOX_TL + _BOX_H * (ow - 2) + _BOX_TR)
-        title_vis = " Alert "[:inner].ljust(inner)
-        frame.append(_BOX_V + title_vis + _BOX_V)
-        for line in content:
-            frame.append(_BOX_V + line + _BOX_V)
-        frame.append(_BOX_BL + _BOX_H * (ow - 2) + _BOX_BR)
-        return frame
 
 
 class AlertDialog(Popup):

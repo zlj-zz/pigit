@@ -93,7 +93,6 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
                 return
 
         self.fresh()
-        self._render()
 
     def _check_via_alert(
         self,
@@ -114,13 +113,11 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 self.fresh()
-                self._render()
                 return
             callee(file)
             self.fresh()
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
-            self._render()
 
         return self._alert_dialog.alert(text, on_result)
 
@@ -174,7 +171,6 @@ class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
                 sleep(2)
 
             self.fresh()
-            self._render()
 
 
 class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
@@ -248,7 +244,6 @@ class ContentDisplay(LineTextBrowser):
             self._content = data.get("content", "")
 
             self._i = self.i_cache.get(self.i_cache_key, 0)
-            self._render()
 
     @bind_keys("esc", "q")
     def _leave_display(self) -> None:
@@ -342,10 +337,6 @@ class GitTuiRoot(OverlayHostMixin, Container):
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._help_popup.resize(size)
-
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        super()._render(size)
-        self._render_termui_overlays()
 
 
 class App(AppEventLoop):

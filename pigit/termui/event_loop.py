@@ -150,23 +150,15 @@ class AppEventLoop:
         self.render()
 
     def render(self) -> None:
-        if getattr(self._child, "_uses_surface_render", False):
-            from pigit.termui.surface import Surface
+        from pigit.termui.surface import Surface
 
-            cols, rows = self._size
-            surface = Surface(cols, rows)
-            # 1. New-style unified pass
-            self._child._render_surface(surface)
-            # 2. Render overlays if the root supports them
-            if hasattr(self._child, "_render_active_overlay_surface"):
-                self._child._render_active_overlay_surface(surface)
-            # 3. Composite to terminal
-            if self._renderer is not None:
-                self._renderer.render_surface(surface)
-        else:
-            # Legacy path for old components
-            self.clear_screen()
-            self._child._render()
+        cols, rows = self._size
+        surface = Surface(cols, rows)
+        self._child._render_surface(surface)
+        if hasattr(self._child, "_render_active_overlay_surface"):
+            self._child._render_active_overlay_surface(surface)
+        if self._renderer is not None:
+            self._renderer.render_surface(surface)
 
     def set_input_timeouts(self, timeout: float) -> None:
         self._input_handle.set_input_timeouts(timeout)
@@ -176,7 +168,7 @@ class AppEventLoop:
             input_key = self._input_handle.get_input()
             if not input_key or not input_key[0]:
                 if self._real_time:
-                    self._child._render()
+                    self.render()
                 continue
             first = input_key[0][0]
             if isinstance(first, str):
@@ -209,10 +201,10 @@ class AppEventLoop:
         handler = self._key_handlers.get(key)
         if handler is not None:
             handler()
+            self.render()
             return "binding"
         self._child._handle_event(key)
-        if self._child.has_overlay_open():
-            self.render()
+        self.render()
         return "child"
 
     def _run_impl(self) -> None:

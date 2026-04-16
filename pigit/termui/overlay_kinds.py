@@ -9,7 +9,7 @@ Date: 2026-04-01
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Protocol, TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pigit.termui.surface import Surface
@@ -56,6 +56,3 @@ class OverlaySurface(Protocol):
 
     def _render_surface(self, surface: "Surface") -> None:
         """Render this shell into the given Surface when active."""
-
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        """Draw this shell when active (framework calls from the host)."""

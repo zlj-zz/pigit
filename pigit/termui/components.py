@@ -151,23 +151,9 @@ class Component(ABC):
     def _render_surface(self, surface: "Surface") -> None:
         """Render this component into the given Surface.
 
-        New components should implement this instead of `_render`.  Old
-        components that still override `_render` can leave this as a no-op.
+        New components should implement this instead of `_render`.
         """
         pass
-
-    def _render(self, size: Optional[tuple[int, int]] = None) -> None:
-        """Legacy imperative render path.
-
-        Deprecated: new components should implement `_render_surface`.
-        """
-        if self._renderer is None:
-            return
-        from pigit.termui.surface import Surface as _Surface
-
-        s = _Surface(self._size[0], self._size[1])
-        self._render_surface(s)
-        self._renderer.render_surface(s)
 
     def _handle_event(self, key: str):
         """Event process handle function.
@@ -287,15 +273,6 @@ class Container(Component):
                 component._render_surface(surface)
                 break
 
-    def _render(self, size: Optional[tuple[int, int]] = None):
-        """Only render the activated child component."""
-        for component in self.children.values():
-            if component.is_activated():
-                component._render()
-
-                # only allow one child activated.
-                break
-
     def _handle_event(self, key: str):
         """Route ``key`` to the active child, then optionally switch tabs.
 
@@ -316,12 +293,13 @@ class Container(Component):
             self.switch_child(self.switch_handle(key))
 
     def switch_child(self, name: str) -> Optional[Component]:
-        """Activate ``name`` if present, refresh it, then render.
+        """Activate ``name`` if present and refresh it.
 
         Calls :meth:`Component.fresh` when implemented; :exc:`NotImplementedError`
         is ignored so simple test doubles keep working. Panels using
         :class:`GitPanelLazyResizeMixin` get ``_panel_loaded`` set after a successful
-        switch so lazy resize stays consistent.
+        switch so lazy resize stays consistent. Re-rendering is performed by the
+        event loop.
         """
         child = None
 
@@ -339,7 +317,6 @@ class Container(Component):
                     pass
             if hasattr(target, "_panel_loaded"):
                 target._panel_loaded = True
-            target._render()
             child = target
 
         return child
@@ -367,22 +344,19 @@ class LineTextBrowser(Component):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render(self, size: Optional[tuple[int, int]] = None):
-        if self._content and self._renderer is not None:
-            self._renderer.draw_panel(
-                self._content[self._i : self._i + self._max_line],
-                self.x,
-                self.y,
-                self._size,
-            )
+    def _render_surface(self, surface: "Surface") -> None:
+        if self._content is None:
+            return
+        chunk = self._content[self._i : self._i + self._max_line]
+        chunk = chunk[: max(0, self._size[1] - self.x + 1)]
+        for row_idx, line in enumerate(chunk, start=self.x):
+            surface.draw_text(row_idx - 1, self.y - 1, line)
 
     def scroll_up(self, line: int = 1):
         self._i = max(self._i - line, 0)
-        self._render()
 
     def scroll_down(self, line: int = 1):
         self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
-        self._render()
 
 
 class ItemSelector(Component):
@@ -429,18 +403,14 @@ class ItemSelector(Component):
     def update(self, action: ActionLiteral, **data):
         pass
 
-    def _render(self, size: Optional[tuple[int, int]] = None):
-        if not self.content or self._renderer is None:
+    def _render_surface(self, surface: "Surface") -> None:
+        if not self.content:
             return
-
-        dis = []
-        for no, item in enumerate(self.visible_items, start=self._r_start):
-            if no == self.curr_no:
-                dis.append(f"{self.CURSOR}{item}")
-            else:
-                dis.append(f" {item}")
-
-        self._renderer.draw_panel(dis, self.x, self.y, self._size)
+        visible = self.visible_items[: max(0, self._size[1] - self.x + 1)]
+        for row_idx, item in enumerate(visible, start=self.x):
+            no = self._r_start + (row_idx - self.x)
+            prefix = self.CURSOR if no == self.curr_no else " "
+            surface.draw_text(row_idx - 1, self.y - 1, f"{prefix}{item}")
 
     def next(self, step: int = 1):
         tmp_no = self.curr_no + step
@@ -451,8 +421,6 @@ class ItemSelector(Component):
         if self.curr_no >= self._r_start + self._size[1]:
             self._r_start += step
 
-        self._render()
-
     def forward(self, step: int = 1):
         tmp = self.curr_no - step
         if tmp < 0 or tmp > self.content_len:
@@ -461,8 +429,6 @@ class ItemSelector(Component):
         self.curr_no -= step
         if self.curr_no < self._r_start:
             self._r_start -= step
-
-        self._render()
 
 
 class GitPanelLazyResizeMixin:

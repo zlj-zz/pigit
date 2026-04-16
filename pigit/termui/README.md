@@ -48,7 +48,7 @@ flowchart TB
 |--------|------|
 | `components.py` | `Component` ABC, `Container`, list/browser helpers (`ItemSelector`, `LineTextBrowser`), `GitPanelLazyResizeMixin`, overlay defaults (`has_overlay_open`, `try_dispatch_overlay`), `nearest_overlay_host()` |
 | `components_overlay.py` | `Popup` (modal shell for one child), `AlertDialog`, `HelpPanel` (bordered regions via `Renderer.draw_panel`) |
-| `overlay_host.py` | `OverlayHostMixin`: single-slot ``POPUP`` session (`begin_popup_session` / `end_popup_session`, `_active_popup`), `OverlayController`, `_render_termui_overlays` |
+| `overlay_host.py` | `OverlayHostMixin`: single-slot ``POPUP`` session (`begin_popup_session` / `end_popup_session`, `_active_popup`), `OverlayController`, `_render_active_overlay_surface` |
 | `overlay_controller.py` | Forwards keys to ``_active_popup.dispatch_overlay_key`` (exception-safe) |
 | `overlay_kinds.py` | `OverlayKind` (`NONE` \| `POPUP`), `OverlayDispatchResult`, `OverlaySurface` protocol |
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize → overlay → main dispatch order; first-frame redraw when a child opens an overlay mid-handler |
@@ -78,15 +78,8 @@ from pigit.termui import AppEventLoop, Component, ExitEventLoop
 class DemoRoot(Component):
     NAME = "demo"
 
-    def _render(self, size=None):
-        if self._renderer is None:
-            return
-        self._renderer.draw_panel(
-            ["termui minimal demo — press q to quit"],
-            self.x,
-            self.y,
-            self._size,
-        )
+    def _render_surface(self, surface):
+        surface.draw_row(0, "termui minimal demo — press q to quit")
 
 
 class DemoLoop(AppEventLoop):
@@ -142,7 +135,7 @@ Panels that open alert sessions typically expose **`_alert_popup`** and **`_aler
 
 ### Rendering
 
-`Session` creates a `Renderer` bound to the terminal. `AppEventLoop._bind_renderer_tree` walks ``children`` only. Side-attached :class:`~pigit.termui.components_overlay.Popup` instances (e.g. ``_help_popup``) are **not** in that map; they receive the same renderer when :meth:`~pigit.termui.components_overlay.Popup._render` runs, via :meth:`~pigit.termui.components_overlay.Popup._sync_renderer_from_session_owner` (``session_owner`` and its ``parent`` chain). Overlay shells and `OverlayHostMixin._render_termui_overlays` call `_render()` **inside the framework**; application code should not rely on those private hooks unless extending `termui` itself.
+`Session` creates a `Renderer` bound to the terminal. `AppEventLoop._bind_renderer_tree` walks ``children`` only. Side-attached :class:`~pigit.termui.components_overlay.Popup` instances (e.g. ``_help_popup``) are **not** in that map; they receive the same renderer via :meth:`~pigit.termui.components_overlay.Popup._sync_renderer_from_session_owner` (``session_owner`` and its ``parent`` chain). `AppEventLoop.render()` builds a `Surface`, calls `_render_surface()` on the root component tree, and then `_render_active_overlay_surface()` on the overlay host so the modal shell is drawn on top. Application code should not rely on those private hooks unless extending `termui` itself.
 
 ### Bindings
 

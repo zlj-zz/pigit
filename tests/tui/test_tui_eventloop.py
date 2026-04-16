@@ -13,7 +13,7 @@ class ComponentMock:
     def resize(self, size):
         pass
 
-    def _render(self):
+    def _render_surface(self, surface):
         pass
 
     def _handle_event(self, event):
@@ -156,7 +156,7 @@ def test_set_input_timeouts(timeout, expected_set_timeout_calls):
 class _Leaf(Component):
     NAME = "leaf"
 
-    def _render(self, size=None):
+    def _render_surface(self, surface):
         pass
 
     def fresh(self):
@@ -326,7 +326,7 @@ def test_overlay_controller_returns_closed_after_error_when_dispatch_raises() ->
         def hide(self) -> None:
             pass
 
-        def _render(self, size=None) -> None:
+        def _render_surface(self, surface) -> None:
             pass
 
     host = MagicMock()

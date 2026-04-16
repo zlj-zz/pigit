@@ -23,7 +23,7 @@ class _Base(Component):
     def fresh(self) -> None:
         pass
 
-    def _render(self, size=None):
+    def _render_surface(self, surface):
         pass
 
     def on_x(self) -> None:
@@ -66,7 +66,7 @@ def test_duplicate_same_callable_deduped():
         def fresh(self) -> None:
             pass
 
-        def _render(self, size=None):
+        def _render_surface(self, surface):
             pass
 
     o = _Dup()

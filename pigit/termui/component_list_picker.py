@@ -54,7 +54,6 @@ class SearchableListPicker(Component):
     """
 
     NAME = "searchable_list_picker"
-    _uses_surface_render = True
 
     def __init__(
         self,
@@ -116,7 +115,7 @@ class SearchableListPicker(Component):
         self._loop.quit("picker", exit_code=exit_code, result_message=message)
 
     def _render_surface(self, surface: "Surface") -> None:
-        cols, term_rows = terminal_size()
+        cols, term_rows = self._size
         has_filter = bool(self._needle) or self._filter_editing
         if not picker_terminal_ok(term_rows):
             self._quit(1, self._terminal_too_small_msg)
@@ -169,6 +168,7 @@ class SearchableListPicker(Component):
         input_row = term_rows - 1
         if self._preview_text:
             surface.draw_row(status_row, truncate_line(self._preview_text, cols))
+            self._preview_text = None
         else:
             surface.draw_row(
                 status_row,
@@ -211,19 +211,16 @@ class SearchableListPicker(Component):
             out = self._on_confirm(self._filtered[self._index])
             if out is not None:
                 self._quit(out[0], out[1])
-            self._render()
             return
 
         if key in ("j", "down"):
             if self._filtered:
                 self._index = (self._index + 1) % len(self._filtered)
-            self._render()
             return
 
         if key in ("k", "up"):
             if self._filtered:
                 self._index = (self._index - 1) % len(self._filtered)
-            self._render()
             return
 
         if key == "q":
@@ -237,7 +234,6 @@ class SearchableListPicker(Component):
         if key == "/":
             self._saved_needle_for_filter = self._needle
             self._filter_editing = True
-            self._render()
             return
 
         if key == "ctrl c":
@@ -252,8 +248,6 @@ class SearchableListPicker(Component):
             preview_text = self._on_preview(self._filtered[self._index])
             if preview_text:
                 self._preview_text = f"preview: {preview_text}"
-                self._render()
-                self._preview_text = None
             return
 
         if len(key) == 1 and key.isdigit():
@@ -270,7 +264,6 @@ class SearchableListPicker(Component):
             self._scroll_offset = 0
             self._filtered = apply_picker_filter(self._all_rows, self._needle)
             self._reconcile_index()
-            self._render()
             return
 
         if key == "esc":
@@ -279,7 +272,6 @@ class SearchableListPicker(Component):
             self._filter_editing = False
             self._scroll_offset = 0
             self._reconcile_index()
-            self._render()
             return
 
         if key == "backspace":
@@ -287,7 +279,6 @@ class SearchableListPicker(Component):
                 self._needle = self._needle[:-1]
             self._filtered = apply_picker_filter(self._all_rows, self._needle)
             self._reconcile_index()
-            self._render()
             return
 
         if key == "ctrl c":
@@ -300,7 +291,6 @@ class SearchableListPicker(Component):
             self._needle += key
             self._filtered = apply_picker_filter(self._all_rows, self._needle)
             self._reconcile_index()
-            self._render()
             return
 
     def _reconcile_index(self) -> None:
@@ -324,21 +314,17 @@ class SearchableListPicker(Component):
             try:
                 num = int(buf)
             except ValueError:
-                self._render()
                 return
             if self._filtered and 1 <= num <= len(self._filtered):
                 out = self._on_confirm(self._filtered[num - 1])
                 if out is not None:
                     self._quit(out[0], out[1])
-                self._render()
                 return
-            self._render()
             return
 
         if key == "esc":
             self._number_prefix = None
             self._clear_bottom_status_row()
-            self._render()
             return
 
         if key == "ctrl c":
@@ -357,4 +343,3 @@ class SearchableListPicker(Component):
 
         self._number_prefix = None
         self._clear_bottom_status_row()
-        self._render()
