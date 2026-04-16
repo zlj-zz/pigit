@@ -299,6 +299,11 @@ class Popup(Component):
     def _layout_content(self) -> None:
         if not hasattr(self._child, "_outer_w"):
             return
+        # Ensure the child's geometry is current before reading it.
+        if getattr(self._child, "_needs_rebuild", False):
+            rebuild = getattr(self._child, "_rebuild_frame", None)
+            if rebuild is not None:
+                rebuild()
         tw, th = self._term_size
         ow = self._child._outer_w
         oh = self._child.outer_row_count

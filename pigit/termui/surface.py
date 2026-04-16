@@ -8,6 +8,7 @@ Date: 2026-04-16
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -17,6 +18,9 @@ from pigit.termui.wcwidth_table import (
     truncate_by_width,
     wcswidth,
 )
+
+# ANSI SGR sequences (e.g. ``\033[31m``, ``\033[0m``).
+_ANSI_SGR_RE = re.compile(r"\x1b\[(?:\d{1,3}(?:;\d{1,3})*)?m")
 
 # Box-drawing (UTF-8).
 _BOX_H = "\u2500"
@@ -124,16 +128,36 @@ class Surface:
                 row[i] = _BLANK_CELL
 
     def draw_text(self, row: int, col: int, text: str) -> None:
-        """Write text starting at (row, col), clipping to bounds."""
+        """Write text starting at (row, col), clipping to bounds.
+
+        Inline ANSI SGR sequences are parsed and applied to subsequent cells
+        as ``Cell.style`` so that upstream components can pass pre-coloured
+        strings without breaking grid layout.
+        """
         if row < 0 or row >= self.height:
             return
         cur_col = col
-        for ch in text:
-            w = _char_width(ord(ch))
+        current_style = ""
+        pos = 0
+        for m in _ANSI_SGR_RE.finditer(text):
+            for ch in text[pos : m.start()]:
+                if cur_col >= self.width:
+                    return
+                w = _char_width(ord(ch))
+                if cur_col >= 0 and cur_col + w <= self.width:
+                    self._rows[row][cur_col] = Cell(ch, style=current_style)
+                    if w == 2:
+                        self._rows[row][cur_col + 1] = Cell("")
+                cur_col += w
+            seq = m.group(0)
+            current_style = "" if seq == "\x1b[0m" else seq
+            pos = m.end()
+        for ch in text[pos:]:
             if cur_col >= self.width:
-                break
+                return
+            w = _char_width(ord(ch))
             if cur_col >= 0 and cur_col + w <= self.width:
-                self._rows[row][cur_col] = Cell(ch)
+                self._rows[row][cur_col] = Cell(ch, style=current_style)
                 if w == 2:
                     self._rows[row][cur_col + 1] = Cell("")
             cur_col += w
@@ -145,8 +169,9 @@ class Surface:
         text_width = wcswidth(text)
         if text_width > self.width:
             text = truncate_by_width(text, self.width - 1) + "…"
+            text_width = wcswidth(text)
         if align == "center":
-            pad_left = max(0, (self.width - wcswidth(text)) // 2)
+            pad_left = max(0, (self.width - text_width) // 2)
             text = " " * pad_left + text
         padded = pad_by_width(text, self.width)
         self.draw_text(row, 0, padded)
