@@ -63,7 +63,8 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
     def fresh(self):
         self.files = files = self.git.load_status(self._size[0])
         if not files:
-            return ["No status changed."]
+            self.set_content(["No status changed."])
+            return
 
         files_str = [file.display_str for file in files]
         self.set_content(files_str)
@@ -73,6 +74,8 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         self._alert_popup.resize(size)
 
     def on_key(self, key: str):
+        if not self.files:
+            return
         f = self.files[self.curr_no]
 
         if key == keys.KEY_ENTER:
