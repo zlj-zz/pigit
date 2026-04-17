@@ -106,3 +106,59 @@ class TestRenderSurface:
         s = Surface(0, 0)
         r.render_surface(s)
         assert True
+
+    def test_ansi_style_end_to_end_via_draw_text(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        s = Surface(3, 1)
+        s.draw_text(0, 0, "\033[31mAB")
+        r.render_surface(s)
+        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        assert "\033[31mA" in written
+        assert "\033[0m" in written
+        assert written.count("\033[31m") == 1
+
+
+class TestRendererUtilities:
+    def test_write_and_flush(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        r.write("hi")
+        sess.stdout.write.assert_called_with("hi")
+        r.flush()
+        sess.stdout.flush.assert_called_once()
+
+    def test_hide_and_show_cursor(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        r.hide_cursor()
+        assert "\033[?25l" in sess.stdout.write.call_args[0][0]
+        r.show_cursor()
+        assert "\033[?25h" in sess.stdout.write.call_args[0][0]
+
+    def test_draw_absolute_row(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        r.draw_absolute_row(3, "hello")
+        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        assert "\033[3;1f" in written
+        assert "\033[K" in written
+        assert "hello" in written
+
+    def test_draw_block(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        r.draw_block(["ab", "cd"], 1, 1, 3, 2)
+        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        assert "\033[1;1f" in written
+        assert "ab" in written
+        assert "cd" in written
+
+    def test_draw_panel(self):
+        sess = FakeSession()
+        r = Renderer(sess)
+        r.draw_panel(["ab", "cd"], 1, 1, size=(5, 3))
+        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        assert "\033[1;1f" in written
+        assert "ab" in written
+        assert "     " in written

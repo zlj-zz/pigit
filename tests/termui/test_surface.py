@@ -87,6 +87,22 @@ class TestSurface:
         s.draw_text(0, -1, "abc")
         assert s.lines()[0] == "bc "
 
+    def test_draw_text_with_ansi_sgr(self):
+        s = Surface(6, 1)
+        s.draw_text(0, 0, "\033[31mAB\033[0mC")
+        cells = s.rows()[0]
+        assert cells[0].char == "A" and cells[0].style == "\033[31m"
+        assert cells[1].char == "B" and cells[1].style == "\033[31m"
+        assert cells[2].char == "C" and cells[2].style == ""
+
+    def test_draw_text_with_multiple_sgr_transitions(self):
+        s = Surface(3, 1)
+        s.draw_text(0, 0, "\033[31mA\033[0m\033[32mB\033[0mC")
+        cells = s.rows()[0]
+        assert cells[0].char == "A" and cells[0].style == "\033[31m"
+        assert cells[1].char == "B" and cells[1].style == "\033[32m"
+        assert cells[2].char == "C" and cells[2].style == ""
+
 
 class TestSurfaceCJK:
     def test_wide_char_occupies_two_cells_with_spacer(self):
@@ -167,3 +183,57 @@ class TestSubsurface:
         assert lines[2][1:3] == "##"
         assert lines[0] == "     "
         assert lines[3] == "     "
+
+
+class TestSurfaceEdgeCases:
+    def test_draw_row_zero_width_is_noop(self):
+        s = Surface(0, 2)
+        s.draw_row(0, "abc")
+        assert s.lines() == ["", ""]
+
+    def test_draw_box_too_small_is_noop(self):
+        s = Surface(3, 3)
+        s.draw_box(0, 0, 1, 3)
+        assert s.lines() == ["   ", "   ", "   "]
+        s2 = Surface(3, 3)
+        s2.draw_box(0, 0, 3, 1)
+        assert s2.lines() == ["   ", "   ", "   "]
+
+
+class TestSubsurfaceEdgeCases:
+    def test_draw_box_clipped_to_zero_is_noop(self):
+        parent = Surface(5, 5)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.draw_box(0, 2, 5, 5)  # col=2 >= width=3 -> clipped None
+        assert parent.lines()[1] == "     "
+
+    def test_fill_rect_clipped_to_zero_is_noop(self):
+        parent = Surface(5, 5)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.fill_rect(0, 3, 5, 5, "#")  # col=3 >= width=3 -> clipped None
+        assert parent.lines()[1] == "     "
+
+    def test_draw_row_out_of_bounds_is_noop(self):
+        parent = Surface(5, 5)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.draw_row(-1, "x")
+        sub.draw_row(3, "x")
+        assert parent.lines()[0] == "     "
+        assert parent.lines()[3] == "     "
+
+
+class TestSurfaceANSI:
+    def test_draw_text_ansi_exceeds_width_stops(self):
+        s = Surface(2, 1)
+        s.draw_text(0, 0, "\033[31mabc")
+        line = s.lines()[0]
+        assert line == "ab"
+
+    def test_draw_text_ansi_with_wide_char(self):
+        s = Surface(4, 1)
+        s.draw_text(0, 0, "\033[32m中")
+        row = s.rows()[0]
+        assert row[0].char == "中"
+        assert row[0].style == "\033[32m"
+        assert row[1].char == ""
+        assert row[2].char == " "

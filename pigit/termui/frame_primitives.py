@@ -28,8 +28,17 @@ class BoxFrame:
         self.inner_width = inner_width
         self.inner_height = inner_height
         self.title = title
-        self.outer_width = inner_width + 2
-        self.outer_height = inner_height + 2
+        self._recalc_outer()
+
+    def _recalc_outer(self) -> None:
+        self.outer_width = self.inner_width + 2
+        self.outer_height = self.inner_height + 2
+
+    def set_inner_size(self, inner_width: int, inner_height: int) -> None:
+        """Update inner dimensions and recompute outer size."""
+        self.inner_width = inner_width
+        self.inner_height = inner_height
+        self._recalc_outer()
 
     def draw_onto(self, surface: "Surface", row: int, col: int) -> None:
         """Draw border onto surface at (row, col)."""

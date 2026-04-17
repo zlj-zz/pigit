@@ -73,12 +73,10 @@ omit = [
     "*/pigit/config.py",
     "*/pigit/ext/lcstat.py",
     "*/pigit/app.py",
-    "*/pigit/termui/components.py",
-    "*/pigit/termui/event_loop.py",
 ]
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 66
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

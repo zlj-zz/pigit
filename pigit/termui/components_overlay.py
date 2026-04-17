@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pigit.termui.surface import Surface
 from pigit.termui.components import Component, _looks_like_overlay_host
 from pigit.termui.frame_primitives import BoxFrame
+from pigit.termui.layout import Padding
 from pigit.termui import keys
 from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
 from pigit.termui.text import sanitize_for_display
@@ -72,23 +73,26 @@ class HelpPanel(Component):
         self._scroll_h = 6
         self._outer_w = 42
         self.outer_row_count = 10
+        self._frame = BoxFrame(0, 0, title="Help   esc close")
+        self._padding = Padding(top=2, right=4, bottom=2, left=4)
 
     def resize(self, size: tuple[int, int]) -> None:
         tw, th = int(size[0]), int(size[1])
+        avail_w, avail_h = self._padding.apply((tw, th))
         inner_w = (
             self._inner_w_cfg if self._inner_w_cfg is not None else max(24, tw // 2)
         )
         inner_h = (
             self._inner_h_cfg if self._inner_h_cfg is not None else max(8, th // 2)
         )
-        inner_w = max(16, min(inner_w, tw - 4))
-        inner_h = max(5, min(inner_h, th - 4))
-        self._outer_w = inner_w + 2
-        inner_rows = inner_h
-        self._scroll_h = max(1, inner_rows - 1)
+        inner_w = max(16, min(inner_w, avail_w))
+        inner_h = max(5, min(inner_h, avail_h))
         self._inner_w = inner_w
-        self.outer_row_count = inner_rows + 2
-        self.fresh()
+        self._scroll_h = max(1, inner_h - 1)
+        self._frame.set_inner_size(self._inner_w, self._scroll_h)
+        self._outer_w = self._frame.outer_width
+        self.outer_row_count = self._frame.outer_height
+        super().resize(size)
 
     def set_entries(self, entries: list[HelpEntry]) -> None:
         lines: list[str] = []
@@ -130,11 +134,10 @@ class HelpPanel(Component):
         pass
 
     def _render_surface(self, surface: "Surface") -> None:
-        frame = BoxFrame(self._inner_w, self._scroll_h, title="Help   esc close")
-        frame.draw_onto(surface, self.x, self.y)
+        self._frame.draw_onto(surface, self.x, self.y)
 
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
-        frame.draw_content(surface, self.x, self.y, chunk)
+        self._frame.draw_content(surface, self.x, self.y, chunk)
 
 
 class Popup(Component):
@@ -372,6 +375,7 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._content_lines: list[str] = []
         self._needs_rebuild = True
+        self._frame = BoxFrame(0, 0, title="Alert")
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size, renderer=renderer)
 
@@ -404,8 +408,9 @@ class AlertDialogBody(Component):
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
         self._content_lines = self._build_content_lines()
-        self._outer_w = inner_w + 2
-        self.outer_row_count = len(self._content_lines) + 2
+        self._frame.set_inner_size(self._inner_w, len(self._content_lines))
+        self._outer_w = self._frame.outer_width
+        self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
 
     def fresh(self) -> None:
@@ -419,10 +424,8 @@ class AlertDialogBody(Component):
             return
         if self._needs_rebuild:
             self._rebuild_frame()
-        inner_h = len(self._content_lines)
-        frame = BoxFrame(self._inner_w, inner_h, title="Alert")
-        frame.draw_onto(surface, self.x, self.y)
-        frame.draw_content(surface, self.x, self.y, self._content_lines)
+        self._frame.draw_onto(surface, self.x, self.y)
+        self._frame.draw_content(surface, self.x, self.y, self._content_lines)
 
     def _build_content_lines(self) -> list[str]:
         inner = self._inner_w

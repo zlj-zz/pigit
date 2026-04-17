@@ -295,6 +295,53 @@ def test_loop_overlay_closed_after_error_maps_to_hook_outcome():
     assert ("k", "overlay_closed_after_error") in loop.trace
 
 
+def test_resize_calls_renderer_clear_cache():
+    component = ComponentMock()
+    event_loop = EventLoop(component, alt=False)
+    event_loop.get_term_size = Mock(return_value=(80, 24))
+    event_loop._renderer = MagicMock()
+
+    event_loop.resize()
+
+    event_loop._renderer.clear_cache.assert_called_once()
+
+
+def test_render_surface_path():
+    from pigit.termui.surface import Surface
+
+    component = ComponentMock()
+    event_loop = EventLoop(component, alt=False)
+    event_loop._size = (10, 5)
+    event_loop._renderer = MagicMock()
+    component._render_surface = Mock()
+
+    event_loop.render()
+
+    component._render_surface.assert_called_once()
+    surface = component._render_surface.call_args[0][0]
+    assert isinstance(surface, Surface)
+    assert surface.width == 10
+    assert surface.height == 5
+
+
+def test_dispatch_while_overlay_closed_renders():
+    class _Quick(AppEventLoop):
+        BINDINGS = [("r", "on_r")]
+
+        def on_r(self) -> None:
+            pass
+
+    loop = _Quick(_Leaf(), alt=False)
+    loop._renderer = MagicMock()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.render = Mock()
+
+    outcome = loop._dispatch_while_overlay_closed("r")
+
+    assert outcome == "binding"
+    loop.render.assert_called_once()
+
+
 def test_app_event_loop_accepts_callable_binding():
     def quit_cb() -> None:
         raise ExitEventLoop("bye")
@@ -355,3 +402,94 @@ def test_overlay_controller_question_mark_toggles_help_when_help_open() -> None:
     ctrl = OverlayController()
     assert ctrl.dispatch(root, "?") is OverlayDispatchResult.HANDLED_IMPLICIT
     root.end_popup_session.assert_called_once()
+
+
+def test_bind_renderer_tree_recurses_into_children():
+    from pigit.termui.components import Container
+
+    class _Leaf(Component):
+        NAME = "leaf"
+
+        def _render_surface(self, surface):
+            pass
+
+        def fresh(self):
+            pass
+
+    a, b = _Leaf(), _Leaf()
+    root = Container({"main": a, "b": b})
+
+    loop = AppEventLoop(root, alt=False)
+    renderer = MagicMock()
+    loop._bind_renderer_tree(root, renderer)
+
+    assert root._renderer is renderer
+    assert a._renderer is renderer
+    assert b._renderer is renderer
+
+
+def test_clear_screen_when_renderer_none_does_not_crash():
+    loop = AppEventLoop(ComponentMock(), alt=False)
+    loop._renderer = None
+    loop.clear_screen()
+
+
+def test_context_manager_start_stop():
+    loop = AppEventLoop(ComponentMock(), alt=False)
+    loop.start = Mock()
+    loop.stop = Mock()
+    with loop:
+        pass
+    loop.start.assert_called_once()
+    loop.stop.assert_called_once()
+
+
+def test_loop_mouse_event_is_ignored():
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_Leaf(), alt=False)
+
+    loop = _Hooked()
+    loop._renderer = MagicMock()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.before_dispatch_key = Mock()
+    loop.after_dispatch_key = Mock()
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], KeyboardInterrupt()]
+
+    loop._run_impl()
+
+    loop.before_dispatch_key.assert_not_called()
+    loop.after_dispatch_key.assert_not_called()
+
+
+@patch("pigit.termui.event_loop.logging.getLogger")
+def test_overlay_open_logs_debug_when_dropped_unbound(mock_get_logger):
+    mock_log = MagicMock()
+    mock_log.isEnabledFor.return_value = True
+    mock_get_logger.return_value = mock_log
+
+    class _OverlayRoot(ComponentMock):
+        def has_overlay_open(self):
+            return True
+
+        def try_dispatch_overlay(self, key):
+            from pigit.termui.overlay_kinds import OverlayDispatchResult
+
+            return OverlayDispatchResult.DROPPED_UNBOUND
+
+    loop = AppEventLoop(_OverlayRoot(), alt=False)
+    loop._renderer = MagicMock()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [[["x"]], KeyboardInterrupt()]
+
+    loop._run_impl()
+
+    mock_log.debug.assert_called_once()
+
+
+def test_quit_raises_exit_event_loop():
+    loop = AppEventLoop(ComponentMock(), alt=False)
+    with pytest.raises(ExitEventLoop, match="bye"):
+        loop.quit("bye", exit_code=42, result_message="msg")

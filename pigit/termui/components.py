@@ -20,8 +20,11 @@ from pigit.termui.bindings import (
 from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
+    from pigit.termui.layout import LayoutEngine
     from pigit.termui.render import Renderer
     from pigit.termui.surface import Surface
+
+_logger = logging.getLogger(__name__)
 
 NONE_SIZE = (0, 0)
 
@@ -225,6 +228,8 @@ def _describe_binding_target(
 class Container(Component):
     """Multiple components are stacked, only the activated sub-component can be rendered."""
 
+    NAME = "container"
+
     def __init__(
         self,
         children: dict[str, "Component"],
@@ -234,6 +239,7 @@ class Container(Component):
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
         key_routing: KeyRouting = "child_first",
+        layout: Optional["LayoutEngine"] = None,
         renderer: Optional["Renderer"] = None,
     ) -> None:
         super().__init__(x, y, size, renderer=renderer)
@@ -242,6 +248,7 @@ class Container(Component):
         for child in children.values():
             child.parent = self
 
+        self._layout = layout
         self.switch_handle = switch_handle
         self._key_routing = key_routing
 
@@ -266,22 +273,44 @@ class Container(Component):
         else:
             raise ComponentError("Not support action of ~Container.")
 
+    def resize(self, size: tuple[int, int]):
+        super().resize(size)
+        if self._layout is not None:
+            self._layout.resize_children(size, offset=(self.x, self.y))
+
+    def _render_child_to_surface(
+        self, component: "Component", surface: "Surface", log_prefix: str
+    ) -> None:
+        w, h = component._size
+        if w <= 0 or h <= 0:
+            return
+        if component.x < 1 or component.y < 1:
+            _logger.warning(
+                "%s %s with invalid 1-based coords (%s, %s)",
+                log_prefix,
+                component.NAME,
+                component.x,
+                component.y,
+            )
+        sub = surface.subsurface(
+            max(0, component.x - 1), max(0, component.y - 1), w, h
+        )
+        component._render_surface(sub)
+
     def _render_surface(self, surface: "Surface") -> None:
-        """Render the activated child component into the given Surface."""
-        for component in self.children.values():
-            if component.is_activated():
-                w, h = component._size
-                if w > 0 and h > 0:
-                    if component.x < 1 or component.y < 1:
-                        logging.getLogger(__name__).warning(
-                            "Container switch to %s with invalid 1-based coords (%s, %s)",
-                            component.NAME, component.x, component.y
-                        )
-                    sub = surface.subsurface(
-                        max(0, component.x - 1), max(0, component.y - 1), w, h
+        """Render children into the given Surface."""
+        if self._layout is not None:
+            for component in self._layout.children:
+                self._render_child_to_surface(
+                    component, surface, "Container layout child"
+                )
+        else:
+            for component in self.children.values():
+                if component.is_activated():
+                    self._render_child_to_surface(
+                        component, surface, "Container switch to"
                     )
-                    component._render_surface(sub)
-                break
+                    break
 
     def _handle_event(self, key: str):
         """Route ``key`` to the active child, then optionally switch tabs.
