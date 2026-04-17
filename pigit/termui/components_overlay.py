@@ -317,7 +317,7 @@ class Popup(Component):
             row, col = int(self._offset[0]), int(self._offset[1])
         self._child.x = row
         self._child.y = col
-        self._child._size = (ow, row + oh - 1)
+        self._child._size = (ow, oh)
 
     def fresh(self) -> None:
         pass
@@ -333,6 +333,12 @@ class Popup(Component):
     def _render_surface(self, surface: "Surface") -> None:
         if not self.open:
             return
+        # Ensure the popup and its child are sized for the current surface before
+        # laying out content. Side-attached popups (e.g. HelpPanel) may never have
+        # been resized because they are not in the component tree.
+        curr_size = (surface.width, surface.height)
+        if self._term_size != curr_size or self._child._size == (0, 0):
+            self.resize(curr_size)
         self._layout_content()
         self._child._render_surface(surface)
 
