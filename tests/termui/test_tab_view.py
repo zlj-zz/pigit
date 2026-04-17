@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_components.py
-Description: Tests for pigit.termui.components base classes.
+Module: tests/termui/test_tab_view.py
+Description: Tests for pigit.termui.components TabView.
 Author: Zev
 Date: 2026-04-17
 """
-
-from __future__ import annotations
 
 import logging
 import pytest
@@ -15,7 +13,7 @@ from unittest.mock import MagicMock
 from pigit.termui.components import (
     Component,
     ComponentError,
-    Container,
+    TabView,
     LineTextBrowser,
     ItemSelector,
     GitPanelLazyResizeMixin,
@@ -59,7 +57,7 @@ class TestComponentBase:
             child.emit("goto", target="x")
 
     def test_notify_children(self):
-        parent = Container({"main": _Leaf(), "b": _Leaf()})
+        parent = TabView({"main": _Leaf(), "b": _Leaf()})
         for child in parent.children.values():
             child.update = MagicMock()
         parent.notify("goto", target="x")
@@ -75,7 +73,7 @@ class TestComponentBase:
     def test_resize_propagates_to_children(self):
         child = _Leaf()
         child.resize = MagicMock(wraps=child.resize)
-        parent = Container({"main": child})
+        parent = TabView({"main": child})
         parent.resize((10, 5))
         child.resize.assert_called_once_with((10, 5))
 
@@ -134,12 +132,12 @@ class TestComponentBase:
         assert leaf.nearest_overlay_host() is None
 
 
-class TestContainer:
+class TestTabView:
     def test_accept_goto_switches_child(self):
         a, b = _Leaf(), _Leaf()
         a.update = MagicMock()
         b.update = MagicMock()
-        cont = Container({"main": a, "b": b})
+        cont = TabView({"main": a, "b": b})
         cont.accept("goto", target="b")
         assert b.is_activated() is True
         assert a.is_activated() is False
@@ -147,13 +145,13 @@ class TestContainer:
 
     def test_accept_goto_missing_logs_warning(self, caplog):
         a = _Leaf()
-        cont = Container({"main": a})
+        cont = TabView({"main": a})
         with caplog.at_level(logging.WARNING):
             cont.accept("goto", target="z")
         assert "Not found child" in caplog.text
 
     def test_accept_unsupported_action_raises(self):
-        cont = Container({"main": _Leaf()})
+        cont = TabView({"main": _Leaf()})
         with pytest.raises(ComponentError, match="Not support action"):
             cont.accept("unknown")
 
@@ -161,7 +159,7 @@ class TestContainer:
         a, b = _Leaf(), _Leaf()
         a._handle_event = MagicMock()
         b._handle_event = MagicMock()
-        cont = Container({"main": a, "b": b}, switch_handle=lambda k: "b")
+        cont = TabView({"main": a, "b": b}, switch_handle=lambda k: "b")
         cont._handle_event("k")
         a._handle_event.assert_called_once_with("k")
         assert b.is_activated() is True
@@ -170,7 +168,7 @@ class TestContainer:
         a, b = _Leaf(), _Leaf()
         a._handle_event = MagicMock()
         b._handle_event = MagicMock()
-        cont = Container(
+        cont = TabView(
             {"main": a, "b": b},
             switch_handle=lambda k: "b",
             key_routing="switch_first",

@@ -405,7 +405,7 @@ def test_overlay_controller_question_mark_toggles_help_when_help_open() -> None:
 
 
 def test_bind_renderer_tree_recurses_into_children():
-    from pigit.termui.components import Container
+    from pigit.termui.components import TabView
 
     class _Leaf(Component):
         NAME = "leaf"
@@ -417,7 +417,7 @@ def test_bind_renderer_tree_recurses_into_children():
             pass
 
     a, b = _Leaf(), _Leaf()
-    root = Container({"main": a, "b": b})
+    root = TabView({"main": a, "b": b})
 
     loop = AppEventLoop(root, alt=False)
     renderer = MagicMock()

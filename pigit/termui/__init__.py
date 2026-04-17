@@ -9,13 +9,15 @@ Date: 2026-03-26
 from __future__ import annotations
 
 from pigit.termui.bindings import BindingError, bind_keys, list_bindings
+from pigit.termui.application import Application
 from pigit.termui.components import (
     ActionLiteral,
     Component,
-    Container,
     GitPanelLazyResizeMixin,
     ItemSelector,
+    LayoutContainer,
     LineTextBrowser,
+    TabView,
 )
 from pigit.termui.components_overlay import AlertDialog, HelpPanel, HelpEntry, Popup
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
@@ -38,15 +40,16 @@ __all__ = [
     "ActionLiteral",
     "AlertDialog",
     "AppEventLoop",
+    "Application",
     "BindingError",
     "Component",
-    "Container",
     "ExitEventLoop",
     "GitPanelLazyResizeMixin",
     "HelpEntry",
     "HelpPanel",
     "ItemSelector",
     "KeyboardInput",
+    "LayoutContainer",
     "LineTextBrowser",
     "OverlayDispatchResult",
     "OverlayHostMixin",
@@ -55,6 +58,7 @@ __all__ = [
     "Popup",
     "Renderer",
     "Session",
+    "TabView",
     "TerminalSize",
     "bind_keys",
     "get_width",

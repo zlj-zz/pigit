@@ -2,7 +2,7 @@ import pytest
 from pigit.termui.components import (
     Component,
     ComponentError,
-    Container,
+    TabView,
     GitPanelLazyResizeMixin,
     ItemSelector,
     LineTextBrowser,
@@ -28,14 +28,14 @@ class MockComponent(Component):
         pass
 
 
-class MockContainer(Container):
-    NAME = "mock-container"
+class MockTabView(TabView):
+    NAME = "mock-tab-view"
 
     def update(self, action: str, **data):
         pass
 
 
-class TestContainer:
+class TestTabView:
     def test_duplicate_component_name_allowed(self):
         a = MockComponent("dup")
         b = MockComponent("dup")
@@ -61,8 +61,8 @@ class TestContainer:
             def resize(self, size) -> None:
                 pass
 
-        class RoutingContainer(Container):
-            NAME = "routing-c"
+        class RoutingTabView(TabView):
+            NAME = "routing-tv"
 
             def update(self, action: str, **data) -> None:
                 pass
@@ -74,7 +74,7 @@ class TestContainer:
         secondary = RecordingChild("secondary")
         children = {"main": main, "secondary": secondary}
 
-        switch_first = RoutingContainer(
+        switch_first = RoutingTabView(
             children=dict(children),
             start_name="main",
             switch_handle=switch_tab,
@@ -86,7 +86,7 @@ class TestContainer:
 
         main2 = RecordingChild("main")
         sec2 = RecordingChild("secondary")
-        child_first = RoutingContainer(
+        child_first = RoutingTabView(
             children={"main": main2, "secondary": sec2},
             start_name="main",
             switch_handle=switch_tab,
@@ -105,7 +105,7 @@ class TestContainer:
         ],
         ids=["default-start", "specified-start", "switch-after-init"],
     )
-    def test_container_init_and_switch(self, start_name, switch_key, expected_active):
+    def test_tab_view_init_and_switch(self, start_name, switch_key, expected_active):
         # Arrange
         children = {
             "main": MockComponent("main"),
@@ -116,11 +116,11 @@ class TestContainer:
             return switch_key or start_name
 
         # Act
-        container = MockContainer(
+        tab_view = MockTabView(
             children=children, start_name=start_name, switch_handle=switch_handle
         )
         if switch_key:
-            container._handle_event(switch_key)
+            tab_view._handle_event(switch_key)
 
         # Assert
         assert children[
@@ -134,14 +134,14 @@ class TestContainer:
         ],
         ids=["unsupported-action"],
     )
-    def test_container_accept_errors(self, action, data, expected_exception):
+    def test_tab_view_accept_errors(self, action, data, expected_exception):
         # Arrange
         children = {"main": MockComponent("main")}
-        container = MockContainer(children=children)
+        tab_view = MockTabView(children=children)
 
         # Act / Assert
         with pytest.raises(expected_exception):
-            container.accept(action, **data)
+            tab_view.accept(action, **data)
 
 
 class MockLineTextBrowser(LineTextBrowser):
@@ -262,9 +262,9 @@ class MockItemSelector(ItemSelector):
 
 
 class TestItemSelector:
-    def test_ItemSelector_init_error(self):
-        ItemSelector.NAME = "**"
-        ItemSelector.CURSOR = "**"
+    def test_ItemSelector_init_error(self, monkeypatch):
+        monkeypatch.setattr(ItemSelector, "NAME", "**")
+        monkeypatch.setattr(ItemSelector, "CURSOR", "**")
 
         with pytest.raises(ComponentError):
             ItemSelector()

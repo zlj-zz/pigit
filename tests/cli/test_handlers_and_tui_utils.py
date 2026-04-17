@@ -91,7 +91,7 @@ def test_tui_handler_execute_first_run_skipped():
             with patch("pigit.handlers.tui_handler.introduce"):
                 with patch("pigit.handlers.tui_handler.confirm", return_value=False):
                     h = TuiHandler(MagicMock())
-                    with patch("pigit.app.App") as m_app:
+                    with patch("pigit.app.PigitApplication") as m_app:
                         h.execute()
                     m_app.assert_not_called()
 
@@ -100,7 +100,7 @@ def test_tui_handler_execute_runs_app():
     with patch("pigit.handlers.tui_handler.IS_WIN", False):
         with patch("pigit.handlers.tui_handler.IS_FIRST_RUN", False):
             h = TuiHandler(MagicMock())
-            with patch("pigit.app.App") as m_app:
+            with patch("pigit.app.PigitApplication") as m_app:
                 h.execute()
             m_app.return_value.run.assert_called_once()
 

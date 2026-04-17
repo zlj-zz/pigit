@@ -46,6 +46,26 @@ class ComponentError(Exception):
     """Error class of ~Component."""
 
 
+def _render_child_to_surface(
+    component: "Component", surface: "Surface", log_prefix: str
+) -> None:
+    w, h = component._size
+    if w <= 0 or h <= 0:
+        return
+    if component.x < 1 or component.y < 1:
+        _logger.warning(
+            "%s %s with invalid 1-based coords (%s, %s)",
+            log_prefix,
+            component.NAME,
+            component.x,
+            component.y,
+        )
+    sub = surface.subsurface(
+        max(0, component.x - 1), max(0, component.y - 1), w, h
+    )
+    component._render_surface(sub)
+
+
 class Component(ABC):
     NAME: str = ""
     BINDINGS: Optional[BindingsList] = None
@@ -225,140 +245,111 @@ def _describe_binding_target(
     return "bound command"
 
 
-class Container(Component):
-    """Multiple components are stacked, only the activated sub-component can be rendered."""
+class TabView(Component):
+    """Tabbed component stack: only the activated sub-component is rendered."""
 
-    NAME = "container"
+    NAME = "tab_view"
 
     def __init__(
         self,
-        children: dict[str, "Component"],
+        children: dict[str, Component],
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
         key_routing: KeyRouting = "child_first",
-        layout: Optional["LayoutEngine"] = None,
         renderer: Optional["Renderer"] = None,
     ) -> None:
         super().__init__(x, y, size, renderer=renderer)
-
         self.children = children
         for child in children.values():
             child.parent = self
-
-        self._layout = layout
         self.switch_handle = switch_handle
         self._key_routing = key_routing
-
         self.name = start_name or "main"
         if self.name not in children:
             raise ComponentError(
                 "Please set the name, or has a component key is 'main'."
             )
-
-        children[self.name].activate()
+        self._active_child = children[self.name]
+        self._active_child.activate()
 
     def fresh(self):
-        pass  # do nothing
+        pass
 
     def accept(self, action: ActionLiteral, **data):
-        # sourcery skip: remove-unnecessary-else, swap-if-else-branches
         if action == "goto" and (name := data.get("target")) is not None:
-            if child := self.switch_child(name):  # switch and fetch next child.
+            if child := self.switch_child(name):
                 child.update(action, **data)
             else:
                 logging.getLogger().warning(f"Not found child: {name}.")
         else:
-            raise ComponentError("Not support action of ~Container.")
-
-    def resize(self, size: tuple[int, int]):
-        super().resize(size)
-        if self._layout is not None:
-            self._layout.resize_children(size, offset=(self.x, self.y))
-
-    def _render_child_to_surface(
-        self, component: "Component", surface: "Surface", log_prefix: str
-    ) -> None:
-        w, h = component._size
-        if w <= 0 or h <= 0:
-            return
-        if component.x < 1 or component.y < 1:
-            _logger.warning(
-                "%s %s with invalid 1-based coords (%s, %s)",
-                log_prefix,
-                component.NAME,
-                component.x,
-                component.y,
-            )
-        sub = surface.subsurface(
-            max(0, component.x - 1), max(0, component.y - 1), w, h
-        )
-        component._render_surface(sub)
+            raise ComponentError("Not support action of ~TabView.")
 
     def _render_surface(self, surface: "Surface") -> None:
-        """Render children into the given Surface."""
-        if self._layout is not None:
-            for component in self._layout.children:
-                self._render_child_to_surface(
-                    component, surface, "Container layout child"
-                )
-        else:
-            for component in self.children.values():
-                if component.is_activated():
-                    self._render_child_to_surface(
-                        component, surface, "Container switch to"
-                    )
-                    break
+        if self._active_child is not None:
+            _render_child_to_surface(
+                self._active_child, surface, "TabView switch to"
+            )
 
     def _handle_event(self, key: str):
-        """Route ``key`` to the active child, then optionally switch tabs.
-
-        With ``key_routing="child_first"`` (default), the active child receives
-        the key first; ``switch_handle`` / ``switch_child`` run afterward (same
-        as historical behavior). With ``key_routing="switch_first"``, tab
-        switching runs first when ``switch_handle`` is set, then the (possibly
-        new) active child receives the key.
-        """
         if self._key_routing == "switch_first" and self.switch_handle:
             self.switch_child(self.switch_handle(key))
-
-        for component in self.children.values():
-            if component.is_activated():
-                component._handle_event(key)
-
+        if self._active_child is not None:
+            self._active_child._handle_event(key)
         if self._key_routing == "child_first" and self.switch_handle:
             self.switch_child(self.switch_handle(key))
 
     def switch_child(self, name: str) -> Optional[Component]:
-        """Activate ``name`` if present and refresh it.
+        if name not in self.children:
+            return None
+        target = self.children[name]
+        if target is self._active_child:
+            return target
+        if self._active_child is not None:
+            self._active_child.deactivate()
+        target.activate()
+        self._active_child = target
+        fresh_fn = getattr(target, "fresh", None)
+        if callable(fresh_fn):
+            try:
+                fresh_fn()
+            except NotImplementedError:
+                pass
+        if hasattr(target, "_panel_loaded"):
+            target._panel_loaded = True
+        return target
 
-        Calls :meth:`Component.fresh` when implemented; :exc:`NotImplementedError`
-        is ignored so simple test doubles keep working. Panels using
-        :class:`GitPanelLazyResizeMixin` get ``_panel_loaded`` set after a successful
-        switch so lazy resize stays consistent. Re-rendering is performed by the
-        event loop.
-        """
-        child = None
 
-        if name in self.children:
-            for component in self.children.values():
-                if component.is_activated():
-                    component.deactivate()
-            target = self.children[name]
-            target.activate()
-            fresh_fn = getattr(target, "fresh", None)
-            if callable(fresh_fn):
-                try:
-                    fresh_fn()
-                except NotImplementedError:
-                    pass
-            if hasattr(target, "_panel_loaded"):
-                target._panel_loaded = True
-            child = target
+class LayoutContainer(Component):
+    """Layout-driven container: renders all children via a LayoutEngine."""
 
-        return child
+    NAME = "layout_container"
+
+    def __init__(
+        self,
+        layout: "LayoutEngine",
+        x: int = 1,
+        y: int = 1,
+        size: Optional[tuple[int, int]] = None,
+        renderer: Optional["Renderer"] = None,
+    ) -> None:
+        super().__init__(x, y, size, renderer=renderer)
+        self._layout = layout
+        for child in layout.children:
+            child.parent = self
+
+    def fresh(self) -> None:
+        pass
+
+    def resize(self, size: tuple[int, int]) -> None:
+        super().resize(size)
+        self._layout.resize_children(size, offset=(self.x, self.y))
+
+    def _render_surface(self, surface: "Surface") -> None:
+        for component in self._layout.children:
+            _render_child_to_surface(component, surface, "LayoutContainer child")
 
 
 class LineTextBrowser(Component):
@@ -475,7 +466,7 @@ class GitPanelLazyResizeMixin:
 
     Inactive panels show a one-line placeholder until first shown, so startup
     ``resize`` avoids running git for every tab. Pair with a container that
-    calls :meth:`fresh` when switching to the active child (:meth:`Container.switch_child`).
+    calls :meth:`fresh` when switching to the active child (:meth:`TabView.switch_child`).
     """
 
     _panel_loaded: bool = False
