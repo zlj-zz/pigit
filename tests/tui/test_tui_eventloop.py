@@ -226,18 +226,12 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks():
     loop.after_dispatch_key.assert_not_called()
 
 
-def test_loop_overlay_open_uses_try_dispatch_overlay_not_child():
-    """When the root reports an open overlay, keys go to overlay dispatch only."""
+def test_loop_overlay_open_routes_to_child_handle_event():
+    """When the root reports an open overlay, keys route to child._handle_event."""
 
     class _OverlayRoot(ComponentMock):
         def has_overlay_open(self):
             return True
-
-        def try_dispatch_overlay(self, key):
-            from pigit.termui.overlay_kinds import OverlayDispatchResult
-
-            assert key == "k"
-            return OverlayDispatchResult.HANDLED_IMPLICIT
 
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
@@ -257,22 +251,16 @@ def test_loop_overlay_open_uses_try_dispatch_overlay_not_child():
 
     loop._run_impl()
 
-    loop._child._handle_event.assert_not_called()
-    assert ("k", "overlay_implicit") in loop.trace
+    loop._child._handle_event.assert_called_once_with("k")
+    assert ("k", "overlay") in loop.trace
 
 
-def test_loop_overlay_closed_after_error_maps_to_hook_outcome():
-    """``CLOSED_AFTER_ERROR`` must surface as ``overlay_closed_after_error`` for hooks/metrics."""
+def test_loop_overlay_open_maps_to_overlay_outcome():
+    """When overlay is open, outcome is ``overlay`` regardless of inner result."""
 
     class _OverlayRoot(ComponentMock):
         def has_overlay_open(self):
             return True
-
-        def try_dispatch_overlay(self, key):
-            from pigit.termui.overlay_kinds import OverlayDispatchResult
-
-            assert key == "k"
-            return OverlayDispatchResult.CLOSED_AFTER_ERROR
 
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
@@ -292,7 +280,8 @@ def test_loop_overlay_closed_after_error_maps_to_hook_outcome():
 
     loop._run_impl()
 
-    assert ("k", "overlay_closed_after_error") in loop.trace
+    loop._child._handle_event.assert_called_once_with("k")
+    assert ("k", "overlay") in loop.trace
 
 
 def test_resize_calls_renderer_clear_cache():
@@ -324,7 +313,7 @@ def test_render_surface_path():
     assert surface.height == 5
 
 
-def test_dispatch_while_overlay_closed_renders():
+def test_dispatch_semantic_string_binding_renders():
     class _Quick(AppEventLoop):
         BINDINGS = [("r", "on_r")]
 
@@ -336,7 +325,7 @@ def test_dispatch_while_overlay_closed_renders():
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.render = Mock()
 
-    outcome = loop._dispatch_while_overlay_closed("r")
+    outcome = loop._dispatch_semantic_string("r")
 
     assert outcome == "binding"
     loop.render.assert_called_once()
@@ -461,32 +450,6 @@ def test_loop_mouse_event_is_ignored():
 
     loop.before_dispatch_key.assert_not_called()
     loop.after_dispatch_key.assert_not_called()
-
-
-@patch("pigit.termui.event_loop.logging.getLogger")
-def test_overlay_open_logs_debug_when_dropped_unbound(mock_get_logger):
-    mock_log = MagicMock()
-    mock_log.isEnabledFor.return_value = True
-    mock_get_logger.return_value = mock_log
-
-    class _OverlayRoot(ComponentMock):
-        def has_overlay_open(self):
-            return True
-
-        def try_dispatch_overlay(self, key):
-            from pigit.termui.overlay_kinds import OverlayDispatchResult
-
-            return OverlayDispatchResult.DROPPED_UNBOUND
-
-    loop = AppEventLoop(_OverlayRoot(), alt=False)
-    loop._renderer = MagicMock()
-    loop.get_term_size = Mock(return_value=(80, 24))
-    loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["x"]], KeyboardInterrupt()]
-
-    loop._run_impl()
-
-    mock_log.debug.assert_called_once()
 
 
 def test_quit_raises_exit_event_loop():

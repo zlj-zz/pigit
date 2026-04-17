@@ -82,3 +82,19 @@ class TestLayerStack:
         result = stack.dispatch("k")
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
         modal.dispatch_overlay_key.assert_called_once_with("k")
+
+    def test_toast_layer_push_pop(self):
+        stack = LayerStack()
+        toast = MagicMock()
+        stack.push(LayerKind.TOAST, toast)
+        assert stack.top(LayerKind.TOAST) is toast
+        assert stack.pop(LayerKind.TOAST) is toast
+        assert stack.top(LayerKind.TOAST) is None
+
+    def test_sheet_layer_push_pop(self):
+        stack = LayerStack()
+        sheet = MagicMock()
+        stack.push(LayerKind.SHEET, sheet)
+        assert stack.top(LayerKind.SHEET) is sheet
+        assert stack.pop(LayerKind.SHEET) is sheet
+        assert stack.top(LayerKind.SHEET) is None

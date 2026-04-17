@@ -97,7 +97,7 @@ class Component(ABC):
     def nearest_overlay_host(self) -> Optional["Component"]:
         """
         Walk parents toward the tree root; return the first ancestor that manages
-        overlay sessions (``begin_popup_session`` / ``end_popup_session`` / ``overlay_kind``).
+        overlay sessions (usually :class:`~pigit.termui.root.ComponentRoot`).
 
         Callers that open modal overlays should use this instead of assuming ``self.parent``
         is the event-loop root (cf. Flutter ``findAncestorStateOfType`` / SwiftUI environment).

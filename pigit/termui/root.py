@@ -85,6 +85,7 @@ class ComponentRoot(Component):
         super().resize(size)
 
     def _render_surface(self, surface: "Surface") -> None:
+        self._expire_toasts()
         self._body._render_surface(surface)
         self._layer_stack.render(surface)
 
@@ -94,3 +95,38 @@ class ComponentRoot(Component):
             if result != OverlayDispatchResult.DROPPED_UNBOUND:
                 return
         self._body._handle_event(key)
+
+    def _expire_toasts(self) -> None:
+        top = self._layer_stack.top(LayerKind.TOAST)
+        if top is not None and top.is_expired():
+            self._pop_layer(LayerKind.TOAST)
+
+    def show_toast(self, message: str, duration: float = 2.0) -> "Toast":
+        """Display a transient toast notification on the TOAST layer."""
+        from pigit.termui.components_overlay import Toast
+
+        toast = Toast(message, duration)
+        self._layer_stack.push(LayerKind.TOAST, toast)
+        return toast
+
+    def show_sheet(self, child: Component, height: int = 8) -> "Sheet":
+        """Display a bottom sheet on the SHEET layer."""
+        from pigit.termui.components_overlay import Sheet
+
+        sheet = Sheet(child, height)
+        sheet.resize(self._size)
+        self._layer_stack.push(LayerKind.SHEET, sheet)
+        return sheet
+
+    def dismiss_toast(self) -> None:
+        """Dismiss the current toast, if any."""
+        self._pop_layer(LayerKind.TOAST)
+
+    def dismiss_sheet(self) -> None:
+        """Dismiss the current sheet, if any."""
+        self._pop_layer(LayerKind.SHEET)
+
+    def _pop_layer(self, kind: LayerKind) -> None:
+        overlay = self._layer_stack.pop(kind)
+        if overlay is not None:
+            overlay.hide()

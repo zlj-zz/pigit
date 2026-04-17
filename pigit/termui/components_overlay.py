@@ -9,6 +9,7 @@ Date: 2026-04-01
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
 from pigit.termui.bindings import resolve_key_handlers_merged
@@ -144,9 +145,10 @@ class Popup(Component):
     """
     Modal shell around one inner :class:`~pigit.termui.components.Component`.
 
-    Pass ``session_owner`` to resolve the :class:`~pigit.termui.overlay_host.OverlayHostMixin`
-    root the same way as :class:`AlertDialog` (``session_owner`` may be the host itself or an
-    ancestor walk via :meth:`~pigit.termui.components.Component.nearest_overlay_host`).
+    Pass ``session_owner`` to resolve the overlay host (usually
+    :class:`~pigit.termui.root.ComponentRoot`) the same way as :class:`AlertDialog`
+    (``session_owner`` may be the host itself or an ancestor walk via
+    :meth:`~pigit.termui.components.Component.nearest_overlay_host`).
     :meth:`toggle` and ``exit_key`` then coordinate ``begin_popup_session`` /
     ``end_popup_session`` when ``session_owner`` is set.
 
@@ -265,7 +267,7 @@ class Popup(Component):
         host = self._resolved_overlay_host()
         if host is None:
             return
-        if host.overlay_kind == OverlayKind.POPUP and host._active_popup is not None:
+        if host.has_overlay_open() and host._active_popup is not None:
             if host._active_popup is not self:
                 return
             host.end_popup_session()
@@ -465,8 +467,7 @@ class AlertDialog(Popup):
 
     Call :meth:`alert` from application code with a message and ``on_result`` callback.
     Opening uses :meth:`~pigit.termui.components_overlay.Popup.show` and host
-    :meth:`~pigit.termui.overlay_host.OverlayHostMixin.begin_popup_session`; closing uses
-    :meth:`~pigit.termui.overlay_host.OverlayHostMixin.end_popup_session` and
+    ``begin_popup_session``; closing uses ``end_popup_session`` and
     :meth:`~pigit.termui.components_overlay.Popup.hide`.
 
     Panels typically set ``_alert_dialog`` and ``_alert_popup`` to this same instance.
@@ -522,7 +523,7 @@ class AlertDialog(Popup):
         """
 
         host = self._resolved_overlay_host()
-        if host is None or host.overlay_kind != OverlayKind.NONE:
+        if host is None or host.has_overlay_open():
             return False
         self._pane.prepare(message, on_result)
         self.relayout_content()
@@ -557,3 +558,81 @@ class AlertDialog(Popup):
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
+
+
+class Toast(Component):
+    """自动消失的通知消息（TOAST 层）。"""
+
+    NAME = "toast"
+
+    def __init__(
+        self,
+        message: str,
+        duration: float = 2.0,
+        size: Optional[tuple[int, int]] = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        super().__init__(size=size)
+        self.message = message
+        self.duration = duration
+        self._clock = clock
+        self._created_at = self._clock()
+        self._lines = [sanitize_for_display(line) for line in message.split("\n")]
+        self.open = True
+
+    def is_expired(self) -> bool:
+        return self._clock() - self._created_at > self.duration
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
+    def _render_surface(self, surface: "Surface") -> None:
+        max_width = max(0, surface.width - 2)
+        lines = [line[:max_width] for line in self._lines]
+        h = len(lines)
+        w = max(len(line) for line in lines) if lines else 0
+        start_y = max(0, surface.height - h - 1)
+        start_x = max(0, surface.width - w - 2)
+        for idx, line in enumerate(lines):
+            surface.draw_text(start_y + idx, start_x, line)
+
+    def hide(self) -> None:
+        self.open = False
+
+
+class Sheet(Component):
+    """底部滑出面板，类似移动端的 bottom sheet（SHEET 层）。"""
+
+    NAME = "sheet"
+
+    def __init__(
+        self,
+        child: Component,
+        height: int = 8,
+        size: Optional[tuple[int, int]] = None,
+    ) -> None:
+        super().__init__(size=size)
+        self._child = child
+        child.parent = self
+        self._target_height = height
+        self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
+        self.open = True
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        if self._child_dispatch is not None:
+            return self._child_dispatch(key)
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
+    def _render_surface(self, surface: "Surface") -> None:
+        if self._size[1] <= 0:
+            return
+        y = surface.height - self._size[1]
+        sub = surface.subsurface(0, y, self._size[0], self._size[1])
+        self._child._render_surface(sub)
+
+    def hide(self) -> None:
+        self.open = False
+
+    def resize(self, size: tuple[int, int]) -> None:
+        self._size = (size[0], min(self._target_height, size[1] // 2))
+        self._child.resize(self._size)

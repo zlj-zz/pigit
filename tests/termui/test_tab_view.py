@@ -114,13 +114,18 @@ class TestComponentBase:
         assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
     def test_nearest_overlay_host_walks_up(self):
-        from pigit.termui.overlay_host import OverlayHostMixin
+        from pigit.termui.overlay_kinds import OverlayKind
 
-        class _Host(OverlayHostMixin, _Leaf):
-            pass
+        class _MockHost(_Leaf):
+            overlay_kind = OverlayKind.NONE
 
-        host = _Host()
-        host._init_overlay_host_state()
+            def begin_popup_session(self, popup):
+                pass
+
+            def end_popup_session(self):
+                pass
+
+        host = _MockHost()
         mid = _Leaf()
         mid.parent = host
         leaf = _Leaf()

@@ -30,13 +30,19 @@ class _ApplicationEventLoop(AppEventLoop):
     def after_start(self):
         self._app.after_start()
 
-    def _dispatch_while_overlay_closed(self, key: str):
+    def _dispatch_semantic_string(self, key: str):
+        self.before_dispatch_key(key)
+        if key == "window resize":
+            self.resize()
+            return "resize"
+
         handler = self._app_key_handlers.get(key)
         if handler is not None:
             handler()
             self.render()
             return "binding"
-        return super()._dispatch_while_overlay_closed(key)
+
+        return super()._dispatch_semantic_string(key)
 
 
 class Application:

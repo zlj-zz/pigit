@@ -8,7 +8,10 @@ Date: 2026-04-17
 
 from __future__ import annotations
 
-from typing import Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .components import Component
 
 
 @runtime_checkable

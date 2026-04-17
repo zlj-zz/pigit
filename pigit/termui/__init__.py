@@ -21,7 +21,6 @@ from pigit.termui.components import (
 )
 from pigit.termui.components_overlay import AlertDialog, HelpPanel, HelpEntry, Popup
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
-from pigit.termui.overlay_host import OverlayHostMixin
 from pigit.termui.overlay_kinds import (
     OverlayDispatchResult,
     OverlayKind,
@@ -52,7 +51,6 @@ __all__ = [
     "LayoutContainer",
     "LineTextBrowser",
     "OverlayDispatchResult",
-    "OverlayHostMixin",
     "OverlayKind",
     "OverlaySurface",
     "Popup",

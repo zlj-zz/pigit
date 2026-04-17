@@ -12,7 +12,6 @@ import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
 from pigit.termui.bindings import BindingsList, resolve_key_handlers_merged
-from pigit.termui.overlay_kinds import OverlayDispatchResult
 from pigit.termui.components import Component
 from pigit.termui.keys import is_mouse_event
 from pigit.termui.render import Renderer
@@ -26,18 +25,8 @@ KeyDispatchOutcome = Literal[
     "binding",
     "resize",
     "child",
-    "overlay_explicit",
-    "overlay_implicit",
-    "overlay_drop",
-    "overlay_closed_after_error",
+    "overlay",
 ]
-
-_OVERLAY_TO_OUTCOME = {
-    OverlayDispatchResult.HANDLED_EXPLICIT: "overlay_explicit",
-    OverlayDispatchResult.HANDLED_IMPLICIT: "overlay_implicit",
-    OverlayDispatchResult.DROPPED_UNBOUND: "overlay_drop",
-    OverlayDispatchResult.CLOSED_AFTER_ERROR: "overlay_closed_after_error",
-}
 
 
 class ExitEventLoop(Exception):
@@ -157,8 +146,6 @@ class AppEventLoop:
         cols, rows = self._size
         surface = Surface(cols, rows)
         self._child._render_surface(surface)
-        if hasattr(self._child, "_render_active_overlay_surface"):
-            self._child._render_active_overlay_surface(surface)
         if self._renderer is not None:
             self._renderer.render_surface(surface)
 
@@ -186,20 +173,9 @@ class AppEventLoop:
             self.resize()
             return "resize"
         if self._child.has_overlay_open():
-            return self._dispatch_while_overlay_open(key)
-        return self._dispatch_while_overlay_closed(key)
-
-    def _dispatch_while_overlay_open(self, key: str) -> KeyDispatchOutcome:
-        ores = self._child.try_dispatch_overlay(key)
-        if (
-            ores is OverlayDispatchResult.DROPPED_UNBOUND
-            and logging.getLogger().isEnabledFor(logging.DEBUG)
-        ):
-            logging.getLogger(__name__).debug("Overlay dropped unbound key: %r", key)
-        self.render()
-        return _OVERLAY_TO_OUTCOME[ores]
-
-    def _dispatch_while_overlay_closed(self, key: str) -> KeyDispatchOutcome:
+            self._child._handle_event(key)
+            self.render()
+            return "overlay"
         handler = self._key_handlers.get(key)
         if handler is not None:
             handler()
