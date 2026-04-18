@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union, Any
 
 from pigit.termui.bindings import (
     BindingsList,
@@ -20,6 +20,7 @@ from pigit.termui.bindings import (
 from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
+    from pigit.termui.components_overlay import ToastPosition
     from pigit.termui.layout import LayoutEngine
     from pigit.termui.render import Renderer
     from pigit.termui.surface import Surface
@@ -35,9 +36,8 @@ KeyRouting = Literal["child_first", "switch_first"]
 def _looks_like_overlay_host(candidate: object) -> bool:
     """Duck-type check for a component that owns app-wide overlay session state."""
 
-    return (
-        callable(getattr(candidate, "begin_popup_session", None))
-        and callable(getattr(candidate, "end_popup_session", None))
+    return callable(getattr(candidate, "begin_popup_session", None)) and callable(
+        getattr(candidate, "end_popup_session", None)
     )
 
 
@@ -59,9 +59,7 @@ def _render_child_to_surface(
             component.x,
             component.y,
         )
-    sub = surface.subsurface(
-        max(0, component.x - 1), max(0, component.y - 1), w, h
-    )
+    sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
     component._render_surface(sub)
 
 
@@ -288,9 +286,7 @@ class TabView(Component):
 
     def _render_surface(self, surface: "Surface") -> None:
         if self._active_child is not None:
-            _render_child_to_surface(
-                self._active_child, surface, "TabView switch to"
-            )
+            _render_child_to_surface(self._active_child, surface, "TabView switch to")
 
     def _handle_event(self, key: str):
         if self._key_routing == "switch_first" and self.switch_handle:
@@ -479,3 +475,65 @@ class GitPanelLazyResizeMixin:
             self.set_content(["Loading..."])
             self.curr_no = 0
             self._r_start = 0
+
+
+class OverlayClientMixin:
+    """Mixin for components that trigger overlays (Toast/Sheet).
+
+    Usage:
+        class StatusPanel(Component, OverlayClientMixin):
+            def on_key(self, key):
+                if key == "i":
+                    self.show_toast("File ignored", duration=2.0)
+    """
+
+    def _nearest_host_with(self, attr: str) -> Optional["Component"]:
+        """Walk parent chain to find host with specified attribute."""
+        current: Optional["Component"] = getattr(self, "parent", None)
+        while current is not None:
+            if hasattr(current, attr):
+                return current
+            current = current.parent
+        return None
+
+    def show_toast(
+        self,
+        message: str,
+        *,
+        duration: float = 2.0,
+        position: Optional["ToastPosition"] = None,
+    ) -> Optional[Any]:
+        """Show toast notification via nearest host.
+
+        Args:
+            message: Toast message content.
+            duration: Display duration in seconds.
+            position: ToastPosition enum value (None for default TOP_RIGHT).
+
+        Returns:
+            Toast instance if successful, None if no host found.
+        """
+        host = self._nearest_host_with("show_toast")
+        if host is None:
+            return None
+        # Import here to avoid circular import
+        from pigit.termui.components_overlay import ToastPosition
+
+        if position is None:
+            position = ToastPosition.TOP_RIGHT
+        return host.show_toast(message, duration=duration, position=position)
+
+    def show_sheet(self, child: "Component", height: int = 8) -> Optional[Any]:
+        """Show bottom sheet via nearest host.
+
+        Args:
+            child: Component to display in sheet.
+            height: Sheet height in rows.
+
+        Returns:
+            Sheet instance if successful, None if no host found.
+        """
+        host = self._nearest_host_with("show_sheet")
+        if host is None:
+            return None
+        return host.show_sheet(child, height)

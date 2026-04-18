@@ -22,6 +22,7 @@ from pigit.termui import (
     LineTextBrowser,
     Popup,
 )
+from pigit.termui.components_overlay import ToastPosition
 from pigit.termui.event_loop import ExitEventLoop
 from pigit.termui.layer import LayerKind
 from pigit.termui.root import ComponentRoot
@@ -311,7 +312,7 @@ class PigitApplication(Application):
         size = self._loop.get_term_size()
         if size.columns < 65 or size.lines < 10:
             self._loop.quit("No enough space to running.")
-        self._root.show_toast("Welcome to Pigit! Press ? for help.", duration=3.0)
+        self._root.show_toast("Welcome to Pigit! Press ? for help.", duration=3.0, position=ToastPosition.BOTTOM_LEFT)
 
     def toggle_help(self):
         root = self._root

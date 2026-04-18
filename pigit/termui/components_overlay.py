@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from enum import Enum, auto
 from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
 from pigit.termui.bindings import resolve_key_handlers_merged
@@ -22,8 +23,12 @@ from pigit.termui.layout import Padding
 from pigit.termui import keys
 from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
 from pigit.termui.text import sanitize_for_display
+from pigit.termui.wcwidth_table import truncate_by_width
 
 _LOG = logging.getLogger(__name__)
+
+# Maximum number of lines to display in a Toast (safety limit)
+MAX_TOAST_LINES = 100
 
 HelpEntry = tuple[str, str]
 
@@ -576,8 +581,17 @@ class AlertDialog(Popup):
         super().resize(size)
 
 
+class ToastPosition(Enum):
+    """Toast 显示位置枚举。"""
+
+    TOP_LEFT = auto()
+    TOP_RIGHT = auto()
+    BOTTOM_LEFT = auto()
+    BOTTOM_RIGHT = auto()
+
+
 class Toast(Component):
-    """自动消失的通知消息（TOAST 层）。"""
+    """自动消失的通知消息（TOAST 层），支持边框、动画和可配置位置。"""
 
     NAME = "toast"
 
@@ -587,33 +601,145 @@ class Toast(Component):
         duration: float = 2.0,
         size: Optional[tuple[int, int]] = None,
         clock: Callable[[], float] = time.monotonic,
+        position: ToastPosition = ToastPosition.TOP_RIGHT,
+        enter_duration: float = 0.5,
+        exit_duration: float = 0.5,
     ) -> None:
         super().__init__(size=size)
-        self.message = message
+        self._message = message
         self.duration = duration
         self._clock = clock
+        self._position = position
+
+        if enter_duration + exit_duration > duration:
+            enter_duration = 0.0
+            exit_duration = 0.0
+        self._enter_duration = enter_duration
+        self._exit_duration = exit_duration
+
         self._created_at = self._clock()
-        self._lines = [sanitize_for_display(line) for line in message.split("\n")]
         self.open = True
 
+        self._term_size: tuple[int, int] = (0, 0)
+        self._needs_rebuild = True
+        self._frame: Optional[BoxFrame] = None
+        self._lines: list[str] = []
+        self._outer_w = 0
+        self.outer_row_count = 0
+
     def is_expired(self) -> bool:
-        return self._clock() - self._created_at > self.duration
+        return self._clock() - self._created_at > self.duration + self._exit_duration
+
+    def resize(self, size: tuple[int, int]) -> None:
+        new_size = (int(size[0]), int(size[1]))
+        if self._term_size != new_size:
+            self._term_size = new_size
+            self._needs_rebuild = True
+        super().resize(size)
+
+    def _rebuild_frame(self) -> None:
+        """根据当前终端尺寸重建 BoxFrame 和内容行。"""
+        max_inner_w = max(0, self._term_size[0] - 4)
+        lines = [
+            truncate_by_width(line, max_inner_w)
+            for line in self._message.split("\n")
+        ]
+        # Safety limit to prevent memory issues with malicious input
+        self._lines = lines[:MAX_TOAST_LINES]
+        inner_h = len(self._lines)
+        inner_w = max(len(line) for line in self._lines) if self._lines else 0
+
+        if self._frame is None:
+            self._frame = BoxFrame(inner_w, inner_h)
+        else:
+            self._frame.set_inner_size(inner_w, inner_h)
+        self._outer_w = self._frame.outer_width
+        self.outer_row_count = self._frame.outer_height
+        self._needs_rebuild = False
+
+    def _compute_slide_offset(self, elapsed: float) -> int:
+        """计算水平方向动画偏移量。
+
+        Args:
+            elapsed: 从创建到现在经过的秒数。
+
+        Returns:
+            相对于目标位置的列偏移（目标位置为0）。
+            LEFT_*: 负值表示在目标左侧（屏幕外）
+            RIGHT_*: 正值表示在目标右侧（屏幕外）
+        """
+        total = self.duration
+        enter = self._enter_duration
+        exit = self._exit_duration
+        dist = self._outer_w if self._outer_w > 0 else 1
+
+        is_left = self._position in (ToastPosition.TOP_LEFT, ToastPosition.BOTTOM_LEFT)
+        direction = -1 if is_left else 1
+
+        if enter == 0 and exit == 0:
+            return 0
+
+        if elapsed < enter and enter > 0:
+            progress = elapsed / enter
+            return direction * int(dist * (1.0 - progress))
+        if elapsed > total - exit and exit > 0:
+            progress = max(0.0, (total - elapsed) / exit)
+            return direction * int(dist * (1.0 - progress))
+        return 0
+
+    def _compute_base_position(self, surface) -> tuple[int, int]:
+        """计算目标位置的 (row, col)，不含动画偏移。"""
+        if self._position in (ToastPosition.TOP_LEFT, ToastPosition.TOP_RIGHT):
+            base_row = 1
+        else:
+            base_row = max(0, surface.height - self.outer_row_count - 1)
+
+        if self._position in (ToastPosition.TOP_LEFT, ToastPosition.BOTTOM_LEFT):
+            base_col = 1
+        else:
+            base_col = max(0, surface.width - self._outer_w - 1)
+
+        return base_row, base_col
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def _render_surface(self, surface: "Surface") -> None:
-        max_width = max(0, surface.width - 2)
-        lines = [line[:max_width] for line in self._lines]
-        h = len(lines)
-        w = max(len(line) for line in lines) if lines else 0
-        start_y = max(0, surface.height - h - 1)
-        start_x = max(0, surface.width - w - 2)
-        for idx, line in enumerate(lines):
-            surface.draw_text(start_y + idx, start_x, line)
+        if not self.open:
+            return
+
+        if surface.width < 4 or surface.height < 3:
+            return
+
+        if self._needs_rebuild:
+            self._rebuild_frame()
+
+        if self._frame is None:
+            return
+
+        elapsed = self._clock() - self._created_at
+        offset_x = self._compute_slide_offset(elapsed)
+        base_row, base_col = self._compute_base_position(surface)
+        render_col = base_col + offset_x
+
+        if base_row + self.outer_row_count <= 0 or base_row >= surface.height:
+            return
+        if render_col + self._outer_w <= 0 or render_col >= surface.width:
+            return
+
+        self._frame.draw_onto(surface, base_row, render_col)
+        self._frame.draw_content(surface, base_row, render_col, self._lines)
+
+    @property
+    def message(self) -> str:
+        """Toast message content (backward compatibility)."""
+        return self._message
 
     def hide(self) -> None:
         self.open = False
+
+    def fresh(self) -> None:
+        pass
 
 
 class Sheet(Component):

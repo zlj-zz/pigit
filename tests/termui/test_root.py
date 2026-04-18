@@ -10,6 +10,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from pigit.termui.components import Component
+from pigit.termui.components_overlay import ToastPosition
 from pigit.termui.layer import LayerKind
 from pigit.termui.root import ComponentRoot
 from pigit.termui.overlay_kinds import OverlayDispatchResult
@@ -89,10 +90,30 @@ class TestComponentRoot:
 
     def test_show_toast(self):
         root = ComponentRoot(DummyBody())
+        root.resize((80, 24))
         toast = root.show_toast("hello", duration=1.5)
         assert root._layer_stack.top(LayerKind.TOAST) is toast
-        assert toast.message == "hello"
+        assert toast._message == "hello"
         assert toast.duration == 1.5
+
+    def test_show_toast_with_position(self):
+        """验证 show_toast 支持 position 参数"""
+        root = ComponentRoot(DummyBody())
+        root.resize((80, 24))
+        toast = root.show_toast("hello", duration=1.5, position=ToastPosition.BOTTOM_LEFT)
+        assert toast._position == ToastPosition.BOTTOM_LEFT
+
+    def test_show_toast_singleton_replaces_existing(self):
+        """验证新 Toast 替换旧 Toast（单例模式）"""
+        root = ComponentRoot(DummyBody())
+        root.resize((80, 24))
+        toast1 = root.show_toast("first", duration=5.0)
+        assert root._layer_stack.top(LayerKind.TOAST) is toast1
+
+        toast2 = root.show_toast("second", duration=5.0)
+        # 旧 Toast 应该被移除
+        assert root._layer_stack.top(LayerKind.TOAST) is toast2
+        assert toast1.open is False  # 旧 Toast 被关闭
 
     def test_show_sheet(self):
         from pigit.termui.components import Component

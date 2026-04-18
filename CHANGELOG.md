@@ -1,5 +1,45 @@
 # Changelog of pigit
 
+## 1.8.0 (2026-04-18)
+
+### TermUI — Rendering architecture overhaul
+
+- **Surface / Cell intermediate layer**: declarative 2-D character buffer replaces direct ANSI emission; `Surface.draw_text`, `draw_row`, `draw_box`, `subsurface` APIs with CJK wide-character and ANSI SGR sequence support.
+- **Incremental rendering**: `Renderer.render_surface()` uses row-level diff against previous frame, falling back to full clear on resize.
+- **Box-drawing primitives**: `BoxFrame` in `frame_primitives.py` with `draw_onto` / `draw_content` APIs; replaces legacy `_build_bordered_frame`.
+- **`_render_surface()` protocol**: all components migrated from `_render()` legacy path; `Popup`, `AlertDialogBody`, `HelpPanel`, `LineTextBrowser`, `ItemSelector`, `SearchableListPicker` now draw to `Surface`.
+
+### TermUI — Component tree refactor
+
+- **`Container` replaced by `TabView` and `LayoutContainer`**: `TabView` for tabbed component stacks (single active child); `LayoutContainer` for layout-engine driven multi-child rendering.
+- **`Application` facade**: `PigitApplication(Application)` replaces `GitTuiRoot(OverlayHostMixin, Container)`; `Application.run()` composes `ComponentRoot` + `_ApplicationEventLoop`.
+- **`ComponentRoot` + `LayerStack`**: `OverlayHostMixin` removed; overlay state managed by `LayerStack` with `LayerKind` (`NONE` / `MODAL` / `TOAST` / `SHEET`).
+- **`Subsurface` layout**: components render into clipped proxies of parent `Surface` for nested layout regions.
+
+### TermUI — Fixes
+
+- **Alert drift**: `AlertDialogBody._needs_rebuild` invalidation prevents stale frame geometry after resize or message change.
+- **StatusPanel refresh**: correct refresh after discarding the last file in a list.
+- **Popup resize**: side-attached popups resized before render when geometry differs from terminal.
+- **ANSI SGR in `Surface.draw_text`**: inline color sequences parsed and stored per-cell as `Cell.style`.
+
+### Command system — complete rewrite (BREAKING)
+
+- **`cmd_new` promoted to `cmd`**: the old `pigit cmd` system (`GitProxy`, `cmd_builtin`, `cmd_func`, `cmd_catalog`, `cmd_proxy`, `shell_mode`) has been completely removed. `pigit cmd` now maps directly to the new system powered by `GitCommandNew`.
+- **`pigit/cmds/` package**: modular command definitions with decorators, models, registry, resolver, security validators, and config loader. Commands organized by domain: `branch.py`, `commit.py`, `history.py`, `index.py`, `merge.py`, `push_pull.py`, `rebase.py`, `remote.py`, `settings.py`, `submodule.py`, `working_tree.py`, `conflict.py`.
+- **`--pick` as default**: `pigit cmd` with no arguments now launches the interactive picker; falls back to help when no TTY.
+- **`pall` parallel command**: `pall` runs git commands in parallel across managed repos via `cmd_new`.
+- **Shell completion updated**: bash/zsh/fish completion scripts now serve `cmd_new` commands under the `cmd` namespace.
+- **`g` shortcut preserved**: continues to work since it prefixes `cmd`, which now resolves to the new system.
+- **Legacy backup**: `cmd_builtin.py` backed up to `docs/cmd_builtin_legacy.py` for reference.
+- **Git command picker UX**: `SearchableListPicker` with real-time preview pane, tab-completion via `read_line_with_completion`, and alt-screen handoff so picked command output is visible.
+- **Internal decoupling**: `tty_io` decoupled from `cmdparse`; picker internals split into `_picker_prompt.py`, `_picker_sorter.py`, `_completion.py`.
+
+### Tests
+
+- Expanded termui test coverage: `Toast`, `Sheet`, `HelpPanel`, `Popup`, `AlertDialogBody`, `LayerStack`, `KeyboardInput`, `ComponentRoot` pop-layer lifecycle.
+- **Removed completion script generation** from docs (shell completion scripts managed separately).
+
 ## 1.7.8 (2026-04-03)
 
 ### TermUI — overlay and bindings

@@ -8,13 +8,14 @@ Date: 2026-04-17
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from pigit.termui.components import Component
 from pigit.termui.layer import LayerKind, LayerStack
 from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
+    from pigit.termui.components_overlay import Sheet, Toast, ToastPosition
     from pigit.termui.surface import Surface
 
 
@@ -89,11 +90,34 @@ class ComponentRoot(Component):
         if top is not None and top.is_expired():
             self._pop_layer(LayerKind.TOAST)
 
-    def show_toast(self, message: str, duration: float = 2.0) -> "Toast":
-        """Display a transient toast notification on the TOAST layer."""
-        from pigit.termui.components_overlay import Toast
+    def show_toast(
+        self,
+        message: str,
+        duration: float = 2.0,
+        position: Optional["ToastPosition"] = None,
+    ) -> "Toast":
+        """Display a transient toast notification on the TOAST layer.
 
-        toast = Toast(message, duration)
+        Args:
+            message: Toast message content.
+            duration: Display duration in seconds.
+            position: ToastPosition enum value (None for default TOP_RIGHT).
+
+        Returns:
+            Toast instance.
+        """
+        from pigit.termui.components_overlay import Toast, ToastPosition
+
+        # 单例模式：移除已有的 Toast
+        existing = self._layer_stack.top(LayerKind.TOAST)
+        if existing is not None:
+            self._pop_layer(LayerKind.TOAST)
+
+        if position is None:
+            position = ToastPosition.TOP_RIGHT
+
+        toast = Toast(message, duration=duration, position=position)
+        toast.resize(self._size)
         self._layer_stack.push(LayerKind.TOAST, toast)
         return toast
 
