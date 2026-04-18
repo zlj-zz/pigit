@@ -1,3 +1,14 @@
+"""
+Event loop tests.
+
+Note on overlay architecture: ComponentMock.has_overlay_open() and
+try_dispatch_overlay() simulate the old single-slot host protocol.
+In the current LayerStack architecture, these methods are implemented
+by ComponentRoot, which delegates to LayerStack for overlay checks,
+dispatch, and rendering. ComponentMock remains valid because
+ComponentRoot exposes the same backward-compatible interface.
+"""
+
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 

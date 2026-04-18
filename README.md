@@ -88,21 +88,6 @@ These are short commands that can replace git operations:
 ......
 ```
 
-#### Shell Mode
-
-Pigit also provides an interactive shell mode for continuous git operations. Use `pigit cmd --shell` to enter the shell mode.
-
-In shell mode, you can use short commands directly without the `pigit cmd` prefix. For example:
-
-```
-(pigit:cmd)> s
-(pigit:cmd)> b
-(pigit:cmd)> shell ls
-(pigit:cmd)> quit
-```
-
-This mode is useful for performing multiple git operations in sequence.
-
 ### `repo`
 
 The command of `repo` support operate multiple repos at the same time.
@@ -276,6 +261,8 @@ The command info has some options:
 - `type`: (Option) Mark the type of command, support ['func', 'command'], and the default is 'command'.
 - `help`: (Option) Command help message.
 - `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
+
+**Note**: The legacy `extra_cmds.py` extension mechanism is preserved for backward compatibility. The new command system (1.8.0+) also supports TOML-based command extensions via configuration.
 
 ## Feature
 

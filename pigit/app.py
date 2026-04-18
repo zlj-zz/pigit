@@ -311,6 +311,7 @@ class PigitApplication(Application):
         size = self._loop.get_term_size()
         if size.columns < 65 or size.lines < 10:
             self._loop.quit("No enough space to running.")
+        self._root.show_toast("Welcome to Pigit! Press ? for help.", duration=3.0)
 
     def toggle_help(self):
         root = self._root

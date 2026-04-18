@@ -40,7 +40,7 @@ class OverlayDispatchResult(Enum):
 
 class OverlaySurface(Protocol):
     """
-    Modal shell that may occupy the single overlay slot on an :class:`~pigit.termui.overlay_host.OverlayHostMixin` root.
+    Modal shell that may occupy a MODAL slot on a :class:`~pigit.termui.root.ComponentRoot` via :class:`~pigit.termui.layer.LayerStack`.
 
     :class:`~pigit.termui.components_overlay.Popup` and :class:`~pigit.termui.components_overlay.AlertDialog`
     satisfy this protocol structurally. Other implementations may be introduced without subclassing ``Popup``.

@@ -22,9 +22,8 @@ class OverlayDispatchHost(Protocol):
     """
     Structural type for the modal host passed to :meth:`OverlayController.dispatch`.
 
-    In practice this is a :class:`~pigit.termui.overlay_host.OverlayHostMixin` instance
-    (e.g. the Git TUI root): it owns ``overlay_kind``, ``_active_popup``, and error
-    recovery on the active shell.
+    In practice this is a :class:`~pigit.termui.root.ComponentRoot` instance: it owns
+    ``overlay_kind``, ``_active_popup``, and error recovery on the active shell.
     """
 
     overlay_kind: OverlayKind

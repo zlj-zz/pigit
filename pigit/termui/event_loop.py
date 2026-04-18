@@ -66,7 +66,7 @@ class AppEventLoop:
         child: Component,
         input_takeover: bool = False,
         input_handle: Optional["InputTerminal"] = None,
-        real_time: bool = False,
+        real_time: bool = True,
         alt: bool = True,
     ) -> None:
         self._renderer: Optional[Renderer] = None
