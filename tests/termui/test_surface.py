@@ -5,7 +5,7 @@ Tests for pigit.termui.surface.
 
 from __future__ import annotations
 
-from pigit.termui.surface import Cell, Surface
+from pigit.termui._surface import Cell, Surface
 
 
 class TestCell:

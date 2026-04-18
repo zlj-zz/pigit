@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/geometry.py
+Module: pigit/termui/_geometry.py
 Description: Terminal column/row sizes aligned with shutil.get_terminal_size.
 Author: Zev
-Date: 2026-03-26
+Date: 2026-04-19
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from shutil import get_terminal_size
 from typing import NamedTuple
 

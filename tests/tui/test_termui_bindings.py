@@ -3,7 +3,7 @@
 
 import pytest
 
-from pigit.termui.bindings import BindingError, resolve_key_handlers
+from pigit.termui._bindings import BindingError, resolve_key_handlers
 
 
 class _Owner:

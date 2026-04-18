@@ -1,68 +1,100 @@
 # -*- coding: utf-8 -*-
 """
 Package: pigit.termui
-Description: Unified lightweight terminal UI (keyboard semantics, session, renderer).
-Author: Zev
-Date: 2026-03-26
+Description: Unified lightweight terminal UI framework.
+
+Usage:
+    from pigit.termui import Component, Toast, ComponentRoot
 """
 
 from __future__ import annotations
 
-from pigit.termui.bindings import BindingError, bind_keys, list_bindings
-from pigit.termui.application import Application
-from pigit.termui.components import (
+# Types and enums
+from pigit.termui.types import (
     ActionLiteral,
-    Component,
-    GitPanelLazyResizeMixin,
-    ItemSelector,
-    LayoutContainer,
-    LineTextBrowser,
-    TabView,
-)
-from pigit.termui.components_overlay import AlertDialog, HelpPanel, HelpEntry, Popup
-from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
-from pigit.termui.overlay_kinds import (
+    KeyRouting,
+    LayerKind,
     OverlayDispatchResult,
-    OverlayKind,
     OverlaySurface,
+    SurfaceProtocol,
+    ToastPosition,
 )
-from pigit.termui.geometry import TerminalSize
-from pigit.termui.input_keyboard import KeyboardInput
-from pigit.termui.key_echo import run_key_echo
-from pigit.termui.render import Renderer
-from pigit.termui.session import Session
-from pigit.termui.text import get_width, plain, sanitize_for_display
 
-from . import keys
+# Core components
+from pigit.termui._component_base import Component, ComponentError
+from pigit.termui._component_mixins import (
+    GitPanelLazyResizeMixin,
+    OverlayClientMixin,
+)
+from pigit.termui._component_containers import LayoutContainer, TabView
+from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
+
+# Overlay components
+from pigit.termui._overlay_components import (
+    AlertDialog,
+    AlertDialogBody,
+    HelpEntry,
+    HelpPanel,
+    Popup,
+    Sheet,
+    Toast,
+)
+
+# Event loop
+from pigit.termui.event_loop import ExitEventLoop
+
+# Root and application
+from pigit.termui._root import ComponentRoot
+from pigit.termui._application import Application
+
+# Other utilities
+from pigit.termui._bindings import bind_keys, list_bindings
+from pigit.termui._geometry import TerminalSize
+from pigit.termui._renderer import Renderer
+from pigit.termui._surface import Surface
+
+# Picker
+from pigit.termui._picker import PickerRow, SearchableListPicker
 
 __all__ = [
+    # Types
     "ActionLiteral",
-    "AlertDialog",
-    "AppEventLoop",
-    "Application",
-    "BindingError",
+    "KeyRouting",
+    "LayerKind",
+    "OverlayDispatchResult",
+    "OverlaySurface",
+    "SurfaceProtocol",
+    "ToastPosition",
+    # Core
     "Component",
-    "ExitEventLoop",
+    "ComponentError",
+    "OverlayClientMixin",
     "GitPanelLazyResizeMixin",
+    # Containers
+    "LayoutContainer",
+    "TabView",
+    # Widgets
+    "ItemSelector",
+    "LineTextBrowser",
+    # Overlays
+    "AlertDialog",
+    "AlertDialogBody",
     "HelpEntry",
     "HelpPanel",
-    "ItemSelector",
-    "KeyboardInput",
-    "LayoutContainer",
-    "LineTextBrowser",
-    "OverlayDispatchResult",
-    "OverlayKind",
-    "OverlaySurface",
     "Popup",
-    "Renderer",
-    "Session",
-    "TabView",
-    "TerminalSize",
+    "Sheet",
+    "Toast",
+    # Root & App
+    "ComponentRoot",
+    "Application",
+    "ExitEventLoop",
+    # Utils
     "bind_keys",
-    "get_width",
-    "keys",
     "list_bindings",
-    "plain",
-    "run_key_echo",
-    "sanitize_for_display",
+    "Surface",
+    "Renderer",
+    "TerminalSize",
+    # Picker
+    "SearchableListPicker",
+    "PickerRow",
 ]

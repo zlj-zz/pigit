@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/component_list_picker.py
+Module: pigit/termui/_picker.py
 Description: Full-screen searchable list picker as a Component driven by AppEventLoop.
 Author: Zev
-Date: 2026-03-29
+Date: 2026-04-19
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, TYPE_CHECKING
 
-from pigit.termui.components import Component
+from pigit.termui._component_base import Component
 from pigit.termui.picker_layout import (
     filter_input_line,
     footer_status_line,
@@ -22,7 +22,7 @@ from pigit.termui.tty_io import terminal_size, truncate_line
 
 if TYPE_CHECKING:
     from pigit.termui.event_loop import AppEventLoop
-    from pigit.termui.surface import Surface
+    from pigit.termui._surface import Surface
 
 PICK_EXIT_CTRL_C = 130
 

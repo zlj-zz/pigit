@@ -9,8 +9,8 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock, patch, Mock
 
-from pigit.termui.application import Application
-from pigit.termui.components import Component
+from pigit.termui._application import Application
+from pigit.termui._component_base import Component
 
 
 class DummyRoot(Component):
@@ -31,7 +31,7 @@ class DummyApp(Application):
 class TestApplication:
     def test_run_builds_root_and_starts_loop(self):
         app = DummyApp()
-        with patch("pigit.termui.application._ApplicationEventLoop") as MockLoop:
+        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
             mock_loop = MagicMock()
             MockLoop.return_value = mock_loop
             app.run()
@@ -43,7 +43,7 @@ class TestApplication:
                 self.hooked = True
 
         app = Hooked()
-        with patch("pigit.termui.application._ApplicationEventLoop") as MockLoop:
+        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
             mock_loop = MagicMock()
 
             def _simulate_run():

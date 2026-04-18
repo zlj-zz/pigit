@@ -10,15 +10,11 @@ import logging
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui.components import (
-    Component,
-    ComponentError,
-    TabView,
-    LineTextBrowser,
-    ItemSelector,
-    GitPanelLazyResizeMixin,
-)
-from pigit.termui.surface import Surface
+from pigit.termui._component_base import Component, ComponentError
+from pigit.termui._component_containers import TabView
+from pigit.termui._component_widgets import LineTextBrowser, ItemSelector
+from pigit.termui._component_mixins import GitPanelLazyResizeMixin
+from pigit.termui._surface import Surface
 
 
 class _Leaf(Component):
@@ -98,7 +94,7 @@ class TestComponentBase:
         assert _Leaf().has_overlay_open() is False
 
     def test_try_dispatch_overlay_default(self):
-        from pigit.termui.overlay_kinds import OverlayDispatchResult
+        from pigit.termui.types import OverlayDispatchResult
 
         assert _Leaf().try_dispatch_overlay("k") is OverlayDispatchResult.DROPPED_UNBOUND
 
@@ -114,11 +110,7 @@ class TestComponentBase:
         assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
     def test_nearest_overlay_host_walks_up(self):
-        from pigit.termui.overlay_kinds import OverlayKind
-
         class _MockHost(_Leaf):
-            overlay_kind = OverlayKind.NONE
-
             def begin_popup_session(self, popup):
                 pass
 

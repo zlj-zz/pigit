@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/surface.py
+Module: pigit/termui/_surface.py
 Description: 2-D character buffer for declarative terminal drawing.
 Author: Zev
-Date: 2026-04-16
+Date: 2026-04-19
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ class Surface:
             return
         text_width = wcswidth(text)
         if text_width > self.width:
-            text = truncate_by_width(text, self.width - 1) + "…"
+            text = truncate_by_width(text, self.width - 1) + "\u2026"
             text_width = wcswidth(text)
         if align == "center":
             pad_left = max(0, (self.width - text_width) // 2)

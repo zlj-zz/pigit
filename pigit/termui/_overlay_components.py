@@ -1,28 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/components_overlay.py
-Description: Popup (layout/control), bordered HelpPanel, and Alert overlay parts.
+Module: pigit/termui/_overlay_components.py
+Description: Overlay components including HelpPanel, Popup, AlertDialog, Toast, and Sheet.
 Author: Zev
-Date: 2026-04-01
+Date: 2026-04-19
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from enum import Enum, auto
 from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
-from pigit.termui.bindings import resolve_key_handlers_merged
+from pigit.termui._bindings import resolve_key_handlers_merged
 
-if TYPE_CHECKING:
-    from pigit.termui.surface import Surface
-from pigit.termui.components import Component, _looks_like_overlay_host
-from pigit.termui.frame_primitives import BoxFrame
-from pigit.termui.layout import Padding
+from ._component_base import Component, _looks_like_overlay_host
+from .types import ToastPosition, OverlayDispatchResult, LayerKind
+from ._frame import BoxFrame
+from ._text import sanitize_for_display
+from ._layout import Padding
+from ._geometry import TerminalSize
+from ._surface import Surface
 from pigit.termui import keys
-from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
-from pigit.termui.text import sanitize_for_display
 from pigit.termui.wcwidth_table import truncate_by_width
 
 _LOG = logging.getLogger(__name__)
@@ -139,7 +138,7 @@ class HelpPanel(Component):
     def fresh(self) -> None:
         pass
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._frame.draw_onto(surface, self.x, self.y)
 
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
@@ -272,13 +271,10 @@ class Popup(Component):
         host = self._resolved_overlay_host()
         if host is None:
             return
-        top = None
         layer_stack = getattr(host, '_layer_stack', None)
-        if layer_stack is not None:
-            from pigit.termui.layer import LayerKind
-            top = layer_stack.top(LayerKind.MODAL)
-        else:
-            top = getattr(host, '_active_popup', None)
+        if layer_stack is None:
+            return
+        top = layer_stack.top(LayerKind.MODAL)
         if top is self:
             host.end_popup_session()
             self.hide()
@@ -345,7 +341,7 @@ class Popup(Component):
                 "Subclass Popup without session_owner must override _on_exit_key."
             )
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self.open:
             return
         # Ensure the popup and its child are sized for the current surface before
@@ -440,7 +436,7 @@ class AlertDialogBody(Component):
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self.open:
             return
         if self._needs_rebuild:
@@ -541,7 +537,6 @@ class AlertDialog(Popup):
         # Only block if another MODAL is already open (TOAST/SHEET are non-blocking).
         layer_stack = getattr(host, '_layer_stack', None)
         if layer_stack is not None:
-            from pigit.termui.layer import LayerKind
             if layer_stack.top(LayerKind.MODAL) is not None:
                 return False
         elif host.has_overlay_open():
@@ -579,15 +574,6 @@ class AlertDialog(Popup):
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
-
-
-class ToastPosition(Enum):
-    """Toast 显示位置枚举。"""
-
-    TOP_LEFT = auto()
-    TOP_RIGHT = auto()
-    BOTTOM_LEFT = auto()
-    BOTTOM_RIGHT = auto()
 
 
 class Toast(Component):
@@ -704,7 +690,7 @@ class Toast(Component):
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self.open:
             return
 
@@ -765,7 +751,7 @@ class Sheet(Component):
             return self._child_dispatch(key)
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if self._size[1] <= 0:
             return
         y = surface.height - self._size[1]

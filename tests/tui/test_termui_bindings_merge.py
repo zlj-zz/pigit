@@ -3,13 +3,13 @@
 
 import pytest
 
-from pigit.termui.bindings import (
+from pigit.termui._bindings import (
     BindingError,
     bind_keys,
     list_bindings,
     resolve_key_handlers_merged,
 )
-from pigit.termui.components import Component
+from pigit.termui._component_base import Component
 
 
 class _Base(Component):
@@ -96,7 +96,7 @@ def test_list_bindings_matches_merge():
 
 def test_get_help_entries_keys_align_with_list_bindings():
     owner = _WithDeco()
-    from pigit.termui.bindings import list_bindings as lb
+    from pigit.termui._bindings import list_bindings as lb
 
     help_rows = owner.get_help_entries()
     bind_keys = [k for k, _ in lb(owner, type(owner))]

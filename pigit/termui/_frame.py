@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/frame_primitives.py
+Module: pigit/termui/_frame.py
 Description: Reusable bordered frame layout helpers for declarative terminal drawing.
 Author: Zev
-Date: 2026-04-16
+Date: 2026-04-19
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Optional, TYPE_CHECKING
 from pigit.termui.wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
-    from pigit.termui.surface import Surface
+    from pigit.termui._surface import Surface
 
 
 class BoxFrame:

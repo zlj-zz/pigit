@@ -10,7 +10,7 @@ from typing import Generator, Optional
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
-from pigit.termui.component_list_picker import PickerRow
+from pigit.termui._picker import PickerRow
 
 
 def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:

@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/application.py
+Module: pigit/termui/_application.py
 Description: Application facade that composes a root component tree and an event loop.
 Author: Zev
-Date: 2026-04-17
+Date: 2026-04-19
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-from pigit.termui.bindings import resolve_key_handlers_merged
-from pigit.termui.components import Component
+from pigit.termui._bindings import resolve_key_handlers_merged
+from pigit.termui._component_base import Component
 from pigit.termui.event_loop import AppEventLoop
 
 
@@ -77,7 +77,7 @@ class Application:
     def run(self) -> None:
         """Build body, wrap in ComponentRoot, create loop, and start TUI."""
         body = self.build_root()
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._root import ComponentRoot
 
         self._root = root = ComponentRoot(body)
         self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)

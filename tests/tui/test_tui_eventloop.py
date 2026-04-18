@@ -12,8 +12,8 @@ ComponentRoot exposes the same backward-compatible interface.
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
-from pigit.termui.components import Component
-from pigit.termui.tui_input_bridge import TermuiInputBridge
+from pigit.termui._component_base import Component
+from pigit.termui.input_bridge import TermuiInputBridge
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 from pigit.termui.input_terminal import InputTerminal
 
@@ -34,7 +34,7 @@ class ComponentMock:
         return False
 
     def try_dispatch_overlay(self, key):
-        from pigit.termui.overlay_kinds import OverlayDispatchResult
+        from pigit.termui.types import OverlayDispatchResult
 
         return OverlayDispatchResult.DROPPED_UNBOUND
 
@@ -307,7 +307,7 @@ def test_resize_calls_renderer_clear_cache():
 
 
 def test_render_surface_path():
-    from pigit.termui.surface import Surface
+    from pigit.termui._surface import Surface
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
@@ -358,55 +358,64 @@ def test_app_event_loop_accepts_callable_binding():
     loop._run_impl()
 
 
-def test_overlay_controller_returns_closed_after_error_when_dispatch_raises() -> None:
-    """Fatal errors during overlay dispatch must clear the slot and return a distinct result."""
-
-    from pigit.termui.overlay_controller import OverlayController
-    from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
+def test_layer_stack_error_recovery_closes_modal() -> None:
+    """Fatal errors during overlay dispatch must clear the slot and return CLOSED_AFTER_ERROR."""
+    from pigit.termui._layer import LayerStack
+    from pigit.termui.types import LayerKind, OverlayDispatchResult
 
     class _BrokenSurface:
         open = True
+        _hide_called = False
+        _reset_called = False
 
         def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
             raise RuntimeError("simulated overlay handler failure")
 
         def hide(self) -> None:
-            pass
+            self._hide_called = True
 
-        def _render_surface(self, surface) -> None:
-            pass
+        def reset_state(self) -> None:
+            self._reset_called = True
 
-    host = MagicMock()
-    host.overlay_kind = OverlayKind.POPUP
-    host._active_popup = _BrokenSurface()
-    host.force_close_overlay_after_error = Mock()
+    stack = LayerStack()
+    broken = _BrokenSurface()
+    stack.push(LayerKind.MODAL, broken)
 
-    ctrl = OverlayController()
-    assert ctrl.dispatch(host, "x") is OverlayDispatchResult.CLOSED_AFTER_ERROR
-    host.force_close_overlay_after_error.assert_called_once()
+    result = stack.dispatch("x")
+
+    assert result is OverlayDispatchResult.CLOSED_AFTER_ERROR
+    assert stack.is_empty(LayerKind.MODAL)
+    assert broken._hide_called
+    assert broken._reset_called
 
 
-def test_overlay_controller_question_mark_toggles_help_when_help_open() -> None:
-    """``?`` must close help while help is open (App-level binding is not run in overlay mode)."""
+def test_layer_stack_question_mark_toggles_help_popup() -> None:
+    """``?`` toggles help popup via Popup.dispatch_overlay_key (implicit HANDLED_IMPLICIT)."""
+    from pigit.termui._layer import LayerStack
+    from pigit.termui._overlay_components import HelpPanel, Popup
+    from pigit.termui.types import LayerKind, OverlayDispatchResult
 
-    from pigit.termui.overlay_controller import OverlayController
-    from pigit.termui.components_overlay import HelpPanel, Popup
-    from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
-
+    # Create LayerStack and mock host that uses it
+    stack = LayerStack()
     root = MagicMock()
-    root.overlay_kind = OverlayKind.POPUP
-    root._layer_stack = None
+    root._layer_stack = stack
+
     help_panel = HelpPanel()
     popup = Popup(help_panel, session_owner=root)
-    root._active_popup = popup
+    popup.open = True
 
-    ctrl = OverlayController()
-    assert ctrl.dispatch(root, "?") is OverlayDispatchResult.HANDLED_IMPLICIT
+    # Push popup to MODAL layer
+    stack.push(LayerKind.MODAL, popup)
+
+    # Dispatch "?" key
+    result = stack.dispatch("?")
+
+    assert result is OverlayDispatchResult.HANDLED_IMPLICIT
     root.end_popup_session.assert_called_once()
 
 
 def test_bind_renderer_tree_recurses_into_children():
-    from pigit.termui.components import TabView
+    from pigit.termui._component_containers import TabView
 
     class _Leaf(Component):
         NAME = "leaf"

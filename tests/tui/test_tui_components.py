@@ -1,12 +1,8 @@
 import pytest
-from pigit.termui.components import (
-    Component,
-    ComponentError,
-    TabView,
-    GitPanelLazyResizeMixin,
-    ItemSelector,
-    LineTextBrowser,
-)
+from pigit.termui._component_base import Component, ComponentError
+from pigit.termui._component_containers import TabView
+from pigit.termui._component_mixins import GitPanelLazyResizeMixin
+from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
 
 # Mock Component to use in tests
 class MockComponent(Component):
@@ -182,7 +178,7 @@ class TestLineTextBrowser:
         assert browser.x == expected_position[0]
         assert browser.y == expected_position[1]
         if content:
-            from pigit.termui.surface import Surface
+            from pigit.termui._surface import Surface
 
             # Components render at local (0,0) coordinates into the surface.
             s = Surface(size[0], size[1])

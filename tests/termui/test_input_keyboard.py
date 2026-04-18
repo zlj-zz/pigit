@@ -155,7 +155,7 @@ class TestKeyboardInputReadKeys:
 
     @patch("pigit.termui.input_keyboard.TerminalSize.from_os")
     def test_read_resize_event(self, mock_from_os):
-        from pigit.termui.geometry import TerminalSize
+        from pigit.termui._geometry import TerminalSize
 
         mock_from_os.side_effect = [
             TerminalSize(80, 24),

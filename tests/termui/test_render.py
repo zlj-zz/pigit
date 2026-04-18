@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from unittest import mock
 
-from pigit.termui.surface import Cell, Surface
-from pigit.termui.render import Renderer
+from pigit.termui._surface import Cell, Surface
+from pigit.termui._renderer import Renderer
 
 
 class FakeSession:

@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import patch
 
 from pigit.termui.keys import is_mouse_event
-from pigit.termui.tui_input_bridge import TermuiInputBridge
+from pigit.termui.input_bridge import TermuiInputBridge
 
 
 @pytest.mark.parametrize(

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/text.py
+Module: pigit/termui/_text.py
 Description: Display width and ANSI stripping — single implementation (no legacy import).
 Author: Zev
-Date: 2026-03-26
+Date: 2026-04-19
 """
 
 from __future__ import annotations

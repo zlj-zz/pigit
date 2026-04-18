@@ -14,7 +14,7 @@ from pigit.git.repo_cd_picker import (
     REPO_CD_NO_TTY_MSG,
     run_repo_cd_picker,
 )
-from pigit.termui.component_list_picker import PickerRow
+from pigit.termui._picker import PickerRow
 
 
 class MockExecutor:

@@ -1,30 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/layer.py
+Module: pigit/termui/_layer.py
 Description: Layer-based overlay stack for multi-level modal/toast/sheet support.
 Author: Zev
-Date: 2026-04-17
+Date: 2026-04-19
 """
 
 from __future__ import annotations
 
-from enum import Enum
+import logging
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pigit.termui.surface import Surface
+    from pigit.termui._surface import Surface
 
-from pigit.termui.overlay_kinds import OverlayKind
-
-
-class LayerKind(Enum):
-    NORMAL = 0
-    TOAST = 1
-    SHEET = 2
-    MODAL = 3
+from pigit.termui.types import LayerKind, OverlayDispatchResult
 
 
 _VISIBLE_LAYER_KINDS = (LayerKind.TOAST, LayerKind.SHEET, LayerKind.MODAL)
+
+_LOG = logging.getLogger(__name__)
 
 
 class Layer:
@@ -96,24 +91,24 @@ class LayerStack:
                 if hasattr(overlay, "resize"):
                     overlay.resize(size)
 
-    def dispatch(self, key: str):
-        from pigit.termui.overlay_kinds import OverlayDispatchResult
-        from pigit.termui.overlay_controller import OverlayController
-
-        # MODAL intercepts everything. If MODAL layer is non-empty, we always
-        # dispatch to its top (even if closed) so the OC can decide whether to
-        # drop or consume. Closed modals are expected to return DROPPED_UNBOUND,
-        # but they still block lower layers.
+    def dispatch(self, key: str) -> OverlayDispatchResult:
+        """Route key to top overlay. MODAL intercepts everything; SHEET/TOAST passthrough if dropped."""
+        # MODAL intercepts everything
         modal = self._layers[LayerKind.MODAL]
         if not modal.is_empty():
             top = modal.top()
             if top is not None:
-                # Cache controller to avoid repeated instantiation on hot path.
-                ctrl = getattr(LayerStack, "_oc", None)
-                if ctrl is None:
-                    ctrl = OverlayController()
-                    LayerStack._oc = ctrl
-                return ctrl.dispatch(_LayerDispatchHost(self), key)
+                try:
+                    return top.dispatch_overlay_key(key)
+                except Exception:
+                    _LOG.exception("Overlay dispatch failed for key %r", key)
+                    # Error recovery: close modal and clean up
+                    modal.pop()
+                    if hasattr(top, "hide"):
+                        top.hide()
+                    if hasattr(top, "reset_state"):
+                        top.reset_state()
+                    return OverlayDispatchResult.CLOSED_AFTER_ERROR
 
         # SHEET / TOAST: dispatch to top, passthrough if dropped
         for kind in (LayerKind.SHEET, LayerKind.TOAST):
@@ -125,22 +120,3 @@ class LayerStack:
                 continue
 
         return OverlayDispatchResult.DROPPED_UNBOUND
-
-
-class _LayerDispatchHost:
-    """Adapter so OverlayController can talk to LayerStack via old protocol."""
-
-    overlay_kind = OverlayKind.POPUP
-    _active_popup = None
-
-    def __init__(self, stack: LayerStack) -> None:
-        self._stack = stack
-        self._active_popup = stack.top(LayerKind.MODAL)
-
-    def force_close_overlay_after_error(self) -> None:
-        top = self._stack.pop(LayerKind.MODAL)
-        if top is not None and hasattr(top, "hide"):
-            top.hide()
-            reset = getattr(top, "reset_state", None)
-            if callable(reset):
-                reset()

@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/root.py
+Module: pigit/termui/_root.py
 Description: Internal framework root that wraps body + LayerStack.
 Author: Zev
-Date: 2026-04-17
+Date: 2026-04-19
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from pigit.termui.components import Component
-from pigit.termui.layer import LayerKind, LayerStack
-from pigit.termui.overlay_kinds import OverlayDispatchResult
+from pigit.termui._component_base import Component
+from pigit.termui._layer import LayerKind, LayerStack
+from pigit.termui.types import OverlayDispatchResult, ToastPosition
 
 if TYPE_CHECKING:
-    from pigit.termui.components_overlay import Sheet, Toast, ToastPosition
-    from pigit.termui.surface import Surface
+    from pigit.termui._overlay_components import Sheet, Toast
+    from pigit.termui._surface import Surface
 
 
 class ComponentRoot(Component):
@@ -94,7 +94,7 @@ class ComponentRoot(Component):
         self,
         message: str,
         duration: float = 2.0,
-        position: Optional["ToastPosition"] = None,
+        position: Optional[ToastPosition] = None,
     ) -> "Toast":
         """Display a transient toast notification on the TOAST layer.
 
@@ -106,7 +106,7 @@ class ComponentRoot(Component):
         Returns:
             Toast instance.
         """
-        from pigit.termui.components_overlay import Toast, ToastPosition
+        from pigit.termui._overlay_components import Toast
 
         # 单例模式：移除已有的 Toast
         existing = self._layer_stack.top(LayerKind.TOAST)
@@ -123,7 +123,7 @@ class ComponentRoot(Component):
 
     def show_sheet(self, child: Component, height: int = 8) -> "Sheet":
         """Display a bottom sheet on the SHEET layer."""
-        from pigit.termui.components_overlay import Sheet
+        from pigit.termui._overlay_components import Sheet
 
         sheet = Sheet(child, height)
         sheet.resize(self._size)

@@ -9,8 +9,8 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui.layer import Layer, LayerKind, LayerStack
-from pigit.termui.overlay_kinds import OverlayDispatchResult
+from pigit.termui._layer import Layer, LayerKind, LayerStack
+from pigit.termui.types import OverlayDispatchResult
 
 
 class TestLayer:
@@ -59,7 +59,7 @@ class TestLayerStack:
         assert stack.top(LayerKind.MODAL) is None
 
     def test_render_skips_closed(self):
-        from pigit.termui.surface import Surface
+        from pigit.termui._surface import Surface
 
         stack = LayerStack()
         open_surf = MagicMock()
@@ -200,44 +200,11 @@ class TestLayerStack:
         overlay.resize.assert_called_once_with((40, 20))
 
 
-class TestLayerDispatchHost:
-    def test_force_close_with_no_top_does_nothing(self):
-        from pigit.termui.layer import _LayerDispatchHost
-
-        stack = LayerStack()
-        host = _LayerDispatchHost(stack)
-        host.force_close_overlay_after_error()
-        # No exception; stack remains empty
-        assert stack.top(LayerKind.MODAL) is None
-
-    def test_force_close_with_no_hide_attribute(self):
-        from pigit.termui.layer import _LayerDispatchHost
-
-        stack = LayerStack()
-        overlay = MagicMock(spec=[])
-        stack.push(LayerKind.MODAL, overlay)
-        host = _LayerDispatchHost(stack)
-        host.force_close_overlay_after_error()
-        assert stack.top(LayerKind.MODAL) is None
-
-    def test_force_close_without_reset_state(self):
-        from pigit.termui.layer import _LayerDispatchHost
-
-        stack = LayerStack()
-        overlay = MagicMock()
-        del overlay.reset_state
-        stack.push(LayerKind.MODAL, overlay)
-        host = _LayerDispatchHost(stack)
-        host.force_close_overlay_after_error()
-        overlay.hide.assert_called_once()
-        assert stack.top(LayerKind.MODAL) is None
-
-
 class TestComponentRootPopLayer:
     """ComponentRoot._pop_layer calls hide() after LayerStack.pop — the caller-level lifecycle hook."""
 
     def test_component_root_pop_layer_calls_hide(self):
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._root import ComponentRoot
 
         body = MagicMock()
         body._render_surface = MagicMock()
@@ -248,7 +215,7 @@ class TestComponentRootPopLayer:
         overlay.hide.assert_called_once()
 
     def test_component_root_force_close_after_error_calls_hide(self):
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._root import ComponentRoot
 
         body = MagicMock()
         root = ComponentRoot(body)

@@ -8,9 +8,9 @@ Date: 2026-04-17
 
 from unittest.mock import MagicMock
 
-from pigit.termui.components import LayoutContainer, Component, _render_child_to_surface
-from pigit.termui.layout import FlexRow
-from pigit.termui.surface import Surface
+from pigit.termui._component_containers import LayoutContainer, Component, _render_child_to_surface
+from pigit.termui._layout import FlexRow
+from pigit.termui._surface import Surface
 
 
 class _Leaf(Component):

@@ -11,11 +11,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
-from pigit.termui.bindings import BindingsList, resolve_key_handlers_merged
-from pigit.termui.components import Component
+from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
+from pigit.termui._component_base import Component
 from pigit.termui.keys import is_mouse_event
-from pigit.termui.render import Renderer
-from pigit.termui.session import Session
+from pigit.termui._renderer import Renderer
+from pigit.termui._session import Session
 
 if TYPE_CHECKING:
     from pigit.termui.input_terminal import InputTerminal
@@ -55,7 +55,7 @@ class AppEventLoop:
 
     ``run()`` always enters :class:`~pigit.termui.session.Session` and binds
     ``session.renderer`` to the whole component tree. When ``input_handle`` is
-    omitted, a :class:`~pigit.termui.tui_input_bridge.TermuiInputBridge` over
+    omitted, a :class:`~pigit.termui.input_bridge.TermuiInputBridge` over
     :class:`~pigit.termui.input_keyboard.KeyboardInput` is used.
     """
 
@@ -77,7 +77,7 @@ class AppEventLoop:
         self._input_takeover = input_takeover
 
         if input_handle is None:
-            from pigit.termui.tui_input_bridge import TermuiInputBridge
+            from pigit.termui.input_bridge import TermuiInputBridge
 
             input_handle = TermuiInputBridge()
         self._input_handle = input_handle
@@ -141,7 +141,7 @@ class AppEventLoop:
         self.render()
 
     def render(self) -> None:
-        from pigit.termui.surface import Surface
+        from pigit.termui._surface import Surface
 
         cols, rows = self._size
         surface = Surface(cols, rows)

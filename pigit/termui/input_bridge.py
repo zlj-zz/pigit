@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/tui_input_bridge.py
+Module: pigit/termui/input_bridge.py
 Description: InputTerminal-compatible adapter over KeyboardInput (Session owns termios).
 Author: Zev
 Date: 2026-03-26

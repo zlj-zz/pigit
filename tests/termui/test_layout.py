@@ -8,8 +8,8 @@ Date: 2026-04-17
 
 import pytest
 
-from pigit.termui.layout import Padding, Border, FlexRow, FlexColumn
-from pigit.termui.components import Component
+from pigit.termui._layout import Padding, Border, FlexRow, FlexColumn
+from pigit.termui._component_base import Component
 
 
 class _Leaf(Component):

@@ -9,11 +9,11 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui.components import Component
-from pigit.termui.components_overlay import ToastPosition
-from pigit.termui.layer import LayerKind
-from pigit.termui.root import ComponentRoot
-from pigit.termui.overlay_kinds import OverlayDispatchResult
+from pigit.termui._component_base import Component
+from pigit.termui._overlay_components import ToastPosition
+from pigit.termui._layer import LayerKind
+from pigit.termui._root import ComponentRoot
+from pigit.termui.types import OverlayDispatchResult
 
 
 class DummyBody(Component):
@@ -116,7 +116,7 @@ class TestComponentRoot:
         assert toast1.open is False  # 旧 Toast 被关闭
 
     def test_show_sheet(self):
-        from pigit.termui.components import Component
+        from pigit.termui._component_base import Component
 
         class _Inner(Component):
             NAME = "inner"
@@ -139,7 +139,7 @@ class TestComponentRoot:
         root = ComponentRoot(DummyBody())
         toast = root.show_toast("expiring", duration=0.0)
         assert root._layer_stack.top(LayerKind.TOAST) is toast
-        from pigit.termui.surface import Surface
+        from pigit.termui._surface import Surface
 
         surface = Surface(10, 5)
         root._render_surface(surface)
@@ -147,7 +147,7 @@ class TestComponentRoot:
         assert toast.open is False
 
     def test_toast_clock_injection(self):
-        from pigit.termui.components_overlay import Toast
+        from pigit.termui._overlay_components import Toast
 
         clock_calls = [0.0, 2.0, 10.0]
         idx = 0

@@ -9,8 +9,8 @@ Date: 2026-04-18
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui.components import Component
-from pigit.termui.components_overlay import (
+from pigit.termui._component_base import Component
+from pigit.termui._overlay_components import (
     AlertDialogBody,
     HelpEntry,
     HelpPanel,
@@ -19,8 +19,8 @@ from pigit.termui.components_overlay import (
     Toast,
     ToastPosition,
 )
-from pigit.termui.overlay_kinds import OverlayDispatchResult
-from pigit.termui.surface import Surface
+from pigit.termui.types import OverlayDispatchResult
+from pigit.termui._surface import Surface
 
 
 class _Leaf(Component):
@@ -46,8 +46,8 @@ class DummyBody(Component):
 class TestOverlayClientMixin:
     def test_mixin_show_toast_finds_host(self):
         """验证 OverlayClientMixin.show_toast 能找到 host 并调用"""
-        from pigit.termui.components import OverlayClientMixin
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._component_mixins import OverlayClientMixin
+        from pigit.termui._root import ComponentRoot
 
         class _MixinComponent(Component, OverlayClientMixin):
             NAME = "mixin_test"
@@ -72,7 +72,7 @@ class TestOverlayClientMixin:
 
     def test_mixin_show_toast_no_host_returns_none(self):
         """验证无 host 时返回 None"""
-        from pigit.termui.components import OverlayClientMixin
+        from pigit.termui._component_mixins import OverlayClientMixin
 
         class _MixinComponent(Component, OverlayClientMixin):
             NAME = "mixin_test"
@@ -90,8 +90,8 @@ class TestOverlayClientMixin:
 
     def test_mixin_show_sheet_finds_host(self):
         """验证 OverlayClientMixin.show_sheet 能找到 host"""
-        from pigit.termui.components import OverlayClientMixin
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._component_mixins import OverlayClientMixin
+        from pigit.termui._root import ComponentRoot
 
         class _MixinComponent(Component, OverlayClientMixin):
             NAME = "mixin_test"
@@ -115,8 +115,8 @@ class TestOverlayClientMixin:
 
     def test_mixin_show_toast_position_parameter(self):
         """验证 Mixin 支持传递 position 参数"""
-        from pigit.termui.components import OverlayClientMixin
-        from pigit.termui.root import ComponentRoot
+        from pigit.termui._component_mixins import OverlayClientMixin
+        from pigit.termui._root import ComponentRoot
 
         class _MixinComponent(Component, OverlayClientMixin):
             NAME = "mixin_test"

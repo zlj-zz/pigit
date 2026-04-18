@@ -10,15 +10,16 @@ from unittest import mock
 
 import pytest
 
-from pigit.termui import KeyboardInput, keys
-from pigit.termui import text as termui_text
-from pigit.termui.geometry import TerminalSize
+from pigit.termui.input_keyboard import KeyboardInput
+from pigit.termui import keys
+from pigit.termui import _text as termui_text
+from pigit.termui._geometry import TerminalSize
 from pigit.termui import wcwidth_table
 
 
 def test_get_width_plain_are_single_source_with_wcwidth_table():
     assert termui_text.get_width is wcwidth_table.get_width
-    assert "pigit.termui.text" in (termui_text.plain.__module__ or "")
+    assert "pigit.termui._text" in (termui_text.plain.__module__ or "")
 
 
 @pytest.mark.parametrize(
@@ -94,7 +95,7 @@ def test_windows_arrow_mapping():
 
 
 def test_picker_preview_key_calls_on_preview():
-    from pigit.termui.component_list_picker import SearchableListPicker, PickerRow
+    from pigit.termui._picker import SearchableListPicker, PickerRow
 
     calls = []
 
@@ -144,7 +145,7 @@ def test_picker_preview_key_calls_on_preview():
     picker.on_key("?")
     assert calls == ["a"]
     # Preview is rendered by the event loop; simulate it manually
-    from pigit.termui.surface import Surface
+    from pigit.termui._surface import Surface
 
     s = Surface(80, 24)
     picker._render_surface(s)

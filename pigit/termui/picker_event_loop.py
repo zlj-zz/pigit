@@ -48,7 +48,7 @@ class PickerAppEventLoop(AppEventLoop):
         but map normal picker exit to ``(exit_code, message)`` via re-raised :exc:`ExitEventLoop`.
         """
 
-        from pigit.termui.component_list_picker import PICK_EXIT_CTRL_C
+        from pigit.termui._picker import PICK_EXIT_CTRL_C
 
         try:
             super().run()

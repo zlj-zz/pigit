@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/render.py
+Module: pigit/termui/_renderer.py
 Description: Session-bound Renderer for ANSI drawing (1-based row/column).
 Author: Zev
-Date: 2026-03-26
+Date: 2026-04-19
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Sequence
 
 if TYPE_CHECKING:
-    from pigit.termui.session import Session
-    from pigit.termui.surface import Cell, Surface
+    from pigit.termui._session import Session
+    from pigit.termui._surface import Cell, Surface
 
 
 class Renderer:

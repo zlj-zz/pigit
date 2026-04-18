@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/layout.py
+Module: pigit/termui/_layout.py
 Description: Lightweight layout containers for the terminal UI framework.
 Author: Zev
-Date: 2026-04-17
+Date: 2026-04-19
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .components import Component
+    from pigit.termui._component_base import Component
 
 
 @runtime_checkable

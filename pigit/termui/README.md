@@ -54,19 +54,18 @@ flowchart TB
 | `overlay_controller.py` | Forwards keys to ``_active_popup.dispatch_overlay_key`` (exception-safe) |
 | `overlay_kinds.py` | `OverlayKind` (`NONE` \| `POPUP`), `OverlayDispatchResult`, `OverlaySurface` protocol |
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize → overlay → main dispatch order; first-frame redraw when a child opens an overlay mid-handler |
-| `session.py` | `Session`: TTY setup, `Renderer` attached to stdout |
+| `_session.py` | `Session`: TTY setup, `Renderer` attached to stdout |
 | `render.py` | `Renderer`: cursor moves, `draw_panel`, clearing |
 | `bindings.py` | `bind_keys`, `list_bindings`, `BindingError`, merged handler resolution |
 | `keys.py` | Semantic key constants and helpers (e.g. `KEY_ESC`, `is_mouse_event`) |
 | `text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
 | `input_keyboard.py` | Low-level byte reader → semantic strings |
 | `input_terminal.py` | `InputTerminal` protocol |
-| `tui_input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
+| `input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
 | `geometry.py` | `TerminalSize` and related helpers |
 | `component_list_picker.py` | Searchable list picker component (CLI/repo flows) |
 | `picker_event_loop.py` | Picker-oriented loop helpers |
 | `picker_layout.py` | Layout helpers for pickers |
-| `key_echo.py` | Development / debugging key echo utility |
 | `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
 
 ## Minimal example
@@ -107,7 +106,7 @@ Stable names are listed in `__all__` inside `__init__.py`. Highlights:
 - **Loop**: `AppEventLoop`, `ExitEventLoop`, `Session`, `Renderer`, `TerminalSize`
 - **Bindings**: `bind_keys`, `list_bindings`, `BindingError`
 - **Input**: `KeyboardInput`, submodule `keys`
-- **Text**: `sanitize_for_display`, `get_width`, `plain`, `run_key_echo`
+- **Text**: `sanitize_for_display`, `get_width`, `plain`
 
 Import the package once for app-level wiring:
 

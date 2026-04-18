@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 from pigit.ext.executor import WAITING
 
-from pigit.termui.component_list_picker import (
+from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
     PickerRow,
     SearchableListPicker,
@@ -21,7 +21,7 @@ from pigit.termui.component_list_picker import (
 from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
-from pigit.termui.tui_input_bridge import TermuiInputBridge
+from pigit.termui.input_bridge import TermuiInputBridge
 
 if TYPE_CHECKING:
     from pigit.ext.executor import Executor

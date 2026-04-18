@@ -117,7 +117,7 @@ def test_repo_handler_cd_pick_no_tty(mock_ctx):
 
 
 def test_tui_utils_get_width_and_plain():
-    from pigit.termui.text import get_width, plain
+    from pigit.termui._text import get_width, plain
 
     assert get_width(0xE) == 0
     assert get_width(0xF) == 0

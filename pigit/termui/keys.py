@@ -102,7 +102,7 @@ def is_mouse_event(ev: object) -> bool:
     Return True if ``ev`` is a legacy 4-tuple mouse event from a custom
     :class:`~pigit.termui.input_terminal.InputTerminal`.
 
-    ``KeyboardInput`` / :class:`~pigit.termui.tui_input_bridge.TermuiInputBridge`
+    ``KeyboardInput`` / :class:`~pigit.termui.input_bridge.TermuiInputBridge`
     emit semantic strings only; tuple events are optional for injected terminals
     that still mirror the old Urwid-style mouse shape.
     """
