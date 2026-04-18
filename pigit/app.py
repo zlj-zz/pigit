@@ -60,11 +60,11 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
             on_result=_noop_alert_result,
         )
 
-    @bind_keys("j")
+    @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
         super().next(step)
 
-    @bind_keys("k")
+    @bind_keys("k", keys.KEY_UP)
     def forward(self, step: int = 1) -> None:
         super().forward(step)
 

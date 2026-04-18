@@ -267,11 +267,19 @@ class Popup(Component):
         host = self._resolved_overlay_host()
         if host is None:
             return
-        if host.has_overlay_open() and host._active_popup is not None:
-            if host._active_popup is not self:
-                return
+        top = None
+        layer_stack = getattr(host, '_layer_stack', None)
+        if layer_stack is not None:
+            from pigit.termui.layer import LayerKind
+            top = layer_stack.top(LayerKind.MODAL)
+        else:
+            top = getattr(host, '_active_popup', None)
+        if top is self:
             host.end_popup_session()
             self.hide()
+            return
+        if top is not None:
+            # Another modal is active; do not steal focus.
             return
         self.show()
         host.begin_popup_session(self)
@@ -523,7 +531,15 @@ class AlertDialog(Popup):
         """
 
         host = self._resolved_overlay_host()
-        if host is None or host.has_overlay_open():
+        if host is None:
+            return False
+        # Only block if another MODAL is already open (TOAST/SHEET are non-blocking).
+        layer_stack = getattr(host, '_layer_stack', None)
+        if layer_stack is not None:
+            from pigit.termui.layer import LayerKind
+            if layer_stack.top(LayerKind.MODAL) is not None:
+                return False
+        elif host.has_overlay_open():
             return False
         self._pane.prepare(message, on_result)
         self.relayout_content()

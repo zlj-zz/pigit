@@ -8,15 +8,14 @@ Date: 2026-04-17
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from pigit.termui.components import Component
 from pigit.termui.layer import LayerKind, LayerStack
-from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
+from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 if TYPE_CHECKING:
     from pigit.termui.surface import Surface
-    from pigit.termui.overlay_kinds import OverlaySurface
 
 
 class ComponentRoot(Component):
@@ -32,29 +31,19 @@ class ComponentRoot(Component):
         self._body = body
         self._body.parent = self
         self._layer_stack = LayerStack()
-        self.overlay_kind = OverlayKind.NONE
-        self._active_popup: Optional["OverlaySurface"] = None
 
     @property
     def body(self) -> Component:
         return self._body
 
-    def _sync_overlay_state_from_stack(self) -> None:
-        """Single source of truth: derive legacy host fields from LayerStack."""
-        top = self._layer_stack.top(LayerKind.MODAL)
-        self._active_popup = top
-        self.overlay_kind = OverlayKind.POPUP if top is not None else OverlayKind.NONE
-
     # --- OverlayHost protocol (backward compatible with Popup/AlertDialog) ---
 
     def begin_popup_session(self, popup) -> None:
         self._layer_stack.push(LayerKind.MODAL, popup)
-        self._sync_overlay_state_from_stack()
 
     def end_popup_session(self) -> None:
         """Release the top MODAL slot. Caller (Popup/AlertDialog) is responsible for hide()."""
         self._layer_stack.pop(LayerKind.MODAL)
-        self._sync_overlay_state_from_stack()
 
     def has_overlay_open(self) -> bool:
         return self._layer_stack.has_any_open()
@@ -69,7 +58,6 @@ class ComponentRoot(Component):
             reset = getattr(top, "reset_state", None)
             if callable(reset):
                 reset()
-        self._sync_overlay_state_from_stack()
 
     # --- Component lifecycle ---
 

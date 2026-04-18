@@ -38,7 +38,6 @@ def _looks_like_overlay_host(candidate: object) -> bool:
     return (
         callable(getattr(candidate, "begin_popup_session", None))
         and callable(getattr(candidate, "end_popup_session", None))
-        and hasattr(candidate, "overlay_kind")
     )
 
 

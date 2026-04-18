@@ -181,7 +181,8 @@ class TestPopup:
     def test_popup_toggle_with_session_owner(self):
         host = MagicMock()
         host.has_overlay_open.return_value = False
-        host._active_popup = None
+        host._layer_stack = MagicMock()
+        host._layer_stack.top.return_value = None
         child = _Leaf()
         popup = Popup(child, session_owner=host)
 
@@ -195,7 +196,8 @@ class TestPopup:
         host.has_overlay_open.return_value = True
         child = _Leaf()
         popup = Popup(child, session_owner=host)
-        host._active_popup = popup
+        host._layer_stack = MagicMock()
+        host._layer_stack.top.return_value = popup
 
         popup.toggle()
 
@@ -234,7 +236,8 @@ class TestPopup:
 
         host = MagicMock()
         host.has_overlay_open.return_value = False
-        host._active_popup = None
+        host._layer_stack = MagicMock()
+        host._layer_stack.top.return_value = None
         child = _HelpChild()
         popup = Popup(child, session_owner=host)
 

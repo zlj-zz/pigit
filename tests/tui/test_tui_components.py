@@ -7,8 +7,6 @@ from pigit.termui.components import (
     ItemSelector,
     LineTextBrowser,
 )
-from pigit.termui.overlay_kinds import OverlayKind
-
 
 # Mock Component to use in tests
 class MockComponent(Component):
@@ -391,10 +389,6 @@ class TestNearestOverlayHost:
     def test_walks_parents_to_first_overlay_host(self) -> None:
         class OverlayHost(Component):
             NAME = "overlay_host"
-
-            def __init__(self) -> None:
-                super().__init__()
-                self.overlay_kind = OverlayKind.NONE
 
             def begin_popup_session(self, popup: object) -> None:
                 pass

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 from pigit.termui.components import Component
 from pigit.termui.layer import LayerKind
 from pigit.termui.root import ComponentRoot
-from pigit.termui.overlay_kinds import OverlayDispatchResult, OverlayKind
+from pigit.termui.overlay_kinds import OverlayDispatchResult
 
 
 class DummyBody(Component):
@@ -42,13 +42,11 @@ class TestComponentRoot:
         popup.open = True
         root.begin_popup_session(popup)
         assert root.has_overlay_open()
-        assert root.overlay_kind is OverlayKind.POPUP
-        assert root._active_popup is popup
+        assert root._layer_stack.top(LayerKind.MODAL) is popup
         root.end_popup_session()
         popup.hide.assert_not_called()
         assert not root.has_overlay_open()
-        assert root.overlay_kind is OverlayKind.NONE
-        assert root._active_popup is None
+        assert root._layer_stack.top(LayerKind.MODAL) is None
 
     def test_handle_event_modal_intercepts(self):
         root = ComponentRoot(DummyBody())
@@ -77,8 +75,7 @@ class TestComponentRoot:
         root.force_close_overlay_after_error()
         popup.hide.assert_called_once()
         assert not root.has_overlay_open()
-        assert root.overlay_kind is OverlayKind.NONE
-        assert root._active_popup is None
+        assert root._layer_stack.top(LayerKind.MODAL) is None
 
     def test_accept_forwards_to_body(self):
         root = ComponentRoot(DummyBody())

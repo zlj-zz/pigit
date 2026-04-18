@@ -395,6 +395,7 @@ def test_overlay_controller_question_mark_toggles_help_when_help_open() -> None:
 
     root = MagicMock()
     root.overlay_kind = OverlayKind.POPUP
+    root._layer_stack = None
     help_panel = HelpPanel()
     popup = Popup(help_panel, session_owner=root)
     root._active_popup = popup
