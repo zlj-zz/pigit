@@ -12,7 +12,7 @@ import sys
 from types import TracebackType
 from typing import Optional, TextIO, Type
 
-from pigit.termui._renderer import Renderer
+from ._renderer import Renderer
 
 
 class Session:

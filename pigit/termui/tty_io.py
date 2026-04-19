@@ -14,7 +14,7 @@ import time
 from contextlib import contextmanager
 from typing import Callable, Optional
 
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from .wcwidth_table import truncate_by_width, wcswidth
 
 # Raw stdin bytes this module recognizes (see also inline comments at each ``if``):
 #   \x1b (27)     ESC — starts ANSI/ECMA-48 escapes (CSI ``ESC [``, SS3 ``ESC O``, etc.).
@@ -346,7 +346,9 @@ def read_line_with_completion(
         write(core)
         if show_hint and candidates:
             total = len(candidates)
-            hint_body = f" → {candidates[candidate_index]} ({candidate_index + 1}/{total})"
+            hint_body = (
+                f" → {candidates[candidate_index]} ({candidate_index + 1}/{total})"
+            )
             if total > 5:
                 hint_body += f" [+{total - 5} more]"
             else:
@@ -393,7 +395,9 @@ def read_line_with_completion(
                 if candidate_index == -1 or not candidates:
                     if all_candidates is None:
                         all_candidates = candidate_provider("")
-                    candidates = [can for can in all_candidates if can.startswith(prefix)]
+                    candidates = [
+                        can for can in all_candidates if can.startswith(prefix)
+                    ]
                     candidate_index = -1
                 if candidates:
                     candidate_index = (candidate_index + 1) % len(candidates)

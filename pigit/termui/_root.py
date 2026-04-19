@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from pigit.termui._component_base import Component
-from pigit.termui._layer import LayerKind, LayerStack
-from pigit.termui.types import OverlayDispatchResult, ToastPosition
+from ._component_base import Component
+from ._layer import LayerKind, LayerStack
+from .types import OverlayDispatchResult, ToastPosition
 
 if TYPE_CHECKING:
-    from pigit.termui._overlay_components import Sheet, Toast
-    from pigit.termui._surface import Surface
+    from ._overlay_components import Sheet, Toast
+    from ._surface import Surface
 
 
 class ComponentRoot(Component):

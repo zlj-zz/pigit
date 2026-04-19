@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._bindings import (
     BindingsList,
@@ -21,7 +21,7 @@ from ._renderer_context import (
     get_renderer,
     get_renderer_strict,
 )
-from .types import ActionLiteral, KeyRouting, OverlayDispatchResult
+from .types import ActionLiteral, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from ._layout import LayoutEngine

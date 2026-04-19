@@ -10,19 +10,17 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, Optional
 
 from ._bindings import resolve_key_handlers_merged
-
 from ._component_base import Component, _looks_like_overlay_host
-from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._geometry import TerminalSize
 from ._surface import Surface
-from pigit.termui import keys
 from .wcwidth_table import truncate_by_width
+from .types import ToastPosition, OverlayDispatchResult, LayerKind
+from . import keys
 
 _logger = logging.getLogger(__name__)
 

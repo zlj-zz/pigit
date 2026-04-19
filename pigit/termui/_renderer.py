@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Sequence
 
 if TYPE_CHECKING:
-    from pigit.termui._session import Session
-    from pigit.termui._surface import Cell, Surface
+    from ._session import Session
+    from ._surface import Cell, Surface
 
 
 class Renderer:

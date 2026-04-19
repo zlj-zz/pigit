@@ -16,7 +16,6 @@ from .types import ActionLiteral, KeyRouting
 
 if TYPE_CHECKING:
     from ._layout import LayoutEngine
-    from ._renderer import Renderer
     from ._surface import Surface
 
 

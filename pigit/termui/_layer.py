@@ -11,11 +11,10 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING
 
+from .types import LayerKind, OverlayDispatchResult
+
 if TYPE_CHECKING:
-    from pigit.termui._surface import Surface
-
-from pigit.termui.types import LayerKind, OverlayDispatchResult
-
+    from ._surface import Surface
 
 _VISIBLE_LAYER_KINDS = (LayerKind.TOAST, LayerKind.SHEET, LayerKind.MODAL)
 

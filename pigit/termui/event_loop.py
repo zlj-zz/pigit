@@ -13,15 +13,13 @@ from typing import TYPE_CHECKING, Literal, Optional
 
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component_base import Component
-from .keys import is_mouse_event
-from ._renderer import Renderer
 from ._renderer_context import (
     set_renderer,
     reset_renderer,
     get_renderer,
-    get_renderer_strict,
 )
 from ._session import Session
+from .keys import is_mouse_event
 
 if TYPE_CHECKING:
     from .input_terminal import InputTerminal

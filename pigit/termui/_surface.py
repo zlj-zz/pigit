@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from pigit.termui.wcwidth_table import (
+from .wcwidth_table import (
     _char_width,
     pad_by_width,
     truncate_by_width,
@@ -80,14 +80,14 @@ class _Subsurface:
         r, c = self._to_parent(row, col)
         self._parent.draw_text(r, c, text)
 
-    def draw_row(self, row: int, text: str, align: Literal["left", "center"] = "left") -> None:
+    def draw_row(
+        self, row: int, text: str, align: Literal["left", "center"] = "left"
+    ) -> None:
         if row < 0 or row >= self.height:
             return
         self._parent.draw_row(self._row + row, text, align)
 
-    def draw_box(
-        self, row: int, col: int, width: int, height: int, title=None
-    ) -> None:
+    def draw_box(self, row: int, col: int, width: int, height: int, title=None) -> None:
         clipped = self._clip(row, col, width, height)
         if clipped is None:
             return
@@ -102,7 +102,9 @@ class _Subsurface:
         self._parent.fill_rect(*clipped, char)
 
     def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
-        return _Subsurface(self._parent, self._row + row, self._col + col, width, height)
+        return _Subsurface(
+            self._parent, self._row + row, self._col + col, width, height
+        )
 
 
 class Surface:
@@ -162,7 +164,9 @@ class Surface:
                     self._rows[row][cur_col + 1] = Cell("")
             cur_col += w
 
-    def draw_row(self, row: int, text: str, align: Literal["left", "center"] = "left") -> None:
+    def draw_row(
+        self, row: int, text: str, align: Literal["left", "center"] = "left"
+    ) -> None:
         """Write a full-width row, truncated or padded with spaces."""
         if row < 0 or row >= self.height or self.width <= 0:
             return

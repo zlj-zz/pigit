@@ -13,9 +13,9 @@ import sys
 import time
 from typing import BinaryIO, Callable, Optional
 
-from pigit.termui import keys
-from pigit.termui._geometry import TerminalSize
-from pigit.termui.input_trie import match_esc_sequence
+from ._geometry import TerminalSize
+from .input_trie import match_esc_sequence
+from . import keys
 
 _ReadHook = Callable[[float], bytes]
 

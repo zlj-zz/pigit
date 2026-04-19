@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Optional
 from ._component_base import Component, ComponentError
 
 if TYPE_CHECKING:
-    from ._renderer import Renderer
     from ._surface import Surface
 
 

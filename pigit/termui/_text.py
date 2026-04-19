@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Pattern
 
-from pigit.termui.wcwidth_table import get_width
+from .wcwidth_table import get_width
 
 __all__ = ["get_width", "plain", "sanitize_for_display"]
 

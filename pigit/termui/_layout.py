@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pigit.termui._component_base import Component
+    from ._component_base import Component
 
 
 @runtime_checkable

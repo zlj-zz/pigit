@@ -11,8 +11,8 @@ from __future__ import annotations
 import math
 from typing import Optional
 
-from pigit.termui.input_keyboard import KeyboardInput
-from pigit.termui.input_terminal import InputTerminal
+from .input_keyboard import KeyboardInput
+from .input_terminal import InputTerminal
 
 
 class TermuiInputBridge(InputTerminal):

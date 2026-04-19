@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from pigit.termui.wcwidth_table import pad_by_width, truncate_by_width
+from .wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
-    from pigit.termui._surface import Surface
+    from ._surface import Surface
 
 
 class BoxFrame:

@@ -21,8 +21,8 @@ from .picker_layout import (
 from .tty_io import terminal_size, truncate_line
 
 if TYPE_CHECKING:
-    from event_loop import AppEventLoop
     from ._surface import Surface
+    from event_loop import AppEventLoop
 
 PICK_EXIT_CTRL_C = 130
 

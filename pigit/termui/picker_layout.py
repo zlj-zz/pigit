@@ -8,8 +8,8 @@ Date: 2026-03-27
 
 from __future__ import annotations
 
-from pigit.termui.tty_io import MIN_LIST_ROWS, truncate_line
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from .tty_io import MIN_LIST_ROWS, truncate_line
+from .wcwidth_table import truncate_by_width, wcswidth
 
 PICKER_HEADER_ROWS = 3
 PICKER_FOOTER_ROWS = 2

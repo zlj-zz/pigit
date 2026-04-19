@@ -12,7 +12,7 @@ import logging
 import sys
 from typing import Optional
 
-from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
+from .event_loop import AppEventLoop, ExitEventLoop
 
 
 class PickerAppEventLoop(AppEventLoop):

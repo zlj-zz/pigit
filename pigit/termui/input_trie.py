@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pigit.termui import keys
+from . import keys
 
 
 def _csi_or_ss3_byte_count(buf: bytes) -> int:
