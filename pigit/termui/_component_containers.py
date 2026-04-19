@@ -11,13 +11,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
-from pigit.termui._component_base import Component, ComponentError
-from pigit.termui.types import ActionLiteral, KeyRouting
+from ._component_base import Component, ComponentError
+from .types import ActionLiteral, KeyRouting
 
 if TYPE_CHECKING:
-    from pigit.termui._layout import LayoutEngine
-    from pigit.termui._renderer import Renderer
-    from pigit.termui._surface import Surface
+    from ._layout import LayoutEngine
+    from ._renderer import Renderer
+    from ._surface import Surface
 
 
 def _render_child_to_surface(
@@ -52,9 +52,8 @@ class TabView(Component):
         start_name: Optional[str] = None,
         switch_handle: Optional[Callable[[str], str]] = None,
         key_routing: KeyRouting = "child_first",
-        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size, renderer=renderer)
+        super().__init__(x, y, size)
         self.children = children
         for child in children.values():
             child.parent = self
@@ -124,9 +123,8 @@ class LayoutContainer(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
-        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size, renderer=renderer)
+        super().__init__(x, y, size)
         self._layout = layout
         for child in layout.children:
             child.parent = self

@@ -16,8 +16,20 @@ from pigit.termui._component_base import Component
 from pigit.termui.input_bridge import TermuiInputBridge
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 from pigit.termui.input_terminal import InputTerminal
+from pigit.termui._renderer_context import set_renderer, reset_renderer
 
 EventLoop = AppEventLoop
+
+
+@pytest.fixture
+def mock_renderer():
+    """Provide a mock renderer in context for unit tests."""
+    renderer = MagicMock()
+    token = set_renderer(renderer)
+    try:
+        yield renderer
+    finally:
+        reset_renderer(token)
 
 
 class ComponentMock:
@@ -182,7 +194,7 @@ class _Leaf(Component):
         ([["unbound"]], "child"),
     ],
 )
-def test_loop_string_dispatch_calls_hooks_with_outcome(batch, expected_outcome):
+def test_loop_string_dispatch_calls_hooks_with_outcome(mock_renderer, batch, expected_outcome):
     """``before_dispatch_key`` / ``after_dispatch_key`` run only on string-key dispatch."""
 
     class _Hooked(AppEventLoop):
@@ -202,7 +214,7 @@ def test_loop_string_dispatch_calls_hooks_with_outcome(batch, expected_outcome):
             self.trace.append(("after", key, outcome))
 
     loop = _Hooked()
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._child._handle_event = Mock()
 
@@ -218,13 +230,13 @@ def test_loop_string_dispatch_calls_hooks_with_outcome(batch, expected_outcome):
         loop._child._handle_event.assert_called_once_with("unbound")
 
 
-def test_loop_real_time_idle_does_not_call_dispatch_hooks():
+def test_loop_real_time_idle_does_not_call_dispatch_hooks(mock_renderer):
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
             super().__init__(_Leaf(), real_time=True, alt=False)
 
     loop = _Hooked()
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
@@ -237,7 +249,7 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks():
     loop.after_dispatch_key.assert_not_called()
 
 
-def test_loop_overlay_open_routes_to_child_handle_event():
+def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
     """When the root reports an open overlay, keys route to child._handle_event."""
 
     class _OverlayRoot(ComponentMock):
@@ -253,7 +265,7 @@ def test_loop_overlay_open_routes_to_child_handle_event():
             self.trace.append((key, outcome))
 
     loop = _Hooked()
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._child._handle_event = Mock()
 
@@ -266,7 +278,7 @@ def test_loop_overlay_open_routes_to_child_handle_event():
     assert ("k", "overlay") in loop.trace
 
 
-def test_loop_overlay_open_maps_to_overlay_outcome():
+def test_loop_overlay_open_maps_to_overlay_outcome(mock_renderer):
     """When overlay is open, outcome is ``overlay`` regardless of inner result."""
 
     class _OverlayRoot(ComponentMock):
@@ -282,7 +294,7 @@ def test_loop_overlay_open_maps_to_overlay_outcome():
             self.trace.append((key, outcome))
 
     loop = _Hooked()
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._child._handle_event = Mock()
 
@@ -296,23 +308,26 @@ def test_loop_overlay_open_maps_to_overlay_outcome():
 
 
 def test_resize_calls_renderer_clear_cache():
+    from pigit.termui._renderer_context import set_renderer, reset_renderer
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop.get_term_size = Mock(return_value=(80, 24))
-    event_loop._renderer = MagicMock()
+    mock_renderer = MagicMock()
+    token = set_renderer(mock_renderer)
+    try:
+        event_loop.resize()
+        mock_renderer.clear_cache.assert_called_once()
+    finally:
+        reset_renderer(token)
 
-    event_loop.resize()
 
-    event_loop._renderer.clear_cache.assert_called_once()
-
-
-def test_render_surface_path():
+def test_render_surface_path(mock_renderer):
     from pigit.termui._surface import Surface
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop._size = (10, 5)
-    event_loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     component._render_surface = Mock()
 
     event_loop.render()
@@ -324,7 +339,7 @@ def test_render_surface_path():
     assert surface.height == 5
 
 
-def test_dispatch_semantic_string_binding_renders():
+def test_dispatch_semantic_string_binding_renders(mock_renderer):
     class _Quick(AppEventLoop):
         BINDINGS = [("r", "on_r")]
 
@@ -332,7 +347,7 @@ def test_dispatch_semantic_string_binding_renders():
             pass
 
     loop = _Quick(_Leaf(), alt=False)
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.render = Mock()
 
@@ -342,7 +357,7 @@ def test_dispatch_semantic_string_binding_renders():
     loop.render.assert_called_once()
 
 
-def test_app_event_loop_accepts_callable_binding():
+def test_app_event_loop_accepts_callable_binding(mock_renderer):
     def quit_cb() -> None:
         raise ExitEventLoop("bye")
 
@@ -350,7 +365,7 @@ def test_app_event_loop_accepts_callable_binding():
         BINDINGS = [("q", quit_cb)]
 
     loop = _Quick(_Leaf(), alt=False)
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
     loop._input_handle.get_input.side_effect = [[["q"]], KeyboardInterrupt()]
@@ -414,8 +429,10 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
     root.end_popup_session.assert_called_once()
 
 
-def test_bind_renderer_tree_recurses_into_children():
+def test_renderer_accessed_via_context():
+    """Renderer is now accessed via ContextVar instead of explicit binding."""
     from pigit.termui._component_containers import TabView
+    from pigit.termui._renderer_context import set_renderer, reset_renderer, get_renderer
 
     class _Leaf(Component):
         NAME = "leaf"
@@ -429,18 +446,22 @@ def test_bind_renderer_tree_recurses_into_children():
     a, b = _Leaf(), _Leaf()
     root = TabView({"main": a, "b": b})
 
-    loop = AppEventLoop(root, alt=False)
+    # Set renderer via ContextVar
     renderer = MagicMock()
-    loop._bind_renderer_tree(root, renderer)
-
-    assert root._renderer is renderer
-    assert a._renderer is renderer
-    assert b._renderer is renderer
+    token = set_renderer(renderer)
+    try:
+        # All components can now access renderer via context
+        assert root.renderer is renderer
+        assert a.renderer is renderer
+        assert b.renderer is renderer
+        assert get_renderer() is renderer
+    finally:
+        reset_renderer(token)
 
 
 def test_clear_screen_when_renderer_none_does_not_crash():
     loop = AppEventLoop(ComponentMock(), alt=False)
-    loop._renderer = None
+    # renderer not needed
     loop.clear_screen()
 
 
@@ -454,13 +475,13 @@ def test_context_manager_start_stop():
     loop.stop.assert_called_once()
 
 
-def test_loop_mouse_event_is_ignored():
+def test_loop_mouse_event_is_ignored(mock_renderer):
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
             super().__init__(_Leaf(), alt=False)
 
     loop = _Hooked()
-    loop._renderer = MagicMock()
+    # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()

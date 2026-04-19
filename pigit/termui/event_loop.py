@@ -11,14 +11,20 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
-from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
-from pigit.termui._component_base import Component
-from pigit.termui.keys import is_mouse_event
-from pigit.termui._renderer import Renderer
-from pigit.termui._session import Session
+from ._bindings import BindingsList, resolve_key_handlers_merged
+from ._component_base import Component
+from .keys import is_mouse_event
+from ._renderer import Renderer
+from ._renderer_context import (
+    set_renderer,
+    reset_renderer,
+    get_renderer,
+    get_renderer_strict,
+)
+from ._session import Session
 
 if TYPE_CHECKING:
-    from pigit.termui.input_terminal import InputTerminal
+    from .input_terminal import InputTerminal
 
 
 KeyDispatchOutcome = Literal[
@@ -69,8 +75,6 @@ class AppEventLoop:
         real_time: bool = True,
         alt: bool = True,
     ) -> None:
-        self._renderer: Optional[Renderer] = None
-
         self._child = child
         self._real_time = real_time
 
@@ -88,15 +92,6 @@ class AppEventLoop:
             self, type(self), self.BINDINGS
         )
 
-    def _bind_renderer_tree(self, component: Component, renderer: Renderer) -> None:
-        """Attach one shared :class:`Renderer` to the whole component tree."""
-
-        component._renderer = renderer
-        children = getattr(component, "children", None)
-        if children:
-            for child in children.values():
-                self._bind_renderer_tree(child, renderer)
-
     def after_start(self):
         """Hook invoked after the loop is ready (subclasses may override)."""
 
@@ -107,8 +102,9 @@ class AppEventLoop:
         """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
     def clear_screen(self) -> None:
-        if self._renderer is not None:
-            self._renderer.clear_screen()
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_screen()
 
     def get_term_size(self):
         from shutil import get_terminal_size
@@ -136,8 +132,9 @@ class AppEventLoop:
 
         self._size = self.get_term_size()
         self._child.resize(self._size)
-        if self._renderer is not None:
-            self._renderer.clear_cache()
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
         self.render()
 
     def render(self) -> None:
@@ -146,8 +143,9 @@ class AppEventLoop:
         cols, rows = self._size
         surface = Surface(cols, rows)
         self._child._render_surface(surface)
-        if self._renderer is not None:
-            self._renderer.render_surface(surface)
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.render_surface(surface)
 
     def set_input_timeouts(self, timeout: float) -> None:
         self._input_handle.set_input_timeouts(timeout)
@@ -202,9 +200,11 @@ class AppEventLoop:
 
     def run(self) -> None:
         with Session(alt_screen=self._alt) as session:
-            self._renderer = session.renderer
-            self._bind_renderer_tree(self._child, session.renderer)
-            self._run_impl()
+            token = set_renderer(session.renderer)
+            try:
+                self._run_impl()
+            finally:
+                reset_renderer(token)
 
     def quit(
         self,

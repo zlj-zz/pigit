@@ -11,18 +11,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, TYPE_CHECKING
 
-from pigit.termui._component_base import Component
-from pigit.termui.picker_layout import (
+from ._component_base import Component
+from .picker_layout import (
     filter_input_line,
     footer_status_line,
     picker_terminal_ok,
     picker_viewport,
 )
-from pigit.termui.tty_io import terminal_size, truncate_line
+from .tty_io import terminal_size, truncate_line
 
 if TYPE_CHECKING:
-    from pigit.termui.event_loop import AppEventLoop
-    from pigit.termui._surface import Surface
+    from event_loop import AppEventLoop
+    from ._surface import Surface
 
 PICK_EXIT_CTRL_C = 130
 
@@ -172,22 +172,22 @@ class SearchableListPicker(Component):
         else:
             surface.draw_row(
                 status_row,
-                footer_status_line(foot, self._needle, has_filter, self._filter_editing, cols),
+                footer_status_line(
+                    foot, self._needle, has_filter, self._filter_editing, cols
+                ),
             )
         if self._filter_editing:
             surface.draw_row(input_row, filter_input_line(self._needle, cols))
 
     def _echo_number_at_bottom(self, number_buf: str) -> None:
-        r = self._renderer
-        assert r is not None
+        r = self.renderer_strict
         cols, term_rows = terminal_size()
         line = truncate_line(f"# {number_buf} — Enter to confirm", cols)
         r.draw_absolute_row(term_rows, line)
         r.flush()
 
     def _clear_bottom_status_row(self) -> None:
-        r = self._renderer
-        assert r is not None
+        r = self.renderer_strict
         _, term_rows = terminal_size()
         r.draw_absolute_row(term_rows, "")
         r.flush()
@@ -202,8 +202,7 @@ class SearchableListPicker(Component):
         self._on_key_browse(key)
 
     def _on_key_browse(self, key: str) -> None:
-        r = self._renderer
-        assert r is not None
+        r = self.renderer_strict
 
         if key == "enter":
             if not self._filtered:
@@ -256,8 +255,7 @@ class SearchableListPicker(Component):
             return
 
     def _on_key_filter_edit(self, key: str) -> None:
-        r = self._renderer
-        assert r is not None
+        r = self.renderer_strict
 
         if key == "enter":
             self._filter_editing = False
@@ -303,8 +301,7 @@ class SearchableListPicker(Component):
             self._index = 0
 
     def _on_key_number_prefix(self, key: str) -> None:
-        r = self._renderer
-        assert r is not None
+        r = self.renderer_strict
         buf = self._number_prefix
         assert buf is not None
 

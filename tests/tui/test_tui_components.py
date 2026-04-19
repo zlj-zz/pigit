@@ -168,11 +168,8 @@ class TestLineTextBrowser:
     def test_LineTextBrowser_init(
         self, mocker, x, y, size, content, expected_position, expected_content
     ):
-        # Arrange
-        mock_renderer = mocker.MagicMock()
-
         # Act
-        browser = MockLineTextBrowser(x, y, size, content, renderer=mock_renderer)
+        browser = MockLineTextBrowser(x, y, size, content)
 
         # Assert
         assert browser.x == expected_position[0]

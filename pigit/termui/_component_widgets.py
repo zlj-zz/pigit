@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from pigit.termui._component_base import Component, ComponentError
+from ._component_base import Component, ComponentError
 
 if TYPE_CHECKING:
-    from pigit.termui._renderer import Renderer
-    from pigit.termui._surface import Surface
+    from ._renderer import Renderer
+    from ._surface import Surface
 
 
 class LineTextBrowser(Component):
@@ -24,9 +24,8 @@ class LineTextBrowser(Component):
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
         content: Optional[list[str]] = None,
-        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size, renderer=renderer)
+        super().__init__(x, y, size)
 
         self._content = content
         self._max_line = self._size[1]
@@ -65,9 +64,8 @@ class ItemSelector(Component):
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
         content: Optional[list[str]] = None,
-        renderer: Optional["Renderer"] = None,
     ) -> None:
-        super().__init__(x, y, size, renderer=renderer)
+        super().__init__(x, y, size)
 
         if len(self.CURSOR) > 1:
             raise ComponentError("error")

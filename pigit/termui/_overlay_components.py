@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
-from pigit.termui._bindings import resolve_key_handlers_merged
+from ._bindings import resolve_key_handlers_merged
 
 from ._component_base import Component, _looks_like_overlay_host
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
@@ -22,9 +22,9 @@ from ._layout import Padding
 from ._geometry import TerminalSize
 from ._surface import Surface
 from pigit.termui import keys
-from pigit.termui.wcwidth_table import truncate_by_width
+from .wcwidth_table import truncate_by_width
 
-_LOG = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 # Maximum number of lines to display in a Toast (safety limit)
 MAX_TOAST_LINES = 100
@@ -67,9 +67,8 @@ class HelpPanel(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
-        renderer: Any = None,
     ) -> None:
-        super().__init__(x=x, y=y, size=size, renderer=renderer)
+        super().__init__(x=x, y=y, size=size)
         self._inner_w_cfg = inner_width
         self._inner_h_cfg = inner_height
         self._lines: list[str] = []
@@ -177,7 +176,6 @@ class Popup(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
-        renderer: Any = None,
     ) -> None:
         self._child = child
         self._offset = offset
@@ -187,7 +185,7 @@ class Popup(Component):
         self._term_size: tuple[int, int] = (80, 24)
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
-        super().__init__(x=x, y=y, size=size, renderer=renderer)
+        super().__init__(x=x, y=y, size=size)
 
     def _resolved_overlay_host(self) -> Optional[Component]:
         """
@@ -203,28 +201,6 @@ class Popup(Component):
         if _looks_like_overlay_host(owner):
             return owner
         return owner.nearest_overlay_host()
-
-    def _sync_renderer_from_session_owner(self) -> None:
-        """
-        If this shell has no ``_renderer`` yet, copy from ``session_owner`` or an ancestor
-        that already received the loop's renderer (side-attached popups are not in ``children``).
-        """
-
-        if self._renderer is not None:
-            return
-        owner = self._session_owner
-        if owner is None:
-            return
-        cur: Optional[Component] = owner
-        while cur is not None:
-            r = getattr(cur, "_renderer", None)
-            if r is not None:
-                self._renderer = r
-                inner = self._child
-                if inner is not None and getattr(inner, "_renderer", None) is None:
-                    inner._renderer = r
-                return
-            cur = cur.parent
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -271,7 +247,7 @@ class Popup(Component):
         host = self._resolved_overlay_host()
         if host is None:
             return
-        layer_stack = getattr(host, '_layer_stack', None)
+        layer_stack = getattr(host, "_layer_stack", None)
         if layer_stack is None:
             return
         top = layer_stack.top(LayerKind.MODAL)
@@ -374,7 +350,6 @@ class AlertDialogBody(Component):
         inner_width: Optional[int] = None,
         confirm_key: str = keys.KEY_ENTER,
         cancel_key: str = keys.KEY_ESC,
-        renderer: Any = None,
     ) -> None:
         if on_result is None:
             raise ValueError("AlertDialog requires on_result in MVP.")
@@ -394,7 +369,7 @@ class AlertDialogBody(Component):
         self._needs_rebuild = True
         self._frame = BoxFrame(0, 0, title="Alert")
         self.BINDINGS = [(self._confirm_key, "_confirm")]
-        super().__init__(x=x, y=y, size=size, renderer=renderer)
+        super().__init__(x=x, y=y, size=size)
 
     def open_alert(self) -> None:
         if self.open:
@@ -494,7 +469,6 @@ class AlertDialog(Popup):
         on_result: Optional[Callable[[bool], None]] = None,
         confirm_key: str = keys.KEY_ENTER,
         cancel_key: str = keys.KEY_ESC,
-        renderer: Any = None,
     ) -> None:
         if on_result is None:
             raise ValueError("AlertDialog requires on_result in MVP.")
@@ -507,7 +481,6 @@ class AlertDialog(Popup):
             inner_width=inner_width,
             confirm_key=confirm_key,
             cancel_key=cancel_key,
-            renderer=renderer,
         )
         super().__init__(
             self._pane,
@@ -517,7 +490,6 @@ class AlertDialog(Popup):
             x=x,
             y=y,
             size=size,
-            renderer=renderer,
         )
 
     def _on_exit_key(self) -> None:
@@ -535,7 +507,7 @@ class AlertDialog(Popup):
         if host is None:
             return False
         # Only block if another MODAL is already open (TOAST/SHEET are non-blocking).
-        layer_stack = getattr(host, '_layer_stack', None)
+        layer_stack = getattr(host, "_layer_stack", None)
         if layer_stack is not None:
             if layer_stack.top(LayerKind.MODAL) is not None:
                 return False
@@ -553,7 +525,7 @@ class AlertDialog(Popup):
         if host is not None:
             host.end_popup_session()
         else:
-            _LOG.warning(
+            _logger.warning(
                 "AlertDialog finished without an overlay host in the parent chain; "
                 "if begin_popup_session ran, root overlay_kind may stay stale."
             )
@@ -564,7 +536,7 @@ class AlertDialog(Popup):
         try:
             fn(value)
         except Exception:
-            _LOG.exception("AlertDialog on_result failed")
+            _logger.exception("AlertDialog on_result failed")
 
     def reset_state(self) -> None:
         """Clear body state and hide the shell (e.g. after host error recovery)."""
@@ -627,8 +599,7 @@ class Toast(Component):
         """根据当前终端尺寸重建 BoxFrame 和内容行。"""
         max_inner_w = max(0, self._term_size[0] - 4)
         lines = [
-            truncate_by_width(line, max_inner_w)
-            for line in self._message.split("\n")
+            truncate_by_width(line, max_inner_w) for line in self._message.split("\n")
         ]
         # Safety limit to prevent memory issues with malicious input
         self._lines = lines[:MAX_TOAST_LINES]

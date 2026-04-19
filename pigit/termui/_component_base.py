@@ -10,19 +10,23 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union, Any
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
-from pigit.termui._bindings import (
+from ._bindings import (
     BindingsList,
     list_bindings,
     resolve_key_handlers_merged,
 )
-from pigit.termui.types import ActionLiteral, KeyRouting, OverlayDispatchResult
+from ._renderer_context import (
+    get_renderer,
+    get_renderer_strict,
+)
+from .types import ActionLiteral, KeyRouting, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from pigit.termui._layout import LayoutEngine
-    from pigit.termui._renderer import Renderer
-    from pigit.termui._surface import Surface
+    from ._layout import LayoutEngine
+    from ._renderer import Renderer
+    from ._surface import Surface
 
 _logger = logging.getLogger(__name__)
 
@@ -70,7 +74,6 @@ class Component(ABC):
         size: Optional[tuple[int, int]] = None,
         children: Optional[dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
-        renderer: Optional["Renderer"] = None,
     ) -> None:
         assert self.NAME, "The `NAME` attribute cannot be empty."
 
@@ -81,7 +84,6 @@ class Component(ABC):
 
         self.parent = parent
         self.children = children
-        self._renderer = renderer
 
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), self.BINDINGS
@@ -207,6 +209,27 @@ class Component(ABC):
         """
 
         return _default_help_entries(self)
+
+    @property
+    def renderer(self) -> Optional["Renderer"]:
+        """Get the current renderer from context.
+
+        Returns:
+            The current Renderer instance, or None if not in event loop.
+        """
+        return get_renderer()
+
+    @property
+    def renderer_strict(self) -> "Renderer":
+        """Get renderer, raising if not available.
+
+        Returns:
+            The current Renderer instance.
+
+        Raises:
+            RendererNotBoundError: If not within AppEventLoop context.
+        """
+        return get_renderer_strict()
 
 
 def _truncate_help_line(text: str, max_len: int = 120) -> str:

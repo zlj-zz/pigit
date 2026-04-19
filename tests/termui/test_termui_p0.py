@@ -140,17 +140,22 @@ def test_picker_preview_key_calls_on_preview():
                 elif row_idx in self.rows:
                     del self.rows[row_idx]
 
-    picker._renderer = FakeRenderer()
-    picker.resize((80, 24))
-    picker.on_key("?")
-    assert calls == ["a"]
-    # Preview is rendered by the event loop; simulate it manually
-    from pigit.termui._surface import Surface
+    from pigit.termui._renderer_context import set_renderer, reset_renderer
+    fake_renderer = FakeRenderer()
+    token = set_renderer(fake_renderer)
+    try:
+        picker.resize((80, 24))
+        picker.on_key("?")
+        assert calls == ["a"]
+        # Preview is rendered by the event loop; simulate it manually
+        from pigit.termui._surface import Surface
 
-    s = Surface(80, 24)
-    picker._render_surface(s)
-    picker._renderer.render_surface(s)
-    assert picker._renderer.rows  # preview text was drawn
+        s = Surface(80, 24)
+        picker._render_surface(s)
+        fake_renderer.render_surface(s)
+        assert fake_renderer.rows  # preview text was drawn
+    finally:
+        reset_renderer(token)
 
 
 def test_read_line_with_completion_uses_provider(monkeypatch):

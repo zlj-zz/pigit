@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Any
 
-from pigit.termui.types import ToastPosition
+from .types import ToastPosition
 
 if TYPE_CHECKING:
-    from pigit.termui.components import Component
+    from ._component_base import Component
 
 
 class GitPanelLazyResizeMixin:
