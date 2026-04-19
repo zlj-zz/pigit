@@ -22,6 +22,7 @@ from pigit.termui.picker_event_loop import PickerAppEventLoop
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
 from pigit.termui.input_bridge import TermuiInputBridge
+from pigit.termui._renderer_context import get_renderer_strict
 
 from ._completion import make_candidate_provider
 from ._mru import load_mru
@@ -174,7 +175,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
 
         if entry.has_args:
             provider = make_candidate_provider(entry.arg_completion)
-            prompter = ArgumentPrompter(self._renderer, write, flush)
+            prompter = ArgumentPrompter(get_renderer_strict(), write, flush)
             extra_raw = prompter.prompt(entry.name, provider)
             if extra_raw is None:
                 return None
@@ -184,7 +185,7 @@ class CmdNewPickerLoop(PickerAppEventLoop):
 
         if self._alt:
             write("\033[?1049l")
-            self._renderer.show_cursor()
+            get_renderer_strict().show_cursor()
             flush()
 
         if self._print_only:
