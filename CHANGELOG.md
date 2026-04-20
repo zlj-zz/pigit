@@ -1,5 +1,39 @@
 # Changelog of pigit
 
+## 1.8.1 (2026-04-21)
+
+### TermUI — InputLine enhancements & real cursor
+
+- **InputLine widget**: added `on_submit`, `on_cancel`, `candidate_provider`, `set_prompt`, `set_candidate_provider`.
+- **Inline Tab completion**: `Tab` opens candidate list, `Tab`/`Shift+Tab` navigates forward/backward, `↑`/`↓` also navigates; matched prefix stays normal, suffix shown dim (`\033[2m`); `Enter` confirms candidate without submitting; `Esc` restores original input.
+- **Real terminal cursor**: `Renderer.set_cursor(row, col)` sets physical cursor position; components call it from `_render_surface`; cursor state cached to avoid redundant ANSI escapes per frame.
+- **Magic key strings replaced**: `InputLine.on_key` uses constants from `keys.py` (`KEY_ENTER`, `KEY_ESC`, `KEY_TAB`, `KEY_SHIFT_TAB`, etc.).
+
+### TermUI — Picker architecture: delete PickerAppMixin, eliminate sync blocking I/O
+
+- **Deleted `PickerAppMixin`**: implicit-contract anti-pattern removed; filter/status logic inlined into `_CmdPickerApp` and `_RepoCdPickerApp`.
+- **Parameter input via event loop**: `PickerMode.PARAM_INPUT` added; command arguments now collected through `InputLine` inside the event loop instead of synchronous blocking `read_line_with_completion` / `read_line_cancellable`.
+- **Deleted `read_line_with_completion` / `read_line_cancellable`**: ~400 lines of raw cbreak line-editing code removed from `tty_io.py` — these were architecture leaks bypassing the event-driven model.
+- **Deleted `ArgumentPrompter`** and its tests: no longer needed after param-input migration.
+- **`_apply_filter` short-circuit**: skips rebuild when filter needle is unchanged.
+
+### TermUI — Container consolidation & legacy cleanup
+
+- **Deleted `LayoutContainer`**: zero production usage, superseded by `Column`.
+- **`TabView` moved to `_component_layouts.py`**: it is a layout component, belongs with `Column`.
+- **Deleted `_component_containers.py`**: empty after `LayoutContainer` removal and `TabView` migration.
+- **`picker_layout.py` cleaned up**: removed `truncate_visual`, `normalize_filter_text`, `footer_status_line`, `filter_input_line` (no longer used by Component-based picker).
+
+### TermUI — Efficiency fixes
+
+- **Per-frame allocations**: eliminated redundant list slice allocations in `ItemSelector` and `LineTextBrowser`.
+- **InputLine.set_value no-op guard**: avoids redundant callbacks when value is unchanged.
+- **Cached renderer/terminal lookups**: `get_renderer_strict()` and `terminal_size()` cached in picker hot paths.
+
+### Fixes
+
+- **CI stability**: `test_loop_string_dispatch_calls_hooks_with_outcome` uses `RuntimeError("stop")` instead of `KeyboardInterrupt` to exit mock event loops (prevents pytest from interpreting it as external SIGINT).
+
 ## 1.8.0 (2026-04-18)
 
 ### TermUI — Rendering architecture overhaul
