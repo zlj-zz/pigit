@@ -44,9 +44,9 @@ class LineTextBrowser(Component):
     def _render_surface(self, surface: "Surface") -> None:
         if self._content is None:
             return
-        chunk = self._content[self._i : self._i + self._max_line]
-        for idx, line in enumerate(chunk):
-            surface.draw_text(idx, 0, line)
+        end = min(self._i + self._max_line, len(self._content))
+        for idx in range(self._i, end):
+            surface.draw_text(idx - self._i, 0, self._content[idx])
 
     def scroll_up(self, line: int = 1):
         self._i = max(self._i - line, 0)
@@ -108,11 +108,10 @@ class ItemSelector(Component):
     def _render_surface(self, surface: "Surface") -> None:
         if not self.content:
             return
-        visible = self.visible_items
-        for idx, item in enumerate(visible):
-            no = self._r_start + idx
-            prefix = self.CURSOR if no == self.curr_no else " "
-            surface.draw_text(idx, 0, f"{prefix}{item}")
+        end = min(self._r_start + self._size[1], len(self.content))
+        for idx in range(self._r_start, end):
+            prefix = self.CURSOR if idx == self.curr_no else " "
+            surface.draw_text(idx - self._r_start, 0, f"{prefix}{self.content[idx]}")
 
     def _notify_change(self) -> None:
         if self._on_change is not None:
@@ -213,6 +212,8 @@ class InputLine(Component):
         """Replace current value and move cursor to end."""
         if self._max_length:
             text = text[: self._max_length]
+        if self._value == text:
+            return
         self._value = text
         self._cursor = len(self._value)
         if self._on_change:

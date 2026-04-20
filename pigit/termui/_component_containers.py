@@ -11,30 +11,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
-from ._component_base import Component, ComponentError
+from ._component_base import Component, ComponentError, _render_child_to_surface
 from .types import ActionLiteral, KeyRouting
 
 if TYPE_CHECKING:
     from ._layout import LayoutEngine
     from ._surface import Surface
-
-
-def _render_child_to_surface(
-    component: "Component", surface: "Surface", log_prefix: str
-) -> None:
-    w, h = component._size
-    if w <= 0 or h <= 0:
-        return
-    if component.x < 1 or component.y < 1:
-        logging.getLogger(__name__).warning(
-            "%s %s with invalid 1-based coords (%s, %s)",
-            log_prefix,
-            component.NAME,
-            component.x,
-            component.y,
-        )
-    sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
-    component._render_surface(sub)
 
 
 class TabView(Component):

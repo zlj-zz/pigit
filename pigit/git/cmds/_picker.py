@@ -102,9 +102,10 @@ def run_cmd_new_picker(
     processor = processor or GitCommandNew()
 
     # 1. Data preparation
-    entries = list(iter_cmd_new_entries())
-    if category:
-        entries = [e for e in entries if e.category.lower() == category.lower()]
+    entries = [
+        e for e in iter_cmd_new_entries()
+        if not category or e.category.lower() == category.lower()
+    ]
 
     mru = load_mru()
     signals = build_context_signals()
@@ -141,7 +142,6 @@ def run_cmd_new_picker(
 
         def __init__(self) -> None:
             super().__init__(input_takeover=True, alt=True)
-            self._alt = True
             self._state = PickerState()
             self._mode = PickerMode.BROWSE
             self._number_buf: Optional[str] = None
@@ -260,14 +260,14 @@ def run_cmd_new_picker(
                 # Clear bottom two rows for prompt
                 renderer.draw_absolute_row(rows - 2, " " * cols)
                 renderer.draw_absolute_row(rows - 1, " " * cols)
-                # Position cursor on second-to-last row for label
-                sys.stdout.write(f"\033[{rows - 1};1H")
-                sys.stdout.write(
+                # Build prompt text and write once
+                prompt_text = (
                     f"Arguments for `{ent.name}` (empty = none, Esc = cancel):"
                 )
-                # Move to last row for input
-                sys.stdout.write(f"\033[{rows};1H")
-                sys.stdout.flush()
+                renderer.move_cursor(rows - 1, 1)
+                renderer.write(prompt_text)
+                renderer.move_cursor(rows, 1)
+                renderer.flush()
                 renderer.show_cursor()
 
                 provider = make_candidate_provider(ent.arg_completion)

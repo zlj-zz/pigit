@@ -12,6 +12,7 @@ from typing import Optional
 
 from pigit.termui._bindings import resolve_key_handlers_merged
 from pigit.termui._component_base import Component
+from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
 
@@ -26,6 +27,7 @@ class _ApplicationEventLoop(AppEventLoop):
         super().__init__(root, **kwargs)
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
+        self._app_on_key = getattr(app, "on_key", None)
 
     def after_start(self):
         self._app.after_start()
@@ -42,9 +44,8 @@ class _ApplicationEventLoop(AppEventLoop):
             self.render()
             return "binding"
 
-        app_on_key = getattr(self._app, "on_key", None)
-        if app_on_key is not None and callable(app_on_key):
-            app_on_key(key)
+        if self._app_on_key is not None:
+            self._app_on_key(key)
             self.render()
             return "app"
 
@@ -88,8 +89,6 @@ class Application:
     def _run_body(self) -> None:
         """Assemble root, create loop, and start TUI. Does NOT catch ExitEventLoop."""
         body = self.build_root()
-        from pigit.termui._root import ComponentRoot
-
         self._root = root = ComponentRoot(body)
         self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
         self.setup_root(root)

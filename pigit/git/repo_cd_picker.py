@@ -36,7 +36,6 @@ from pigit.termui._picker import (
     PickerRow,
     PickerState,
 )
-from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
 
@@ -94,7 +93,6 @@ def run_repo_cd_picker(
 
         def __init__(self) -> None:
             super().__init__(input_takeover=True, alt=True)
-            self._alt = True
             self._state = PickerState()
             self._mode = PickerMode.BROWSE
             self._initial_filter = initial_filter
