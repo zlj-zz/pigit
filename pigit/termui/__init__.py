@@ -26,8 +26,7 @@ from pigit.termui._component_mixins import (
     GitPanelLazyResizeMixin,
     OverlayClientMixin,
 )
-from pigit.termui._component_containers import LayoutContainer, TabView
-from pigit.termui._component_layouts import Column
+from pigit.termui._component_layouts import Column, TabView
 from pigit.termui._component_widgets import (
     InputLine,
     ItemSelector,
@@ -78,7 +77,6 @@ __all__ = [
     "OverlayClientMixin",
     "GitPanelLazyResizeMixin",
     # Containers
-    "LayoutContainer",
     "TabView",
     # Widgets
     "Column",

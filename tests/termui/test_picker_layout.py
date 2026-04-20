@@ -1,45 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Tests for pigit.termui.picker_layout and tty_io truncation helpers."""
+"""Tests for pigit.termui.picker_layout viewport helpers."""
 
 from __future__ import annotations
 
-from pigit.termui.picker_layout import truncate_visual
-from pigit.termui.tty_io import truncate_line
+from pigit.termui.picker_layout import picker_terminal_ok, picker_viewport
 
 
-class TestTruncateVisual:
-    def test_fits_within_max_cols(self):
-        assert truncate_visual("hello", 10) == "hello"
+class TestPickerViewport:
+    def test_calculates_available_list_rows(self):
+        # Header (3) + Footer (2) = 5 fixed rows
+        assert picker_viewport(10) == 5
+        assert picker_viewport(20) == 15
 
-    def test_truncates_ascii(self):
-        assert truncate_visual("hello world", 8) == "hello w…"
-
-    def test_max_cols_one(self):
-        assert truncate_visual("hello", 1) == "h"
-
-    def test_zero_or_negative_returns_empty(self):
-        assert truncate_visual("hello", 0) == ""
-        assert truncate_visual("hello", -1) == ""
-
-    def test_truncates_cjk_by_display_width(self):
-        assert truncate_visual("中文测试", 5) == "中文…"
+    def test_small_terminal(self):
+        assert picker_viewport(5) == 0
 
 
-class TestTruncateLine:
-    def test_fits_within_max_cols(self):
-        assert truncate_line("hello world", 20) == "hello world"
+class TestPickerTerminalOk:
+    def test_large_enough(self):
+        assert picker_terminal_ok(20) is True
 
-    def test_collapses_whitespace(self):
-        assert truncate_line("hello\n\tworld", 20) == "hello world"
-
-    def test_truncates_ascii(self):
-        assert truncate_line("hello world", 8) == "hello w…"
-
-    def test_max_cols_one(self):
-        assert truncate_line("hello", 1) == "h"
-
-    def test_zero_or_negative_returns_empty(self):
-        assert truncate_line("hello", 0) == ""
-
-    def test_truncates_cjk_by_display_width(self):
-        assert truncate_line("中文测试", 5) == "中文…"
+    def test_too_small(self):
+        assert picker_terminal_ok(5) is False

@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_containers import TabView
+from pigit.termui._component_layouts import TabView
 from pigit.termui._component_widgets import LineTextBrowser, ItemSelector
 from pigit.termui._component_mixins import GitPanelLazyResizeMixin
 from pigit.termui._surface import Surface

@@ -437,7 +437,7 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
 
 def test_renderer_accessed_via_context():
     """Renderer is now accessed via ContextVar instead of explicit binding."""
-    from pigit.termui._component_containers import TabView
+    from pigit.termui._component_layouts import TabView
     from pigit.termui._renderer_context import set_renderer, reset_renderer, get_renderer
 
     class _Leaf(Component):

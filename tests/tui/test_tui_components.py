@@ -1,6 +1,6 @@
 import pytest
 from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_containers import TabView
+from pigit.termui._component_layouts import TabView
 from pigit.termui._component_mixins import GitPanelLazyResizeMixin
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
 
