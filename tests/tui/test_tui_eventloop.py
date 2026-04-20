@@ -84,16 +84,18 @@ def test_init_respects_injected_input_handle():
 
 
 @pytest.mark.parametrize(
-    "exc_factory, expected_stop_calls",
+    "exc_factory, expected_stop_calls, should_reraise",
     [
-        (lambda: ExitEventLoop("x"), 1),
-        (lambda: KeyboardInterrupt(), 1),
-        (lambda: EOFError(), 1),
-        (lambda: RuntimeError("x"), 1),
+        (lambda: ExitEventLoop("x"), 1, True),
+        (lambda: KeyboardInterrupt(), 1, True),
+        (lambda: EOFError(), 1, True),
+        (lambda: RuntimeError("x"), 1, False),
     ],
 )
 @patch("pigit.termui.event_loop.Session")
-def test_run_exception_handling(mock_session_cls, exc_factory, expected_stop_calls):
+def test_run_exception_handling(
+    mock_session_cls, exc_factory, expected_stop_calls, should_reraise
+):
     session_cm = MagicMock()
     session_inner = MagicMock()
     session_inner.renderer = MagicMock()
@@ -111,7 +113,11 @@ def test_run_exception_handling(mock_session_cls, exc_factory, expected_stop_cal
     event_loop.start = Mock()
     event_loop.stop = Mock()
 
-    event_loop.run()
+    if should_reraise:
+        with pytest.raises(type(exc_factory())):
+            event_loop.run()
+    else:
+        event_loop.run()
     assert event_loop.stop.call_count == expected_stop_calls
 
 

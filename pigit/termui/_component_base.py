@@ -77,7 +77,7 @@ class Component(ABC):
     ) -> None:
         assert self.NAME, "The `NAME` attribute cannot be empty."
 
-        self._activated = False  # component whether activated state.
+        self._activated = False
 
         self.x, self.y = x, y
         self._size = size or NONE_SIZE
@@ -118,15 +118,13 @@ class Component(ABC):
     def fresh(self):
         """Fresh content data.
 
-        Here is do nothing. If needed, should overwritten in sub-class.
+        Default is no-op; override if the component needs to rebuild internal
+        state when resized or notified.
         """
-        raise NotImplementedError()
+        pass
 
     def accept(self, action: ActionLiteral, **data):
-        """Process emit action of child.
-
-        Here is do nothing. If needed, should overwritten in sub-class.
-        """
+        """Process emit action of child."""
         raise NotImplementedError()
 
     def emit(self, action: ActionLiteral, **data):
@@ -135,10 +133,7 @@ class Component(ABC):
         self.parent.accept(action, **data)
 
     def update(self, action: ActionLiteral, **data):
-        """Process notify action of parent.
-
-        Here is do nothing. If needed, should overwritten in sub-class.
-        """
+        """Process notify action of parent."""
         raise NotImplementedError()
 
     def notify(self, action: ActionLiteral, **data):
@@ -150,19 +145,13 @@ class Component(ABC):
             child.update(action, **data)
 
     def resize(self, size: tuple[int, int]):
-        """Response to the resize event.
-
-        Re-set the size of component. And refresh the content.
-        If has children, let children process resize.
-        """
+        """Response to the resize event."""
         self._size = size
         self.fresh()
 
-        # if has no children, None or {}
         if not self.children:
             return
 
-        # let children process resize.
         for child in self.children.values():
             child.resize(size)
 

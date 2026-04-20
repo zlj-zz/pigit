@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/git/repo_cd_picker.py
-Description: TTY picker for ``pigit repo cd --pick`` (executor / shell cd live in git, not termui).
+Description: TTY picker for ``pigit repo cd --pick``.
 Author: Zev
-Date: 2026-03-29
+Date: 2026-04-20
 """
 
 from __future__ import annotations
@@ -13,15 +13,32 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 from pigit.ext.executor import WAITING
 
+from pigit.termui import (
+    Application,
+    Component,
+    ComponentRoot,
+    ExitEventLoop,
+    HelpPanel,
+    Popup,
+    keys,
+)
+from pigit.termui._component_layouts import Column
+from pigit.termui._component_widgets import (
+    InputLine,
+    ItemSelector,
+    StatusBar,
+)
 from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
+    PickerAppMixin,
+    PickerHeader,
+    PickerMode,
     PickerRow,
-    SearchableListPicker,
+    PickerState,
 )
-from pigit.termui.picker_event_loop import PickerAppEventLoop
+from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
-from pigit.termui.input_bridge import TermuiInputBridge
 
 if TYPE_CHECKING:
     from pigit.ext.executor import Executor
@@ -40,67 +57,6 @@ _REPO_CD_TERMINAL_TOO_SMALL_MSG = (
 )
 
 EMPTY_MANAGED_REPOS_MSG = "No managed repos; use `pigit repo add`."
-
-
-class RepoCdPickerLoop(PickerAppEventLoop):
-    """Drives :class:`SearchableListPicker` for managed-repo ``cd`` selection."""
-
-    BINDINGS = [
-        ("Q", "binding_quit_picker"),
-    ]
-
-    def __init__(
-        self,
-        rows: Sequence[PickerRow],
-        executor: "Executor",
-        *,
-        initial_filter: str = "",
-        pick_alt_screen: bool = False,
-    ) -> None:
-        self._terminal_too_small_msg = _REPO_CD_TERMINAL_TOO_SMALL_MSG
-
-        def render_line(r: PickerRow) -> str:
-            return f"{r.title}  {r.detail}"
-
-        def on_confirm(r: PickerRow) -> Optional[tuple[int, Optional[str]]]:
-            path = r.ref
-            assert isinstance(path, str)
-            # Return path via result_message; executor will run after Session exits
-            # to ensure terminal is properly restored (alt screen, cursor, termios)
-            return 0, path
-
-        title = (
-            "pigit repo cd --pick  [j/k scroll  Enter cd  / filter  q/Esc quit  "
-            "Ctrl+C abort  1-9+Enter]"
-        )
-        picker = SearchableListPicker(
-            list(rows),
-            title_line=title,
-            render_line=render_line,
-            on_confirm=on_confirm,
-            terminal_too_small_msg=self._terminal_too_small_msg,
-            initial_filter=initial_filter,
-        )
-        super().__init__(
-            picker,
-            input_takeover=True,
-            input_handle=TermuiInputBridge(),
-            alt=pick_alt_screen,
-        )
-        self.set_input_timeouts(0.125)
-        picker.bind_event_loop(self)
-
-    def binding_quit_picker(self) -> None:
-        self.quit("quit", exit_code=0, result_message=None)
-
-    def after_start(self) -> None:
-        _, rows = terminal_size()
-        if not picker_terminal_ok(rows):
-            self.quit(
-                "terminal",
-                exit_code=1,
-                result_message=self._terminal_too_small_msg,
-            )
 
 
 def run_repo_cd_picker(
@@ -123,22 +79,123 @@ def run_repo_cd_picker(
     if not tty_ok():
         return 1, REPO_CD_NO_TTY_MSG
 
-    try:
-        loop = RepoCdPickerLoop(
-            rows,
-            executor,
-            initial_filter=initial_filter,
-            pick_alt_screen=pick_alt_screen,
-        )
-        exit_code, result = loop.run_with_result()
-        # After Session exits, execute shell command if a repo was selected.
-        # This ensures terminal is properly restored (alt screen, cursor, termios)
-        # before spawning the interactive shell.
-        if exit_code == 0 and result is not None:
-            shell_cd = "$SHELL -c 'cd {0} && exec $SHELL'"
-            executor.exec(shell_cd.format(result), flags=WAITING)
-        return exit_code, None
-    except KeyboardInterrupt:
-        sys.stdout.write("\n")
-        sys.stdout.flush()
-        return PICK_EXIT_CTRL_C, None
+    title = (
+        "pigit repo cd --pick  "
+        "[j/k scroll  Enter cd  / filter  q/Esc quit  Ctrl+C abort]"
+    )
+
+    rendered = [f"{r.title}  {r.detail}" for r in rows]
+
+    class _RepoCdPickerApp(Application, PickerAppMixin):
+        BINDINGS = [
+            ("Q", "quit"),
+            ("?", "toggle_help"),
+        ]
+
+        def __init__(self) -> None:
+            super().__init__(input_takeover=True, alt=True)
+            self._alt = True
+            self._state = PickerState()
+            self._mode = PickerMode.BROWSE
+            self._initial_filter = initial_filter
+            self._rows = rows
+            self._filtered_rows = list(rows)
+
+        def build_root(self) -> Component:
+            self._header = PickerHeader(title)
+            self._list = ItemSelector(
+                content=list(rendered),
+                on_selection_changed=lambda idx: self._state.selected_idx.set(idx),
+            )
+            self._status = StatusBar(self._state.status_text)
+            self._input = InputLine(
+                prompt="/",
+                visible=False,
+                on_value_changed=lambda text: self._state.filter_text.set(text),
+            )
+            self._layout = Column(
+                [self._header, self._list, self._status, self._input],
+                heights=[3, "flex", 1, 0],
+            )
+            return self._layout
+
+        def setup_root(self, root: ComponentRoot) -> None:
+            self._loop.set_input_timeouts(0.125)
+            root.show_toast(
+                "j/k scroll, Enter cd, / filter, ? help",
+                duration=3.0,
+            )
+            self._help_panel = HelpPanel()
+            self._help_popup = Popup(
+                self._help_panel,
+                session_owner=root,
+                exit_key=keys.KEY_ESC,
+            )
+            self._state.selected_idx.subscribe(self._update_status)
+            self._update_status(0)
+
+            # Apply initial filter if provided
+            if self._initial_filter:
+                self._input.set_value(self._initial_filter)
+                self._enter_filter()
+                self._apply_filter()
+
+        def after_start(self) -> None:
+            _, term_rows = terminal_size()
+            if not picker_terminal_ok(term_rows):
+                self.quit(
+                    exit_code=1,
+                    result_message=_REPO_CD_TERMINAL_TOO_SMALL_MSG,
+                )
+
+        # --- Event handling ---
+
+        def on_key(self, key: str) -> None:
+            if self._mode == PickerMode.FILTER:
+                self._on_filter(key)
+                return
+            self._on_browse(key)
+
+        def _on_browse(self, key: str) -> None:
+            if key in ("j", keys.KEY_DOWN):
+                self._list.next()
+            elif key in ("k", keys.KEY_UP):
+                self._list.forward()
+            elif key == "enter":
+                self._execute_selected()
+            elif key == "/":
+                self._enter_filter()
+            elif key in ("q", keys.KEY_ESC):
+                self.quit()
+            elif key == "?":
+                self._show_preview()
+
+        # --- Business logic ---
+
+        def _execute_selected(self) -> None:
+            idx = self._list.curr_no
+            if idx < 0 or idx >= len(self._filtered_rows):
+                return
+            path = self._filtered_rows[idx].ref
+            assert isinstance(path, str)
+            raise ExitEventLoop(
+                "done", exit_code=0, result_message=path
+            )
+
+        def _show_preview(self) -> None:
+            idx = self._list.curr_no
+            if idx < 0 or idx >= len(self._filtered_rows):
+                return
+            path = self._filtered_rows[idx].ref
+            assert isinstance(path, str)
+            self._status.set_text(f"path: {path}")
+
+    exit_code, result = _RepoCdPickerApp().run_with_result()
+
+    # After Session exits, execute shell command if a repo was selected.
+    # This ensures terminal is properly restored (alt screen, cursor, termios)
+    # before spawning the interactive shell.
+    if exit_code == 0 and result is not None:
+        shell_cd = "$SHELL -c 'cd {0} && exec $SHELL'"
+        executor.exec(shell_cd.format(result), flags=WAITING)
+    return exit_code, None

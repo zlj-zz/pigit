@@ -12,7 +12,7 @@ from typing import Optional
 
 from pigit.termui._bindings import resolve_key_handlers_merged
 from pigit.termui._component_base import Component
-from pigit.termui.event_loop import AppEventLoop
+from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
 
 class _ApplicationEventLoop(AppEventLoop):
@@ -41,6 +41,12 @@ class _ApplicationEventLoop(AppEventLoop):
             handler()
             self.render()
             return "binding"
+
+        app_on_key = getattr(self._app, "on_key", None)
+        if app_on_key is not None and callable(app_on_key):
+            app_on_key(key)
+            self.render()
+            return "app"
 
         return super()._dispatch_semantic_string(key)
 
@@ -74,8 +80,13 @@ class Application:
         """Lifecycle hook invoked after the loop is ready."""
         pass
 
-    def run(self) -> None:
-        """Build body, wrap in ComponentRoot, create loop, and start TUI."""
+    def resize(self, size: tuple[int, int]) -> None:
+        """Manually trigger resize on the root component tree."""
+        if self._root is not None:
+            self._root.resize(size)
+
+    def _run_body(self) -> None:
+        """Assemble root, create loop, and start TUI. Does NOT catch ExitEventLoop."""
         body = self.build_root()
         from pigit.termui._root import ComponentRoot
 
@@ -83,3 +94,31 @@ class Application:
         self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
         self.setup_root(root)
         self._loop.run()
+
+    def run(self) -> None:
+        """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.
+
+        ``exit_code`` and ``result_message`` from the exception are intentionally
+        discarded. Use :meth:`run_with_result` if you need the exit tuple.
+        """
+        try:
+            self._run_body()
+        except ExitEventLoop:
+            pass
+
+    def run_with_result(self) -> tuple[int, Optional[str]]:
+        """Short-lived TUI entry returning (exit_code, message).
+
+        Used by pickers and other one-shot interactive flows.
+        """
+        from pigit.termui._picker import PICK_EXIT_CTRL_C
+
+        try:
+            self._run_body()
+        except ExitEventLoop as e:
+            return e.exit_code, e.result_message
+        except KeyboardInterrupt:
+            return PICK_EXIT_CTRL_C, None
+        except EOFError:
+            return 0, None  # input exhausted — graceful exit
+        return 0, None

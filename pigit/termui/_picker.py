@@ -9,22 +9,25 @@ Date: 2026-04-19
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence, TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ._component_base import Component
-from .picker_layout import (
-    filter_input_line,
-    footer_status_line,
-    picker_terminal_ok,
-    picker_viewport,
-)
-from .tty_io import terminal_size, truncate_line
+from ._reactive import Signal
+from .event_loop import ExitEventLoop
+from .tty_io import truncate_line
 
 if TYPE_CHECKING:
     from ._surface import Surface
-    from event_loop import AppEventLoop
 
 PICK_EXIT_CTRL_C = 130
+
+
+class PickerMode(Enum):
+    """Picker interaction modes."""
+
+    BROWSE = "browse"
+    FILTER = "filter"
 
 
 @dataclass(frozen=True)
@@ -45,298 +48,107 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRo
     return [r for r in rows if q in r.title.lower() or q in (r.detail or "").lower()]
 
 
-class SearchableListPicker(Component):
-    """
-    Root component for ``cmd --pick`` / ``repo cd --pick``: filter, scroll, confirm.
+class PickerHeader(Component):
+    """Static three-line header with separator."""
 
-    Must be used under :class:`~pigit.termui.picker_event_loop.PickerAppEventLoop`
-    with :meth:`~SearchableListPicker.bind_event_loop` called after construction.
-    """
+    NAME = "picker_header"
 
-    NAME = "searchable_list_picker"
-
-    def __init__(
-        self,
-        all_rows: Sequence[PickerRow],
-        *,
-        title_line: str,
-        render_line: Callable[[PickerRow], str],
-        on_confirm: Callable[[PickerRow], Optional[tuple[int, Optional[str]]]],
-        terminal_too_small_msg: str,
-        initial_filter: str = "",
-        on_preview: Optional[Callable[[PickerRow], Optional[str]]] = None,
-    ) -> None:
+    def __init__(self, title_line: str) -> None:
         super().__init__()
-        self._all_rows = list(all_rows)
-        self._title_line = title_line
-        self._render_line = render_line
-        self._on_confirm = on_confirm
-        self._on_preview = on_preview
-        self._terminal_too_small_msg = terminal_too_small_msg
-
-        self._needle = initial_filter
-        self._filtered: list[PickerRow] = apply_picker_filter(
-            self._all_rows, self._needle
-        )
-        self._index = 0
-        self._scroll_offset = 0
-        self._filter_editing = False
-        self._number_prefix: Optional[str] = None
-        self._saved_needle_for_filter = ""
-        self._preview_text: Optional[str] = None
-
-        self._loop: Optional["AppEventLoop"] = None
-
-    def bind_event_loop(self, loop: "AppEventLoop") -> None:
-        """Attach the owning loop for :meth:`quit_with_result`."""
-
-        self._loop = loop
-
-    def fresh(self) -> None:
-        return
-
-    def _sync_scroll(self, viewport: int) -> None:
-        if not self._filtered:
-            self._scroll_offset = 0
-            return
-        n = len(self._filtered)
-        if n <= viewport:
-            self._scroll_offset = 0
-            return
-        if self._index < self._scroll_offset:
-            self._scroll_offset = self._index
-        elif self._index >= self._scroll_offset + viewport:
-            self._scroll_offset = self._index - viewport + 1
-        max_scroll = n - viewport
-        self._scroll_offset = max(0, min(self._scroll_offset, max_scroll))
-
-    def _quit(self, exit_code: int, message: Optional[str]) -> None:
-        assert self._loop is not None
-        self._loop.quit("picker", exit_code=exit_code, result_message=message)
+        self._title = title_line
 
     def _render_surface(self, surface: "Surface") -> None:
-        cols, term_rows = self._size
-        has_filter = bool(self._needle) or self._filter_editing
-        if not picker_terminal_ok(term_rows):
-            self._quit(1, self._terminal_too_small_msg)
-            return
-
-        vp = picker_viewport(term_rows)
-        filtered = self._filtered
-
-        # Header
+        cols = surface.width
         sep = "=" * min(72, cols)
         surface.draw_text(0, 0, sep)
-        surface.draw_text(1, 0, truncate_line(self._title_line, cols))
+        surface.draw_text(1, 0, truncate_line(self._title, cols))
         surface.draw_text(2, 0, sep)
 
-        if not filtered:
-            msg = (
-                "No matches. Press / to edit filter, q or Esc to quit, "
-                "Ctrl+C to abort."
-            )
-            for row in range(3, 3 + vp):
-                surface.draw_row(row, msg if row == 3 else "")
-        else:
-            if self._index >= len(filtered):
-                self._index = len(filtered) - 1
-            if self._index < 0:
-                self._index = 0
+    def fresh(self) -> None:
+        pass
 
-            self._sync_scroll(vp)
-            for row in range(vp):
-                li = self._scroll_offset + row
-                if li >= len(filtered):
-                    surface.draw_row(3 + row, "")
-                    continue
-                ent = filtered[li]
-                prefix = "> " if li == self._index else "  "
-                raw = self._render_line(ent).lstrip()
-                body = truncate_line(raw, cols - len(prefix))
-                surface.draw_row(3 + row, prefix + body)
 
-        # Footer
-        n = len(filtered)
+class PickerState:
+    """Picker-level shared state via Signals."""
+
+    def __init__(self) -> None:
+        self.selected_idx = Signal(0)
+        self.filter_text = Signal("")
+        self.status_text = Signal("")
+
+
+class PickerAppMixin:
+    """Shared picker logic for Application subclasses.
+
+    Assumes the subclass has set the following attributes in ``__init__``
+    or ``build_root``:
+
+    - ``_mode`` (:class:`PickerMode`)
+    - ``_input`` (:class:`~pigit.termui._component_widgets.InputLine`)
+    - ``_layout`` (:class:`~pigit.termui._component_layouts.Column`)
+    - ``_list`` (:class:`~pigit.termui._component_widgets.ItemSelector`)
+    - ``_rows`` (sequence of :class:`PickerRow`)
+    - ``_filtered_rows`` (list of :class:`PickerRow`)
+    - ``_state`` (:class:`PickerState`)
+    - ``_loop`` (event loop with ``get_term_size`` and ``render``)
+    - ``_help_popup`` (overlay toggleable)
+    """
+
+    def _on_filter(self, key: str) -> None:
+        if key == "enter":
+            self._exit_filter()
+        elif key == "esc":
+            self._input.clear()
+            self._exit_filter()
+        elif key == "backspace":
+            self._input.backspace()
+            self._apply_filter()
+        elif key == "ctrl c":
+            self.quit(exit_code=PICK_EXIT_CTRL_C)
+        elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
+            self._input.insert(key)
+            self._apply_filter()
+
+    def _enter_filter(self) -> None:
+        self._mode = PickerMode.FILTER
+        self._input.set_visible(True)
+        self._layout.set_heights([3, "flex", 1, 1])
+        self.resize(self._loop.get_term_size())
+
+    def _exit_filter(self) -> None:
+        self._mode = PickerMode.BROWSE
+        self._input.set_visible(False)
+        self._layout.set_heights([3, "flex", 1, 0])
+        self.resize(self._loop.get_term_size())
+
+    def _apply_filter(self) -> None:
+        needle = self._input.value
+        filtered = apply_picker_filter(self._rows, needle)
+        self._filtered_rows = filtered
+        self._list.set_content([self._format_row(r) for r in filtered])
+        self._list.curr_no = 0
+        self._state.selected_idx.set(0)
+        self._update_status(0)
+
+    def _update_status(self, idx: int) -> None:
+        n = len(self._list.content)
+        vp = self._list.visible_row_count
         if n > vp:
-            lo = self._scroll_offset + 1
-            hi = min(self._scroll_offset + vp, n)
-            foot = f"-- rows {lo}-{hi} of {n} (j/k scroll) --"
+            lo = self._list.viewport_start + 1
+            hi = min(self._list.viewport_start + vp, n)
+            text = f"-- rows {lo}-{hi} of {n} --"
         else:
-            foot = f"-- {n} row(s) --"
+            text = f"-- {n} row(s) --"
+        self._state.status_text.set(text)
 
-        status_row = term_rows - 2
-        input_row = term_rows - 1
-        if self._preview_text:
-            surface.draw_row(status_row, truncate_line(self._preview_text, cols))
-            self._preview_text = None
-        else:
-            surface.draw_row(
-                status_row,
-                footer_status_line(
-                    foot, self._needle, has_filter, self._filter_editing, cols
-                ),
-            )
-        if self._filter_editing:
-            surface.draw_row(input_row, filter_input_line(self._needle, cols))
+    def _format_row(self, row: PickerRow) -> str:
+        """Subclasses override to control row rendering."""
+        return f"{row.title}  {row.detail}"
 
-    def _echo_number_at_bottom(self, number_buf: str) -> None:
-        r = self.renderer_strict
-        cols, term_rows = terminal_size()
-        line = truncate_line(f"# {number_buf} — Enter to confirm", cols)
-        r.draw_absolute_row(term_rows, line)
-        r.flush()
+    def quit(self, exit_code: int = 0, result_message: Optional[str] = None) -> None:
+        raise ExitEventLoop("quit", exit_code=exit_code, result_message=result_message)
 
-    def _clear_bottom_status_row(self) -> None:
-        r = self.renderer_strict
-        _, term_rows = terminal_size()
-        r.draw_absolute_row(term_rows, "")
-        r.flush()
+    def toggle_help(self) -> None:
+        self._help_popup.toggle()
 
-    def on_key(self, key: str) -> None:
-        if self._number_prefix is not None:
-            self._on_key_number_prefix(key)
-            return
-        if self._filter_editing:
-            self._on_key_filter_edit(key)
-            return
-        self._on_key_browse(key)
 
-    def _on_key_browse(self, key: str) -> None:
-        r = self.renderer_strict
-
-        if key == "enter":
-            if not self._filtered:
-                return
-            out = self._on_confirm(self._filtered[self._index])
-            if out is not None:
-                self._quit(out[0], out[1])
-            return
-
-        if key in ("j", "down"):
-            if self._filtered:
-                self._index = (self._index + 1) % len(self._filtered)
-            return
-
-        if key in ("k", "up"):
-            if self._filtered:
-                self._index = (self._index - 1) % len(self._filtered)
-            return
-
-        if key == "q":
-            self._quit(0, None)
-            return
-
-        if key == "esc":
-            self._quit(0, None)
-            return
-
-        if key == "/":
-            self._saved_needle_for_filter = self._needle
-            self._filter_editing = True
-            return
-
-        if key == "ctrl c":
-            r.write("\n")
-            r.flush()
-            self._quit(PICK_EXIT_CTRL_C, None)
-            return
-
-        if key == "?":
-            if not self._filtered or self._on_preview is None:
-                return
-            preview_text = self._on_preview(self._filtered[self._index])
-            if preview_text:
-                self._preview_text = f"preview: {preview_text}"
-            return
-
-        if len(key) == 1 and key.isdigit():
-            self._number_prefix = key
-            self._echo_number_at_bottom(self._number_prefix)
-            return
-
-    def _on_key_filter_edit(self, key: str) -> None:
-        r = self.renderer_strict
-
-        if key == "enter":
-            self._filter_editing = False
-            self._scroll_offset = 0
-            self._filtered = apply_picker_filter(self._all_rows, self._needle)
-            self._reconcile_index()
-            return
-
-        if key == "esc":
-            self._needle = self._saved_needle_for_filter
-            self._filtered = apply_picker_filter(self._all_rows, self._needle)
-            self._filter_editing = False
-            self._scroll_offset = 0
-            self._reconcile_index()
-            return
-
-        if key == "backspace":
-            if self._needle:
-                self._needle = self._needle[:-1]
-            self._filtered = apply_picker_filter(self._all_rows, self._needle)
-            self._reconcile_index()
-            return
-
-        if key == "ctrl c":
-            r.write("\n")
-            r.flush()
-            self._quit(PICK_EXIT_CTRL_C, None)
-            return
-
-        if len(key) == 1 and key.isprintable() and ord(key) >= 32:
-            self._needle += key
-            self._filtered = apply_picker_filter(self._all_rows, self._needle)
-            self._reconcile_index()
-            return
-
-    def _reconcile_index(self) -> None:
-        if self._filtered:
-            if self._index >= len(self._filtered):
-                self._index = len(self._filtered) - 1
-            if self._index < 0:
-                self._index = 0
-        else:
-            self._index = 0
-
-    def _on_key_number_prefix(self, key: str) -> None:
-        r = self.renderer_strict
-        buf = self._number_prefix
-        assert buf is not None
-
-        if key == "enter":
-            self._number_prefix = None
-            self._clear_bottom_status_row()
-            try:
-                num = int(buf)
-            except ValueError:
-                return
-            if self._filtered and 1 <= num <= len(self._filtered):
-                out = self._on_confirm(self._filtered[num - 1])
-                if out is not None:
-                    self._quit(out[0], out[1])
-                return
-            return
-
-        if key == "esc":
-            self._number_prefix = None
-            self._clear_bottom_status_row()
-            return
-
-        if key == "ctrl c":
-            self._number_prefix = None
-            self._clear_bottom_status_row()
-            r.write("\n")
-            r.flush()
-            self._quit(PICK_EXIT_CTRL_C, None)
-            return
-
-        if len(key) == 1 and key.isdigit():
-            buf = buf + key
-            self._number_prefix = buf
-            self._echo_number_at_bottom(buf)
-            return
-
-        self._number_prefix = None
-        self._clear_bottom_status_row()

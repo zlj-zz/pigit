@@ -185,11 +185,15 @@ class AppEventLoop:
         try:
             self.start()
             self._loop()
-        except ExitEventLoop as e:
+        except ExitEventLoop:
             self.stop()
-            logging.getLogger().debug("AppEventLoop exit: %s", e)
-        except (KeyboardInterrupt, EOFError):
+            raise
+        except KeyboardInterrupt:
             self.stop()
+            raise
+        except EOFError:
+            self.stop()
+            raise
         except Exception as e:
             self.stop()
             logging.getLogger().exception(
