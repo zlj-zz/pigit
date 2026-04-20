@@ -15,32 +15,28 @@ from typing import Optional, TYPE_CHECKING
 
 from pigit.termui import (
     Application,
+    Column,
     Component,
     ComponentRoot,
     ExitEventLoop,
     HelpPanel,
-    Popup,
-    keys,
-)
-from pigit.termui._component_layouts import Column
-from pigit.termui._component_widgets import (
     InputLine,
     ItemSelector,
     StatusBar,
+    Popup,
+    keys,
 )
 from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
-    PickerAppMixin,
     PickerHeader,
     PickerMode,
     PickerRow,
     PickerState,
+    apply_picker_filter,
 )
 from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import (
-    read_line_cancellable,
-    read_line_with_completion,
     terminal_size,
     truncate_line,
     tty_ok,
@@ -75,6 +71,7 @@ _tty_ok = tty_ok
 # Picker implementation using Application facade + generic components
 # ---------------------------------------------------------------------------
 
+
 def run_cmd_new_picker(
     processor: Optional[GitCommandNew] = None,
     *,
@@ -103,7 +100,8 @@ def run_cmd_new_picker(
 
     # 1. Data preparation
     entries = [
-        e for e in iter_cmd_new_entries()
+        e
+        for e in iter_cmd_new_entries()
         if not category or e.category.lower() == category.lower()
     ]
 
@@ -134,7 +132,7 @@ def run_cmd_new_picker(
     )
 
     # 2. Local Application (used only inside this function)
-    class _CmdPickerApp(Application, PickerAppMixin):
+    class _CmdPickerApp(Application):
         BINDINGS = [
             ("Q", "quit"),
             ("?", "toggle_help"),
@@ -150,6 +148,8 @@ def run_cmd_new_picker(
             self._rows = rows
             self._filtered_rows = list(rows)
             self._render_line = render_line
+            self._pending_entry: Optional[CmdNewEntry] = None
+            self._last_needle: str = ""
 
         def build_root(self) -> Component:
             self._header = PickerHeader(title)
@@ -161,7 +161,9 @@ def run_cmd_new_picker(
             self._input = InputLine(
                 prompt="/",
                 visible=False,
-                on_value_changed=lambda text: self._state.filter_text.set(text),
+                on_value_changed=self._on_filter_value_changed,
+                on_submit=self._on_input_submit,
+                on_cancel=self._on_input_cancel,
             )
 
             self._layout = Column(
@@ -199,8 +201,12 @@ def run_cmd_new_picker(
             if self._number_buf is not None:
                 self._on_number_prefix(key)
                 return
-            if self._mode == PickerMode.FILTER:
-                self._on_filter(key)
+            if self._mode in (PickerMode.FILTER, PickerMode.PARAM_INPUT):
+                if key == "ctrl c":
+                    raise ExitEventLoop(
+                        "quit", exit_code=PICK_EXIT_CTRL_C, result_message=None
+                    )
+                self._input.on_key(key)
                 return
             self._on_browse(key)
 
@@ -208,9 +214,9 @@ def run_cmd_new_picker(
             if key in ("j", keys.KEY_DOWN):
                 self._list.next()
             elif key in ("k", keys.KEY_UP):
-                self._list.forward()  # forward = scroll up (index decreases)
+                self._list.forward()
             elif key == "enter":
-                self._execute_selected()
+                self._enter_param_input()
             elif key == "/":
                 self._enter_filter()
             elif key in ("q", keys.KEY_ESC):
@@ -233,7 +239,7 @@ def run_cmd_new_picker(
                     return
                 if 1 <= num <= len(self._list.content):
                     self._list.curr_no = num - 1
-                    self._execute_selected()
+                    self._enter_param_input()
             elif key == keys.KEY_ESC:
                 self._number_buf = None
                 self._clear_number_echo()
@@ -244,72 +250,113 @@ def run_cmd_new_picker(
                 self._number_buf = None
                 self._clear_number_echo()
 
-        # --- Business logic ---
+        # --- Filter mode ---
 
-        def _execute_selected(self) -> None:
+        def _on_filter_value_changed(self, text: str) -> None:
+            self._state.filter_text.set(text)
+            self._apply_filter()
+
+        def _enter_filter(self) -> None:
+            self._mode = PickerMode.FILTER
+            self._input.set_prompt("/")
+            self._input.set_candidate_provider(None)
+            self._input.set_visible(True)
+            self._layout.set_heights([3, "flex", 1, 1])
+            self.resize(self._loop.get_term_size())
+
+        def _exit_filter(self) -> None:
+            self._mode = PickerMode.BROWSE
+            self._input.set_visible(False)
+            self._layout.set_heights([3, "flex", 1, 0])
+            self.resize(self._loop.get_term_size())
+
+        def _apply_filter(self) -> None:
+            if self._mode != PickerMode.FILTER:
+                return
+            needle = self._input.value
+            if needle == self._last_needle:
+                return
+            self._last_needle = needle
+            filtered = apply_picker_filter(self._rows, needle)
+            self._filtered_rows = filtered
+            self._list.set_content([self._format_row(r) for r in filtered])
+            self._list.curr_no = 0
+            self._state.selected_idx.set(0)
+            self._update_status(0)
+
+        # --- Param input mode ---
+
+        def _enter_param_input(self) -> None:
             idx = self._list.curr_no
             if idx < 0 or idx >= len(self._filtered_rows):
                 return
-            ent = self._filtered_rows[idx].ref
+            row = self._filtered_rows[idx]
+            ent = row.ref
             assert isinstance(ent, CmdNewEntry)
 
-            extra_args: list[str] = []
-            if ent.has_args:
-                renderer = get_renderer_strict()
-                cols, rows = terminal_size()
-                # Clear bottom two rows for prompt
-                renderer.draw_absolute_row(rows - 2, " " * cols)
-                renderer.draw_absolute_row(rows - 1, " " * cols)
-                # Build prompt text and write once
-                prompt_text = (
-                    f"Arguments for `{ent.name}` (empty = none, Esc = cancel):"
-                )
-                renderer.move_cursor(rows - 1, 1)
-                renderer.write(prompt_text)
-                renderer.move_cursor(rows, 1)
-                renderer.flush()
-                renderer.show_cursor()
+            if not ent.has_args:
+                self._finish_execute(ent, "")
+                return
 
-                provider = make_candidate_provider(ent.arg_completion)
-                if provider:
-                    extra_raw = read_line_with_completion(
-                        write=sys.stdout.write,
-                        flush=sys.stdout.flush,
-                        prompt=f"{ent.name} ",
-                        candidate_provider=provider,
-                        hint_styler=lambda t: f"\033[2m{t}\033[0m",
-                    )
-                else:
-                    extra_raw = read_line_cancellable(
-                        write=sys.stdout.write,
-                        flush=sys.stdout.flush,
-                        prompt=f"{ent.name} ",
-                    )
+            self._pending_entry = ent
+            self._mode = PickerMode.PARAM_INPUT
+            self._input.set_prompt(f"{ent.name} ")
+            self._input.set_value("")
+            self._input.set_candidate_provider(
+                make_candidate_provider(ent.arg_completion)
+            )
+            self._input.set_visible(True)
+            self._layout.set_heights([3, "flex", 1, 1])
+            self.resize(self._loop.get_term_size())
 
-                renderer.hide_cursor()
-                if extra_raw is None:
-                    # User cancelled — wipe bottom rows and re-render TUI
-                    renderer.draw_absolute_row(rows - 2, " " * cols)
-                    renderer.draw_absolute_row(rows - 1, " " * cols)
-                    self._loop.render()
-                    return
-                extra_args = (
-                    shlex.split(extra_raw.strip()) if extra_raw.strip() else []
-                )
+        def _exit_param_input(self) -> None:
+            self._mode = PickerMode.BROWSE
+            self._pending_entry = None
+            self._input.set_candidate_provider(None)
+            self._input.clear()
+            self._input.set_prompt("/")
+            self._input.set_visible(False)
+            self._layout.set_heights([3, "flex", 1, 0])
+            self.resize(self._loop.get_term_size())
 
+        def _on_input_submit(self, value: str) -> None:
+            if self._mode == PickerMode.FILTER:
+                self._exit_filter()
+            elif self._mode == PickerMode.PARAM_INPUT:
+                assert self._pending_entry is not None
+                self._finish_execute(self._pending_entry, value)
+
+        def _on_input_cancel(self) -> None:
+            if self._mode == PickerMode.FILTER:
+                self._exit_filter()
+                self._input.clear()
+            elif self._mode == PickerMode.PARAM_INPUT:
+                self._exit_param_input()
+
+        # --- Business logic ---
+
+        def _finish_execute(self, ent: CmdNewEntry, extra_raw: str) -> None:
+            extra_args = shlex.split(extra_raw.strip()) if extra_raw.strip() else []
             if self._print_only:
                 cmd_parts = ["pigit", "cmd", ent.name, *extra_args]
                 result = " ".join(shlex.quote(p) for p in cmd_parts)
-                raise ExitEventLoop(
-                    "done", exit_code=0, result_message=result
-                )
+                raise ExitEventLoop("done", exit_code=0, result_message=result)
             exit_code, output = self._processor.execute(ent.name, extra_args)
-            raise ExitEventLoop(
-                "done", exit_code=exit_code, result_message=output
-            )
+            raise ExitEventLoop("done", exit_code=exit_code, result_message=output)
 
         def _format_row(self, row: PickerRow) -> str:
             return self._render_line(row)
+
+        def _update_status(self, idx: int) -> None:
+            n = len(self._list.content)
+            vp = self._list.visible_row_count
+            if n > vp:
+                lo = self._list.viewport_start + 1
+                hi = min(self._list.viewport_start + vp, n)
+                text = f"-- rows {lo}-{hi} of {n} --"
+            else:
+                text = f"-- {n} row(s) --"
+            self._state.status_text.set(text)
 
         def _show_preview(self) -> None:
             idx = self._list.curr_no
@@ -331,6 +378,16 @@ def run_cmd_new_picker(
             renderer = get_renderer_strict()
             cols, _ = terminal_size()
             renderer.draw_absolute_row(1, " " * cols)
+
+        def quit(
+            self, exit_code: int = 0, result_message: Optional[str] = None
+        ) -> None:
+            raise ExitEventLoop(
+                "quit", exit_code=exit_code, result_message=result_message
+            )
+
+        def toggle_help(self) -> None:
+            self._help_popup.toggle()
 
     # 3. Launch
     exit_code, message = _CmdPickerApp().run_with_result()

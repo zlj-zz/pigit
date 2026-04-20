@@ -92,8 +92,6 @@ class TabView(Component):
         return target
 
 
-
-
 class Column(Component):
     """Vertical stack: fixed heights + flex share.
 
@@ -176,9 +174,7 @@ class Column(Component):
             if child.x < 1 or child.y < 1:
                 continue
             child._render_surface(
-                surface.subsurface(
-                    max(0, child.x - 1), max(0, child.y - 1), w, h
-                )
+                surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
     def notify(self, action: ActionLiteral, **data) -> None:

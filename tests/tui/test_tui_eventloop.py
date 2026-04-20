@@ -226,7 +226,7 @@ def test_loop_string_dispatch_calls_hooks_with_outcome(mock_renderer, batch, exp
 
     key = batch[0][0]
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [batch, KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [batch, RuntimeError("stop")]
 
     loop._run_impl()
 
@@ -247,7 +247,7 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[], KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [[], RuntimeError("stop")]
 
     loop._run_impl()
 
@@ -276,7 +276,7 @@ def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
     loop._child._handle_event = Mock()
 
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [[["k"]], RuntimeError("stop")]
 
     loop._run_impl()
 
@@ -305,7 +305,7 @@ def test_loop_overlay_open_maps_to_overlay_outcome(mock_renderer):
     loop._child._handle_event = Mock()
 
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [[["k"]], RuntimeError("stop")]
 
     loop._run_impl()
 
@@ -374,9 +374,10 @@ def test_app_event_loop_accepts_callable_binding(mock_renderer):
     # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["q"]], KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [[["q"]], RuntimeError("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop, match="bye"):
+        loop._run_impl()
 
 
 def test_layer_stack_error_recovery_closes_modal() -> None:
@@ -492,7 +493,7 @@ def test_loop_mouse_event_is_ignored(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], KeyboardInterrupt()]
+    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], RuntimeError("stop")]
 
     loop._run_impl()
 

@@ -8,33 +8,30 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING, Optional, Sequence
 
 from pigit.ext.executor import WAITING
 
 from pigit.termui import (
     Application,
+    Column,
     Component,
     ComponentRoot,
     ExitEventLoop,
     HelpPanel,
-    Popup,
-    keys,
-)
-from pigit.termui._component_layouts import Column
-from pigit.termui._component_widgets import (
     InputLine,
     ItemSelector,
     StatusBar,
+    Popup,
+    keys,
 )
 from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
-    PickerAppMixin,
     PickerHeader,
     PickerMode,
     PickerRow,
     PickerState,
+    apply_picker_filter
 )
 from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
@@ -85,7 +82,7 @@ def run_repo_cd_picker(
 
     rendered = [f"{r.title}  {r.detail}" for r in rows]
 
-    class _RepoCdPickerApp(Application, PickerAppMixin):
+    class _RepoCdPickerApp(Application):
         BINDINGS = [
             ("Q", "quit"),
             ("?", "toggle_help"),
@@ -98,6 +95,7 @@ def run_repo_cd_picker(
             self._initial_filter = initial_filter
             self._rows = rows
             self._filtered_rows = list(rows)
+            self._last_needle: str = ""
 
         def build_root(self) -> Component:
             self._header = PickerHeader(title)
@@ -109,7 +107,9 @@ def run_repo_cd_picker(
             self._input = InputLine(
                 prompt="/",
                 visible=False,
-                on_value_changed=lambda text: self._state.filter_text.set(text),
+                on_value_changed=self._on_filter_value_changed,
+                on_submit=self._on_input_submit,
+                on_cancel=self._on_input_cancel,
             )
             self._layout = Column(
                 [self._header, self._list, self._status, self._input],
@@ -132,7 +132,6 @@ def run_repo_cd_picker(
             self._state.selected_idx.subscribe(self._update_status)
             self._update_status(0)
 
-            # Apply initial filter if provided
             if self._initial_filter:
                 self._input.set_value(self._initial_filter)
                 self._enter_filter()
@@ -150,7 +149,11 @@ def run_repo_cd_picker(
 
         def on_key(self, key: str) -> None:
             if self._mode == PickerMode.FILTER:
-                self._on_filter(key)
+                if key == "ctrl c":
+                    raise ExitEventLoop(
+                        "quit", exit_code=PICK_EXIT_CTRL_C, result_message=None
+                    )
+                self._input.on_key(key)
                 return
             self._on_browse(key)
 
@@ -168,6 +171,43 @@ def run_repo_cd_picker(
             elif key == "?":
                 self._show_preview()
 
+        # --- Filter mode ---
+
+        def _on_filter_value_changed(self, text: str) -> None:
+            self._state.filter_text.set(text)
+            self._apply_filter()
+
+        def _enter_filter(self) -> None:
+            self._mode = PickerMode.FILTER
+            self._input.set_visible(True)
+            self._layout.set_heights([3, "flex", 1, 1])
+            self.resize(self._loop.get_term_size())
+
+        def _exit_filter(self) -> None:
+            self._mode = PickerMode.BROWSE
+            self._input.set_visible(False)
+            self._layout.set_heights([3, "flex", 1, 0])
+            self.resize(self._loop.get_term_size())
+
+        def _apply_filter(self) -> None:
+            needle = self._input.value
+            if needle == self._last_needle:
+                return
+            self._last_needle = needle
+            filtered = apply_picker_filter(self._rows, needle)
+            self._filtered_rows = filtered
+            self._list.set_content([f"{r.title}  {r.detail}" for r in filtered])
+            self._list.curr_no = 0
+            self._state.selected_idx.set(0)
+            self._update_status(0)
+
+        def _on_input_submit(self, value: str) -> None:
+            self._exit_filter()
+
+        def _on_input_cancel(self) -> None:
+            self._exit_filter()
+            self._input.clear()
+
         # --- Business logic ---
 
         def _execute_selected(self) -> None:
@@ -176,9 +216,7 @@ def run_repo_cd_picker(
                 return
             path = self._filtered_rows[idx].ref
             assert isinstance(path, str)
-            raise ExitEventLoop(
-                "done", exit_code=0, result_message=path
-            )
+            raise ExitEventLoop("done", exit_code=0, result_message=path)
 
         def _show_preview(self) -> None:
             idx = self._list.curr_no
@@ -187,6 +225,27 @@ def run_repo_cd_picker(
             path = self._filtered_rows[idx].ref
             assert isinstance(path, str)
             self._status.set_text(f"path: {path}")
+
+        def _update_status(self, idx: int) -> None:
+            n = len(self._list.content)
+            vp = self._list.visible_row_count
+            if n > vp:
+                lo = self._list.viewport_start + 1
+                hi = min(self._list.viewport_start + vp, n)
+                text = f"-- rows {lo}-{hi} of {n} --"
+            else:
+                text = f"-- {n} row(s) --"
+            self._state.status_text.set(text)
+
+        def quit(
+            self, exit_code: int = 0, result_message: Optional[str] = None
+        ) -> None:
+            raise ExitEventLoop(
+                "quit", exit_code=exit_code, result_message=result_message
+            )
+
+        def toggle_help(self) -> None:
+            self._help_popup.toggle()
 
     exit_code, result = _RepoCdPickerApp().run_with_result()
 

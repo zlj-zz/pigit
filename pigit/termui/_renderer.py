@@ -27,6 +27,9 @@ class Renderer:
         self._out = session.stdout
         self._prev_frame: Optional[list[str]] = None
         self._prev_size: Optional[tuple[int, int]] = None
+        self._cursor_pos: Optional[tuple[int, int]] = None
+        self._last_cursor: Optional[tuple[int, int]] = None
+        self._cursor_visible: bool = False
 
     def write(self, text: str) -> None:
         self._out.write(text)
@@ -67,6 +70,15 @@ class Renderer:
 
     def show_cursor(self) -> None:
         self._out.write("\033[?25h")
+
+    def set_cursor(self, row: int, col: int) -> None:
+        """Set cursor position in 0-based surface coordinates.
+
+        ``render_surface`` will move the physical terminal cursor here
+        and show it after the frame is drawn.  If never called, the
+        cursor is hidden.
+        """
+        self._cursor_pos = (row, col)
 
     def draw_block(
         self, lines: Sequence[str], row: int, col: int, width: int, height: int
@@ -156,6 +168,22 @@ class Renderer:
 
         self._prev_frame = lines
         self._prev_size = curr_size
+
+        if self._cursor_pos is not None:
+            target = (self._cursor_pos[0] + 1, self._cursor_pos[1] + 1)
+            if self._last_cursor != target:
+                self.move_cursor(*target)
+                self._last_cursor = target
+            if not self._cursor_visible:
+                self.show_cursor()
+                self._cursor_visible = True
+        else:
+            if self._cursor_visible:
+                self.hide_cursor()
+                self._cursor_visible = False
+            self._last_cursor = None
+
+        self._cursor_pos = None
         self.flush()
 
     def clear_cache(self) -> None:

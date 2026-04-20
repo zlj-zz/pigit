@@ -71,7 +71,7 @@ def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
 def make_candidate_provider(
     comp: Optional[CompletionType],
 ) -> Optional[callable]:
-    """Build a candidate provider callback for read_line_with_completion.
+    """Build a candidate provider callback for tab completion.
 
     Args:
         comp: Completion type for the argument.

@@ -12,6 +12,20 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
+from .keys import (
+    KEY_BACKSPACE,
+    KEY_DELETE,
+    KEY_END,
+    KEY_ENTER,
+    KEY_ESC,
+    KEY_HOME,
+    KEY_LEFT,
+    KEY_RIGHT,
+    KEY_SHIFT_TAB,
+    KEY_TAB,
+    KEY_UP,
+    KEY_DOWN,
+)
 from .tty_io import truncate_line
 
 if TYPE_CHECKING:
@@ -192,6 +206,9 @@ class InputLine(Component):
         visible: bool = True,
         max_length: Optional[int] = None,
         on_value_changed: Optional[Callable[[str], None]] = None,
+        on_submit: Optional[Callable[[str], None]] = None,
+        on_cancel: Optional[Callable[[], None]] = None,
+        candidate_provider: Optional[Callable[[str], list[str]]] = None,
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
@@ -201,8 +218,16 @@ class InputLine(Component):
         self._visible = visible
         self._max_length = max_length
         self._on_change = on_value_changed
+        self._on_submit = on_submit
+        self._on_cancel = on_cancel
         self._value = ""
         self._cursor = 0
+        # Completion state
+        self._candidate_provider = candidate_provider
+        self._candidates: list[str] = []
+        self._candidate_idx = 0
+        self._showing_candidates = False
+        self._original_value = ""
 
     @property
     def value(self) -> str:
@@ -262,6 +287,91 @@ class InputLine(Component):
         if self._on_change:
             self._on_change(self._value)
 
+    def set_prompt(self, prompt: str) -> None:
+        """Switch prompt text at runtime."""
+        self._prompt = prompt
+
+    def set_candidate_provider(
+        self, provider: Optional[Callable[[str], list[str]]]
+    ) -> None:
+        """Switch or clear the candidate provider at runtime.
+
+        When ``provider`` is *None*, the *Tab* key behaves as a plain key.
+        """
+        self._candidate_provider = provider
+        self._candidates = []
+        self._candidate_idx = 0
+        self._showing_candidates = False
+
+    def on_key(self, key: str) -> None:
+        """Process keyboard input for this input line.
+
+        Callers (e.g. ``Application`` subclasses) are responsible for
+        ensuring this method is only invoked when the input line is active.
+        """
+        if key == KEY_ENTER:
+            if self._showing_candidates:
+                self._value = self._candidates[self._candidate_idx]
+                self._cursor = len(self._value)
+                self._showing_candidates = False
+                self._candidates = []
+                return
+            if self._on_submit:
+                self._on_submit(self._value)
+            return
+
+        if key == KEY_ESC:
+            if self._showing_candidates:
+                self._value = self._original_value
+                self._cursor = len(self._value)
+                self._showing_candidates = False
+                self._candidates = []
+                return
+            if self._on_cancel:
+                self._on_cancel()
+            return
+
+        if key in (KEY_TAB, KEY_SHIFT_TAB) and self._candidate_provider:
+            if not self._showing_candidates:
+                self._showing_candidates = True
+                self._original_value = self._value
+                self._candidates = self._candidate_provider(self._value)
+                self._candidate_idx = 0
+            else:
+                step = 1 if key == KEY_TAB else -1
+                self._candidate_idx = max(
+                    0, min(self._candidate_idx + step, len(self._candidates) - 1)
+                )
+            if self._candidates:
+                self._value = self._candidates[self._candidate_idx]
+                self._cursor = len(self._value)
+            return
+
+        if key in (KEY_UP, KEY_DOWN) and self._showing_candidates:
+            step = -1 if key == KEY_UP else 1
+            self._candidate_idx = max(
+                0, min(self._candidate_idx + step, len(self._candidates) - 1)
+            )
+            self._value = self._candidates[self._candidate_idx]
+            self._cursor = len(self._value)
+            return
+
+        # Plain text editing
+        if key == KEY_BACKSPACE:
+            self.backspace()
+        elif key == KEY_DELETE:
+            self.delete()
+        elif key == KEY_LEFT:
+            self.cursor_left()
+        elif key == KEY_RIGHT:
+            self.cursor_right()
+        elif key == KEY_HOME:
+            self.home()
+        elif key == KEY_END:
+            self.end()
+        elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
+            self.insert(key)
+
     def cursor_left(self) -> None:
         self._cursor = max(0, self._cursor - 1)
 
@@ -271,7 +381,33 @@ class InputLine(Component):
     def _render_surface(self, surface: "Surface") -> None:
         if not self._visible:
             return
-        line = f"{self._prompt}{self._value}"
-        surface.draw_row(0, truncate_line(line, surface.width))
+        core = f"{self._prompt}{self._value}"
+        if self._showing_candidates and self._candidates:
+            # Inline completion: text already typed by the user stays normal,
+            # the rest of the candidate is shown dim.
+            match_len = len(self._original_value)
+            matched = self._value[:match_len]
+            suffix = self._value[match_len:]
+            prefix = f"{self._prompt}{matched}"
+            avail = surface.width - len(prefix)
+            if avail < 0:
+                prefix = (
+                    prefix[: surface.width - 1] + "…" if surface.width > 0 else ""
+                )
+                suffix = ""
+            elif len(suffix) > avail:
+                suffix = suffix[:avail]
+            surface.draw_text(0, 0, prefix)
+            if suffix:
+                surface.draw_text(0, len(prefix), f"\033[2m{suffix}\033[0m")
+        else:
+            surface.draw_row(0, truncate_line(core, surface.width))
+        # Tell renderer where to place the physical cursor.
+        # self.x is 1-based row, self.y is 1-based col (Column convention).
+        from ._renderer_context import get_renderer
 
-
+        renderer = get_renderer()
+        if renderer is not None:
+            cursor_row = self.x - 1
+            cursor_col = self.y - 1 + len(self._prompt) + self._cursor
+            renderer.set_cursor(cursor_row, cursor_col)
