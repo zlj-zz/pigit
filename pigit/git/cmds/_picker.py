@@ -25,6 +25,7 @@ from pigit.termui import (
     StatusBar,
     Popup,
     keys,
+    get_renderer_strict,
 )
 from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
@@ -33,9 +34,8 @@ from pigit.termui._picker import (
     PickerRow,
     PickerState,
     apply_picker_filter,
+    picker_terminal_ok,
 )
-from pigit.termui._renderer_context import get_renderer_strict
-from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import (
     terminal_size,
     truncate_line,

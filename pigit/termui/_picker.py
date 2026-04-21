@@ -14,12 +14,27 @@ from typing import TYPE_CHECKING, Sequence
 
 from ._component_base import Component
 from ._reactive import Signal
-from .tty_io import truncate_line
+from .tty_io import truncate_line, MIN_LIST_ROWS
 
 if TYPE_CHECKING:
     from ._surface import Surface
 
 PICK_EXIT_CTRL_C = 130
+
+PICKER_HEADER_ROWS = 3
+PICKER_FOOTER_ROWS = 2
+
+
+def picker_viewport(term_rows: int) -> int:
+    """List rows between the fixed header and two pinned bottom rows."""
+
+    return term_rows - PICKER_HEADER_ROWS - PICKER_FOOTER_ROWS
+
+
+def picker_terminal_ok(term_rows: int) -> bool:
+    """Whether the terminal has enough rows for header, list, and footer."""
+
+    return picker_viewport(term_rows) >= MIN_LIST_ROWS
 
 
 class PickerMode(Enum):

@@ -31,9 +31,9 @@ from pigit.termui._picker import (
     PickerMode,
     PickerRow,
     PickerState,
-    apply_picker_filter
+    apply_picker_filter,
+    picker_terminal_ok,
 )
-from pigit.termui.picker_layout import picker_terminal_ok
 from pigit.termui.tty_io import terminal_size, tty_ok
 
 if TYPE_CHECKING:
