@@ -33,8 +33,6 @@ if TYPE_CHECKING:
 
 
 class LineTextBrowser(Component):
-    NAME = "line_text_browser"
-
     def __init__(
         self,
         x: int = 1,
@@ -70,7 +68,6 @@ class LineTextBrowser(Component):
 
 
 class ItemSelector(Component):
-    NAME = "item_selector"
     CURSOR: str = "\u2192"
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
@@ -159,8 +156,6 @@ class StatusBar(Component):
     are managed by the container and manual values are ignored.
     """
 
-    NAME = "status_bar"
-
     def __init__(
         self,
         text: Union[str, Signal[str]] = "",
@@ -197,8 +192,6 @@ class InputLine(Component):
     When placed inside a layout container (e.g. ``Column``), ``x`` and ``y``
     are managed by the container and manual values are ignored.
     """
-
-    NAME = "input_line"
 
     def __init__(
         self,

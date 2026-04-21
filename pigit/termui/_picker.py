@@ -66,8 +66,6 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRo
 class PickerHeader(Component):
     """Static three-line header with separator."""
 
-    NAME = "picker_header"
-
     def __init__(self, title_line: str) -> None:
         super().__init__()
         self._title = title_line

@@ -47,8 +47,6 @@ class HelpPanel(Component):
     when shell and child bindings do not handle them.
     """
 
-    NAME = "help"
-
     TOGGLE_HELP_SEMANTIC_KEYS: ClassVar[tuple[str, ...]] = ("?",)
 
     BINDINGS = [
@@ -161,8 +159,6 @@ class Popup(Component):
     content may declare :data:`TOGGLE_HELP_SEMANTIC_KEYS` so :meth:`_fallback_overlay_key`
     calls :meth:`toggle` for those keys when ``session_owner`` is set.
     """
-
-    NAME = "popup"
 
     def __init__(
         self,
@@ -335,8 +331,6 @@ class AlertDialogBody(Component):
     ESC is handled by the :class:`Popup` shell (see :meth:`AlertDialog._on_exit_key`).
     """
 
-    NAME = "alert_dialog_body"
-
     def __init__(
         self,
         shell: "AlertDialog",
@@ -455,8 +449,6 @@ class AlertDialog(Popup):
     Panels typically set ``_alert_dialog`` and ``_alert_popup`` to this same instance.
     """
 
-    NAME = "alert_dialog"
-
     def __init__(
         self,
         session_owner: Component,
@@ -548,8 +540,6 @@ class AlertDialog(Popup):
 
 class Toast(Component):
     """自动消失的通知消息（TOAST 层），支持边框、动画和可配置位置。"""
-
-    NAME = "toast"
 
     def __init__(
         self,
@@ -699,8 +689,6 @@ class Toast(Component):
 
 class Sheet(Component):
     """底部滑出面板，类似移动端的 bottom sheet（SHEET 层）。"""
-
-    NAME = "sheet"
 
     def __init__(
         self,

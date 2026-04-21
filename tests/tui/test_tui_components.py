@@ -3,13 +3,12 @@ from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
 from pigit.termui._component_mixins import GitPanelLazyResizeMixin
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
+from pigit.termui.types import ActionLiteral
 
 # Mock Component to use in tests
 class MockComponent(Component):
-    NAME = "mock-comp"
-
     def __init__(self, name):
-        self.NAME = name
+        self._name = name
         super().__init__()
 
     def _render_surface(self, surface):
@@ -23,9 +22,7 @@ class MockComponent(Component):
 
 
 class MockTabView(TabView):
-    NAME = "mock-tab-view"
-
-    def update(self, action: str, **data):
+    def update(self, action: ActionLiteral, **data):
         pass
 
 
@@ -33,15 +30,13 @@ class TestTabView:
     def test_duplicate_component_name_allowed(self):
         a = MockComponent("dup")
         b = MockComponent("dup")
-        assert a.NAME == "dup"
-        assert b.NAME == "dup"
+        assert a._name == "dup"
+        assert b._name == "dup"
 
-    def test_container_key_routing_switch_first_vs_child_first(self):
+    def test_container_key_routing_via_shortcuts(self):
         received: list = []
 
         class RecordingChild(Component):
-            NAME = "rc"
-
             def __init__(self, label: str) -> None:
                 self._label = label
                 super().__init__()
@@ -56,90 +51,79 @@ class TestTabView:
                 pass
 
         class RoutingTabView(TabView):
-            NAME = "routing-tv"
-
-            def update(self, action: str, **data) -> None:
+            def update(self, action: ActionLiteral, **data) -> None:
                 pass
-
-        def switch_tab(key: str) -> str:
-            return "secondary" if key == "2" else ""
 
         main = RecordingChild("main")
         secondary = RecordingChild("secondary")
-        children = {"main": main, "secondary": secondary}
 
-        switch_first = RoutingTabView(
-            children=dict(children),
-            start_name="main",
-            switch_handle=switch_tab,
-            key_routing="switch_first",
+        # shortcut "2" switches to secondary; after switch, key is NOT re-dispatched
+        tv = RoutingTabView(
+            route_map={"/main": main, "/secondary": secondary},
+            shortcuts={"2": "/secondary"},
+            start="/main",
         )
         received.clear()
-        switch_first._handle_event("2")
-        assert received == [("secondary", "2")]
+        tv._handle_event("2")
+        assert secondary.is_activated() is True
+        assert received == []
 
-        main2 = RecordingChild("main")
-        sec2 = RecordingChild("secondary")
-        child_first = RoutingTabView(
-            children={"main": main2, "secondary": sec2},
-            start_name="main",
-            switch_handle=switch_tab,
-            key_routing="child_first",
-        )
+        # key "k" delegates to active child
         received.clear()
-        child_first._handle_event("2")
-        assert received == [("main", "2")]
+        tv._handle_event("k")
+        assert received == [("secondary", "k")]
 
     @pytest.mark.parametrize(
-        "start_name, switch_key, expected_active",
+        "start, switch_key, expected_active",
         [
-            ("main", None, "main"),  # Happy path: default start_name
-            ("secondary", None, "secondary"),  # Happy path: specified start_name
-            ("main", "secondary", "secondary"),  # Edge case: switch child after init
+            ("/main", None, "/main"),  # Happy path: default start
+            ("/secondary", None, "/secondary"),  # Happy path: specified start
+            ("/main", "/secondary", "/secondary"),  # Edge case: switch after init
         ],
         ids=["default-start", "specified-start", "switch-after-init"],
     )
-    def test_tab_view_init_and_switch(self, start_name, switch_key, expected_active):
+    def test_tab_view_init_and_switch(self, start, switch_key, expected_active):
         # Arrange
-        children = {
-            "main": MockComponent("main"),
-            "secondary": MockComponent("secondary"),
+        route_map = {
+            "/main": MockComponent("main"),
+            "/secondary": MockComponent("secondary"),
         }
-
-        def switch_handle(key):
-            return switch_key or start_name
+        shortcuts = {}
+        if switch_key:
+            shortcuts["x"] = switch_key
 
         # Act
         tab_view = MockTabView(
-            children=children, start_name=start_name, switch_handle=switch_handle
+            route_map=route_map, shortcuts=shortcuts or None, start=start
         )
         if switch_key:
-            tab_view._handle_event(switch_key)
+            tab_view._handle_event("x")
 
         # Assert
-        assert children[
+        assert route_map[
             expected_active
         ].is_activated(), f"{expected_active} should be activated"
 
     @pytest.mark.parametrize(
-        "action, data, expected_exception",
+        "action, data",
         [
-            ("unsupported", {}, ComponentError),  # Error case: unsupported action
+            ("unsupported", {}),  # unsupported action logs warning
         ],
         ids=["unsupported-action"],
     )
-    def test_tab_view_accept_errors(self, action, data, expected_exception):
+    def test_tab_view_accept_logs_warning(self, action, data, caplog):
         # Arrange
-        children = {"main": MockComponent("main")}
-        tab_view = MockTabView(children=children)
+        route_map = {"/main": MockComponent("main")}
+        tab_view = MockTabView(route_map=route_map)
 
         # Act / Assert
-        with pytest.raises(expected_exception):
+        with caplog.at_level("WARNING"):
             tab_view.accept(action, **data)
+        assert "unsupported" in caplog.text or "not found" in caplog.text
 
 
 class MockLineTextBrowser(LineTextBrowser):
-    NAME = "mock-line-text-browser"
+    pass
 
 
 class TestLineTextBrowser:
@@ -246,19 +230,17 @@ class TestLineTextBrowser:
 
 
 class MockItemSelector(ItemSelector):
-    NAME = "test-item-selector"
-
     def fresh(self):
         pass
 
 
 class TestItemSelector:
-    def test_ItemSelector_init_error(self, monkeypatch):
-        monkeypatch.setattr(ItemSelector, "NAME", "**")
-        monkeypatch.setattr(ItemSelector, "CURSOR", "**")
-
+    def test_ItemSelector_init_error(self):
+        # CURSOR length != 1 raises ComponentError
+        class BadSelector(ItemSelector):
+            CURSOR = "**"
         with pytest.raises(ComponentError):
-            ItemSelector()
+            BadSelector()
 
     # Test initialization of ItemSelector
     @pytest.mark.parametrize(
@@ -338,7 +320,6 @@ class TestGitPanelLazyResizeMixin:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
         class DemoPanel(GitPanelLazyResizeMixin, ItemSelector):
-            NAME = "demo_lazy_git_panel"
             CURSOR = ">"
             fresh_calls = 0
 
@@ -360,7 +341,6 @@ class TestGitPanelLazyResizeMixin:
     def test_inactive_after_load_keeps_content_on_resize(self):
 
         class DemoPanel2(GitPanelLazyResizeMixin, ItemSelector):
-            NAME = "demo_lazy_git_panel_2"
             CURSOR = ">"
             fresh_calls = 0
 
@@ -381,8 +361,6 @@ class TestGitPanelLazyResizeMixin:
 class TestNearestOverlayHost:
     def test_walks_parents_to_first_overlay_host(self) -> None:
         class OverlayHost(Component):
-            NAME = "overlay_host"
-
             def begin_popup_session(self, popup: object) -> None:
                 pass
 

@@ -79,10 +79,12 @@ class TestComponentRoot:
         assert root._layer_stack.top(LayerKind.MODAL) is None
 
     def test_accept_forwards_to_body(self):
+        from pigit.termui.types import ActionLiteral
+
         root = ComponentRoot(DummyBody())
         root.body.accept = MagicMock()
-        root.accept("goto", target="x")
-        root.body.accept.assert_called_once_with("goto", target="x")
+        root.accept(ActionLiteral.goto, target="x")
+        root.body.accept.assert_called_once_with(ActionLiteral.goto, target="x")
 
     def test_fresh_does_not_raise(self):
         root = ComponentRoot(DummyBody())

@@ -25,8 +25,6 @@ class ComponentRoot(Component):
     Not exported in the public termui API.
     """
 
-    NAME = "component_root"
-
     def __init__(self, body: Component) -> None:
         super().__init__()
         self._body = body

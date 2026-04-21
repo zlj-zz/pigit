@@ -739,7 +739,9 @@ class LocalGit:
 
     def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> str:
         path = path or self.path
-        _, err, _ = self.executor.exec(f"git checkout {branch_name}", cwd=path)
+        code, err, out = self.executor.exec(
+            f"git checkout {branch_name}", cwd=path, flags=WAITING | REPLY | DECODE
+        )
         return err or "ok"
 
     def open_repo_in_browser(

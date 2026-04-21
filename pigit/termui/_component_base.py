@@ -55,7 +55,7 @@ def _render_child_to_surface(
         _logger.warning(
             "%s %s with invalid 1-based coords (%s, %s)",
             log_prefix,
-            component.NAME,
+            type(component).__name__,
             component.x,
             component.y,
         )
@@ -64,7 +64,6 @@ def _render_child_to_surface(
 
 
 class Component(ABC):
-    NAME: str = ""
     BINDINGS: Optional[BindingsList] = None
 
     def __init__(
@@ -75,8 +74,6 @@ class Component(ABC):
         children: Optional[dict[str, "Component"]] = None,
         parent: Optional["Component"] = None,
     ) -> None:
-        assert self.NAME, "The `NAME` attribute cannot be empty."
-
         self._activated = False
 
         self.x, self.y = x, y
@@ -125,7 +122,11 @@ class Component(ABC):
 
     def accept(self, action: ActionLiteral, **data):
         """Process emit action of child."""
-        raise NotImplementedError()
+        _logger.warning(
+            "%s.accept: unsupported action %r",
+            type(self).__name__,
+            action,
+        )
 
     def emit(self, action: ActionLiteral, **data):
         """Emit to parent."""
@@ -134,7 +135,11 @@ class Component(ABC):
 
     def update(self, action: ActionLiteral, **data):
         """Process notify action of parent."""
-        raise NotImplementedError()
+        _logger.warning(
+            "%s.update: unsupported action %r",
+            type(self).__name__,
+            action,
+        )
 
     def notify(self, action: ActionLiteral, **data):
         """Notify all children."""

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
 from ._component_base import Component, ComponentError, _render_child_to_surface
 from .types import ActionLiteral, KeyRouting
 
+_logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from ._surface import Surface
 
@@ -21,75 +23,96 @@ if TYPE_CHECKING:
 class TabView(Component):
     """Tabbed component stack: only the activated sub-component is rendered."""
 
-    NAME = "tab_view"
-
     def __init__(
         self,
-        children: dict[str, Component],
+        route_map: dict[str, Component],
+        shortcuts: Optional[dict[str, str]] = None,
+        start: str = "",
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
-        start_name: Optional[str] = None,
-        switch_handle: Optional[Callable[[str], str]] = None,
-        key_routing: KeyRouting = "child_first",
     ) -> None:
         super().__init__(x, y, size)
-        self.children = children
-        for child in children.values():
+
+        self._route_map = dict(route_map)
+        for child in self._route_map.values():
+            if child.parent is not None and child.parent is not self:
+                _logger.warning("Reparenting %s to TabView", type(child).__name__)
             child.parent = self
-        self.switch_handle = switch_handle
-        self._key_routing = key_routing
-        self.name = start_name or "main"
-        if self.name not in children:
+
+        self._shortcuts = dict(shortcuts) if shortcuts else {}
+        for key, name in self._shortcuts.items():
+            if name not in self._route_map:
+                raise ComponentError(
+                    f"shortcuts['{key}'] -> '{name}' not in route_map"
+                )
+
+        self.children = self._route_map
+
+        if not self._route_map:
+            raise ComponentError("route_map cannot be empty.")
+        if not start:
+            start = next(iter(self._route_map))
+        if start not in self._route_map:
             raise ComponentError(
-                "Please set the name, or has a component key is 'main'."
+                f"start '{start}' not in route_map. "
+                f"Available: {list(self._route_map.keys())}."
             )
-        self._active_child = children[self.name]
-        self._active_child.activate()
+        self._active = self._route_map[start]
+        self._active.activate()
 
-    def fresh(self):
-        pass
-
-    def accept(self, action: ActionLiteral, **data):
-        if action == "goto" and (name := data.get("target")) is not None:
-            if child := self.switch_child(name):
-                child.update(action, **data)
-            else:
-                logging.getLogger(__name__).warning(f"Not found child: {name}.")
-        else:
-            raise ComponentError("Not support action of ~TabView.")
-
-    def _render_surface(self, surface: "Surface") -> None:
-        if self._active_child is not None:
-            _render_child_to_surface(self._active_child, surface, "TabView switch to")
-
-    def _handle_event(self, key: str):
-        if self._key_routing == "switch_first" and self.switch_handle:
-            self.switch_child(self.switch_handle(key))
-        if self._active_child is not None:
-            self._active_child._handle_event(key)
-        if self._key_routing == "child_first" and self.switch_handle:
-            self.switch_child(self.switch_handle(key))
-
-    def switch_child(self, name: str) -> Optional[Component]:
-        if name not in self.children:
+    def route_to(self, target: str) -> Optional[Component]:
+        """Switch to the child identified by logical name in route_map."""
+        panel = self._route_map.get(target)
+        if panel is None:
             return None
-        target = self.children[name]
-        if target is self._active_child:
-            return target
-        if self._active_child is not None:
-            self._active_child.deactivate()
-        target.activate()
-        self._active_child = target
-        fresh_fn = getattr(target, "fresh", None)
+        if panel is self._active:
+            return panel
+        if self._active is not None:
+            self._active.deactivate()
+        panel.activate()
+        self._active = panel
+        fresh_fn = getattr(panel, "fresh", None)
         if callable(fresh_fn):
             try:
                 fresh_fn()
             except NotImplementedError:
                 pass
-        if hasattr(target, "_panel_loaded"):
-            target._panel_loaded = True
-        return target
+            except Exception:
+                _logger.exception("fresh() failed for %s", target)
+        if hasattr(panel, "_panel_loaded"):
+            panel._panel_loaded = True
+        return panel
+
+    def accept(self, action: ActionLiteral, **data):
+        if action is ActionLiteral.goto:
+            target = data.get("target")
+            if isinstance(target, str) and self.route_to(target) is not None:
+                self._active.update(action, **data)
+            else:
+                _logger.warning(
+                    "TabView.goto: target %r not found in route_map %r",
+                    target,
+                    list(self._route_map.keys()),
+                )
+            return
+        _logger.warning("TabView: unsupported action %r", action)
+
+    def _render_surface(self, surface: "Surface") -> None:
+        if self._active is not None:
+            _render_child_to_surface(self._active, surface, "TabView")
+
+    def _handle_event(self, key: str):
+        if self._shortcuts:
+            name = self._shortcuts.get(key)
+            if name is not None and name in self._route_map:
+                panel = self._route_map[name]
+                if panel is not self._active:
+                    self.route_to(name)
+                    return
+        if self._active is not None:
+            self._active._handle_event(key)
+
 
 
 class Column(Component):
@@ -100,8 +123,6 @@ class Column(Component):
     to maintain ordering and overrides all methods that would otherwise iterate
     over ``self.children`` (``resize``, ``notify``, ``accept``, ``fresh``).
     """
-
-    NAME = "column"
 
     def __init__(
         self,

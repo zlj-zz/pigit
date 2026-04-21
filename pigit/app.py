@@ -6,6 +6,7 @@ Author: Zev
 Date: 2026-04-17
 """
 
+from enum import Enum
 from time import sleep
 from typing import Optional
 
@@ -25,10 +26,20 @@ from pigit.termui import (
     Popup,
     TabView,
     ToastPosition,
+    OverlayClientMixin,
 )
 from .git.repo import GitFileT, GitFuncT, Repo
 
 repo_handle = Repo()
+
+
+class PanelRoute(str, Enum):
+    """Type-safe route identifiers for Pigit TUI panels."""
+
+    STATUS = "/status"
+    BRANCH = "/branch"
+    COMMIT = "/commit"
+    DISPLAY = "/display"
 
 
 def _noop_alert_result(_: bool) -> None:
@@ -36,8 +47,6 @@ def _noop_alert_result(_: bool) -> None:
 
 
 class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
-    NAME = "status"
-
     def __init__(
         self,
         x: int = 1,
@@ -88,7 +97,11 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         if key == keys.KEY_ENTER:
             c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split("\n")
             self.emit(
-                "goto", target="display_panel", source=self.NAME, key=f.name, content=c
+                ActionLiteral.goto,
+                target=PanelRoute.DISPLAY,
+                source=PanelRoute.STATUS,
+                key=f.name,
+                content=c,
             )
             return
         if key in {keys.KEY_SPACE, "a"}:
@@ -125,9 +138,7 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         return self._alert_dialog.alert(text, on_result)
 
 
-class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
-    NAME = "branch"
-
+class BranchPanel(GitPanelLazyResizeMixin, ItemSelector,OverlayClientMixin):
     def __init__(
         self,
         x: int = 1,
@@ -160,20 +171,17 @@ class BranchPanel(GitPanelLazyResizeMixin, ItemSelector):
         super().forward(step)
 
     def on_key(self, key: str):
-        if key == keys.KEY_SPACE:
+        if key in {keys.KEY_SPACE, keys.KEY_ENTER}:
             local_branch = self.branches[self.curr_no]
             if local_branch.is_head:
                 return
             err = self.git.checkout_branch(local_branch.name)
             if "error" in err:
-                print(err, sep="", flush=True)
-                sleep(2)
+                self.show_toast(f"Checkout failed: {err}", duration=3.0)
             self.fresh()
 
 
 class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
-    NAME = "commit"
-
     def __init__(
         self,
         x: int = 1,
@@ -208,12 +216,15 @@ class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
         if key == keys.KEY_ENTER:
             commit = self.commits[self.curr_no]
             content = self.git.load_commit_info(commit.sha).split("\n")
-            self.emit("goto", target="display_panel", source=self.NAME, content=content)
+            self.emit(
+                ActionLiteral.goto,
+                target=PanelRoute.DISPLAY,
+                source=PanelRoute.COMMIT,
+                content=content,
+            )
 
 
 class ContentDisplay(LineTextBrowser):
-    NAME = "display_panel"
-
     def __init__(
         self,
         x: int = 1,
@@ -221,7 +232,7 @@ class ContentDisplay(LineTextBrowser):
         size: Optional[tuple[int, int]] = None,
     ) -> None:
         super().__init__(x, y, size, "")
-        self.come_from = ""
+        self.come_from: PanelRoute | None = None
         self.i_cache_key = ""
         self.i_cache = {}
 
@@ -231,21 +242,20 @@ class ContentDisplay(LineTextBrowser):
     _CACHE_MAX = 64
 
     def update(self, action: ActionLiteral, **data):
-        if action == "goto":
+        if action is ActionLiteral.goto:
             self.i_cache[self.i_cache_key] = self._i
-            if len(self.i_cache) > self._CACHE_MAX:
-                # Simple FIFO eviction: drop oldest half.
-                keys_to_drop = list(self.i_cache.keys())[: self._CACHE_MAX // 2]
-                for k in keys_to_drop:
-                    del self.i_cache[k]
-            self.come_from = data.get("source", "")
+            while len(self.i_cache) >= self._CACHE_MAX:
+                del self.i_cache[next(iter(self.i_cache))]
+            src = data.get("source")
+            self.come_from = PanelRoute(src) if isinstance(src, str) and src else None
             self.i_cache_key = data.get("key", "")
             self._content = data.get("content", "")
             self._i = self.i_cache.get(self.i_cache_key, 0)
 
     @bind_keys("esc", "q")
     def _leave_display(self) -> None:
-        self.emit("goto", target=self.come_from)
+        if self.come_from is not None:
+            self.emit(ActionLiteral.goto, target=self.come_from)
 
     @bind_keys("j")
     def _scroll_line_down(self) -> None:
@@ -281,22 +291,15 @@ class PigitApplication(Application):
         commit_panel = CommitPanel()
         display_panel = ContentDisplay()
 
-        def get_name(key: str):
-            return {
-                "1": status_panel.NAME,
-                "2": branch_panel.NAME,
-                "3": commit_panel.NAME,
-            }.get(key, "")
-
         return TabView(
-            {
-                status_panel.NAME: status_panel,
-                branch_panel.NAME: branch_panel,
-                commit_panel.NAME: commit_panel,
-                display_panel.NAME: display_panel,
+            route_map={
+                PanelRoute.STATUS: status_panel,
+                PanelRoute.BRANCH: branch_panel,
+                PanelRoute.COMMIT: commit_panel,
+                PanelRoute.DISPLAY: display_panel,
             },
-            start_name=status_panel.NAME,
-            switch_handle=get_name,
+            shortcuts={"1": PanelRoute.STATUS, "2": PanelRoute.BRANCH, "3": PanelRoute.COMMIT},
+            start=PanelRoute.STATUS,
         )
 
     def setup_root(self, root: ComponentRoot) -> None:
