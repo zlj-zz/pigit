@@ -228,40 +228,44 @@ On windows should be: `C:\\User\\<your username>`
 | [log]        | debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
 | [log]        | output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 
-## Extra cmds
+## Custom Commands
 
-You can setting your custom cmds. It need create a `extra_cmds.py` file at the **pigit** home. And writing like this:
+You can define custom aliases and scripts via a TOML configuration file at the **pigit** home directory.
 
-```python
-import os
+### Configuration file
 
-def print_user(args):
-    print(os.system('whoami'))
+Create `pigit.cmds.toml` in your pigit home directory:
 
-extra_cmds = {
-    'echo': {
-        'command': 'echo 123',
-    },
-    'print-user': {
-        'command': print_user,
-        'type': 'func',
-        'help': 'print system user name.'
-    }
-}
+- Linux/macOS: `~/.config/pigit/pigit.cmds.toml`
+- Windows: `%USERPROFILE%\pigit\pigit.cmds.toml`
+
+### Aliases
+
+```toml
+[cmd_new.aliases]
+mybl = "bl"
+mylog = "log --oneline --graph"
 ```
 
-The `extra_cmds` dict is must. And the structure is command key and command info.
+### Scripts
 
-In `pigit cmd -l`, search, and `--pick`, entries loaded from `extra_cmds` are prefixed with `[extra]` so you can tell them apart from built-ins.
+Multi-step command scripts:
 
-The command info has some options:
+```toml
+[cmd_new.scripts.myscript]
+steps = ["status", "log --oneline"]
+help = "Show status then log"
+category = "script"
+```
 
-- `command`: (Must have) Short life corresponds to the complete command or a method. If it is a method, it must receive a parameter tuple.
-- `type`: (Option) Mark the type of command, support ['func', 'command'], and the default is 'command'.
-- `help`: (Option) Command help message.
-- `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
+Concise form (for simple step lists):
 
-**Note**: The legacy `extra_cmds.py` extension mechanism is preserved for backward compatibility. The new command system (1.8.0+) also supports TOML-based command extensions via configuration.
+```toml
+[cmd_new.scripts]
+quick-check = ["status", "diff --cached"]
+```
+
+In `pigit cmd -l`, search, and `--pick`, user-defined entries are prefixed with `[alias]` or `[script]` so you can tell them apart from built-ins.
 
 ## Feature
 
