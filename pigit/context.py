@@ -79,8 +79,8 @@ class Context:
         from .git.repo import Repo
 
         setup_logging(
-            debug=config.log_debug,
-            log_file=None if config.log_output else LOG_FILE_PATH,
+            debug=config.get().log.debug,
+            log_file=None if config.get().log.output else LOG_FILE_PATH,
         )
 
         app_log = logger(log_name)

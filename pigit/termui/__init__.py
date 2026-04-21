@@ -57,6 +57,7 @@ from pigit.termui._application import Application
 from pigit.termui._bindings import bind_keys, list_bindings
 from pigit.termui._geometry import TerminalSize
 from pigit.termui._renderer import Renderer
+from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui._surface import Surface
 
 # Picker
@@ -104,6 +105,7 @@ __all__ = [
     "list_bindings",
     "Surface",
     "Renderer",
+    "get_renderer_strict",
     "TerminalSize",
     # Picker
     "PickerRow",

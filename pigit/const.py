@@ -39,7 +39,7 @@ else:
 LOG_FILE_PATH: str = f"{PIGIT_HOME}/log/{__project__}.log"
 
 # Config file path
-CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.conf"
+CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.toml"
 
 # Code counter file path
 COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"

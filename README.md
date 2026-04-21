@@ -212,22 +212,21 @@ On Linux or MacOS: `~/.config/pigit`
 
 On windows should be: `C:\\User\\<your username>`
 
-[here](./docs/pigit.conf) is a configuration template.
+[here](./examples/pigit.toml) is a configuration template.
 
-| config key            | type  | default                     | desc                                                                                                                        |
-| --------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| cmd_display           | bool  | True                        | Show original git command.                                                                                                  |
-| cmd_recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
-| tui_help_showtime     | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
-| counter_use_gitignore | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
-| counter_show_invalid  | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
-| counter_show_icon     | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
-| counter_format        | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
-| git_config_format     | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
-| repo_info_include     | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
-| repo_auto_append      | bool  | True                        | Whether auto append path to repos.                                                                                          |
-| log_debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
-| log_output            | bool  | False                       | Whether output log in terminal.                                                                                             |
+| section      | key               | type  | default                     | desc                                                                                                                        |
+| ------------ | ----------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [cmd]        | display           | bool  | True                        | Show original git command.                                                                                                  |
+| [cmd]        | recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
+| [counter]    | use_gitignore     | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
+| [counter]    | show_invalid      | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
+| [counter]    | show_icon         | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
+| [counter]    | format            | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
+| [info]       | git_config_format | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
+| [info]       | repo_include      | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
+| [repo]       | auto_append       | bool  | True                        | Whether auto append path to repos.                                                                                          |
+| [log]        | debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
+| [log]        | output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 
 ## Extra cmds
 

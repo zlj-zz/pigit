@@ -55,10 +55,10 @@ def pigit(args: "Namespace", _) -> None:
         return
 
     elif args.config:
-        console.echo(show_gitconfig(format_type=ctx.config.git_config_format))
+        console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
-        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.repo_info_include))
+        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.get().info.repo_include))
 
     elif args.complete:
         # Generate completion vars dict.
@@ -108,14 +108,15 @@ def pigit(args: "Namespace", _) -> None:
 
     elif args.count:
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
+        config = ctx.config.get()
         total_size, diff_result, invalids = Counter(
-            saved_dir=COUNTER_DIR_PATH, show_invalid=ctx.config.counter_show_invalid
-        ).diff_count(path, ctx.config.counter_use_gitignore)
-        if ctx.config.counter_format == "simple":
+            saved_dir=COUNTER_DIR_PATH, show_invalid=config.counter.show_invalid
+        ).diff_count(path, config.counter.use_gitignore)
+        if config.counter.format == "simple":
             for k, v in diff_result.items():
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
-        elif conf.counter_format == "table":
+        elif config.counter.format == "table":
 
             def color_index(
                 count: int,
@@ -143,7 +144,7 @@ def pigit(args: "Namespace", _) -> None:
             for k, v in diff_result.items():
                 f_type_str = (
                     f"`{get_file_icon(k)} {k}`<cyan>"
-                    if ctx.config.counter_show_icon
+                    if config.counter.show_icon
                     else k
                 )
 
@@ -163,7 +164,7 @@ def pigit(args: "Namespace", _) -> None:
                     f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
                 )
             tb.caption = " Total: {0}".format(total_size)
-            get_console().echo(tb)
+            console.echo(tb)
         else:
             print("Invalid display format!")
 

@@ -1,23 +1,36 @@
 from unittest.mock import patch
 
+import pytest
+
 from pigit.config import Config
+from pigit.config_data import ConfigData
 
-from paths import TEST_PATH
+from paths import TEST_CONFIG
 
 
-TEST_CONFIG = f"{TEST_PATH}/pigit.conf"
+@pytest.fixture(autouse=True)
+def _reset_config_singleton():
+    """Reset Config singleton between tests."""
+    Config._instances.clear()
+    yield
+    Config._instances.clear()
 
 
 @patch("builtins.input", lambda _: "yes")
-def test_create():
+def test_create(tmp_path):
+    config_path = tmp_path / "pigit-create.toml"
     assert (
         Config(
-            TEST_CONFIG,
+            str(config_path),
             version="test",
             auto_load=False,
         ).create_config_template()
-        == True
     )
+    assert config_path.exists()
+    content = config_path.read_text(encoding="utf-8")
+    assert 'version = "test"' in content
+    assert "[cmd]" in content
+    assert "[counter]" in content
 
 
 def test_load():
@@ -25,72 +38,100 @@ def test_load():
         TEST_CONFIG,
         version="test",
         auto_load=True,
+    )
+    data = c.get()
+    assert data.cmd.display is False
+    assert data.cmd.recommend is False
+    assert data.counter.use_gitignore is False
+    assert data.counter.show_invalid is True
+    assert data.counter.show_icon is True
+    assert data.counter.format == "simple"
+    assert data.info.git_config_format == "normal"
+    assert data.info.repo_include == ["path", "remote"]
+    assert data.repo.auto_append is False
+    assert data.log.debug is True
+    assert data.log.output is True
+
+
+def test_output_warnings():
+    c = Config(
+        TEST_CONFIG,
+        version="test",
+        auto_load=True,
     ).output_warnings()
-    print(c.conf)
+    data = c.get()
+    assert isinstance(data, ConfigData)
 
 
-def test_list_config_uses_literal_eval():
+def test_default_values_when_no_config_file():
     c = Config(
-        TEST_CONFIG,
+        "/nonexistent/path/pigit.toml",
         version="test",
-        auto_load=False,
+        auto_load=True,
     )
-    c.conf = {}
-    c._warnings = []
-
-    c.check_and_set_value("repo_info_include", '["path", "remote"]', c.conf)
-
-    assert c.conf["repo_info_include"] == ["path", "remote"]
-    assert c._warnings == []
-
-
-def test_list_config_rejects_non_literal_expression():
-    c = Config(
-        TEST_CONFIG,
-        version="test",
-        auto_load=False,
-    )
-    c.conf = {}
-    c._warnings = []
-
-    c.check_and_set_value(
-        "repo_info_include",
-        '[__import__("os").system("echo hacked")]',
-        c.conf,
-    )
-
-    assert "repo_info_include" not in c.conf
-    assert any("invalid list literal" in warning for warning in c._warnings)
+    data = c.get()
+    assert data.cmd.display is True
+    assert data.cmd.recommend is True
+    assert data.counter.use_gitignore is True
+    assert data.counter.format == "table"
+    assert data.info.git_config_format == "table"
+    assert data.info.repo_include == ["remote", "branch", "log"]
+    assert data.repo.auto_append is True
+    assert data.log.debug is False
+    assert data.log.output is False
 
 
-def test_read_config_parse_inline_comments_and_hash_in_string(tmp_path):
-    config_path = tmp_path / "pigit-inline-comment.conf"
+def test_invalid_format_falls_back_to_default(tmp_path):
+    config_path = tmp_path / "pigit-invalid.toml"
     config_path.write_text(
-        "\n".join(
-            [
-                "#? Config file for pigit v. test",
-                "# full line comment",
-                "cmd_display=true",
-                "cmd_recommend=false # line-end comment",
-                'counter_format="simple"',
-                'repo_info_include=["path#hash", "remote"] # keep hash in string',
-            ]
-        ),
+        '\n'.join([
+            'version = "test"',
+            '',
+            '[counter]',
+            'format = "invalid"',
+            '',
+            '[info]',
+            'git_config_format = "invalid"',
+        ]),
         encoding="utf-8",
     )
 
     c = Config(
-        TEST_CONFIG,
+        str(config_path),
         version="test",
-        auto_load=False,
+        auto_load=True,
     )
-    c.config_file_path = str(config_path)
-    c.conf = {}
-    c._warnings = []
+    data = c.get()
+    assert data.counter.format == "table"
+    assert data.info.git_config_format == "table"
+    assert any("counter.format" in w for w in c._warnings)
+    assert any("git_config_format" in w for w in c._warnings)
 
-    c.read_config()
 
-    assert c.conf["cmd_display"] is True
-    assert c.conf["cmd_recommend"] is False
-    assert c.conf["counter_format"] == "simple"
-    assert c.conf["repo_info_include"] == ["path#hash", "remote"]
+def test_toml_read_with_comments_and_inline_strings(tmp_path):
+    config_path = tmp_path / "pigit-comment.toml"
+    config_path.write_text(
+        '\n'.join([
+            '#? Config file for pigit v. test',
+            '# full line comment',
+            'version = "test"',
+            '',
+            '[cmd]',
+            'display = true',
+            'recommend = false',
+            '',
+            '[info]',
+            'repo_include = ["path#hash", "remote"]',
+        ]),
+        encoding="utf-8",
+    )
+
+    c = Config(
+        str(config_path),
+        version="test",
+        auto_load=True,
+    )
+    data = c.get()
+    assert data.cmd.display is True
+    assert data.cmd.recommend is False
+    assert data.info.repo_include == ["path#hash", "remote"]

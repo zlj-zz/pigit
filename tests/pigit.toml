@@ -1,0 +1,24 @@
+#? Config file for pigit v. test
+
+version = "test"
+
+[cmd]
+display = false
+recommend = false
+
+[counter]
+use_gitignore = false
+show_invalid = true
+show_icon = true
+format = "simple"
+
+[info]
+git_config_format = "normal"
+repo_include = ["path", "remote"]
+
+[repo]
+auto_append = false
+
+[log]
+debug = true
+output = true
