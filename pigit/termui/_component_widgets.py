@@ -251,17 +251,13 @@ class InputLine(Component):
     def delete(self) -> None:
         """Delete character after cursor."""
         if self._cursor < len(self._value):
-            self._value = (
-                self._value[: self._cursor] + self._value[self._cursor + 1 :]
-            )
+            self._value = self._value[: self._cursor] + self._value[self._cursor + 1 :]
             if self._on_change:
                 self._on_change(self._value)
 
     def backspace(self) -> None:
         if self._cursor > 0:
-            self._value = (
-                self._value[: self._cursor - 1] + self._value[self._cursor :]
-            )
+            self._value = self._value[: self._cursor - 1] + self._value[self._cursor :]
             self._cursor -= 1
             if self._on_change:
                 self._on_change(self._value)
@@ -384,9 +380,7 @@ class InputLine(Component):
             prefix = f"{self._prompt}{matched}"
             avail = surface.width - len(prefix)
             if avail < 0:
-                prefix = (
-                    prefix[: surface.width - 1] + "…" if surface.width > 0 else ""
-                )
+                prefix = prefix[: surface.width - 1] + "…" if surface.width > 0 else ""
                 suffix = ""
             elif len(suffix) > avail:
                 suffix = suffix[:avail]

@@ -16,13 +16,12 @@ from .widgets import WIDGETS
 BASH_HELPERS = {
     "branch": '_git_branches() { git branch -a 2>/dev/null | sed "s/^[\\* ]*//" | sed "s|^remotes/||" | sort -u; }',
     "file": '_git_files() { { git status --porcelain 2>/dev/null | cut -c4- | grep -v "^$"; git ls-files --others --exclude-standard 2>/dev/null; } | sort -u; }',
-    "remote": '_git_remotes() { git remote 2>/dev/null | sort -u; }',
-    "tag": '_git_tags() { git tag 2>/dev/null | sort -u; }',
+    "remote": "_git_remotes() { git remote 2>/dev/null | sort -u; }",
+    "tag": "_git_tags() { git tag 2>/dev/null | sort -u; }",
     "commit": '_git_commits() { git log --oneline 2>/dev/null | cut -d" " -f1; }',
     "stash": '_git_stashes() { git stash list 2>/dev/null | cut -d":" -f1; }',
     "ref": '_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }',
 }
-
 
 
 class BashCompletion(ShellCompletion):
@@ -131,7 +130,7 @@ class BashCompletion(ShellCompletion):
             Escaped pattern with quotes if it contains special characters.
         """
         # Characters that have special meaning in bash case patterns
-        special_chars = set('.?*[]!')
+        special_chars = set(".?*[]!")
         if any(c in pattern for c in special_chars):
             return f'"{pattern}"'
         return pattern
@@ -147,7 +146,9 @@ class BashCompletion(ShellCompletion):
         """
         if not used_completions:
             return ""
-        helpers = [BASH_HELPERS[comp] for comp in used_completions if comp in BASH_HELPERS]
+        helpers = [
+            BASH_HELPERS[comp] for comp in used_completions if comp in BASH_HELPERS
+        ]
         return "\n\n".join(helpers) + "\n"
 
     def generate_content(self) -> dict:
@@ -179,9 +180,9 @@ class BashCompletion(ShellCompletion):
                     # Escape case pattern to handle wildcards like '.' in 'b.o'
                     escaped_pattern = self._escape_case_pattern(cmd_name)
                     cmd_arg_cases.append(
-                        f'''        {escaped_pattern})
+                        f"""        {escaped_pattern})
                         COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
-                        ;;'''
+                        ;;"""
                     )
 
         # Extract top-level options and commands

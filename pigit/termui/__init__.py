@@ -12,7 +12,6 @@ from __future__ import annotations
 # Types and enums
 from pigit.termui.types import (
     ActionLiteral,
-    KeyRouting,
     LayerKind,
     OverlayDispatchResult,
     OverlaySurface,
@@ -66,7 +65,6 @@ from pigit.termui._picker import PickerRow
 __all__ = [
     # Types
     "ActionLiteral",
-    "KeyRouting",
     "LayerKind",
     "OverlayDispatchResult",
     "OverlaySurface",

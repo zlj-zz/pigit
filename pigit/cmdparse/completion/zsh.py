@@ -203,7 +203,9 @@ class ZshCompletion(ShellCompletion):
         """Generate git helper function definitions."""
         if not self._used_git_helpers:
             return ""
-        helpers = [ZSH_HELPERS[comp] for comp in self._used_git_helpers if comp in ZSH_HELPERS]
+        helpers = [
+            ZSH_HELPERS[comp] for comp in self._used_git_helpers if comp in ZSH_HELPERS
+        ]
         return "\n\n".join(helpers) + "\n"
 
     def args2complete(self, args_dict: dict) -> str:

@@ -72,7 +72,7 @@ flowchart TB
 | `_picker.py` | `SearchableListPicker` component (CLI/repo flows) |
 | `picker_layout.py` | Layout helpers for pickers |
 | `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
-| `types.py` | `ActionLiteral`, `KeyRouting`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
+| `types.py` | `ActionLiteral`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
 
 ## Minimal example
 

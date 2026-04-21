@@ -95,7 +95,9 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
             return
         f = self.files[self.curr_no]
         if key == keys.KEY_ENTER:
-            c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split("\n")
+            c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split(
+                "\n"
+            )
             self.emit(
                 ActionLiteral.goto,
                 target=PanelRoute.DISPLAY,
@@ -138,7 +140,7 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         return self._alert_dialog.alert(text, on_result)
 
 
-class BranchPanel(GitPanelLazyResizeMixin, ItemSelector,OverlayClientMixin):
+class BranchPanel(GitPanelLazyResizeMixin, ItemSelector, OverlayClientMixin):
     def __init__(
         self,
         x: int = 1,
@@ -298,7 +300,11 @@ class PigitApplication(Application):
                 PanelRoute.COMMIT: commit_panel,
                 PanelRoute.DISPLAY: display_panel,
             },
-            shortcuts={"1": PanelRoute.STATUS, "2": PanelRoute.BRANCH, "3": PanelRoute.COMMIT},
+            shortcuts={
+                "1": PanelRoute.STATUS,
+                "2": PanelRoute.BRANCH,
+                "3": PanelRoute.COMMIT,
+            },
             start=PanelRoute.STATUS,
         )
 
@@ -315,7 +321,11 @@ class PigitApplication(Application):
         size = self._loop.get_term_size()
         if size.columns < 65 or size.lines < 10:
             self._loop.quit("No enough space to running.")
-        self._root.show_toast("Welcome to Pigit! Press ? for help.", duration=3.0, position=ToastPosition.BOTTOM_LEFT)
+        self._root.show_toast(
+            "Welcome to Pigit! Press ? for help.",
+            duration=3.0,
+            position=ToastPosition.BOTTOM_LEFT,
+        )
 
     def toggle_help(self):
         root = self._root

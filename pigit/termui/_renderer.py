@@ -154,7 +154,11 @@ class Renderer:
         lines = [self._row_to_str(row) for row in surface.rows()]
         curr_size = (surface.width, surface.height)
 
-        if self._prev_frame is None or len(self._prev_frame) != len(lines) or self._prev_size != curr_size:
+        if (
+            self._prev_frame is None
+            or len(self._prev_frame) != len(lines)
+            or self._prev_size != curr_size
+        ):
             self.clear_screen()
             for idx, line in enumerate(lines, start=1):
                 self.move_cursor(idx, 1)

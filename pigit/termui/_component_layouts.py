@@ -9,10 +9,10 @@ Date: 2026-04-20
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union
 
 from ._component_base import Component, ComponentError, _render_child_to_surface
-from .types import ActionLiteral, KeyRouting
+from .types import ActionLiteral
 
 _logger = logging.getLogger(__name__)
 
@@ -43,9 +43,7 @@ class TabView(Component):
         self._shortcuts = dict(shortcuts) if shortcuts else {}
         for key, name in self._shortcuts.items():
             if name not in self._route_map:
-                raise ComponentError(
-                    f"shortcuts['{key}'] -> '{name}' not in route_map"
-                )
+                raise ComponentError(f"shortcuts['{key}'] -> '{name}' not in route_map")
 
         self.children = self._route_map
 
@@ -112,7 +110,6 @@ class TabView(Component):
                     return
         if self._active is not None:
             self._active._handle_event(key)
-
 
 
 class Column(Component):

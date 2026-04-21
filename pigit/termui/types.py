@@ -17,15 +17,10 @@ class ActionLiteral(Enum):
     goto = auto()
 
 
-# 按键路由策略
-class KeyRouting(Enum):
-    child_first = auto()
-    switch_first = auto()
-
-
 # Toast 位置
 class ToastPosition(Enum):
     """Toast display position."""
+
     TOP_LEFT = auto()
     TOP_RIGHT = auto()
     BOTTOM_LEFT = auto()
@@ -35,6 +30,7 @@ class ToastPosition(Enum):
 # 图层类型（合并原 LayerKind 和 OverlayKind）
 class LayerKind(Enum):
     """Layer kind for overlay management."""
+
     NONE = 0
     MODAL = 1  # 原 POPUP（值为1）直接更名为 MODAL，保持值不变
     TOAST = 2
@@ -44,6 +40,7 @@ class LayerKind(Enum):
 # 覆盖层按键分发结果
 class OverlayDispatchResult(Enum):
     """Result of overlay key dispatch."""
+
     HANDLED_EXPLICIT = auto()
     HANDLED_IMPLICIT = auto()
     DROPPED_UNBOUND = auto()
