@@ -108,7 +108,16 @@ class ItemSelector(Component):
 
     def set_content(self, content: list[str]):
         self.content = content
-        self._r_start = 0
+        if not content:
+            self._r_start = 0
+            self.curr_no = 0
+            return
+        self.curr_no = min(self.curr_no, len(content) - 1)
+        visible_h = self._size[1]
+        if self.curr_no >= self._r_start + visible_h:
+            self._r_start = max(0, self.curr_no - visible_h + 1)
+        elif self.curr_no < self._r_start:
+            self._r_start = self.curr_no
 
     def clear_items(self):
         self.set_content([""])
@@ -371,6 +380,9 @@ class InputLine(Component):
         if not self._visible:
             return
         core = f"{self._prompt}{self._value}"
+        prompt_len = len(self._prompt)
+        cursor_abs = prompt_len + self._cursor
+
         if self._showing_candidates and self._candidates:
             # Inline completion: text already typed by the user stays normal,
             # the rest of the candidate is shown dim.
@@ -387,14 +399,16 @@ class InputLine(Component):
             surface.draw_text(0, 0, prefix)
             if suffix:
                 surface.draw_text(0, len(prefix), f"\033[2m{suffix}\033[0m")
+            # Block cursor at the end of the completion text.
+            cursor_abs = len(prefix) + len(suffix)
+            if cursor_abs < surface.width:
+                surface.draw_text(0, cursor_abs, "\033[7m \033[0m")
         else:
             surface.draw_row(0, truncate_line(core, surface.width))
-        # Tell renderer where to place the physical cursor.
-        # self.x is 1-based row, self.y is 1-based col (Column convention).
-        from ._renderer_context import get_renderer
-
-        renderer = get_renderer()
-        if renderer is not None:
-            cursor_row = self.x - 1
-            cursor_col = self.y - 1 + len(self._prompt) + self._cursor
-            renderer.set_cursor(cursor_row, cursor_col)
+            # Draw block cursor (reverse video) over the character at cursor.
+            if cursor_abs < surface.width:
+                if self._cursor < len(self._value):
+                    ch = self._value[self._cursor]
+                else:
+                    ch = " "
+                surface.draw_text(0, cursor_abs, f"\033[7m{ch}\033[0m")

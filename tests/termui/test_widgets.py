@@ -230,30 +230,20 @@ class TestInputLine:
         assert row_cells[3].style == "\033[2m"
         assert row_cells[4].style == "\033[2m"
 
-    def test_render_sets_renderer_cursor(self, mocker):
+    def test_render_draws_block_cursor(self, mocker):
         mock_surface = mocker.Mock()
         mock_surface.width = 10
-        mock_renderer = mocker.Mock()
-        mocker.patch(
-            "pigit.termui._renderer_context.get_renderer",
-            return_value=mock_renderer,
-        )
         inp = InputLine(prompt="> ", size=(10, 1))
-        inp.x = 5
-        inp.y = 3
         inp.set_value("hi")
         inp._render_surface(mock_surface)
-        # cursor_row = x - 1 = 4, cursor_col = y - 1 + len("> ") + 2 = 2 + 2 + 2 = 6
-        mock_renderer.set_cursor.assert_called_once_with(4, 6)
+        # Text is drawn via draw_row, then block cursor is drawn via draw_text
+        # at cursor position (prompt_len + cursor = 2 + 2 = 4) as reverse video.
+        mock_surface.draw_row.assert_called_once()
+        mock_surface.draw_text.assert_called_once_with(0, 4, "\033[7m \033[0m")
 
-    def test_render_no_cursor_when_showing_candidates(self, mocker):
+    def test_render_block_cursor_in_candidate_mode(self, mocker):
         mock_surface = mocker.Mock()
         mock_surface.width = 12
-        mock_renderer = mocker.Mock()
-        mocker.patch(
-            "pigit.termui._renderer_context.get_renderer",
-            return_value=mock_renderer,
-        )
         inp = InputLine(
             candidate_provider=lambda text: ["opt"],
             size=(12, 1),
@@ -261,8 +251,14 @@ class TestInputLine:
         inp.set_value("o")
         inp.on_key("tab")
         inp._render_surface(mock_surface)
-        # candidate mode still sets cursor (renderer decides visibility)
-        mock_renderer.set_cursor.assert_called_once()
+        # Candidate mode draws prefix + dim suffix, then block cursor at end.
+        calls = mock_surface.draw_text.call_args_list
+        # Last call should be the block cursor at position 3 ("o" + "pt").
+        assert calls[-1] == ((0, 3, "\033[7m \033[0m"),) or calls[-1].args == (
+            0,
+            3,
+            "\033[7m \033[0m",
+        )
 
     def test_on_key_plain_text_editing(self):
         inp = InputLine()
