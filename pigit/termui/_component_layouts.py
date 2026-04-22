@@ -66,6 +66,11 @@ class TabView(Component):
             return None
         if panel is self._active:
             return panel
+        # Force full redraw; previous panel content would otherwise ghost
+        # through incremental row diff.
+        r = self.renderer
+        if r is not None:
+            r.clear_cache()
         if self._active is not None:
             self._active.deactivate()
         panel.activate()
