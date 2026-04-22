@@ -7,8 +7,10 @@ Date: 2026-04-17
 """
 
 from enum import Enum
-from time import sleep
-from typing import Optional
+from typing import Callable, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import subprocess
 
 from pigit.termui import (
     ActionLiteral,
@@ -32,6 +34,11 @@ from .git.repo import GitFileT, GitFuncT, Repo
 
 repo_handle = Repo()
 
+ExternalProcessCallback = Callable[
+    [list[str], Optional[str]],
+    "subprocess.CompletedProcess[str]",
+]
+
 
 class PanelRoute(str, Enum):
     """Type-safe route identifiers for Pigit TUI panels."""
@@ -46,7 +53,7 @@ def _noop_alert_result(_: bool) -> None:
     pass
 
 
-class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
+class StatusPanel(GitPanelLazyResizeMixin, ItemSelector, OverlayClientMixin):
     def __init__(
         self,
         x: int = 1,
@@ -55,10 +62,12 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
         content: Optional[list[str]] = None,
         *,
         alert_inner_width: Optional[int] = None,
+        on_shell: Optional[ExternalProcessCallback] = None,
     ) -> None:
         super().__init__(x, y, size, content)
         self.repo_path, self.repo_conf = repo_handle.confirm_repo()
         self.git = repo_handle.bind_path(self.repo_path)
+        self._on_shell = on_shell
 
         self.files: list[GitFileT] = []
         self._alert_dialog = AlertDialog(
@@ -95,9 +104,9 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
             return
         f = self.files[self.curr_no]
         if key == keys.KEY_ENTER:
-            c = self.git.load_file_diff(f.name, f.tracked, f.has_staged_change).split(
-                "\n"
-            )
+            # MM: prefer unstaged diff; otherwise show staged if exists
+            cached = f.has_staged_change and not f.has_unstaged_change
+            c = self.git.load_file_diff(f.name, f.tracked, cached).split("\n")
             self.emit(
                 ActionLiteral.goto,
                 target=PanelRoute.DISPLAY,
@@ -119,6 +128,23 @@ class StatusPanel(GitPanelLazyResizeMixin, ItemSelector):
             if self._check_via_alert(self.git.discard_file, f, msg="Discard file"):
                 return
             self.fresh()
+
+    @bind_keys("C")
+    def create_commit(self) -> None:
+        """Create a new commit with default editor."""
+        if not self.git.has_staged_changes(self.repo_path):
+            self.show_toast("No staged changes to commit.", duration=2.0)
+            return
+        if self._on_shell is None:
+            self.show_toast("Editor launch is not configured.", duration=2.0)
+            return
+        try:
+            result = self._on_shell(["git", "commit"], self.repo_path)
+        except Exception as e:
+            self.show_toast(f"Failed to open editor: {e}", duration=3.0)
+            return
+        if result.returncode != 0:
+            self.show_toast(f"Commit failed (exit {result.returncode}).", duration=2.0)
 
     def _check_via_alert(
         self,
@@ -288,7 +314,7 @@ class PigitApplication(Application):
         super().__init__(input_takeover=True)
 
     def build_root(self):
-        status_panel = StatusPanel()
+        status_panel = StatusPanel(on_shell=self.on_shell_request)
         branch_panel = BranchPanel()
         commit_panel = CommitPanel()
         display_panel = ContentDisplay()
@@ -326,6 +352,23 @@ class PigitApplication(Application):
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,
         )
+
+    def on_shell_request(self, cmd: list[str], cwd: Optional[str] = None):
+        result = self.run_external_process(cmd, cwd=cwd)
+        if result.returncode == 0:
+            self._refresh_status_panel()
+        return result
+
+    def _refresh_status_panel(self) -> None:
+        root = self._root
+        if root is None:
+            return
+        body = getattr(root, "body", None)
+        if not isinstance(body, TabView):
+            return
+        status = body.get_tab_by_route(PanelRoute.STATUS)
+        if status is not None and hasattr(status, "fresh"):
+            status.fresh()
 
     def toggle_help(self):
         root = self._root

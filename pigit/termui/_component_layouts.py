@@ -82,6 +82,10 @@ class TabView(Component):
             panel._panel_loaded = True
         return panel
 
+    def get_tab_by_route(self, route: str) -> Optional[Component]:
+        """Return the child panel for the given route key."""
+        return self._route_map.get(route)
+
     def accept(self, action: ActionLiteral, **data):
         if action is ActionLiteral.goto:
             target = data.get("target")

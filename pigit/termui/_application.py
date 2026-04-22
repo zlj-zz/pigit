@@ -8,12 +8,15 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from pigit.termui._bindings import resolve_key_handlers_merged
 from pigit.termui._component_base import Component
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
+
+if TYPE_CHECKING:
+    import subprocess
 
 
 class _ApplicationEventLoop(AppEventLoop):
@@ -93,6 +96,27 @@ class Application:
         self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
         self.setup_root(root)
         self._loop.run()
+
+    def run_external_process(
+        self,
+        cmd: list[str],
+        cwd: Optional[str] = None,
+    ) -> "subprocess.CompletedProcess[str]":
+        """Suspend TUI, run an external command, then resume TUI and redraw.
+
+        Args:
+            cmd: Command argument list (e.g. ["git", "commit"]).
+            cwd: Working directory for the command.
+
+        Returns:
+            subprocess.CompletedProcess with returncode and other fields.
+
+        Raises:
+            RuntimeError: If called outside run() lifecycle.
+        """
+        if self._loop is None:
+            raise RuntimeError("Application not running.")
+        return self._loop.exec_external(cmd, cwd=cwd)
 
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.

@@ -744,6 +744,19 @@ class LocalGit:
         )
         return err or "ok"
 
+    def has_staged_changes(self, path: Optional[str] = None) -> bool:
+        """Return True if index has staged changes."""
+        path = path or self.path
+        code, _, _ = self.executor.exec(
+            "git diff --cached --quiet", flags=REPLY | SILENT, cwd=path
+        )
+        # --quiet: exit 0 = no differences, 1 = differences exist
+        if code == 0:
+            return False
+        if code == 1:
+            return True
+        raise RepoError(f"git diff --cached failed with exit code {code}")
+
     def open_repo_in_browser(
         self,
         path: Optional[str] = None,

@@ -22,7 +22,12 @@ class Session:
     KeyboardInput must not call termios; this class owns terminal attributes on POSIX.
     """
 
-    def __init__(self, alt_screen: bool = False, stdin: Optional[TextIO] = None, stdout: Optional[TextIO] = None):
+    def __init__(
+        self,
+        alt_screen: bool = False,
+        stdin: Optional[TextIO] = None,
+        stdout: Optional[TextIO] = None,
+    ):
         self.alt_screen = alt_screen
         self.stdin = stdin or sys.stdin
         self.stdout = stdout or sys.stdout
@@ -45,6 +50,42 @@ class Session:
             self.stdout.write("\033[?25l")
         self.stdout.flush()
         return self
+
+    def suspend(self) -> None:
+        """Temporarily restore terminal to normal state for external full-screen processes.
+
+        Idempotent: skips if already suspended.
+        On Windows only toggles alternate screen and cursor; does not restore termios.
+        """
+        if getattr(self, "_suspended", False):
+            return
+        self._suspended = True
+        if self.alt_screen:
+            self.stdout.write("\033[?1049l")
+        self.stdout.write("\033[?25h")
+        self.stdout.flush()
+        if sys.platform != "win32" and self._old_termios is not None:
+            import termios
+
+            termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)
+
+    def resume(self) -> None:
+        """Restore terminal back to TUI mode from normal state.
+
+        Idempotent: skips if not currently suspended.
+        On Windows only toggles alternate screen and cursor; does not restore termios.
+        """
+        if not getattr(self, "_suspended", False):
+            return
+        self._suspended = False
+        if sys.platform != "win32":
+            import tty
+
+            tty.setcbreak(self._fd)
+        if self.alt_screen:
+            self.stdout.write("\033[?1049h")
+        self.stdout.write("\033[?25l")
+        self.stdout.flush()
 
     def __exit__(
         self,
