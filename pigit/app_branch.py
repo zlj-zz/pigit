@@ -15,7 +15,7 @@ from pigit.termui import (
     LazyLoadMixin,
     ItemSelector,
     keys,
-    OverlayClientMixin,
+    show_toast,
 )
 from pigit.termui._surface import _DEFAULT_BG
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
+class BranchPanel(LazyLoadMixin, ItemSelector):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
@@ -129,11 +129,11 @@ class BranchPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
                 return
             local_branch = self.branches[self.curr_no]
             if local_branch.is_head:
-                self.show_toast("Already on this branch.", duration=1.5)
+                show_toast("Already on this branch.", duration=1.5)
                 return
             err = self.git.checkout_branch(local_branch.name)
             if "error" in err:
-                self.show_toast(f"Checkout failed: {err}", duration=3.0)
+                show_toast(f"Checkout failed: {err}", duration=3.0)
             else:
-                self.show_toast(f"Switched to {local_branch.name}", duration=1.5)
+                show_toast(f"Switched to {local_branch.name}", duration=1.5)
             self.fresh()

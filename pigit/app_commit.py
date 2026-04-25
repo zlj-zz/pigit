@@ -17,7 +17,6 @@ from pigit.termui import (
     LazyLoadMixin,
     ItemSelector,
     keys,
-    OverlayClientMixin,
 )
 from pigit.termui.types import ActionLiteral
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
@@ -44,7 +43,7 @@ def _relative_time(unix_ts: int) -> str:
     return f"{delta // 604800}w ago"
 
 
-class CommitPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
+class CommitPanel(LazyLoadMixin, ItemSelector):
     """Commit panel with list view, relative time, and unpushed markers."""
 
     CURSOR = "\u25cf"

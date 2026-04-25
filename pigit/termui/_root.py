@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Optional
 from ._component_base import Component
 from ._layer import LayerKind, LayerStack
 from .types import OverlayDispatchResult, ToastPosition
+from . import _overlay_context
 
 if TYPE_CHECKING:
     from ._overlay_components import Sheet, Toast
@@ -31,7 +32,14 @@ class ComponentRoot(Component):
         self._body = body
         self._body.parent = self
         self._layer_stack = LayerStack()
+        self._overlay_host_token = _overlay_context.set_overlay_host(self)
         self._badge_text: Optional[str] = None
+
+    def __del__(self) -> None:
+        try:
+            _overlay_context.reset_overlay_host(self._overlay_host_token)
+        except Exception:
+            pass
 
     @property
     def body(self) -> Component:

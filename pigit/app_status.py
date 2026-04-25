@@ -17,7 +17,7 @@ from pigit.termui import (
     LazyLoadMixin,
     ItemSelector,
     keys,
-    OverlayClientMixin,
+    show_toast,
 )
 from pigit.termui.types import ActionLiteral
 from pigit.termui._surface import _DEFAULT_BG
@@ -63,7 +63,7 @@ def _status_label(file: File) -> str:
     return ""
 
 
-class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
+class StatusPanel(LazyLoadMixin, ItemSelector):
     """Status panel with visual mode."""
 
     CURSOR = "\u25cf"  # filled circle
@@ -343,7 +343,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
-        self.show_toast("No files selected", duration=2.0)
+        show_toast("No files selected", duration=2.0)
 
     def _clear_visual_mode(self) -> None:
         """Exit visual mode and clear selection state."""
@@ -364,7 +364,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
         """Unified handler for single / visual mode actions."""
         if self._visual_mode:
             if self._visual_scroll:
-                self.show_toast("Press s to exit scroll mode", duration=2.0)
+                show_toast("Press s to exit scroll mode", duration=2.0)
                 return
             if not self._selected:
                 self._toast_no_selection()

@@ -21,10 +21,7 @@ from pigit.termui.types import (
 
 # Core components
 from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_mixins import (
-    LazyLoadMixin,
-    OverlayClientMixin,
-)
+from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._component_layouts import Column, Row, TabView
 from pigit.termui._component_widgets import (
     InputLine,
@@ -52,6 +49,9 @@ from pigit.termui.event_loop import ExitEventLoop
 from pigit.termui._root import ComponentRoot
 from pigit.termui._application import Application
 
+# Overlay context (module-level functions)
+from pigit.termui._overlay_context import show_toast, show_sheet
+
 # Other utilities
 from pigit.termui._bindings import bind_keys, list_bindings
 from pigit.termui._geometry import TerminalSize
@@ -74,7 +74,6 @@ __all__ = [
     # Core
     "Component",
     "ComponentError",
-    "OverlayClientMixin",
     "LazyLoadMixin",
     # Containers
     "TabView",
@@ -110,6 +109,9 @@ __all__ = [
     "Renderer",
     "get_renderer_strict",
     "TerminalSize",
+    # Overlay context
+    "show_toast",
+    "show_sheet",
     # Picker
     "PickerRow",
 ]

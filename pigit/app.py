@@ -24,6 +24,7 @@ from pigit.termui import (
     LayerKind,
     Popup,
     Row,
+    show_toast,
     TabView,
     ToastPosition,
 )
@@ -209,13 +210,13 @@ class PigitApplication(Application):
             )
         except Exception:
             logging.warning("Failed to initialize repo info", exc_info=True)
-            self._root.show_toast(
+            show_toast(
                 "Failed to load repo info. Check git configuration.",
                 duration=3.0,
                 position=ToastPosition.BOTTOM_LEFT,
             )
 
-        self._root.show_toast(
+        show_toast(
             "Welcome to Pigit! Press ? for help.",
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,

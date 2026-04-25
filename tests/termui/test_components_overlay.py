@@ -43,97 +43,67 @@ class DummyBody(Component):
         pass
 
 
-class TestOverlayClientMixin:
-    def test_mixin_show_toast_finds_host(self):
-        """验证 OverlayClientMixin.show_toast 能找到 host 并调用"""
-        from pigit.termui._component_mixins import OverlayClientMixin
+class TestOverlayContext:
+    def test_show_toast_with_host(self):
+        """验证 show_toast 在 overlay host context 下能工作"""
+        from pigit.termui._overlay_context import show_toast
         from pigit.termui._root import ComponentRoot
-
-        class _MixinComponent(Component, OverlayClientMixin):
-            NAME = "mixin_test"
-
-            def _render_surface(self, surface):
-                pass
-
-            def fresh(self):
-                pass
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        mixin_comp = _MixinComponent()
-        mixin_comp.parent = root.body
-        root.body.children = {"test": mixin_comp}
 
-        result = mixin_comp.show_toast("test message", duration=2.0)
+        result = show_toast("test message", duration=2.0)
 
         # 应该成功创建 Toast
         assert result is not None
         assert result._message == "test message"
 
-    def test_mixin_show_toast_no_host_returns_none(self):
-        """验证无 host 时返回 None"""
-        from pigit.termui._component_mixins import OverlayClientMixin
+    def test_show_toast_no_host_returns_none(self):
+        """验证无 overlay host context 时返回 None"""
+        from pigit.termui._overlay_context import (
+            _get_host,
+            reset_overlay_host,
+            set_overlay_host,
+            show_toast,
+        )
 
-        class _MixinComponent(Component, OverlayClientMixin):
-            NAME = "mixin_test"
+        # 清除可能由其他测试遗留的 overlay host
+        prev_host = _get_host()
+        if prev_host is not None:
+            token = set_overlay_host(None)
+        else:
+            token = None
 
-            def _render_surface(self, surface):
-                pass
+        try:
+            assert _get_host() is None
+            result = show_toast("test message")
+            assert result is None
+        finally:
+            if token is not None:
+                reset_overlay_host(token)
 
-            def fresh(self):
-                pass
-
-        mixin_comp = _MixinComponent()
-        # 无 parent，应该返回 None
-        result = mixin_comp.show_toast("test message")
-        assert result is None
-
-    def test_mixin_show_sheet_finds_host(self):
-        """验证 OverlayClientMixin.show_sheet 能找到 host"""
-        from pigit.termui._component_mixins import OverlayClientMixin
+    def test_show_sheet_with_host(self):
+        """验证 show_sheet 在 overlay host context 下能工作"""
+        from pigit.termui._overlay_context import show_sheet
         from pigit.termui._root import ComponentRoot
-
-        class _MixinComponent(Component, OverlayClientMixin):
-            NAME = "mixin_test"
-
-            def _render_surface(self, surface):
-                pass
-
-            def fresh(self):
-                pass
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        mixin_comp = _MixinComponent()
-        mixin_comp.parent = root.body
-        root.body.children = {"test": mixin_comp}
 
         inner = _Leaf()
-        result = mixin_comp.show_sheet(inner, height=5)
+        result = show_sheet(inner, height=5)
 
         assert result is not None
 
-    def test_mixin_show_toast_position_parameter(self):
-        """验证 Mixin 支持传递 position 参数"""
-        from pigit.termui._component_mixins import OverlayClientMixin
+    def test_show_toast_position_parameter(self):
+        """验证 show_toast 支持传递 position 参数"""
+        from pigit.termui._overlay_context import show_toast
         from pigit.termui._root import ComponentRoot
-
-        class _MixinComponent(Component, OverlayClientMixin):
-            NAME = "mixin_test"
-
-            def _render_surface(self, surface):
-                pass
-
-            def fresh(self):
-                pass
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        mixin_comp = _MixinComponent()
-        mixin_comp.parent = root.body
-        root.body.children = {"test": mixin_comp}
 
-        result = mixin_comp.show_toast(
+        result = show_toast(
             "test", duration=2.0, position=ToastPosition.BOTTOM_LEFT
         )
 
