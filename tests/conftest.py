@@ -12,7 +12,7 @@ _PIGIT_PATH = PROJECT_ROOT
 
 # Not support.
 if sys.platform == "win32":
-    collect_ignore_glob = ["**/test_tui_input.py", "**/test_tui_eventloop.py"]
+    collect_ignore_glob = ["**/test_tui_input.py", "**/test_termui_eventloop.py"]
 
 PYTHON_VERSION = sys.version_info[:3]
 if PYTHON_VERSION < (3, 9):

@@ -1,11 +1,24 @@
 import pytest
+from unittest.mock import MagicMock
+
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
 from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
-from pigit.termui.types import ActionLiteral
+from pigit.termui.types import ActionLiteral, OverlayDispatchResult
 
-# Mock Component to use in tests
+
+# --- Helpers ---
+
+
+class _Leaf(Component):
+    def fresh(self):
+        pass
+
+    def _render_surface(self, surface):
+        pass
+
+
 class MockComponent(Component):
     def __init__(self, name):
         self._name = name
@@ -24,6 +37,101 @@ class MockComponent(Component):
 class MockTabView(TabView):
     def update(self, action: ActionLiteral, **data):
         pass
+
+
+# --- Component base ---
+
+
+class TestComponentBase:
+    def test_emit_to_parent(self):
+        parent = _Leaf()
+        child = _Leaf()
+        child.parent = parent
+        parent.accept = MagicMock()
+        child.emit(ActionLiteral.goto, target="x")
+        parent.accept.assert_called_once_with(ActionLiteral.goto, target="x")
+
+    def test_emit_without_parent_raises(self):
+        child = _Leaf()
+        with pytest.raises(AssertionError, match="Has no parent"):
+            child.emit(ActionLiteral.goto, target="x")
+
+    def test_notify_children(self):
+        a, b = _Leaf(), _Leaf()
+        parent = _Leaf(children={"a": a, "b": b})
+        a.parent = parent
+        b.parent = parent
+        a.update = MagicMock()
+        b.update = MagicMock()
+        parent.notify(ActionLiteral.goto, target="x")
+        a.update.assert_called_once_with(ActionLiteral.goto, target="x")
+        b.update.assert_called_once_with(ActionLiteral.goto, target="x")
+
+    def test_notify_without_children_raises(self):
+        leaf = _Leaf()
+        leaf.children = None
+        with pytest.raises(AssertionError, match="Has no children"):
+            leaf.notify(ActionLiteral.goto, target="x")
+
+    def test_resize_propagates_to_children(self):
+        child = _Leaf()
+        child.resize = MagicMock(wraps=child.resize)
+        parent = TabView(children=[child])
+        parent.resize((10, 5))
+        child.resize.assert_called_once_with((10, 5))
+
+    def test_handle_event_binding(self):
+        class _Bound(_Leaf):
+            BINDINGS = [("x", "on_x")]
+
+            def on_x(self):
+                self.called = True
+
+        leaf = _Bound()
+        leaf._handle_event("x")
+        assert leaf.called is True
+
+    def test_handle_event_on_key(self):
+        leaf = _Leaf()
+        leaf.on_key = MagicMock()
+        leaf._handle_event("k")
+        leaf.on_key.assert_called_once_with("k")
+
+    def test_has_overlay_open_default(self):
+        assert _Leaf().has_overlay_open() is False
+
+    def test_try_dispatch_overlay_default(self):
+        assert _Leaf().try_dispatch_overlay("k") is OverlayDispatchResult.DROPPED_UNBOUND
+
+    def test_get_help_entries_derives_from_bindings(self):
+        class _Bound(_Leaf):
+            BINDINGS = [("x", "on_x")]
+
+            def on_x(self):
+                """Do the thing."""
+                pass
+
+        entries = _Bound().get_help_entries()
+        assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
+
+    def test_nearest_overlay_host_walks_up(self):
+        class _MockHost(_Leaf):
+            def begin_popup_session(self, popup):
+                pass
+
+            def end_popup_session(self):
+                pass
+
+        host = _MockHost()
+        mid = _Leaf()
+        mid.parent = host
+        leaf = _Leaf()
+        leaf.parent = mid
+        assert leaf.nearest_overlay_host() is host
+
+    def test_nearest_overlay_host_none(self):
+        leaf = _Leaf()
+        assert leaf.nearest_overlay_host() is None
 
 
 class TestTabView:

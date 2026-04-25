@@ -163,3 +163,26 @@ class TestComponentRoot:
         toast = Toast("injected", duration=5.0, clock=fake_clock)
         assert not toast.is_expired()   # 2.0 - 0.0 = 2.0 <= 5.0
         assert toast.is_expired()       # 10.0 - 0.0 = 10.0 > 5.0
+
+    # --- Badge ---
+
+    def test_badge_starts_none(self):
+        root = ComponentRoot(DummyBody())
+        assert root.badge_text is None
+
+    def test_show_badge_sets_text(self):
+        root = ComponentRoot(DummyBody())
+        root.show_badge("3 staged")
+        assert root.badge_text == "3 staged"
+
+    def test_hide_badge_clears_text(self):
+        root = ComponentRoot(DummyBody())
+        root.show_badge("3 staged")
+        root.hide_badge()
+        assert root.badge_text is None
+
+    def test_show_badge_overwrites_previous(self):
+        root = ComponentRoot(DummyBody())
+        root.show_badge("old")
+        root.show_badge("new")
+        assert root.badge_text == "new"
