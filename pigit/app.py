@@ -6,6 +6,7 @@ Author: Zev
 Date: 2026-04-17
 """
 
+import logging
 import os
 from typing import Callable, Optional, TYPE_CHECKING
 
@@ -207,7 +208,12 @@ class PigitApplication(Application):
                 branch_name=head,
             )
         except Exception:
-            pass
+            logging.warning("Failed to initialize repo info", exc_info=True)
+            self._root.show_toast(
+                "Failed to load repo info. Check git configuration.",
+                duration=3.0,
+                position=ToastPosition.BOTTOM_LEFT,
+            )
 
         self._root.show_toast(
             "Welcome to Pigit! Press ? for help.",

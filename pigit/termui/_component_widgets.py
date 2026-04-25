@@ -147,7 +147,7 @@ class ItemSelector(Component):
             self._r_start += step
         self._notify_change()
 
-    def forward(self, step: int = 1):
+    def previous(self, step: int = 1):
         tmp = self.curr_no - step
         if tmp < 0 or tmp >= len(self.content):
             return

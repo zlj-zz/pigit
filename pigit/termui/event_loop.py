@@ -198,9 +198,10 @@ class AppEventLoop:
             raise
         except Exception as e:
             self.stop()
-            logging.getLogger().exception(
+            _logger.exception(
                 "AppEventLoop: unhandled exception in main loop: %s", e
             )
+            raise
 
     def run(self) -> None:
         with Session(alt_screen=self._alt) as session:

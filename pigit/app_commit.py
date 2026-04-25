@@ -21,10 +21,10 @@ from pigit.termui import (
 )
 from pigit.termui.types import ActionLiteral
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
-from pigit.termui._surface import _DEFAULT_BG
 
 if TYPE_CHECKING:
     from .git.model import Commit
@@ -75,8 +75,8 @@ class CommitPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
         super().next(step)
 
     @bind_keys("k", keys.KEY_UP)
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
+    def previous(self, step: int = 1) -> None:
+        super().previous(step)
 
     @bind_keys("g")
     def toggle_view(self) -> None:

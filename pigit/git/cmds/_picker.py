@@ -214,7 +214,7 @@ def run_cmd_new_picker(
             if key in ("j", keys.KEY_DOWN):
                 self._list.next()
             elif key in ("k", keys.KEY_UP):
-                self._list.forward()
+                self._list.previous()
             elif key == "enter":
                 self._enter_param_input()
             elif key == "/":

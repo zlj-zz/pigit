@@ -212,11 +212,11 @@ class TestItemSelector:
         assert sel.curr_no == 3
         assert sel._r_start == 2
 
-    def test_forward_scroll(self):
+    def test_previous_scroll(self):
         sel = _Selector(content=["a", "b", "c", "d"], size=(5, 2))
         sel.curr_no = 3
         sel._r_start = 2
-        sel.forward(2)
+        sel.previous(2)
         assert sel.curr_no == 1
         assert sel._r_start == 0
 
@@ -226,10 +226,10 @@ class TestItemSelector:
         sel.next(1)
         assert sel.curr_no == 1
 
-    def test_forward_out_of_bounds_is_ignored(self):
+    def test_previous_out_of_bounds_is_ignored(self):
         sel = _Selector(content=["a", "b"], size=(5, 2))
         sel.curr_no = 0
-        sel.forward(1)
+        sel.previous(1)
         assert sel.curr_no == 0
 
     def test_render_cursor(self):

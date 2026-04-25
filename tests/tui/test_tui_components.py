@@ -306,11 +306,11 @@ class TestItemSelector:
         ],
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
-    def test_ItemSelector_forward(self, content, initial_pos, step, expected_pos):
+    def test_ItemSelector_previous(self, content, initial_pos, step, expected_pos):
         selector = MockItemSelector(content=content)
         selector.curr_no = initial_pos
 
-        selector.forward(step=step)
+        selector.previous(step=step)
         assert selector.curr_no == expected_pos
 
 

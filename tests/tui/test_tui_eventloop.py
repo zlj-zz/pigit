@@ -89,7 +89,7 @@ def test_init_respects_injected_input_handle():
         (lambda: ExitEventLoop("x"), 1, True),
         (lambda: KeyboardInterrupt(), 1, True),
         (lambda: EOFError(), 1, True),
-        (lambda: RuntimeError("x"), 1, False),
+        (lambda: RuntimeError("x"), 1, True),
     ],
 )
 @patch("pigit.termui.event_loop.Session")
@@ -121,9 +121,9 @@ def test_run_exception_handling(
     assert event_loop.stop.call_count == expected_stop_calls
 
 
-@patch("pigit.termui.event_loop.logging.getLogger")
+@patch("pigit.termui.event_loop._logger")
 @patch("pigit.termui.event_loop.Session")
-def test_run_unexpected_exception_logs_with_exception(mock_session_cls, mock_get_logger):
+def test_run_unexpected_exception_logs_with_exception(mock_session_cls, mock_logger):
     session_cm = MagicMock()
     session_inner = MagicMock()
     session_inner.renderer = MagicMock()
@@ -131,19 +131,17 @@ def test_run_unexpected_exception_logs_with_exception(mock_session_cls, mock_get
     session_cm.__exit__.return_value = None
     mock_session_cls.return_value = session_cm
 
-    mock_log = MagicMock()
-    mock_get_logger.return_value = mock_log
-
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop._loop = Mock(side_effect=RuntimeError("boom"))
     event_loop.start = Mock()
     event_loop.stop = Mock()
 
-    event_loop.run()
+    with pytest.raises(RuntimeError, match="boom"):
+        event_loop.run()
 
     event_loop.stop.assert_called_once()
-    mock_log.exception.assert_called_once()
+    mock_logger.exception.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -226,9 +224,10 @@ def test_loop_string_dispatch_calls_hooks_with_outcome(mock_renderer, batch, exp
 
     key = batch[0][0]
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [batch, RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [batch, ExitEventLoop("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
 
     assert ("before", key) in loop.trace
     assert ("after", key, expected_outcome) in loop.trace
@@ -247,9 +246,10 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[], RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [[], ExitEventLoop("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
 
     loop.before_dispatch_key.assert_not_called()
     loop.after_dispatch_key.assert_not_called()
@@ -276,9 +276,10 @@ def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
     loop._child._handle_event = Mock()
 
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [[["k"]], ExitEventLoop("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
 
     loop._child._handle_event.assert_called_once_with("k")
     assert ("k", "overlay") in loop.trace
@@ -305,9 +306,10 @@ def test_loop_overlay_open_maps_to_overlay_outcome(mock_renderer):
     loop._child._handle_event = Mock()
 
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [[["k"]], ExitEventLoop("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
 
     loop._child._handle_event.assert_called_once_with("k")
     assert ("k", "overlay") in loop.trace
@@ -374,7 +376,7 @@ def test_app_event_loop_accepts_callable_binding(mock_renderer):
     # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["q"]], RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [[["q"]], ExitEventLoop("stop")]
 
     with pytest.raises(ExitEventLoop, match="bye"):
         loop._run_impl()
@@ -493,9 +495,10 @@ def test_loop_mouse_event_is_ignored(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], RuntimeError("stop")]
+    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], ExitEventLoop("stop")]
 
-    loop._run_impl()
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
 
     loop.before_dispatch_key.assert_not_called()
     loop.after_dispatch_key.assert_not_called()

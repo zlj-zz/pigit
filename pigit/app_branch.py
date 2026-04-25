@@ -17,9 +17,9 @@ from pigit.termui import (
     keys,
     OverlayClientMixin,
 )
+from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
-from pigit.termui._surface import _DEFAULT_BG
 
 if TYPE_CHECKING:
     from .git.model import Branch
@@ -68,8 +68,8 @@ class BranchPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
         super().next(step)
 
     @bind_keys("k", keys.KEY_UP)
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
+    def previous(self, step: int = 1) -> None:
+        super().previous(step)
 
     def _render_surface(self, surface) -> None:
         if not self.content:

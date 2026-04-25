@@ -13,9 +13,9 @@ from typing import Optional
 from pigit.termui import bind_keys, Component, keys, LineTextBrowser
 from pigit.termui.types import ActionLiteral
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
-from pigit.termui._surface import _DEFAULT_BG
 
 
 class DiffViewer(LineTextBrowser):

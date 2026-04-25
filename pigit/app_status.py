@@ -21,10 +21,10 @@ from pigit.termui import (
 )
 from pigit.termui.types import ActionLiteral
 from pigit.termui._surface import _DEFAULT_BG
+from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
 from .git.model import File
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
     from .git.repo import GitFileT, GitFuncT
@@ -118,8 +118,8 @@ class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
             self._update_visual_selection()
 
     @bind_keys("k", keys.KEY_UP)
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
+    def previous(self, step: int = 1) -> None:
+        super().previous(step)
         if self._visual_mode and self._visual_scroll and self._visual_anchor is not None:
             self._update_visual_selection()
 
@@ -300,56 +300,27 @@ class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
             )
             return
         if key == "a":
-            if self._visual_mode:
-                if self._visual_scroll:
-                    self.show_toast("Press s to exit scroll mode", duration=2.0)
-                    return
-                if not self._selected:
-                    self._toast_no_selection()
-                    return
-                count = len(self._selected)
-                for idx in sorted(self._selected):
-                    if idx < len(self.files):
-                        self.git.switch_file_status(self.files[idx])
-                self._clear_visual_mode()
-                self._notify_badge(f"Updated {count} file(s)")
-            else:
-                action = "Unstaged" if f.has_staged_change else "Staged"
-                self.git.switch_file_status(f)
-                self._notify_badge(f"{action} {f.name}")
-            self.fresh()
+            action = "Unstaged" if f.has_staged_change else "Staged"
+            self._run_action(
+                self.git.switch_file_status,
+                single_msg=f"{action} {f.name}",
+                batch_msg="Updated {} file(s)",
+            )
             return
         if key == "i":
-            if self._visual_mode:
-                if self._visual_scroll:
-                    self.show_toast("Press s to exit scroll mode", duration=2.0)
-                    return
-                if not self._selected:
-                    self._toast_no_selection()
-                    return
-                count = len(self._selected)
-                for idx in sorted(self._selected):
-                    if idx < len(self.files):
-                        self.git.ignore_file(self.files[idx])
-                self._clear_visual_mode()
-                self._notify_badge(f"Ignored {count} file(s)")
-            else:
-                self._check_via_alert(self.git.ignore_file, f, msg="Ignored")
-            self.fresh()
+            self._run_action(
+                self.git.ignore_file,
+                single_msg="Ignored",
+                batch_msg="Ignored {} file(s)",
+            )
             return
         if key == "d":
-            if self._visual_mode:
-                if self._visual_scroll:
-                    self.show_toast("Press s to exit scroll mode", duration=2.0)
-                    return
-                if not self._selected:
-                    self._toast_no_selection()
-                    return
-                self._confirm_batch("Discard", self.git.discard_file)
-            else:
-                if self._check_via_alert(self.git.discard_file, f, msg="Discard file"):
-                    return
-            self.fresh()
+            self._run_action(
+                self.git.discard_file,
+                single_msg="Discard file",
+                batch_msg="Discard {} file(s)",
+                needs_confirm=True,
+            )
             return
 
     # --- Helpers ---
@@ -381,6 +352,41 @@ class StatusPanel(LazyLoadMixin, ItemSelector, OverlayClientMixin):
         self._visual_anchor = None
         self._visual_scroll = False
         self._notify_mode()
+
+    def _run_action(
+        self,
+        callee: GitFuncT,
+        *,
+        single_msg: str = "",
+        batch_msg: str = "",
+        needs_confirm: bool = False,
+    ) -> None:
+        """Unified handler for single / visual mode actions."""
+        if self._visual_mode:
+            if self._visual_scroll:
+                self.show_toast("Press s to exit scroll mode", duration=2.0)
+                return
+            if not self._selected:
+                self._toast_no_selection()
+                return
+            if needs_confirm:
+                self._confirm_batch(batch_msg, callee)
+            else:
+                count = len(self._selected)
+                for idx in sorted(self._selected):
+                    if idx < len(self.files):
+                        callee(self.files[idx])
+                self._clear_visual_mode()
+                self._notify_badge(batch_msg.format(count))
+        else:
+            f = self.files[self.curr_no]
+            if needs_confirm:
+                if self._check_via_alert(callee, f, msg=single_msg):
+                    return
+            else:
+                callee(f)
+                self._notify_badge(single_msg)
+        self.fresh()
 
     def _check_via_alert(
         self,

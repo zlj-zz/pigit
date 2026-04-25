@@ -161,7 +161,7 @@ def run_repo_cd_picker(
             if key in ("j", keys.KEY_DOWN):
                 self._list.next()
             elif key in ("k", keys.KEY_UP):
-                self._list.forward()
+                self._list.previous()
             elif key == "enter":
                 self._execute_selected()
             elif key == "/":
