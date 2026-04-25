@@ -7,7 +7,7 @@ Date: 2026-04-15
 """
 
 import subprocess
-from typing import Optional
+from typing import Callable, Optional
 
 from ._completion_types import CompletionType
 
@@ -70,7 +70,7 @@ def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
 
 def make_candidate_provider(
     comp: Optional[CompletionType],
-) -> Optional[callable]:
+) -> Optional[Callable]:
     """Build a candidate provider callback for tab completion.
 
     Args:

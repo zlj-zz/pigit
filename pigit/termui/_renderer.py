@@ -10,9 +10,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Sequence
 
+from ._color import ColorAdapter
+from ._surface import _DEFAULT_BG, _DEFAULT_FG
+
 if TYPE_CHECKING:
     from ._session import Session
-    from ._surface import Cell, Surface
+    from ._surface import FlatCell, Surface
 
 
 class Renderer:
@@ -30,6 +33,7 @@ class Renderer:
         self._cursor_pos: Optional[tuple[int, int]] = None
         self._last_cursor: Optional[tuple[int, int]] = None
         self._cursor_visible: bool = False
+        self._color = ColorAdapter()
 
     def write(self, text: str) -> None:
         self._out.write(text)
@@ -132,21 +136,145 @@ class Renderer:
             cur_row += 1
         self.flush()
 
-    def _row_to_str(self, row: list["Cell"]) -> str:
+    # ------------------------------------------------------------------ #
+    # Row rendering (FlatCell-aware)
+    # ------------------------------------------------------------------ #
+
+    def _row_to_str(self, row: list["FlatCell"]) -> str:
+        """Convert a row of FlatCells to an ANSI string.
+
+        Dispatches to specialized handlers based on whether the row contains
+        legacy ``ansi_style`` cells, RGB cells, or a mix.
+        """
+        # Determine if any cell actually uses RGB features (non-default colors/bold)
+        has_rgb = any(
+            cell.char != ""
+            and cell.ansi_style is None
+            and (cell.fg != _DEFAULT_FG or cell.bg != _DEFAULT_BG or cell.bold)
+            for cell in row
+        )
+        has_legacy = any(cell.char != "" and cell.ansi_style is not None for cell in row)
+
+        if not has_rgb:
+            # All cells are legacy or plain default — use legacy renderer
+            return self._row_to_str_legacy(row)
+        if not has_legacy:
+            return self._row_to_str_rgb(row)
+        return self._row_to_str_mixed(row)
+
+    def _row_to_str_legacy(self, row: list["FlatCell"]) -> str:
+        """Render a row where every cell uses legacy ``ansi_style``."""
         parts = []
         last_style = ""
         for cell in row:
             if cell.char == "":
                 continue
-            if cell.style != last_style:
+            if cell.ansi_style != last_style:
                 if last_style:
                     parts.append("\033[0m")
-                if cell.style:
-                    parts.append(cell.style)
-                last_style = cell.style
+                if cell.ansi_style:
+                    parts.append(cell.ansi_style)
+                last_style = cell.ansi_style
             parts.append(cell.char)
         if last_style:
             parts.append("\033[0m")
+        return "".join(parts)
+
+    def _row_to_str_rgb(self, row: list["FlatCell"]) -> str:
+        """Render a row where cells use RGB attributes."""
+        parts = []
+        last_fg = _DEFAULT_FG
+        last_bg = _DEFAULT_BG
+        last_bold = False
+        has_style = False
+
+        for cell in row:
+            if cell.char == "":
+                continue
+            sgr_parts = []
+            if cell.fg != last_fg:
+                if cell.fg == _DEFAULT_FG:
+                    sgr_parts.append("\033[39m")
+                else:
+                    sgr_parts.append(self._color.fg_sequence(cell.fg))
+                last_fg = cell.fg
+            if cell.bg != last_bg:
+                if cell.bg == _DEFAULT_BG:
+                    sgr_parts.append("\033[49m")
+                else:
+                    sgr_parts.append(self._color.bg_sequence(cell.bg))
+                last_bg = cell.bg
+            if cell.bold != last_bold:
+                sgr_parts.append(self._color.bold_sequence(cell.bold))
+                last_bold = cell.bold
+
+            if sgr_parts:
+                parts.extend(sgr_parts)
+                has_style = True
+            parts.append(cell.char)
+
+        if has_style:
+            parts.append(self._color.reset_sequence())
+        return "".join(parts)
+
+    def _row_to_str_mixed(self, row: list["FlatCell"]) -> str:
+        """Render a row containing both legacy and RGB cells."""
+        parts = []
+        in_legacy = False
+        last_fg = _DEFAULT_FG
+        last_bg = _DEFAULT_BG
+        last_bold = False
+
+        for cell in row:
+            if cell.char == "":
+                continue
+
+            if cell.ansi_style is not None:
+                # Legacy cell
+                if not in_legacy:
+                    # Transition from RGB to legacy
+                    if last_fg != _DEFAULT_FG or last_bg != _DEFAULT_BG or last_bold:
+                        parts.append(self._color.reset_sequence())
+                        last_fg = _DEFAULT_FG
+                        last_bg = _DEFAULT_BG
+                        last_bold = False
+                in_legacy = True
+                parts.append(cell.ansi_style)
+                parts.append(cell.char)
+            else:
+                # RGB cell
+                if in_legacy:
+                    # Transition from legacy to RGB: reset terminal state
+                    parts.append(self._color.reset_sequence())
+                    in_legacy = False
+                    last_fg = _DEFAULT_FG
+                    last_bg = _DEFAULT_BG
+                    last_bold = False
+
+                sgr_parts = []
+                if cell.fg != last_fg:
+                    if cell.fg == _DEFAULT_FG:
+                        sgr_parts.append("\033[39m")
+                    else:
+                        sgr_parts.append(self._color.fg_sequence(cell.fg))
+                    last_fg = cell.fg
+                if cell.bg != last_bg:
+                    if cell.bg == _DEFAULT_BG:
+                        sgr_parts.append("\033[49m")
+                    else:
+                        sgr_parts.append(self._color.bg_sequence(cell.bg))
+                    last_bg = cell.bg
+                if cell.bold != last_bold:
+                    sgr_parts.append(self._color.bold_sequence(cell.bold))
+                    last_bold = cell.bold
+
+                parts.extend(sgr_parts)
+                parts.append(cell.char)
+
+        # Only emit trailing reset if last active styling is non-default
+        if last_fg != _DEFAULT_FG or last_bg != _DEFAULT_BG or last_bold:
+            parts.append(self._color.reset_sequence())
+
         return "".join(parts)
 
     def render_surface(self, surface: "Surface") -> None:
@@ -167,6 +295,7 @@ class Renderer:
             for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
                 if old != new:
                     self.move_cursor(idx, 1)
+                    self._out.write(self._color.reset_sequence())
                     self.erase_line_to_end()
                     self._out.write(new)
 

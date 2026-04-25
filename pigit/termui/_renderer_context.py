@@ -59,8 +59,8 @@ def get_renderer_strict() -> "Renderer":
 def set_renderer(renderer: "Renderer") -> contextvars.Token:
     """Set renderer in current context.
 
-    ContextVar 自动处理嵌套：每次 set 创建新的上下文层，
-    不影响外层上下文的值。
+    ContextVar automatically handles nesting: each set creates a new context
+    layer without affecting the outer context's value.
 
     Args:
         renderer: The Renderer instance to set.

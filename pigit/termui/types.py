@@ -12,12 +12,12 @@ from enum import Enum, auto
 from typing import Protocol, runtime_checkable
 
 
-# 动作类型
+# Action types
 class ActionLiteral(Enum):
     goto = auto()
 
 
-# Toast 位置
+# Toast positions
 class ToastPosition(Enum):
     """Toast display position."""
 
@@ -27,17 +27,17 @@ class ToastPosition(Enum):
     BOTTOM_RIGHT = auto()
 
 
-# 图层类型（合并原 LayerKind 和 OverlayKind）
+# Layer kinds (merged from LayerKind and OverlayKind)
 class LayerKind(Enum):
     """Layer kind for overlay management."""
 
     NONE = 0
-    MODAL = 1  # 原 POPUP（值为1）直接更名为 MODAL，保持值不变
+    MODAL = 1  # Formerly POPUP (value 1), renamed to MODAL while keeping the value
     TOAST = 2
     SHEET = 3
 
 
-# 覆盖层按键分发结果
+# Overlay key dispatch results
 class OverlayDispatchResult(Enum):
     """Result of overlay key dispatch."""
 
@@ -47,7 +47,7 @@ class OverlayDispatchResult(Enum):
     CLOSED_AFTER_ERROR = auto()  # Error recovery: slot cleared, host cleaned up
 
 
-# 覆盖层表面协议
+# Overlay surface protocol
 class OverlaySurface(Protocol):
     """
     Modal shell that may occupy a MODAL slot on a ComponentRoot via LayerStack.
@@ -68,7 +68,7 @@ class OverlaySurface(Protocol):
         """Render this shell into the given Surface when active."""
 
 
-# Surface Protocol（与实现类 Surface 区分）
+# Surface protocol (distinguished from the Surface implementation class)
 @runtime_checkable
 class SurfaceProtocol(Protocol):
     """Surface protocol for type checking."""

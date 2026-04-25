@@ -22,10 +22,10 @@ from pigit.termui.types import (
 # Core components
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_mixins import (
-    GitPanelLazyResizeMixin,
+    LazyLoadMixin,
     OverlayClientMixin,
 )
-from pigit.termui._component_layouts import Column, TabView
+from pigit.termui._component_layouts import Column, Row, TabView
 from pigit.termui._component_widgets import (
     InputLine,
     ItemSelector,
@@ -55,9 +55,10 @@ from pigit.termui._application import Application
 # Other utilities
 from pigit.termui._bindings import bind_keys, list_bindings
 from pigit.termui._geometry import TerminalSize
+from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._renderer import Renderer
 from pigit.termui._renderer_context import get_renderer_strict
-from pigit.termui._surface import Surface
+from pigit.termui._surface import Cell, FlatCell, Surface
 
 # Picker
 from pigit.termui._picker import PickerRow
@@ -74,7 +75,7 @@ __all__ = [
     "Component",
     "ComponentError",
     "OverlayClientMixin",
-    "GitPanelLazyResizeMixin",
+    "LazyLoadMixin",
     # Containers
     "TabView",
     # Widgets
@@ -102,6 +103,10 @@ __all__ = [
     "bind_keys",
     "list_bindings",
     "Surface",
+    "FlatCell",
+    "Cell",
+    "ColorAdapter",
+    "ColorMode",
     "Renderer",
     "get_renderer_strict",
     "TerminalSize",

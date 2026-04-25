@@ -17,7 +17,7 @@ from ._component_base import Component, _looks_like_overlay_host
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._surface import Surface
+from ._surface import Surface, _DEFAULT_BG
 from .wcwidth_table import truncate_by_width
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from . import keys
@@ -113,13 +113,15 @@ class HelpPanel(Component):
         you want the list to reflect the current tree (e.g. before opening help).
         """
 
-        children = getattr(host, "children", None)
+        children = getattr(host, "children", None) or getattr(host, "_children", None)
         if children is None:
             raise TypeError(
                 "Host must expose a non-optional `children` mapping (e.g. Container root)."
             )
         rows: list[HelpEntry] = []
-        for panel in children.values():
+        # Support both dict-like (values) and sequence-like children
+        panels = children.values() if hasattr(children, "values") else children
+        for panel in panels:
             rows.extend(panel.get_help_entries())
         self.set_entries(rows[:max_rows])
 
@@ -134,6 +136,9 @@ class HelpPanel(Component):
         pass
 
     def _render_surface(self, surface: Surface) -> None:
+        # Fill the entire panel area with default background to prevent
+        # underlying panel content from leaking through.
+        surface.fill_rect_rgb(self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG)
         self._frame.draw_onto(surface, self.x, self.y)
 
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
@@ -292,8 +297,8 @@ class Popup(Component):
         ow = self._child._outer_w
         oh = self._child.outer_row_count
         if self._offset is None:
-            row = 1 + max(0, (th - oh) // 2)
-            col = 1 + max(0, (tw - ow) // 2)
+            row = max(0, (th - oh) // 2)
+            col = max(0, (tw - ow) // 2)
         else:
             row, col = int(self._offset[0]), int(self._offset[1])
         self._child.x = row
@@ -408,6 +413,9 @@ class AlertDialogBody(Component):
             return
         if self._needs_rebuild:
             self._rebuild_frame()
+        # Fill the entire dialog area with default background to prevent
+        # previous frame content from leaking through the borders.
+        surface.fill_rect_rgb(self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG)
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)
 
@@ -539,7 +547,7 @@ class AlertDialog(Popup):
 
 
 class Toast(Component):
-    """自动消失的通知消息（TOAST 层），支持边框、动画和可配置位置。"""
+    """Auto-dismissing notification message (TOAST layer) with border, animation, and configurable position."""
 
     def __init__(
         self,
@@ -584,7 +592,7 @@ class Toast(Component):
         super().resize(size)
 
     def _rebuild_frame(self) -> None:
-        """根据当前终端尺寸重建 BoxFrame 和内容行。"""
+        """Rebuild BoxFrame and content lines based on current terminal size."""
         max_inner_w = max(0, self._term_size[0] - 4)
         lines = [
             truncate_by_width(line, max_inner_w) for line in self._message.split("\n")
@@ -603,15 +611,15 @@ class Toast(Component):
         self._needs_rebuild = False
 
     def _compute_slide_offset(self, elapsed: float) -> int:
-        """计算水平方向动画偏移量。
+        """Compute horizontal animation offset.
 
         Args:
-            elapsed: 从创建到现在经过的秒数。
+            elapsed: Seconds elapsed since creation.
 
         Returns:
-            相对于目标位置的列偏移（目标位置为0）。
-            LEFT_*: 负值表示在目标左侧（屏幕外）
-            RIGHT_*: 正值表示在目标右侧（屏幕外）
+            Column offset relative to the target position (target is 0).
+            LEFT_*: negative means left of target (off-screen)
+            RIGHT_*: positive means right of target (off-screen)
         """
         total = self.duration
         enter = self._enter_duration
@@ -633,7 +641,7 @@ class Toast(Component):
         return 0
 
     def _compute_base_position(self, surface) -> tuple[int, int]:
-        """计算目标位置的 (row, col)，不含动画偏移。"""
+        """Compute the target (row, col) without animation offset."""
         if self._position in (ToastPosition.TOP_LEFT, ToastPosition.TOP_RIGHT):
             base_row = 1
         else:
@@ -688,7 +696,7 @@ class Toast(Component):
 
 
 class Sheet(Component):
-    """底部滑出面板，类似移动端的 bottom sheet（SHEET 层）。"""
+    """Bottom sheet panel, similar to mobile bottom sheet (SHEET layer)."""
 
     def __init__(
         self,
@@ -712,7 +720,7 @@ class Sheet(Component):
         if self._size[1] <= 0:
             return
         y = surface.height - self._size[1]
-        sub = surface.subsurface(0, y, self._size[0], self._size[1])
+        sub = surface.subsurface(y, 0, self._size[0], self._size[1])
         self._child._render_surface(sub)
 
     def hide(self) -> None:

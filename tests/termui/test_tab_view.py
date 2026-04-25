@@ -14,7 +14,7 @@ from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
 from pigit.termui.types import ActionLiteral
 from pigit.termui._component_widgets import LineTextBrowser, ItemSelector
-from pigit.termui._component_mixins import GitPanelLazyResizeMixin
+from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._surface import Surface
 
 
@@ -69,7 +69,7 @@ class TestComponentBase:
     def test_resize_propagates_to_children(self):
         child = _Leaf()
         child.resize = MagicMock(wraps=child.resize)
-        parent = TabView(route_map={"/main": child})
+        parent = TabView(children=[child])
         parent.resize((10, 5))
         child.resize.assert_called_once_with((10, 5))
 
@@ -134,21 +134,22 @@ class TestTabView:
         a, b = _Leaf(), _Leaf()
         a.update = MagicMock()
         b.update = MagicMock()
-        cont = TabView(route_map={"/main": a, "/b": b})
-        cont.accept(ActionLiteral.goto, target="/b")
+        cont = TabView(children=[a, b], start=a)
+        cont.accept(ActionLiteral.goto, target=b)
         assert b.is_activated() is True
         assert a.is_activated() is False
-        b.update.assert_called_once_with(ActionLiteral.goto, target="/b")
+        b.update.assert_called_once_with(ActionLiteral.goto, target=b)
 
     def test_accept_goto_missing_logs_warning(self, caplog):
         a = _Leaf()
-        cont = TabView(route_map={"/main": a})
+        cont = TabView(children=[a])
+        missing = _Leaf()
         with caplog.at_level(logging.WARNING):
-            cont.accept(ActionLiteral.goto, target="/z")
-        assert "not found in route_map" in caplog.text
+            cont.accept(ActionLiteral.goto, target=missing)
+        assert "not found in children" in caplog.text
 
     def test_accept_unsupported_action_logs_warning(self, caplog):
-        cont = TabView(route_map={"/main": _Leaf()})
+        cont = TabView(children=[_Leaf()])
         with caplog.at_level(logging.WARNING):
             cont.accept(ActionLiteral.goto, target="/z")
         assert "unsupported action" in caplog.text or "not found" in caplog.text
@@ -158,8 +159,9 @@ class TestTabView:
         a._handle_event = MagicMock()
         b._handle_event = MagicMock()
         cont = TabView(
-            route_map={"/main": a, "/b": b},
-            shortcuts={"1": "/b"},
+            children=[a, b],
+            start=a,
+            shortcuts={"1": b},
         )
         cont._handle_event("1")
         b._handle_event.assert_not_called()
@@ -168,7 +170,7 @@ class TestTabView:
     def test_handle_event_delegates_to_active(self):
         a = _Leaf()
         a._handle_event = MagicMock()
-        cont = TabView(route_map={"/main": a})
+        cont = TabView(children=[a])
         cont._handle_event("k")
         a._handle_event.assert_called_once_with("k")
 
@@ -238,9 +240,9 @@ class TestItemSelector:
         assert s.lines()[1] == " b   "
 
 
-class TestGitPanelLazyResizeMixin:
+class TestLazyLoadMixin:
     def test_resize_when_activated_calls_fresh(self):
-        class _Panel(GitPanelLazyResizeMixin, _Leaf):
+        class _Panel(LazyLoadMixin, _Leaf):
             def __init__(self):
                 super().__init__()
                 self.fresh_calls = 0
@@ -255,7 +257,7 @@ class TestGitPanelLazyResizeMixin:
         assert panel._panel_loaded is True
 
     def test_resize_when_inactive_sets_placeholder(self):
-        class _Panel(GitPanelLazyResizeMixin, _Leaf):
+        class _Panel(LazyLoadMixin, _Leaf):
             def set_content(self, content):
                 self._placeholder = content
 

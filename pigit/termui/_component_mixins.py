@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from ._component_base import Component
 
 
-class GitPanelLazyResizeMixin:
+class LazyLoadMixin:
     """Defer expensive :meth:`fresh` until the panel is activated.
 
     Inactive panels show a one-line placeholder until first shown, so startup

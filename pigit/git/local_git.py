@@ -562,7 +562,7 @@ class LocalGit:
         limit_flag = f"-n {max_commits}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
         command = (
-            f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" '
+            f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%P|%s" '
             f"{limit_flag} --abbrev=20 --date=unix {filter_flag}"
         ).strip()
 
@@ -577,7 +577,10 @@ class LocalGit:
             unix_timestamp = int(split_[1])
             author = split_[2]
             extra_info = (split_[3]).strip()
+            parent_str = split_[4].strip()
             message = "|".join(split_[5:])
+
+            parents = parent_str.split() if parent_str else []
 
             tag = []
             if extra_info:
@@ -596,6 +599,7 @@ class LocalGit:
                 status=status,
                 extra_info=extra_info,
                 tag=tag,
+                parents=parents,
             )
 
     def load_commits(
@@ -743,6 +747,104 @@ class LocalGit:
             f"git checkout {branch_name}", cwd=path, flags=WAITING | REPLY | DECODE
         )
         return err or "ok"
+
+    def get_file_info(
+        self, file: Union[File, str], path: Optional[str] = None
+    ) -> tuple[str, str]:
+        """Get file size and last modification time as formatted strings.
+
+        Returns:
+            (size_str, mtime_str) like ("12.5K", "2026-04-24 10:30").
+        """
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        file_path = os.path.join(path, file_name)
+        try:
+            st = os.stat(file_path)
+            size = self._format_size(st.st_size)
+            mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime))
+            return size, mtime
+        except OSError:
+            return "?", "?"
+
+    @staticmethod
+    def _format_size(size: int) -> str:
+        if size < 1024:
+            return f"{size}B"
+        if size < 1024 * 1024:
+            return f"{size / 1024:.1f}K"
+        return f"{size / (1024 * 1024):.1f}M"
+
+    def get_branch_recent_commit(
+        self, branch_name: str, path: Optional[str] = None
+    ) -> tuple[str, str]:
+        """Get the most recent commit message and author for a branch."""
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f'git log {branch_name} -1 --pretty=format:"%s|%aN"',
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not resp:
+            return "?", "?"
+        parts = resp.split("|")
+        return parts[0], parts[1] if len(parts) > 1 else "?"
+
+    def get_branch_creation_time(
+        self, branch_name: str, path: Optional[str] = None
+    ) -> str:
+        """Return branch creation date as YYYY-MM-DD (best-effort via reflog)."""
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f'git reflog show {branch_name} --format="%at" | tail -1',
+            flags=REPLY | DECODE,
+            cwd=path,
+            shell=True,
+        )
+        if not resp:
+            return "?"
+        try:
+            ts = int(resp.strip())
+            return time.strftime("%Y-%m-%d", time.localtime(ts))
+        except ValueError:
+            return "?"
+
+    def get_commit_stats(
+        self, commit_sha: str, path: Optional[str] = None
+    ) -> tuple[list[tuple[str, int, int]], int, int]:
+        """Get changed files and insertion/deletion counts for a commit.
+
+        Returns:
+            (files, total_insertions, total_deletions) where files is a list
+            of (file_name, insertions, deletions).
+        """
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f'git show --numstat --format="" {commit_sha}',
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not resp:
+            return [], 0, 0
+
+        files: list[tuple[str, int, int]] = []
+        total_add = 0
+        total_del = 0
+
+        for line in resp.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                add = int(parts[0]) if parts[0].isdigit() else 0
+                delete = int(parts[1]) if parts[1].isdigit() else 0
+                file_name = parts[2]
+                files.append((file_name, add, delete))
+                total_add += add
+                total_del += delete
+
+        return files, total_add, total_del
 
     def has_staged_changes(self, path: Optional[str] = None) -> bool:
         """Return True if index has staged changes."""

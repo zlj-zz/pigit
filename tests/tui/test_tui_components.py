@@ -1,7 +1,7 @@
 import pytest
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
-from pigit.termui._component_mixins import GitPanelLazyResizeMixin
+from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
 from pigit.termui.types import ActionLiteral
 
@@ -59,9 +59,9 @@ class TestTabView:
 
         # shortcut "2" switches to secondary; after switch, key is NOT re-dispatched
         tv = RoutingTabView(
-            route_map={"/main": main, "/secondary": secondary},
-            shortcuts={"2": "/secondary"},
-            start="/main",
+            children=[main, secondary],
+            shortcuts={"2": secondary},
+            start=main,
         )
         received.clear()
         tv._handle_event("2")
@@ -74,35 +74,34 @@ class TestTabView:
         assert received == [("secondary", "k")]
 
     @pytest.mark.parametrize(
-        "start, switch_key, expected_active",
+        "start_idx, switch_target_idx, expected_active_idx",
         [
-            ("/main", None, "/main"),  # Happy path: default start
-            ("/secondary", None, "/secondary"),  # Happy path: specified start
-            ("/main", "/secondary", "/secondary"),  # Edge case: switch after init
+            (0, None, 0),  # Happy path: default start
+            (1, None, 1),  # Happy path: specified start
+            (0, 1, 1),  # Edge case: switch after init
         ],
         ids=["default-start", "specified-start", "switch-after-init"],
     )
-    def test_tab_view_init_and_switch(self, start, switch_key, expected_active):
+    def test_tab_view_init_and_switch(self, start_idx, switch_target_idx, expected_active_idx):
         # Arrange
-        route_map = {
-            "/main": MockComponent("main"),
-            "/secondary": MockComponent("secondary"),
-        }
+        main = MockComponent("main")
+        secondary = MockComponent("secondary")
+        children = [main, secondary]
         shortcuts = {}
-        if switch_key:
-            shortcuts["x"] = switch_key
+        if switch_target_idx is not None:
+            shortcuts["x"] = children[switch_target_idx]
 
         # Act
         tab_view = MockTabView(
-            route_map=route_map, shortcuts=shortcuts or None, start=start
+            children=children, shortcuts=shortcuts or None, start=children[start_idx]
         )
-        if switch_key:
+        if switch_target_idx is not None:
             tab_view._handle_event("x")
 
         # Assert
-        assert route_map[
-            expected_active
-        ].is_activated(), f"{expected_active} should be activated"
+        assert children[
+            expected_active_idx
+        ].is_activated(), f"child[{expected_active_idx}] should be activated"
 
     @pytest.mark.parametrize(
         "action, data",
@@ -113,8 +112,7 @@ class TestTabView:
     )
     def test_tab_view_accept_logs_warning(self, action, data, caplog):
         # Arrange
-        route_map = {"/main": MockComponent("main")}
-        tab_view = MockTabView(route_map=route_map)
+        tab_view = MockTabView(children=[MockComponent("main")])
 
         # Act / Assert
         with caplog.at_level("WARNING"):
@@ -316,10 +314,10 @@ class TestItemSelector:
         assert selector.curr_no == expected_pos
 
 
-class TestGitPanelLazyResizeMixin:
+class TestLazyLoadMixin:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
-        class DemoPanel(GitPanelLazyResizeMixin, ItemSelector):
+        class DemoPanel(LazyLoadMixin, ItemSelector):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -340,7 +338,7 @@ class TestGitPanelLazyResizeMixin:
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 
-        class DemoPanel2(GitPanelLazyResizeMixin, ItemSelector):
+        class DemoPanel2(LazyLoadMixin, ItemSelector):
             CURSOR = ">"
             fresh_calls = 0
 

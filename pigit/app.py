@@ -6,31 +6,35 @@ Author: Zev
 Date: 2026-04-17
 """
 
-from enum import Enum
+import os
 from typing import Callable, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import subprocess
 
 from pigit.termui import (
-    ActionLiteral,
-    AlertDialog,
     Application,
-    bind_keys,
+    Column,
+    Component,
     ComponentRoot,
     ExitEventLoop,
-    GitPanelLazyResizeMixin,
     HelpPanel,
-    ItemSelector,
     keys,
     LayerKind,
-    LineTextBrowser,
     Popup,
+    Row,
     TabView,
     ToastPosition,
-    OverlayClientMixin,
 )
-from .git.repo import GitFileT, GitFuncT, Repo
+from .app_branch import BranchPanel
+from .app_chrome import AppFooter, AppHeader, PeekLabel
+from .app_commit import CommitPanel
+from .app_diff import DiffViewer
+from .app_inspector import InspectorPanel
+from .app_palette import CommandPalette
+from .app_status import StatusPanel
+from .app_theme import THEME
+from .git.repo import Repo
 
 repo_handle = Repo()
 
@@ -40,299 +44,143 @@ ExternalProcessCallback = Callable[
 ]
 
 
-class PanelRoute(str, Enum):
-    """Type-safe route identifiers for Pigit TUI panels."""
-
-    STATUS = "/status"
-    BRANCH = "/branch"
-    COMMIT = "/commit"
-    DISPLAY = "/display"
-
-
-def _noop_alert_result(_: bool) -> None:
-    pass
-
-
-class StatusPanel(GitPanelLazyResizeMixin, ItemSelector, OverlayClientMixin):
-    def __init__(
-        self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
-        *,
-        alert_inner_width: Optional[int] = None,
-        on_shell: Optional[ExternalProcessCallback] = None,
-    ) -> None:
-        super().__init__(x, y, size, content)
-        self.repo_path, self.repo_conf = repo_handle.confirm_repo()
-        self.git = repo_handle.bind_path(self.repo_path)
-        self._on_shell = on_shell
-
-        self.files: list[GitFileT] = []
-        self._alert_dialog = AlertDialog(
-            self,
-            x=x,
-            y=y,
-            size=size,
-            inner_width=alert_inner_width,
-            on_result=_noop_alert_result,
-        )
-
-    @bind_keys("j", keys.KEY_DOWN)
-    def next(self, step: int = 1) -> None:
-        super().next(step)
-
-    @bind_keys("k", keys.KEY_UP)
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
-
-    def fresh(self):
-        self.files = files = self.git.load_status(self._size[0])
-        if not files:
-            self.set_content(["No status changed."])
-            return
-        files_str = [file.display_str for file in files]
-        self.set_content(files_str)
-
-    def resize(self, size: tuple[int, int]) -> None:
-        super().resize(size)
-        self._alert_dialog.resize(size)
-
-    def on_key(self, key: str):
-        if not self.files:
-            return
-        f = self.files[self.curr_no]
-        if key == keys.KEY_ENTER:
-            # MM: prefer unstaged diff; otherwise show staged if exists
-            cached = f.has_staged_change and not f.has_unstaged_change
-            c = self.git.load_file_diff(f.name, f.tracked, cached).split("\n")
-            self.emit(
-                ActionLiteral.goto,
-                target=PanelRoute.DISPLAY,
-                source=PanelRoute.STATUS,
-                key=f.name,
-                content=c,
-            )
-            return
-        if key in {keys.KEY_SPACE, "a"}:
-            self.git.switch_file_status(f)
-            self.fresh()
-            return
-        if key == "i":
-            if self._check_via_alert(self.git.ignore_file, f, msg="Ignore file"):
-                return
-            self.fresh()
-            return
-        if key == "d":
-            if self._check_via_alert(self.git.discard_file, f, msg="Discard file"):
-                return
-            self.fresh()
-
-    @bind_keys("C")
-    def create_commit(self) -> None:
-        """Create a new commit with default editor."""
-        if not self.git.has_staged_changes(self.repo_path):
-            self.show_toast("No staged changes to commit.", duration=2.0)
-            return
-        if self._on_shell is None:
-            self.show_toast("Editor launch is not configured.", duration=2.0)
-            return
-        try:
-            result = self._on_shell(["git", "commit"], self.repo_path)
-        except Exception as e:
-            self.show_toast(f"Failed to open editor: {e}", duration=3.0)
-            return
-        if result.returncode != 0:
-            self.show_toast(f"Commit failed (exit {result.returncode}).", duration=2.0)
-
-    def _check_via_alert(
-        self,
-        callee: GitFuncT,
-        file: GitFileT,
-        msg: str = "",
-    ) -> bool:
-        text = f"{msg} '{file}' ?"
-
-        def on_result(confirmed: bool) -> None:
-            if not confirmed:
-                self.fresh()
-                return
-            callee(file)
-            self.fresh()
-            if self.files:
-                self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
-
-        return self._alert_dialog.alert(text, on_result)
-
-
-class BranchPanel(GitPanelLazyResizeMixin, ItemSelector, OverlayClientMixin):
-    def __init__(
-        self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
-    ) -> None:
-        super().__init__(x, y, size, content)
-        self.repo_path, self.repo_conf = repo_handle.confirm_repo()
-        self.git = repo_handle.bind_path(self.repo_path)
-
-    def fresh(self):
-        self.branches = branches = self.git.load_branches()
-        if not branches:
-            return ["No status changed."]
-        processed_branches = []
-        for branch in branches:
-            if branch.is_head:
-                processed_branches.append(f"* {branch.name}")
-            else:
-                processed_branches.append(f"  {branch.name}")
-        self.set_content(processed_branches)
-
-    @bind_keys("j")
-    def next(self, step: int = 1) -> None:
-        super().next(step)
-
-    @bind_keys("k")
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
-
-    def on_key(self, key: str):
-        if key in {keys.KEY_SPACE, keys.KEY_ENTER}:
-            local_branch = self.branches[self.curr_no]
-            if local_branch.is_head:
-                return
-            err = self.git.checkout_branch(local_branch.name)
-            if "error" in err:
-                self.show_toast(f"Checkout failed: {err}", duration=3.0)
-            self.fresh()
-
-
-class CommitPanel(GitPanelLazyResizeMixin, ItemSelector):
-    def __init__(
-        self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
-    ) -> None:
-        super().__init__(x, y, size, content)
-        self.repo_path, self.repo_conf = repo_handle.confirm_repo()
-        self.git = repo_handle.bind_path(self.repo_path)
-
-    @bind_keys("j")
-    def next(self, step: int = 1) -> None:
-        super().next(step)
-
-    @bind_keys("k")
-    def forward(self, step: int = 1) -> None:
-        super().forward(step)
-
-    def fresh(self):
-        branch_name = self.git.get_head()
-        self.commits = commits = self.git.load_commits(branch_name or "")
-        if not commits:
-            return ["No status changed."]
-        processed_commits = []
-        for commit in commits:
-            state_flag = "   " if commit.is_pushed() else " ? "
-            processed_commits.append(f"{state_flag}{commit.sha[:7]} {commit.msg}")
-        self.set_content(processed_commits)
-
-    def on_key(self, key: str):
-        if key == keys.KEY_ENTER:
-            commit = self.commits[self.curr_no]
-            content = self.git.load_commit_info(commit.sha).split("\n")
-            self.emit(
-                ActionLiteral.goto,
-                target=PanelRoute.DISPLAY,
-                source=PanelRoute.COMMIT,
-                content=content,
-            )
-
-
-class ContentDisplay(LineTextBrowser):
-    def __init__(
-        self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-    ) -> None:
-        super().__init__(x, y, size, "")
-        self.come_from: PanelRoute | None = None
-        self.i_cache_key = ""
-        self.i_cache = {}
-
-    def fresh(self):
-        pass
-
-    _CACHE_MAX = 64
-
-    def update(self, action: ActionLiteral, **data):
-        if action is ActionLiteral.goto:
-            self.i_cache[self.i_cache_key] = self._i
-            while len(self.i_cache) >= self._CACHE_MAX:
-                del self.i_cache[next(iter(self.i_cache))]
-            src = data.get("source")
-            self.come_from = PanelRoute(src) if isinstance(src, str) and src else None
-            self.i_cache_key = data.get("key", "")
-            self._content = data.get("content", "")
-            self._i = self.i_cache.get(self.i_cache_key, 0)
-
-    @bind_keys("esc", "q")
-    def _leave_display(self) -> None:
-        if self.come_from is not None:
-            self.emit(ActionLiteral.goto, target=self.come_from)
-
-    @bind_keys("j")
-    def _scroll_line_down(self) -> None:
-        self.scroll_down()
-
-    @bind_keys("k")
-    def _scroll_line_up(self) -> None:
-        self.scroll_up()
-
-    @bind_keys("J")
-    def _scroll_page_down(self) -> None:
-        self.scroll_down(5)
-
-    @bind_keys("K")
-    def _scroll_page_up(self) -> None:
-        self.scroll_up(5)
-
-
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
     BINDINGS = [
         ("Q", "quit"),
         ("?", "toggle_help"),
+        (";", "toggle_palette"),
+        ("I", "toggle_inspector"),
     ]
 
     def __init__(self) -> None:
         super().__init__(input_takeover=True)
+        self._header: Optional[AppHeader] = None
+        self._footer: Optional[AppFooter] = None
+        self._tab_view: Optional[TabView] = None
+        self._body_row: Optional[Row] = None
+        self._peek_label = PeekLabel()
+        self._repo_path: Optional[str] = None
+        self._palette: Optional[CommandPalette] = None
+        self._inspector: Optional[InspectorPanel] = None
+        self._inspector_visible = False
 
     def build_root(self):
-        status_panel = StatusPanel(on_shell=self.on_shell_request)
-        branch_panel = BranchPanel()
-        commit_panel = CommitPanel()
-        display_panel = ContentDisplay()
-
-        return TabView(
-            route_map={
-                PanelRoute.STATUS: status_panel,
-                PanelRoute.BRANCH: branch_panel,
-                PanelRoute.COMMIT: commit_panel,
-                PanelRoute.DISPLAY: display_panel,
-            },
-            shortcuts={
-                "1": PanelRoute.STATUS,
-                "2": PanelRoute.BRANCH,
-                "3": PanelRoute.COMMIT,
-            },
-            start=PanelRoute.STATUS,
+        display_panel = DiffViewer()
+        status_panel = StatusPanel(
+            on_shell=self.on_shell_request,
+            display=display_panel,
+            on_visual_mode_changed=self._on_visual_mode_changed,
+            on_selection_changed=self._on_panel_selection_changed,
+            on_badge=self._show_status_badge,
         )
+        branch_panel = BranchPanel(
+            on_selection_changed=self._on_panel_selection_changed,
+        )
+        commit_panel = CommitPanel(
+            display=display_panel,
+            on_selection_changed=self._on_panel_selection_changed,
+        )
+
+        _TAB_HELP: dict[Component, list[tuple[str, str]]] = {
+            status_panel: [
+                ("j/k", "Navigate"),
+                ("Enter", "Open"),
+                ("a", "Stage"),
+                ("d", "Discard"),
+                ("i", "Ignore"),
+                ("v", "Visual"),
+                ("?", "Help"),
+            ],
+            branch_panel: [
+                ("j/k", "Navigate"),
+                ("Enter/Space", "Checkout"),
+                ("?", "Help"),
+            ],
+            commit_panel: [
+                ("j/k", "Navigate"),
+                ("Enter", "View"),
+                ("g", "Toggle view"),
+                ("?", "Help"),
+            ],
+            display_panel: [
+                ("j/k", "Navigate"),
+                 ("J/K", "Quick Navigate"),
+                ("esc", "Back"),
+                ("?", "Help"),
+            ],
+        }
+        _TAB_LABELS: dict[Component, str] = {
+            status_panel: "Status",
+            branch_panel: "Branch",
+            commit_panel: "Commit",
+            display_panel: "Display",
+        }
+        _TAB_KEYS: dict[Component, str] = {
+            status_panel: "1",
+            branch_panel: "2",
+            commit_panel: "3",
+            display_panel: "",
+        }
+
+        def _on_tab_switch(panel: Component) -> None:
+            self._footer.set_context("", _TAB_HELP.get(panel, []))
+            self._header.set_state(
+                current_tab=_TAB_LABELS.get(panel, ""),
+                current_tab_key=_TAB_KEYS.get(panel, ""),
+            )
+            self._update_inspector_content()
+
+        self._tab_view = TabView(
+            children=[status_panel, branch_panel, commit_panel, display_panel],
+            shortcuts={
+                "1": status_panel,
+                "2": branch_panel,
+                "3": commit_panel,
+            },
+            start=status_panel,
+            on_switch=_on_tab_switch,
+        )
+        self._status_panel = status_panel
+        self._branch_panel = branch_panel
+        self._commit_panel = commit_panel
+        self._display_panel = display_panel
+
+        self._header = AppHeader(
+            theme=THEME,
+            repo_name="",
+            branch_name="",
+            current_tab="Status",
+            current_tab_key="1",
+        )
+        self._footer = AppFooter(theme=THEME)
+        self._footer.set_context(
+            "",
+            (
+                _TAB_HELP.get(self._tab_view.active, [])
+                if self._tab_view is not None
+                else []
+            ),
+        )
+
+        # Command palette
+        self._palette = CommandPalette(
+            on_execute=self._on_palette_execute,
+            on_dismiss=self._dismiss_palette,
+        )
+
+        self._inspector = InspectorPanel()
+        self._body_row = Row(
+            children=[self._tab_view, self._inspector],
+            widths=["flex", 0],
+        )
+
+        chrome_column = Column(
+            children=[self._header, self._body_row, self._footer],
+            heights=[2, "flex", 2],
+        )
+        return chrome_column
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel()
@@ -347,6 +195,20 @@ class PigitApplication(Application):
         size = self._loop.get_term_size()
         if size.columns < 65 or size.lines < 10:
             self._loop.quit("No enough space to running.")
+
+        # Initialize header with repo info
+        try:
+            repo_path, _ = repo_handle.confirm_repo()
+            self._repo_path = repo_path
+            git = repo_handle.bind_path(repo_path)
+            head = git.get_head() or ""
+            self._header.set_state(
+                repo_name=os.path.basename(repo_path) if repo_path else "",
+                branch_name=head,
+            )
+        except Exception:
+            pass
+
         self._root.show_toast(
             "Welcome to Pigit! Press ? for help.",
             duration=3.0,
@@ -360,15 +222,27 @@ class PigitApplication(Application):
         return result
 
     def _refresh_status_panel(self) -> None:
-        root = self._root
-        if root is None:
-            return
-        body = getattr(root, "body", None)
-        if not isinstance(body, TabView):
-            return
-        status = body.get_tab_by_route(PanelRoute.STATUS)
+        status = getattr(self, "_status_panel", None)
         if status is not None and hasattr(status, "fresh"):
             status.fresh()
+
+    def _on_visual_mode_changed(self, mode: str) -> None:
+        if self._header is not None:
+            self._header.set_state(mode=mode)
+
+    def _on_panel_selection_changed(self, idx: int) -> None:
+        """Callback when panel selection changes via j/k navigation."""
+        self._update_inspector_content()
+
+    def _show_status_badge(self, msg: str) -> None:
+        """Show a transient badge in the header for 1.5s."""
+        if self._root is not None:
+            self._root.show_badge(
+                msg,
+                duration=1.5,
+                bg=THEME.bg_active,
+                fg=THEME.fg_primary,
+            )
 
     def toggle_help(self):
         root = self._root
@@ -376,8 +250,124 @@ class PigitApplication(Application):
 
         help_open = root._layer_stack.top(LayerKind.MODAL) is self._help_popup
         if not help_open:
-            self._help_panel.merge_help_entries_from_host_children(root.body)
+            # Help panel merges from the TabView inside Column
+            tab_view = self._tab_view
+            if tab_view is not None:
+                self._help_panel.merge_help_entries_from_host_children(tab_view)
         self._help_popup.toggle()
+
+    def toggle_palette(self):
+        """Toggle command palette visibility."""
+        if self._palette is None or self._root is None:
+            return
+        if self._palette.is_active:
+            self._palette.close()
+        else:
+            self._palette.open()
+            self._root.show_sheet(self._palette, height=8)
+
+    def _dismiss_palette(self) -> None:
+        """Dismiss the palette sheet from the root."""
+        if self._root is not None:
+            self._root.dismiss_sheet()
+
+    def _inspector_width(self, total_width: int) -> int:
+        """Compute inspector width: 30% of total, capped at 45."""
+        return min(int(total_width * 0.3), 45)
+
+    def toggle_inspector(self):
+        """Toggle inspector panel visibility."""
+        if self._inspector is None or self._body_row is None:
+            return
+        self._inspector_visible = not self._inspector_visible
+        size = self._loop.get_term_size()
+        if self._inspector_visible:
+            self._body_row.set_widths(
+                ["flex", self._inspector_width(size.columns)]
+            )
+            self._update_inspector_content()
+        else:
+            self._body_row.set_widths(["flex", 0])
+        self._root.resize(size)
+
+    def resize(self, size: tuple[int, int]) -> None:
+        """Recompute inspector width on terminal resize."""
+        if self._inspector_visible and self._body_row is not None:
+            self._body_row.set_widths(
+                ["flex", self._inspector_width(size[0])]
+            )
+        super().resize(size)
+
+    def _update_inspector_content(self):
+        """Update inspector based on current tab and selection."""
+        if self._inspector is None or self._tab_view is None:
+            return
+        active = self._tab_view.active
+        if active is None:
+            return
+        idx = getattr(active, "curr_no", 0)
+        # Skip if neither panel nor selection has changed
+        last = getattr(self, "_last_inspector_key", None)
+        current_key = (id(active), idx)
+        if last == current_key:
+            return
+        self._last_inspector_key = current_key
+
+        status = getattr(self, "_status_panel", None)
+        branch = getattr(self, "_branch_panel", None)
+        commit = getattr(self, "_commit_panel", None)
+        git = getattr(active, "git", None)
+
+        if active is status and hasattr(active, "files"):
+            files = active.files
+            if files and 0 <= idx < len(files):
+                file = files[idx]
+                size, mtime = ("?", "?")
+                if git is not None:
+                    size, mtime = git.get_file_info(file)
+                self._inspector.show_file(file, size=size, mtime=mtime)
+        elif active is branch and hasattr(active, "branches"):
+            branches = active.branches
+            if branches and 0 <= idx < len(branches):
+                b = branches[idx]
+                recent_msg, recent_author, created = "?", "?", "?"
+                if git is not None:
+                    recent_msg, recent_author = git.get_branch_recent_commit(b.name)
+                    created = git.get_branch_creation_time(b.name)
+                self._inspector.show_branch(
+                    b,
+                    recent_msg=recent_msg,
+                    recent_author=recent_author,
+                    created=created,
+                )
+        elif active is commit and hasattr(active, "commits"):
+            commits = active.commits
+            if commits and 0 <= idx < len(commits):
+                c = commits[idx]
+                changed_files, total_add, total_del = [], 0, 0
+                if git is not None:
+                    changed_files, total_add, total_del = git.get_commit_stats(c.sha)
+                self._inspector.show_commit(
+                    c,
+                    changed_files=changed_files,
+                    total_add=total_add,
+                    total_del=total_del,
+                )
+
+    def _on_palette_execute(self, cmd: str) -> None:
+        """Handle command palette execution."""
+        cmd_map = {
+            "status": getattr(self, "_status_panel", None),
+            "branch": getattr(self, "_branch_panel", None),
+            "commit": getattr(self, "_commit_panel", None),
+            "diff": getattr(self, "_display_panel", None),
+            "quit": "quit",
+        }
+        target = cmd_map.get(cmd.lower())
+        if target == "quit":
+            self.quit()
+        elif target is not None and self._tab_view is not None:
+            self._tab_view.route_to(target)
 
     def quit(self):
         raise ExitEventLoop("Quit")

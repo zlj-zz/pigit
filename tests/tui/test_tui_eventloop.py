@@ -451,7 +451,7 @@ def test_renderer_accessed_via_context():
             pass
 
     a, b = _Leaf(), _Leaf()
-    root = TabView({"main": a, "b": b})
+    root = TabView(children=[a, b])
 
     # Set renderer via ContextVar
     renderer = MagicMock()

@@ -77,10 +77,18 @@ class Commit:
     # Tag list of the commit.
     tag: list
 
+    # Parent commit SHAs.
+    parents: list[str] = None
+
     action: str = ""
 
     def is_pushed(self) -> bool:
         return self.status == "pushed"
+
+    @property
+    def is_merge(self) -> bool:
+        """Return True if this commit has more than one parent."""
+        return bool(self.parents and len(self.parents) > 1)
 
 
 @dataclass
