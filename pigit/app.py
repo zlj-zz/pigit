@@ -8,7 +8,7 @@ Date: 2026-04-17
 
 import logging
 import os
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Callable, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     import subprocess
@@ -67,6 +67,11 @@ class PigitApplication(Application):
         self._palette: Optional[CommandPalette] = None
         self._inspector: Optional[InspectorPanel] = None
         self._inspector_visible = False
+        # Panel references set in build_root()
+        self._status_panel: Optional[StatusPanel] = None
+        self._branch_panel: Optional[BranchPanel] = None
+        self._commit_panel: Optional[CommitPanel] = None
+        self._display_panel: Optional[DiffViewer] = None
 
     def build_root(self):
         display_panel = DiffViewer()
@@ -229,9 +234,8 @@ class PigitApplication(Application):
         return result
 
     def _refresh_status_panel(self) -> None:
-        status = getattr(self, "_status_panel", None)
-        if status is not None and hasattr(status, "fresh"):
-            status.fresh()
+        if self._status_panel is not None:
+            self._status_panel.fresh()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
         if self._header is not None:
@@ -320,40 +324,36 @@ class PigitApplication(Application):
             return
         self._last_inspector_key = current_key
 
-        status = getattr(self, "_status_panel", None)
-        branch = getattr(self, "_branch_panel", None)
-        commit = getattr(self, "_commit_panel", None)
-        git = getattr(active, "git", None)
-
-        if active is status and hasattr(active, "files"):
-            files = active.files
-            if files and 0 <= idx < len(files):
-                file = files[idx]
+        if isinstance(active, StatusPanel) and active.files:
+            if 0 <= idx < len(active.files):
+                file = active.files[idx]
                 size, mtime = ("?", "?")
-                if git is not None:
-                    size, mtime = git.get_file_info(file)
+                if active.git is not None:
+                    size, mtime = active.git.get_file_info(file)
                 self._inspector.show_file(file, size=size, mtime=mtime)
-        elif active is branch and hasattr(active, "branches"):
-            branches = active.branches
-            if branches and 0 <= idx < len(branches):
-                b = branches[idx]
+        elif isinstance(active, BranchPanel) and active.branches:
+            if 0 <= idx < len(active.branches):
+                b = active.branches[idx]
                 recent_msg, recent_author, created = "?", "?", "?"
-                if git is not None:
-                    recent_msg, recent_author = git.get_branch_recent_commit(b.name)
-                    created = git.get_branch_creation_time(b.name)
+                if active.git is not None:
+                    recent_msg, recent_author = active.git.get_branch_recent_commit(
+                        b.name
+                    )
+                    created = active.git.get_branch_creation_time(b.name)
                 self._inspector.show_branch(
                     b,
                     recent_msg=recent_msg,
                     recent_author=recent_author,
                     created=created,
                 )
-        elif active is commit and hasattr(active, "commits"):
-            commits = active.commits
-            if commits and 0 <= idx < len(commits):
-                c = commits[idx]
+        elif isinstance(active, CommitPanel) and active.commits:
+            if 0 <= idx < len(active.commits):
+                c = active.commits[idx]
                 changed_files, total_add, total_del = [], 0, 0
-                if git is not None:
-                    changed_files, total_add, total_del = git.get_commit_stats(c.sha)
+                if active.git is not None:
+                    changed_files, total_add, total_del = active.git.get_commit_stats(
+                        c.sha
+                    )
                 self._inspector.show_commit(
                     c,
                     changed_files=changed_files,
@@ -363,11 +363,11 @@ class PigitApplication(Application):
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
-        cmd_map = {
-            "status": getattr(self, "_status_panel", None),
-            "branch": getattr(self, "_branch_panel", None),
-            "commit": getattr(self, "_commit_panel", None),
-            "diff": getattr(self, "_display_panel", None),
+        cmd_map: dict[str, Optional[Union[Component, str]]] = {
+            "status": self._status_panel,
+            "branch": self._branch_panel,
+            "commit": self._commit_panel,
+            "diff": self._display_panel,
             "quit": "quit",
         }
         target = cmd_map.get(cmd.lower())
