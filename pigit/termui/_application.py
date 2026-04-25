@@ -95,7 +95,10 @@ class Application:
         self._root = root = ComponentRoot(body)
         self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
         self.setup_root(root)
-        self._loop.run()
+        try:
+            self._loop.run()
+        finally:
+            root.destroy()
 
     def run_external_process(
         self,

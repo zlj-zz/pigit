@@ -61,9 +61,7 @@ class FlatCell:
         self.bold = bold
         # Backward compat: 'style' kwarg maps to ansi_style
         self.ansi_style = ansi_style if ansi_style is not None else (style or None)
-        self._hash = hash(
-            (self.char, self.fg, self.bg, self.bold, self.ansi_style)
-        )
+        self._hash = hash((self.char, self.fg, self.bg, self.bold, self.ansi_style))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FlatCell):

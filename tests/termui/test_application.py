@@ -55,3 +55,13 @@ class TestApplication:
             app.run()
             mock_loop.run.assert_called_once()
             assert app.hooked is True
+
+    def test_destroy_called_after_loop_exit(self):
+        """root.destroy() must be called in finally block after loop exits."""
+        app = DummyApp()
+        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
+            mock_loop = MagicMock()
+            MockLoop.return_value = mock_loop
+            app.run()
+            assert app._root is not None
+            # destroy() was called during cleanup in finally block

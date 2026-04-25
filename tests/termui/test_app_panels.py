@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_diff import DiffViewer
+from pigit.termui._component_base import ComponentError
 from pigit.termui._surface import Surface
 
 
@@ -93,8 +94,8 @@ class TestDiffViewer:
                 pass
         d = DiffViewer()
         d.come_from = FakeSource()
-        # emit requires a parent; should raise AssertionError
-        with pytest.raises(AssertionError):
+        # emit requires a parent; should raise ComponentError
+        with pytest.raises(ComponentError):
             d._leave_display()
 
     def test_leave_display_with_parent(self):

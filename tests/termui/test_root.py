@@ -186,3 +186,8 @@ class TestComponentRoot:
         root.show_badge("old")
         root.show_badge("new")
         assert root.badge_text == "new"
+
+    def test_destroy_resets_overlay_host(self):
+        """destroy() cleans up the overlay host ContextVar without error."""
+        root = ComponentRoot(DummyBody())
+        root.destroy()  # should not raise

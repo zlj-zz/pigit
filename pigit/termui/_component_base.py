@@ -130,7 +130,8 @@ class Component(ABC):
 
     def emit(self, action: ActionLiteral, **data):
         """Emit to parent."""
-        assert self.parent is not None, "Has no parent to emitting."
+        if self.parent is None:
+            raise ComponentError("Has no parent to emitting.")
         self.parent.accept(action, **data)
 
     def update(self, action: ActionLiteral, **data):
@@ -143,9 +144,10 @@ class Component(ABC):
 
     def notify(self, action: ActionLiteral, **data):
         """Notify all children."""
-        assert (
-            self.children is not None
-        ), f"Has no children to notifying; {self.__class__}."
+        if self.children is None:
+            raise ComponentError(
+                f"Has no children to notifying; {self.__class__}."
+            )
         for child in self.children.values():
             child.update(action, **data)
 

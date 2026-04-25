@@ -35,7 +35,8 @@ class ComponentRoot(Component):
         self._overlay_host_token = _overlay_context.set_overlay_host(self)
         self._badge_text: Optional[str] = None
 
-    def __del__(self) -> None:
+    def destroy(self) -> None:
+        """Clean up overlay host token. Call when the TUI exits."""
         try:
             _overlay_context.reset_overlay_host(self._overlay_host_token)
         except Exception:
@@ -50,7 +51,7 @@ class ComponentRoot(Component):
     def show_badge(
         self,
         text: str,
-        duration: float = 0,
+        duration: Optional[float] = None,
         bg: Optional[tuple[int, int, int]] = None,
         fg: Optional[tuple[int, int, int]] = None,
     ) -> None:
@@ -59,11 +60,19 @@ class ComponentRoot(Component):
         The badge is rendered by the application chrome (e.g. AppHeader)
         reading ``self.parent.badge_text``.  This method only stores state;
         the framework does not control layout.
+
+        Args:
+            text: Badge text to display.
+            duration: Seconds until auto-hide. ``None`` means permanent.
         """
         self._badge_text = text
         self._badge_bg = bg
         self._badge_fg = fg
-        self._badge_until = time.monotonic() + duration if duration > 0 else float("inf")
+        self._badge_until = (
+            time.monotonic() + duration
+            if duration is not None and duration > 0
+            else float("inf")
+        )
 
     def hide_badge(self) -> None:
         """Clear the badge text."""

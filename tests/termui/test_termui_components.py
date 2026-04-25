@@ -53,7 +53,7 @@ class TestComponentBase:
 
     def test_emit_without_parent_raises(self):
         child = _Leaf()
-        with pytest.raises(AssertionError, match="Has no parent"):
+        with pytest.raises(ComponentError, match="Has no parent"):
             child.emit(ActionLiteral.goto, target="x")
 
     def test_notify_children(self):
@@ -70,7 +70,7 @@ class TestComponentBase:
     def test_notify_without_children_raises(self):
         leaf = _Leaf()
         leaf.children = None
-        with pytest.raises(AssertionError, match="Has no children"):
+        with pytest.raises(ComponentError, match="Has no children"):
             leaf.notify(ActionLiteral.goto, target="x")
 
     def test_resize_propagates_to_children(self):
