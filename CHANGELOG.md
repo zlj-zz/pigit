@@ -1,5 +1,48 @@
 # Changelog of pigit
 
+## 1.8.2 (2026-04-26)
+
+### TermUI — Component model & layout
+
+- **`Component.children` unified to `Sequence[Component]`**: removed dict-based children API and internal splits (`_child_list`, `_children`); `notify()` and `resize()` iterate `self.children` directly.
+- **`LazyLoadMixin` inlined into `ItemSelector`**: activated via `lazy_load=True` parameter; deleted `_component_mixins.py`.
+- **Local coordinates in `Column`/`Row`**: fixed double-offsetting bug where nested layouts applied global coordinates instead of local; `layout_flex` extracted to `_layout.py`.
+
+### TermUI — Chrome & Header
+
+- **`AppHeader` extracted to generic `Header`**: supports left/center/right slots and `on_refresh` callback for dynamic content assembly.
+- **Badge system refactored**: `get_badge()` / `show_badge()` via `_overlay_context` (ContextVar-based); removed `on_badge` callback.
+- **Dynamic footer help**: `AppFooter` collects entries from active panel's `get_help_entries()` instead of hard-coding.
+
+### TermUI — Overlay system
+
+- **`OverlayClientMixin` replaced by `_overlay_context`**: ContextVar-based overlay host lookup eliminates mixin MRO complexity.
+- **`Popup.toggle()` calls `on_before_show()`**: opening a popup now triggers the child's `on_before_show()` hook before `show()`.
+
+### App — Panel improvements
+
+- **`StatusPanel` visual mode**: `v` toggles visual selection, `s` toggles scroll-select, `Space` toggles individual selection; batch actions (`a` stage, `d` discard, `i` ignore) operate on selected files.
+- **`Repo` dependency injection**: `PigitApplication` and panels receive `Repo` via constructor, eliminating import-time side effects.
+- **`relative_time` caching in `CommitPanel`**: `fresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
+- **Panel render comments**: `_render_surface` methods in `StatusPanel`, `BranchPanel`, `CommitPanel` now document layout intent and coordinate calculations.
+- **`InputLine` block cursor**: physical cursor rendered as filled block; `set_content` scroll-reset bug fixed.
+- **`StatusPanel` `C` key**: opens `$EDITOR` for git commit.
+
+### TermUI — Error handling
+
+- **`ComponentRoot.destroy()`**: bare `except Exception: pass` replaced with explicit `(RuntimeError, ValueError)` catch and error logging.
+- **`AppEventLoop._dispatch_semantic_string()`**: key handler exceptions no longer swallow `ExitEventLoop`; explicit re-raise before generic catch.
+
+### HelpPanel
+
+- **Grouped display**: entries organized by panel title (`get_help_title()`); bold headers, blue keys (`THEME.accent_blue`), aligned descriptions.
+- **`refresh_entries_from_source`**: renamed from `merge_help_entries_from_host_children`; auto-refreshes via `on_before_show()` before open.
+
+### Fixes
+
+- **`git show`**: omits empty `file_name` argument.
+- **`TabView` panel switch**: clears renderer cache to prevent ghost content.
+
 ## 1.8.1 (2026-04-21)
 
 ### TermUI — InputLine enhancements & real cursor
