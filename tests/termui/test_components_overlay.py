@@ -103,9 +103,7 @@ class TestOverlayContext:
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
 
-        result = show_toast(
-            "test", duration=2.0, position=ToastPosition.BOTTOM_LEFT
-        )
+        result = show_toast("test", duration=2.0, position=ToastPosition.BOTTOM_LEFT)
 
         assert result is not None
         assert result._position == ToastPosition.BOTTOM_LEFT
@@ -114,7 +112,9 @@ class TestOverlayContext:
 class TestToast:
     def test_toast_render_surface(self):
         # 使用无动画的 Toast 以确保立即可见
-        toast = Toast("Hello World", duration=5.0, enter_duration=0.0, exit_duration=0.0)
+        toast = Toast(
+            "Hello World", duration=5.0, enter_duration=0.0, exit_duration=0.0
+        )
         surface = Surface(40, 10)
         toast.resize((40, 10))  # 新实现需要 resize
         toast._render_surface(surface)
@@ -470,8 +470,15 @@ class TestHelpPanel:
         panel = HelpPanel()
         # Need more entries than _scroll_h so scroll_down advances
         panel.set_entries(
-            [("a", "A"), ("b", "B"), ("c", "C"), ("d", "D"),
-             ("e", "E"), ("f", "F"), ("g", "G")]
+            [
+                ("a", "A"),
+                ("b", "B"),
+                ("c", "C"),
+                ("d", "D"),
+                ("e", "E"),
+                ("f", "F"),
+                ("g", "G"),
+            ]
         )
         start = panel._offset
         # scroll down advances (inner_h defaults to >=5, so _scroll_h >=4)

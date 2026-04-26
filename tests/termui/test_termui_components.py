@@ -58,7 +58,7 @@ class TestComponentBase:
 
     def test_notify_children(self):
         a, b = _Leaf(), _Leaf()
-        parent = _Leaf(children={"a": a, "b": b})
+        parent = _Leaf(children=[a, b])
         a.parent = parent
         b.parent = parent
         a.update = MagicMock()
@@ -67,11 +67,11 @@ class TestComponentBase:
         a.update.assert_called_once_with(ActionLiteral.goto, target="x")
         b.update.assert_called_once_with(ActionLiteral.goto, target="x")
 
-    def test_notify_without_children_raises(self):
+    def test_notify_without_children_noop(self):
         leaf = _Leaf()
-        leaf.children = None
-        with pytest.raises(ComponentError, match="Has no children"):
-            leaf.notify(ActionLiteral.goto, target="x")
+        leaf.children = []
+        # Empty children is a no-op, not an error
+        leaf.notify(ActionLiteral.goto, target="x")
 
     def test_resize_propagates_to_children(self):
         child = _Leaf()
@@ -101,7 +101,9 @@ class TestComponentBase:
         assert _Leaf().has_overlay_open() is False
 
     def test_try_dispatch_overlay_default(self):
-        assert _Leaf().try_dispatch_overlay("k") is OverlayDispatchResult.DROPPED_UNBOUND
+        assert (
+            _Leaf().try_dispatch_overlay("k") is OverlayDispatchResult.DROPPED_UNBOUND
+        )
 
     def test_get_help_entries_derives_from_bindings(self):
         class _Bound(_Leaf):
@@ -190,7 +192,9 @@ class TestTabView:
         ],
         ids=["default-start", "specified-start", "switch-after-init"],
     )
-    def test_tab_view_init_and_switch(self, start_idx, switch_target_idx, expected_active_idx):
+    def test_tab_view_init_and_switch(
+        self, start_idx, switch_target_idx, expected_active_idx
+    ):
         # Arrange
         main = MockComponent("main")
         secondary = MockComponent("secondary")
@@ -345,6 +349,7 @@ class TestItemSelector:
         # CURSOR length != 1 raises ComponentError
         class BadSelector(ItemSelector):
             CURSOR = "**"
+
         with pytest.raises(ComponentError):
             BadSelector()
 

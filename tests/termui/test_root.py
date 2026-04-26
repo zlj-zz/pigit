@@ -102,7 +102,9 @@ class TestComponentRoot:
         """验证 show_toast 支持 position 参数"""
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        toast = root.show_toast("hello", duration=1.5, position=ToastPosition.BOTTOM_LEFT)
+        toast = root.show_toast(
+            "hello", duration=1.5, position=ToastPosition.BOTTOM_LEFT
+        )
         assert toast._position == ToastPosition.BOTTOM_LEFT
 
     def test_show_toast_singleton_replaces_existing(self):
@@ -161,8 +163,8 @@ class TestComponentRoot:
             return val
 
         toast = Toast("injected", duration=5.0, clock=fake_clock)
-        assert not toast.is_expired()   # 2.0 - 0.0 = 2.0 <= 5.0
-        assert toast.is_expired()       # 10.0 - 0.0 = 10.0 > 5.0
+        assert not toast.is_expired()  # 2.0 - 0.0 = 2.0 <= 5.0
+        assert toast.is_expired()  # 10.0 - 0.0 = 10.0 > 5.0
 
     # --- Badge ---
 

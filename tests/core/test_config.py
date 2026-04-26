@@ -19,13 +19,11 @@ def _reset_config_singleton():
 @patch("builtins.input", lambda _: "yes")
 def test_create(tmp_path):
     config_path = tmp_path / "pigit-create.toml"
-    assert (
-        Config(
-            str(config_path),
-            version="test",
-            auto_load=False,
-        ).create_config_template()
-    )
+    assert Config(
+        str(config_path),
+        version="test",
+        auto_load=False,
+    ).create_config_template()
     assert config_path.exists()
     content = config_path.read_text(encoding="utf-8")
     assert 'version = "test"' in content
@@ -84,15 +82,17 @@ def test_default_values_when_no_config_file():
 def test_invalid_format_falls_back_to_default(tmp_path):
     config_path = tmp_path / "pigit-invalid.toml"
     config_path.write_text(
-        '\n'.join([
-            'version = "test"',
-            '',
-            '[counter]',
-            'format = "invalid"',
-            '',
-            '[info]',
-            'git_config_format = "invalid"',
-        ]),
+        "\n".join(
+            [
+                'version = "test"',
+                "",
+                "[counter]",
+                'format = "invalid"',
+                "",
+                "[info]",
+                'git_config_format = "invalid"',
+            ]
+        ),
         encoding="utf-8",
     )
 
@@ -111,18 +111,20 @@ def test_invalid_format_falls_back_to_default(tmp_path):
 def test_toml_read_with_comments_and_inline_strings(tmp_path):
     config_path = tmp_path / "pigit-comment.toml"
     config_path.write_text(
-        '\n'.join([
-            '#? Config file for pigit v. test',
-            '# full line comment',
-            'version = "test"',
-            '',
-            '[cmd]',
-            'display = true',
-            'recommend = false',
-            '',
-            '[info]',
-            'repo_include = ["path#hash", "remote"]',
-        ]),
+        "\n".join(
+            [
+                "#? Config file for pigit v. test",
+                "# full line comment",
+                'version = "test"',
+                "",
+                "[cmd]",
+                "display = true",
+                "recommend = false",
+                "",
+                "[info]",
+                'repo_include = ["path#hash", "remote"]',
+            ]
+        ),
         encoding="utf-8",
     )
 

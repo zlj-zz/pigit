@@ -76,22 +76,27 @@ class TestDiffViewer:
 
     def test_scroll_position_cache(self):
         from pigit.termui._component_base import Component
+
         class FakeSource(Component):
             def _render_surface(self, surface):
                 pass
+
         source = FakeSource()
         d = DiffViewer()
         d._i = 5
         from pigit.termui.types import ActionLiteral
+
         d.update(ActionLiteral.goto, source=source, key="test.py", content=["line1"])
         assert d.i_cache_key == "test.py"
         assert d.come_from is source
 
     def test_leave_display_no_parent(self):
         from pigit.termui._component_base import Component
+
         class FakeSource(Component):
             def _render_surface(self, surface):
                 pass
+
         d = DiffViewer()
         d.come_from = FakeSource()
         # emit requires a parent; should raise ComponentError
@@ -100,19 +105,25 @@ class TestDiffViewer:
 
     def test_leave_display_with_parent(self):
         from pigit.termui._component_base import Component
+
         class FakeParent(Component):
             def __init__(self):
                 self._received = []
                 super().__init__()
+
             def _handle_event(self, key):
                 pass
+
             def _render_surface(self, surface):
                 pass
+
             def accept(self, action, **data):
                 self._received.append((action, data))
+
         class FakeSource(Component):
             def _render_surface(self, surface):
                 pass
+
         parent = FakeParent()
         d = DiffViewer()
         d.parent = parent

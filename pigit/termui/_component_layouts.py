@@ -37,27 +37,27 @@ class TabView(Component):
         super().__init__(x, y, size)
 
         self._on_switch = on_switch
-        self._children = list(children)
-        for child in self._children:
+        self.children = list(children)
+        for child in self.children:
             if child.parent is not None and child.parent is not self:
                 _logger.warning("Reparenting %s to TabView", type(child).__name__)
             child.parent = self
 
         self._shortcuts = dict(shortcuts) if shortcuts else {}
         for key, panel in self._shortcuts.items():
-            if panel not in self._children:
+            if panel not in self.children:
                 raise ComponentError(
                     f"shortcuts['{key}'] -> {type(panel).__name__} not in children"
                 )
 
-        if not self._children:
+        if not self.children:
             raise ComponentError("children cannot be empty.")
         if start is None:
-            start = self._children[0]
-        if start not in self._children:
+            start = self.children[0]
+        if start not in self.children:
             raise ComponentError(
                 f"start {type(start).__name__} not in children. "
-                f"Available: {[type(c).__name__ for c in self._children]}."
+                f"Available: {[type(c).__name__ for c in self.children]}."
             )
         self._active = start
         self._active.activate()
@@ -69,7 +69,7 @@ class TabView(Component):
 
     def route_to(self, target: Component) -> Optional[Component]:
         """Switch to the given child component."""
-        if target not in self._children:
+        if target not in self.children:
             return None
         if target is self._active:
             return target
@@ -99,7 +99,7 @@ class TabView(Component):
     def accept(self, action: ActionLiteral, **data):
         if action is ActionLiteral.goto:
             target = data.get("target")
-            if isinstance(target, Component) and target in self._children:
+            if isinstance(target, Component) and target in self.children:
                 self.route_to(target)
                 self._active.update(action, **data)
             else:
@@ -112,12 +112,8 @@ class TabView(Component):
 
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size
-        for child in self._children:
+        for child in self.children:
             child.resize(size)
-
-    def notify(self, action: ActionLiteral, **data) -> None:
-        for child in self._children:
-            child.update(action, **data)
 
     def _render_surface(self, surface: "Surface") -> None:
         if self._active is not None:
@@ -126,7 +122,7 @@ class TabView(Component):
     def _handle_event(self, key: str):
         if self._shortcuts:
             panel = self._shortcuts.get(key)
-            if panel is not None and panel in self._children:
+            if panel is not None and panel in self.children:
                 if panel is not self._active:
                     self.route_to(panel)
                     return
@@ -138,9 +134,6 @@ class Column(Component):
     """Vertical stack: fixed heights + flex share.
 
     Children receive geometry from this container; manual ``x, y`` is ignored.
-    This component does **not** set ``self.children`` — it uses ``_child_list``
-    to maintain ordering and overrides all methods that would otherwise iterate
-    over ``self.children`` (``resize``, ``notify``, ``accept``, ``fresh``).
     """
 
     def __init__(
@@ -151,16 +144,16 @@ class Column(Component):
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
     ) -> None:
-        super().__init__(x, y, size, children=None)
-        self._child_list = list(children)
-        for child in self._child_list:
+        super().__init__(x, y, size)
+        self.children = list(children)
+        for child in self.children:
             child.parent = self
         self._heights = list(heights)
 
     def set_heights(self, heights: Sequence[Union[int, Literal["flex"]]]) -> None:
-        if len(heights) != len(self._child_list):
+        if len(heights) != len(self.children):
             raise ValueError(
-                f"heights length mismatch: expected {len(self._child_list)}, "
+                f"heights length mismatch: expected {len(self.children)}, "
                 f"got {len(heights)}"
             )
         self._heights = list(heights)
@@ -171,7 +164,7 @@ class Column(Component):
         heights = layout_flex(self._heights, total_h)
 
         y = 0
-        for child, h in zip(self._child_list, heights):
+        for child, h in zip(self.children, heights):
             child.x = y + 1
             child.y = 1
             if h > 0:
@@ -186,7 +179,7 @@ class Column(Component):
             y += h
 
     def _render_surface(self, surface: "Surface") -> None:
-        for child in self._child_list:
+        for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
                 continue
@@ -196,28 +189,21 @@ class Column(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def notify(self, action: ActionLiteral, **data) -> None:
-        for child in self._child_list:
-            child.update(action, **data)
-
     def accept(self, action: ActionLiteral, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not
         override ``accept`` (e.g. ``_PickerHeader``).
         """
-        for child in self._child_list:
+        for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
-        for child in self._child_list:
+        for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()
 
-    def fresh(self) -> None:
-        pass
-
     def _handle_event(self, key: str) -> None:
-        for child in self._child_list:
+        for child in self.children:
             child._handle_event(key)
 
 
@@ -225,7 +211,6 @@ class Row(Component):
     """Horizontal stack: fixed widths + flex share.
 
     Children receive geometry from this container; manual ``x, y`` is ignored.
-    This component uses ``_child_list`` to maintain ordering.
     """
 
     def __init__(
@@ -236,16 +221,16 @@ class Row(Component):
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
     ) -> None:
-        super().__init__(x, y, size, children=None)
-        self._child_list = list(children)
-        for child in self._child_list:
+        super().__init__(x, y, size)
+        self.children = list(children)
+        for child in self.children:
             child.parent = self
         self._widths = list(widths)
 
     def set_widths(self, widths: Sequence[Union[int, Literal["flex"]]]) -> None:
-        if len(widths) != len(self._child_list):
+        if len(widths) != len(self.children):
             raise ValueError(
-                f"widths length mismatch: expected {len(self._child_list)}, "
+                f"widths length mismatch: expected {len(self.children)}, "
                 f"got {len(widths)}"
             )
         new_widths = list(widths)
@@ -259,7 +244,7 @@ class Row(Component):
         widths = layout_flex(self._widths, width)
 
         x = 0
-        for child, w in zip(self._child_list, widths):
+        for child, w in zip(self.children, widths):
             child.x = 1
             child.y = x + 1
             if w > 0:
@@ -274,7 +259,7 @@ class Row(Component):
             x += w
 
     def _render_surface(self, surface: "Surface") -> None:
-        for child in self._child_list:
+        for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
                 continue
@@ -284,23 +269,16 @@ class Row(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def notify(self, action: ActionLiteral, **data) -> None:
-        for child in self._child_list:
-            child.update(action, **data)
-
     def accept(self, action: ActionLiteral, **data) -> None:
-        for child in self._child_list:
+        for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
-        for child in self._child_list:
+        for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()
 
-    def fresh(self) -> None:
-        pass
-
     def _handle_event(self, key: str) -> None:
-        for child in self._child_list:
+        for child in self.children:
             child._handle_event(key)

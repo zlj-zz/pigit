@@ -198,7 +198,9 @@ class _Leaf(Component):
         ([["unbound"]], "child"),
     ],
 )
-def test_loop_string_dispatch_calls_hooks_with_outcome(mock_renderer, batch, expected_outcome):
+def test_loop_string_dispatch_calls_hooks_with_outcome(
+    mock_renderer, batch, expected_outcome
+):
     """``before_dispatch_key`` / ``after_dispatch_key`` run only on string-key dispatch."""
 
     class _Hooked(AppEventLoop):
@@ -317,6 +319,7 @@ def test_loop_overlay_open_maps_to_overlay_outcome(mock_renderer):
 
 def test_resize_calls_renderer_clear_cache():
     from pigit.termui._renderer_context import set_renderer, reset_renderer
+
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop.get_term_size = Mock(return_value=(80, 24))
@@ -441,7 +444,11 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
 def test_renderer_accessed_via_context():
     """Renderer is now accessed via ContextVar instead of explicit binding."""
     from pigit.termui._component_layouts import TabView
-    from pigit.termui._renderer_context import set_renderer, reset_renderer, get_renderer
+    from pigit.termui._renderer_context import (
+        set_renderer,
+        reset_renderer,
+        get_renderer,
+    )
 
     class _Leaf(Component):
         NAME = "leaf"
@@ -495,7 +502,10 @@ def test_loop_mouse_event_is_ignored(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[[("mouse down", 1, 2, 3)]], ExitEventLoop("stop")]
+    loop._input_handle.get_input.side_effect = [
+        [[("mouse down", 1, 2, 3)]],
+        ExitEventLoop("stop"),
+    ]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()

@@ -52,6 +52,7 @@ class TestCommandPalette:
         p.open()
         assert p.is_active
         from pigit.termui import keys
+
         p.on_key(keys.KEY_ESC)
         assert not p.is_active
 
@@ -80,6 +81,7 @@ class TestInspectorPanel:
     def test_show_file(self):
         i = InspectorPanel()
         from pigit.git.model import File
+
         f = File(
             name="test.py",
             display_str="test.py",
@@ -99,6 +101,7 @@ class TestInspectorPanel:
     def test_render(self):
         i = InspectorPanel()
         from pigit.git.model import File
+
         f = File(
             name="test.py",
             display_str="test.py",
@@ -128,9 +131,26 @@ class TestContributionGraph:
     def test_set_commits(self):
         r = ContributionGraph()
         from pigit.git.model import Commit
+
         commits = [
-            Commit(sha="abc1234", msg="first", author="a", unix_timestamp=1000000000, status="pushed", extra_info="", tag=[]),
-            Commit(sha="def5678", msg="second", author="a", unix_timestamp=1000864000, status="pushed", extra_info="", tag=[]),
+            Commit(
+                sha="abc1234",
+                msg="first",
+                author="a",
+                unix_timestamp=1000000000,
+                status="pushed",
+                extra_info="",
+                tag=[],
+            ),
+            Commit(
+                sha="def5678",
+                msg="second",
+                author="a",
+                unix_timestamp=1000864000,
+                status="pushed",
+                extra_info="",
+                tag=[],
+            ),
         ]
         r.set_commits(commits)
         assert len(r._day_counts) == 2
@@ -139,8 +159,17 @@ class TestContributionGraph:
     def test_render(self):
         r = ContributionGraph()
         from pigit.git.model import Commit
+
         commits = [
-            Commit(sha="a", msg="1", author="a", unix_timestamp=1000, status="pushed", extra_info="", tag=[]),
+            Commit(
+                sha="a",
+                msg="1",
+                author="a",
+                unix_timestamp=1000,
+                status="pushed",
+                extra_info="",
+                tag=[],
+            ),
         ]
         r.set_commits(commits)
         s = Surface(60, 12)

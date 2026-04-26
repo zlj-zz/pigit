@@ -12,15 +12,19 @@ from pigit.termui._surface import Surface
 class TestHeader:
     def test_render_basic(self):
         h = Header(separator=True, sep_fg=THEME.fg_dim)
-        h.set_left([
-            ("my-repo", THEME.fg_primary, False),
-            ("  ", THEME.fg_dim, False),
-            ("main", THEME.accent_cyan, False),
-        ])
-        h.set_right([
-            ("Status", THEME.fg_muted, True),
-            (" [1]", THEME.fg_primary, True),
-        ])
+        h.set_left(
+            [
+                ("my-repo", THEME.fg_primary, False),
+                ("  ", THEME.fg_dim, False),
+                ("main", THEME.accent_cyan, False),
+            ]
+        )
+        h.set_right(
+            [
+                ("Status", THEME.fg_muted, True),
+                (" [1]", THEME.fg_primary, True),
+            ]
+        )
         s = Surface(40, 2)
         h.resize((40, 2))
         h._render_surface(s)
@@ -32,15 +36,19 @@ class TestHeader:
 
     def test_render_with_center(self):
         h = Header(separator=True, sep_fg=THEME.fg_dim)
-        h.set_left([
-            ("r", THEME.fg_primary, False),
-            ("  ", THEME.fg_dim, False),
-            ("b", THEME.accent_cyan, False),
-        ])
-        h.set_center([
-            ("\u21912 ", THEME.accent_green, False),
-            ("\u21931", THEME.accent_yellow, False),
-        ])
+        h.set_left(
+            [
+                ("r", THEME.fg_primary, False),
+                ("  ", THEME.fg_dim, False),
+                ("b", THEME.accent_cyan, False),
+            ]
+        )
+        h.set_center(
+            [
+                ("\u21912 ", THEME.accent_green, False),
+                ("\u21931", THEME.accent_yellow, False),
+            ]
+        )
         s = Surface(30, 2)
         h.resize((30, 2))
         h._render_surface(s)
@@ -51,11 +59,13 @@ class TestHeader:
 
     def test_render_truncates_on_small_width(self):
         h = Header(separator=True, sep_fg=THEME.fg_dim)
-        h.set_left([
-            ("very-long-repo-name", THEME.fg_primary, False),
-            ("  ", THEME.fg_dim, False),
-            ("feature", THEME.accent_cyan, False),
-        ])
+        h.set_left(
+            [
+                ("very-long-repo-name", THEME.fg_primary, False),
+                ("  ", THEME.fg_dim, False),
+                ("feature", THEME.accent_cyan, False),
+            ]
+        )
         s = Surface(10, 2)
         h.resize((10, 2))
         h._render_surface(s)

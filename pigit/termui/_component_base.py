@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
 from ._bindings import (
     BindingsList,
@@ -71,7 +71,7 @@ class Component(ABC):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
-        children: Optional[dict[str, "Component"]] = None,
+        children: Optional[Sequence["Component"]] = None,
         parent: Optional["Component"] = None,
     ) -> None:
         self._activated = False
@@ -80,7 +80,7 @@ class Component(ABC):
         self._size = size or NONE_SIZE
 
         self.parent = parent
-        self.children = children
+        self.children = list(children) if children else []
 
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), self.BINDINGS
@@ -144,9 +144,7 @@ class Component(ABC):
 
     def notify(self, action: ActionLiteral, **data):
         """Notify all children."""
-        if self.children is None:
-            raise ComponentError(f"Has no children to notifying; {self.__class__}.")
-        for child in self.children.values():
+        for child in self.children:
             child.update(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
@@ -154,10 +152,7 @@ class Component(ABC):
         self._size = size
         self.fresh()
 
-        if not self.children:
-            return
-
-        for child in self.children.values():
+        for child in self.children:
             child.resize(size)
 
     def _render_surface(self, surface: "Surface") -> None:

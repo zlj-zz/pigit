@@ -110,27 +110,57 @@ class TestBuildContextSignals:
 
 class TestContextScore:
     def test_index_boosted_when_unstaged(self):
-        entry = CmdNewEntry(name="i.a", help_text="add all", category="index", is_dangerous=False, has_args=False)
+        entry = CmdNewEntry(
+            name="i.a",
+            help_text="add all",
+            category="index",
+            is_dangerous=False,
+            has_args=False,
+        )
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
         assert context_score(entry, signals) == 100
 
     def test_commit_boosted_when_staged(self):
-        entry = CmdNewEntry(name="c", help_text="commit", category="commit", is_dangerous=False, has_args=False)
+        entry = CmdNewEntry(
+            name="c",
+            help_text="commit",
+            category="commit",
+            is_dangerous=False,
+            has_args=False,
+        )
         signals = {"has_unstaged": False, "has_staged": True, "has_conflict": False}
         assert context_score(entry, signals) == 100
 
     def test_conflict_boosted_when_conflict(self):
-        entry = CmdNewEntry(name="C.r", help_text="resolve", category="conflict", is_dangerous=False, has_args=False)
+        entry = CmdNewEntry(
+            name="C.r",
+            help_text="resolve",
+            category="conflict",
+            is_dangerous=False,
+            has_args=False,
+        )
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": True}
         assert context_score(entry, signals) == 100
 
     def test_merge_boosted_when_conflict(self):
-        entry = CmdNewEntry(name="m.a", help_text="abort", category="merge", is_dangerous=False, has_args=False)
+        entry = CmdNewEntry(
+            name="m.a",
+            help_text="abort",
+            category="merge",
+            is_dangerous=False,
+            has_args=False,
+        )
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": True}
         assert context_score(entry, signals) == 100
 
     def test_no_boost_when_no_signal(self):
-        entry = CmdNewEntry(name="b", help_text="branch", category="branch", is_dangerous=False, has_args=False)
+        entry = CmdNewEntry(
+            name="b",
+            help_text="branch",
+            category="branch",
+            is_dangerous=False,
+            has_args=False,
+        )
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
         assert context_score(entry, signals) == 0
 
@@ -138,9 +168,27 @@ class TestContextScore:
 class TestSortPickerEntries:
     def test_mru_comes_first(self):
         entries = [
-            CmdNewEntry(name="a", help_text="", category="branch", is_dangerous=False, has_args=False),
-            CmdNewEntry(name="b", help_text="", category="branch", is_dangerous=False, has_args=False),
-            CmdNewEntry(name="c", help_text="", category="branch", is_dangerous=False, has_args=False),
+            CmdNewEntry(
+                name="a",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
+            CmdNewEntry(
+                name="b",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
+            CmdNewEntry(
+                name="c",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
         ]
         mru = ["c", "a"]
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": False}
@@ -149,8 +197,20 @@ class TestSortPickerEntries:
 
     def test_context_score_breaks_tie(self):
         entries = [
-            CmdNewEntry(name="b", help_text="", category="branch", is_dangerous=False, has_args=False),
-            CmdNewEntry(name="i", help_text="", category="index", is_dangerous=False, has_args=False),
+            CmdNewEntry(
+                name="b",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
+            CmdNewEntry(
+                name="i",
+                help_text="",
+                category="index",
+                is_dangerous=False,
+                has_args=False,
+            ),
         ]
         mru = []
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
@@ -159,8 +219,20 @@ class TestSortPickerEntries:
 
     def test_mru_overrides_context_score(self):
         entries = [
-            CmdNewEntry(name="b", help_text="", category="branch", is_dangerous=False, has_args=False),
-            CmdNewEntry(name="i", help_text="", category="index", is_dangerous=False, has_args=False),
+            CmdNewEntry(
+                name="b",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
+            CmdNewEntry(
+                name="i",
+                help_text="",
+                category="index",
+                is_dangerous=False,
+                has_args=False,
+            ),
         ]
         mru = ["b"]
         signals = {"has_unstaged": True, "has_staged": False, "has_conflict": False}
@@ -170,12 +242,22 @@ class TestSortPickerEntries:
 
     def test_alphabetical_fallback(self):
         entries = [
-            CmdNewEntry(name="z", help_text="", category="branch", is_dangerous=False, has_args=False),
-            CmdNewEntry(name="a", help_text="", category="branch", is_dangerous=False, has_args=False),
+            CmdNewEntry(
+                name="z",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
+            CmdNewEntry(
+                name="a",
+                help_text="",
+                category="branch",
+                is_dangerous=False,
+                has_args=False,
+            ),
         ]
         mru = []
         signals = {"has_unstaged": False, "has_staged": False, "has_conflict": False}
         sorted_entries = sort_picker_entries(entries, mru, signals)
         assert [e.name for e in sorted_entries] == ["a", "z"]
-
-

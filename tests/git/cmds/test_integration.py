@@ -29,22 +29,28 @@ class TestGitCommandNewIntegration:
     def test_full_workflow(self, fresh_registry):
         """Test a complete command execution workflow."""
         # Register commands
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b",
-                category=CommandCategory.BRANCH,
-                help="List branches",
-            ),
-            handler="git branch",
-        ))
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b.c",
-                category=CommandCategory.BRANCH,
-                help="Create branch",
-            ),
-            handler=lambda args: f"git checkout -b {args[0]}" if args else "git checkout -b",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b",
+                    category=CommandCategory.BRANCH,
+                    help="List branches",
+                ),
+                handler="git branch",
+            )
+        )
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b.c",
+                    category=CommandCategory.BRANCH,
+                    help="Create branch",
+                ),
+                handler=lambda args: (
+                    f"git checkout -b {args[0]}" if args else "git checkout -b"
+                ),
+            )
+        )
 
         # Create processor with mock config
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
@@ -56,17 +62,19 @@ class TestGitCommandNewIntegration:
 
     def test_dangerous_command_confirmation(self, fresh_registry, monkeypatch):
         """Test dangerous command requires confirmation."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b.d",
-                category=CommandCategory.BRANCH,
-                help="Delete branch",
-                dangerous=True,
-                confirm_msg="Delete branch?",
-                security_level=SecurityLevel.DANGEROUS,
-            ),
-            handler="git branch -d",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b.d",
+                    category=CommandCategory.BRANCH,
+                    help="Delete branch",
+                    dangerous=True,
+                    confirm_msg="Delete branch?",
+                    security_level=SecurityLevel.DANGEROUS,
+                ),
+                handler="git branch -d",
+            )
+        )
 
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
 
@@ -81,18 +89,21 @@ class TestGitCommandNewIntegration:
 
     def test_alias_resolution(self, fresh_registry):
         """Test alias resolution in execution."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b.c",
-                category=CommandCategory.BRANCH,
-                help="Create branch",
-            ),
-            handler="git checkout -b",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b.c",
+                    category=CommandCategory.BRANCH,
+                    help="Create branch",
+                ),
+                handler="git checkout -b",
+            )
+        )
         fresh_registry.add_alias("bc", "b.c")
 
         # Verify alias is resolved
         from pigit.git.cmds import CommandResolver
+
         resolver = CommandResolver(fresh_registry)
         resolved = resolver.resolve("bc")
 
@@ -102,23 +113,27 @@ class TestGitCommandNewIntegration:
 
     def test_search_commands(self, fresh_registry):
         """Test command search functionality."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b",
-                category=CommandCategory.BRANCH,
-                help="List branches",
-                examples=["b -a"],
-            ),
-            handler="git branch",
-        ))
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b.d",
-                category=CommandCategory.BRANCH,
-                help="Delete branch",
-            ),
-            handler="git branch -d",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b",
+                    category=CommandCategory.BRANCH,
+                    help="List branches",
+                    examples=["b -a"],
+                ),
+                handler="git branch",
+            )
+        )
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b.d",
+                    category=CommandCategory.BRANCH,
+                    help="Delete branch",
+                ),
+                handler="git branch -d",
+            )
+        )
 
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
 
@@ -131,25 +146,29 @@ class TestGitCommandNewIntegration:
 
     def test_list_dangerous(self, fresh_registry):
         """Test listing dangerous commands."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="safe",
-                category=CommandCategory.BRANCH,
-                help="Safe command",
-            ),
-            handler="git status",
-        ))
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="dangerous",
-                category=CommandCategory.BRANCH,
-                help="Dangerous command",
-                dangerous=True,
-                confirm_msg="Confirm?",
-                security_level=SecurityLevel.DANGEROUS,
-            ),
-            handler="git reset --hard",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="safe",
+                    category=CommandCategory.BRANCH,
+                    help="Safe command",
+                ),
+                handler="git status",
+            )
+        )
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="dangerous",
+                    category=CommandCategory.BRANCH,
+                    help="Dangerous command",
+                    dangerous=True,
+                    confirm_msg="Confirm?",
+                    security_level=SecurityLevel.DANGEROUS,
+                ),
+                handler="git reset --hard",
+            )
+        )
 
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
         dangerous = processor.list_dangerous()
@@ -159,22 +178,26 @@ class TestGitCommandNewIntegration:
 
     def test_category_filter(self, fresh_registry):
         """Test filtering commands by category."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b",
-                category=CommandCategory.BRANCH,
-                help="Branch command",
-            ),
-            handler="git branch",
-        ))
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="c",
-                category=CommandCategory.COMMIT,
-                help="Commit command",
-            ),
-            handler="git commit",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b",
+                    category=CommandCategory.BRANCH,
+                    help="Branch command",
+                ),
+                handler="git branch",
+            )
+        )
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="c",
+                    category=CommandCategory.COMMIT,
+                    help="Commit command",
+                ),
+                handler="git commit",
+            )
+        )
 
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
 
@@ -213,27 +236,33 @@ class TestGitCommandNewIntegration:
 class TestGitCommandNewPreview:
     def test_preview_string_handler(self, fresh_registry):
         """Preview returns templated string for string handlers."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="s",
-                category=CommandCategory.BRANCH,
-                help="status",
-            ),
-            handler="git status",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="s",
+                    category=CommandCategory.BRANCH,
+                    help="status",
+                ),
+                handler="git status",
+            )
+        )
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
         assert processor.preview("s") == (0, "git status")
 
     def test_preview_with_args(self, fresh_registry):
         """Preview formats command with arguments."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="b.c",
-                category=CommandCategory.BRANCH,
-                help="create",
-            ),
-            handler=lambda args: f"git checkout -b {args[0]}" if args else "git checkout -b",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b.c",
+                    category=CommandCategory.BRANCH,
+                    help="create",
+                ),
+                handler=lambda args: (
+                    f"git checkout -b {args[0]}" if args else "git checkout -b"
+                ),
+            )
+        )
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
         assert processor.preview("b.c", ["feature"]) == (0, "git checkout -b feature")
 
@@ -246,14 +275,16 @@ class TestGitCommandNewPreview:
 
     def test_preview_unknown_command(self, fresh_registry):
         """Preview returns error for unknown commands with suggestions."""
-        fresh_registry.register(CommandDef(
-            meta=CommandMeta(
-                short="status",
-                category=CommandCategory.BRANCH,
-                help="status",
-            ),
-            handler="git status",
-        ))
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="status",
+                    category=CommandCategory.BRANCH,
+                    help="status",
+                ),
+                handler="git status",
+            )
+        )
         processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
         exit_code, output = processor.preview("st")
         assert exit_code == 1

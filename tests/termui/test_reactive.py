@@ -78,7 +78,7 @@ class TestComputed:
         c.subscribe(lambda v: called.append(v))
 
         base.set(2)  # computed now 4
-        _ = c.value   # trigger recompute + notify
+        _ = c.value  # trigger recompute + notify
         assert called == [4]
 
     def test_no_notification_when_unchanged(self):

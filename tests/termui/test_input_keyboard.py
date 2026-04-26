@@ -176,6 +176,7 @@ class TestKeyboardInputReadKeys:
     def test_read_windows_path(self):
         """Coverage for _read_chunk_windows branch via mock."""
         import sys
+
         mock_msvcrt = MagicMock()
         mock_msvcrt.kbhit.side_effect = [True, False]
         mock_msvcrt.getch.return_value = b"x"
@@ -205,8 +206,7 @@ class TestKeyboardInputReadKeys:
         mock_stdin = MagicMock()
         mock_stdin.fileno.return_value = 0
         ki._stdin = mock_stdin
-        with patch("select.select") as mock_select, \
-             patch("os.read") as mock_read:
+        with patch("select.select") as mock_select, patch("os.read") as mock_read:
             mock_select.return_value = ([mock_stdin], [], [])
             mock_read.return_value = b"abc"
             result = ki._read_chunk_posix(timeout=0.01)
@@ -217,8 +217,7 @@ class TestKeyboardInputReadKeys:
         mock_stdin = MagicMock()
         mock_stdin.fileno.return_value = 0
         ki._stdin = mock_stdin
-        with patch("select.select") as mock_select, \
-             patch("os.read") as mock_read:
+        with patch("select.select") as mock_select, patch("os.read") as mock_read:
             mock_select.side_effect = [InterruptedError, ([mock_stdin], [], [])]
             mock_read.return_value = b"x"
             result = ki._read_chunk_posix(timeout=0.01)
@@ -229,8 +228,7 @@ class TestKeyboardInputReadKeys:
         mock_stdin = MagicMock()
         mock_stdin.fileno.return_value = 0
         ki._stdin = mock_stdin
-        with patch("select.select") as mock_select, \
-             patch("os.read") as mock_read:
+        with patch("select.select") as mock_select, patch("os.read") as mock_read:
             mock_select.return_value = ([mock_stdin], [], [])
             mock_read.side_effect = BlockingIOError
             result = ki._read_chunk_posix(timeout=0.01)

@@ -113,15 +113,13 @@ class HelpPanel(Component):
         you want the list to reflect the current tree (e.g. before opening help).
         """
 
-        children = getattr(host, "children", None) or getattr(host, "_children", None)
+        children = getattr(host, "children", None)
         if children is None:
             raise TypeError(
-                "Host must expose a non-optional `children` mapping (e.g. Container root)."
+                "Host must expose a non-optional `children` sequence (e.g. TabView, Column)."
             )
         rows: list[HelpEntry] = []
-        # Support both dict-like (values) and sequence-like children
-        panels = children.values() if hasattr(children, "values") else children
-        for panel in panels:
+        for panel in children:
             rows.extend(panel.get_help_entries())
         self.set_entries(rows[:max_rows])
 

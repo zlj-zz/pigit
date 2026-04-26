@@ -155,7 +155,7 @@ deploy = ["!:npm run build", "!:npm run deploy"]
 
     def test_load_scripts_full_form(self):
         """Test loading scripts in full form (table with metadata)."""
-        toml_content = '''
+        toml_content = """
 [cmd_new.scripts.update_test]
 steps = ["!:export SAVED_BRANCH=$(git branch --show-current)", "b.o test", "p", "m $SAVED_BRANCH"]
 help = "Update test branch with current branch changes"
@@ -170,7 +170,7 @@ help = "Build and deploy the application"
 category = "settings"
 dangerous = true
 confirm_msg = "This will deploy to production. Continue?"
-'''
+"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(toml_content)
             temp_path = f.name

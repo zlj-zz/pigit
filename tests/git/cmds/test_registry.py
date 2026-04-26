@@ -145,7 +145,9 @@ class TestCommandRegistry:
             security_level=SecurityLevel.DANGEROUS,
         )
         fresh_registry.register(CommandDef(meta=meta_safe, handler="git safe"))
-        fresh_registry.register(CommandDef(meta=meta_dangerous, handler="git dangerous"))
+        fresh_registry.register(
+            CommandDef(meta=meta_dangerous, handler="git dangerous")
+        )
 
         dangerous = fresh_registry.get_dangerous()
         assert len(dangerous) == 1

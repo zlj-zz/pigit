@@ -112,9 +112,7 @@ class TestInputLine:
         assert inp._prompt == "git "
 
     def test_tab_triggers_completion(self):
-        inp = InputLine(
-            candidate_provider=lambda text: ["foo", "bar", "baz"]
-        )
+        inp = InputLine(candidate_provider=lambda text: ["foo", "bar", "baz"])
         inp.insert("f")
         inp.on_key("tab")
         assert inp._showing_candidates is True
@@ -129,9 +127,7 @@ class TestInputLine:
         assert not inp._showing_candidates
 
     def test_completion_navigate_up_down(self):
-        inp = InputLine(
-            candidate_provider=lambda text: ["a", "b", "c"]
-        )
+        inp = InputLine(candidate_provider=lambda text: ["a", "b", "c"])
         inp.on_key("tab")
         assert inp.value == "a"
         inp.on_key("down")

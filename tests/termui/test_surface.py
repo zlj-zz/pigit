@@ -349,7 +349,9 @@ class TestSurfaceRGB:
 
     def test_subsurface_with_margin(self):
         s = Surface(10, 10)
-        sub = s.subsurface_with_margin(0, 0, 10, 10, margin_top=1, margin_bottom=1, margin_left=2, margin_right=2)
+        sub = s.subsurface_with_margin(
+            0, 0, 10, 10, margin_top=1, margin_bottom=1, margin_left=2, margin_right=2
+        )
         assert sub.width == 6
         assert sub.height == 8
         sub.draw_text(0, 0, "x")

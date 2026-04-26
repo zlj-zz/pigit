@@ -120,7 +120,9 @@ class TestSecureExecutor:
 
     def test_confirm_keyboard_interrupt(self, monkeypatch):
         executor = SecureExecutor()
-        monkeypatch.setattr("builtins.input", lambda _: (_ for _ in ()).throw(KeyboardInterrupt))
+        monkeypatch.setattr(
+            "builtins.input", lambda _: (_ for _ in ()).throw(KeyboardInterrupt)
+        )
 
         result = executor.confirm("Proceed?")
         assert result is False

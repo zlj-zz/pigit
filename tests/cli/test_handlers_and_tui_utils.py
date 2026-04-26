@@ -68,13 +68,13 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         h.cd(SimpleNamespace(repo="r"))
         h.process_repos_option(["a"], "git pull")
         h.open_browser(
-            SimpleNamespace(
-                branch=None, issue=None, commit=None, print=False
-            )
+            SimpleNamespace(branch=None, issue=None, commit=None, print=False)
         )
     mock_ctx.repo.clear_repos.assert_called_once()
     mock_ctx.repo.report_repos.assert_called_once()
-    mock_ctx.repo.cd_repo.assert_called_once_with("r", pick=False, pick_alt_screen=False)
+    mock_ctx.repo.cd_repo.assert_called_once_with(
+        "r", pick=False, pick_alt_screen=False
+    )
     mock_ctx.repo.process_repos_option.assert_called_once()
     mock_ctx.repo.open_repo_in_browser.assert_called_once()
 

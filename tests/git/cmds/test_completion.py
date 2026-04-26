@@ -16,7 +16,11 @@ def test_git_branch_completion_candidates(monkeypatch):
         stdout = "  main\n* feature\n  remotes/origin/dev\n"
 
     monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeResult())
-    assert _git_completion_candidates(CompletionType.BRANCH) == ["feature", "main", "origin/dev"]
+    assert _git_completion_candidates(CompletionType.BRANCH) == [
+        "feature",
+        "main",
+        "origin/dev",
+    ]
 
 
 def test_git_file_completion_candidates(monkeypatch):
