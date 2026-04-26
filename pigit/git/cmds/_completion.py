@@ -43,11 +43,7 @@ def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
 
     if comp_type == CompletionType.COMMIT:
         stdout = _git_run_text(["log", "--oneline", "--max-count=1000"])
-        return [
-            ln.split(None, 1)[0]
-            for ln in stdout.splitlines()
-            if ln.strip()
-        ]
+        return [ln.split(None, 1)[0] for ln in stdout.splitlines() if ln.strip()]
 
     if comp_type == CompletionType.REMOTE:
         stdout = _git_run_text(["remote"])

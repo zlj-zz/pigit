@@ -127,6 +127,7 @@ class ColorAdapter:
 # 256-color quantization (6x6x6 cube + grayscale)
 # ------------------------------------------------------------------ #
 
+
 @lru_cache(maxsize=512)
 def _nearest_256(rgb: tuple[int, int, int]) -> int:
     """Map RGB to nearest xterm-256 color code (0-255).
@@ -193,6 +194,7 @@ _GRAYSCALE_LEVELS: list[int] = [
 # 16-color quantization
 # ------------------------------------------------------------------ #
 
+
 @lru_cache(maxsize=256)
 def _nearest_16(rgb: tuple[int, int, int]) -> int:
     """Map RGB to nearest standard 16-color ANSI code (0-15)."""
@@ -209,6 +211,7 @@ def _nearest_16(rgb: tuple[int, int, int]) -> int:
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
+
 
 def _color_distance(a: tuple[int, int, int], b: tuple[int, int, int]) -> int:
     """Squared Euclidean distance between two RGB triples."""

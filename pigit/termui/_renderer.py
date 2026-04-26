@@ -153,7 +153,9 @@ class Renderer:
             and (cell.fg != _DEFAULT_FG or cell.bg != _DEFAULT_BG or cell.bold)
             for cell in row
         )
-        has_legacy = any(cell.char != "" and cell.ansi_style is not None for cell in row)
+        has_legacy = any(
+            cell.char != "" and cell.ansi_style is not None for cell in row
+        )
 
         if not has_rgb:
             # All cells are legacy or plain default — use legacy renderer

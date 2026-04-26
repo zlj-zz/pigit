@@ -180,9 +180,7 @@ class CommandPalette(Component):
         # Draw input text
         if wcswidth(core) > w:
             core = truncate_by_width(core, w - 1) + "…"
-        surface.draw_text_rgb(
-            input_row, 0, core, fg=THEME.fg_primary, bg=_PALETTE_BG
-        )
+        surface.draw_text_rgb(input_row, 0, core, fg=THEME.fg_primary, bg=_PALETTE_BG)
 
         # Block cursor
         if cursor_abs < w:

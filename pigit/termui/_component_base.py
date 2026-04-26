@@ -145,9 +145,7 @@ class Component(ABC):
     def notify(self, action: ActionLiteral, **data):
         """Notify all children."""
         if self.children is None:
-            raise ComponentError(
-                f"Has no children to notifying; {self.__class__}."
-            )
+            raise ComponentError(f"Has no children to notifying; {self.__class__}.")
         for child in self.children.values():
             child.update(action, **data)
 

@@ -113,7 +113,7 @@ class PigitApplication(Application):
             ],
             display_panel: [
                 ("j/k", "Navigate"),
-                 ("J/K", "Quick Navigate"),
+                ("J/K", "Quick Navigate"),
                 ("esc", "Back"),
                 ("?", "Help"),
             ],
@@ -293,9 +293,7 @@ class PigitApplication(Application):
         self._inspector_visible = not self._inspector_visible
         size = self._loop.get_term_size()
         if self._inspector_visible:
-            self._body_row.set_widths(
-                ["flex", self._inspector_width(size.columns)]
-            )
+            self._body_row.set_widths(["flex", self._inspector_width(size.columns)])
             self._update_inspector_content()
         else:
             self._body_row.set_widths(["flex", 0])
@@ -304,9 +302,7 @@ class PigitApplication(Application):
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute inspector width on terminal resize."""
         if self._inspector_visible and self._body_row is not None:
-            self._body_row.set_widths(
-                ["flex", self._inspector_width(size[0])]
-            )
+            self._body_row.set_widths(["flex", self._inspector_width(size[0])])
         super().resize(size)
 
     def _update_inspector_content(self):

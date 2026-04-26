@@ -8,7 +8,14 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Protocol, runtime_checkable, Sequence, TYPE_CHECKING, Union
+from typing import (
+    Literal,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+    TYPE_CHECKING,
+)
 
 if TYPE_CHECKING:
     from ._component_base import Component

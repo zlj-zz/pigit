@@ -26,11 +26,11 @@ _GRAPH_BG = (45, 45, 50)
 # GitHub-style green heatmap palette (0 → 4)
 # Level 0 is intentionally lighter than _GRAPH_BG so empty cells pop.
 _HEATMAP_COLORS: list[tuple[int, int, int]] = [
-    (75, 75, 82),        # 0 commits (visible empty cell)
-    (144, 238, 144),     # level 1 (light green)
-    (64, 196, 99),       # level 2 (medium green)
-    (48, 161, 78),       # level 3 (dark green)
-    (33, 110, 57),       # level 4 (very dark green)
+    (75, 75, 82),  # 0 commits (visible empty cell)
+    (144, 238, 144),  # level 1 (light green)
+    (64, 196, 99),  # level 2 (medium green)
+    (48, 161, 78),  # level 3 (dark green)
+    (33, 110, 57),  # level 4 (very dark green)
 ]
 
 _CELL_CHAR = "■"
@@ -110,9 +110,7 @@ class ContributionGraph(Component):
                 col = _LEFT_MARGIN + week * cell_w
                 if col >= last_label_end and col < w:
                     label = week_start.strftime("%b")
-                    surface.draw_text_rgb(
-                        0, col, label, fg=THEME.fg_dim, bg=_GRAPH_BG
-                    )
+                    surface.draw_text_rgb(0, col, label, fg=THEME.fg_dim, bg=_GRAPH_BG)
                     last_label_end = col + wcswidth(label) + 1
 
         # --- Day-of-week labels (Mon/Wed/Fri) ---
@@ -120,9 +118,7 @@ class ContributionGraph(Component):
         for day, label in day_labels.items():
             row = _TOP_MARGIN + day * cell_h
             if row < h:
-                surface.draw_text_rgb(
-                    row, 0, label, fg=THEME.fg_dim, bg=_GRAPH_BG
-                )
+                surface.draw_text_rgb(row, 0, label, fg=THEME.fg_dim, bg=_GRAPH_BG)
 
         # --- Heatmap cells ---
         for week in range(num_weeks):
@@ -144,9 +140,7 @@ class ContributionGraph(Component):
         legend_row = _TOP_MARGIN + 7 * cell_h + 1
         if legend_row < h:
             x = 0
-            surface.draw_text_rgb(
-                legend_row, x, "Less", fg=THEME.fg_dim, bg=_GRAPH_BG
-            )
+            surface.draw_text_rgb(legend_row, x, "Less", fg=THEME.fg_dim, bg=_GRAPH_BG)
             x += 5
             for level in range(5):
                 surface.draw_text_rgb(
@@ -157,6 +151,4 @@ class ContributionGraph(Component):
                     bg=_GRAPH_BG,
                 )
                 x += 1
-            surface.draw_text_rgb(
-                legend_row, x, " More", fg=THEME.fg_dim, bg=_GRAPH_BG
-            )
+            surface.draw_text_rgb(legend_row, x, " More", fg=THEME.fg_dim, bg=_GRAPH_BG)

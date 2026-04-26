@@ -114,13 +114,21 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
         super().next(step)
-        if self._visual_mode and self._visual_scroll and self._visual_anchor is not None:
+        if (
+            self._visual_mode
+            and self._visual_scroll
+            and self._visual_anchor is not None
+        ):
             self._update_visual_selection()
 
     @bind_keys("k", keys.KEY_UP)
     def previous(self, step: int = 1) -> None:
         super().previous(step)
-        if self._visual_mode and self._visual_scroll and self._visual_anchor is not None:
+        if (
+            self._visual_mode
+            and self._visual_scroll
+            and self._visual_anchor is not None
+        ):
             self._update_visual_selection()
 
     def _update_visual_selection(self) -> None:
@@ -255,9 +263,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
                 if filename:
                     is_selected = idx in self._selected
                     filename_fg = (
-                        THEME.accent_purple
-                        if is_selected
-                        else THEME.fg_primary
+                        THEME.accent_purple if is_selected else THEME.fg_primary
                     )
                     surface.draw_text_rgb(
                         row,

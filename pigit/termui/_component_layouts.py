@@ -237,9 +237,7 @@ class Row(Component):
             child.parent = self
         self._widths = list(widths)
 
-    def set_widths(
-        self, widths: Sequence[Union[int, Literal["flex"]]]
-    ) -> None:
+    def set_widths(self, widths: Sequence[Union[int, Literal["flex"]]]) -> None:
         if len(widths) != len(self._child_list):
             raise ValueError(
                 f"widths length mismatch: expected {len(self._child_list)}, "

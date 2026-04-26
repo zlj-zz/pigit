@@ -192,28 +192,53 @@ class AppHeader(Component):
             mode_text = f"[{self._mode}]"
             mode_w = wcswidth(mode_text)
             surface.draw_text_rgb(
-                row, right_x, mode_text, fg=self._theme.fg_primary, bg=_DEFAULT_BG, bold=True
+                row,
+                right_x,
+                mode_text,
+                fg=self._theme.fg_primary,
+                bg=_DEFAULT_BG,
+                bold=True,
             )
             rest = f"  {self._current_tab}"
             rest_w = wcswidth(rest)
             surface.draw_text_rgb(
-                row, right_x + mode_w, rest, fg=self._theme.fg_muted, bg=_DEFAULT_BG, bold=True
+                row,
+                right_x + mode_w,
+                rest,
+                fg=self._theme.fg_muted,
+                bg=_DEFAULT_BG,
+                bold=True,
             )
             if self._current_tab_key:
                 key_text = f" [{self._current_tab_key}]"
                 surface.draw_text_rgb(
-                    row, right_x + mode_w + rest_w, key_text, fg=self._theme.fg_primary, bg=_DEFAULT_BG, bold=True
+                    row,
+                    right_x + mode_w + rest_w,
+                    key_text,
+                    fg=self._theme.fg_primary,
+                    bg=_DEFAULT_BG,
+                    bold=True,
                 )
         else:
             tab_text = self._current_tab
             tab_w = wcswidth(tab_text)
             surface.draw_text_rgb(
-                row, right_x, tab_text, fg=self._theme.fg_muted, bg=_DEFAULT_BG, bold=True
+                row,
+                right_x,
+                tab_text,
+                fg=self._theme.fg_muted,
+                bg=_DEFAULT_BG,
+                bold=True,
             )
             if self._current_tab_key:
                 key_text = f" [{self._current_tab_key}]"
                 surface.draw_text_rgb(
-                    row, right_x + tab_w, key_text, fg=self._theme.fg_primary, bg=_DEFAULT_BG, bold=True
+                    row,
+                    right_x + tab_w,
+                    key_text,
+                    fg=self._theme.fg_primary,
+                    bg=_DEFAULT_BG,
+                    bold=True,
                 )
 
 

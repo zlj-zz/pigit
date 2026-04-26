@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from ._overlay_components import Sheet, Toast
     from .types import ToastPosition
 
-_overlay_host_ctx: contextvars.ContextVar[Optional["Component"]] = contextvars.ContextVar(
-    "overlay_host", default=None
+_overlay_host_ctx: contextvars.ContextVar[Optional["Component"]] = (
+    contextvars.ContextVar("overlay_host", default=None)
 )
 
 

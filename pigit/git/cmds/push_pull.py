@@ -220,7 +220,10 @@ def fetch_update(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Clone a repository.",
     has_args=True,
-    examples=["pigit cmd_new f.c https://github.com/user/repo.git", "pigit cmd_new f.c https://github.com/user/repo.git my-dir"],
+    examples=[
+        "pigit cmd_new f.c https://github.com/user/repo.git",
+        "pigit cmd_new f.c https://github.com/user/repo.git my-dir",
+    ],
     related=["f", "f.C"],
 )
 def fetch_clone(args: list[str]) -> str:

@@ -198,9 +198,7 @@ class AppEventLoop:
             raise
         except Exception as e:
             self.stop()
-            _logger.exception(
-                "AppEventLoop: unhandled exception in main loop: %s", e
-            )
+            _logger.exception("AppEventLoop: unhandled exception in main loop: %s", e)
             raise
 
     def run(self) -> None:

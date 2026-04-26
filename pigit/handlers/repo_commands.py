@@ -83,9 +83,7 @@ class RepoCommandHandler:
     def cd(self, args: "Namespace") -> None:
         pick = getattr(args, "repo_cd_pick", False)
         pick_alt = getattr(args, "repo_cd_pick_alt_screen", False)
-        code, msg = self.repo.cd_repo(
-            args.repo, pick=pick, pick_alt_screen=pick_alt
-        )
+        code, msg = self.repo.cd_repo(args.repo, pick=pick, pick_alt_screen=pick_alt)
         if code != 0:
             if msg:
                 self.console.echo(msg)

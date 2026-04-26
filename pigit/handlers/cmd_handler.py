@@ -52,7 +52,9 @@ class CmdHandler:
                 CommandCategory(category)
             except ValueError:
                 self._console.echo(f"`Unknown category: {category}`<tomato>")
-                self._console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                self._console.echo(
+                    f"Valid categories: {', '.join(c.value for c in CommandCategory)}"
+                )
                 return 1
 
         exit_code, message = run_cmd_new_picker(
@@ -91,7 +93,9 @@ class CmdHandler:
                     help_text = self._processor.get_help(category=category)
                 except ValueError:
                     self._console.echo(f"`Unknown category: {args.type}`<tomato>")
-                    self._console.echo(f"Valid categories: {', '.join(c.value for c in CommandCategory)}")
+                    self._console.echo(
+                        f"Valid categories: {', '.join(c.value for c in CommandCategory)}"
+                    )
                     return 1
             else:
                 help_text = self._processor.get_help()

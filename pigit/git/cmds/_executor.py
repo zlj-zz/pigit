@@ -70,9 +70,7 @@ def _execute_override(
     """
     try:
         override_def = registry.get(handler_name)
-        return _execute_handler(
-            override_def.handler, args, executor, execute_step
-        )
+        return _execute_handler(override_def.handler, args, executor, execute_step)
     except Exception:
         pass
 

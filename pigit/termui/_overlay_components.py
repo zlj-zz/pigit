@@ -138,7 +138,9 @@ class HelpPanel(Component):
     def _render_surface(self, surface: Surface) -> None:
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
-        surface.fill_rect_rgb(self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG)
+        surface.fill_rect_rgb(
+            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+        )
         self._frame.draw_onto(surface, self.x, self.y)
 
         chunk = self._lines[self._offset : self._offset + self._scroll_h]
@@ -415,7 +417,9 @@ class AlertDialogBody(Component):
             self._rebuild_frame()
         # Fill the entire dialog area with default background to prevent
         # previous frame content from leaking through the borders.
-        surface.fill_rect_rgb(self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG)
+        surface.fill_rect_rgb(
+            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+        )
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)
 
