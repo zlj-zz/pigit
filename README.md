@@ -50,6 +50,16 @@ tools arguments:
                         exists, the values available in it are used)
 ```
 
+### Interaction
+
+Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
+
+Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
+
+![interaction demo](./docs/resources/demo_interaction.gif)
+
+And in the interaction mode, you can use `?` or `h` to see the help message.
+
 ### `cmd`
 
 The command of `cmd` support some short sub-command to replace the long git original command.
@@ -122,16 +132,6 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
 ```
-
-### Interaction
-
-Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
-
-Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
-
-![interaction demo](./docs/resources/demo_interaction.gif)
-
-And in the interaction mode, you can use `?` or `h` to see the help message.
 
 ## Installation
 
