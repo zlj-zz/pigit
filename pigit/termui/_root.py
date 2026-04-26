@@ -8,6 +8,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import TYPE_CHECKING, Optional
 
@@ -19,6 +20,8 @@ from . import _overlay_context
 if TYPE_CHECKING:
     from ._overlay_components import Sheet, Toast
     from ._surface import Surface
+
+_logger = logging.getLogger(__name__)
 
 
 class ComponentRoot(Component):
@@ -42,8 +45,8 @@ class ComponentRoot(Component):
         """Clean up overlay host token. Call when the TUI exits."""
         try:
             _overlay_context.reset_overlay_host(self._overlay_host_token)
-        except Exception:
-            pass
+        except (RuntimeError, ValueError):
+            _logger.error("Failed to reset overlay host token", exc_info=True)
 
     @property
     def body(self) -> Component:

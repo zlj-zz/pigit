@@ -176,7 +176,12 @@ class AppEventLoop:
             return "overlay"
         handler = self._key_handlers.get(key)
         if handler is not None:
-            handler()
+            try:
+                handler()
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("Key handler for '%s' failed", key)
             self.render()
             return "binding"
         self._child._handle_event(key)

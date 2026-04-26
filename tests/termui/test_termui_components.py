@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
-from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
 from pigit.termui.types import ActionLiteral, OverlayDispatchResult
 
@@ -427,10 +426,10 @@ class TestItemSelector:
         assert selector.curr_no == expected_pos
 
 
-class TestLazyLoadMixin:
+class TestItemSelectorLazyLoad:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
-        class DemoPanel(LazyLoadMixin, ItemSelector):
+        class DemoPanel(ItemSelector):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -438,7 +437,7 @@ class TestLazyLoadMixin:
                 DemoPanel.fresh_calls += 1
                 self.set_content(["ready"])
 
-        p = DemoPanel(size=(12, 4))
+        p = DemoPanel(size=(12, 4), lazy_load=True)
         p.deactivate()
         p.resize((12, 4))
         assert DemoPanel.fresh_calls == 0
@@ -451,7 +450,7 @@ class TestLazyLoadMixin:
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 
-        class DemoPanel2(LazyLoadMixin, ItemSelector):
+        class DemoPanel2(ItemSelector):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -459,7 +458,7 @@ class TestLazyLoadMixin:
                 DemoPanel2.fresh_calls += 1
                 self.set_content(["a", "b"])
 
-        p = DemoPanel2(size=(12, 4))
+        p = DemoPanel2(size=(12, 4), lazy_load=True)
         p.activate()
         p.resize((12, 4))
         assert DemoPanel2.fresh_calls == 1

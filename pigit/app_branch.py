@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from pigit.termui import (
     bind_keys,
-    LazyLoadMixin,
     ItemSelector,
     keys,
     show_toast,
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(LazyLoadMixin, ItemSelector):
+class BranchPanel(ItemSelector):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
@@ -44,7 +43,14 @@ class BranchPanel(LazyLoadMixin, ItemSelector):
         repo_path: Optional[str] = None,
         repo_conf: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
+        super().__init__(
+            x,
+            y,
+            size,
+            content,
+            on_selection_changed=on_selection_changed,
+            lazy_load=True,
+        )
         self.repo_path = repo_path
         self.repo_conf = repo_conf
         self.git = git

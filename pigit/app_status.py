@@ -14,7 +14,6 @@ from pigit.termui import (
     AlertDialog,
     bind_keys,
     Component,
-    LazyLoadMixin,
     ItemSelector,
     keys,
     show_badge,
@@ -65,7 +64,7 @@ def _status_label(file: File) -> str:
     return ""
 
 
-class StatusPanel(LazyLoadMixin, ItemSelector):
+class StatusPanel(ItemSelector):
     """Status panel with visual mode."""
 
     CURSOR = "\u25cf"  # filled circle
@@ -85,7 +84,14 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
         repo_path: Optional[str] = None,
         repo_conf: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
+        super().__init__(
+            x,
+            y,
+            size,
+            content,
+            on_selection_changed=on_selection_changed,
+            lazy_load=True,
+        )
         self.repo_path = repo_path
         self.repo_conf = repo_conf
         self.git = git

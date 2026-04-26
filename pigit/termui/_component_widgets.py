@@ -81,6 +81,8 @@ class ItemSelector(Component):
         size: Optional[tuple[int, int]] = None,
         content: Optional[list[str]] = None,
         on_selection_changed: Optional[Callable[[int], None]] = None,
+        *,
+        lazy_load: bool = False,
     ) -> None:
         super().__init__(x, y, size)
 
@@ -92,6 +94,21 @@ class ItemSelector(Component):
         self.curr_no = 0
         self._r_start = 0
         self._on_change = on_selection_changed
+        self._lazy_load = lazy_load
+        self._panel_loaded = False
+
+    def resize(self, size: tuple[int, int]) -> None:
+        self._size = size
+        if self._lazy_load:
+            if self.is_activated():
+                self.fresh()
+                self._panel_loaded = True
+            elif not self._panel_loaded:
+                self.set_content(["Loading..."])
+                self.curr_no = 0
+                self._r_start = 0
+        else:
+            self.fresh()
 
     @property
     def visible_row_count(self) -> int:

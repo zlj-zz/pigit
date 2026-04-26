@@ -14,7 +14,6 @@ from pigit.ext.utils import relative_time
 from pigit.termui import (
     bind_keys,
     Component,
-    LazyLoadMixin,
     ItemSelector,
     keys,
 )
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
     from .git.model import Commit
 
 
-class CommitPanel(LazyLoadMixin, ItemSelector):
+class CommitPanel(ItemSelector):
     """Commit panel with list view, relative time, and unpushed markers."""
 
     CURSOR = "\u25cf"
@@ -48,7 +47,14 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
         repo_path: Optional[str] = None,
         repo_conf: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
+        super().__init__(
+            x,
+            y,
+            size,
+            content,
+            on_selection_changed=on_selection_changed,
+            lazy_load=True,
+        )
         self.repo_path = repo_path
         self.repo_conf = repo_conf
         self.git = git
