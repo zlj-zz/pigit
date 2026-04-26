@@ -89,7 +89,10 @@ class ColorAdapter:
             return ""
         if self.mode == ColorMode.TRUECOLOR:
             return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
-        return f"\033[{code}m"
+        if self.mode == ColorMode.COLOR_256:
+            return f"\033[38;5;{code}m"
+        # COLOR_16: map 0-7 to 30-37, 8-15 to 90-97
+        return f"\033[{30 + code}m" if code < 8 else f"\033[{82 + code}m"
 
     def bg_sequence(self, rgb: tuple[int, int, int]) -> str:
         """Return ANSI SGR sequence for background color."""
@@ -98,7 +101,10 @@ class ColorAdapter:
             return ""
         if self.mode == ColorMode.TRUECOLOR:
             return f"\033[48;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
-        return f"\033[{code + 10}m"
+        if self.mode == ColorMode.COLOR_256:
+            return f"\033[48;5;{code}m"
+        # COLOR_16: map 0-7 to 40-47, 8-15 to 100-107
+        return f"\033[{40 + code}m" if code < 8 else f"\033[{92 + code}m"
 
     def bold_sequence(self, bold: bool) -> str:
         """Return ANSI SGR sequence for bold weight."""

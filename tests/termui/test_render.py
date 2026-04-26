@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-from pigit.termui._color import ColorMode
+from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._surface import Cell, FlatCell, Surface
 from pigit.termui._renderer import Renderer
 
@@ -174,6 +174,7 @@ class TestRowToStrRGB:
 
     def test_rgb_cells_generate_truecolor_sequences(self):
         r = Renderer(FakeSession())
+        r._color = ColorAdapter(ColorMode.TRUECOLOR)
         row = [
             FlatCell("A", fg=(255, 0, 0)),
             FlatCell("B", fg=(255, 0, 0)),
@@ -183,6 +184,7 @@ class TestRowToStrRGB:
 
     def test_rgb_fg_and_bg(self):
         r = Renderer(FakeSession())
+        r._color = ColorAdapter(ColorMode.TRUECOLOR)
         row = [FlatCell("X", fg=(255, 0, 0), bg=(0, 0, 255))]
         result = r._row_to_str(row)
         assert "\033[38;2;255;0;0m" in result
@@ -241,6 +243,7 @@ class TestRenderSurfaceRGB:
     def test_rgb_end_to_end(self):
         sess = FakeSession()
         r = Renderer(sess)
+        r._color = ColorAdapter(ColorMode.TRUECOLOR)
         s = Surface(3, 1)
         s.draw_text_rgb(0, 0, "AB", fg=(255, 0, 0))
         r.render_surface(s)
@@ -251,16 +254,12 @@ class TestRenderSurfaceRGB:
     def test_256_mode_generates_256_codes(self):
         sess = FakeSession()
         r = Renderer(sess)
-        r._color = ColorMode.COLOR_256
-        # Need to replace the adapter
-        from pigit.termui._color import ColorAdapter
-
         r._color = ColorAdapter(ColorMode.COLOR_256)
         s = Surface(1, 1)
         s.draw_text_rgb(0, 0, "X", fg=(255, 0, 0))
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
-        assert "38;5;" in written or "\033[9m" in written
+        assert "\033[38;5;9m" in written
 
 
 class TestRenderSurfaceIncrementalWithRGB:

@@ -49,19 +49,16 @@ class TestColorAdapter:
         assert adapter.fg_sequence((255, 0, 0)) == ""
         assert adapter.bg_sequence((0, 0, 255)) == ""
 
-    def test_256_mode_returns_code(self):
+    def test_256_mode_returns_38_5_code(self):
         adapter = ColorAdapter(ColorMode.COLOR_256)
         seq = adapter.fg_sequence((255, 0, 0))
-        assert seq.startswith("\033[")
-        assert seq.endswith("m")
-        # Should be a 38;5;N or just N m sequence
-        assert "38;5;" in seq or seq == "\033[9m"
+        assert seq == "\033[38;5;9m"
 
-    def test_16_mode_returns_code(self):
+    def test_16_mode_returns_bright_red_code(self):
         adapter = ColorAdapter(ColorMode.COLOR_16)
         seq = adapter.fg_sequence((255, 0, 0))
-        # Red is code 9 (bright red) or 1
-        assert seq in ("\033[1m", "\033[9m")
+        # Code 9 (bright red) maps to 91
+        assert seq == "\033[91m"
 
 
 class TestNearest256:
