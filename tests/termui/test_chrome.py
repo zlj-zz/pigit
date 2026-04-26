@@ -50,7 +50,9 @@ class TestAppHeader:
 class TestAppFooter:
     def test_render_basic(self):
         f = AppFooter(THEME)
-        f.set_context("src/app.py", [("Enter", "Diff"), ("Space", "Stage")])
+        f.set_context("src/app.py")
+        f.set_global_help([("Q", "Quit")])
+        f.set_help_provider(lambda: [("Enter", "Diff"), ("Space", "Stage")])
         s = Surface(50, 2)
         f.resize((50, 2))
         f._render_surface(s)
@@ -70,7 +72,7 @@ class TestAppFooter:
 
     def test_set_context_clears_text(self):
         f = AppFooter(THEME)
-        f.set_context("file", [("a", "b")])
+        f.set_context("file")
         assert f._context_text == "\u2192 file"
         f.set_context("")
         assert f._context_text == ""

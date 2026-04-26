@@ -85,6 +85,14 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
         else:
             self._view_mode = "list"
 
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Return help pairs for commit panel."""
+        return [
+            ("j/k", "Navigate"),
+            ("Enter", "View"),
+            ("g", "Toggle view"),
+        ]
+
     def fresh(self) -> None:
         branch_name = self.git.get_head() or ""
         self.commits = commits = self.git.load_commits(branch_name)

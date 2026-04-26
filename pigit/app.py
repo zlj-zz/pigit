@@ -89,34 +89,11 @@ class PigitApplication(Application):
             on_selection_changed=self._on_panel_selection_changed,
         )
 
-        _TAB_HELP: dict[Component, list[tuple[str, str]]] = {
-            status_panel: [
-                ("j/k", "Navigate"),
-                ("Enter", "Open"),
-                ("a", "Stage"),
-                ("d", "Discard"),
-                ("i", "Ignore"),
-                ("v", "Visual"),
-                ("?", "Help"),
-            ],
-            branch_panel: [
-                ("j/k", "Navigate"),
-                ("Enter/Space", "Checkout"),
-                ("?", "Help"),
-            ],
-            commit_panel: [
-                ("j/k", "Navigate"),
-                ("Enter", "View"),
-                ("g", "Toggle view"),
-                ("?", "Help"),
-            ],
-            display_panel: [
-                ("j/k", "Navigate"),
-                ("J/K", "Quick Navigate"),
-                ("esc", "Back"),
-                ("?", "Help"),
-            ],
-        }
+        _GLOBAL_HELP: list[tuple[str, str]] = [
+            ("Q", "Quit"),
+            ("I", "Inspector"),
+            (";", "Palette"),
+        ]
         _TAB_LABELS: dict[Component, str] = {
             status_panel: "Status",
             branch_panel: "Branch",
@@ -131,7 +108,8 @@ class PigitApplication(Application):
         }
 
         def _on_tab_switch(panel: Component) -> None:
-            self._footer.set_context("", _TAB_HELP.get(panel, []))
+            provider = getattr(panel, "get_help_entries", None)
+            self._footer.set_help_provider(provider)
             self._header.set_state(
                 current_tab=_TAB_LABELS.get(panel, ""),
                 current_tab_key=_TAB_KEYS.get(panel, ""),
@@ -161,14 +139,9 @@ class PigitApplication(Application):
             current_tab_key="1",
         )
         self._footer = AppFooter(theme=THEME)
-        self._footer.set_context(
-            "",
-            (
-                _TAB_HELP.get(self._tab_view.active, [])
-                if self._tab_view is not None
-                else []
-            ),
-        )
+        self._footer.set_global_help(_GLOBAL_HELP)
+        provider = getattr(self._tab_view.active, "get_help_entries", None)
+        self._footer.set_help_provider(provider)
 
         # Command palette
         self._palette = CommandPalette(

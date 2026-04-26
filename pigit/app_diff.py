@@ -53,6 +53,14 @@ class DiffViewer(LineTextBrowser):
         self._compute_heatmap()
         self._compute_line_numbers()
 
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Return help pairs for diff viewer."""
+        return [
+            ("j/k", "Navigate"),
+            ("J/K", "Quick Navigate"),
+            ("esc", "Back"),
+        ]
+
     def update(self, action: ActionLiteral, **data) -> None:
         if action is ActionLiteral.goto:
             self.i_cache[self.i_cache_key] = self._i

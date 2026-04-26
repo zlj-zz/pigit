@@ -59,6 +59,13 @@ class BranchPanel(LazyLoadMixin, ItemSelector):
             lines.append(line)
         self.set_content(lines)
 
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Return help pairs for branch panel."""
+        return [
+            ("j/k", "Navigate"),
+            ("c", "Checkout"),
+        ]
+
     def _format_branch(self, branch: "Branch") -> str:
         """Format a branch for display."""
         return branch.name
@@ -124,7 +131,7 @@ class BranchPanel(LazyLoadMixin, ItemSelector):
                             )
 
     def on_key(self, key: str) -> None:
-        if key in {keys.KEY_SPACE, keys.KEY_ENTER}:
+        if key == "c":
             if not self.branches:
                 return
             local_branch = self.branches[self.curr_no]

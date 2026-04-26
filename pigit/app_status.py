@@ -341,6 +341,32 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
                 mode = "Visual"
             self._on_visual_mode_changed(mode)
 
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Return help pairs based on current mode."""
+        if self._visual_mode:
+            if self._visual_scroll:
+                return [
+                    ("j/k", "Navigate & select"),
+                    ("s", "Exit scroll mode"),
+                ]
+            return [
+                ("j/k", "Navigate"),
+                ("Space", "Select"),
+                ("a", "Stage selected"),
+                ("d", "Discard selected"),
+                ("i", "Ignore selected"),
+                ("v", "Exit visual"),
+                ("s", "Toggle scroll mode"),
+            ]
+        return [
+            ("j/k", "Navigate"),
+            ("Enter", "Open"),
+            ("a", "Stage"),
+            ("d", "Discard"),
+            ("i", "Ignore"),
+            ("v", "Visual"),
+        ]
+
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
         show_toast("No files selected", duration=2.0)

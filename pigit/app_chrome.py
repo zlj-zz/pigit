@@ -9,7 +9,7 @@ Date: 2026-04-23
 from __future__ import annotations
 
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from pigit.termui import Component, get_badge
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
@@ -239,13 +239,19 @@ class AppFooter(Component):
         super().__init__()
         self._theme = theme
         self._context_text = ""
-        self._help_pairs: list[tuple[str, str]] = []
+        self._global_help: list[tuple[str, str]] = []
+        self._help_provider: Optional[Callable[[], list[tuple[str, str]]]] = None
 
-    def set_context(
-        self, item_name: str = "", help_pairs: Optional[list[tuple[str, str]]] = None
-    ) -> None:
+    def set_context(self, item_name: str = "") -> None:
         self._context_text = f"\u2192 {item_name}" if item_name else ""
-        self._help_pairs = list(help_pairs) if help_pairs else []
+
+    def set_global_help(self, pairs: list[tuple[str, str]]) -> None:
+        self._global_help = list(pairs)
+
+    def set_help_provider(
+        self, provider: Optional[Callable[[], list[tuple[str, str]]]]
+    ) -> None:
+        self._help_provider = provider
 
     def _render_surface(self, surface) -> None:
         w = surface.width
@@ -274,6 +280,8 @@ class AppFooter(Component):
         """Draw footer text content at the given row.
 
         Keys are rendered bright (fg_primary + bold), descriptions dim (fg_muted).
+        Panel help is pulled from the registered provider each render cycle;
+        global help is appended and deduplicated by key.
         """
         surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
 
@@ -287,8 +295,16 @@ class AppFooter(Component):
             )
             x += left_w + 2
 
+        # Pull panel help from provider and merge with global help
+        panel_help = self._help_provider() if self._help_provider else []
+        seen = {key for key, _ in panel_help}
+        help_pairs = list(panel_help)
+        for key, desc in self._global_help:
+            if key not in seen:
+                help_pairs.append((key, desc))
+
         # Draw help pairs: key bright, description dim
-        for key, desc in self._help_pairs:
+        for key, desc in help_pairs:
             # Each pair: "key desc"  +  two spaces before next pair
             pair_text = f"{key} {desc}"
             pair_w = wcswidth(pair_text)
