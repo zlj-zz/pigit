@@ -8,9 +8,9 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-import time
 from typing import Callable, Optional, TYPE_CHECKING
 
+from pigit.ext.utils import relative_time
 from pigit.termui import (
     bind_keys,
     Component,
@@ -27,20 +27,6 @@ from .app_contribution_graph import ContributionGraph
 
 if TYPE_CHECKING:
     from .git.model import Commit
-
-
-def _relative_time(unix_ts: int) -> str:
-    """Return a human-readable relative time string."""
-    delta = int(time.time()) - unix_ts
-    if delta < 60:
-        return f"{delta}s ago"
-    if delta < 3600:
-        return f"{delta // 60}m ago"
-    if delta < 86400:
-        return f"{delta // 3600}h ago"
-    if delta < 604800:
-        return f"{delta // 86400}d ago"
-    return f"{delta // 604800}w ago"
 
 
 class CommitPanel(LazyLoadMixin, ItemSelector):
@@ -105,7 +91,7 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
         max_meta_w = 0
         for commit in commits:
             lines.append(self._format_commit(commit))
-            meta = f"  {commit.author}  {_relative_time(commit.unix_timestamp)}"
+            meta = f"  {commit.author}  {relative_time(commit.unix_timestamp)}"
             max_meta_w = max(max_meta_w, wcswidth(meta))
         self.set_content(lines)
         self._max_meta_w = max_meta_w
@@ -114,7 +100,7 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
         """Format a commit for display."""
         msg = commit.msg
         sha = commit.sha[:7]
-        rel = _relative_time(commit.unix_timestamp)
+        rel = relative_time(commit.unix_timestamp)
         author = commit.author
         # Build a single-line summary for default content
         marker = "\u25cf" if not commit.is_pushed() else " "
@@ -188,7 +174,7 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
             # Draw message (truncated to leave room for meta)
             msg = commit.msg
             author = commit.author
-            rel = _relative_time(commit.unix_timestamp)
+            rel = relative_time(commit.unix_timestamp)
             meta = f"  {author}  {rel}"
             meta_w = wcswidth(meta)
             tag_str = f" {commit.tag[0]}" if commit.tag else ""

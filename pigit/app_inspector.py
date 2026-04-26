@@ -8,9 +8,9 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-import time
 from typing import Optional, TYPE_CHECKING
 
+from pigit.ext.utils import relative_time
 from pigit.termui import Component
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui._surface import _DEFAULT_BG
@@ -106,7 +106,7 @@ class InspectorPanel(Component):
         """Display commit details."""
         self._title = "Commit"
         tags = ", ".join(commit.tag) if commit.tag else "none"
-        rel_time = self._relative_time(commit.unix_timestamp)
+        rel_time = relative_time(commit.unix_timestamp)
 
         self._content = [
             commit.sha[:7],
@@ -126,20 +126,6 @@ class InspectorPanel(Component):
                 self._content.append(f"  {file_name} +{add} -{delete}")
             if len(changed_files) > 8:
                 self._content.append(f"  ... and {len(changed_files) - 8} more")
-
-    @staticmethod
-    def _relative_time(unix_ts: int) -> str:
-        """Return a human-readable relative time string."""
-        delta = int(time.time()) - unix_ts
-        if delta < 60:
-            return f"{delta}s ago"
-        if delta < 3600:
-            return f"{delta // 60}m ago"
-        if delta < 86400:
-            return f"{delta // 3600}h ago"
-        if delta < 604800:
-            return f"{delta // 86400}d ago"
-        return f"{delta // 604800}w ago"
 
     def _render_surface(self, surface) -> None:
         w = surface.width

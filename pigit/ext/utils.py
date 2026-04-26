@@ -1,9 +1,24 @@
 # -*- coding:utf-8 -*-
 
 import sys
+import time
 from collections import Counter
 from math import sqrt
 from typing import Iterable
+
+
+def relative_time(unix_ts: int) -> str:
+    """Return a human-readable relative time string."""
+    delta = int(time.time()) - unix_ts
+    if delta < 60:
+        return f"{delta}s ago"
+    if delta < 3600:
+        return f"{delta // 60}m ago"
+    if delta < 86400:
+        return f"{delta // 3600}h ago"
+    if delta < 604800:
+        return f"{delta // 86400}d ago"
+    return f"{delta // 604800}w ago"
 
 
 def strtobool(s: str) -> bool:
