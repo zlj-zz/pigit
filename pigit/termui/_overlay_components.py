@@ -87,6 +87,7 @@ class HelpPanel(Component):
         ] = []
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Recalculate inner and outer dimensions for the given terminal size."""
         tw, th = int(size[0]), int(size[1])
         avail_w, avail_h = self._padding.apply((tw, th))
         inner_w = (
@@ -105,6 +106,7 @@ class HelpPanel(Component):
         super().resize(size)
 
     def set_entries(self, entries: list[HelpEntry]) -> None:
+        """Set flat help entries and rebuild rendered lines."""
         if not entries:
             self._lines = []
             self._line_segments = []
@@ -130,6 +132,7 @@ class HelpPanel(Component):
         self._offset = 0
 
     def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
+        """Set grouped help entries with category headers and rebuild rendered lines."""
         if not groups:
             self._lines = []
             self._line_segments = []
@@ -207,13 +210,16 @@ class HelpPanel(Component):
         self.set_grouped_entries(groups)
 
     def scroll_down(self) -> None:
+        """Scroll the help content down by one line."""
         max_off = max(0, len(self._lines) - self._scroll_h)
         self._offset = min(self._offset + 1, max_off)
 
     def scroll_up(self) -> None:
+        """Scroll the help content up by one line."""
         self._offset = max(0, self._offset - 1)
 
     def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _render_surface(self, surface: Surface) -> None:
@@ -348,6 +354,7 @@ class Popup(Component):
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def toggle(self) -> None:
+        """Toggle the popup session on the resolved overlay host."""
         if self._session_owner is None:
             return
         host = self._resolved_overlay_host()
@@ -379,12 +386,15 @@ class Popup(Component):
         self.hide()
 
     def show(self) -> None:
+        """Open the popup."""
         self.open = True
 
     def hide(self) -> None:
+        """Close the popup."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the popup and its child to the given terminal size."""
         self._term_size = (int(size[0]), int(size[1]))
         self._child.resize(size)
         self._layout_content()
@@ -416,6 +426,7 @@ class Popup(Component):
         self._child._size = (ow, oh)
 
     def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _on_exit_key(self) -> None:
@@ -479,20 +490,24 @@ class AlertDialogBody(Component):
         super().__init__(x=x, y=y, size=size)
 
     def open_alert(self) -> None:
+        """Open the alert dialog body."""
         if self.open:
             return
         self.open = True
 
     def prepare(self, message: str, on_result: Callable[[bool], None]) -> None:
+        """Configure message and callback, then open the alert."""
         self._message = sanitize_for_display(message)
         self._on_result = on_result
         self.open_alert()
         self._needs_rebuild = True
 
     def reset_state(self) -> None:
+        """Close the alert dialog body."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the alert body and mark it for rebuild."""
         self._term_cols = int(size[0])
         self._term_lines = int(size[1])
         self._needs_rebuild = True
@@ -513,6 +528,7 @@ class AlertDialogBody(Component):
         self._needs_rebuild = False
 
     def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _confirm(self) -> None:
@@ -655,6 +671,7 @@ class AlertDialog(Popup):
         self._pane.reset_state()
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the alert dialog and its child pane."""
         super().resize(size)
 
 
@@ -694,9 +711,11 @@ class Toast(Component):
         self.outer_row_count = 0
 
     def is_expired(self) -> bool:
+        """Return True if the toast has exceeded its display duration."""
         return self._clock() - self._created_at > self.duration + self._exit_duration
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the toast and mark it for rebuild if the size changed."""
         new_size = (int(size[0]), int(size[1]))
         if self._term_size != new_size:
             self._term_size = new_size
@@ -767,6 +786,7 @@ class Toast(Component):
         return base_row, base_col
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Drop all keys; toasts are non-interactive."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def _render_surface(self, surface: Surface) -> None:
@@ -801,9 +821,11 @@ class Toast(Component):
         return self._message
 
     def hide(self) -> None:
+        """Close the toast."""
         self.open = False
 
     def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
 
@@ -824,6 +846,7 @@ class Sheet(Component):
         self.open = True
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Forward overlay keys to the child component if supported."""
         if self._child_dispatch is not None:
             return self._child_dispatch(key)
         return OverlayDispatchResult.DROPPED_UNBOUND
@@ -836,8 +859,10 @@ class Sheet(Component):
         self._child._render_surface(sub)
 
     def hide(self) -> None:
+        """Close the sheet."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the sheet and its child to the given terminal size."""
         self._size = (size[0], min(self._target_height, size[1] // 2))
         self._child.resize(self._size)

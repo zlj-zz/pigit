@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class SizeModifier(Protocol):
+    """Protocol for objects that modify available size and report an offset."""
+
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
         """Return the actual (width, height) after modification."""
 
@@ -32,6 +34,8 @@ class SizeModifier(Protocol):
 
 @runtime_checkable
 class LayoutEngine(Protocol):
+    """Protocol for layout engines that resize children within available space."""
+
     def resize_children(
         self, available: tuple[int, int], offset: tuple[int, int]
     ) -> None:
@@ -58,10 +62,12 @@ class Padding:
         self.left = left
 
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        """Shrink available space by the configured padding."""
         w, h = available
         return max(0, w - self.left - self.right), max(0, h - self.top - self.bottom)
 
     def offset(self) -> tuple[int, int]:
+        """Return the (top, left) offset introduced by this padding."""
         return self.top, self.left
 
 
@@ -73,10 +79,12 @@ class Border:
     """
 
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        """Shrink available space by 1 cell on each side."""
         w, h = available
         return max(0, w - 2), max(0, h - 2)
 
     def offset(self) -> tuple[int, int]:
+        """Return the (top, left) offset introduced by this border."""
         return 1, 1
 
 

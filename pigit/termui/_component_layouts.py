@@ -97,6 +97,7 @@ class TabView(Component):
         return target
 
     def accept(self, action: ActionEventType, **data):
+        """Handle a goto action by routing to the target child."""
         if action is ActionEventType.goto:
             target = data.get("target")
             if isinstance(target, Component) and target in self.children:
@@ -111,6 +112,7 @@ class TabView(Component):
         _logger.warning("TabView: unsupported action %r", action)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the container and propagate the new size to all children."""
         self._size = size
         for child in self.children:
             child.resize(size)
@@ -151,6 +153,7 @@ class Column(Component):
         self._heights = list(heights)
 
     def set_heights(self, heights: Sequence[Union[int, Literal["flex"]]]) -> None:
+        """Update the height spec for each child and validate the length."""
         if len(heights) != len(self.children):
             raise ValueError(
                 f"heights length mismatch: expected {len(self.children)}, "
@@ -159,6 +162,7 @@ class Column(Component):
         self._heights = list(heights)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the column and lay out children vertically according to heights."""
         self._size = size
         width, total_h = size
         heights = layout_flex(self._heights, total_h)
@@ -198,6 +202,7 @@ class Column(Component):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
+        """Destroy all children that implement destroy."""
         for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()
@@ -228,6 +233,7 @@ class Row(Component):
         self._widths = list(widths)
 
     def set_widths(self, widths: Sequence[Union[int, Literal["flex"]]]) -> None:
+        """Update the width spec for each child and validate the length."""
         if len(widths) != len(self.children):
             raise ValueError(
                 f"widths length mismatch: expected {len(self.children)}, "
@@ -239,6 +245,7 @@ class Row(Component):
         self._widths = new_widths
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the row and lay out children horizontally according to widths."""
         self._size = size
         width, height = size
         widths = layout_flex(self._widths, width)
@@ -270,11 +277,15 @@ class Row(Component):
             )
 
     def accept(self, action: ActionEventType, **data) -> None:
+        """Broadcast action to all children. Skip leaf components that do not
+        override ``accept``.
+        """
         for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
+        """Destroy all children that implement destroy."""
         for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()

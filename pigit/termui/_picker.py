@@ -78,6 +78,7 @@ class PickerHeader(Component):
         surface.draw_text(2, 0, sep)
 
     def refresh(self) -> None:
+        """No-op refresh for the static header (subclasses may override)."""
         pass
 
 

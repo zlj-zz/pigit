@@ -24,6 +24,7 @@ MIN_LIST_ROWS = 1
 
 
 def tty_ok() -> bool:
+    """Return True if both stdin and stdout are connected to a TTY."""
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 

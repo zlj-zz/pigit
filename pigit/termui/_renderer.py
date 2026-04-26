@@ -37,12 +37,15 @@ class Renderer:
         self._color = ColorAdapter()
 
     def write(self, text: str) -> None:
+        """Write raw text to the terminal output stream."""
         self._out.write(text)
 
     def flush(self) -> None:
+        """Flush the terminal output stream."""
         self._out.flush()
 
     def clear_screen(self) -> None:
+        """Clear the entire screen and move the cursor to the top-left."""
         # Full clear then CUP (1,1), aligned with historical full-screen Git TUI.
         self._out.write("\033[2J\033[0;0f")
         self.move_cursor(1, 1)
@@ -71,9 +74,11 @@ class Renderer:
         self._out.write(text)
 
     def hide_cursor(self) -> None:
+        """Hide the terminal cursor."""
         self._out.write("\033[?25l")
 
     def show_cursor(self) -> None:
+        """Show the terminal cursor."""
         self._out.write("\033[?25h")
 
     def set_cursor(self, row: int, col: int) -> None:

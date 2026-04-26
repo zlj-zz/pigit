@@ -102,11 +102,13 @@ class AppEventLoop:
         """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
     def clear_screen(self) -> None:
+        """Clear the terminal screen via the current renderer."""
         renderer = get_renderer()
         if renderer is not None:
             renderer.clear_screen()
 
     def get_term_size(self):
+        """Return the current terminal size as (columns, rows)."""
         from shutil import get_terminal_size
 
         return get_terminal_size()
@@ -138,6 +140,7 @@ class AppEventLoop:
         self.render()
 
     def render(self) -> None:
+        """Render the component tree to the terminal."""
         from pigit.termui._surface import Surface
 
         cols, rows = self._size
@@ -148,6 +151,7 @@ class AppEventLoop:
             renderer.render_surface(surface)
 
     def set_input_timeouts(self, timeout: float) -> None:
+        """Set the input polling timeout on the underlying input handle."""
         self._input_handle.set_input_timeouts(timeout)
 
     def _loop(self) -> None:
@@ -207,6 +211,7 @@ class AppEventLoop:
             raise
 
     def run(self) -> None:
+        """Enter a Session, bind the renderer, and run the main event loop."""
         with Session(alt_screen=self._alt) as session:
             self._session = session
             token = set_renderer(session.renderer)
@@ -259,4 +264,5 @@ class AppEventLoop:
         exit_code: int = 0,
         result_message: Optional[str] = None,
     ) -> None:
+        """Raise ExitEventLoop to break out of the event loop."""
         raise ExitEventLoop(msg, exit_code=exit_code, result_message=result_message)

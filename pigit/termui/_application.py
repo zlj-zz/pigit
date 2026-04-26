@@ -33,6 +33,7 @@ class _ApplicationEventLoop(AppEventLoop):
         self._app_on_key = getattr(app, "on_key", None)
 
     def after_start(self):
+        """Delegate the after-start hook to the Application instance."""
         self._app.after_start()
 
     def _dispatch_semantic_string(self, key: str):

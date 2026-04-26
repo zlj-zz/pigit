@@ -64,6 +64,13 @@ def _render_child_to_surface(
 
 
 class Component(ABC):
+    """Base class for all TUI components.
+
+    Provides the component tree (parent/children), size/position,
+    key-handler resolution, action dispatch, and lifecycle hooks.
+    Subclasses must implement :meth:`_render_surface`.
+    """
+
     BINDINGS: Optional[BindingsList] = None
 
     def __init__(
@@ -103,9 +110,11 @@ class Component(ABC):
         return None
 
     def activate(self):
+        """Mark the component as active. Called when it enters the visible tree."""
         self._activated = True
 
     def deactivate(self):
+        """Mark the component as inactive. Called when it leaves the visible tree."""
         self._activated = False
 
     def is_activated(self):

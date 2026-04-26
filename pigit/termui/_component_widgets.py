@@ -53,6 +53,7 @@ class LineTextBrowser(Component):
         self._r = [0, self._size[1]]
 
     def resize(self, size: tuple[int, int]):
+        """Resize the browser and update the maximum visible lines."""
         self._max_line = size[1]
         super().resize(size)
 
@@ -64,9 +65,11 @@ class LineTextBrowser(Component):
             surface.draw_text(idx - self._i, 0, self._content[idx])
 
     def scroll_up(self, line: int = 1):
+        """Scroll the view up by the given number of lines."""
         self._i = max(self._i - line, 0)
 
     def scroll_down(self, line: int = 1):
+        """Scroll the view down by the given number of lines."""
         self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
 
 
@@ -99,6 +102,7 @@ class ItemSelector(Component):
         self._panel_loaded = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the selector and refresh content if activated or not lazy."""
         self._size = size
         if self._lazy_load:
             if self.is_activated():
@@ -127,6 +131,7 @@ class ItemSelector(Component):
         return self.content[self._r_start : self._r_start + self.visible_row_count]
 
     def set_content(self, content: list[str]):
+        """Replace the list content and clamp the current selection to the new bounds."""
         self.content = content
         if not content:
             self._r_start = 0
@@ -140,9 +145,11 @@ class ItemSelector(Component):
             self._r_start = self.curr_no
 
     def clear_items(self):
+        """Clear the selector content, leaving a single empty item."""
         self.set_content([""])
 
     def update(self, action, **data):
+        """No-op update handler for compatibility with the action system."""
         pass
 
     def _render_surface(self, surface: "Surface") -> None:
@@ -158,6 +165,7 @@ class ItemSelector(Component):
             self._on_change(self.curr_no)
 
     def next(self, step: int = 1):
+        """Move the selection forward by the given step."""
         tmp_no = self.curr_no + step
         if tmp_no < 0 or tmp_no >= len(self.content):
             return
@@ -168,6 +176,7 @@ class ItemSelector(Component):
         self._notify_change()
 
     def previous(self, step: int = 1):
+        """Move the selection backward by the given step."""
         tmp = self.curr_no - step
         if tmp < 0 or tmp >= len(self.content):
             return
@@ -203,14 +212,17 @@ class Header(Component):
         self._right: list[tuple[str, tuple[int, int, int], bool]] = []
 
     def set_left(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        """Set the left header segments."""
         self._left = list(segments)
 
     def set_center(
         self, segments: list[tuple[str, tuple[int, int, int], bool]]
     ) -> None:
+        """Set the center header segments."""
         self._center = list(segments)
 
     def set_right(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        """Set the right header segments."""
         self._right = list(segments)
 
     def _render_surface(self, surface: "Surface") -> None:
@@ -321,12 +333,14 @@ class StatusBar(Component):
             self._text = text
 
     def set_text(self, text: str) -> None:
+        """Update the displayed status text."""
         self._text = text
 
     def _on_change(self, text: str) -> None:
         self._text = text
 
     def destroy(self) -> None:
+        """Unsubscribe from the signal and clean up resources."""
         if self._unsub:
             self._unsub()
 
@@ -373,6 +387,7 @@ class InputLine(Component):
 
     @property
     def value(self) -> str:
+        """Return the current input value."""
         return self._value
 
     def set_value(self, text: str) -> None:
@@ -387,9 +402,11 @@ class InputLine(Component):
             self._on_change(self._value)
 
     def set_visible(self, visible: bool) -> None:
+        """Toggle whether the input line is visible."""
         self._visible = visible
 
     def insert(self, ch: str) -> None:
+        """Insert a character at the current cursor position."""
         if self._max_length and len(self._value) >= self._max_length:
             return
         self._value = self._value[: self._cursor] + ch + self._value[self._cursor :]
@@ -405,6 +422,7 @@ class InputLine(Component):
                 self._on_change(self._value)
 
     def backspace(self) -> None:
+        """Delete the character before the cursor."""
         if self._cursor > 0:
             self._value = self._value[: self._cursor - 1] + self._value[self._cursor :]
             self._cursor -= 1
@@ -420,6 +438,7 @@ class InputLine(Component):
         self._cursor = len(self._value)
 
     def clear(self) -> None:
+        """Clear the input value and reset the cursor."""
         self._value = ""
         self._cursor = 0
         if self._on_change:
@@ -511,9 +530,11 @@ class InputLine(Component):
             self.insert(key)
 
     def cursor_left(self) -> None:
+        """Move the cursor one position to the left."""
         self._cursor = max(0, self._cursor - 1)
 
     def cursor_right(self) -> None:
+        """Move the cursor one position to the right."""
         self._cursor = min(len(self._value), self._cursor + 1)
 
     def _render_surface(self, surface: "Surface") -> None:

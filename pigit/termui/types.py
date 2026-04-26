@@ -14,7 +14,9 @@ from typing import Protocol, runtime_checkable
 
 # Action types
 class ActionEventType(Enum):
-    goto = auto()
+    """Action event types for parent-child communication in the component tree."""
+
+    goto = auto()  # Navigate to a target (e.g. open a file or branch)
 
 
 # Toast positions

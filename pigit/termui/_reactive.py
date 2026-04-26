@@ -22,9 +22,11 @@ class Signal(Generic[T]):
 
     @property
     def value(self) -> T:
+        """Return the current value of the signal."""
         return self._value
 
     def set(self, value: T) -> None:
+        """Set the value and notify subscribers if it changed."""
         if value == self._value:
             return
         self._value = value
@@ -47,6 +49,7 @@ class Computed(Generic[T]):
 
     @property
     def value(self) -> T:
+        """Return the current derived value, recomputing and notifying if changed."""
         new = self._fn()
         if new != self._value:
             self._value = new

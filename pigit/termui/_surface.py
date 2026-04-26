@@ -122,6 +122,7 @@ class _Subsurface:
         return r, c, w, h
 
     def draw_text(self, row: int, col: int, text: str) -> None:
+        """Write text at local (row, col), clipping to subsurface bounds."""
         if row < 0 or row >= self.height or col >= self.width:
             return
         r, c = self._to_parent(row, col)
@@ -130,11 +131,13 @@ class _Subsurface:
     def draw_row(
         self, row: int, text: str, align: Literal["left", "center"] = "left"
     ) -> None:
+        """Write a full-width row, aligned and clipped to subsurface bounds."""
         if row < 0 or row >= self.height:
             return
         self._parent.draw_row(self._row + row, text, align)
 
     def draw_box(self, row: int, col: int, width: int, height: int, title=None) -> None:
+        """Draw a box-drawing border at local (row, col), clipped to bounds."""
         clipped = self._clip(row, col, width, height)
         if clipped is None:
             return
@@ -143,12 +146,14 @@ class _Subsurface:
     def fill_rect(
         self, row: int, col: int, width: int, height: int, char: str = " "
     ) -> None:
+        """Fill a rectangular area with char, clipped to subsurface bounds."""
         clipped = self._clip(row, col, width, height)
         if clipped is None:
             return
         self._parent.fill_rect(*clipped, char)
 
     def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+        """Return a nested subsurface relative to this one."""
         return _Subsurface(
             self._parent, self._row + row, self._col + col, width, height
         )
@@ -164,6 +169,7 @@ class _Subsurface:
         bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
     ) -> None:
+        """Write text with RGB colors at local (row, col), clipped to bounds."""
         if row < 0 or row >= self.height or col >= self.width:
             return
         r, c = self._to_parent(row, col)
@@ -172,6 +178,7 @@ class _Subsurface:
     def fill_rect_rgb(
         self, row: int, col: int, width: int, height: int, bg: tuple[int, int, int]
     ) -> None:
+        """Fill a rectangle with an RGB background, clipped to subsurface bounds."""
         clipped = self._clip(row, col, width, height)
         if clipped is None:
             return
@@ -186,6 +193,7 @@ class _Subsurface:
         bold: bool = False,
         align: Literal["left", "center"] = "left",
     ) -> None:
+        """Write a full-width row with RGB colors, clipped to subsurface bounds."""
         if row < 0 or row >= self.height:
             return
         self._parent.draw_row_rgb(
