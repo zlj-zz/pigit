@@ -38,8 +38,6 @@ from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.repo import Repo
 
-repo_handle = Repo()
-
 ExternalProcessCallback = Callable[
     [list[str], Optional[str]],
     "subprocess.CompletedProcess[str]",
@@ -56,14 +54,16 @@ class PigitApplication(Application):
         ("I", "toggle_inspector"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, repo: Optional[Repo] = None) -> None:
         super().__init__(input_takeover=True)
+        self._repo = repo or Repo()
+        self._repo_path, self._repo_conf = self._repo.confirm_repo()
+        self._git = self._repo.bind_path(self._repo_path)
         self._header: Optional[AppHeader] = None
         self._footer: Optional[AppFooter] = None
         self._tab_view: Optional[TabView] = None
         self._body_row: Optional[Row] = None
         self._peek_label = PeekLabel()
-        self._repo_path: Optional[str] = None
         self._palette: Optional[CommandPalette] = None
         self._inspector: Optional[InspectorPanel] = None
         self._inspector_visible = False
@@ -73,20 +73,28 @@ class PigitApplication(Application):
         self._commit_panel: Optional[CommitPanel] = None
         self._display_panel: Optional[DiffViewer] = None
 
-    def build_root(self):
+    def build_root(self) -> Component:
         display_panel = DiffViewer()
         status_panel = StatusPanel(
-            on_shell=self.on_shell_request,
             display=display_panel,
             on_visual_mode_changed=self._on_visual_mode_changed,
             on_selection_changed=self._on_panel_selection_changed,
+            git=self._git,
+            repo_path=self._repo_path,
+            repo_conf=self._repo_conf,
         )
         branch_panel = BranchPanel(
             on_selection_changed=self._on_panel_selection_changed,
+            git=self._git,
+            repo_path=self._repo_path,
+            repo_conf=self._repo_conf,
         )
         commit_panel = CommitPanel(
             display=display_panel,
             on_selection_changed=self._on_panel_selection_changed,
+            git=self._git,
+            repo_path=self._repo_path,
+            repo_conf=self._repo_conf,
         )
 
         _GLOBAL_HELP: list[tuple[str, str]] = [
@@ -177,12 +185,9 @@ class PigitApplication(Application):
 
         # Initialize header with repo info
         try:
-            repo_path, _ = repo_handle.confirm_repo()
-            self._repo_path = repo_path
-            git = repo_handle.bind_path(repo_path)
-            head = git.get_head() or ""
+            head = self._git.get_head() or ""
             self._header.set_state(
-                repo_name=os.path.basename(repo_path) if repo_path else "",
+                repo_name=os.path.basename(self._repo_path) if self._repo_path else "",
                 branch_name=head,
             )
         except Exception:
@@ -198,12 +203,6 @@ class PigitApplication(Application):
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,
         )
-
-    def on_shell_request(self, cmd: list[str], cwd: Optional[str] = None):
-        result = self.run_external_process(cmd, cwd=cwd)
-        if result.returncode == 0:
-            self._refresh_status_panel()
-        return result
 
     def _refresh_status_panel(self) -> None:
         if self._status_panel is not None:

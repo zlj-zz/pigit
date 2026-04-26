@@ -18,10 +18,12 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui._surface import _DEFAULT_BG
+from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
 
 if TYPE_CHECKING:
+    from .git.local_git import LocalGit
     from .git.model import Branch
 
 
@@ -38,14 +40,14 @@ class BranchPanel(LazyLoadMixin, ItemSelector):
         content: Optional[list[str]] = None,
         *,
         on_selection_changed: Optional[Callable] = None,
+        git: "LocalGit",
+        repo_path: Optional[str] = None,
+        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
-        # Lazy import to avoid circular dependency
-        from .git.repo import Repo
-
-        _repo = Repo()
-        self.repo_path, self.repo_conf = _repo.confirm_repo()
-        self.git = _repo.bind_path(self.repo_path)
+        self.repo_path = repo_path
+        self.repo_conf = repo_conf
+        self.git = git
         self.branches: list[Branch] = []
 
     def fresh(self) -> None:
@@ -92,9 +94,6 @@ class BranchPanel(LazyLoadMixin, ItemSelector):
             prefix = self.CURSOR if is_cursor else " "
             fg = THEME.accent_green if is_head else THEME.fg_primary
             text = f"{prefix} {self.content[idx]}"
-
-            from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-
             if wcswidth(text) > w:
                 text = truncate_by_width(text, w - 1) + "\u2026"
 

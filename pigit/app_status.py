@@ -28,6 +28,7 @@ from .app_theme import THEME
 from .git.model import File
 
 if TYPE_CHECKING:
+    from .git.local_git import LocalGit
     from .git.repo import GitFileT, GitFuncT
 
 
@@ -77,19 +78,17 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
         content: Optional[list[str]] = None,
         *,
         alert_inner_width: Optional[int] = None,
-        on_shell: Optional[Callable] = None,
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
+        git: "LocalGit",
+        repo_path: Optional[str] = None,
+        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
-        # Lazy import to avoid circular dependency with app.py
-        from .git.repo import Repo
-
-        _repo = Repo()
-        self.repo_path, self.repo_conf = _repo.confirm_repo()
-        self.git = _repo.bind_path(self.repo_path)
-        self._on_shell = on_shell
+        self.repo_path = repo_path
+        self.repo_conf = repo_conf
+        self.git = git
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
 

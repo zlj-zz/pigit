@@ -26,6 +26,7 @@ from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
 
 if TYPE_CHECKING:
+    from .git.local_git import LocalGit
     from .git.model import Commit
 
 
@@ -43,13 +44,14 @@ class CommitPanel(LazyLoadMixin, ItemSelector):
         *,
         display: Optional[Component] = None,
         on_selection_changed: Optional[Callable] = None,
+        git: "LocalGit",
+        repo_path: Optional[str] = None,
+        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
-        from .git.repo import Repo
-
-        _repo = Repo()
-        self.repo_path, self.repo_conf = _repo.confirm_repo()
-        self.git = _repo.bind_path(self.repo_path)
+        self.repo_path = repo_path
+        self.repo_conf = repo_conf
+        self.git = git
         self.commits: list[Commit] = []
         self._view_mode: str = "list"
         self._contrib_graph = ContributionGraph()
