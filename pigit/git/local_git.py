@@ -650,8 +650,13 @@ class LocalGit:
         path = path or self.path
         color_str = "never" if plain else "always"
 
+        if file_name:
+            cmd = f"git show --color={color_str} {shlex.quote(commit_sha)} -- {shlex.quote(file_name)}"
+        else:
+            cmd = f"git show --color={color_str} {shlex.quote(commit_sha)}"
+
         _, _, resp = self.executor.exec(
-            f"git show --color={color_str} {shlex.quote(commit_sha)} {shlex.quote(file_name)}",
+            cmd,
             flags=REPLY | DECODE,
             cwd=path,
         )
