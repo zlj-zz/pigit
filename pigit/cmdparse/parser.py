@@ -12,13 +12,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Iterable,
-    List,
     Literal,
     Optional,
     Sequence,
-    Tuple,
     Type,
     TypedDict,
     Union,
@@ -191,9 +188,9 @@ class Parser(ArgumentParser):
     # ============
     # call method
     # ============
-    def main(self, args: Optional[List[str]] = None, **kwargs):
+    def main(self, args: Optional[list[str]] = None, **kwargs):
         known_args: Namespace
-        unknown: List
+        unknown: list
 
         known_args, unknown = self.parse_known_args(args)
         # print("call", known_args, unknown)
@@ -203,14 +200,14 @@ class Parser(ArgumentParser):
         elif self.default_callback is not None:
             self.default_callback(known_args, unknown)
 
-    def __call__(self, args: Optional[List[str]] = None, **kwds: Any) -> Any:
+    def __call__(self, args: Optional[list[str]] = None, **kwds: Any) -> Any:
         self.main(args, **kwds)
 
     # ===============================
     # tools methods of serialization
     # ===============================
     @classmethod
-    def from_dict(cls, parser_dict: Dict) -> "Parser":
+    def from_dict(cls, parser_dict: dict) -> "Parser":
         """Parse a `dict` to generate a ~Parser."""
         from copy import deepcopy
 
@@ -220,14 +217,14 @@ class Parser(ArgumentParser):
         def add_command(
             handle: Union["Parser", "_ArgumentGroup"],
             name: str,
-            args: Dict[str, Any],
+            args: dict[str, Any],
         ) -> None:
             """Add command to ~Parser or ~Group object."""
 
-            names: List[str] = name.split(" ")
+            names: list[str] = name.split(" ")
             handle.add_argument(*names, **args)
 
-        def parse_args(handle: "Parser", args: Dict) -> None:
+        def parse_args(handle: "Parser", args: dict) -> None:
             sub_parsers: Optional["_SubParsersAction"] = None
 
             for name, prop in args.items():
@@ -255,7 +252,7 @@ class Parser(ArgumentParser):
                     if not sub_parsers:
                         sub_parsers = handle.add_subparsers()
 
-                    sub_args: Dict = prop.pop("args", None)
+                    sub_args: dict = prop.pop("args", None)
 
                     sub_handle: "Parser" = sub_parsers.add_parser(name, **prop)
 
@@ -272,7 +269,7 @@ class Parser(ArgumentParser):
                 else:
                     add_command(handle, name, prop)
 
-        args: Dict = parser_dict.pop("args", {})
+        args: dict = parser_dict.pop("args", {})
 
         # Create root parser. Parse and add command.
         root_parser = cls(**parser_dict)
@@ -280,17 +277,17 @@ class Parser(ArgumentParser):
 
         return root_parser
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Return a dict of a parameter serialization of ~Parser."""
 
-        cmd_names: List[str] = [
+        cmd_names: list[str] = [
             "prog",
             "usage",
             "description",
             "epilog",
             "prefix_chars",
         ]
-        argument_names: List[str] = [
+        argument_names: list[str] = [
             "nargs",
             "const",
             "dest",
@@ -300,7 +297,7 @@ class Parser(ArgumentParser):
             "help",
         ]
 
-        def _process(parser: "Parser", target_dict: Dict) -> Dict:
+        def _process(parser: "Parser", target_dict: dict) -> dict:
             # Set parser parameters.
             for name in cmd_names:
                 target_dict[name] = getattr(parser, name, None)
@@ -527,7 +524,7 @@ def argument(
     choices: Optional[Iterable] = None,
     required: Optional[bool] = None,
     help: Optional[str] = None,
-    metavar: Union[str, Tuple[str, ...], None] = None,
+    metavar: Union[str, tuple[str, ...], None] = None,
     dest: Optional[str] = None,
     version: Optional[str] = None,
     **kwargs: Any,
@@ -551,7 +548,7 @@ def argument(name: str, **kwargs) -> Callable:
             kwargs["help"] = fn.__doc__
 
         # Check each name whether valid.
-        names: List[str] = name.strip().split()
+        names: list[str] = name.strip().split()
         _param_memo(fn, (names, kwargs))
 
         return fn

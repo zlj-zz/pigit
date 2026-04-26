@@ -2,7 +2,7 @@
 """
 Module: pigit/ext/log.py
 Description: Root logging setup, named loggers, and uncaught-exception forwarding.
-Author: Project Team
+Author: Zev
 Date: 2024-01-01
 """
 
@@ -11,7 +11,7 @@ import logging.handlers
 import os
 import sys
 import threading
-from typing import Dict, Optional
+from typing import Optional
 
 _PIGIT_HANDLER_ATTR = "_pigit_log_handler"
 _UNCAUGHT_HOOKS_INSTALLED = False
@@ -116,7 +116,7 @@ def install_uncaught_exception_logging() -> None:
 
 
 # cache logger, avoid creating loggers with the same name repeatedly.
-_logger_cache: Dict[str, "logging.Logger"] = {}
+_logger_cache: dict[str, "logging.Logger"] = {}
 
 
 def logger(name: Optional[str] = None) -> "logging.Logger":

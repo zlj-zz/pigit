@@ -5,10 +5,10 @@ Project metadata and dependencies live in ``pyproject.toml`` (PEP 517/518).
 
 import sys
 
-if sys.version_info < (3, 8, 5):
+if sys.version_info < (3, 9):
     print(
         "The current version of pigit does not support less "
-        "than Python 3.8.5; see https://pypi.org/project/pigit/"
+        "than Python 3.9; see https://pypi.org/project/pigit/"
     )
     sys.exit(1)
 

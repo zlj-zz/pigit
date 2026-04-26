@@ -1,17 +1,25 @@
 # -*- coding:utf-8 -*-
 
-import ast
 import logging
 import os
-import re
 import textwrap
-from typing import Any, List, Literal, Dict
+from typing import Any
 
+try:
+    import tomllib  # type: ignore
+except ImportError:
+    import tomli  # type: ignore
+
+from .config_data import (
+    ConfigData,
+    CmdConfig,
+    CounterConfig,
+    InfoConfig,
+    RepoConfig,
+    LogConfig,
+)
 from .ext.singleton import Singleton
-from .ext.utils import confirm, strtobool, traceback_info
-
-
-CONF_ERROR = "==error=="
+from .ext.utils import confirm, traceback_info
 
 
 class ConfigError(Exception):
@@ -33,112 +41,77 @@ class Config(metaclass=Singleton):
         #                                     {version:>20} |___/
         # Git-tools -- pigit configuration.
 
+        version = "{version}"
+
+        [cmd]
+
         # (bool) Show original git command.
-        cmd_display={cmd_display}
+        display = {cmd_display}
 
         # (bool) Is it recommended to correct when entering wrong commands.
-        cmd_recommend={cmd_recommend}
+        recommend = {cmd_recommend}
 
-        # (float) Display time of help information in interactive mode.
-        tui_help_showtime={tui_help_showtime}
-
-        # (bool) Whether show the icon of file.
-        # The effect is not perfect and needs improvement.
-        tui_files_icon={tui_files_icon}
+        [counter]
 
         # (bool) Whether to use the ignore configuration of the `.gitignore` file.
-        counter_use_gitignore={counter_use_gitignore}
+        use_gitignore = {counter_use_gitignore}
 
         # (bool) Whether show files that cannot be counted.
-        counter_show_invalid={counter_show_invalid}
+        show_invalid = {counter_show_invalid}
 
         # (bool) Whether show files icons. Font support required, like: 'Nerd Font'
-        counter_show_icon={counter_show_icon}
+        show_icon = {counter_show_icon}
 
         # Output format of statistical results. Supported: [table, simple]
-        # When the command line width is not enough, the `simple ` format is forced.
-        counter_format={counter_format}
+        # When the command line width is not enough, the `simple` format is forced.
+        format = "{counter_format}"
+
+        [info]
 
         # Git local config print format. Supported: [table, normal]
-        git_config_format={git_config_format}
+        git_config_format = "{git_config_format}"
 
         # Control which parts need to be displayed when viewing git repository information.
-        # Support: (path,remote,branch,log,summary)
-        repo_info_include={repo_info_include}
+        # Support: (path, remote, branch, log, summary)
+        repo_include = {repo_info_include}
+
+        [repo]
 
         # (bool) Whether auto append path to repos.
-        repo_auto_append={repo_auto_append}
+        auto_append = {repo_auto_append}
+
+        [log]
 
         # (bool) Whether run PIGIT in debug mode.
-        log_debug={log_debug}
+        debug = {log_debug}
 
         # (bool) Whether output log in terminal.
-        log_output={log_output}
-
+        output = {log_output}
         """
     )
 
-    _KEYS: List[str] = [
-        "cmd_display",
-        "cmd_recommend",
-        "tui_help_showtime",
-        "tui_files_icon",
-        "counter_use_gitignore",
-        "counter_show_invalid",
-        "counter_show_icon",
-        "counter_format",
-        "git_config_format",
-        "repo_info_include",
-        "repo_auto_append",
-        "log_debug",
-        "log_output",
-    ]
-
-    # ======================
-    # config default values.
-    # ======================
-
-    # cmd processor conf
-    cmd_display: bool = True
-    cmd_recommend: bool = True
-
-    # tui conf
-    tui_help_showtime: float = 1.5
-    tui_files_icon: bool = False
-
-    # code counter conf
-    counter_use_gitignore: bool = True
-    counter_show_invalid: bool = False
-    counter_show_icon: bool = False
-    counter_format: Literal["table", "simple"] = "table"
-    _counter_format_candidate: List = ["table", "simple"]
-
-    # info conf
-    git_config_format: Literal["normal", "table"] = "table"
-    _git_config_format_candidate: List = ["normal", "table"]
-
-    repo_info_include: List[str] = ["remote", "branch", "log"]
-
-    # repo conf
-    repo_auto_append: bool = True
-
-    # setting conf
-    log_debug: bool = False
-    log_output: bool = False
-
-    # Store warning messages.
-    _warnings: List = []
+    _counter_format_candidate: list[str] = ["table", "simple"]
+    _git_config_format_candidate: list[str] = ["normal", "table"]
 
     def __init__(
         self, path: str, version: str = "unknown", auto_load: bool = True
     ) -> None:
         self.config_file_path: str = path
         self.current_version: str = version
-        self.conf: Dict[str, Any] = {}
+        self._data = ConfigData(version=version)
+        self._warnings: list[str] = []
         self.log = logging.getLogger()
 
         if auto_load:
             self.load_config()
+
+    def get(self) -> ConfigData:
+        """Return the current configuration data.
+
+        Returns:
+            ConfigData instance with all configuration values.
+        """
+        return self._data
 
     def output_warnings(self) -> "Config":
         """Output config warning info and return self object.
@@ -157,178 +130,114 @@ class Config(metaclass=Singleton):
 
         return self
 
-    def check_and_set_value(self, key: str, value: str, config: Dict) -> None:
-        if key not in self._KEYS:
-            self._warnings.append(f"'{key}' is not be supported!")
-            return
+    def _load_toml(self, path: str) -> ConfigData:
+        """Load configuration from TOML file.
 
-        v_type = type(getattr(self, key))
-        if v_type == int:
+        Args:
+            path: Path to the TOML configuration file.
+
+        Returns:
+            ConfigData populated from the TOML file.
+        """
+        with open(path, "rb") as f:
             try:
-                config[key] = int(value)
-            except ValueError:
-                self._warnings.append(f'Config key "{key}" should be an integer!')
-        elif v_type == float:
-            try:
-                config[key] = float(value)
-            except ValueError:
-                self._warnings.append(f'Config key "{key}" should be a float!')
-        elif v_type == bool:
-            try:
-                # True values are y, yes, t, true, on and 1;
-                # false values are n, no, f, false, off and 0.
-                # Raises ValueError if val is anything else.
-                config[key] = bool(strtobool(value))
-            except ValueError:
-                self._warnings.append(f'Config key "{key}" can only be True or False!')
-        elif v_type == str:
-            if "color" in key and not re.match(r"^#[0-9a-fA-F]6$", value):
-                self._warnings.append(
-                    f'Config key "{key}" should be RGB string, like: "#FF0000".'
-                )
-            else:
-                config[key] = value
-        elif v_type == list:
-            try:
-                parsed_value = ast.literal_eval(value)
-            except (ValueError, SyntaxError):
-                self._warnings.append(
-                    f'Config key "{key}" has invalid list literal: `{value}`.'
-                )
-                return
+                raw: dict[str, Any] = tomllib.load(f)
+            except NameError:
+                raw = tomli.load(f)
 
-            if isinstance(parsed_value, list):
-                config[key] = parsed_value
-            else:
-                self._warnings.append(
-                    f'Config key "{key}" should be a list literal, got `{value}`.'
-                )
+        version = raw.get("version", self.current_version)
 
-    @staticmethod
-    def _remove_inline_comment(line: str) -> str:
-        """Remove comments while preserving '#' inside quoted strings."""
-        in_single_quote = False
-        in_double_quote = False
-        escaped = False
+        # Parse [cmd] section
+        cmd_raw = raw.get("cmd", {})
+        cmd = CmdConfig(
+            display=cmd_raw.get("display", True),
+            recommend=cmd_raw.get("recommend", True),
+        )
 
-        for idx, ch in enumerate(line):
-            if escaped:
-                escaped = False
-                continue
-
-            if ch == "\\" and (in_single_quote or in_double_quote):
-                escaped = True
-                continue
-
-            if ch == "'" and not in_double_quote:
-                in_single_quote = not in_single_quote
-                continue
-
-            if ch == '"' and not in_single_quote:
-                in_double_quote = not in_double_quote
-                continue
-
-            if ch == "#" and not in_single_quote and not in_double_quote:
-                return line[:idx].rstrip()
-
-        return line
-
-    def read_config(self) -> None:
-        config = self.conf
-        config_file = self.config_file_path
-
-        if not os.path.isfile(config_file):
-            self.log.info("Has no custom config file.")
-            return
-
-        with open(config_file) as cf:
-            for line in cf:
-                line = line.strip()
-                if line.startswith("#? Config"):
-                    config["version"] = line[line.find("v. ") + 3 :]
-                    continue
-                if line.startswith("#"):
-                    # comment line.
-                    continue
-                if "=" not in line:
-                    # invalid line.
-                    continue
-
-                # remove line comment.
-                line = self._remove_inline_comment(line)
-                if "=" not in line:
-                    continue
-
-                # processing.
-                key_str, value_str = line.split("=", maxsplit=1)
-                key_str = key_str.strip()
-                value_str = value_str.strip().strip('"')
-
-                # checking.
-                self.check_and_set_value(key_str, value_str, config)
-
-    def parse_config(self) -> None:
-        config = self.conf
-
-        if (  # check code-counter output format whether supported.
-            "counter_format" in config
-            and config["counter_format"] not in self._counter_format_candidate
-        ):
-            config["counter_format"] = CONF_ERROR
+        # Parse [counter] section
+        counter_raw = raw.get("counter", {})
+        counter_format = counter_raw.get("format", "table")
+        if counter_format not in self._counter_format_candidate:
+            counter_format = "table"
             self._warnings.append(
-                'Config key "{0}" support must in {1}'.format(
-                    "counter_format", self._counter_format_candidate
+                'Config key "counter.format" support must in {}'.format(
+                    self._counter_format_candidate
                 )
             )
+        counter = CounterConfig(
+            use_gitignore=counter_raw.get("use_gitignore", True),
+            show_invalid=counter_raw.get("show_invalid", False),
+            show_icon=counter_raw.get("show_icon", False),
+            format=counter_format,
+        )
 
-        if (
-            "git_config_format" in config
-            and config["git_config_format"] not in self._git_config_format_candidate
-        ):
-            config["git_config_format"] = CONF_ERROR
+        # Parse [info] section
+        info_raw = raw.get("info", {})
+        git_config_format = info_raw.get("git_config_format", "table")
+        if git_config_format not in self._git_config_format_candidate:
+            git_config_format = "table"
             self._warnings.append(
-                'Config key "{0}" support must in {1}'.format(
-                    "git_config_format", self._git_config_format_candidate
+                'Config key "info.git_config_format" support must in {}'.format(
+                    self._git_config_format_candidate
                 )
             )
+        repo_include = info_raw.get("repo_include", ["remote", "branch", "log"])
+        if not isinstance(repo_include, list):
+            repo_include = ["remote", "branch", "log"]
+            self._warnings.append(
+                'Config key "info.repo_include" should be a list, using default.'
+            )
+        info = InfoConfig(
+            git_config_format=git_config_format,
+            repo_include=repo_include,
+        )
 
-        version = self.current_version
-        if "version" in config and not (
-            # If unknown current version or
-            # If the version is right or
-            # If current version is a [beta, alpha, dev] version then will not tip.
-            # Else if version is not right will tip.
-            version == "unknown"
-            or config["version"] == version
-            or "beta" in version
-            or "alpha" in version
-            or "dev" in version
+        # Parse [repo] section
+        repo_raw = raw.get("repo", {})
+        repo = RepoConfig(
+            auto_append=repo_raw.get("auto_append", True),
+        )
+
+        # Parse [log] section
+        log_raw = raw.get("log", {})
+        log = LogConfig(
+            debug=log_raw.get("debug", False),
+            output=log_raw.get("output", False),
+        )
+
+        # Version check
+        if not (
+            self.current_version == "unknown"
+            or version == self.current_version
+            or "beta" in self.current_version
+            or "alpha" in self.current_version
+            or "dev" in self.current_version
         ):
             self._warnings.append(
                 "The current configuration file is not up-to-date."
                 "You'd better recreate it."
-                f"Config version is '{config['version']}', current version is '{version}'."
+                f"Config version is '{version}', current version is '{self.current_version}'."
             )
+
+        return ConfigData(
+            version=version,
+            cmd=cmd,
+            counter=counter,
+            info=info,
+            repo=repo,
+            log=log,
+        )
 
     def load_config(self) -> None:
         try:
-            self.read_config()
+            self._data = self._load_toml(self.config_file_path)
+        except FileNotFoundError:
+            self.log.info("Has no custom config file.")
         except Exception:
             self.log.error(traceback_info())
             self._warnings.append(
                 f"Can not load the config file. Path: {self.config_file_path}"
             )
-
-        self.parse_config()
-
-        # setting config.
-        for key in self._KEYS:
-            if key in self.conf.keys() and self.conf[key] != CONF_ERROR:
-                # update default for using.
-                setattr(self, key, self.conf[key])
-            else:
-                # append default to conf for written.
-                self.conf[key] = getattr(self, key)
 
     def create_config_template(self) -> bool:
         parent_dir = os.path.dirname(self.config_file_path)
@@ -340,17 +249,27 @@ class Config(metaclass=Singleton):
         ):
             return False
 
-        # Try to load already has config.
-        self.load_config()
-        self.conf["version"] = self.current_version
+        # Use current data (defaults or loaded values)
+        data = self._data
 
-        # Write config with already exist custom settings.
         try:
-            with open(
-                self.config_file_path,
-                "w" if os.path.isfile(self.config_file_path) else "x",
-            ) as f:
-                f.write(self.CONFIG_TEMPLATE.format(**self.conf))
+            with open(self.config_file_path, "w") as f:
+                f.write(
+                    self.CONFIG_TEMPLATE.format(
+                        version=self.current_version,
+                        cmd_display=str(data.cmd.display).lower(),
+                        cmd_recommend=str(data.cmd.recommend).lower(),
+                        counter_use_gitignore=str(data.counter.use_gitignore).lower(),
+                        counter_show_invalid=str(data.counter.show_invalid).lower(),
+                        counter_show_icon=str(data.counter.show_icon).lower(),
+                        counter_format=data.counter.format,
+                        git_config_format=data.info.git_config_format,
+                        repo_info_include=data.info.repo_include,
+                        repo_auto_append=str(data.repo.auto_append).lower(),
+                        log_debug=str(data.log.debug).lower(),
+                        log_output=str(data.log.output).lower(),
+                    )
+                )
         except Exception:
             self.log.error(traceback_info())
             print("Fail to create config.")

@@ -1,6 +1,6 @@
 import os
 import textwrap
-from typing import List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 from plenty import box
 from plenty.table import UintTable
@@ -78,7 +78,7 @@ def show_gitconfig(
         )
 
     if format_type == "table":
-        style: List[Union[str, "Style"]] = ["", "pale_green" if color else ""]
+        style: list[Union[str, "Style"]] = ["", "pale_green" if color else ""]
 
         tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
         for header, values in config.items():

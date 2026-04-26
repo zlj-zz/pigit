@@ -6,9 +6,17 @@ import os
 import pprint
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Generator, Optional
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
+from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
+from pigit.termui._picker import PickerRow
+
+
+def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
+    """Return managed repo names sorted by Unicode code points (stable across platforms)."""
+
+    return sorted(repos.keys())
 
 
 class ManagedRepos:
@@ -40,7 +48,7 @@ class ManagedRepos:
         self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _make_repo_name(path: str, repos: Dict[str, str], name_counts: Counter) -> str:
+    def _make_repo_name(path: str, repos: dict[str, str], name_counts: Counter) -> str:
         """
         Given a new repo `path`, create a repo name. By default, basename is used.
         If name collision exists, further include parent path name.
@@ -61,7 +69,7 @@ class ManagedRepos:
             return os.path.join(par_name, name)
         return name
 
-    def load_repos(self) -> Dict:
+    def load_repos(self) -> dict:
         """Load repos info from cache file."""
 
         if not self.repo_json_path.is_file():
@@ -70,7 +78,7 @@ class ManagedRepos:
         with self.repo_json_path.open(mode="r") as fp:
             return json.load(fp)
 
-    def dump_repos(self, repos: Dict) -> bool:
+    def dump_repos(self, repos: dict) -> bool:
         """Dump repos info to cache file, re-write mode."""
 
         try:
@@ -133,10 +141,11 @@ class ManagedRepos:
             report_dict[repo_name] = commits
         pprint.pprint(report_dict)
 
-    def ll_repos(self, reverse: bool = False) -> Generator[List[Tuple], None, None]:
+    def ll_repos(self, reverse: bool = False) -> Generator[list[tuple], None, None]:
         exist_repos = self.load_repos()
 
-        for repo_name, prop in exist_repos.items():
+        for repo_name in iter_managed_repo_names(exist_repos):
+            prop = exist_repos[repo_name]
             repo_path = prop["path"]
             head = self.get_head(repo_path)
 
@@ -186,7 +195,7 @@ class ManagedRepos:
                     ("Local Path", repo_path),
                 ]
 
-    def add_repos(self, paths: List[str], dry_run: bool = False) -> List:
+    def add_repos(self, paths: list[str], dry_run: bool = False) -> list:
         """Traverse the incoming paths. If it is not saved and is a git
         directory, add it to repos.
 
@@ -218,7 +227,7 @@ class ManagedRepos:
 
         return new_git_paths
 
-    def rm_repos(self, repos: List[str], use_path: bool = False) -> List[Tuple]:
+    def rm_repos(self, repos: list[str], use_path: bool = False) -> list[tuple]:
         exist_repos = self.load_repos()
 
         del_repos = []
@@ -237,7 +246,7 @@ class ManagedRepos:
         self.dump_repos(exist_repos)
         return list(zip(del_repos, del_paths))
 
-    def rename_repo(self, repo: str, name: str) -> Tuple[bool, str]:
+    def rename_repo(self, repo: str, name: str) -> tuple[bool, str]:
         """Rename repo
 
         Args:
@@ -245,7 +254,7 @@ class ManagedRepos:
             name (str): new name
 
         Returns:
-            Tuple[bool, str]: whether rename successful, tip msg.
+            tuple[bool, str]: whether rename successful, tip msg.
         """
 
         exist_repos = self.load_repos()
@@ -264,42 +273,72 @@ class ManagedRepos:
             self.dump_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def cd_repo(self, repo: Optional[str] = None):
+    def cd_repo(
+        self,
+        repo: Optional[str] = None,
+        *,
+        pick: bool = False,
+        pick_alt_screen: bool = False,
+    ) -> tuple[int, Optional[str]]:
         """Quick jump to repo dir.
 
         Args:
-            repo (Optional[str], optional): repo name. Defaults to None.
+            repo: Managed repo name, or ``None`` to choose interactively (legacy or ``--pick``).
+            pick: If ``True``, use the built-in TTY picker when the name is missing or not
+                an exact key (requires a terminal for the picker path).
 
         Returns:
-            _type_: _description_
+            ``(exit_code, message)``. The handler maps non-zero codes to :exc:`SystemExit`.
         """
 
         command = "$SHELL -c 'cd {0} && exec $SHELL'"
         exist_repos = self.load_repos()
 
-        if repo in exist_repos:
+        if pick:
+            if not exist_repos:
+                return 1, EMPTY_MANAGED_REPOS_MSG
+            if repo is not None and repo in exist_repos:
+                path = exist_repos[repo]["path"]
+                self.executor.exec(command.format(path), flags=WAITING)
+                return 0, None
+            rows = [
+                PickerRow(
+                    title=name,
+                    # detail=exist_repos[name]["path"],
+                    ref=exist_repos[name]["path"],
+                )
+                for name in iter_managed_repo_names(exist_repos)
+            ]
+            initial_filter = "" if repo is None else repo
+            return run_repo_cd_picker(
+                rows,
+                self.executor,
+                initial_filter=initial_filter,
+                pick_alt_screen=pick_alt_screen,
+            )
+
+        if repo is not None and repo in exist_repos:
             path = exist_repos[repo]["path"]
             self.executor.exec(command.format(path), flags=WAITING)
-        else:
-            cur_cache = []
-            print("Managed repos include the following:")
-            for i, r in enumerate(exist_repos, 0):
-                cur_cache.append(r)
-                print(".  ", i, r)
+            return 0, None
 
-            try:
-                input_num = int(input("Please input the index:"))
-                if 0 <= input_num <= len(cur_cache):
-                    path = exist_repos[cur_cache[input_num]]["path"]
-                    print(
-                        self.executor.exec(command.format(path), cwd=".", flags=WAITING)
-                    )
-                else:
-                    print("Error: index out of range.")
-            except Exception:
-                print("Error: index need input a number.")
+        cur_cache = iter_managed_repo_names(exist_repos)
+        print("Managed repos include the following:")
+        for i, r in enumerate(cur_cache):
+            print(".  ", i, r)
 
-    def process_repos_option(self, repos: Optional[List[str]], cmd: str):
+        try:
+            input_num = int(input("Please input the index:"))
+            if 0 <= input_num < len(cur_cache):
+                path = exist_repos[cur_cache[input_num]]["path"]
+                print(self.executor.exec(command.format(path), cwd=".", flags=WAITING))
+            else:
+                print("Error: index out of range.")
+        except Exception:
+            print("Error: index need input a number.")
+        return 0, None
+
+    def process_repos_option(self, repos: Optional[list[str]], cmd: str):
         exist_repos = self.load_repos()
         print(f":: {cmd}\n")
 

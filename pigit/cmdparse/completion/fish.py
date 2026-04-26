@@ -1,8 +1,15 @@
-# -*- coding:utf-8 -*-
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/cmdparse/completion/fish.py
+Description: Fish shell completion generator.
+Author: Zev
+Date: 2026-04-15
+"""
 
 import textwrap
 
 from .base import ShellCompletion
+from .widgets import WIDGETS
 
 
 class FishCompletion(ShellCompletion):
@@ -33,7 +40,18 @@ class FishCompletion(ShellCompletion):
 
         complete --no-files --command %(prop)s --arguments \
         "(%(func_name)s)";
+
+%(widget)s
         """
     )
 
     # TODO:improve `fish` completion script.
+
+    def generate_resource(self) -> str:
+        complete_content = self.generate_content()
+        return self.TEMPLATE_SRC % {
+            "func_name": self.func_name,
+            "prop": self.prog_name,
+            "complete_vars": complete_content,
+            "widget": WIDGETS["fish"],
+        }

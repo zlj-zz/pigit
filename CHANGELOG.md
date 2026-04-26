@@ -1,5 +1,190 @@
 # Changelog of pigit
 
+## 1.8.2 (2026-04-26)
+
+### TermUI — Component model & layout
+
+- **`Component.children` unified to `Sequence[Component]`**: removed dict-based children API and internal splits (`_child_list`, `_children`); `notify()` and `resize()` iterate `self.children` directly.
+- **`LazyLoadMixin` inlined into `ItemSelector`**: activated via `lazy_load=True` parameter; deleted `_component_mixins.py`.
+- **Local coordinates in `Column`/`Row`**: fixed double-offsetting bug where nested layouts applied global coordinates instead of local; `layout_flex` extracted to `_layout.py`.
+
+### TermUI — Chrome & Header
+
+- **`AppHeader` extracted to generic `Header`**: supports left/center/right slots and `on_refresh` callback for dynamic content assembly.
+- **Badge system refactored**: `get_badge()` / `show_badge()` via `_overlay_context` (ContextVar-based); removed `on_badge` callback.
+- **Dynamic footer help**: `AppFooter` collects entries from active panel's `get_help_entries()` instead of hard-coding.
+
+### TermUI — Overlay system
+
+- **`OverlayClientMixin` replaced by `_overlay_context`**: ContextVar-based overlay host lookup eliminates mixin MRO complexity.
+- **`Popup.toggle()` calls `on_before_show()`**: opening a popup now triggers the child's `on_before_show()` hook before `show()`.
+
+### App — Panel improvements
+
+- **`StatusPanel` visual mode**: `v` toggles visual selection, `s` toggles scroll-select, `Space` toggles individual selection; batch actions (`a` stage, `d` discard, `i` ignore) operate on selected files.
+- **`Repo` dependency injection**: `PigitApplication` and panels receive `Repo` via constructor, eliminating import-time side effects.
+- **`relative_time` caching in `CommitPanel`**: `fresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
+- **Panel render comments**: `_render_surface` methods in `StatusPanel`, `BranchPanel`, `CommitPanel` now document layout intent and coordinate calculations.
+- **`InputLine` block cursor**: physical cursor rendered as filled block; `set_content` scroll-reset bug fixed.
+- **`StatusPanel` `C` key**: opens `$EDITOR` for git commit.
+
+### TermUI — Error handling
+
+- **`ComponentRoot.destroy()`**: bare `except Exception: pass` replaced with explicit `(RuntimeError, ValueError)` catch and error logging.
+- **`AppEventLoop._dispatch_semantic_string()`**: key handler exceptions no longer swallow `ExitEventLoop`; explicit re-raise before generic catch.
+
+### HelpPanel
+
+- **Grouped display**: entries organized by panel title (`get_help_title()`); bold headers, blue keys (`THEME.accent_blue`), aligned descriptions.
+- **`refresh_entries_from_source`**: renamed from `merge_help_entries_from_host_children`; auto-refreshes via `on_before_show()` before open.
+
+### Fixes
+
+- **`git show`**: omits empty `file_name` argument.
+- **`TabView` panel switch**: clears renderer cache to prevent ghost content.
+
+## 1.8.1 (2026-04-21)
+
+### TermUI — InputLine enhancements & real cursor
+
+- **InputLine widget**: added `on_submit`, `on_cancel`, `candidate_provider`, `set_prompt`, `set_candidate_provider`.
+- **Inline Tab completion**: `Tab` opens candidate list, `Tab`/`Shift+Tab` navigates forward/backward, `↑`/`↓` also navigates; matched prefix stays normal, suffix shown dim (`\033[2m`); `Enter` confirms candidate without submitting; `Esc` restores original input.
+- **Real terminal cursor**: `Renderer.set_cursor(row, col)` sets physical cursor position; components call it from `_render_surface`; cursor state cached to avoid redundant ANSI escapes per frame.
+- **Magic key strings replaced**: `InputLine.on_key` uses constants from `keys.py` (`KEY_ENTER`, `KEY_ESC`, `KEY_TAB`, `KEY_SHIFT_TAB`, etc.).
+
+### TermUI — Picker architecture: delete PickerAppMixin, eliminate sync blocking I/O
+
+- **Deleted `PickerAppMixin`**: implicit-contract anti-pattern removed; filter/status logic inlined into `_CmdPickerApp` and `_RepoCdPickerApp`.
+- **Parameter input via event loop**: `PickerMode.PARAM_INPUT` added; command arguments now collected through `InputLine` inside the event loop instead of synchronous blocking `read_line_with_completion` / `read_line_cancellable`.
+- **Deleted `read_line_with_completion` / `read_line_cancellable`**: ~400 lines of raw cbreak line-editing code removed from `tty_io.py` — these were architecture leaks bypassing the event-driven model.
+- **Deleted `ArgumentPrompter`** and its tests: no longer needed after param-input migration.
+- **`_apply_filter` short-circuit**: skips rebuild when filter needle is unchanged.
+
+### TermUI — Container consolidation & legacy cleanup
+
+- **Deleted `LayoutContainer`**: zero production usage, superseded by `Column`.
+- **`TabView` moved to `_component_layouts.py`**: it is a layout component, belongs with `Column`.
+- **Deleted `_component_containers.py`**: empty after `LayoutContainer` removal and `TabView` migration.
+- **`picker_layout.py` cleaned up**: removed `truncate_visual`, `normalize_filter_text`, `footer_status_line`, `filter_input_line` (no longer used by Component-based picker).
+
+### TermUI — Efficiency fixes
+
+- **Per-frame allocations**: eliminated redundant list slice allocations in `ItemSelector` and `LineTextBrowser`.
+- **InputLine.set_value no-op guard**: avoids redundant callbacks when value is unchanged.
+- **Cached renderer/terminal lookups**: `get_renderer_strict()` and `terminal_size()` cached in picker hot paths.
+
+### Fixes
+
+- **CI stability**: `test_loop_string_dispatch_calls_hooks_with_outcome` uses `RuntimeError("stop")` instead of `KeyboardInterrupt` to exit mock event loops (prevents pytest from interpreting it as external SIGINT).
+
+## 1.8.0 (2026-04-18)
+
+### TermUI — Rendering architecture overhaul
+
+- **Surface / Cell intermediate layer**: declarative 2-D character buffer replaces direct ANSI emission; `Surface.draw_text`, `draw_row`, `draw_box`, `subsurface` APIs with CJK wide-character and ANSI SGR sequence support.
+- **Incremental rendering**: `Renderer.render_surface()` uses row-level diff against previous frame, falling back to full clear on resize.
+- **Box-drawing primitives**: `BoxFrame` in `frame_primitives.py` with `draw_onto` / `draw_content` APIs; replaces legacy `_build_bordered_frame`.
+- **`_render_surface()` protocol**: all components migrated from `_render()` legacy path; `Popup`, `AlertDialogBody`, `HelpPanel`, `LineTextBrowser`, `ItemSelector`, `SearchableListPicker` now draw to `Surface`.
+
+### TermUI — Component tree refactor
+
+- **`Container` replaced by `TabView` and `LayoutContainer`**: `TabView` for tabbed component stacks (single active child); `LayoutContainer` for layout-engine driven multi-child rendering.
+- **`Application` facade**: `PigitApplication(Application)` replaces `GitTuiRoot(OverlayHostMixin, Container)`; `Application.run()` composes `ComponentRoot` + `_ApplicationEventLoop`.
+- **`ComponentRoot` + `LayerStack`**: `OverlayHostMixin` removed; overlay state managed by `LayerStack` with `LayerKind` (`NONE` / `MODAL` / `TOAST` / `SHEET`).
+- **`Subsurface` layout**: components render into clipped proxies of parent `Surface` for nested layout regions.
+
+### TermUI — Fixes
+
+- **Alert drift**: `AlertDialogBody._needs_rebuild` invalidation prevents stale frame geometry after resize or message change.
+- **StatusPanel refresh**: correct refresh after discarding the last file in a list.
+- **Popup resize**: side-attached popups resized before render when geometry differs from terminal.
+- **ANSI SGR in `Surface.draw_text`**: inline color sequences parsed and stored per-cell as `Cell.style`.
+
+### Command system — complete rewrite (BREAKING)
+
+- **`cmd_new` promoted to `cmd`**: the old `pigit cmd` system (`GitProxy`, `cmd_builtin`, `cmd_func`, `cmd_catalog`, `cmd_proxy`, `shell_mode`) has been completely removed. `pigit cmd` now maps directly to the new system powered by `GitCommandNew`.
+- **`pigit/cmds/` package**: modular command definitions with decorators, models, registry, resolver, security validators, and config loader. Commands organized by domain: `branch.py`, `commit.py`, `history.py`, `index.py`, `merge.py`, `push_pull.py`, `rebase.py`, `remote.py`, `settings.py`, `submodule.py`, `working_tree.py`, `conflict.py`.
+- **`--pick` as default**: `pigit cmd` with no arguments now launches the interactive picker; falls back to help when no TTY.
+- **`pall` parallel command**: `pall` runs git commands in parallel across managed repos via `cmd_new`.
+- **Shell completion updated**: bash/zsh/fish completion scripts now serve `cmd_new` commands under the `cmd` namespace.
+- **`g` shortcut preserved**: continues to work since it prefixes `cmd`, which now resolves to the new system.
+- **Legacy backup**: `cmd_builtin.py` backed up to `docs/cmd_builtin_legacy.py` for reference.
+- **Git command picker UX**: `SearchableListPicker` with real-time preview pane, tab-completion via `read_line_with_completion`, and alt-screen handoff so picked command output is visible.
+- **Internal decoupling**: `tty_io` decoupled from `cmdparse`; picker internals split into `_picker_prompt.py`, `_picker_sorter.py`, `_completion.py`.
+
+### Tests
+
+- Expanded termui test coverage: `Toast`, `Sheet`, `HelpPanel`, `Popup`, `AlertDialogBody`, `LayerStack`, `KeyboardInput`, `ComponentRoot` pop-layer lifecycle.
+- **Removed completion script generation** from docs (shell completion scripts managed separately).
+
+## 1.7.8 (2026-04-03)
+
+### TermUI — overlay and bindings
+
+- **Single modal slot**: `OverlayHostMixin` + `OverlayKind` / `OverlayDispatchResult` / `OverlaySurface`; `OverlayController` forwards keys to the active shell’s `dispatch_overlay_key` (exceptions → `CLOSED_AFTER_ERROR` + host cleanup).
+- **Event loop**: `window resize` before overlay routing; while `has_overlay_open()`, keys use `try_dispatch_overlay` only (main tree does not receive them). `KeyDispatchOutcome` includes `overlay_explicit`, `overlay_implicit`, `overlay_drop`, `overlay_closed_after_error`. `_loop` split into `_dispatch_semantic_string`, `_dispatch_while_overlay_open`, `_dispatch_while_overlay_closed`.
+- **`Popup`**: optional `session_owner`; `_resolved_overlay_host()` uses `nearest_overlay_host()` or treats the owner as host when it already has overlay APIs. No constructor restriction on child type; implicit toggle keys come from the child class’s `TOGGLE_HELP_SEMANTIC_KEYS`. Renderer for side-attached shells is applied in `_render` via `_sync_renderer_from_session_owner` (walk `session_owner` / `parent`); removed `AppEventLoop._bind_side_overlay_components`.
+- **`AlertDialog`**: same `session_owner` pattern via base `Popup`; ESC / confirm flow unchanged at the API level.
+- **`HelpPanel`**: `refresh_entries_from_source` aggregates `get_help_entries()` from `entries_source.children` into the panel (replaces the old `populate_*` name).
+- **Bindings**: `bind_keys` + class `BINDINGS` merged in `resolve_key_handlers_merged` / `list_bindings`; duplicate keys to the same target deduped; conflicts raise `BindingError` with `semantic_key`, `first_target`, `second_target`, `owner_class_name`.
+- **Text**: `sanitize_for_display` for safe overlay strings.
+- **Exports** (`pigit.termui.__all__`): among others `AlertDialog`, `Popup`, `HelpPanel`, `HelpEntry`, `OverlayHostMixin`, `OverlayKind`, `OverlayDispatchResult`, `OverlaySurface`, `bind_keys`, `BindingError`, `list_bindings`, `sanitize_for_display`.
+
+### Git TUI (`pigit.app`)
+
+- **`GitTuiRoot`**: one overlay slot (help `Popup` vs `AlertDialog`); `?` toggles help; help rows refreshed via `HelpPanel.refresh_entries_from_source` before open.
+- **`StatusPanel._check_via_alert`**: after confirm, **`fresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
+
+## 1.7.7 (2026-03-29)
+
+- **Breaking (CLI pickers / termui)**
+  - Removed `pigit.termui.scenes` (and `run_list_picker`). Full-screen pickers use **`AppEventLoop`** + **`SearchableListPicker`** only.
+  - **Types / helpers**: `PickerRow`, `PICK_EXIT_CTRL_C`, `apply_picker_filter` → `from pigit.termui.component_list_picker import …`
+  - **`repo cd --pick` glue** → `pigit.git.repo_cd_picker` (`run_repo_cd_picker`, `EMPTY_MANAGED_REPOS_MSG`, `REPO_CD_NO_TTY_MSG`, …).
+  - **`pigit cmd --pick` / `repo cd --pick`**: require a real TTY; no headless or fake-input test harness in product code.
+- **Migration (copy-paste)**:
+  ```text
+  # Old (removed)
+  from pigit.termui.scenes.list_picker import run_list_picker, PickerRow
+
+  # New — data / component
+  from pigit.termui.component_list_picker import PickerRow, PICK_EXIT_CTRL_C, apply_picker_filter
+
+  # New — product entrypoints stay in git
+  from pigit.git.cmd_picker import run_command_picker
+  from pigit.git.repo_cd_picker import run_repo_cd_picker, EMPTY_MANAGED_REPOS_MSG
+  ```
+- **Internal**: `pigit.termui.picker_event_loop.PickerAppEventLoop` (pickers run only inside a real TTY `Session`), `Renderer.draw_absolute_row` / `erase_line_to_end`; `ExitEventLoop` carries optional `exit_code` / `result_message`; `AppEventLoop.quit(..., exit_code=, result_message=)`.
+
+## 1.7.6 (2026-03-29)
+
+- **Internal TUI** (`docs/technical_termui_event_loop_components_phase1.md`): Centralized `BINDINGS` resolution in `pigit.termui.bindings.resolve_key_handlers`; `Component` and `AppEventLoop` store `Dict[str, Callable]` as `_key_handlers` (construction-time errors for bad string targets). `ItemSelector` no longer duplicates a separate `event_map`.
+- **Internal**: Removed process-wide `NAME` uniqueness (`_NamespaceComp`); `NAME` remains required and non-empty; routing stays keyed by `Container.children` and `emit("goto", ...)`.
+- **`AppEventLoop`**: Optional hooks `before_dispatch_key` / `after_dispatch_key` with `KeyDispatchOutcome` (`"binding"` | `"resize"` | `"child"`) on string-key dispatch only; default `PanelContainer` behavior unchanged (`Container.key_routing="child_first"`).
+- **Tests**: `tests/tui/test_termui_bindings.py`; extended event-loop and container coverage for hooks, callable bindings, and `key_routing`.
+
+## 1.7.5 (2026-03-29)
+
+- **Breaking (internal TUI)**: `AppEventLoop` always runs inside `pigit.termui.session.Session` with `TermuiInputBridge` + `KeyboardInput` when `input_handle` is omitted. Removed `use_termui_keyboard`, default `PosixInput` / `pigit.termui.legacy_input`, and the non-session `renderer_for_stdout` path.
+- **Internal**: `AppEventLoop._run_impl` uses `logging` (`PIGIT.pigit.termui.event_loop`): `ExitEventLoop` → debug line; `KeyboardInterrupt` / `EOFError` silent after `stop()`; other exceptions → `logging.exception` (no stdout traceback prints).
+- **Extensions**: Custom `InputTerminal` implementations may still emit legacy 4-tuple mouse events; they are ignored via `pigit.termui.keys.is_mouse_event` (same shape as before). String semantic keys remain the supported contract for `KeyboardInput` / `TermuiInputBridge`.
+- **Other**: `Renderer` is only constructed from a live `Session`; `TermuiInputBridge.set_input_timeouts` rejects non-finite or negative values. List picker test hook mapping renamed to `_raw_tty_char_to_semantic`.
+
+## 1.7.4 (2026-03-27)
+
+- **Breaking**: Removed legacy packages `pigit.tui` and `pigit.interactive`. Terminal UI lives under `pigit.termui` only.
+- **Migration**:
+  - `pigit.tui.components` / `pigit.tui.event_loop` → `pigit.termui.components` / `pigit.termui.event_loop` (class `EventLoop` renamed to `AppEventLoop`).
+  - `pigit.tui.utils` (`get_width`, `plain`) → `pigit.termui.text` (same symbols).
+  - `pigit.tui.input` → `pigit.termui.legacy_input` (`PosixInput` and helpers).
+  - `pigit.interactive.list_picker` / `repo_cd` / layout / tty helpers → `pigit.termui.scenes.list_picker`, `pigit.termui.scenes.repo_cd`, `pigit.termui.picker_layout`, `pigit.termui.tty_io`.
+- **Implementation**: `Renderer.draw_panel` replaces static `Render.draw`; `AppEventLoop` injects a single `Renderer` into the component tree. `get_width` / `plain` are implemented in `termui/text.py` + `termui/wcwidth_table.py`.
+
+## 1.7.3 (2026-03-26)
+- **Unified term UI (`pigit.termui`)**: Session, Renderer, KeyboardInput (semantic keys), list picker on `Session` + `KeyboardInput`, optional `--pick-alt-screen` for `pigit cmd` / `pigit repo cd --pick`.
+- **Main TUI (`App`)**: `EventLoop(..., use_termui_keyboard=True)` runs inside `pigit.termui.session.Session` with `TermuiInputBridge` over `KeyboardInput` (legacy `PosixInput` remains the default for `EventLoop` when the flag is off).
+- **Deprecation (P3)**: Importing `pigit.interactive` emits a one-time `DeprecationWarning` directing new code to `pigit.termui`. The `pigit.tui` package is documented as legacy (no runtime warning) because `pigit.termui.text` still imports `pigit.tui.utils` for a single `get_width` / `plain` implementation.
+
 ## 1.7.2 (2026-03-23)
 - Update `.gitignore` template
 

@@ -61,7 +61,9 @@ def test_split_cmd_argv_shlex_valueerror_fallback():
 async def test_run_async_subprocess_empty_argv():
     ex = Executor()
     es = ex.generate_popen_state(REPLY | REDIRECT | DECODE | WAITING, {})
-    r = await ex.run_async_subprocess(es, "", {"shell": False, "stdout": -1, "stderr": -1})
+    r = await ex.run_async_subprocess(
+        es, "", {"shell": False, "stdout": -1, "stderr": -1}
+    )
     assert r[0] == 1
 
 

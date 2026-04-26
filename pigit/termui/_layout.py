@@ -1,0 +1,121 @@
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/termui/_layout.py
+Description: Lightweight layout containers for the terminal UI framework.
+Author: Zev
+Date: 2026-04-19
+"""
+
+from __future__ import annotations
+
+from typing import (
+    Literal,
+    Protocol,
+    Sequence,
+    Union,
+    runtime_checkable,
+    TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+    from ._component_base import Component
+
+
+@runtime_checkable
+class SizeModifier(Protocol):
+    def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        """Return the actual (width, height) after modification."""
+
+    def offset(self) -> tuple[int, int]:
+        """Return the (top, left) offset introduced by this modifier."""
+
+
+@runtime_checkable
+class LayoutEngine(Protocol):
+    def resize_children(
+        self, available: tuple[int, int], offset: tuple[int, int]
+    ) -> None:
+        """Resize all managed children within the available space.
+
+        ``offset`` is the parent container's (x, y) in screen 1-based
+        coordinates; children x/y must be set relative to the screen.
+        """
+
+
+class Padding:
+    """Shrink available space by fixed offsets on each side."""
+
+    def __init__(
+        self,
+        top: int = 0,
+        right: int = 0,
+        bottom: int = 0,
+        left: int = 0,
+    ) -> None:
+        self.top = top
+        self.right = right
+        self.bottom = bottom
+        self.left = left
+
+    def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        w, h = available
+        return max(0, w - self.left - self.right), max(0, h - self.top - self.bottom)
+
+    def offset(self) -> tuple[int, int]:
+        return self.top, self.left
+
+
+class Border:
+    """Reserve 1 cell inward on each side (like a 1-cell thick frame).
+
+    This modifier only reserves space; it does NOT draw any visual border.
+    To draw an actual frame, pair this with :class:`BoxFrame`.
+    """
+
+    def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        w, h = available
+        return max(0, w - 2), max(0, h - 2)
+
+    def offset(self) -> tuple[int, int]:
+        return 1, 1
+
+
+def layout_flex(
+    sizes: Sequence[Union[int, Literal["flex"]]],
+    total: int,
+) -> list[int]:
+    """Allocate space for fixed + flex children along one axis.
+
+    Fixed sizes are honored (clamped to remaining space). Flex items share
+    leftover space evenly via integer division; remainder pixels go to the
+    last flex item so no space is wasted and the layout stays stable (only
+    one child changes by a small amount when the container resizes).
+
+    Args:
+        sizes: Sequence of fixed ints or ``"flex"`` for each child.
+        total: Total available pixels along this axis.
+
+    Returns:
+        Allocated size in pixels for each child.
+    """
+    fixed = sum(s for s in sizes if s != "flex")
+    flex_indices = [i for i, s in enumerate(sizes) if s == "flex"]
+    flex_n = len(flex_indices)
+
+    available = max(0, total - fixed)
+    flex_base = available // flex_n if flex_n else 0
+    remainder = available - flex_base * flex_n
+
+    result: list[int] = []
+    consumed = 0
+    for i, s in enumerate(sizes):
+        if s == "flex":
+            result.append(flex_base)
+        else:
+            result.append(min(s, max(0, total - consumed)))
+        consumed += result[-1]
+
+    if flex_indices and remainder > 0:
+        result[flex_indices[-1]] += remainder
+
+    return result

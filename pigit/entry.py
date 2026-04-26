@@ -2,7 +2,7 @@
 # The PIGIT terminal tool entry file.
 
 import os
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from plenty import get_console
 from plenty.table import Table
@@ -10,7 +10,6 @@ from plenty.table import Table
 from .config import Config
 from .context import Context
 from .const import (
-    CMD_TYPE_LIST_SENTINEL,
     CONFIG_FILE_PATH,
     COUNTER_DIR_PATH,
     REPOS_PATH,
@@ -20,19 +19,17 @@ from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
-from .git import Git_Proxy_Cmds, create_gitignore
-from .handlers import CmdHandler, RepoCommandHandler, TuiHandler
+from .git import create_gitignore
+from .handlers import RepoCommandHandler, TuiHandler
 from .info import introduce, show_gitconfig
 
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
 
-
 # ===============
 # Configuration.
 # ===============
 conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
-
 
 # ==============
 # Global handle
@@ -40,7 +37,6 @@ conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_war
 ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
 console = get_console()
-
 
 # =====================
 # main command `pigit`
@@ -59,17 +55,47 @@ def pigit(args: "Namespace", _) -> None:
         return
 
     elif args.config:
-        console.echo(show_gitconfig(format_type=ctx.config.git_config_format))
+        console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
-        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.repo_info_include))
+        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.get().info.repo_include))
 
     elif args.complete:
         # Generate completion vars dict.
         complete_vars = pigit.to_dict()
-        complete_vars["args"]["cmd"]["args"].update(
-            {k: {"help": v["help"], "args": {}} for k, v in Git_Proxy_Cmds.items()}
-        )
+
+        # Add cmd commands to completion with arg_completion metadata
+        from .git.cmds import get_registry, register_user_commands
+        from .git.cmds._completion_types import CompletionType
+        register_user_commands()
+        registry = get_registry()
+
+        for cmd_def in registry.get_all():
+            meta = cmd_def.meta
+            # Handle Union[CompletionType, list[CompletionType]]
+            if meta.arg_completion is None:
+                arg_comp_value = ""
+            elif isinstance(meta.arg_completion, list):
+                # Take first completion type as primary (for multi-param scenarios)
+                arg_comp_value = meta.arg_completion[0].value if meta.arg_completion else ""
+            else:
+                arg_comp_value = meta.arg_completion.value
+
+            cmd_entry = {
+                "help": meta.help,
+                "args": {},
+                "arg_completion": arg_comp_value,
+            }
+            complete_vars["args"]["cmd"]["args"][meta.short] = cmd_entry
+
+        # Add user-defined aliases to completion
+        for alias_name, target in registry.get_aliases().items():
+            cmd_entry = {
+                "help": f"Alias for {target}",
+                "args": {},
+                "arg_completion": "",
+            }
+            complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
 
         from .cmdparse.completion import shell_complete
 
@@ -82,14 +108,15 @@ def pigit(args: "Namespace", _) -> None:
 
     elif args.count:
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
+        config = ctx.config.get()
         total_size, diff_result, invalids = Counter(
-            saved_dir=COUNTER_DIR_PATH, show_invalid=ctx.config.counter_show_invalid
-        ).diff_count(path, ctx.config.counter_use_gitignore)
-        if ctx.config.counter_format == "simple":
+            saved_dir=COUNTER_DIR_PATH, show_invalid=config.counter.show_invalid
+        ).diff_count(path, config.counter.use_gitignore)
+        if config.counter.format == "simple":
             for k, v in diff_result.items():
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
-        elif conf.counter_format == "table":
+        elif config.counter.format == "table":
 
             def color_index(
                 count: int,
@@ -117,7 +144,7 @@ def pigit(args: "Namespace", _) -> None:
             for k, v in diff_result.items():
                 f_type_str = (
                     f"`{get_file_icon(k)} {k}`<cyan>"
-                    if ctx.config.counter_show_icon
+                    if config.counter.show_icon
                     else k
                 )
 
@@ -137,7 +164,7 @@ def pigit(args: "Namespace", _) -> None:
                     f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
                 )
             tb.caption = " Total: {0}".format(total_size)
-            get_console().echo(tb)
+            console.echo(tb)
         else:
             print("Invalid display format!")
 
@@ -149,7 +176,6 @@ def pigit(args: "Namespace", _) -> None:
         handler = TuiHandler(ctx)
         if handler.preprocess():
             handler.execute()
-
 
 # yapf: enable
 pigit.add_argument(
@@ -200,46 +226,62 @@ tools_group.add_argument(
 # =============================================
 # sub command `cmd`
 # =============================================
-@pigit.sub_parser("cmd", help="git short command.")
-@argument("--shell", action="store_true", help="Go to the pigit shell mode.")
+@pigit.sub_parser("cmd", help="git short command system.")
 @argument(
     "-l --list",
     action="store_true",
-    dest="cmd_list",
-    help="List all short commands and help (full table).",
+    help="List all commands.",
 )
 @argument(
-    "-s --search",
-    dest="cmd_search",
-    nargs=1,
-    metavar="QUERY",
-    help="Search commands by keyword (substring, case-insensitive). "
-    "For the complete table use -l / --list instead.",
-)
-@argument(
-    "-p --pick",
+    "-d --dangerous",
     action="store_true",
-    dest="cmd_pick",
-    help="Interactively pick and run a short command (requires a TTY).",
+    help="List only dangerous commands.",
 )
 @argument(
     "-t --type",
-    nargs="?",
-    const=CMD_TYPE_LIST_SENTINEL,
-    default=None,
-    dest="cmd_type",
-    metavar="TYPE",
-    help="Without TYPE: list supported command types. "
-    "With TYPE: list short commands in that type (e.g. Branch).",
+    dest="type",
+    metavar="CATEGORY",
+    help="Filter by category (branch, commit, index, etc.).",
 )
-@argument("args", nargs="*", type=str, help="Command parameter list.")
 @argument(
-    "command", nargs="?", type=str, default=None, help="Short git command or other."
+    "-s --search",
+    dest="search",
+    metavar="QUERY",
+    help="Search commands by keyword.",
 )
-def _(args: "Namespace", unknown: List):
-    """If you want to use some original git commands, please use -- to indicate."""
+@argument(
+    "-p --pick",
+    dest="pick",
+    metavar="CATEGORY",
+    nargs="?",
+    const=True,
+    help="Interactively pick and run a command (requires a TTY). Optional CATEGORY to filter.",
+)
+@argument(
+    "--pick-print",
+    dest="pick_print",
+    metavar="CATEGORY",
+    nargs="?",
+    const=True,
+    help="Interactively pick a command and print it to stdout instead of running.",
+)
+@argument(
+    "--widget",
+    choices=("bash", "zsh", "fish"),
+    help="Print a shell widget for Alt+G picker integration.",
+)
+@argument(
+    "command",
+    nargs="*",
+    help="Command to execute with arguments.",
+)
+def _(args: "Namespace", _):
+    """Execute short git commands."""
+    from .handlers.cmd_handler import handle_cmd
 
-    CmdHandler(ctx.current(), args, unknown).execute()
+    exit_code = handle_cmd(args)
+    if exit_code != 0:
+        raise SystemExit(exit_code)
 
 
 # =============================================
@@ -283,13 +325,25 @@ repo.sub_parser("clear", help="clear the all repos.")(
 
 @repo.sub_parser("report", help="genereate report of all repos.")
 @argument("--author", type=str, required=True, help="select author of commits.")
-@argument("--since",  type=str,default='', help="start range of commits.")
-@argument("--until",  type=str,default='', help="end range of commits.")
+@argument("--since", type=str, default="", help="start range of commits.")
+@argument("--until", type=str, default="", help="end range of commits.")
 def repo_report(args, _):
     RepoCommandHandler(ctx.current()).report(args)
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
+@argument(
+    "-p --pick",
+    action="store_true",
+    dest="repo_cd_pick",
+    help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
+)
+@argument(
+    "--pick-alt-screen",
+    action="store_true",
+    dest="repo_cd_pick_alt_screen",
+    help="Use alternate screen for the repo picker (with --pick).",
+)
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)
@@ -312,7 +366,6 @@ for sub_cmd, prop in repo_options.items():
             )
         )
     )
-
 
 # =============================================
 # sub command `open`

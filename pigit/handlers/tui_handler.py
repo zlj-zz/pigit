@@ -21,6 +21,6 @@ class TuiHandler(BaseHandler):
             if not confirm("Input `enter` to continue:"):
                 return
 
-        from ..app import App
+        from ..app import PigitApplication
 
-        App().run()
+        PigitApplication().run()

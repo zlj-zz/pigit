@@ -7,20 +7,10 @@ import os
 import shlex
 import sys
 from subprocess import Popen, PIPE
-from typing import (
-    Any,
-    ByteString,
-    Dict,
-    Final,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Any, ByteString, Final, Iterator, Optional, Union
 
 # Type defined
-ExecResult = Tuple[int, Union[None, str, ByteString], Union[None, str, ByteString]]
+ExecResult = tuple[int, Union[None, str, ByteString], Union[None, str, ByteString]]
 ExecResType = Union[None, str, ByteString]
 
 # Const
@@ -46,14 +36,14 @@ def _detect_encoding(data: ByteString) -> str:
     return ""
 
 
-def _split_cmd_argv(cmd: str) -> List[str]:
+def _split_cmd_argv(cmd: str) -> list[str]:
     """Split one command line into argv for :func:`asyncio.create_subprocess_exec`.
 
     Args:
         cmd (str): Full command string (no shell metacharacters such as ``|``).
 
     Returns:
-        List[str]: Argv tokens; on :exc:`ValueError` from :func:`shlex.split`, falls back to :meth:`str.split`.
+        list[str]: Argv tokens; on :exc:`ValueError` from :func:`shlex.split`, falls back to :meth:`str.split`.
     """
     try:
         return shlex.split(cmd, posix=(os.name != "nt"))
@@ -92,7 +82,7 @@ class Executor:
         input()
 
     def generate_popen_state(
-        self, flags: int, popen_kws: Dict[str, Any]
+        self, flags: int, popen_kws: dict[str, Any]
     ) -> "ExecState":
         """Generate the state context for executing a command.
 
@@ -165,17 +155,17 @@ class Executor:
         if err:
             print(err)
 
-    def __call__(self, cmd: Union[str, List, Tuple], *, flags: int = 0, **kws) -> Tuple:
+    def __call__(self, cmd: Union[str, list, tuple], *, flags: int = 0, **kws) -> tuple:
         return self.exec(cmd, flags=flags, **kws)
 
-    def exec(self, cmd: Union[str, List, Tuple], *, flags: int = 0, **kws) -> Tuple:
+    def exec(self, cmd: Union[str, list, tuple], *, flags: int = 0, **kws) -> tuple:
         """Execute a command synchronously.
 
         ``kws`` is passed to :class:`subprocess.Popen` after applying ``flags``; flag bits
         override conflicting ``kws`` where applicable.
 
         Args:
-            cmd (Union[str, List, Tuple]): The command to execute.
+            cmd (Union[str, list, tuple]): The command to execute.
             flags (int, optional): Bit flags (:data:`WAITING`, :data:`REPLY`, etc.). Defaults to 0.
             **kws: Extra :class:`~subprocess.Popen` arguments (``cwd``, ``env``, ``shell``, …).
 
@@ -210,13 +200,13 @@ class Executor:
 
                 if not es.reply:
                     self._print(_out, _err)
-                    return None, None, None
+                    return _code, _err, None
 
                 return _code, _err, _out
 
     def exec_stream(
         self,
-        cmd: Union[str, List, Tuple],
+        cmd: Union[str, list, tuple],
         *,
         flags: int = 0,
         **kws: Any,
@@ -269,14 +259,14 @@ class Executor:
         except Exception as e:
             self._log_warning(f"Failed to exec_stream: {cmd!r}\n{e}")
 
-    def _asyncio_spawn_kw(self, cur_kws: Dict[str, Any]) -> Dict[str, Any]:
+    def _asyncio_spawn_kw(self, cur_kws: dict[str, Any]) -> dict[str, Any]:
         """Build kwargs for :func:`asyncio.create_subprocess_exec` / shell helpers.
 
         Args:
-            cur_kws (Dict[str, Any]): Merged popen-style kwargs.
+            cur_kws (dict[str, Any]): Merged popen-style kwargs.
 
         Returns:
-            Dict[str, Any]: Allowed keys only, with ``start_new_session=True`` if unset.
+            dict[str, Any]: Allowed keys only, with ``start_new_session=True`` if unset.
         """
         allowed = ("stdin", "stdout", "stderr", "cwd", "env", "executable")
         sk = {k: cur_kws[k] for k in allowed if k in cur_kws}
@@ -286,9 +276,9 @@ class Executor:
     async def run_async_subprocess(
         self,
         es: "ExecState",
-        cmd: Union[str, List, Tuple],
-        cur_kws: Dict[str, Any],
-    ) -> Tuple:
+        cmd: Union[str, list, tuple],
+        cur_kws: dict[str, Any],
+    ) -> tuple:
         """Run one subprocess asynchronously.
 
         String commands default to ``shell=True`` (``create_subprocess_shell``), matching
@@ -297,8 +287,8 @@ class Executor:
 
         Args:
             es (ExecState): State from :meth:`generate_popen_state`.
-            cmd (Union[str, List, Tuple]): Command line or argv sequence.
-            cur_kws (Dict[str, Any]): Per-call kwargs (``cwd``, ``shell``, stdio handles, …).
+            cmd (Union[str, list, tuple]): Command line or argv sequence.
+            cur_kws (dict[str, Any]): Per-call kwargs (``cwd``, ``shell``, stdio handles, …).
 
         Returns:
             Tuple: Same shape as :meth:`exec` for the active flags.
@@ -343,25 +333,25 @@ class Executor:
     async def exec_async(
         self,
         *cmds,
-        orders: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[list[dict[str, Any]]] = None,
         flags: int = 0,
         max_concurrent: Optional[int] = None,
         **kws,
-    ) -> List[Tuple]:
+    ) -> list[tuple]:
         """Execute multiple commands concurrently (asyncio).
 
         Args:
             *cmds: Commands to run (each passed to :meth:`run_async_subprocess`).
-            orders (Optional[List[Dict[str, Any]]]): Per-command kwargs; merged over ``kws``
+            orders (Optional[list[dict[str, Any]]]): Per-command kwargs; merged over ``kws``
                 (later keys win).
             flags (int, optional): Shared flags for :meth:`generate_popen_state`. Defaults to 0.
             max_concurrent (Optional[int]): Max subprocesses at once; ``None`` means unlimited.
             **kws: Shared kwargs merged into each command before ``orders[i]``.
 
         Returns:
-            List[Tuple]: One result per command, in the same order as ``cmds``.
+            list[Tuple]: One result per command, in the same order as ``cmds``.
         """
-        popen_orders = copy.deepcopy(orders) if orders is not None else []
+        popen_orders = list(orders) if orders is not None else []
         # len of order not enough, will completion.
         if len(popen_orders) < len(cmds):
             popen_orders.extend([{}] * (len(cmds) - len(popen_orders)))
@@ -374,7 +364,7 @@ class Executor:
             mc = max(1, min(int(max_concurrent), n))
             sem = asyncio.Semaphore(mc)
 
-        async def run_one(i: int) -> Tuple:
+        async def run_one(i: int) -> tuple:
             cur_kws = {**kws, **popen_orders[i]}
             if sem is not None:
                 async with sem:
@@ -386,22 +376,22 @@ class Executor:
     def exec_parallel(
         self,
         *cmds,
-        orders: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[list[dict[str, Any]]] = None,
         flags: int = 0,
         max_concurrent: Optional[int] = None,
         **kws,
-    ) -> List[Tuple]:
+    ) -> list[tuple]:
         """Run multiple commands in parallel (``asyncio.run`` + :meth:`exec_async`).
 
         Args:
             *cmds: Same as :meth:`exec_async`.
-            orders (Optional[List[Dict[str, Any]]]): Same as :meth:`exec_async`.
+            orders (Optional[list[dict[str, Any]]]): Same as :meth:`exec_async`.
             flags (int, optional): Same as :meth:`exec_async`. Defaults to 0.
             max_concurrent (Optional[int]): Same as :meth:`exec_async`.
             **kws: Same as :meth:`exec_async`.
 
         Returns:
-            List[Tuple]: Same as :meth:`exec_async`.
+            list[Tuple]: Same as :meth:`exec_async`.
         """
         return asyncio.run(
             self.exec_async(

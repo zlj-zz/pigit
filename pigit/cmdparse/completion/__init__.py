@@ -1,14 +1,22 @@
 # -*- coding:utf-8 -*-
 
-from typing import Dict, Optional, Type
+from typing import Optional, Type
 
 from .base import ShellCompletion
 from .bash import BashCompletion
 from .zsh import ZshCompletion
 from .fish import FishCompletion
 
+__all__ = [
+    "ShellCompletion",
+    "BashCompletion",
+    "ZshCompletion",
+    "FishCompletion",
+    "shell_complete",
+    "get_shell",
+]
 
-_Supported_Shell: Dict[str, Type[ShellCompletion]] = {
+_Supported_Shell: dict[str, Type[ShellCompletion]] = {
     "bash": BashCompletion,
     "zsh": ZshCompletion,
     "fish": FishCompletion,
@@ -16,7 +24,7 @@ _Supported_Shell: Dict[str, Type[ShellCompletion]] = {
 
 
 def shell_complete(
-    complete_vars: Dict,
+    complete_vars: dict,
     shell: Optional[str] = None,
     prog: Optional[str] = None,
     script_dir: Optional[str] = None,

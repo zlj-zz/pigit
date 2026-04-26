@@ -1,9 +1,8 @@
-from typing import Optional, Tuple
+from typing import Optional
 from shutil import get_terminal_size
 from pathlib import Path
 
 from .template import IGNORE_TEMPLATE
-
 
 __all__ = ("get_ignore_source", "create_gitignore")
 
@@ -19,7 +18,7 @@ def create_gitignore(
     file_name: str = ".gitignore",
     dir_path: Optional[str] = None,
     writing: bool = True,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     """Try to create a gitignore file.
 
     Args:
@@ -29,7 +28,7 @@ def create_gitignore(
         writing (bool, optional): whether writing. Defaults to True.
 
     Returns:
-        Tuple[int, str]: (code, message)
+        tuple[int, str]: (code, message)
             code:
                 0: successful
                 1: don't write

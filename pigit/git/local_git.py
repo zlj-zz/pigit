@@ -1,12 +1,13 @@
 # -*- coding:utf-8 -*-
 
 import logging
-import os
 import re
+import shlex
 import time
 import shutil
 import textwrap
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import Iterator, Optional, Union
 
 from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
@@ -49,7 +50,7 @@ class LocalGit:
 
     def confirm_repo(
         self, given_path: Optional[str] = None, exclude_submodule: bool = False
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Confirm given path whether a git repo. And return repo path info.
         Get the current git repository path. If not, the path is empty.
         Get the local git config path. If not, the path is empty.
@@ -64,12 +65,12 @@ class LocalGit:
         path = given_path if given_path is not None else self.path
         if path is None or path == "":
             path = "."
-        path = os.path.abspath(path)
+        path = str(Path(path).resolve())
 
         repo_path: str = ""
         git_conf_path: str = ""
 
-        if not os.path.isdir(path):
+        if not Path(path).is_dir():
             return repo_path, git_conf_path
 
         code, _err, top_out = self.executor.exec(
@@ -80,7 +81,7 @@ class LocalGit:
         if code is None or code != 0 or not top_out or not str(top_out).strip():
             return "", ""
 
-        repo_path = os.path.abspath(str(top_out).strip())
+        repo_path = str(Path(str(top_out).strip()).resolve())
 
         code2, _err2, gd_out = self.executor.exec(
             "git rev-parse --git-dir",
@@ -91,33 +92,33 @@ class LocalGit:
             return "", ""
 
         git_dir_raw = str(gd_out).strip()
-        if os.path.isabs(git_dir_raw):
-            git_conf_path = os.path.normpath(git_dir_raw)
+        if Path(git_dir_raw).is_absolute():
+            git_conf_path = str(Path(git_dir_raw).resolve())
         else:
-            git_conf_path = os.path.normpath(os.path.join(repo_path, git_dir_raw))
+            git_conf_path = str((Path(repo_path) / git_dir_raw).resolve())
 
         return repo_path, git_conf_path
 
-    def get_config(self, path: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    def get_config(self, path: Optional[str] = None) -> dict[str, dict[str, str]]:
         """Try to read git config and parse, return a config dict.
 
         Args:
             path (Optional[str], optional): repo path. Defaults to None.
 
         Returns:
-            Dict[str, Dict[str, str]]: config dict.
+            dict[str, dict[str, str]]: config dict.
         """
         path = path or self.path
 
         _, config_path = self.confirm_repo(path)
         try:
-            with open(f"{config_path}/config", "r") as cf:
+            with open(Path(config_path) / "config", "r") as cf:
                 context = cf.read()
         except Exception as e:
             self.log.warning(f"Can not read config with: {e}")
             return {}
         else:
-            conf_dict: Dict[str, Dict[str, str]] = {}
+            conf_dict: dict[str, dict[str, str]] = {}
             conf_list = re.split(self._RE_CONFIG_NEWLINE, context)
             config_type: str = ""
 
@@ -164,7 +165,10 @@ class LocalGit:
             else:
                 return ""
 
-        command = "git merge-base %s %s@{u}" % (branch_name, branch_name)
+        command = "git merge-base %s %s@{u}" % (
+            shlex.quote(branch_name),
+            shlex.quote(branch_name),
+        )
         _, _, commit_msg = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
         return commit_msg.strip()
 
@@ -173,7 +177,7 @@ class LocalGit:
         path: Optional[str] = None,
         include_remote: bool = False,
         plain: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get repo all branch."""
         path = path or self.path
 
@@ -190,7 +194,7 @@ class LocalGit:
             return []
         return [branch[2:] for branch in res.rstrip().split("\n")]
 
-    def get_remotes(self, path: Optional[str] = None) -> List[str]:
+    def get_remotes(self, path: Optional[str] = None) -> list[str]:
         """Get repo remote url."""
 
         # Get remote name, exit when error.
@@ -215,7 +219,9 @@ class LocalGit:
 
         # Get remote url, exit when error.
         _, err, remote_url = self.executor.exec(
-            f"git ls-remote --get-url {remote_name}", flags=REPLY | DECODE, cwd=path
+            f"git ls-remote --get-url {shlex.quote(remote_name)}",
+            flags=REPLY | DECODE,
+            cwd=path,
         )
 
         if err:
@@ -236,7 +242,7 @@ class LocalGit:
 
     def get_repo_desc(
         self,
-        include_part: Optional[List] = None,
+        include_part: Optional[list] = None,
         path: Optional[str] = None,
         color: bool = True,
     ) -> str:
@@ -266,7 +272,7 @@ class LocalGit:
         # Get remote url.
         if not include_part or "remote" in include_part:
             try:
-                with open(f"{repo_path}/.git/config", "r") as cf:
+                with open(Path(repo_path) / ".git" / "config", "r") as cf:
                     config = cf.read()
             except Exception:
                 remote = error_str
@@ -308,7 +314,7 @@ class LocalGit:
     # =============
     # Special info
     # =============
-    def load_branches(self, path: Optional[str] = None) -> List[Branch]:
+    def load_branches(self, path: Optional[str] = None) -> list[Branch]:
         path = path or self.path
         branches = []
 
@@ -362,8 +368,11 @@ class LocalGit:
         limit_flag = f"-{limit}" if limit else ""
         filter_flag = f"--follow -- {filter_path}" if filter_path else ""
 
+        branch_part = shlex.quote(branch_name) if branch_name else ""
+        limit_part = f"-{limit}" if limit else ""
+        filter_part = f"--follow -- {shlex.quote(filter_path)}" if filter_path else ""
         _, _, resp = self.executor.exec(
-            f"git log {branch_name} {arg_str} {limit_flag} {filter_flag}",
+            f"git log {branch_part} {arg_str} {limit_part} {filter_part}",
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -372,38 +381,39 @@ class LocalGit:
 
     @staticmethod
     def _find_dot_git_dir(cwd: str) -> Optional[str]:
-        cur = os.path.abspath(cwd)
+        cur = Path(cwd).resolve()
         while True:
-            git = os.path.join(cur, ".git")
-            if os.path.isdir(git):
-                return git
-            if os.path.isfile(git):
+            git = cur / ".git"
+            if git.is_dir():
+                return str(git)
+            if git.is_file():
                 return None
-            parent = os.path.dirname(cur)
+            parent = cur.parent
             if parent == cur:
                 return None
             cur = parent
 
     def _load_status_cache_signature(
         self, cwd: str
-    ) -> Optional[Tuple[int, int, int, int, bool]]:
+    ) -> Optional[tuple[int, int, int, int, bool]]:
         git_dir = self._find_dot_git_dir(cwd)
         if not git_dir:
             return None
 
-        def st(p: str) -> Tuple[int, int]:
+        def st(p: "Path") -> tuple[int, int]:
             try:
-                s = os.stat(p)
+                s = p.stat()
                 return (s.st_mtime_ns, s.st_size)
             except OSError:
                 return (0, 0)
 
-        index_p = os.path.join(git_dir, "index")
-        head_p = os.path.join(git_dir, "HEAD")
-        merge = os.path.join(git_dir, "MERGE_HEAD")
+        git = Path(git_dir)
+        index_p = git / "index"
+        head_p = git / "HEAD"
+        merge = git / "MERGE_HEAD"
         i0, i1 = st(index_p)
         h0, h1 = st(head_p)
-        return (i0, i1, h0, h1, os.path.exists(merge))
+        return (i0, i1, h0, h1, merge.exists())
 
     def load_status(
         self,
@@ -413,7 +423,7 @@ class LocalGit:
         path: Optional[str] = None,
         icon: bool = False,
         use_cache: bool = True,
-    ) -> List[File]:
+    ) -> list[File]:
         """Get the file tree status of GIT for processing and encapsulation.
 
         Args:
@@ -423,13 +433,13 @@ class LocalGit:
                     and within a short TTL (see class constant ``_LOAD_STATUS_CACHE_TTL``).
 
         Returns:
-                (List[File]): Processed file status list.
+                (list[File]): Processed file status list.
         """
         path = path or self.path
         if path is None or path == "":
-            workdir = os.path.abspath(".")
+            workdir = str(Path(".").resolve())
         else:
-            workdir = os.path.abspath(path)
+            workdir = str(Path(path).resolve())
 
         key = (workdir, max_width, ident, plain, icon)
         now = time.monotonic()
@@ -531,7 +541,8 @@ class LocalGit:
             file = file.split("->")[-1].strip()
 
         _, err, res = self.executor.exec(
-            f"git diff --submodule --no-ext-diff {_plain} {_cached} {_tracked} {file}",
+            f"git diff --submodule --no-ext-diff {_plain} {_cached} {_tracked} "
+            f"{shlex.quote(file)}",
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -559,11 +570,13 @@ class LocalGit:
         first_pushed_commit = self.get_first_pushed_commit(path, branch_name)
         passed_first_pushed_commit = not first_pushed_commit
 
-        limit_flag = f"-n {max_commits}" if limit else ""
-        filter_flag = f"--follow -- {filter_path}" if filter_path else ""
+        branch_part = shlex.quote(branch_name) if branch_name else ""
+        limit_part = f"-n {max_commits}" if limit else ""
+        filter_part = f"--follow -- {shlex.quote(filter_path)}" if filter_path else ""
         command = (
-            f'git log {branch_name} --oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" '
-            f"{limit_flag} --abbrev=20 --date=unix {filter_flag}"
+            f"git log {branch_part} --oneline "
+            f'--pretty=format:"%H|%at|%aN|%d|%P|%s" '
+            f"{limit_part} --abbrev=20 --date=unix {filter_part}"
         ).strip()
 
         for line in self.executor.exec_stream(command, cwd=path):
@@ -577,7 +590,10 @@ class LocalGit:
             unix_timestamp = int(split_[1])
             author = split_[2]
             extra_info = (split_[3]).strip()
+            parent_str = split_[4].strip()
             message = "|".join(split_[5:])
+
+            parents = parent_str.split() if parent_str else []
 
             tag = []
             if extra_info:
@@ -596,6 +612,7 @@ class LocalGit:
                 status=status,
                 extra_info=extra_info,
                 tag=tag,
+                parents=parents,
             )
 
     def load_commits(
@@ -605,7 +622,7 @@ class LocalGit:
         filter_path: str = "",
         path: Optional[str] = None,
         max_commits: int = 300,
-    ) -> List[Commit]:
+    ) -> list[Commit]:
         """Get commits for a branch (materializes :meth:`iter_commits`)."""
         return list(
             self.iter_commits(
@@ -633,8 +650,13 @@ class LocalGit:
         path = path or self.path
         color_str = "never" if plain else "always"
 
+        if file_name:
+            cmd = f"git show --color={color_str} {shlex.quote(commit_sha)} -- {shlex.quote(file_name)}"
+        else:
+            cmd = f"git show --color={color_str} {shlex.quote(commit_sha)}"
+
         _, _, resp = self.executor.exec(
-            f"git show --color={color_str} {commit_sha} {file_name}",
+            cmd,
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -657,18 +679,20 @@ class LocalGit:
             pass
         elif file.has_unstaged_change:
             self.executor.exec(
-                f"git add -- '{file_name}'", flags=WAITING | SILENT, cwd=path
+                f"git add -- {shlex.quote(file_name)}",
+                flags=WAITING | SILENT,
+                cwd=path,
             )
         elif file.has_staged_change:
             if file.tracked:
                 self.executor.exec(
-                    f"git reset HEAD -- '{file_name}'",
+                    f"git reset HEAD -- {shlex.quote(file_name)}",
                     flags=WAITING | SILENT,
                     cwd=path,
                 )
             else:
                 self.executor.exec(
-                    f"git rm --cached --force -- '{file_name}'",
+                    f"git rm --cached --force -- {shlex.quote(file_name)}",
                     flags=WAITING | SILENT,
                     cwd=path,
                 )
@@ -682,7 +706,7 @@ class LocalGit:
         lookup = path if path is not None else self.path
         if lookup is None or lookup == "":
             lookup = "."
-        lookup = os.path.abspath(lookup)
+        lookup = str(Path(lookup).resolve())
 
         repo_root, _ = self.confirm_repo(lookup)
         if not repo_root:
@@ -698,7 +722,7 @@ class LocalGit:
 
         if tracked:
             code, err, out = self.executor.exec(
-                f"git checkout -- '{file_name}'",
+                f"git checkout -- {shlex.quote(file_name)}",
                 flags=WAITING | REPLY | DECODE,
                 cwd=repo_root,
             )
@@ -718,14 +742,15 @@ class LocalGit:
                     detail,
                 )
         else:
-            abs_file = os.path.normpath(os.path.join(repo_root, file_name))
-            if not os.path.lexists(abs_file):
+            abs_file = (Path(repo_root) / file_name).resolve()
+            try:
+                if abs_file.is_dir() and not abs_file.is_symlink():
+                    shutil.rmtree(abs_file)
+                else:
+                    abs_file.unlink()
+            except FileNotFoundError:
                 self.log.info("discard_file: skip missing untracked path %r", abs_file)
                 return
-            if os.path.isdir(abs_file) and not os.path.islink(abs_file):
-                shutil.rmtree(abs_file)
-            else:
-                os.remove(abs_file)
 
     def ignore_file(self, file: Union[File, str], path: Optional[str] = None):
         """Append file to `.gitignore` file."""
@@ -734,13 +759,128 @@ class LocalGit:
         repo_path, _ = self.confirm_repo(path)
         file_name = _file_path_for_cmd(file)
 
-        with open(f"{repo_path}/.gitignore", "a+") as f:
+        with open(Path(repo_path) / ".gitignore", "a+") as f:
             f.write(f"\n{file_name}")
 
     def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> str:
         path = path or self.path
-        _, err, _ = self.executor.exec(f"git checkout {branch_name}", cwd=path)
+        code, err, out = self.executor.exec(
+            f"git checkout {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
         return err or "ok"
+
+    def get_file_info(
+        self, file: Union[File, str], path: Optional[str] = None
+    ) -> tuple[str, str]:
+        """Get file size and last modification time as formatted strings.
+
+        Returns:
+            (size_str, mtime_str) like ("12.5K", "2026-04-24 10:30").
+        """
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        file_path = Path(path) / file_name
+        try:
+            st = file_path.stat()
+            size = self._format_size(st.st_size)
+            mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime))
+            return size, mtime
+        except OSError:
+            return "?", "?"
+
+    @staticmethod
+    def _format_size(size: int) -> str:
+        if size < 1024:
+            return f"{size}B"
+        if size < 1024 * 1024:
+            return f"{size / 1024:.1f}K"
+        return f"{size / (1024 * 1024):.1f}M"
+
+    def get_branch_recent_commit(
+        self, branch_name: str, path: Optional[str] = None
+    ) -> tuple[str, str]:
+        """Get the most recent commit message and author for a branch."""
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f"git log {shlex.quote(branch_name)} -1 --pretty=format:%s|%aN",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not resp:
+            return "?", "?"
+        parts = resp.split("|")
+        return parts[0], parts[1] if len(parts) > 1 else "?"
+
+    def get_branch_creation_time(
+        self, branch_name: str, path: Optional[str] = None
+    ) -> str:
+        """Return branch creation date as YYYY-MM-DD (best-effort via reflog)."""
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f"git reflog show {shlex.quote(branch_name)} --format=%at | tail -1",
+            flags=REPLY | DECODE,
+            cwd=path,
+            shell=True,
+        )
+        if not resp:
+            return "?"
+        try:
+            ts = int(resp.strip())
+            return time.strftime("%Y-%m-%d", time.localtime(ts))
+        except ValueError:
+            return "?"
+
+    def get_commit_stats(
+        self, commit_sha: str, path: Optional[str] = None
+    ) -> tuple[list[tuple[str, int, int]], int, int]:
+        """Get changed files and insertion/deletion counts for a commit.
+
+        Returns:
+            (files, total_insertions, total_deletions) where files is a list
+            of (file_name, insertions, deletions).
+        """
+        path = path or self.path
+        _, _, resp = self.executor.exec(
+            f"git show --numstat --format= {shlex.quote(commit_sha)}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not resp:
+            return [], 0, 0
+
+        files: list[tuple[str, int, int]] = []
+        total_add = 0
+        total_del = 0
+
+        for line in resp.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                add = int(parts[0]) if parts[0].isdigit() else 0
+                delete = int(parts[1]) if parts[1].isdigit() else 0
+                file_name = parts[2]
+                files.append((file_name, add, delete))
+                total_add += add
+                total_del += delete
+
+        return files, total_add, total_del
+
+    def has_staged_changes(self, path: Optional[str] = None) -> bool:
+        """Return True if index has staged changes."""
+        path = path or self.path
+        code, _, _ = self.executor.exec(
+            "git diff --cached --quiet", flags=REPLY | SILENT, cwd=path
+        )
+        # --quiet: exit 0 = no differences, 1 = differences exist
+        if code == 0:
+            return False
+        if code == 1:
+            return True
+        raise RepoError(f"git diff --cached failed with exit code {code}")
 
     def open_repo_in_browser(
         self,
@@ -749,7 +889,7 @@ class LocalGit:
         issue: str = "",
         commit: str = "",
         print: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         path = path or self.path
         remote_url = self.get_remote_url(path=path)
 

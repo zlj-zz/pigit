@@ -2,8 +2,7 @@
 
 """This file save some model class of git info class."""
 
-from typing import List
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # flake8: noqa
@@ -76,12 +75,20 @@ class Commit:
     extra_info: str
 
     # Tag list of the commit.
-    tag: List
+    tag: list[str]
+
+    # Parent commit SHAs.
+    parents: list[str] = field(default_factory=list)
 
     action: str = ""
 
     def is_pushed(self) -> bool:
         return self.status == "pushed"
+
+    @property
+    def is_merge(self) -> bool:
+        """Return True if this commit has more than one parent."""
+        return bool(self.parents and len(self.parents) > 1)
 
 
 @dataclass

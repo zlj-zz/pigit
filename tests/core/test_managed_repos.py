@@ -186,7 +186,9 @@ def test_rename_repo_cases(tmp_repos_json):
     assert ok is False and "same name" in msg
 
     ok, msg = mr.rename_repo("old", "taken")
-    tmp_repos_json.write_text(json.dumps({"old": {"path": "/p"}, "taken": {"path": "/q"}}))
+    tmp_repos_json.write_text(
+        json.dumps({"old": {"path": "/p"}, "taken": {"path": "/q"}})
+    )
     ok, msg = mr.rename_repo("old", "taken")
     assert ok is False and "already in use" in msg
 

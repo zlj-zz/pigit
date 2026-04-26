@@ -1,6 +1,6 @@
 # PIGIT
 
-![Python 3](https://img.shields.io/badge/Python-v3.8%5E-green?logo=python)
+![Python 3](https://img.shields.io/badge/Python-v3.9%5E-green?logo=python)
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -50,6 +50,16 @@ tools arguments:
                         exists, the values available in it are used)
 ```
 
+### Interaction
+
+Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
+
+Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
+
+![interaction demo](./docs/resources/demo_interaction.gif)
+
+And in the interaction mode, you can use `?` or `h` to see the help message.
+
 ### `cmd`
 
 The command of `cmd` support some short sub-command to replace the long git original command.
@@ -88,21 +98,6 @@ These are short commands that can replace git operations:
 ......
 ```
 
-#### Shell Mode
-
-Pigit also provides an interactive shell mode for continuous git operations. Use `pigit cmd --shell` to enter the shell mode.
-
-In shell mode, you can use short commands directly without the `pigit cmd` prefix. For example:
-
-```
-(pigit:cmd)> s
-(pigit:cmd)> b
-(pigit:cmd)> shell ls
-(pigit:cmd)> quit
-```
-
-This mode is useful for performing multiple git operations in sequence.
-
 ### `repo`
 
 The command of `repo` support operate multiple repos at the same time.
@@ -112,6 +107,8 @@ The command of `repo` support operate multiple repos at the same time.
 ![demo display](./docs/resources/demo_repo_3.png)
 
 Use `pigit repo -h` to get more help.
+
+**`repo cd` / `repo cd --pick`**: With a managed repo name that exists in `repos.json`, `pigit repo cd <name>` jumps into that working tree (same as before). Use **`pigit repo cd --pick`** (`-p`) in a real terminal to open the built-in list picker (j/k, `/` filter, Enter to confirm, q/Esc to quit). If you pass a name that is not an exact key, the picker opens with the filter pre-filled so you can narrow the list. Scripts and CI should pass an explicit name or avoid `--pick`; the picker requires stdin and stdout to be TTYs. Details: `docs/technical_repo_cd_interactive.md`.
 
 ```
 usage: pigit
@@ -135,16 +132,6 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
 ```
-
-### Interaction
-
-Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
-
-Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
-
-![interaction demo](./docs/resources/demo_interaction.gif)
-
-And in the interaction mode, you can use `?` or `h` to see the help message.
 
 ## Installation
 
@@ -225,55 +212,60 @@ On Linux or MacOS: `~/.config/pigit`
 
 On windows should be: `C:\\User\\<your username>`
 
-[here](./docs/pigit.conf) is a configuration template.
+[here](./examples/pigit.toml) is a configuration template.
 
-| config key            | type  | default                     | desc                                                                                                                        |
-| --------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| cmd_display           | bool  | True                        | Show original git command.                                                                                                  |
-| cmd_recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
-| tui_help_showtime     | float | 1.5                         | Display time of help information in interactive mode.                                                                       |
-| counter_use_gitignore | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
-| counter_show_invalid  | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
-| counter_show_icon     | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
-| counter_format        | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
-| git_config_format     | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
-| repo_info_include     | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
-| repo_auto_append      | bool  | True                        | Whether auto append path to repos.                                                                                          |
-| log_debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
-| log_output            | bool  | False                       | Whether output log in terminal.                                                                                             |
+| section      | key               | type  | default                     | desc                                                                                                                        |
+| ------------ | ----------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [cmd]        | display           | bool  | True                        | Show original git command.                                                                                                  |
+| [cmd]        | recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
+| [counter]    | use_gitignore     | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
+| [counter]    | show_invalid      | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
+| [counter]    | show_icon         | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
+| [counter]    | format            | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
+| [info]       | git_config_format | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
+| [info]       | repo_include      | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
+| [repo]       | auto_append       | bool  | True                        | Whether auto append path to repos.                                                                                          |
+| [log]        | debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
+| [log]        | output            | bool  | False                       | Whether output log in terminal.                                                                                             |
 
-## Extra cmds
+## Custom Commands
 
-You can setting your custom cmds. It need create a `extra_cmds.py` file at the **pigit** home. And writing like this:
+You can define custom aliases and scripts via a TOML configuration file at the **pigit** home directory.
 
-```python
-import os
+### Configuration file
 
-def print_user(args):
-    print(os.system('whoami'))
+Create `pigit.cmds.toml` in your pigit home directory:
 
-extra_cmds = {
-    'echo': {
-        'command': 'echo 123',
-    },
-    'print-user': {
-        'command': print_user,
-        'type': 'func',
-        'help': 'print system user name.'
-    }
-}
+- Linux/macOS: `~/.config/pigit/pigit.cmds.toml`
+- Windows: `%USERPROFILE%\pigit\pigit.cmds.toml`
+
+### Aliases
+
+```toml
+[cmd_new.aliases]
+mybl = "bl"
+mylog = "log --oneline --graph"
 ```
 
-The `extra_cmds` dict is must. And the structure is command key and command info.
+### Scripts
 
-In `pigit cmd -l`, search, and `--pick`, entries loaded from `extra_cmds` are prefixed with `[extra]` so you can tell them apart from built-ins.
+Multi-step command scripts:
 
-The command info has some options:
+```toml
+[cmd_new.scripts.myscript]
+steps = ["status", "log --oneline"]
+help = "Show status then log"
+category = "script"
+```
 
-- `command`: (Must have) Short life corresponds to the complete command or a method. If it is a method, it must receive a parameter tuple.
-- `type`: (Option) Mark the type of command, support ['func', 'command'], and the default is 'command'.
-- `help`: (Option) Command help message.
-- `has_arguments`: (Option, bool) Whether the command accepts parameters. Default is True.
+Concise form (for simple step lists):
+
+```toml
+[cmd_new.scripts]
+quick-check = ["status", "diff --cached"]
+```
+
+In `pigit cmd -l`, search, and `--pick`, user-defined entries are prefixed with `[alias]` or `[script]` so you can tell them apart from built-ins.
 
 ## Feature
 

@@ -1,8 +1,14 @@
 # -*- coding:utf-8 -*-
+"""
+Module: pigit/cmdparse/completion/base.py
+Description: Base shell completion class.
+Author: Zev
+Date: 2026-04-12
+"""
 
 import os
 import re
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 
 class ShellCompletionError(Exception):
@@ -17,27 +23,36 @@ class ShellCompletion:
     SHELL: str  # shell name.
     TEMPLATE_SRC: str  # script template string.
 
+    # Git completion helper function names mapping
+    # Maps completion type to helper function name
+    GIT_COMPLETION_FUNCS = {
+        "branch": "_git_branches",
+        "file": "_git_files",
+        "remote": "_git_remotes",
+        "tag": "_git_tags",
+        "commit": "_git_commits",
+        "stash": "_git_stashes",
+        "ref": "_git_refs",
+    }
+
     def __init__(
         self,
         prog_name: Optional[str] = None,
-        complete_vars: Optional[Dict] = None,
+        complete_vars: Optional[dict] = None,
         script_dir: Optional[str] = None,
         script_name: Optional[str] = None,
     ) -> None:
-        """Initialization.
+        """Initialize shell completion generator.
 
         Args:
-            prop (str): completion trigger command.
-            complete_var (dict): complete arguments dict.
-                >>> complete_vars = {
-                ...     '-h': 'Display help messages',
-                ...     '-v': 'Show version and exit',
-                ... }
-            script_dir (str): where is the completion file save.
-            script_name (str, optional): completion file name. Defaults to None.
+            prog_name: Program name for completion.
+            complete_vars: Dictionary of completion variables.
+            script_dir: Directory to save completion script.
+            script_name: Completion script file name.
 
         Raises:
-            TypeError: when `complete_var` is not dict.
+            TypeError: When complete_vars is not a dict.
+            ShellCompletionError: When prog_name cannot be determined.
         """
 
         if not isinstance(complete_vars, dict):
@@ -65,7 +80,14 @@ class ShellCompletion:
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
-    def _parse(self, args: Dict) -> Tuple:
+    def _parse(self, args: dict) -> tuple:
+        """Parse args dict and extract completion metadata.
+
+        Args:
+            args: Dictionary of command arguments and properties.
+
+        Returns: tuple of (arguments, positions, sub_opts) with completion metadata.
+        """
         _arguments = []
         _positions = []
         _sub_opts = {}
@@ -87,6 +109,9 @@ class ShellCompletion:
                     "_positions": p,
                     "_sub_opts": s,
                     "help": prop.get("help", "_").replace("\n", ""),
+                    "arg_completion": prop.get(
+                        "arg_completion", ""
+                    ),  # NEW: extract arg_completion
                 }
             elif name.startswith("-"):
                 _arguments.append((name, prop.get("help", "_").replace("\n", "")))
@@ -115,7 +140,7 @@ class ShellCompletion:
 
         sub_q = [_sub_opts]
         while sub_q:
-            temp: Dict = sub_q.pop(0)
+            temp: dict = sub_q.pop(0)
             for opt_name, p in temp.items():
                 comp_keys.add(opt_name)
 
@@ -163,8 +188,7 @@ class ShellCompletion:
 
         try:
             with open(full_path, "w" if os.path.isfile(full_path) else "x") as f:
-                for line in complete_src:
-                    f.write(line)
+                f.write(complete_src)
         except Exception:
             return False
         else:

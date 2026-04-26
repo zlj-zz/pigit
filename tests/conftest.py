@@ -12,13 +12,13 @@ _PIGIT_PATH = PROJECT_ROOT
 
 # Not support.
 if sys.platform == "win32":
-    collect_ignore_glob = ["**/test_tui_input.py", "**/test_tui_eventloop.py"]
+    collect_ignore_glob = ["**/test_tui_input.py", "**/test_termui_eventloop.py"]
 
 PYTHON_VERSION = sys.version_info[:3]
-if PYTHON_VERSION < (3, 8, 5):
+if PYTHON_VERSION < (3, 9):
     raise Exception(
-        "The current version of pigit does not support less than (Python3.8)."
+        "The current version of pigit does not support less than (Python3.9)."
     )
 
 
-# /opt/homebrew/opt/python@3.8/bin/python3 -m pytest
+# /opt/homebrew/opt/python@3.9/bin/python3 -m pytest

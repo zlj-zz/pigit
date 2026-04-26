@@ -10,30 +10,28 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Iterator, Optional, Union
 
 from .executor import DECODE, Executor, ExecResult, REPLY
 
-CmdT = Union[str, List[Any], Tuple[Any, ...]]
+CmdT = Union[str, list[Any], tuple[Any, ...]]
 
 
 class ExecutorStrategy(ABC):
     """Minimal surface used by git helpers (sync path)."""
 
     @abstractmethod
-    def exec(self, cmd: CmdT, *, flags: int = 0, **kws: Any) -> ExecResult:
-        ...
+    def exec(self, cmd: CmdT, *, flags: int = 0, **kws: Any) -> ExecResult: ...
 
     @abstractmethod
     def exec_parallel(
         self,
         *cmds: CmdT,
-        orders: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[list[dict[str, Any]]] = None,
         flags: int = 0,
         max_concurrent: Optional[int] = None,
         **kws: Any,
-    ) -> List[ExecResult]:
-        ...
+    ) -> list[ExecResult]: ...
 
     def exec_stream(self, cmd: CmdT, **kws: Any) -> Iterator[str]:
         """Fallback: buffer full stdout via :meth:`exec` (tests and non-streaming strategies)."""
@@ -60,14 +58,20 @@ class MockExecutor(ExecutorStrategy):
 
     def __init__(
         self,
-        responses: Optional[Dict[str, ExecResult]] = None,
+        responses: Optional[dict[str, ExecResult]] = None,
         default: ExecResult = (0, "", ""),
     ) -> None:
         self.responses = dict(responses) if responses else {}
         self.default = default
-        self.exec_calls: List[Tuple[CmdT, int, Dict[str, Any]]] = []
-        self.parallel_calls: List[
-            Tuple[Tuple[CmdT, ...], Optional[List[Dict[str, Any]]], int, Optional[int], Dict[str, Any]]
+        self.exec_calls: list[tuple[CmdT, int, dict[str, Any]]] = []
+        self.parallel_calls: list[
+            tuple[
+                tuple[CmdT, ...],
+                Optional[list[dict[str, Any]]],
+                int,
+                Optional[int],
+                dict[str, Any],
+            ]
         ] = []
 
     def exec(self, cmd: CmdT, *, flags: int = 0, **kws: Any) -> ExecResult:
@@ -80,16 +84,16 @@ class MockExecutor(ExecutorStrategy):
     def exec_parallel(
         self,
         *cmds: CmdT,
-        orders: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[list[dict[str, Any]]] = None,
         flags: int = 0,
         max_concurrent: Optional[int] = None,
         **kws: Any,
-    ) -> List[ExecResult]:
+    ) -> list[ExecResult]:
         self.parallel_calls.append((cmds, orders, flags, max_concurrent, dict(kws)))
         popen_orders = copy.deepcopy(orders) if orders is not None else []
         if len(popen_orders) < len(cmds):
             popen_orders.extend([{}] * (len(cmds) - len(popen_orders)))
-        out: List[ExecResult] = []
+        out: list[ExecResult] = []
         for i, cmd in enumerate(cmds):
             merged = {**kws, **popen_orders[i]}
             out.append(self.exec(cmd, flags=flags, **merged))
