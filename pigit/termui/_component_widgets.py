@@ -83,7 +83,7 @@ class ItemSelector(Component):
         super().__init__(x, y, size)
 
         if len(self.CURSOR) > 1:
-            raise ComponentError("error")
+            raise ComponentError("CURSOR must be a single character")
 
         self.content = content or [""]
 

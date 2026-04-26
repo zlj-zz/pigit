@@ -149,7 +149,7 @@ class Component(ABC):
         for child in self.children.values():
             child.update(action, **data)
 
-    def resize(self, size: tuple[int, int]):
+    def resize(self, size: tuple[int, int]) -> None:
         """Response to the resize event."""
         self._size = size
         self.fresh()
