@@ -77,8 +77,9 @@ __all__ = [
     "LazyLoadMixin",
     # Containers
     "TabView",
-    # Widgets
     "Column",
+    "Row",
+    # Widgets
     "InputLine",
     "ItemSelector",
     "LineTextBrowser",

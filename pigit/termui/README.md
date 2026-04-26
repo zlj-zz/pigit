@@ -50,7 +50,7 @@ flowchart TB
 |--------|------|
 | `_component_base.py` | `Component` ABC, `ComponentError`, `nearest_overlay_host()` |
 | `_component_mixins.py` | `GitPanelLazyResizeMixin` (defer `fresh`), `OverlayClientMixin` (toast/sheet helpers) |
-| `_component_containers.py` | `TabView` (tabbed stack), `LayoutContainer` (layout-driven) |
+| `_component_layouts.py` | `TabView` (tabbed stack), `Column`, `Row` (layout containers) |
 | `_component_widgets.py` | `ItemSelector` (cursor list), `LineTextBrowser` (scrollable text) |
 | `_overlay_components.py` | `Popup` (modal shell), `AlertDialog`, `HelpPanel`, `Toast`, `Sheet` |
 | `_layer.py` | `LayerStack`, `Layer`, `LayerKind` (`NONE` / `MODAL` / `TOAST` / `SHEET`) |
@@ -106,7 +106,7 @@ Full Git TUI wiring (tabs, help, alerts, toasts) lives in `pigit.app` (`PigitApp
 
 Stable names are listed in `__all__` inside `__init__.py`. Highlights:
 
-- **Tree**: `Component`, `TabView`, `LayoutContainer`, `ActionLiteral`, `GitPanelLazyResizeMixin`, `OverlayClientMixin`, `ItemSelector`, `LineTextBrowser`
+- **Tree**: `Component`, `TabView`, `Column`, `Row`, `ActionLiteral`, `LazyLoadMixin`, `ItemSelector`, `LineTextBrowser`
 - **Overlay**: `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`
 - **Application**: `Application`, `ComponentRoot` (internal but exported), `ExitEventLoop`
 - **Loop**: `AppEventLoop`, `Session`, `Renderer`, `TerminalSize`
