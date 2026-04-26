@@ -3,10 +3,12 @@
 import sys
 import time
 from collections import Counter
+from functools import lru_cache
 from math import sqrt
 from typing import Iterable
 
 
+@lru_cache(maxsize=256)
 def relative_time(unix_ts: int) -> str:
     """Return a human-readable relative time string."""
     delta = int(time.time()) - unix_ts

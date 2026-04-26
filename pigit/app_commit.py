@@ -98,8 +98,11 @@ class CommitPanel(ItemSelector):
         lines = []
         max_meta_w = 0
         for commit in commits:
+            # Cache relative_time on the commit to avoid recalculation in
+            # _format_commit and _render_list_view.
+            commit._rel_time = relative_time(commit.unix_timestamp)
             lines.append(self._format_commit(commit))
-            meta = f"  {commit.author}  {relative_time(commit.unix_timestamp)}"
+            meta = f"  {commit.author}  {commit._rel_time}"
             max_meta_w = max(max_meta_w, wcswidth(meta))
         self.set_content(lines)
         self._max_meta_w = max_meta_w
@@ -108,7 +111,7 @@ class CommitPanel(ItemSelector):
         """Format a commit for display."""
         msg = commit.msg
         sha = commit.sha[:7]
-        rel = relative_time(commit.unix_timestamp)
+        rel = getattr(commit, "_rel_time", None) or relative_time(commit.unix_timestamp)
         author = commit.author
         # Build a single-line summary for default content
         marker = "\u25cf" if not commit.is_pushed() else " "
@@ -188,7 +191,9 @@ class CommitPanel(ItemSelector):
             # --- Message (truncated to leave room for tag + meta) ---
             msg = commit.msg
             author = commit.author
-            rel = relative_time(commit.unix_timestamp)
+            rel = getattr(commit, "_rel_time", None) or relative_time(
+                commit.unix_timestamp
+            )
             meta = f"  {author}  {rel}"
             meta_w = wcswidth(meta)
             tag_str = f" {commit.tag[0]}" if commit.tag else ""
