@@ -87,6 +87,11 @@ class BranchPanel(ItemSelector):
         super().previous(step)
 
     def _render_surface(self, surface) -> None:
+        """Render each branch row as: [cursor][sp][branch_name.......][↑ahead ↓behind]
+
+        The cursor + branch name starts at column 0.  Ahead/behind indicators are drawn
+        right-aligned; ahead is green, behind is yellow.
+        """
         if not self.content:
             return
         w = surface.width
@@ -96,6 +101,7 @@ class BranchPanel(ItemSelector):
             row = idx - self._r_start
             is_cursor = idx == self.curr_no
 
+            # --- Draw cursor + branch name on the left ---
             is_head = idx < len(self.branches) and self.branches[idx].is_head
             prefix = self.CURSOR if is_cursor else " "
             fg = THEME.accent_green if is_head else THEME.fg_primary
@@ -105,7 +111,7 @@ class BranchPanel(ItemSelector):
 
             surface.draw_text_rgb(row, 0, text, fg=fg, bg=_DEFAULT_BG, bold=is_cursor)
 
-            # Draw ahead/behind indicators on the right
+            # --- Draw ahead/behind indicators right-aligned ---
             if idx < len(self.branches):
                 branch = self.branches[idx]
                 indicators = []
@@ -118,9 +124,8 @@ class BranchPanel(ItemSelector):
                 indicator_str = " ".join(indicators)
                 if indicator_str:
                     ind_w = wcswidth(indicator_str)
-                    if ind_w < w - 4:
+                    if ind_w < w - 4:  # leave a small margin from the edge
                         ind_x = w - ind_w
-                        # ahead = green, behind = yellow
                         x = ind_x
                         if ahead:
                             a_text = f"\u2191{ahead}"
@@ -128,7 +133,7 @@ class BranchPanel(ItemSelector):
                             surface.draw_text_rgb(
                                 row, x, a_text, fg=THEME.accent_green, bg=_DEFAULT_BG
                             )
-                            x += a_w + 1
+                            x += a_w + 1  # spacer before behind indicator
                         if behind:
                             b_text = f"\u2193{behind}"
                             surface.draw_text_rgb(

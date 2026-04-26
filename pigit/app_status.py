@@ -195,6 +195,12 @@ class StatusPanel(ItemSelector):
         self._alert_dialog.resize(size)
 
     def _render_surface(self, surface) -> None:
+        """Render each status row as: [cursor][sp][staged][unstaged][sp][filename.......][label]
+
+        The first five columns (cursor + space + staged + unstaged + space) are a fixed
+        prefix.  The filename fills the remaining width, and the status label is drawn
+        right-aligned when there is room.
+        """
         if not self.content:
             return
         w = surface.width
@@ -213,7 +219,7 @@ class StatusPanel(ItemSelector):
             fixed_width = 5
 
             if fixed_width >= w:
-                # Not enough space; draw truncated prefix only
+                # Terminal too narrow; draw truncated prefix only
                 surface.draw_text_rgb(
                     row,
                     0,
@@ -223,6 +229,7 @@ class StatusPanel(ItemSelector):
                     bold=is_cursor,
                 )
             else:
+                # --- Draw fixed prefix (5 columns) ---
                 col = 0
                 surface.draw_text_rgb(
                     row,
@@ -232,11 +239,13 @@ class StatusPanel(ItemSelector):
                     bg=_DEFAULT_BG,
                     bold=is_cursor,
                 )
-                col += 1
+                col += 1  # cursor
+
                 surface.draw_text_rgb(
                     row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
                 )
-                col += 1
+                col += 1  # spacer
+
                 surface.draw_text_rgb(
                     row,
                     col,
@@ -245,7 +254,8 @@ class StatusPanel(ItemSelector):
                     bg=_DEFAULT_BG,
                     bold=is_cursor,
                 )
-                col += 1
+                col += 1  # staged status
+
                 surface.draw_text_rgb(
                     row,
                     col,
@@ -254,13 +264,14 @@ class StatusPanel(ItemSelector):
                     bg=_DEFAULT_BG,
                     bold=is_cursor,
                 )
-                col += 1
+                col += 1  # unstaged status
+
                 surface.draw_text_rgb(
                     row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
                 )
-                col += 1
+                col += 1  # spacer before filename
 
-                # Filename (truncate if needed)
+                # --- Draw filename (fills remaining width) ---
                 avail = w - fixed_width
                 if wcswidth(filename) > avail:
                     filename = truncate_by_width(filename, avail - 1) + "\u2026"
@@ -278,11 +289,11 @@ class StatusPanel(ItemSelector):
                         bold=is_cursor,
                     )
 
-            # Draw status label on the right
+            # --- Draw status label right-aligned ---
             if idx < len(self.files):
                 label = _status_label(self.files[idx])
                 label_w = wcswidth(label)
-                if label_w < w - 4:
+                if label_w < w - 4:  # leave a small margin from the edge
                     label_x = w - label_w
                     surface.draw_text_rgb(
                         row,

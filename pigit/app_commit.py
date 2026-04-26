@@ -128,7 +128,12 @@ class CommitPanel(ItemSelector):
         self._render_list_view(surface)
 
     def _render_list_view(self, surface) -> None:
-        """Render commit list."""
+        """Render commit list as:
+        [cursor 2cols][unpushed? 2cols][SHA 8cols][msg.........][tag][  author  reltime]
+
+        Meta (author + relative_time) is right-aligned using the widest meta width across
+        all commits so every row ends at the same column for vertical alignment.
+        """
         w = surface.width
         end = min(self._r_start + self._size[1], len(self.content))
         max_meta_w = getattr(self, "_max_meta_w", 0)
@@ -138,6 +143,7 @@ class CommitPanel(ItemSelector):
             is_cursor = idx == self.curr_no
 
             if idx >= len(self.commits):
+                # Fallback for non-commit rows (e.g. "No commits found.")
                 prefix = "\u25cf " if is_cursor else "  "
                 text = prefix + self.content[idx]
                 if wcswidth(text) > w:
@@ -150,14 +156,14 @@ class CommitPanel(ItemSelector):
             commit = self.commits[idx]
             x = 0
 
-            # Cursor indicator (reserve 2 cols for alignment)
+            # --- Cursor indicator (reserve 2 cols for alignment) ---
             if is_cursor:
                 surface.draw_text_rgb(
                     row, x, "\u25cf", fg=THEME.fg_primary, bg=_DEFAULT_BG, bold=True
                 )
             x += 2
 
-            # Unpushed marker
+            # --- Unpushed marker (2 cols) ---
             if not commit.is_pushed():
                 marker = "\u25cf"
                 surface.draw_text_rgb(
@@ -170,16 +176,16 @@ class CommitPanel(ItemSelector):
                 )
                 x += wcswidth(marker) + 1
             else:
-                x += 2
+                x += 2  # empty spacer to keep alignment
 
-            # Draw SHA
+            # --- SHA (7 chars + 1 spacer = 8 cols) ---
             sha = commit.sha[:7]
             surface.draw_text_rgb(
                 row, x, sha, fg=THEME.fg_dim, bg=_DEFAULT_BG, bold=is_cursor
             )
             x += len(sha) + 1
 
-            # Draw message (truncated to leave room for meta)
+            # --- Message (truncated to leave room for tag + meta) ---
             msg = commit.msg
             author = commit.author
             rel = relative_time(commit.unix_timestamp)
@@ -188,7 +194,7 @@ class CommitPanel(ItemSelector):
             tag_str = f" {commit.tag[0]}" if commit.tag else ""
             tag_w = wcswidth(tag_str)
 
-            # Use max meta width across all commits so tail info aligns vertically
+            # Reserve the widest meta width across all commits so tail info aligns vertically
             reserve_meta_w = max(max_meta_w, meta_w)
             avail = w - x - reserve_meta_w - tag_w - 1
             if avail > 0:
@@ -199,9 +205,9 @@ class CommitPanel(ItemSelector):
                 )
                 x += wcswidth(msg)
 
-            # Draw tag
+            # --- Tag ---
             if tag_str:
-                x += 1
+                x += 1  # spacer before tag
                 surface.draw_text_rgb(
                     row,
                     x,
@@ -212,7 +218,7 @@ class CommitPanel(ItemSelector):
                 )
                 x += tag_w
 
-            # Draw meta right-aligned using reserved width for vertical alignment.
+            # --- Meta right-aligned using reserved width for vertical alignment ---
             # Pad shorter meta with leading spaces so all rows end at the same column.
             meta_x = w - reserve_meta_w
             if meta_x >= 0:
