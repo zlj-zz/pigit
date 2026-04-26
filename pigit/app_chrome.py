@@ -12,7 +12,7 @@ import time
 from typing import Callable, Optional
 
 from pigit.termui import Component
-from pigit.termui.wcwidth_table import wcswidth
+from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import FlatTheme

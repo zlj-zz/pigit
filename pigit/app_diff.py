@@ -53,6 +53,9 @@ class DiffViewer(LineTextBrowser):
         self._compute_heatmap()
         self._compute_line_numbers()
 
+    def get_help_title(self) -> str:
+        return "Diff"
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for diff viewer."""
         return [

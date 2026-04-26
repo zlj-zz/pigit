@@ -82,14 +82,14 @@
 - **Event loop**: `window resize` before overlay routing; while `has_overlay_open()`, keys use `try_dispatch_overlay` only (main tree does not receive them). `KeyDispatchOutcome` includes `overlay_explicit`, `overlay_implicit`, `overlay_drop`, `overlay_closed_after_error`. `_loop` split into `_dispatch_semantic_string`, `_dispatch_while_overlay_open`, `_dispatch_while_overlay_closed`.
 - **`Popup`**: optional `session_owner`; `_resolved_overlay_host()` uses `nearest_overlay_host()` or treats the owner as host when it already has overlay APIs. No constructor restriction on child type; implicit toggle keys come from the child class’s `TOGGLE_HELP_SEMANTIC_KEYS`. Renderer for side-attached shells is applied in `_render` via `_sync_renderer_from_session_owner` (walk `session_owner` / `parent`); removed `AppEventLoop._bind_side_overlay_components`.
 - **`AlertDialog`**: same `session_owner` pattern via base `Popup`; ESC / confirm flow unchanged at the API level.
-- **`HelpPanel`**: `merge_help_entries_from_host_children` aggregates `get_help_entries()` from `host.children` into the panel (replaces the old `populate_*` name).
+- **`HelpPanel`**: `refresh_entries_from_source` aggregates `get_help_entries()` from `entries_source.children` into the panel (replaces the old `populate_*` name).
 - **Bindings**: `bind_keys` + class `BINDINGS` merged in `resolve_key_handlers_merged` / `list_bindings`; duplicate keys to the same target deduped; conflicts raise `BindingError` with `semantic_key`, `first_target`, `second_target`, `owner_class_name`.
 - **Text**: `sanitize_for_display` for safe overlay strings.
 - **Exports** (`pigit.termui.__all__`): among others `AlertDialog`, `Popup`, `HelpPanel`, `HelpEntry`, `OverlayHostMixin`, `OverlayKind`, `OverlayDispatchResult`, `OverlaySurface`, `bind_keys`, `BindingError`, `list_bindings`, `sanitize_for_display`.
 
 ### Git TUI (`pigit.app`)
 
-- **`GitTuiRoot`**: one overlay slot (help `Popup` vs `AlertDialog`); `?` toggles help; help rows refreshed via `HelpPanel.merge_help_entries_from_host_children` before open.
+- **`GitTuiRoot`**: one overlay slot (help `Popup` vs `AlertDialog`); `?` toggles help; help rows refreshed via `HelpPanel.refresh_entries_from_source` before open.
 - **`StatusPanel._check_via_alert`**: after confirm, **`fresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
 
 ## 1.7.7 (2026-03-29)

@@ -176,7 +176,10 @@ class PigitApplication(Application):
         return chrome_column
 
     def setup_root(self, root: ComponentRoot) -> None:
-        self._help_panel = HelpPanel()
+        self._help_panel = HelpPanel(
+            entries_source=self._tab_view,
+            key_fg=THEME.accent_blue,
+        )
         self._help_popup = Popup(
             self._help_panel,
             session_owner=root,
@@ -252,15 +255,8 @@ class PigitApplication(Application):
         self._update_inspector_content()
 
     def toggle_help(self):
-        root = self._root
-        assert isinstance(root, ComponentRoot)
-
-        help_open = root._layer_stack.top(LayerKind.MODAL) is self._help_popup
-        if not help_open:
-            # Help panel merges from the TabView inside Column
-            tab_view = self._tab_view
-            if tab_view is not None:
-                self._help_panel.merge_help_entries_from_host_children(tab_view)
+        """Toggle help popup visibility. Entries are refreshed automatically
+        via HelpPanel.on_before_show before opening."""
         self._help_popup.toggle()
 
     def toggle_palette(self):

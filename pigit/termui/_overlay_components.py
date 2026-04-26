@@ -17,8 +17,8 @@ from ._component_base import Component, _looks_like_overlay_host
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._surface import Surface, _DEFAULT_BG
-from .wcwidth_table import truncate_by_width
+from ._surface import Surface, _DEFAULT_BG, _DEFAULT_FG
+from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from . import keys
 
@@ -38,7 +38,7 @@ class HelpPanel(Component):
     that can reach the modal host (typically the loop root or a panel under it); the shell
     resolves the host via :meth:`~pigit.termui.components.Component.nearest_overlay_host` or
     treats ``session_owner`` as the host when it owns overlay state. Bind ``?`` to a handler that
-    refreshes rows (e.g. :meth:`merge_help_entries_from_host_children`) when opening help,
+    refreshes rows (e.g. :meth:`refresh_entries_from_source`) when opening help,
     then calls ``popup.toggle()``.
 
     :data:`TOGGLE_HELP_SEMANTIC_KEYS` lists keys that toggle help while this panel's
@@ -63,10 +63,15 @@ class HelpPanel(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        *,
+        entries_source: Optional[Component] = None,
+        key_fg: Optional[tuple[int, int, int]] = None,
     ) -> None:
         super().__init__(x=x, y=y, size=size)
         self._inner_w_cfg = inner_width
         self._inner_h_cfg = inner_height
+        self._entries_source = entries_source
+        self._key_fg = key_fg
         self._lines: list[str] = []
         self._offset = 0
         self._inner_w = 40
@@ -75,6 +80,10 @@ class HelpPanel(Component):
         self.outer_row_count = 10
         self._frame = BoxFrame(0, 0, title="Help   esc close")
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
+        # Each element is a list of (text, fg, bold) segments for one line.
+        self._line_segments: list[
+            list[tuple[str, Optional[tuple[int, int, int]], bool]]
+        ] = []
 
     def resize(self, size: tuple[int, int]) -> None:
         tw, th = int(size[0]), int(size[1])
@@ -95,33 +104,106 @@ class HelpPanel(Component):
         super().resize(size)
 
     def set_entries(self, entries: list[HelpEntry]) -> None:
+        if not entries:
+            self._lines = []
+            self._line_segments = []
+            self._offset = 0
+            return
+        max_key_w = max(wcswidth(key_disp) for key_disp, _ in entries)
         lines: list[str] = []
+        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
         for key_disp, desc in entries:
-            lines.append(f"{key_disp}  {desc}")
+            pad = max_key_w - wcswidth(key_disp)
+            line = f"{key_disp}{' ' * pad}  {desc}"
+            lines.append(line)
+            seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
+            if self._key_fg is not None:
+                seg.append((key_disp, self._key_fg, False))
+                seg.append((" " * pad + "  ", None, False))
+            else:
+                seg.append((key_disp + " " * pad + "  ", None, False))
+            seg.append((desc, None, False))
+            segments.append(seg)
         self._lines = lines
+        self._line_segments = segments
         self._offset = 0
 
-    def merge_help_entries_from_host_children(
-        self, host: Any, *, max_rows: int = 256
+    def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
+        if not groups:
+            self._lines = []
+            self._line_segments = []
+            self._offset = 0
+            return
+        max_key_w = 0
+        for _, entries in groups:
+            for key_disp, _ in entries:
+                max_key_w = max(max_key_w, wcswidth(key_disp))
+
+        lines: list[str] = []
+        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
+        for title, entries in groups:
+            if not entries:
+                continue
+            # Category header
+            lines.append(title)
+            segments.append([(title, None, True)])
+            # Indented entries
+            for key_disp, desc in entries:
+                pad = max_key_w - wcswidth(key_disp)
+                line = f"  {key_disp}{' ' * pad}  {desc}"
+                lines.append(line)
+                seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
+                seg.append(("  ", None, False))
+                if self._key_fg is not None:
+                    seg.append((key_disp, self._key_fg, False))
+                    seg.append((" " * pad + "  ", None, False))
+                else:
+                    seg.append((key_disp + " " * pad + "  ", None, False))
+                seg.append((desc, None, False))
+                segments.append(seg)
+            # Blank line between groups
+            lines.append("")
+            segments.append([])
+
+        self._lines = lines
+        self._line_segments = segments
+        self._offset = 0
+
+    def on_before_show(self) -> None:
+        """Refresh help entries from the configured source before opening."""
+        if self._entries_source is not None:
+            self.refresh_entries_from_source(self._entries_source)
+
+    def refresh_entries_from_source(
+        self, entries_source: Any, *, max_rows: int = 256
     ) -> None:
         """
-        Build help rows from ``host.children``: collect
+        Build grouped help rows from ``entries_source.children``: collect
         :meth:`~pigit.termui.components.Component.get_help_entries` from each mapped child,
-        then :meth:`set_entries` (truncated to ``max_rows``).
+        group by :meth:`~pigit.termui.components.Component.get_help_title`, then
+        :meth:`set_grouped_entries` (truncated to ``max_rows``).
 
         This is independent of how or when the panel is shown; call it from app code when
         you want the list to reflect the current tree (e.g. before opening help).
         """
 
-        children = getattr(host, "children", None)
+        children = getattr(entries_source, "children", None)
         if children is None:
             raise TypeError(
-                "Host must expose a non-optional `children` sequence (e.g. TabView, Column)."
+                "Source must expose a non-optional `children` sequence (e.g. TabView, Column)."
             )
-        rows: list[HelpEntry] = []
+        groups: list[tuple[str, list[HelpEntry]]] = []
         for panel in children:
-            rows.extend(panel.get_help_entries())
-        self.set_entries(rows[:max_rows])
+            entries = panel.get_help_entries()
+            if not entries:
+                continue
+            title_getter = getattr(panel, "get_help_title", None)
+            if callable(title_getter):
+                title = title_getter()
+            else:
+                title = panel.__class__.__name__.replace("Panel", "")
+            groups.append((title, entries))
+        self.set_grouped_entries(groups)
 
     def scroll_down(self) -> None:
         max_off = max(0, len(self._lines) - self._scroll_h)
@@ -141,8 +223,32 @@ class HelpPanel(Component):
         )
         self._frame.draw_onto(surface, self.x, self.y)
 
-        chunk = self._lines[self._offset : self._offset + self._scroll_h]
-        self._frame.draw_content(surface, self.x, self.y, chunk)
+        content_row = self.x + 1
+        content_col = self.y + 1
+        chunk = self._line_segments[self._offset : self._offset + self._scroll_h]
+        for i, segments in enumerate(chunk):
+            x = content_col
+            row = content_row + i
+            for text, fg, bold in segments:
+                if x >= content_col + self._inner_w:
+                    break
+                text_w = wcswidth(text)
+                avail = content_col + self._inner_w - x
+                if text_w > avail:
+                    text = truncate_by_width(text, avail)
+                surface.draw_text_rgb(
+                    row,
+                    x,
+                    text,
+                    fg=fg if fg is not None else _DEFAULT_FG,
+                    bg=_DEFAULT_BG,
+                    bold=bold,
+                )
+                x += wcswidth(text)
+            # Pad remaining width with spaces to prevent residue
+            while x < content_col + self._inner_w:
+                surface.draw_text_rgb(row, x, " ", fg=_DEFAULT_FG, bg=_DEFAULT_BG)
+                x += 1
 
 
 class Popup(Component):
@@ -257,6 +363,9 @@ class Popup(Component):
         if top is not None:
             # Another modal is active; do not steal focus.
             return
+        before_show = getattr(self._child, "on_before_show", None)
+        if callable(before_show):
+            before_show()
         self.show()
         host.begin_popup_session(self)
 

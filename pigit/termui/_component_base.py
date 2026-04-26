@@ -189,6 +189,16 @@ class Component(ABC):
 
         return OverlayDispatchResult.DROPPED_UNBOUND
 
+    def get_help_title(self) -> str:
+        """Return the title for this component's help section.
+
+        Default is the class name without "Component" suffix, if present.
+        """
+        name = type(self).__name__
+        if name.endswith("Component"):
+            return name[: -len("Component")]
+        return name
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """
         Return ``(key display, description)`` rows for the help panel.

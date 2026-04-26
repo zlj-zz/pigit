@@ -357,6 +357,9 @@ class StatusPanel(ItemSelector):
                 mode = "Visual"
             self._on_visual_mode_changed(mode)
 
+    def get_help_title(self) -> str:
+        return "Status"
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs based on current mode."""
         if self._visual_mode:

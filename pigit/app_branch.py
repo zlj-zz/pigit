@@ -67,6 +67,9 @@ class BranchPanel(ItemSelector):
             lines.append(line)
         self.set_content(lines)
 
+    def get_help_title(self) -> str:
+        return "Branch"
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for branch panel."""
         return [

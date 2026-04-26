@@ -79,6 +79,9 @@ class CommitPanel(ItemSelector):
         else:
             self._view_mode = "list"
 
+    def get_help_title(self) -> str:
+        return "Commit"
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for commit panel."""
         return [
