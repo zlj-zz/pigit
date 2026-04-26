@@ -24,6 +24,7 @@ from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_mixins import LazyLoadMixin
 from pigit.termui._component_layouts import Column, Row, TabView
 from pigit.termui._component_widgets import (
+    Header,
     InputLine,
     ItemSelector,
     LineTextBrowser,
@@ -80,6 +81,7 @@ __all__ = [
     "Column",
     "Row",
     # Widgets
+    "Header",
     "InputLine",
     "ItemSelector",
     "LineTextBrowser",

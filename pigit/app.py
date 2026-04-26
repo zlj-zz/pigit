@@ -19,6 +19,8 @@ from pigit.termui import (
     Component,
     ComponentRoot,
     ExitEventLoop,
+    get_badge,
+    Header,
     HelpPanel,
     keys,
     LayerKind,
@@ -29,7 +31,7 @@ from pigit.termui import (
     ToastPosition,
 )
 from .app_branch import BranchPanel
-from .app_chrome import AppFooter, AppHeader, PeekLabel
+from .app_chrome import AppFooter, PeekLabel
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
@@ -59,7 +61,7 @@ class PigitApplication(Application):
         self._repo = repo or Repo()
         self._repo_path, self._repo_conf = self._repo.confirm_repo()
         self._git = self._repo.bind_path(self._repo_path)
-        self._header: Optional[AppHeader] = None
+        self._header: Optional[Header] = None
         self._footer: Optional[AppFooter] = None
         self._tab_view: Optional[TabView] = None
         self._body_row: Optional[Row] = None
@@ -67,6 +69,14 @@ class PigitApplication(Application):
         self._palette: Optional[CommandPalette] = None
         self._inspector: Optional[InspectorPanel] = None
         self._inspector_visible = False
+        # Header state
+        self._repo_name: str = ""
+        self._branch_name: str = ""
+        self._ahead: int = 0
+        self._behind: int = 0
+        self._current_tab: str = "Status"
+        self._current_tab_key: str = "1"
+        self._mode: str = ""
         # Panel references set in build_root()
         self._status_panel: Optional[StatusPanel] = None
         self._branch_panel: Optional[BranchPanel] = None
@@ -118,10 +128,8 @@ class PigitApplication(Application):
         def _on_tab_switch(panel: Component) -> None:
             provider = getattr(panel, "get_help_entries", None)
             self._footer.set_help_provider(provider)
-            self._header.set_state(
-                current_tab=_TAB_LABELS.get(panel, ""),
-                current_tab_key=_TAB_KEYS.get(panel, ""),
-            )
+            self._current_tab = _TAB_LABELS.get(panel, "")
+            self._current_tab_key = _TAB_KEYS.get(panel, "")
             self._update_inspector_content()
 
         self._tab_view = TabView(
@@ -139,12 +147,10 @@ class PigitApplication(Application):
         self._commit_panel = commit_panel
         self._display_panel = display_panel
 
-        self._header = AppHeader(
-            theme=THEME,
-            repo_name="",
-            branch_name="",
-            current_tab="Status",
-            current_tab_key="1",
+        self._header = Header(
+            separator=True,
+            sep_fg=THEME.fg_dim,
+            on_refresh=self._refresh_header,
         )
         self._footer = AppFooter(theme=THEME)
         self._footer.set_global_help(_GLOBAL_HELP)
@@ -186,10 +192,10 @@ class PigitApplication(Application):
         # Initialize header with repo info
         try:
             head = self._git.get_head() or ""
-            self._header.set_state(
-                repo_name=os.path.basename(self._repo_path) if self._repo_path else "",
-                branch_name=head,
+            self._repo_name = (
+                os.path.basename(self._repo_path) if self._repo_path else ""
             )
+            self._branch_name = head
         except Exception:
             logging.warning("Failed to initialize repo info", exc_info=True)
             show_toast(
@@ -209,8 +215,37 @@ class PigitApplication(Application):
             self._status_panel.fresh()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
-        if self._header is not None:
-            self._header.set_state(mode=mode)
+        self._mode = mode
+
+    def _refresh_header(self, header: Header) -> None:
+        badge, badge_bg, badge_fg = get_badge()
+        left: list[tuple[str, tuple[int, int, int], bool]] = []
+        if badge:
+            left.append((f"{badge} ", badge_fg or THEME.fg_primary, True))
+        left.extend(
+            [
+                (self._repo_name, THEME.fg_primary, False),
+                ("  ", THEME.fg_dim, False),
+                (self._branch_name, THEME.accent_cyan, False),
+            ]
+        )
+
+        center: list[tuple[str, tuple[int, int, int], bool]] = []
+        if self._ahead > 0:
+            center.append((f"\u2191{self._ahead} ", THEME.accent_green, False))
+        if self._behind > 0:
+            center.append((f"\u2193{self._behind}", THEME.accent_yellow, False))
+
+        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        if self._mode:
+            right.append((f"[{self._mode}]  ", THEME.fg_primary, True))
+        right.append((self._current_tab, THEME.fg_muted, True))
+        if self._current_tab_key:
+            right.append((f" [{self._current_tab_key}]", THEME.fg_primary, True))
+
+        header.set_left(left)
+        header.set_center(center)
+        header.set_right(right)
 
     def _on_panel_selection_changed(self, idx: int) -> None:
         """Callback when panel selection changes via j/k navigation."""

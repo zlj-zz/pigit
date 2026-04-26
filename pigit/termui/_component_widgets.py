@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
+from ._surface import _DEFAULT_BG
 from .keys import (
     KEY_BACKSPACE,
     KEY_DELETE,
@@ -27,6 +28,7 @@ from .keys import (
     KEY_DOWN,
 )
 from .tty_io import truncate_line
+from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
     from ._surface import Surface
@@ -156,6 +158,126 @@ class ItemSelector(Component):
         if self.curr_no < self._r_start:
             self._r_start -= step
         self._notify_change()
+
+
+class Header(Component):
+    """Generic header bar with left/center/right segments.
+
+    Each slot is a list of ``(text, fg_rgb, bold)`` tuples.  Center is
+    horizontally centred; right is right-aligned.  If the total width
+    exceeds the available space, the centre group is dropped first, then
+    the left group is truncated with an ellipsis.
+    """
+
+    def __init__(
+        self,
+        *,
+        separator: bool = True,
+        sep_fg: tuple[int, int, int] = (100, 100, 100),
+        on_refresh: Optional[Callable[["Header"], None]] = None,
+    ) -> None:
+        super().__init__()
+        self._separator = separator
+        self._sep_fg = sep_fg
+        self._on_refresh = on_refresh
+        self._left: list[tuple[str, tuple[int, int, int], bool]] = []
+        self._center: list[tuple[str, tuple[int, int, int], bool]] = []
+        self._right: list[tuple[str, tuple[int, int, int], bool]] = []
+
+    def set_left(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        self._left = list(segments)
+
+    def set_center(
+        self, segments: list[tuple[str, tuple[int, int, int], bool]]
+    ) -> None:
+        self._center = list(segments)
+
+    def set_right(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        self._right = list(segments)
+
+    def _render_surface(self, surface: "Surface") -> None:
+        if self._on_refresh is not None:
+            self._on_refresh(self)
+
+        w = surface.width
+        h = surface.height
+        if w <= 0:
+            return
+
+        if h >= 2 and self._separator:
+            self._draw_content(surface, 0, w)
+            surface.fill_rect_rgb(1, 0, w, 1, _DEFAULT_BG)
+            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=_DEFAULT_BG)
+        else:
+            self._draw_content(surface, 0, w)
+
+    def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
+        surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
+
+        left_w = self._slot_width(self._left)
+        center_w = self._slot_width(self._center)
+        right_w = self._slot_width(self._right)
+
+        # Drop centre if total exceeds width
+        total = left_w + (2 if center_w else 0) + center_w + right_w
+        if total > w and center_w:
+            center_w = 0
+            total = left_w + right_w
+
+        # Truncate left if still exceeds
+        if total > w:
+            max_left = max(0, w - right_w - 1)
+            self._left = self._truncate_slot(self._left, max_left)
+            left_w = self._slot_width(self._left)
+
+        # Draw left
+        x = 0
+        for text, fg, bold in self._left:
+            surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+            x += wcswidth(text)
+
+        # Draw centre
+        if self._center and center_w:
+            centre_x = max(0, (w - center_w) // 2)
+            x = centre_x
+            for text, fg, bold in self._center:
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                x += wcswidth(text)
+
+        # Draw right
+        if self._right and right_w:
+            right_x = max(0, w - right_w)
+            x = right_x
+            for text, fg, bold in self._right:
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                x += wcswidth(text)
+
+    @staticmethod
+    def _slot_width(
+        slot: list[tuple[str, tuple[int, int, int], bool]],
+    ) -> int:
+        return sum(wcswidth(text) for text, _, _ in slot)
+
+    @staticmethod
+    def _truncate_slot(
+        slot: list[tuple[str, tuple[int, int, int], bool]],
+        max_width: int,
+    ) -> list[tuple[str, tuple[int, int, int], bool]]:
+        if max_width <= 0 or not slot:
+            return []
+        result: list[tuple[str, tuple[int, int, int], bool]] = []
+        current_w = 0
+        for text, fg, bold in slot:
+            text_w = wcswidth(text)
+            if current_w + text_w > max_width - 1:
+                avail = max_width - current_w - 1
+                if avail > 0:
+                    truncated = truncate_by_width(text, avail) + "\u2026"
+                    result.append((truncated, fg, bold))
+                break
+            result.append((text, fg, bold))
+            current_w += text_w
+        return result
 
 
 class StatusBar(Component):

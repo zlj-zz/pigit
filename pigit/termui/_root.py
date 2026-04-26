@@ -60,7 +60,7 @@ class ComponentRoot(Component):
     ) -> None:
         """Set badge text to display in the chrome header.
 
-        The badge is rendered by the application chrome (e.g. AppHeader)
+        The badge is rendered by the application chrome (e.g. Header)
         reading ``self.parent.badge_text``.  This method only stores state;
         the framework does not control layout.
 

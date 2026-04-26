@@ -3,14 +3,24 @@
 
 from __future__ import annotations
 
-from pigit.app_chrome import AppFooter, AppHeader, PeekLabel
+from pigit.app_chrome import AppFooter, PeekLabel
 from pigit.app_theme import THEME
+from pigit.termui import Header
 from pigit.termui._surface import Surface
 
 
-class TestAppHeader:
+class TestHeader:
     def test_render_basic(self):
-        h = AppHeader(THEME, repo_name="my-repo", branch_name="main")
+        h = Header(separator=True, sep_fg=THEME.fg_dim)
+        h.set_left([
+            ("my-repo", THEME.fg_primary, False),
+            ("  ", THEME.fg_dim, False),
+            ("main", THEME.accent_cyan, False),
+        ])
+        h.set_right([
+            ("Status", THEME.fg_muted, True),
+            (" [1]", THEME.fg_primary, True),
+        ])
         s = Surface(40, 2)
         h.resize((40, 2))
         h._render_surface(s)
@@ -20,8 +30,17 @@ class TestAppHeader:
         # Row 1: separator line
         assert "\u2500" in s.lines()[1]
 
-    def test_render_with_ahead_behind(self):
-        h = AppHeader(THEME, repo_name="r", branch_name="b", ahead=2, behind=1)
+    def test_render_with_center(self):
+        h = Header(separator=True, sep_fg=THEME.fg_dim)
+        h.set_left([
+            ("r", THEME.fg_primary, False),
+            ("  ", THEME.fg_dim, False),
+            ("b", THEME.accent_cyan, False),
+        ])
+        h.set_center([
+            ("\u21912 ", THEME.accent_green, False),
+            ("\u21931", THEME.accent_yellow, False),
+        ])
         s = Surface(30, 2)
         h.resize((30, 2))
         h._render_surface(s)
@@ -31,7 +50,12 @@ class TestAppHeader:
         assert "\u2500" in s.lines()[1]  # separator
 
     def test_render_truncates_on_small_width(self):
-        h = AppHeader(THEME, repo_name="very-long-repo-name", branch_name="feature")
+        h = Header(separator=True, sep_fg=THEME.fg_dim)
+        h.set_left([
+            ("very-long-repo-name", THEME.fg_primary, False),
+            ("  ", THEME.fg_dim, False),
+            ("feature", THEME.accent_cyan, False),
+        ])
         s = Surface(10, 2)
         h.resize((10, 2))
         h._render_surface(s)
@@ -39,12 +63,14 @@ class TestAppHeader:
         assert "\u2026" in line or "very" in line
         assert "\u2500" in s.lines()[1]  # separator
 
-    def test_set_state_updates_fields(self):
-        h = AppHeader(THEME)
-        h.set_state(repo_name="repo", branch_name="dev", ahead=5)
-        assert h._repo_name == "repo"
-        assert h._branch_name == "dev"
-        assert h._ahead == 5
+    def test_set_slots_updates_fields(self):
+        h = Header()
+        h.set_left([("repo", THEME.fg_primary, False)])
+        h.set_center([("center", THEME.fg_dim, False)])
+        h.set_right([("right", THEME.fg_muted, True)])
+        assert h._left == [("repo", THEME.fg_primary, False)]
+        assert h._center == [("center", THEME.fg_dim, False)]
+        assert h._right == [("right", THEME.fg_muted, True)]
 
 
 class TestAppFooter:
