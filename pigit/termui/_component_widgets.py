@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
-from ._surface import _DEFAULT_BG
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .keys import (
     KEY_BACKSPACE,
     KEY_DELETE,
@@ -31,7 +31,8 @@ from .tty_io import truncate_line
 from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
-    from ._surface import Surface
+    from .palette import DEFAULT_BG, DEFAULT_FG
+from ._surface import Surface
 
 
 class LineTextBrowser(Component):
@@ -223,13 +224,13 @@ class Header(Component):
 
         if h >= 2 and self._separator:
             self._draw_content(surface, 0, w)
-            surface.fill_rect_rgb(1, 0, w, 1, _DEFAULT_BG)
-            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=_DEFAULT_BG)
+            surface.fill_rect_rgb(1, 0, w, 1, DEFAULT_BG)
+            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=DEFAULT_BG)
         else:
             self._draw_content(surface, 0, w)
 
     def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
-        surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1, DEFAULT_BG)
 
         left_w = self._slot_width(self._left)
         center_w = self._slot_width(self._center)
@@ -250,7 +251,7 @@ class Header(Component):
         # Draw left
         x = 0
         for text, fg, bold in self._left:
-            surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+            surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
             x += wcswidth(text)
 
         # Draw centre
@@ -258,7 +259,7 @@ class Header(Component):
             centre_x = max(0, (w - center_w) // 2)
             x = centre_x
             for text, fg, bold in self._center:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
                 x += wcswidth(text)
 
         # Draw right
@@ -266,7 +267,7 @@ class Header(Component):
             right_x = max(0, w - right_w)
             x = right_x
             for text, fg, bold in self._right:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
                 x += wcswidth(text)
 
     @staticmethod

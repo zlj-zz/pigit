@@ -11,9 +11,8 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional
 
-from pigit.termui import Component
+from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import FlatTheme
 
@@ -48,17 +47,17 @@ class AppFooter(Component):
         if h >= 2:
             # Two-row footer: dedicated separator line + content row
             # Row 0: separator
-            surface.fill_rect_rgb(0, 0, w, 1, _DEFAULT_BG)
+            surface.fill_rect_rgb(0, 0, w, 1, palette.DEFAULT_BG)
             surface.draw_text_rgb(
-                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=_DEFAULT_BG
+                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=palette.DEFAULT_BG
             )
             # Row 1: content
             self._draw_footer_content(surface, 1, w)
         else:
             # Single-row fallback: border line overlaid with content
-            surface.fill_rect_rgb(0, 0, w, 1, _DEFAULT_BG)
+            surface.fill_rect_rgb(0, 0, w, 1, palette.DEFAULT_BG)
             surface.draw_text_rgb(
-                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=_DEFAULT_BG
+                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=palette.DEFAULT_BG
             )
             self._draw_footer_content(surface, 0, w)
 
@@ -69,7 +68,7 @@ class AppFooter(Component):
         Panel help is pulled from the registered provider each render cycle;
         global help is appended and deduplicated by key.
         """
-        surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
         left_text = self._context_text
         left_w = wcswidth(left_text)
@@ -77,7 +76,7 @@ class AppFooter(Component):
 
         if left_text:
             surface.draw_text_rgb(
-                row, x, left_text, fg=self._theme.fg_primary, bg=_DEFAULT_BG
+                row, x, left_text, fg=self._theme.fg_primary, bg=palette.DEFAULT_BG
             )
             x += left_w + 2
 
@@ -103,20 +102,22 @@ class AppFooter(Component):
                         x,
                         truncate_by_width(pair_text, avail) + "\u2026",
                         fg=self._theme.fg_muted,
-                        bg=_DEFAULT_BG,
+                        bg=palette.DEFAULT_BG,
                     )
                 break
 
             # Draw key bright + bold
             key_w = wcswidth(key)
             surface.draw_text_rgb(
-                row, x, key, fg=self._theme.fg_primary, bg=_DEFAULT_BG, bold=True
+                row, x, key, fg=self._theme.fg_primary, bg=palette.DEFAULT_BG, bold=True
             )
             x += key_w
 
             # Space + description dim
             rest = f" {desc}  "
-            surface.draw_text_rgb(row, x, rest, fg=self._theme.fg_muted, bg=_DEFAULT_BG)
+            surface.draw_text_rgb(
+                row, x, rest, fg=self._theme.fg_muted, bg=palette.DEFAULT_BG
+            )
             x += wcswidth(rest)
 
 

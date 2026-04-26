@@ -14,9 +14,9 @@ from pigit.termui import (
     bind_keys,
     ItemSelector,
     keys,
+    palette,
     show_toast,
 )
-from pigit.termui._surface import _DEFAULT_BG
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -112,7 +112,9 @@ class BranchPanel(ItemSelector):
             if wcswidth(text) > w:
                 text = truncate_by_width(text, w - 1) + "\u2026"
 
-            surface.draw_text_rgb(row, 0, text, fg=fg, bg=_DEFAULT_BG, bold=is_cursor)
+            surface.draw_text_rgb(
+                row, 0, text, fg=fg, bg=palette.DEFAULT_BG, bold=is_cursor
+            )
 
             # --- Draw ahead/behind indicators right-aligned ---
             if idx < len(self.branches):
@@ -134,13 +136,21 @@ class BranchPanel(ItemSelector):
                             a_text = f"\u2191{ahead}"
                             a_w = wcswidth(a_text)
                             surface.draw_text_rgb(
-                                row, x, a_text, fg=THEME.accent_green, bg=_DEFAULT_BG
+                                row,
+                                x,
+                                a_text,
+                                fg=THEME.accent_green,
+                                bg=palette.DEFAULT_BG,
                             )
                             x += a_w + 1  # spacer before behind indicator
                         if behind:
                             b_text = f"\u2193{behind}"
                             surface.draw_text_rgb(
-                                row, x, b_text, fg=THEME.accent_yellow, bg=_DEFAULT_BG
+                                row,
+                                x,
+                                b_text,
+                                fg=THEME.accent_yellow,
+                                bg=palette.DEFAULT_BG,
                             )
 
     def on_key(self, key: str) -> None:

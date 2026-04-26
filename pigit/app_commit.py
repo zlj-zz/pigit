@@ -12,14 +12,14 @@ from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
 from pigit.termui import (
+    ActionLiteral,
     bind_keys,
     Component,
     ItemSelector,
     keys,
+    palette,
 )
-from pigit.termui.types import ActionLiteral
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -155,7 +155,12 @@ class CommitPanel(ItemSelector):
                 if wcswidth(text) > w:
                     text = truncate_by_width(text, w - 1) + "\u2026"
                 surface.draw_text_rgb(
-                    row, 0, text, fg=THEME.fg_muted, bg=_DEFAULT_BG, bold=is_cursor
+                    row,
+                    0,
+                    text,
+                    fg=THEME.fg_muted,
+                    bg=palette.DEFAULT_BG,
+                    bold=is_cursor,
                 )
                 continue
 
@@ -165,7 +170,12 @@ class CommitPanel(ItemSelector):
             # --- Cursor indicator (reserve 2 cols for alignment) ---
             if is_cursor:
                 surface.draw_text_rgb(
-                    row, x, "\u25cf", fg=THEME.fg_primary, bg=_DEFAULT_BG, bold=True
+                    row,
+                    x,
+                    "\u25cf",
+                    fg=THEME.fg_primary,
+                    bg=palette.DEFAULT_BG,
+                    bold=True,
                 )
             x += 2
 
@@ -177,7 +187,7 @@ class CommitPanel(ItemSelector):
                     x,
                     marker,
                     fg=THEME.accent_yellow,
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
                 x += wcswidth(marker) + 1
@@ -187,7 +197,7 @@ class CommitPanel(ItemSelector):
             # --- SHA (7 chars + 1 spacer = 8 cols) ---
             sha = commit.sha[:7]
             surface.draw_text_rgb(
-                row, x, sha, fg=THEME.fg_dim, bg=_DEFAULT_BG, bold=is_cursor
+                row, x, sha, fg=THEME.fg_dim, bg=palette.DEFAULT_BG, bold=is_cursor
             )
             x += len(sha) + 1
 
@@ -209,7 +219,12 @@ class CommitPanel(ItemSelector):
                 if wcswidth(msg) > avail:
                     msg = truncate_by_width(msg, avail - 1) + "\u2026"
                 surface.draw_text_rgb(
-                    row, x, msg, fg=THEME.fg_primary, bg=_DEFAULT_BG, bold=is_cursor
+                    row,
+                    x,
+                    msg,
+                    fg=THEME.fg_primary,
+                    bg=palette.DEFAULT_BG,
+                    bold=is_cursor,
                 )
                 x += wcswidth(msg)
 
@@ -221,7 +236,7 @@ class CommitPanel(ItemSelector):
                     x,
                     tag_str,
                     fg=THEME.accent_cyan,
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
                 x += tag_w
@@ -237,7 +252,7 @@ class CommitPanel(ItemSelector):
                     meta_x,
                     padded_meta,
                     fg=THEME.fg_muted,
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
 

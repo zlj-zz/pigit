@@ -11,9 +11,8 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
-from pigit.termui import Component
+from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
 
@@ -135,7 +134,7 @@ class InspectorPanel(Component):
 
         # Left border
         for row in range(h):
-            surface.draw_text_rgb(row, 0, "│", fg=THEME.fg_dim, bg=_DEFAULT_BG)
+            surface.draw_text_rgb(row, 0, "│", fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
 
         # Title
         content_x = 2
@@ -143,13 +142,20 @@ class InspectorPanel(Component):
         title_w = wcswidth(title)
         if title_w < w - content_x:
             surface.draw_text_rgb(
-                0, content_x, title, fg=THEME.accent_cyan, bg=_DEFAULT_BG, bold=True
+                0,
+                content_x,
+                title,
+                fg=THEME.accent_cyan,
+                bg=palette.DEFAULT_BG,
+                bold=True,
             )
 
         # Separator under title
         if h > 1:
             sep = "─" * (w - content_x)
-            surface.draw_text_rgb(1, content_x, sep, fg=THEME.fg_dim, bg=_DEFAULT_BG)
+            surface.draw_text_rgb(
+                1, content_x, sep, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
+            )
 
         # Content lines
         for i, line in enumerate(self._content):
@@ -161,5 +167,5 @@ class InspectorPanel(Component):
             if wcswidth(text) > avail:
                 text = truncate_by_width(text, avail - 1) + "…"
             surface.draw_text_rgb(
-                row, content_x, text, fg=THEME.fg_primary, bg=_DEFAULT_BG
+                row, content_x, text, fg=THEME.fg_primary, bg=palette.DEFAULT_BG
             )

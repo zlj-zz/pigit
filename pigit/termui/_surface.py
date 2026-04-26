@@ -11,15 +11,13 @@ from __future__ import annotations
 import re
 from typing import Literal, Optional
 
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import (
     _char_width,
     pad_by_width,
     truncate_by_width,
     wcswidth,
 )
-
-_DEFAULT_FG: tuple[int, int, int] = (220, 220, 230)
-_DEFAULT_BG: tuple[int, int, int] = (18, 18, 22)
 
 # ANSI SGR sequences (e.g. ``\033[31m``, ``\033[0m``).
 _ANSI_SGR_RE = re.compile(r"\x1b\[(?:\d{1,3}(?:;\d{1,3})*)?m")
@@ -50,8 +48,8 @@ class FlatCell:
         self,
         char: str = " ",
         style: str = "",
-        fg: tuple[int, int, int] = _DEFAULT_FG,
-        bg: tuple[int, int, int] = _DEFAULT_BG,
+        fg: tuple[int, int, int] = DEFAULT_FG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
         ansi_style: Optional[str] = None,
     ) -> None:
@@ -163,7 +161,7 @@ class _Subsurface:
         col: int,
         text: str,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = _DEFAULT_BG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
     ) -> None:
         if row < 0 or row >= self.height or col >= self.width:
@@ -184,7 +182,7 @@ class _Subsurface:
         row: int,
         text: str,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = _DEFAULT_BG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
         align: Literal["left", "center"] = "left",
     ) -> None:
@@ -348,7 +346,7 @@ class Surface:
         col: int,
         text: str,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = _DEFAULT_BG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
     ) -> None:
         """Write text with explicit RGB foreground and background colors.
@@ -391,7 +389,7 @@ class Surface:
         row: int,
         text: str,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = _DEFAULT_BG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
         align: Literal["left", "center"] = "left",
     ) -> None:

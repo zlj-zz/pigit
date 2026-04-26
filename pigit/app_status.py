@@ -11,16 +11,16 @@ from __future__ import annotations
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.termui import (
+    ActionLiteral,
     AlertDialog,
     bind_keys,
     Component,
     ItemSelector,
     keys,
+    palette,
     show_badge,
     show_toast,
 )
-from pigit.termui.types import ActionLiteral
-from pigit.termui._surface import _DEFAULT_BG
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -225,7 +225,7 @@ class StatusPanel(ItemSelector):
                     0,
                     truncate_by_width(f"{cursor_prefix} {staged}{unstaged} ", w),
                     fg=THEME.fg_primary,
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
             else:
@@ -236,13 +236,13 @@ class StatusPanel(ItemSelector):
                     col,
                     cursor_prefix,
                     fg=THEME.fg_primary,
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
                 col += 1  # cursor
 
                 surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
+                    row, col, " ", fg=THEME.fg_primary, bg=palette.DEFAULT_BG
                 )
                 col += 1  # spacer
 
@@ -251,7 +251,7 @@ class StatusPanel(ItemSelector):
                     col,
                     staged,
                     fg=_staged_fg(staged),
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
                 col += 1  # staged status
@@ -261,13 +261,13 @@ class StatusPanel(ItemSelector):
                     col,
                     unstaged,
                     fg=_unstaged_fg(unstaged),
-                    bg=_DEFAULT_BG,
+                    bg=palette.DEFAULT_BG,
                     bold=is_cursor,
                 )
                 col += 1  # unstaged status
 
                 surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
+                    row, col, " ", fg=THEME.fg_primary, bg=palette.DEFAULT_BG
                 )
                 col += 1  # spacer before filename
 
@@ -285,7 +285,7 @@ class StatusPanel(ItemSelector):
                         col,
                         filename,
                         fg=filename_fg,
-                        bg=_DEFAULT_BG,
+                        bg=palette.DEFAULT_BG,
                         bold=is_cursor,
                     )
 
@@ -300,7 +300,7 @@ class StatusPanel(ItemSelector):
                         label_x,
                         label,
                         fg=THEME.fg_muted,
-                        bg=_DEFAULT_BG,
+                        bg=palette.DEFAULT_BG,
                     )
 
     def on_key(self, key: str) -> None:

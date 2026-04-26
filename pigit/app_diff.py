@@ -10,10 +10,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pigit.termui import bind_keys, Component, keys, LineTextBrowser
-from pigit.termui.types import ActionLiteral
+from pigit.termui import (
+    ActionLiteral,
+    Component,
+    LineTextBrowser,
+    keys,
+    palette,
+    bind_keys,
+)
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
 
@@ -203,8 +208,10 @@ class DiffViewer(LineTextBrowser):
         inner_w = w - 2
         top_border = "\u250c" + "\u2500" * inner_w + "\u2510"
         bottom_border = "\u2514" + "\u2500" * inner_w + "\u2518"
-        surface.draw_text_rgb(0, 0, top_border, fg=THEME.fg_dim, bg=_DEFAULT_BG)
-        surface.draw_text_rgb(h - 1, 0, bottom_border, fg=THEME.fg_dim, bg=_DEFAULT_BG)
+        surface.draw_text_rgb(0, 0, top_border, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        surface.draw_text_rgb(
+            h - 1, 0, bottom_border, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
+        )
 
         # Content area is inset by 1 row and 1 column on each side
         content_h = h - 2
@@ -226,10 +233,10 @@ class DiffViewer(LineTextBrowser):
                 bg = THEME.bg_danger
                 fg = THEME.fg_primary
             elif line.startswith("@@"):
-                bg = _DEFAULT_BG
+                bg = palette.DEFAULT_BG
                 fg = THEME.accent_blue
             else:
-                bg = _DEFAULT_BG
+                bg = palette.DEFAULT_BG
                 fg = THEME.fg_primary
 
             # Fill the entire content row background (including border columns)
@@ -263,12 +270,12 @@ class DiffViewer(LineTextBrowser):
         # show left/right borders so the box frame stays complete.
         last_content_row = end - self._i  # 0-based index of last content row
         for blank_row in range(last_content_row + 1, h - 1):
-            surface.fill_rect_rgb(blank_row, 0, w, 1, _DEFAULT_BG)
+            surface.fill_rect_rgb(blank_row, 0, w, 1, palette.DEFAULT_BG)
             surface.draw_text_rgb(
-                blank_row, 0, "\u2502", fg=THEME.fg_dim, bg=_DEFAULT_BG
+                blank_row, 0, "\u2502", fg=THEME.fg_dim, bg=palette.DEFAULT_BG
             )
             surface.draw_text_rgb(
-                blank_row, w - 1, "\u2502", fg=THEME.fg_dim, bg=_DEFAULT_BG
+                blank_row, w - 1, "\u2502", fg=THEME.fg_dim, bg=palette.DEFAULT_BG
             )
 
     def _render_surface_borderless(self, surface) -> None:
@@ -297,14 +304,14 @@ class DiffViewer(LineTextBrowser):
                 bg = THEME.bg_danger
                 fg = THEME.fg_primary
             elif line.startswith("@@"):
-                bg = _DEFAULT_BG
+                bg = palette.DEFAULT_BG
                 fg = THEME.accent_blue
             else:
-                bg = _DEFAULT_BG
+                bg = palette.DEFAULT_BG
                 fg = THEME.fg_primary
 
             # Fill row background only for added/removed lines
-            if bg != _DEFAULT_BG:
+            if bg != palette.DEFAULT_BG:
                 surface.fill_rect_rgb(row, 0, w, 1, bg)
 
             # Draw line number (right-aligned in line-no column)

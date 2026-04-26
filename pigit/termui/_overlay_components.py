@@ -17,7 +17,8 @@ from ._component_base import Component, _looks_like_overlay_host
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._surface import Surface, _DEFAULT_BG, _DEFAULT_FG
+from ._surface import Surface
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from . import keys
@@ -219,7 +220,7 @@ class HelpPanel(Component):
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
 
@@ -240,14 +241,14 @@ class HelpPanel(Component):
                     row,
                     x,
                     text,
-                    fg=fg if fg is not None else _DEFAULT_FG,
-                    bg=_DEFAULT_BG,
+                    fg=fg if fg is not None else DEFAULT_FG,
+                    bg=DEFAULT_BG,
                     bold=bold,
                 )
                 x += wcswidth(text)
             # Pad remaining width with spaces to prevent residue
             while x < content_col + self._inner_w:
-                surface.draw_text_rgb(row, x, " ", fg=_DEFAULT_FG, bg=_DEFAULT_BG)
+                surface.draw_text_rgb(row, x, " ", fg=DEFAULT_FG, bg=DEFAULT_BG)
                 x += 1
 
 
@@ -525,7 +526,7 @@ class AlertDialogBody(Component):
         # Fill the entire dialog area with default background to prevent
         # previous frame content from leaking through the borders.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)

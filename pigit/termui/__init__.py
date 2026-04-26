@@ -59,6 +59,7 @@ from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._renderer import Renderer
 from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui._surface import Cell, FlatCell, Surface
+from pigit.termui import palette
 
 # Picker
 from pigit.termui._picker import PickerRow
@@ -105,6 +106,7 @@ __all__ = [
     "Surface",
     "FlatCell",
     "Cell",
+    "palette",
     "ColorAdapter",
     "ColorMode",
     "Renderer",
