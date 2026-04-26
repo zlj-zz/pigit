@@ -168,16 +168,21 @@ class Column(Component):
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size
         width, total_h = size
-        ox, oy = self.x - 1, self.y - 1
-
         heights = layout_flex(self._heights, total_h)
 
-        y = oy
+        y = 0
         for child, h in zip(self._child_list, heights):
             child.x = y + 1
-            child.y = ox + 1
+            child.y = 1
             if h > 0:
                 child.resize((width, h))
+            _logger.debug(
+                "Column resize: child=%s x=%s y=%s size=%s",
+                type(child).__name__,
+                child.x,
+                child.y,
+                child._size,
+            )
             y += h
 
     def _render_surface(self, surface: "Surface") -> None:
@@ -251,16 +256,21 @@ class Row(Component):
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size
         width, height = size
-        ox, oy = self.x - 1, self.y - 1
-
         widths = layout_flex(self._widths, width)
 
-        x = ox
+        x = 0
         for child, w in zip(self._child_list, widths):
-            child.x = oy + 1
+            child.x = 1
             child.y = x + 1
             if w > 0:
                 child.resize((w, height))
+            _logger.debug(
+                "Row resize: child=%s x=%s y=%s size=%s",
+                type(child).__name__,
+                child.x,
+                child.y,
+                child._size,
+            )
             x += w
 
     def _render_surface(self, surface: "Surface") -> None:

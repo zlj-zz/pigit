@@ -107,6 +107,9 @@ class _Subsurface:
         self.width = max(0, width)
         self.height = max(0, height)
 
+    def __repr__(self) -> str:
+        return f"_Subsurface({self.width}x{self.height} @ {self._row},{self._col})"
+
     def _to_parent(self, row: int, col: int) -> tuple[int, int]:
         return self._row + row, self._col + col
 
@@ -207,6 +210,9 @@ class Surface:
         self._rows: list[list[FlatCell]] = [
             [FlatCell() for _ in range(width)] for _ in range(height)
         ]
+
+    def __repr__(self) -> str:
+        return f"Surface({self.width}x{self.height})"
 
     def clear(self) -> None:
         """Reset every cell to a blank space."""
