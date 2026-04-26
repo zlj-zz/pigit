@@ -12,6 +12,7 @@ import logging
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
 
 from ._component_base import Component, ComponentError, _render_child_to_surface
+from ._layout import layout_flex
 from .types import ActionLiteral
 
 _logger = logging.getLogger(__name__)
@@ -169,41 +170,15 @@ class Column(Component):
         width, total_h = size
         ox, oy = self.x - 1, self.y - 1
 
-        fixed = sum(h for h in self._heights if h != "flex")
-        flex_n = sum(1 for h in self._heights if h == "flex")
-        if total_h < fixed:
-            flex_h = 0
-        else:
-            flex_h = max(0, total_h - fixed) // flex_n if flex_n else 0
+        heights = layout_flex(self._heights, total_h)
 
-        # First pass: compute all geometries
         y = oy
-        flex_items: list[tuple[int, int]] = []
-        geometries: list[tuple[int, int, int, int]] = []
-        for i, (child, h) in enumerate(zip(self._child_list, self._heights)):
-            if h == "flex":
-                flex_items.append((i, flex_h))
-                h_val = flex_h
-            else:
-                remaining = max(0, total_h - (y - oy))
-                h_val = min(h, remaining)
-            geometries.append((y + 1, oy + 1, width, h_val))
-            y += h_val
-
-        # Remainder pixels go to the last flex child (no truncation loss)
-        if flex_items and total_h >= fixed:
-            remainder = total_h - fixed - flex_h * flex_n
-            if remainder > 0:
-                last_idx, last_h = flex_items[-1]
-                gx, gy, gw, _ = geometries[last_idx]
-                geometries[last_idx] = (gx, gy, gw, last_h + remainder)
-
-        # Second pass: apply via child.resize() so subclasses handle their own _size
-        for child, (cx, cy, cw, ch) in zip(self._child_list, geometries):
-            child.x = cx
-            child.y = cy
-            if ch > 0:
-                child.resize((cw, ch))
+        for child, h in zip(self._child_list, heights):
+            child.x = y + 1
+            child.y = ox + 1
+            if h > 0:
+                child.resize((width, h))
+            y += h
 
     def _render_surface(self, surface: "Surface") -> None:
         for child in self._child_list:
@@ -280,38 +255,15 @@ class Row(Component):
         width, height = size
         ox, oy = self.x - 1, self.y - 1
 
-        fixed = sum(w for w in self._widths if w != "flex")
-        flex_n = sum(1 for w in self._widths if w == "flex")
-        if width < fixed:
-            flex_w = 0
-        else:
-            flex_w = max(0, width - fixed) // flex_n if flex_n else 0
+        widths = layout_flex(self._widths, width)
 
-        x = 0
-        flex_items: list[tuple[int, int]] = []
-        geometries: list[tuple[int, int, int, int]] = []
-        for i, (child, w) in enumerate(zip(self._child_list, self._widths)):
-            if w == "flex":
-                flex_items.append((i, flex_w))
-                w_val = flex_w
-            else:
-                remaining = max(0, width - x)
-                w_val = min(w, remaining)
-            geometries.append((1, x + 1, w_val, height))
-            x += w_val
-
-        if flex_items and width >= fixed:
-            remainder = width - fixed - flex_w * flex_n
-            if remainder > 0:
-                last_idx, last_w = flex_items[-1]
-                gx, gy, _, gh = geometries[last_idx]
-                geometries[last_idx] = (gx, gy, last_w + remainder, gh)
-
-        for child, (cx, cy, cw, ch) in zip(self._child_list, geometries):
-            child.x = cx
-            child.y = cy
-            if cw > 0:
-                child.resize((cw, ch))
+        x = ox
+        for child, w in zip(self._child_list, widths):
+            child.x = oy + 1
+            child.y = x + 1
+            if w > 0:
+                child.resize((w, height))
+            x += w
 
     def _render_surface(self, surface: "Surface") -> None:
         for child in self._child_list:
