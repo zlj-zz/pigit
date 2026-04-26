@@ -215,7 +215,7 @@ class PigitApplication(Application):
 
     def _refresh_status_panel(self) -> None:
         if self._status_panel is not None:
-            self._status_panel.fresh()
+            self._status_panel.refresh()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
         self._mode = mode

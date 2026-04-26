@@ -21,7 +21,7 @@ from ._renderer_context import (
     get_renderer,
     get_renderer_strict,
 )
-from .types import ActionLiteral, OverlayDispatchResult
+from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from ._layout import LayoutEngine
@@ -112,7 +112,7 @@ class Component(ABC):
         """Get current activate status."""
         return self._activated
 
-    def fresh(self):
+    def refresh(self):
         """Fresh content data.
 
         Default is no-op; override if the component needs to rebuild internal
@@ -120,7 +120,7 @@ class Component(ABC):
         """
         pass
 
-    def accept(self, action: ActionLiteral, **data):
+    def accept(self, action: ActionEventType, **data):
         """Process emit action of child."""
         _logger.warning(
             "%s.accept: unsupported action %r",
@@ -128,13 +128,13 @@ class Component(ABC):
             action,
         )
 
-    def emit(self, action: ActionLiteral, **data):
+    def emit(self, action: ActionEventType, **data):
         """Emit to parent."""
         if self.parent is None:
             raise ComponentError("Has no parent to emitting.")
         self.parent.accept(action, **data)
 
-    def update(self, action: ActionLiteral, **data):
+    def update(self, action: ActionEventType, **data):
         """Process notify action of parent."""
         _logger.warning(
             "%s.update: unsupported action %r",
@@ -142,7 +142,7 @@ class Component(ABC):
             action,
         )
 
-    def notify(self, action: ActionLiteral, **data):
+    def notify(self, action: ActionEventType, **data):
         """Notify all children."""
         for child in self.children:
             child.update(action, **data)
@@ -150,7 +150,7 @@ class Component(ABC):
     def resize(self, size: tuple[int, int]) -> None:
         """Response to the resize event."""
         self._size = size
-        self.fresh()
+        self.refresh()
 
         for child in self.children:
             child.resize(size)

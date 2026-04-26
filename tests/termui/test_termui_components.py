@@ -4,14 +4,14 @@ from unittest.mock import MagicMock
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import TabView
 from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
-from pigit.termui.types import ActionLiteral, OverlayDispatchResult
+from pigit.termui.types import ActionEventType, OverlayDispatchResult
 
 
 # --- Helpers ---
 
 
 class _Leaf(Component):
-    def fresh(self):
+    def refresh(self):
         pass
 
     def _render_surface(self, surface):
@@ -34,7 +34,7 @@ class MockComponent(Component):
 
 
 class MockTabView(TabView):
-    def update(self, action: ActionLiteral, **data):
+    def update(self, action: ActionEventType, **data):
         pass
 
 
@@ -47,13 +47,13 @@ class TestComponentBase:
         child = _Leaf()
         child.parent = parent
         parent.accept = MagicMock()
-        child.emit(ActionLiteral.goto, target="x")
-        parent.accept.assert_called_once_with(ActionLiteral.goto, target="x")
+        child.emit(ActionEventType.goto, target="x")
+        parent.accept.assert_called_once_with(ActionEventType.goto, target="x")
 
     def test_emit_without_parent_raises(self):
         child = _Leaf()
         with pytest.raises(ComponentError, match="Has no parent"):
-            child.emit(ActionLiteral.goto, target="x")
+            child.emit(ActionEventType.goto, target="x")
 
     def test_notify_children(self):
         a, b = _Leaf(), _Leaf()
@@ -62,15 +62,15 @@ class TestComponentBase:
         b.parent = parent
         a.update = MagicMock()
         b.update = MagicMock()
-        parent.notify(ActionLiteral.goto, target="x")
-        a.update.assert_called_once_with(ActionLiteral.goto, target="x")
-        b.update.assert_called_once_with(ActionLiteral.goto, target="x")
+        parent.notify(ActionEventType.goto, target="x")
+        a.update.assert_called_once_with(ActionEventType.goto, target="x")
+        b.update.assert_called_once_with(ActionEventType.goto, target="x")
 
     def test_notify_without_children_noop(self):
         leaf = _Leaf()
         leaf.children = []
         # Empty children is a no-op, not an error
-        leaf.notify(ActionLiteral.goto, target="x")
+        leaf.notify(ActionEventType.goto, target="x")
 
     def test_resize_propagates_to_children(self):
         child = _Leaf()
@@ -160,7 +160,7 @@ class TestTabView:
                 pass
 
         class RoutingTabView(TabView):
-            def update(self, action: ActionLiteral, **data) -> None:
+            def update(self, action: ActionEventType, **data) -> None:
                 pass
 
         main = RecordingChild("main")
@@ -286,14 +286,14 @@ class TestLineTextBrowser:
     def test_resize(self, mocker, initial_size, new_size, expected_size):
         # Arrange
         browser = MockLineTextBrowser(size=initial_size)
-        mocker.patch.object(browser, "fresh")
+        mocker.patch.object(browser, "refresh")
 
         # Act
         browser.resize(new_size)
 
         # Assert
         assert browser._size == expected_size
-        browser.fresh.assert_called_once()
+        browser.refresh.assert_called_once()
 
     @pytest.mark.parametrize(
         "content, initial_index, scroll_lines, expected_index",
@@ -339,7 +339,7 @@ class TestLineTextBrowser:
 
 
 class MockItemSelector(ItemSelector):
-    def fresh(self):
+    def refresh(self):
         pass
 
 
@@ -433,7 +433,7 @@ class TestItemSelectorLazyLoad:
             CURSOR = ">"
             fresh_calls = 0
 
-            def fresh(self):
+            def refresh(self):
                 DemoPanel.fresh_calls += 1
                 self.set_content(["ready"])
 
@@ -454,7 +454,7 @@ class TestItemSelectorLazyLoad:
             CURSOR = ">"
             fresh_calls = 0
 
-            def fresh(self):
+            def refresh(self):
                 DemoPanel2.fresh_calls += 1
                 self.set_content(["a", "b"])
 
@@ -477,7 +477,7 @@ class TestNearestOverlayHost:
             def end_popup_session(self) -> None:
                 pass
 
-            def fresh(self) -> None:
+            def refresh(self) -> None:
                 raise NotImplementedError
 
             def _render_surface(self, surface) -> None:

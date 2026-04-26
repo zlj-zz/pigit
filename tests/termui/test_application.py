@@ -19,7 +19,7 @@ class DummyRoot(Component):
     def _render_surface(self, surface):
         pass
 
-    def fresh(self):
+    def refresh(self):
         pass
 
 

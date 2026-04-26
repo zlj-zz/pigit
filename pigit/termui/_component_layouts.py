@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
 
 from ._component_base import Component, ComponentError, _render_child_to_surface
 from ._layout import layout_flex
-from .types import ActionLiteral
+from .types import ActionEventType
 
 _logger = logging.getLogger(__name__)
 
@@ -82,22 +82,22 @@ class TabView(Component):
             self._active.deactivate()
         target.activate()
         self._active = target
-        fresh_fn = getattr(target, "fresh", None)
+        fresh_fn = getattr(target, "refresh", None)
         if callable(fresh_fn):
             try:
                 fresh_fn()
             except NotImplementedError:
                 pass
             except Exception:
-                _logger.exception("fresh() failed for %s", type(target).__name__)
+                _logger.exception("refresh() failed for %s", type(target).__name__)
         if hasattr(target, "_panel_loaded"):
             target._panel_loaded = True
         if self._on_switch is not None:
             self._on_switch(target)
         return target
 
-    def accept(self, action: ActionLiteral, **data):
-        if action is ActionLiteral.goto:
+    def accept(self, action: ActionEventType, **data):
+        if action is ActionEventType.goto:
             target = data.get("target")
             if isinstance(target, Component) and target in self.children:
                 self.route_to(target)
@@ -189,7 +189,7 @@ class Column(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def accept(self, action: ActionLiteral, **data) -> None:
+    def accept(self, action: ActionEventType, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not
         override ``accept`` (e.g. ``_PickerHeader``).
         """
@@ -269,7 +269,7 @@ class Row(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def accept(self, action: ActionLiteral, **data) -> None:
+    def accept(self, action: ActionEventType, **data) -> None:
         for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)

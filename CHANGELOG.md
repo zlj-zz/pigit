@@ -23,7 +23,7 @@
 
 - **`StatusPanel` visual mode**: `v` toggles visual selection, `s` toggles scroll-select, `Space` toggles individual selection; batch actions (`a` stage, `d` discard, `i` ignore) operate on selected files.
 - **`Repo` dependency injection**: `PigitApplication` and panels receive `Repo` via constructor, eliminating import-time side effects.
-- **`relative_time` caching in `CommitPanel`**: `fresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
+- **`relative_time` caching in `CommitPanel`**: `refresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
 - **Panel render comments**: `_render_surface` methods in `StatusPanel`, `BranchPanel`, `CommitPanel` now document layout intent and coordinate calculations.
 - **`InputLine` block cursor**: physical cursor rendered as filled block; `set_content` scroll-reset bug fixed.
 - **`StatusPanel` `C` key**: opens `$EDITOR` for git commit.
@@ -133,7 +133,7 @@
 ### Git TUI (`pigit.app`)
 
 - **`GitTuiRoot`**: one overlay slot (help `Popup` vs `AlertDialog`); `?` toggles help; help rows refreshed via `HelpPanel.refresh_entries_from_source` before open.
-- **`StatusPanel._check_via_alert`**: after confirm, **`fresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
+- **`StatusPanel._check_via_alert`**: after confirm, **`refresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
 
 ## 1.7.7 (2026-03-29)
 

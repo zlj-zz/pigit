@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.termui import (
-    ActionLiteral,
+    ActionEventType,
     AlertDialog,
     bind_keys,
     Component,
@@ -181,7 +181,7 @@ class StatusPanel(ItemSelector):
         else:
             self._selected.add(idx)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         self.files = self.git.load_status(self._size[0], plain=True)
         self._all_files = list(self.files)
         if not self.files:
@@ -313,7 +313,7 @@ class StatusPanel(ItemSelector):
                 "\n"
             )
             self.emit(
-                ActionLiteral.goto,
+                ActionEventType.goto,
                 target=self._display,
                 source=self,
                 key=f.name,
@@ -431,7 +431,7 @@ class StatusPanel(ItemSelector):
             else:
                 callee(f)
                 show_badge(single_msg, duration=1.5)
-        self.fresh()
+        self.refresh()
 
     def _check_via_alert(
         self,
@@ -443,10 +443,10 @@ class StatusPanel(ItemSelector):
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:
-                self.fresh()
+                self.refresh()
                 return
             callee(file)
-            self.fresh()
+            self.refresh()
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
             show_badge(msg, duration=1.5)
@@ -467,7 +467,7 @@ class StatusPanel(ItemSelector):
             self._selected.clear()
             self._visual_mode = False
             self._visual_anchor = None
-            self.fresh()
+            self.refresh()
             show_badge(f"{action} {count} file(s)", duration=1.5)
 
         self._alert_dialog.alert(text, on_result)

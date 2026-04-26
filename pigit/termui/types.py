@@ -13,7 +13,7 @@ from typing import Protocol, runtime_checkable
 
 
 # Action types
-class ActionLiteral(Enum):
+class ActionEventType(Enum):
     goto = auto()
 
 

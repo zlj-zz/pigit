@@ -31,7 +31,7 @@ def fresh_registry():
 
 @pytest.fixture
 def resolver(fresh_registry):
-    """Provide a command resolver with fresh registry."""
+    """Provide a command resolver with refresh registry."""
     return CommandResolver(fresh_registry)
 
 

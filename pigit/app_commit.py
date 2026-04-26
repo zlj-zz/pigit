@@ -12,7 +12,7 @@ from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
 from pigit.termui import (
-    ActionLiteral,
+    ActionEventType,
     bind_keys,
     Component,
     ItemSelector,
@@ -90,7 +90,7 @@ class CommitPanel(ItemSelector):
             ("g", "Toggle view"),
         ]
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         branch_name = self.git.get_head() or ""
         self.commits = commits = self.git.load_commits(branch_name)
         self._contrib_graph.set_commits(commits)
@@ -278,7 +278,7 @@ class CommitPanel(ItemSelector):
             commit = self.commits[self.curr_no]
             content = self.git.load_commit_info(commit.sha, plain=True).split("\n")
             self.emit(
-                ActionLiteral.goto,
+                ActionEventType.goto,
                 target=self._display,
                 source=self,
                 content=content,

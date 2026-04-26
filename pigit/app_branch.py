@@ -56,7 +56,7 @@ class BranchPanel(ItemSelector):
         self.git = git
         self.branches: list[Branch] = []
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         self.branches = branches = self.git.load_branches()
         if not branches:
             self.set_content(["No branches found."])
@@ -166,4 +166,4 @@ class BranchPanel(ItemSelector):
                 show_toast(f"Checkout failed: {err}", duration=3.0)
             else:
                 show_toast(f"Switched to {local_branch.name}", duration=1.5)
-            self.fresh()
+            self.refresh()

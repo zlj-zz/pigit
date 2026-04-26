@@ -213,7 +213,7 @@ class HelpPanel(Component):
     def scroll_up(self) -> None:
         self._offset = max(0, self._offset - 1)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
     def _render_surface(self, surface: Surface) -> None:
@@ -388,7 +388,7 @@ class Popup(Component):
         self._term_size = (int(size[0]), int(size[1]))
         self._child.resize(size)
         self._layout_content()
-        self.fresh()
+        self.refresh()
 
     def relayout_content(self) -> None:
         """Recompute child ``x`` / ``y`` / ``_size`` after child geometry changes."""
@@ -415,7 +415,7 @@ class Popup(Component):
         self._child.y = col
         self._child._size = (ow, oh)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
     def _on_exit_key(self) -> None:
@@ -512,7 +512,7 @@ class AlertDialogBody(Component):
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
     def _confirm(self) -> None:
@@ -803,7 +803,7 @@ class Toast(Component):
     def hide(self) -> None:
         self.open = False
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
 

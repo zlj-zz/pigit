@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 from pigit.termui import (
-    ActionLiteral,
+    ActionEventType,
     Component,
     LineTextBrowser,
     keys,
@@ -69,8 +69,8 @@ class DiffViewer(LineTextBrowser):
             ("esc", "Back"),
         ]
 
-    def update(self, action: ActionLiteral, **data) -> None:
-        if action is ActionLiteral.goto:
+    def update(self, action: ActionEventType, **data) -> None:
+        if action is ActionEventType.goto:
             self.i_cache[self.i_cache_key] = self._i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
@@ -89,7 +89,7 @@ class DiffViewer(LineTextBrowser):
     @bind_keys(keys.KEY_ESC)
     def _leave_display(self) -> None:
         if self.come_from is not None:
-            self.emit(ActionLiteral.goto, target=self.come_from)
+            self.emit(ActionEventType.goto, target=self.come_from)
 
     @bind_keys("j")
     def _scroll_line_down(self) -> None:

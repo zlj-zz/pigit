@@ -102,14 +102,14 @@ class ItemSelector(Component):
         self._size = size
         if self._lazy_load:
             if self.is_activated():
-                self.fresh()
+                self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
                 self.set_content(["Loading..."])
                 self.curr_no = 0
                 self._r_start = 0
         else:
-            self.fresh()
+            self.refresh()
 
     @property
     def visible_row_count(self) -> int:

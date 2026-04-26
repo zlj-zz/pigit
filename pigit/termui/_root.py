@@ -127,7 +127,7 @@ class ComponentRoot(Component):
 
     # --- Component lifecycle ---
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
     def accept(self, action, **data):

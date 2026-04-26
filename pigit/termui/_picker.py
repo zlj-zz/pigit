@@ -77,7 +77,7 @@ class PickerHeader(Component):
         surface.draw_text(1, 0, truncate_line(self._title, cols))
         surface.draw_text(2, 0, sep)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
 
