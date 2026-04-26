@@ -17,6 +17,7 @@ from pigit.termui import (
     LazyLoadMixin,
     ItemSelector,
     keys,
+    show_badge,
     show_toast,
 )
 from pigit.termui.types import ActionLiteral
@@ -80,7 +81,6 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
-        on_badge: Optional[Callable] = None,
     ) -> None:
         super().__init__(x, y, size, content, on_selection_changed=on_selection_changed)
         # Lazy import to avoid circular dependency with app.py
@@ -92,7 +92,6 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
         self._on_shell = on_shell
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
-        self._on_badge = on_badge
 
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
@@ -342,11 +341,6 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
                 mode = "Visual"
             self._on_visual_mode_changed(mode)
 
-    def _notify_badge(self, msg: str) -> None:
-        """Notify parent to show a transient badge."""
-        if self._on_badge is not None:
-            self._on_badge(msg)
-
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
         show_toast("No files selected", duration=2.0)
@@ -383,7 +377,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
                     if idx < len(self.files):
                         callee(self.files[idx])
                 self._clear_visual_mode()
-                self._notify_badge(batch_msg.format(count))
+                show_badge(batch_msg.format(count), duration=1.5)
         else:
             f = self.files[self.curr_no]
             if needs_confirm:
@@ -391,7 +385,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
                     return
             else:
                 callee(f)
-                self._notify_badge(single_msg)
+                show_badge(single_msg, duration=1.5)
         self.fresh()
 
     def _check_via_alert(
@@ -410,7 +404,7 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
             self.fresh()
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
-            self._notify_badge(msg)
+            show_badge(msg, duration=1.5)
 
         return self._alert_dialog.alert(text, on_result)
 
@@ -429,6 +423,6 @@ class StatusPanel(LazyLoadMixin, ItemSelector):
             self._visual_mode = False
             self._visual_anchor = None
             self.fresh()
-            self._notify_badge(f"{action} {count} file(s)")
+            show_badge(f"{action} {count} file(s)", duration=1.5)
 
         self._alert_dialog.alert(text, on_result)

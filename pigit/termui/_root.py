@@ -34,6 +34,9 @@ class ComponentRoot(Component):
         self._layer_stack = LayerStack()
         self._overlay_host_token = _overlay_context.set_overlay_host(self)
         self._badge_text: Optional[str] = None
+        self._badge_bg: Optional[tuple[int, int, int]] = None
+        self._badge_fg: Optional[tuple[int, int, int]] = None
+        self._badge_until = 0
 
     def destroy(self) -> None:
         """Clean up overlay host token. Call when the TUI exits."""

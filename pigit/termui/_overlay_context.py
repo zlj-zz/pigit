@@ -14,14 +14,15 @@ from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from ._component_base import Component
     from ._overlay_components import Sheet, Toast
+    from ._root import ComponentRoot
     from .types import ToastPosition
 
-_overlay_host_ctx: contextvars.ContextVar[Optional["Component"]] = (
+_overlay_host_ctx: contextvars.ContextVar[Optional["ComponentRoot"]] = (
     contextvars.ContextVar("overlay_host", default=None)
 )
 
 
-def set_overlay_host(host: "Component") -> contextvars.Token:
+def set_overlay_host(host: "ComponentRoot") -> contextvars.Token:
     """Set the current overlay host in context."""
     return _overlay_host_ctx.set(host)
 
@@ -31,7 +32,7 @@ def reset_overlay_host(token: contextvars.Token) -> None:
     _overlay_host_ctx.reset(token)
 
 
-def _get_host() -> Optional["Component"]:
+def _get_host() -> Optional["ComponentRoot"]:
     """Get the current overlay host from context."""
     return _overlay_host_ctx.get()
 
@@ -57,6 +58,19 @@ def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
     return host.show_sheet(child, height)
 
 
+def show_badge(
+    text: str,
+    duration: Optional[float] = None,
+    bg: Optional[tuple[int, int, int]] = None,
+    fg: Optional[tuple[int, int, int]] = None,
+) -> None:
+    """Show a badge on the overlay host."""
+    host = _get_host()
+    if host is None:
+        return
+    host.show_badge(text, duration=duration, bg=bg, fg=fg)
+
+
 def get_badge() -> tuple[
     Optional[str],
     Optional[tuple[int, int, int]],
@@ -71,8 +85,4 @@ def get_badge() -> tuple[
     host = _get_host()
     if host is None:
         return None, None, None
-    return (
-        getattr(host, "badge_text", None),
-        getattr(host, "badge_bg", None),
-        getattr(host, "badge_fg", None),
-    )
+    return host.badge_text, host.badge_bg, host.badge_fg

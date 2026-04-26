@@ -80,7 +80,6 @@ class PigitApplication(Application):
             display=display_panel,
             on_visual_mode_changed=self._on_visual_mode_changed,
             on_selection_changed=self._on_panel_selection_changed,
-            on_badge=self._show_status_badge,
         )
         branch_panel = BranchPanel(
             on_selection_changed=self._on_panel_selection_changed,
@@ -244,16 +243,6 @@ class PigitApplication(Application):
     def _on_panel_selection_changed(self, idx: int) -> None:
         """Callback when panel selection changes via j/k navigation."""
         self._update_inspector_content()
-
-    def _show_status_badge(self, msg: str) -> None:
-        """Show a transient badge in the header for 1.5s."""
-        if self._root is not None:
-            self._root.show_badge(
-                msg,
-                duration=1.5,
-                bg=THEME.bg_active,
-                fg=THEME.fg_primary,
-            )
 
     def toggle_help(self):
         root = self._root
