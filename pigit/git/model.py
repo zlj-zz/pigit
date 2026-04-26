@@ -2,7 +2,7 @@
 
 """This file save some model class of git info class."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # flake8: noqa
@@ -75,10 +75,10 @@ class Commit:
     extra_info: str
 
     # Tag list of the commit.
-    tag: list
+    tag: list[str]
 
     # Parent commit SHAs.
-    parents: list[str] = None
+    parents: list[str] = field(default_factory=list)
 
     action: str = ""
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from pigit.termui import Component
+from pigit.termui import Component, get_badge
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui._surface import _DEFAULT_BG
 
@@ -87,18 +87,8 @@ class AppHeader(Component):
         """Draw header text content at the given row."""
         surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
 
-        # Badge: walk up parent chain to find ComponentRoot badge state
-        badge = None
-        badge_bg = None
-        badge_fg = None
-        parent = self.parent
-        while parent is not None:
-            if hasattr(parent, "badge_text"):
-                badge = parent.badge_text
-                badge_bg = getattr(parent, "badge_bg", None)
-                badge_fg = getattr(parent, "badge_fg", None)
-                break
-            parent = getattr(parent, "parent", None)
+        # Badge: read from overlay host via context
+        badge, badge_bg, badge_fg = get_badge()
 
         badge_width = 0
         if badge:

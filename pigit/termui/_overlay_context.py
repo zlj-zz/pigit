@@ -55,3 +55,24 @@ def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
     if host is None:
         return None
     return host.show_sheet(child, height)
+
+
+def get_badge() -> tuple[
+    Optional[str],
+    Optional[tuple[int, int, int]],
+    Optional[tuple[int, int, int]],
+]:
+    """Get current badge state from the overlay host.
+
+    Returns:
+        Tuple of (badge_text, badge_bg, badge_fg). All None if no badge
+        or no host is active.
+    """
+    host = _get_host()
+    if host is None:
+        return None, None, None
+    return (
+        getattr(host, "badge_text", None),
+        getattr(host, "badge_bg", None),
+        getattr(host, "badge_fg", None),
+    )
