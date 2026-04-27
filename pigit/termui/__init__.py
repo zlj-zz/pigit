@@ -53,7 +53,8 @@ from pigit.termui._application import Application
 from pigit.termui._overlay_context import get_badge, show_badge, show_toast, show_sheet
 
 # Other utilities
-from pigit.termui._bindings import bind_keys, list_bindings
+from pigit.termui._bindings import bind_keys, BindingError, list_bindings
+from pigit.termui import keys
 from pigit.termui._geometry import TerminalSize
 from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._renderer import Renderer
@@ -102,7 +103,9 @@ __all__ = [
     "Signal",
     # Utils
     "bind_keys",
+    "BindingError",
     "list_bindings",
+    "keys",
     "Surface",
     "FlatCell",
     "Cell",

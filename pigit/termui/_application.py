@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from pigit.termui._bindings import resolve_key_handlers_merged
+from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
 from pigit.termui._component_base import Component
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
@@ -61,7 +61,7 @@ class Application:
     High-level facade: subclasses implement build_root() and optional app-level bindings.
     """
 
-    BINDINGS = None
+    BINDINGS: Optional[BindingsList] = None
 
     def __init__(self, **loop_kwargs) -> None:
         self._loop: Optional[AppEventLoop] = None

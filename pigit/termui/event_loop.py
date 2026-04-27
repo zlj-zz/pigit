@@ -101,6 +101,9 @@ class AppEventLoop:
     def after_dispatch_key(self, key: str, outcome: KeyDispatchOutcome) -> None:
         """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
+    def before_mouse_event(self, event: str) -> None:
+        """Hook before handling a mouse event (subclasses may override)."""
+
     def clear_screen(self) -> None:
         """Clear the terminal screen via the current renderer."""
         renderer = get_renderer()
@@ -167,6 +170,7 @@ class AppEventLoop:
                 self.after_dispatch_key(first, outcome)
                 continue
             if is_mouse_event(first):
+                self.before_mouse_event(first)
                 continue
 
     def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:

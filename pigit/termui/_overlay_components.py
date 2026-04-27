@@ -300,6 +300,12 @@ class Popup(Component):
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
+        self._resolved_handlers = resolve_key_handlers_merged(
+            self, type(self), getattr(self, "BINDINGS", None)
+        )
+        self._resolved_child_handlers = resolve_key_handlers_merged(
+            self._child, type(self._child), getattr(self._child, "BINDINGS", None)
+        )
 
     def _resolved_overlay_host(self) -> Optional[Component]:
         """
@@ -328,13 +334,17 @@ class Popup(Component):
             return OverlayDispatchResult.HANDLED_EXPLICIT
         return self._fallback_overlay_key(key)
 
-    @staticmethod
-    def _invoke_binding_target(target: Component, key: str) -> bool:
-        handlers = resolve_key_handlers_merged(
-            target,
-            type(target),
-            getattr(target, "BINDINGS", None),
-        )
+    def _invoke_binding_target(self, target: Component, key: str) -> bool:
+        if target is self:
+            handlers = self._resolved_handlers
+        elif target is self._child:
+            handlers = self._resolved_child_handlers
+        else:
+            handlers = resolve_key_handlers_merged(
+                target,
+                type(target),
+                getattr(target, "BINDINGS", None),
+            )
         fn = handlers.get(key)
         if fn is None:
             return False
