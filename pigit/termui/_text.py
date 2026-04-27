@@ -29,7 +29,7 @@ def sanitize_for_display(text: str, max_scalars: int = 4096) -> str:
     Truncates to ``max_scalars`` Unicode scalar values. Newlines are preserved.
     """
 
-    stripped = plain(text.replace("\x1b", ""))
+    stripped = plain(text).replace("\x1b", "")
     out: list[str] = []
     n = 0
     for ch in stripped:

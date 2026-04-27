@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
-from .palette import DEFAULT_BG, DEFAULT_FG
+from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
 from .keys import (
     KEY_BACKSPACE,
     KEY_DELETE,
@@ -28,6 +28,7 @@ from .keys import (
     KEY_DOWN,
 )
 from .tty_io import truncate_line
+from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
@@ -62,7 +63,13 @@ class LineTextBrowser(Component):
             return
         end = min(self._i + self._max_line, len(self._content))
         for idx in range(self._i, end):
-            surface.draw_text(idx - self._i, 0, self._content[idx])
+            surface.draw_text_rgb(
+                idx - self._i,
+                0,
+                self._content[idx],
+                fg=DEFAULT_FG,
+                bg=DEFAULT_BG,
+            )
 
     def scroll_up(self, line: int = 1):
         """Scroll the view up by the given number of lines."""
@@ -163,9 +170,7 @@ class ItemSelector(Component):
             left, main, right = self.describe_row(idx, is_cursor)
             self._draw_row_layout(surface, row, left, main, right)
 
-    def describe_row(
-        self, idx: int, is_cursor: bool
-    ) -> tuple[
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
         list[tuple[str, tuple[int, int, int], bool]],
         list[tuple[str, tuple[int, int, int], bool]] | None,
         list[tuple[str, tuple[int, int, int], bool]],
@@ -489,7 +494,9 @@ class StatusBar(Component):
             self._unsub()
 
     def _render_surface(self, surface: "Surface") -> None:
-        surface.draw_row(0, truncate_line(self._text, surface.width))
+        text = truncate_line(self._text, surface.width)
+        text = pad_by_width(text, surface.width)
+        surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
 
 
 class InputLine(Component):
@@ -701,19 +708,23 @@ class InputLine(Component):
                 suffix = ""
             elif len(suffix) > avail:
                 suffix = suffix[:avail]
-            surface.draw_text(0, 0, prefix)
+            surface.draw_text_rgb(0, 0, prefix, fg=DEFAULT_FG, bg=DEFAULT_BG)
             if suffix:
-                surface.draw_text(0, len(prefix), f"\033[2m{suffix}\033[0m")
+                surface.draw_text_rgb(
+                    0, len(prefix), suffix, fg=DEFAULT_FG_DIM, bg=DEFAULT_BG
+                )
             # Block cursor at the end of the completion text.
             cursor_abs = len(prefix) + len(suffix)
             if cursor_abs < surface.width:
-                surface.draw_text(0, cursor_abs, "\033[7m \033[0m")
+                surface.draw_text_rgb(0, cursor_abs, " ", fg=DEFAULT_BG, bg=DEFAULT_FG)
         else:
-            surface.draw_row(0, truncate_line(core, surface.width))
+            text = truncate_line(core, surface.width)
+            text = pad_by_width(text, surface.width)
+            surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
             # Draw block cursor (reverse video) over the character at cursor.
             if cursor_abs < surface.width:
                 if self._cursor < len(self._value):
                     ch = self._value[self._cursor]
                 else:
                     ch = " "
-                surface.draw_text(0, cursor_abs, f"\033[7m{ch}\033[0m")
+                surface.draw_text_rgb(0, cursor_abs, ch, fg=DEFAULT_BG, bg=DEFAULT_FG)

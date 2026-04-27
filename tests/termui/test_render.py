@@ -8,6 +8,7 @@ from unittest import mock
 from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._surface import Cell, FlatCell, Surface
 from pigit.termui._renderer import Renderer
+from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
 
 
 class FakeSession:
@@ -53,8 +54,8 @@ class TestRenderSurface:
         sess = FakeSession()
         r = Renderer(sess)
         s = Surface(5, 2)
-        s.draw_text(0, 0, "hello")
-        s.draw_text(1, 0, "world")
+        s.draw_text_rgb(0, 0, "hello", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(1, 0, "world", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
         assert "\033[2J" in written
@@ -63,12 +64,12 @@ class TestRenderSurface:
         sess = FakeSession()
         r = Renderer(sess)
         s = Surface(7, 3)
-        s.draw_text(0, 0, "hello  ")
-        s.draw_text(1, 0, "world  ")
-        s.draw_text(2, 0, "stay   ")
+        s.draw_text_rgb(0, 0, "hello  ", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(1, 0, "world  ", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(2, 0, "stay   ", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         sess.stdout.reset_mock()
-        s.draw_text(1, 0, "changed")
+        s.draw_text_rgb(1, 0, "changed", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
         assert "\033[2J" not in written
@@ -80,7 +81,7 @@ class TestRenderSurface:
         sess = FakeSession()
         r = Renderer(sess)
         s = Surface(3, 1)
-        s.draw_text(0, 0, "abc")
+        s.draw_text_rgb(0, 0, "abc", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         sess.stdout.reset_mock()
         r.clear_cache()
@@ -92,9 +93,9 @@ class TestRenderSurface:
         sess = FakeSession()
         r = Renderer(sess)
         s1 = Surface(3, 1)
-        s1.draw_text(0, 0, "abc")
+        s1.draw_text_rgb(0, 0, "abc", fg=DEFAULT_FG, bg=DEFAULT_BG)
         s2 = Surface(4, 1)
-        s2.draw_text(0, 0, "abcd")
+        s2.draw_text_rgb(0, 0, "abcd", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s1)
         sess.stdout.reset_mock()
         r.render_surface(s2)
@@ -108,16 +109,16 @@ class TestRenderSurface:
         r.render_surface(s)
         assert True
 
-    def test_ansi_style_end_to_end_via_draw_text(self):
+    def test_rgb_end_to_end_via_draw_text_rgb(self):
         sess = FakeSession()
         r = Renderer(sess)
+        r._color = ColorAdapter(ColorMode.TRUECOLOR)
         s = Surface(3, 1)
-        s.draw_text(0, 0, "\033[31mAB")
+        s.draw_text_rgb(0, 0, "AB", fg=(255, 0, 0), bg=DEFAULT_BG)
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
-        assert "\033[31mA" in written
+        assert "\033[38;2;255;0;0m" in written
         assert "\033[0m" in written
-        assert written.count("\033[31m") == 1
 
 
 class TestRendererUtilities:
@@ -281,10 +282,10 @@ class TestRenderSurfaceIncrementalWithRGB:
         r = Renderer(sess)
         s = Surface(3, 2)
         s.draw_text_rgb(0, 0, "abc", fg=(255, 0, 0))
-        s.draw_text(1, 0, "def")
+        s.draw_text_rgb(1, 0, "def", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         sess.stdout.reset_mock()
-        s.draw_text(1, 0, "xyz")
+        s.draw_text_rgb(1, 0, "xyz", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
         assert "abc" not in written

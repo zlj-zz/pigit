@@ -86,7 +86,7 @@ class DemoRoot(Component):
     NAME = "demo"
 
     def _render_surface(self, surface):
-        surface.draw_row(0, "termui minimal demo — press q to quit")
+        surface.draw_text_rgb(0, 0, "termui minimal demo — press q to quit", fg=(220, 220, 230), bg=(18, 18, 22))
 
 
 class DemoLoop(AppEventLoop):

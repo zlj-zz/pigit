@@ -22,6 +22,7 @@ from pigit.termui import (
     bind_keys,
 )
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui._text import plain
 
 from .app_theme import THEME
 
@@ -64,7 +65,7 @@ class DiffViewer(LineTextBrowser):
         the rendered output.
         """
         self._content = [
-            line.replace("\r", "").expandtabs(8) for line in diff_lines
+            plain(line).replace("\r", "").expandtabs(8) for line in diff_lines
         ]
         self._compute_heatmap()
         self._compute_line_numbers()

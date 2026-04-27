@@ -26,8 +26,8 @@ class BoxFrame:
         inner_height: int,
         title: Optional[str] = None,
         *,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] = DEFAULT_FG,
+        bg: tuple[int, int, int] = DEFAULT_BG,
         bold: bool = False,
     ) -> None:
         self.inner_width = inner_width
@@ -50,19 +50,16 @@ class BoxFrame:
 
     def draw_onto(self, surface: "Surface", row: int, col: int) -> None:
         """Draw border onto surface at (row, col)."""
-        if self.fg is not None:
-            surface.draw_box_rgb(
-                row,
-                col,
-                self.outer_width,
-                self.outer_height,
-                fg=self.fg,
-                bg=self.bg if self.bg is not None else DEFAULT_BG,
-                bold=self.bold,
-                title=self.title,
-            )
-        else:
-            surface.draw_box(row, col, self.outer_width, self.outer_height, self.title)
+        surface.draw_box_rgb(
+            row,
+            col,
+            self.outer_width,
+            self.outer_height,
+            fg=self.fg,
+            bg=self.bg,
+            bold=self.bold,
+            title=self.title,
+        )
 
     def draw_content(
         self, surface: "Surface", row: int, col: int, lines: list[str]
@@ -82,14 +79,11 @@ class BoxFrame:
             text = pad_by_width(
                 truncate_by_width(line, self.inner_width), self.inner_width
             )
-            if self.fg is not None:
-                surface.draw_text_rgb(
-                    content_row + i,
-                    content_col,
-                    text,
-                    fg=self.fg,
-                    bg=self.bg if self.bg is not None else DEFAULT_BG,
-                    bold=self.bold,
-                )
-            else:
-                surface.draw_text(content_row + i, content_col, text)
+            surface.draw_text_rgb(
+                content_row + i,
+                content_col,
+                text,
+                fg=self.fg,
+                bg=self.bg,
+                bold=self.bold,
+            )
