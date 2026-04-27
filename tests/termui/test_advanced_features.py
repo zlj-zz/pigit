@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_palette import CommandPalette
-from pigit.app_inspector import InspectorPanel
+from pigit.app_inspector import FileInfo, InspectorPanel
 from pigit.app_contribution_graph import ContributionGraph
 from pigit.termui._surface import Surface
 
@@ -94,7 +94,7 @@ class TestInspectorPanel:
             has_merged_conflicts=False,
             has_inline_merged_conflicts=False,
         )
-        i.show_file(f)
+        i.show(FileInfo(file=f, size="?", mtime="?"))
         assert "test.py" in i._content[0]
         assert "staged" in i._content[2]
 
@@ -114,7 +114,7 @@ class TestInspectorPanel:
             has_merged_conflicts=False,
             has_inline_merged_conflicts=False,
         )
-        i.show_file(f)
+        i.show(FileInfo(file=f, size="?", mtime="?"))
         s = Surface(20, 10)
         i.resize((20, 10))
         i._render_surface(s)

@@ -23,6 +23,7 @@ from pigit.termui import (
 )
 
 
+from .app_inspector import FileInfo
 from .app_theme import THEME
 from .git.model import File
 
@@ -194,9 +195,7 @@ class StatusPanel(ItemSelector):
         super().resize(size)
         self._alert_dialog.resize(size)
 
-    def describe_row(
-        self, idx: int, is_cursor: bool
-    ) -> tuple[
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
         list[tuple[str, tuple[int, int, int], bool]],
         list[tuple[str, tuple[int, int, int], bool]] | None,
         list[tuple[str, tuple[int, int, int], bool]],
@@ -310,6 +309,17 @@ class StatusPanel(ItemSelector):
             ("i", "Ignore"),
             ("v", "Visual"),
         ]
+
+    def get_inspector_data(self) -> Optional[FileInfo]:
+        """Return inspector data for the currently selected file."""
+        idx = self.curr_no
+        if not self.files or not (0 <= idx < len(self.files)):
+            return None
+        file = self.files[idx]
+        size, mtime = ("?", "?")
+        if self.git is not None:
+            size, mtime = self.git.get_file_info(file)
+        return FileInfo(file=file, size=size, mtime=mtime)
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""

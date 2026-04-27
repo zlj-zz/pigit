@@ -21,6 +21,7 @@ from pigit.termui import (
 )
 from pigit.termui.wcwidth_table import wcswidth
 
+from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
 
@@ -90,6 +91,22 @@ class CommitPanel(ItemSelector):
             ("g", "Toggle view"),
         ]
 
+    def get_inspector_data(self) -> Optional[CommitInfo]:
+        """Return inspector data for the currently selected commit."""
+        idx = self.curr_no
+        if not self.commits or not (0 <= idx < len(self.commits)):
+            return None
+        c = self.commits[idx]
+        changed_files, total_add, total_del = [], 0, 0
+        if self.git is not None:
+            changed_files, total_add, total_del = self.git.get_commit_stats(c.sha)
+        return CommitInfo(
+            commit=c,
+            changed_files=changed_files,
+            total_add=total_add,
+            total_del=total_del,
+        )
+
     def refresh(self) -> None:
         branch_name = self.git.get_head() or ""
         self.commits = commits = self.git.load_commits(branch_name)
@@ -128,9 +145,7 @@ class CommitPanel(ItemSelector):
         if self._view_mode == "river":
             self._render_heatmap_overlay(surface)
 
-    def describe_row(
-        self, idx: int, is_cursor: bool
-    ) -> tuple[
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
         list[tuple[str, tuple[int, int, int], bool]],
         list[tuple[str, tuple[int, int, int], bool]] | None,
         list[tuple[str, tuple[int, int, int], bool]],

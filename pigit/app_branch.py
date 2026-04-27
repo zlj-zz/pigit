@@ -19,6 +19,7 @@ from pigit.termui import (
 )
 from pigit.termui.wcwidth_table import wcswidth
 
+from .app_inspector import BranchInfo
 from .app_theme import THEME
 
 if TYPE_CHECKING:
@@ -77,6 +78,23 @@ class BranchPanel(ItemSelector):
             ("c", "Checkout"),
         ]
 
+    def get_inspector_data(self) -> Optional[BranchInfo]:
+        """Return inspector data for the currently selected branch."""
+        idx = self.curr_no
+        if not self.branches or not (0 <= idx < len(self.branches)):
+            return None
+        b = self.branches[idx]
+        recent_msg, recent_author, created = "?", "?", "?"
+        if self.git is not None:
+            recent_msg, recent_author = self.git.get_branch_recent_commit(b.name)
+            created = self.git.get_branch_creation_time(b.name)
+        return BranchInfo(
+            branch=b,
+            recent_msg=recent_msg,
+            recent_author=recent_author,
+            created=created,
+        )
+
     def _format_branch(self, branch: "Branch") -> str:
         """Format a branch for display."""
         return branch.name
@@ -89,9 +107,7 @@ class BranchPanel(ItemSelector):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    def describe_row(
-        self, idx: int, is_cursor: bool
-    ) -> tuple[
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
         list[tuple[str, tuple[int, int, int], bool]],
         list[tuple[str, tuple[int, int, int], bool]] | None,
         list[tuple[str, tuple[int, int, int], bool]],

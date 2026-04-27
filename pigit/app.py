@@ -302,7 +302,7 @@ class PigitApplication(Application):
         if self._inspector is None or self._tab_view is None:
             return
         active = self._tab_view.active
-        if active is None:
+        if active is None or not hasattr(active, "get_inspector_data"):
             return
         idx = getattr(active, "curr_no", 0)
         # Skip if neither panel nor selection has changed
@@ -311,43 +311,7 @@ class PigitApplication(Application):
         if last == current_key:
             return
         self._last_inspector_key = current_key
-
-        if isinstance(active, StatusPanel) and active.files:
-            if 0 <= idx < len(active.files):
-                file = active.files[idx]
-                size, mtime = ("?", "?")
-                if active.git is not None:
-                    size, mtime = active.git.get_file_info(file)
-                self._inspector.show_file(file, size=size, mtime=mtime)
-        elif isinstance(active, BranchPanel) and active.branches:
-            if 0 <= idx < len(active.branches):
-                b = active.branches[idx]
-                recent_msg, recent_author, created = "?", "?", "?"
-                if active.git is not None:
-                    recent_msg, recent_author = active.git.get_branch_recent_commit(
-                        b.name
-                    )
-                    created = active.git.get_branch_creation_time(b.name)
-                self._inspector.show_branch(
-                    b,
-                    recent_msg=recent_msg,
-                    recent_author=recent_author,
-                    created=created,
-                )
-        elif isinstance(active, CommitPanel) and active.commits:
-            if 0 <= idx < len(active.commits):
-                c = active.commits[idx]
-                changed_files, total_add, total_del = [], 0, 0
-                if active.git is not None:
-                    changed_files, total_add, total_del = active.git.get_commit_stats(
-                        c.sha
-                    )
-                self._inspector.show_commit(
-                    c,
-                    changed_files=changed_files,
-                    total_add=total_add,
-                    total_del=total_del,
-                )
+        self._inspector.show(active.get_inspector_data())
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
