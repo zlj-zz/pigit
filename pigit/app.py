@@ -9,7 +9,7 @@ Date: 2026-04-17
 import logging
 import os
 from dataclasses import dataclass
-from typing import Callable, Optional, TYPE_CHECKING, Union
+from typing import Optional, Union
 
 from pigit.termui import (
     Application,
@@ -21,7 +21,6 @@ from pigit.termui import (
     Header,
     HelpPanel,
     keys,
-    LayerKind,
     Popup,
     Row,
     show_toast,
@@ -132,7 +131,7 @@ class PigitApplication(Application):
             footer.set_help_provider(provider)
             self._current_tab = _TAB_LABELS.get(panel, "")
             self._current_tab_key = _TAB_KEYS.get(panel, "")
-            self._update_inspector_content()
+            self._w.inspector.update_from(panel)
 
         tab_view = TabView(
             children=[status_panel, branch_panel, commit_panel, diff_viewer],
@@ -256,7 +255,8 @@ class PigitApplication(Application):
 
     def _on_panel_selection_changed(self, idx: int) -> None:
         """Callback when panel selection changes via j/k navigation."""
-        self._update_inspector_content()
+        if self._widgets is not None:
+            self._w.inspector.update_from(self._w.tab_view.active)
 
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
@@ -290,7 +290,7 @@ class PigitApplication(Application):
         size = self._loop.get_term_size()
         if self._inspector_visible:
             self._w.body_row.set_widths(["flex", self._inspector_width(size.columns)])
-            self._update_inspector_content()
+            self._w.inspector.update_from(self._w.tab_view.active)
         else:
             self._w.body_row.set_widths(["flex", 0])
         self._root.resize(size)
@@ -300,22 +300,6 @@ class PigitApplication(Application):
         if self._inspector_visible and self._widgets is not None:
             self._w.body_row.set_widths(["flex", self._inspector_width(size[0])])
         super().resize(size)
-
-    def _update_inspector_content(self):
-        """Update inspector based on current tab and selection."""
-        if self._widgets is None:
-            return
-        active = self._w.tab_view.active
-        if active is None or not hasattr(active, "get_inspector_data"):
-            return
-        idx = getattr(active, "curr_no", 0)
-        # Skip if neither panel nor selection has changed
-        last = getattr(self, "_last_inspector_key", None)
-        current_key = (id(active), idx)
-        if last == current_key:
-            return
-        self._last_inspector_key = current_key
-        self._w.inspector.show(active.get_inspector_data())
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""

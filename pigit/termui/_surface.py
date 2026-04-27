@@ -304,7 +304,7 @@ class Surface:
         if text.isascii():
             total_w = len(text)
             if col + total_w > self.width:
-                text = text[:self.width - col]
+                text = text[: self.width - col]
             for ch in text:
                 self._rows[row][col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
                 col += 1

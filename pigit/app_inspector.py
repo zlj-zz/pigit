@@ -77,6 +77,20 @@ class InspectorPanel(Component):
         elif isinstance(data, CommitInfo):
             self._show_commit_impl(data)
 
+    def update_from(self, source) -> None:
+        """Refresh content from *source* if it provides inspector data.
+
+        Caches by ``(id(source), curr_no)`` to avoid redundant git calls.
+        """
+        if not hasattr(source, "get_inspector_data"):
+            return
+        idx = getattr(source, "curr_no", 0)
+        key = (id(source), idx)
+        if getattr(self, "_last_key", None) == key:
+            return
+        self._last_key = key
+        self.show(source.get_inspector_data())
+
     def _show_file_impl(self, data: FileInfo) -> None:
         """Display file details."""
         file = data.file

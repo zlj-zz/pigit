@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.app_palette import CommandPalette
+from pigit.app_command_palette import CommandPalette
 from pigit.app_inspector import FileInfo, InspectorPanel
 from pigit.app_contribution_graph import ContributionGraph
 from pigit.termui._surface import Surface

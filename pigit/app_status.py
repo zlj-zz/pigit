@@ -18,7 +18,6 @@ from pigit.termui import (
     exec_external,
     ItemSelector,
     keys,
-    palette,
     show_badge,
     show_toast,
 )

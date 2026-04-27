@@ -58,6 +58,7 @@ class CommitPanel(ItemSelector):
         self._contrib_graph = ContributionGraph()
         self._display = display
         self._rel_time_cache: dict[str, str] = {}
+        self._max_meta_w = 0
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -185,7 +186,7 @@ class CommitPanel(ItemSelector):
         )
         meta = f"  {author}  {rel}"
         meta_w = wcswidth(meta)
-        max_meta_w = getattr(self, "_max_meta_w", 0)
+        max_meta_w = self._max_meta_w
         reserve = max(max_meta_w, meta_w)
         pad = reserve - meta_w
         if pad > 0:

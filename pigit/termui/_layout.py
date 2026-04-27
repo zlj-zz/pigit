@@ -14,11 +14,7 @@ from typing import (
     Sequence,
     Union,
     runtime_checkable,
-    TYPE_CHECKING,
 )
-
-if TYPE_CHECKING:
-    from ._component_base import Component
 
 
 @runtime_checkable
