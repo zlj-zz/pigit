@@ -327,7 +327,7 @@ class ItemSelector(Component):
     def previous(self, step: int = 1):
         """Move the selection backward by the given step."""
         tmp = self.curr_no - step
-        if tmp < 0 or tmp >= len(self.content):
+        if tmp < 0:
             return
 
         self.curr_no -= step
