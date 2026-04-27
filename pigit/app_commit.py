@@ -203,7 +203,7 @@ class CommitPanel(ItemSelector):
 
         graph_h = min(self._contrib_graph.min_height(), h)
         self._contrib_graph.resize((w, graph_h))
-        self._contrib_graph._render_surface(surface)
+        self._contrib_graph.render_into(surface)
 
     def on_key(self, key: str) -> None:
         if self._view_mode is CommitViewMode.HEATMAP:
