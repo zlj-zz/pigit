@@ -114,27 +114,6 @@ class Application:
         finally:
             root.destroy()
 
-    def run_external_process(
-        self,
-        cmd: list[str],
-        cwd: Optional[str] = None,
-    ) -> "subprocess.CompletedProcess[str]":
-        """Suspend TUI, run an external command, then resume TUI and redraw.
-
-        Args:
-            cmd: Command argument list (e.g. ["git", "commit"]).
-            cwd: Working directory for the command.
-
-        Returns:
-            subprocess.CompletedProcess with returncode and other fields.
-
-        Raises:
-            RuntimeError: If called outside run() lifecycle.
-        """
-        if self._loop is None:
-            raise RuntimeError("Application not running.")
-        return self._loop.exec_external(cmd, cwd=cwd)
-
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.
 

@@ -9,7 +9,6 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import logging
-import subprocess
 from typing import TYPE_CHECKING, Literal, Optional
 
 from ._bindings import BindingsList, resolve_key_handlers_merged
@@ -234,42 +233,6 @@ class AppEventLoop:
             finally:
                 reset_renderer(token)
                 self._session = None
-
-    def exec_external(
-        self,
-        cmd: list[str],
-        cwd: Optional[str] = None,
-    ) -> "subprocess.CompletedProcess[str]":
-        """Suspend TUI, run an external command, then resume TUI and redraw.
-
-        Args:
-            cmd: Command argument list (e.g. ["git", "commit"]).
-            cwd: Working directory for the command.
-
-        Returns:
-            subprocess.CompletedProcess with returncode and other fields.
-
-        Raises:
-            RuntimeError: If called outside run() lifecycle.
-        """
-        session = getattr(self, "_session", None)
-        if session is None:
-            raise RuntimeError("Session not available; call only inside run().")
-
-        session.suspend()
-        result: "subprocess.CompletedProcess[str]"
-        try:
-            result = subprocess.run(cmd, cwd=cwd, stdin=None, stdout=None, stderr=None)
-        finally:
-            try:
-                session.resume()
-            except Exception:
-                _logger.exception(
-                    "Session.resume() failed; terminal may be in bad state"
-                )
-                raise
-            self.resize()
-        return result
 
     def quit(
         self,

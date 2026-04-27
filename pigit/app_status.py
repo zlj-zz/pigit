@@ -15,6 +15,7 @@ from pigit.termui import (
     AlertDialog,
     bind_keys,
     Component,
+    exec_external,
     ItemSelector,
     keys,
     palette,
@@ -77,7 +78,6 @@ class StatusPanel(ItemSelector):
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
-        on_commit: Optional[Callable[[], None]] = None,
         git: "LocalGit",
     ) -> None:
         super().__init__(
@@ -87,7 +87,6 @@ class StatusPanel(ItemSelector):
         self.git = git
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
-        self._on_commit = on_commit
 
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
@@ -259,11 +258,20 @@ class StatusPanel(ItemSelector):
             )
             return
         if key == "C":
-            if any(f.has_staged_change for f in self.files):
-                if self._on_commit is not None:
-                    self._on_commit()
-            else:
+            if not any(f.has_staged_change for f in self.files):
                 show_toast("No staged changes to commit", duration=2.0)
+                return
+            try:
+                result = exec_external(["git", "commit"], cwd=self.git.path)
+                if result.returncode == 0:
+                    show_toast("Commit created", duration=1.5)
+                else:
+                    show_toast("Commit aborted or failed", duration=2.0)
+            except Exception:
+                show_toast("Failed to open editor", duration=2.0)
+                raise
+            finally:
+                self.refresh()
             return
 
     # --- Helpers ---

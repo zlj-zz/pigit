@@ -51,6 +51,7 @@ from pigit.termui._application import Application
 
 # Overlay context (module-level functions)
 from pigit.termui._overlay_context import get_badge, show_badge, show_toast, show_sheet
+from pigit.termui._session_context import exec_external
 
 # Other utilities
 from pigit.termui._bindings import bind_keys, BindingError, list_bindings
@@ -120,6 +121,8 @@ __all__ = [
     "show_sheet",
     "show_badge",
     "get_badge",
+    # Session context
+    "exec_external",
     # Picker
     "PickerRow",
 ]

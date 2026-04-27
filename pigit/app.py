@@ -11,9 +11,6 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Optional, TYPE_CHECKING, Union
 
-if TYPE_CHECKING:
-    import subprocess
-
 from pigit.termui import (
     Application,
     Column,
@@ -41,11 +38,6 @@ from .app_command_palette import CommandPalette
 from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.repo import Repo
-
-ExternalProcessCallback = Callable[
-    [list[str], Optional[str]],
-    "subprocess.CompletedProcess[str]",
-]
 
 
 @dataclass
@@ -96,7 +88,6 @@ class PigitApplication(Application):
             display=diff_viewer,
             on_visual_mode_changed=self._on_visual_mode_changed,
             on_selection_changed=self._on_panel_selection_changed,
-            on_commit=self._on_status_commit,
             git=self._git,
         )
         branch_panel = BranchPanel(
@@ -229,23 +220,6 @@ class PigitApplication(Application):
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,
         )
-
-    def _on_status_commit(self) -> None:
-        try:
-            result = self.exec_external(["git", "commit"], cwd=self._repo_path)
-            if result.returncode == 0:
-                show_toast("Commit created", duration=1.5)
-            else:
-                show_toast("Commit aborted or failed", duration=2.0)
-        except Exception:
-            logging.warning("Failed to run git commit", exc_info=True)
-            show_toast("Failed to open editor", duration=2.0)
-        finally:
-            self._refresh_status_panel()
-
-    def _refresh_status_panel(self) -> None:
-        if self._widgets is not None:
-            self._w.status.refresh()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
         self._mode = mode
