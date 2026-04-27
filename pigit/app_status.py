@@ -77,6 +77,7 @@ class StatusPanel(ItemSelector):
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
+        on_commit: Optional[Callable[[], None]] = None,
         git: "LocalGit",
     ) -> None:
         super().__init__(
@@ -86,6 +87,7 @@ class StatusPanel(ItemSelector):
         self.git = git
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
+        self._on_commit = on_commit
 
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
@@ -256,6 +258,13 @@ class StatusPanel(ItemSelector):
                 needs_confirm=True,
             )
             return
+        if key == "C":
+            if any(f.has_staged_change for f in self.files):
+                if self._on_commit is not None:
+                    self._on_commit()
+            else:
+                show_toast("No staged changes to commit", duration=2.0)
+            return
 
     # --- Helpers ---
 
@@ -296,6 +305,7 @@ class StatusPanel(ItemSelector):
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
+            ("C", "Commit"),
             ("v", "Visual"),
         ]
 
