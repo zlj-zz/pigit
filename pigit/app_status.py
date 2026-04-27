@@ -183,13 +183,14 @@ class StatusPanel(ItemSelector):
             self._selected.add(idx)
 
     def refresh(self) -> None:
-        self.files = self.git.load_status(self._size[0], plain=True)
+        self.files = self.git.load_status()
         self._all_files = list(self.files)
         if not self.files:
             self.set_content(["No status changed."])
             return
-        files_str = [f.display_str for f in self.files]
-        self.set_content(files_str)
+        # content is only used for row-count bookkeeping; rendering uses
+        # describe_row which reads directly from self.files.
+        self.set_content([f.name for f in self.files])
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
@@ -201,10 +202,14 @@ class StatusPanel(ItemSelector):
         list[tuple[str, tuple[int, int, int], bool]],
     ]:
         """Return row description: [cursor][staged][unstaged][filename.......][label]"""
-        line = self.content[idx]
-        staged = line[0] if len(line) > 0 else " "
-        unstaged = line[1] if len(line) > 1 else " "
-        filename = line[3:] if len(line) > 3 else ""
+        if idx >= len(self.files):
+            text = self.content[idx] if idx < len(self.content) else ""
+            prefix = self.CURSOR if is_cursor else " "
+            return ([(f"{prefix} {text}", THEME.fg_primary, is_cursor)], None, [])
+
+        file = self.files[idx]
+        staged = file.short_status[0] if len(file.short_status) > 0 else " "
+        unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         cursor_prefix = self.CURSOR if is_cursor else " "
 
         left = [
@@ -217,13 +222,12 @@ class StatusPanel(ItemSelector):
 
         is_selected = idx in self._selected
         filename_fg = THEME.accent_purple if is_selected else THEME.fg_primary
-        main = [(filename, filename_fg, is_cursor)]
+        main = [(file.name, filename_fg, is_cursor)]
 
         right: list[tuple[str, tuple[int, int, int], bool]] = []
-        if idx < len(self.files):
-            label = _status_label(self.files[idx])
-            if label:
-                right.append((label, THEME.fg_muted, False))
+        label = _status_label(file)
+        if label:
+            right.append((label, THEME.fg_muted, False))
 
         return left, main, right
 
