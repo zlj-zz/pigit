@@ -157,12 +157,13 @@ class Component(ABC):
             child.update(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Response to the resize event."""
+        """Response to the resize event.
+
+        Subclasses that manage child geometry (e.g. Column, Row, TabView)
+        must override this method to propagate the correct size to each child.
+        """
         self._size = size
         self.refresh()
-
-        for child in self.children:
-            child.resize(size)
 
     def _render_surface(self, surface: "Surface") -> None:
         """Render this component into the given Surface.
