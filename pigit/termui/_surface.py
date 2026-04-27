@@ -86,6 +86,7 @@ class FlatCell:
 Cell = FlatCell
 
 _BLANK_CELL = FlatCell()
+_SPACER_CELL = FlatCell("")
 
 
 class _Subsurface:
@@ -218,9 +219,8 @@ class Surface:
     def __init__(self, width: int, height: int) -> None:
         self.width = width
         self.height = height
-        self._rows: list[list[FlatCell]] = [
-            [FlatCell() for _ in range(width)] for _ in range(height)
-        ]
+        blank_row = [_BLANK_CELL] * width
+        self._rows: list[list[FlatCell]] = [list(blank_row) for _ in range(height)]
 
     def __repr__(self) -> str:
         return f"Surface({self.width}x{self.height})"
@@ -283,18 +283,45 @@ class Surface:
             bg: Background RGB tuple.
             bold: Whether to render in bold weight.
         """
-        if row < 0 or row >= self.height:
+        if row < 0 or row >= self.height or col >= self.width:
             return
-        cur_col = col
+
+        if col < 0:
+            # Rare: negative start column; scan char-by-char and clip.
+            cur_col = col
+            for ch in text:
+                if cur_col >= self.width:
+                    return
+                w = _char_width(ord(ch))
+                if cur_col >= 0 and cur_col + w <= self.width:
+                    self._rows[row][cur_col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
+                    if w == 2:
+                        self._rows[row][cur_col + 1] = _SPACER_CELL
+                cur_col += w
+            return
+
+        # Pre-compute width and truncate early to avoid per-char overflow checks.
+        if text.isascii():
+            total_w = len(text)
+            if col + total_w > self.width:
+                text = text[:self.width - col]
+            for ch in text:
+                self._rows[row][col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
+                col += 1
+            return
+
+        total_w = wcswidth(text)
+        if col + total_w > self.width:
+            text = truncate_by_width(text, self.width - col)
+
         for ch in text:
-            if cur_col >= self.width:
-                return
+            if col >= self.width:
+                break
             w = _char_width(ord(ch))
-            if cur_col >= 0 and cur_col + w <= self.width:
-                self._rows[row][cur_col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
-                if w == 2:
-                    self._rows[row][cur_col + 1] = FlatCell("")
-            cur_col += w
+            self._rows[row][col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
+            if w == 2:
+                self._rows[row][col + 1] = _SPACER_CELL
+            col += w
 
     def fill_rect_rgb(
         self, row: int, col: int, width: int, height: int, bg: tuple[int, int, int]
