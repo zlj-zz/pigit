@@ -9,6 +9,7 @@ Date: 2026-04-23
 from __future__ import annotations
 
 import logging
+import re
 
 from typing import Optional
 
@@ -172,8 +173,6 @@ class DiffViewer(LineTextBrowser):
 
     def _compute_line_numbers(self) -> None:
         """Compute line numbers for each diff line by parsing @@ headers."""
-        import re
-
         self._line_numbers = []
         old_line = 0
         new_line = 0
