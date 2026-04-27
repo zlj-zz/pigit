@@ -179,7 +179,12 @@ class AppEventLoop:
             self.resize()
             return "resize"
         if self._child.has_overlay_open():
-            self._child._handle_event(key)
+            try:
+                self._child._handle_event(key)
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("Overlay handler for '%s' failed", key)
             self.render()
             return "overlay"
         handler = self._key_handlers.get(key)
@@ -192,7 +197,12 @@ class AppEventLoop:
                 _logger.exception("Key handler for '%s' failed", key)
             self.render()
             return "binding"
-        self._child._handle_event(key)
+        try:
+            self._child._handle_event(key)
+        except ExitEventLoop:
+            raise
+        except Exception:
+            _logger.exception("Child handler for '%s' failed", key)
         self.render()
         return "child"
 

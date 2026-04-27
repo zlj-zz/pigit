@@ -8,6 +8,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
+import logging
 from typing import Optional, TYPE_CHECKING
 
 from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
@@ -17,6 +18,8 @@ from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
 if TYPE_CHECKING:
     import subprocess
+
+_logger = logging.getLogger(__name__)
 
 
 class _ApplicationEventLoop(AppEventLoop):
@@ -44,12 +47,22 @@ class _ApplicationEventLoop(AppEventLoop):
 
         handler = self._app_key_handlers.get(key)
         if handler is not None:
-            handler()
+            try:
+                handler()
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("App binding for '%s' failed", key)
             self.render()
             return "binding"
 
         if self._app_on_key is not None:
-            self._app_on_key(key)
+            try:
+                self._app_on_key(key)
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("App on_key for '%s' failed", key)
             self.render()
             return "app"
 

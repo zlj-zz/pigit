@@ -21,6 +21,10 @@ class RepoError(Exception):
     """Error class of ~GitOption."""
 
 
+class GitError(Exception):
+    """Raised when a git command fails."""
+
+
 def _file_path_for_cmd(file: Union[File, str]) -> str:
     if isinstance(file, File):
         return file.get_file_str()
@@ -750,14 +754,15 @@ class LocalGit:
         with open(Path(repo_path) / ".gitignore", "a+") as f:
             f.write(f"\n{file_name}")
 
-    def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> str:
+    def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> None:
         path = path or self.path
         code, err, out = self.executor.exec(
             f"git checkout {shlex.quote(branch_name)}",
             cwd=path,
             flags=WAITING | REPLY | DECODE,
         )
-        return err or "ok"
+        if code != 0:
+            raise GitError(err or f"checkout failed: {branch_name}")
 
     def get_file_info(
         self, file: Union[File, str], path: Optional[str] = None

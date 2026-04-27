@@ -240,7 +240,8 @@ class PigitApplication(Application):
         except Exception:
             logging.warning("Failed to run git commit", exc_info=True)
             show_toast("Failed to open editor", duration=2.0)
-        self._refresh_status_panel()
+        finally:
+            self._refresh_status_panel()
 
     def _refresh_status_panel(self) -> None:
         if self._widgets is not None:

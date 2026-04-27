@@ -129,11 +129,12 @@ class BranchPanel(ItemSelector):
             if local_branch.is_head:
                 show_toast("Already on this branch.", duration=1.5)
                 return
-            err = self.git.checkout_branch(local_branch.name)
-            if "error" in err:
-                show_toast(f"Checkout failed: {err}", duration=3.0)
-            else:
-                show_toast(f"Switched to {local_branch.name}", duration=1.5)
-                if self._branch_signal is not None:
-                    self._branch_signal.set(local_branch.name)
+            try:
+                self.git.checkout_branch(local_branch.name)
+            except Exception as e:
+                show_toast(f"Checkout failed: {e}", duration=3.0)
+                return
+            show_toast(f"Switched to {local_branch.name}", duration=1.5)
+            if self._branch_signal is not None:
+                self._branch_signal.set(local_branch.name)
             self.refresh()
