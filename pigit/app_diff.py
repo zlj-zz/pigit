@@ -208,72 +208,84 @@ class DiffViewer(LineTextBrowser):
         # Bypass LineTextBrowser.resize() which would reset _max_line to full height
         super(LineTextBrowser, self).resize(size)
 
+    def _draw_diff_line(
+        self,
+        surface,
+        row: int,
+        line: str,
+        idx: int,
+        *,
+        x_offset: int,
+        main_w: int,
+        heatmap_x: int,
+        fill_width: int,
+        fill_always: bool,
+    ) -> None:
+        """Render one diff line: background, line number, text, and heatmap."""
+        if line.startswith("+"):
+            bg = THEME.bg_success
+            fg = THEME.fg_primary
+        elif line.startswith("-"):
+            bg = THEME.bg_danger
+            fg = THEME.fg_primary
+        elif line.startswith("@@"):
+            bg = palette.DEFAULT_BG
+            fg = THEME.accent_blue
+        else:
+            bg = palette.DEFAULT_BG
+            fg = THEME.fg_primary
+
+        if fill_always or bg != palette.DEFAULT_BG:
+            surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
+
+        line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
+        if line_no:
+            no_text = line_no.rjust(self.LINE_NO_WIDTH - 1)
+            surface.draw_text_rgb(row, x_offset, no_text, fg=THEME.fg_dim, bg=bg)
+
+        text = line
+        if wcswidth(text) > main_w:
+            text = truncate_by_width(text, main_w - 1) + "…"
+        surface.draw_text_rgb(row, x_offset + self.LINE_NO_WIDTH, text, fg=fg, bg=bg)
+
+        sym = self._heatmap[idx]
+        color = self._heatmap_colors[idx]
+        surface.draw_text_rgb(row, heatmap_x, sym, fg=color, bg=bg)
+
     def _render_surface(self, surface) -> None:
         if not self._content:
             return
         w = surface.width
         h = surface.height
         if w <= self.LINE_NO_WIDTH + 3 or h < 3:
-            # Too small for box border, fall back to borderless rendering
             self._render_surface_borderless(surface)
             return
 
-        # Draw outer box frame (content rows will overlay left/right borders with
-        # their own background colors).
         surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
 
-        # Content area is inset by 1 row and 1 column on each side
         content_h = h - 2
         content_w = w - 2
         main_w = content_w - self.LINE_NO_WIDTH - 1
         end = min(self._i + content_h, len(self._content))
 
         for idx in range(self._i, end):
-            row = idx - self._i + 1  # +1 to skip top border
+            row = idx - self._i + 1
             if row >= h - 1:
                 break
-            line = self._content[idx]
+            self._draw_diff_line(
+                surface,
+                row,
+                self._content[idx],
+                idx,
+                x_offset=1,
+                main_w=main_w,
+                heatmap_x=w - 2,
+                fill_width=w - 2,
+                fill_always=True,
+            )
 
-            # Determine background color based on diff prefix
-            if line.startswith("+"):
-                bg = THEME.bg_success
-                fg = THEME.fg_primary
-            elif line.startswith("-"):
-                bg = THEME.bg_danger
-                fg = THEME.fg_primary
-            elif line.startswith("@@"):
-                bg = palette.DEFAULT_BG
-                fg = THEME.accent_blue
-            else:
-                bg = palette.DEFAULT_BG
-                fg = THEME.fg_primary
-
-            # Fill only the content area background, keeping border columns
-            # at the default background so the box frame remains clean.
-            surface.fill_rect_rgb(row, 1, w - 2, 1, bg)
-
-            # Draw line number (right-aligned in line-no column)
-            line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
-            if line_no:
-                no_text = line_no.rjust(self.LINE_NO_WIDTH - 1)
-                surface.draw_text_rgb(row, 1, no_text, fg=THEME.fg_dim, bg=bg)
-
-            # Draw line text (truncate by display width, not character count)
-            text = line
-            if wcswidth(text) > main_w:
-                text = truncate_by_width(text, main_w - 1) + "…"
-            surface.draw_text_rgb(row, 1 + self.LINE_NO_WIDTH, text, fg=fg, bg=bg)
-
-            # Draw heatmap
-            sym = self._heatmap[idx]
-            color = self._heatmap_colors[idx]
-            surface.draw_text_rgb(row, w - 2, sym, fg=color, bg=bg)
-
-        # When content is shorter than viewport, fill remaining rows with the
-        # default background (outer box frame already drew left/right borders).
         last_content_row = end - self._i
         for blank_row in range(last_content_row + 1, h - 1):
-            # Fill only the interior so the outer box frame borders remain.
             surface.fill_rect_rgb(blank_row, 1, w - 2, 1, palette.DEFAULT_BG)
 
     def _render_surface_borderless(self, surface) -> None:
@@ -283,48 +295,21 @@ class DiffViewer(LineTextBrowser):
         if w <= self.LINE_NO_WIDTH + 1:
             return
 
-        # Main area excludes line number column and rightmost heatmap column
         main_w = w - self.LINE_NO_WIDTH - 1
-        # Use full height for borderless fallback (ignore _max_line border adjustment)
         end = min(self._i + h, len(self._content))
 
         for idx in range(self._i, end):
             row = idx - self._i
             if row >= h:
                 break
-            line = self._content[idx]
-
-            # Determine background color based on diff prefix
-            if line.startswith("+"):
-                bg = THEME.bg_success
-                fg = THEME.fg_primary
-            elif line.startswith("-"):
-                bg = THEME.bg_danger
-                fg = THEME.fg_primary
-            elif line.startswith("@@"):
-                bg = palette.DEFAULT_BG
-                fg = THEME.accent_blue
-            else:
-                bg = palette.DEFAULT_BG
-                fg = THEME.fg_primary
-
-            # Fill row background only for added/removed lines
-            if bg != palette.DEFAULT_BG:
-                surface.fill_rect_rgb(row, 0, w, 1, bg)
-
-            # Draw line number (right-aligned in line-no column)
-            line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
-            if line_no:
-                no_text = line_no.rjust(self.LINE_NO_WIDTH - 1)
-                surface.draw_text_rgb(row, 0, no_text, fg=THEME.fg_dim, bg=bg)
-
-            # Draw line text (truncate by display width, not character count)
-            text = line
-            if wcswidth(text) > main_w:
-                text = truncate_by_width(text, main_w - 1) + "…"
-            surface.draw_text_rgb(row, self.LINE_NO_WIDTH, text, fg=fg, bg=bg)
-
-            # Draw heatmap in rightmost column
-            sym = self._heatmap[idx]
-            color = self._heatmap_colors[idx]
-            surface.draw_text_rgb(row, w - 1, sym, fg=color, bg=bg)
+            self._draw_diff_line(
+                surface,
+                row,
+                self._content[idx],
+                idx,
+                x_offset=0,
+                main_w=main_w,
+                heatmap_x=w - 1,
+                fill_width=w,
+                fill_always=False,
+            )
