@@ -8,6 +8,7 @@ Date: 2026-04-17
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Callable, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
@@ -32,7 +33,7 @@ from pigit.termui import (
 )
 from pigit.termui._reactive import Signal
 from .app_branch import BranchPanel
-from .app_chrome import AppFooter, PeekLabel
+from .app_chrome import AppFooter
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
@@ -45,6 +46,22 @@ ExternalProcessCallback = Callable[
     [list[str], Optional[str]],
     "subprocess.CompletedProcess[str]",
 ]
+
+
+@dataclass
+class _PigitWidgets:
+    """Container for all major UI widgets created in build_root()."""
+
+    header: Header
+    footer: AppFooter
+    tab_view: TabView
+    body_row: Row
+    palette: CommandPalette
+    inspector: InspectorPanel
+    status: StatusPanel
+    branch: BranchPanel
+    commit: CommitPanel
+    diff: DiffViewer
 
 
 class PigitApplication(Application):
@@ -62,13 +79,7 @@ class PigitApplication(Application):
         self._repo = repo or Repo()
         self._repo_path, self._repo_conf = self._repo.confirm_repo()
         self._git = self._repo.bind_path(self._repo_path)
-        self._header: Optional[Header] = None
-        self._footer: Optional[AppFooter] = None
-        self._tab_view: Optional[TabView] = None
-        self._body_row: Optional[Row] = None
-        self._peek_label = PeekLabel()
-        self._palette: Optional[CommandPalette] = None
-        self._inspector: Optional[InspectorPanel] = None
+        self._widgets: Optional[_PigitWidgets] = None
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
@@ -78,35 +89,24 @@ class PigitApplication(Application):
         self._current_tab: str = "Status"
         self._current_tab_key: str = "1"
         self._mode: str = ""
-        # Panel references set in build_root()
-        self._status_panel: Optional[StatusPanel] = None
-        self._branch_panel: Optional[BranchPanel] = None
-        self._commit_panel: Optional[CommitPanel] = None
-        self._display_panel: Optional[DiffViewer] = None
 
     def build_root(self) -> Component:
-        display_panel = DiffViewer()
+        diff_viewer = DiffViewer()
         status_panel = StatusPanel(
-            display=display_panel,
+            display=diff_viewer,
             on_visual_mode_changed=self._on_visual_mode_changed,
             on_selection_changed=self._on_panel_selection_changed,
             git=self._git,
-            repo_path=self._repo_path,
-            repo_conf=self._repo_conf,
         )
         branch_panel = BranchPanel(
             on_selection_changed=self._on_panel_selection_changed,
             branch_signal=self._branch_signal,
             git=self._git,
-            repo_path=self._repo_path,
-            repo_conf=self._repo_conf,
         )
         commit_panel = CommitPanel(
-            display=display_panel,
+            display=diff_viewer,
             on_selection_changed=self._on_panel_selection_changed,
             git=self._git,
-            repo_path=self._repo_path,
-            repo_conf=self._repo_conf,
         )
 
         _GLOBAL_HELP: list[tuple[str, str]] = [
@@ -118,24 +118,32 @@ class PigitApplication(Application):
             status_panel: "Status",
             branch_panel: "Branch",
             commit_panel: "Commit",
-            display_panel: "Display",
+            diff_viewer: "Display",
         }
         _TAB_KEYS: dict[Component, str] = {
             status_panel: "1",
             branch_panel: "2",
             commit_panel: "3",
-            display_panel: "",
+            diff_viewer: "",
         }
+
+        header = Header(
+            separator=True,
+            sep_fg=THEME.fg_dim,
+            on_refresh=self._refresh_header,
+        )
+        footer = AppFooter(theme=THEME)
+        footer.set_global_help(_GLOBAL_HELP)
 
         def _on_tab_switch(panel: Component) -> None:
             provider = getattr(panel, "get_help_entries", None)
-            self._footer.set_help_provider(provider)
+            footer.set_help_provider(provider)
             self._current_tab = _TAB_LABELS.get(panel, "")
             self._current_tab_key = _TAB_KEYS.get(panel, "")
             self._update_inspector_content()
 
-        self._tab_view = TabView(
-            children=[status_panel, branch_panel, commit_panel, display_panel],
+        tab_view = TabView(
+            children=[status_panel, branch_panel, commit_panel, diff_viewer],
             shortcuts={
                 "1": status_panel,
                 "2": branch_panel,
@@ -144,42 +152,48 @@ class PigitApplication(Application):
             start=status_panel,
             on_switch=_on_tab_switch,
         )
-        self._status_panel = status_panel
-        self._branch_panel = branch_panel
-        self._commit_panel = commit_panel
-        self._display_panel = display_panel
+        provider = getattr(tab_view.active, "get_help_entries", None)
+        footer.set_help_provider(provider)
 
-        self._header = Header(
-            separator=True,
-            sep_fg=THEME.fg_dim,
-            on_refresh=self._refresh_header,
-        )
-        self._footer = AppFooter(theme=THEME)
-        self._footer.set_global_help(_GLOBAL_HELP)
-        provider = getattr(self._tab_view.active, "get_help_entries", None)
-        self._footer.set_help_provider(provider)
-
-        # Command palette
-        self._palette = CommandPalette(
+        palette = CommandPalette(
             on_execute=self._on_palette_execute,
             on_dismiss=self._dismiss_palette,
         )
 
-        self._inspector = InspectorPanel()
-        self._body_row = Row(
-            children=[self._tab_view, self._inspector],
+        inspector = InspectorPanel()
+        body_row = Row(
+            children=[tab_view, inspector],
             widths=["flex", 0],
         )
 
+        self._widgets = _PigitWidgets(
+            header=header,
+            footer=footer,
+            tab_view=tab_view,
+            body_row=body_row,
+            palette=palette,
+            inspector=inspector,
+            status=status_panel,
+            branch=branch_panel,
+            commit=commit_panel,
+            diff=diff_viewer,
+        )
+
         chrome_column = Column(
-            children=[self._header, self._body_row, self._footer],
+            children=[header, body_row, footer],
             heights=[2, "flex", 2],
         )
         return chrome_column
 
+    @property
+    def _w(self) -> _PigitWidgets:
+        """Shorthand for accessing widgets; raises if build_root() has not run."""
+        assert self._widgets is not None
+        return self._widgets
+
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            entries_source=self._tab_view,
+            entries_source=self._w.tab_view,
             key_fg=THEME.accent_blue,
         )
         self._help_popup = Popup(
@@ -216,8 +230,8 @@ class PigitApplication(Application):
         )
 
     def _refresh_status_panel(self) -> None:
-        if self._status_panel is not None:
-            self._status_panel.refresh()
+        if self._widgets is not None:
+            self._w.status.refresh()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
         self._mode = mode
@@ -263,13 +277,13 @@ class PigitApplication(Application):
 
     def toggle_palette(self):
         """Toggle command palette visibility."""
-        if self._palette is None or self._root is None:
+        if self._widgets is None or self._root is None:
             return
-        if self._palette.is_active:
-            self._palette.close()
+        if self._w.palette.is_active:
+            self._w.palette.close()
         else:
-            self._palette.open()
-            self._root.show_sheet(self._palette, height=8)
+            self._w.palette.open()
+            self._root.show_sheet(self._w.palette, height=8)
 
     def _dismiss_palette(self) -> None:
         """Dismiss the palette sheet from the root."""
@@ -282,28 +296,28 @@ class PigitApplication(Application):
 
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
-        if self._inspector is None or self._body_row is None:
+        if self._widgets is None:
             return
         self._inspector_visible = not self._inspector_visible
         size = self._loop.get_term_size()
         if self._inspector_visible:
-            self._body_row.set_widths(["flex", self._inspector_width(size.columns)])
+            self._w.body_row.set_widths(["flex", self._inspector_width(size.columns)])
             self._update_inspector_content()
         else:
-            self._body_row.set_widths(["flex", 0])
+            self._w.body_row.set_widths(["flex", 0])
         self._root.resize(size)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute inspector width on terminal resize."""
-        if self._inspector_visible and self._body_row is not None:
-            self._body_row.set_widths(["flex", self._inspector_width(size[0])])
+        if self._inspector_visible and self._widgets is not None:
+            self._w.body_row.set_widths(["flex", self._inspector_width(size[0])])
         super().resize(size)
 
     def _update_inspector_content(self):
         """Update inspector based on current tab and selection."""
-        if self._inspector is None or self._tab_view is None:
+        if self._widgets is None:
             return
-        active = self._tab_view.active
+        active = self._w.tab_view.active
         if active is None or not hasattr(active, "get_inspector_data"):
             return
         idx = getattr(active, "curr_no", 0)
@@ -313,22 +327,24 @@ class PigitApplication(Application):
         if last == current_key:
             return
         self._last_inspector_key = current_key
-        self._inspector.show(active.get_inspector_data())
+        self._w.inspector.show(active.get_inspector_data())
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
+        if self._widgets is None:
+            return
         cmd_map: dict[str, Optional[Union[Component, str]]] = {
-            "status": self._status_panel,
-            "branch": self._branch_panel,
-            "commit": self._commit_panel,
-            "diff": self._display_panel,
+            "status": self._w.status,
+            "branch": self._w.branch,
+            "commit": self._w.commit,
+            "diff": self._w.diff,
             "quit": "quit",
         }
         target = cmd_map.get(cmd.lower())
         if target == "quit":
             self.quit()
-        elif target is not None and self._tab_view is not None:
-            self._tab_view.route_to(target)
+        elif target is not None:
+            self._w.tab_view.route_to(target)
 
     def quit(self):
         raise ExitEventLoop("Quit")

@@ -72,29 +72,17 @@ class StatusPanel(ItemSelector):
 
     def __init__(
         self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
         *,
         alert_inner_width: Optional[int] = None,
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
-        repo_path: Optional[str] = None,
-        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(
-            x,
-            y,
-            size,
-            content,
             on_selection_changed=on_selection_changed,
             lazy_load=True,
         )
-        self.repo_path = repo_path
-        self.repo_conf = repo_conf
         self.git = git
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
@@ -103,9 +91,6 @@ class StatusPanel(ItemSelector):
         self._all_files: list[File] = []  # For filter reset
         self._alert_dialog = AlertDialog(
             self,
-            x=x,
-            y=y,
-            size=size,
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )

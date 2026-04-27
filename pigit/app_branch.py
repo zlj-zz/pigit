@@ -14,11 +14,9 @@ from pigit.termui import (
     bind_keys,
     ItemSelector,
     keys,
-    palette,
     show_toast,
 )
 from pigit.termui._reactive import Signal
-from pigit.termui.wcwidth_table import wcswidth
 
 from .app_inspector import BranchInfo
 from .app_theme import THEME
@@ -35,27 +33,15 @@ class BranchPanel(ItemSelector):
 
     def __init__(
         self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
         *,
         on_selection_changed: Optional[Callable] = None,
         branch_signal: Optional[Signal[str]] = None,
         git: "LocalGit",
-        repo_path: Optional[str] = None,
-        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(
-            x,
-            y,
-            size,
-            content,
             on_selection_changed=on_selection_changed,
             lazy_load=True,
         )
-        self.repo_path = repo_path
-        self.repo_conf = repo_conf
         self.git = git
         self._branch_signal = branch_signal
         self.branches: list[Branch] = []

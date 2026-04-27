@@ -8,6 +8,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+from enum import Enum, auto
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
@@ -17,13 +18,18 @@ from pigit.termui import (
     Component,
     ItemSelector,
     keys,
-    palette,
 )
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
+
+
+class CommitViewMode(Enum):
+    LIST = auto()
+    HEATMAP = auto()
+
 
 if TYPE_CHECKING:
     from .git.local_git import LocalGit
@@ -37,32 +43,21 @@ class CommitPanel(ItemSelector):
 
     def __init__(
         self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
         *,
         display: Optional[Component] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
-        repo_path: Optional[str] = None,
-        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(
-            x,
-            y,
-            size,
-            content,
             on_selection_changed=on_selection_changed,
             lazy_load=True,
         )
-        self.repo_path = repo_path
-        self.repo_conf = repo_conf
         self.git = git
         self.commits: list[Commit] = []
-        self._view_mode: str = "list"
+        self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
         self._display = display
+        self._rel_time_cache: dict[str, str] = {}
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -75,10 +70,10 @@ class CommitPanel(ItemSelector):
     @bind_keys("g")
     def toggle_view(self) -> None:
         """Toggle between list and contribution graph view."""
-        if self._view_mode == "list":
-            self._view_mode = "river"
+        if self._view_mode is CommitViewMode.LIST:
+            self._view_mode = CommitViewMode.HEATMAP
         else:
-            self._view_mode = "list"
+            self._view_mode = CommitViewMode.LIST
 
     def get_help_title(self) -> str:
         return "Commit"
@@ -117,12 +112,12 @@ class CommitPanel(ItemSelector):
             return
         lines = []
         max_meta_w = 0
+        self._rel_time_cache.clear()
         for commit in commits:
-            # Cache relative_time on the commit to avoid recalculation in
-            # _format_commit and _render_list_view.
-            commit._rel_time = relative_time(commit.unix_timestamp)
+            rel = relative_time(commit.unix_timestamp)
+            self._rel_time_cache[commit.sha] = rel
             lines.append(self._format_commit(commit))
-            meta = f"  {commit.author}  {commit._rel_time}"
+            meta = f"  {commit.author}  {rel}"
             max_meta_w = max(max_meta_w, wcswidth(meta))
         self.set_content(lines)
         self._max_meta_w = max_meta_w
@@ -131,7 +126,9 @@ class CommitPanel(ItemSelector):
         """Format a commit for display."""
         msg = commit.msg
         sha = commit.sha[:7]
-        rel = getattr(commit, "_rel_time", None) or relative_time(commit.unix_timestamp)
+        rel = self._rel_time_cache.get(commit.sha) or relative_time(
+            commit.unix_timestamp
+        )
         author = commit.author
         # Build a single-line summary for default content
         marker = "\u25cf" if not commit.is_pushed() else " "
@@ -142,7 +139,7 @@ class CommitPanel(ItemSelector):
         if not self.content:
             return
         super()._render_surface(surface)
-        if self._view_mode == "river":
+        if self._view_mode is CommitViewMode.HEATMAP:
             self._render_heatmap_overlay(surface)
 
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
@@ -183,7 +180,9 @@ class CommitPanel(ItemSelector):
 
         # Right: padded meta
         author = commit.author
-        rel = getattr(commit, "_rel_time", None) or relative_time(commit.unix_timestamp)
+        rel = self._rel_time_cache.get(commit.sha) or relative_time(
+            commit.unix_timestamp
+        )
         meta = f"  {author}  {rel}"
         meta_w = wcswidth(meta)
         max_meta_w = getattr(self, "_max_meta_w", 0)
@@ -207,7 +206,7 @@ class CommitPanel(ItemSelector):
         self._contrib_graph._render_surface(surface)
 
     def on_key(self, key: str) -> None:
-        if self._view_mode == "river":
+        if self._view_mode is CommitViewMode.HEATMAP:
             # Contribution graph is view-only; g toggles back to list.
             return
 

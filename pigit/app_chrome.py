@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/app_chrome.py
-Description: Application chrome components (header, footer, peek label).
+Description: Application chrome components (header, footer).
 Author: Zev
 Date: 2026-04-23
 """
 
 from __future__ import annotations
 
-import time
 from typing import Callable, Optional
 
 from pigit.termui import Component, palette
@@ -119,63 +118,3 @@ class AppFooter(Component):
                 row, x, rest, fg=self._theme.fg_muted, bg=palette.DEFAULT_BG
             )
             x += wcswidth(rest)
-
-
-class PeekLabel:
-    """Transient tab-switch feedback rendered into body surface.
-
-    Not a Component — managed directly by PigitApplication.
-    """
-
-    def __init__(self) -> None:
-        self._label: Optional[str] = None
-        self._peek_until: float = 0.0
-
-    def show(self, label: str, duration: float = 0.5) -> None:
-        """Trigger a peek label display."""
-        self._label = label
-        self._peek_until = time.monotonic() + duration
-
-    def is_visible(self) -> bool:
-        """Check if the peek label should still be rendered."""
-        if self._label is None:
-            return False
-        if time.monotonic() > self._peek_until:
-            self._label = None
-            return False
-        return True
-
-    def render(self, surface, theme: FlatTheme) -> None:
-        """Render the peek label centered on the given surface."""
-        if not self.is_visible():
-            return
-        if not self._label:
-            return
-
-        w, h = surface.width, surface.height
-        if w < 10 or h < 3:
-            return
-
-        label = self._label
-        label_w = wcswidth(label)
-
-        # Box dimensions
-        box_w = min(w - 4, label_w + 6)
-        box_h = min(h - 2, 3)
-        box_x = (w - box_w) // 2
-        box_y = (h - box_h) // 2
-
-        # Fill background
-        surface.fill_rect_rgb(box_y, box_x, box_w, box_h, theme.bg_active)
-
-        # Center text
-        text_x = box_x + (box_w - label_w) // 2
-        text_y = box_y + box_h // 2
-        surface.draw_text_rgb(
-            text_y,
-            text_x,
-            label,
-            fg=theme.fg_primary,
-            bg=theme.bg_active,
-            bold=True,
-        )
