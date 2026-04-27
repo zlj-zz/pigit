@@ -143,15 +143,6 @@ class _Subsurface:
             return
         self._parent.draw_box(*clipped, title)
 
-    def fill_rect(
-        self, row: int, col: int, width: int, height: int, char: str = " "
-    ) -> None:
-        """Fill a rectangular area with char, clipped to subsurface bounds."""
-        clipped = self._clip(row, col, width, height)
-        if clipped is None:
-            return
-        self._parent.fill_rect(*clipped, char)
-
     def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
         """Return a nested subsurface relative to this one."""
         return _Subsurface(
@@ -183,22 +174,6 @@ class _Subsurface:
         if clipped is None:
             return
         self._parent.fill_rect_rgb(*clipped, bg)
-
-    def draw_row_rgb(
-        self,
-        row: int,
-        text: str,
-        fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
-        bold: bool = False,
-        align: Literal["left", "center"] = "left",
-    ) -> None:
-        """Write a full-width row with RGB colors, clipped to subsurface bounds."""
-        if row < 0 or row >= self.height:
-            return
-        self._parent.draw_row_rgb(
-            self._row + row, text, fg=fg, bg=bg, bold=bold, align=align
-        )
 
     def draw_box_rgb(
         self,
@@ -360,17 +335,6 @@ class Surface:
             pad = max(0, (width - 2 - wcswidth(title_text)) // 2)
             self.draw_text(row, col + 1 + pad, title_text)
 
-    def fill_rect(
-        self, row: int, col: int, width: int, height: int, char: str = " "
-    ) -> None:
-        """Fill a rectangular area starting at (row, col)."""
-        ch = char[0] if char else " "
-        cell = FlatCell(ch)
-        for r in range(row, min(row + height, self.height)):
-            for c in range(col, min(col + width, self.width)):
-                if 0 <= r < self.height and 0 <= c < self.width:
-                    self._rows[r][c] = cell
-
     def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
         """Return a proxy that translates local coordinates to this surface."""
         return _Subsurface(self, row, col, width, height)
@@ -449,40 +413,6 @@ class Surface:
                 if 0 <= r < self.height and 0 <= c < self.width:
                     self._rows[r][c] = cell
 
-    def draw_row_rgb(
-        self,
-        row: int,
-        text: str,
-        fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
-        bold: bool = False,
-        align: Literal["left", "center"] = "left",
-    ) -> None:
-        """Write a full-width row with RGB colors.
-
-        Text is truncated or padded with spaces to fill the row width.
-        """
-        if row < 0 or row >= self.height or self.width <= 0:
-            return
-        text_width = wcswidth(text)
-        if text_width > self.width:
-            text = truncate_by_width(text, self.width - 1) + "\u2026"
-            text_width = wcswidth(text)
-        if align == "center":
-            pad_left = max(0, (self.width - text_width) // 2)
-            text = " " * pad_left + text
-        padded = pad_by_width(text, self.width)
-        cur_col = 0
-        for ch in padded:
-            if cur_col >= self.width:
-                break
-            w = _char_width(ord(ch))
-            if cur_col >= 0 and cur_col + w <= self.width:
-                self._rows[row][cur_col] = FlatCell(ch, fg=fg, bg=bg, bold=bold)
-                if w == 2:
-                    self._rows[row][cur_col + 1] = FlatCell("")
-            cur_col += w
-
     def draw_box_rgb(
         self,
         row: int,
@@ -545,24 +475,6 @@ class Surface:
         for c in range(col, min(col + width, self.width)):
             if 0 <= row < self.height and 0 <= c < self.width:
                 self._rows[row][c] = cell
-
-    def fill_row_bg(self, row: int, bg: tuple[int, int, int]) -> None:
-        """Fill the background of an entire row, preserving characters.
-
-        Only the ``bg`` attribute is changed; ``fg``, ``bold``, and
-        ``ansi_style`` are retained.
-        """
-        if row < 0 or row >= self.height:
-            return
-        for c in range(self.width):
-            old = self._rows[row][c]
-            self._rows[row][c] = FlatCell(
-                old.char,
-                fg=old.fg,
-                bg=bg,
-                bold=old.bold,
-                ansi_style=old.ansi_style,
-            )
 
     def rows(self) -> list[list[FlatCell]]:
         """Return the internal row buffers for Renderer output.

@@ -45,12 +45,6 @@ class TestSurface:
         assert lines[0].startswith("┌")
         assert lines[0].endswith("┐")
 
-    def test_fill_rect(self):
-        s = Surface(5, 3)
-        s.fill_rect(1, 1, 3, 2, "#")
-        assert s.lines()[1] == " ### "
-        assert s.lines()[2] == " ### "
-
     def test_clear_resets_all_cells(self):
         s = Surface(4, 2)
         s.draw_text(0, 0, "ABCD")
@@ -176,15 +170,6 @@ class TestSubsurface:
         assert lines[3][1] == "└"
         assert lines[3][3] == "┘"
 
-    def test_fill_rect_clipped_by_subsurface_bounds(self):
-        parent = Surface(5, 5)
-        sub = parent.subsurface(1, 1, 2, 2)
-        sub.fill_rect(0, 0, 5, 5, "#")
-        lines = parent.lines()
-        assert lines[1][1:3] == "##"
-        assert lines[2][1:3] == "##"
-        assert lines[0] == "     "
-        assert lines[3] == "     "
 
 
 class TestSurfaceEdgeCases:
@@ -207,12 +192,6 @@ class TestSubsurfaceEdgeCases:
         parent = Surface(5, 5)
         sub = parent.subsurface(1, 1, 3, 3)
         sub.draw_box(0, 2, 5, 5)  # col=2 >= width=3 -> clipped None
-        assert parent.lines()[1] == "     "
-
-    def test_fill_rect_clipped_to_zero_is_noop(self):
-        parent = Surface(5, 5)
-        sub = parent.subsurface(1, 1, 3, 3)
-        sub.fill_rect(0, 3, 5, 5, "#")  # col=3 >= width=3 -> clipped None
         assert parent.lines()[1] == "     "
 
     def test_draw_row_out_of_bounds_is_noop(self):
@@ -315,38 +294,6 @@ class TestSurfaceRGB:
         assert s.rows()[2][1].bg == (0, 0, 255)
         assert s.rows()[2][2].bg == (0, 0, 255)
 
-    def test_draw_row_rgb(self):
-        s = Surface(5, 1)
-        s.draw_row_rgb(0, "hi", fg=(255, 255, 255), bg=(0, 0, 0))
-        row = s.rows()[0]
-        assert row[0].char == "h"
-        assert row[0].fg == (255, 255, 255)
-        assert row[4].char == " "  # padded
-
-    def test_draw_row_rgb_center(self):
-        s = Surface(6, 1)
-        s.draw_row_rgb(0, "hi", fg=(255, 0, 0), align="center")
-        line = s.lines()[0]
-        assert line == "  hi  "
-
-    def test_fill_row_bg(self):
-        s = Surface(5, 1)
-        s.draw_text(0, 0, "hello")
-        s.fill_row_bg(0, (100, 100, 100))
-        row = s.rows()[0]
-        assert row[0].char == "h"
-        assert row[0].bg == (100, 100, 100)
-        assert row[4].char == "o"
-        assert row[4].bg == (100, 100, 100)
-
-    def test_fill_row_bg_preserves_fg(self):
-        s = Surface(3, 1)
-        s.draw_text_rgb(0, 0, "A", fg=(255, 0, 0))
-        s.fill_row_bg(0, (0, 0, 255))
-        row = s.rows()[0]
-        assert row[0].fg == (255, 0, 0)
-        assert row[0].bg == (0, 0, 255)
-
     def test_subsurface_with_margin(self):
         s = Surface(10, 10)
         sub = s.subsurface_with_margin(
@@ -393,12 +340,6 @@ class TestSurfaceRGBEdgeCases:
             for cell in row:
                 assert cell.bg == (18, 18, 22)
 
-    def test_fill_row_bg_out_of_bounds(self):
-        s = Surface(3, 1)
-        s.fill_row_bg(-1, (255, 0, 0))
-        s.fill_row_bg(5, (255, 0, 0))
-        # No crash, no changes
-        assert all(c.bg == (18, 18, 22) for c in s.rows()[0])
 
 
 class TestSurfaceRGBWideChars:
@@ -440,12 +381,4 @@ class TestSurfaceRGBWideChars:
         assert row[2].char == ""  # spacer
         assert row[3].char == "B"  # C is clipped
 
-    def test_draw_row_rgb_wide_char_no_overflow(self):
-        s = Surface(5, 1)
-        s.draw_row_rgb(0, "中文", fg=(255, 0, 0))
-        row = s.rows()[0]
-        assert row[0].char == "中"
-        assert row[1].char == ""
-        assert row[2].char == "文"
-        assert row[3].char == ""
-        assert row[4].char == " "
+
