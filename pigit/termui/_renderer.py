@@ -299,6 +299,7 @@ class Renderer:
             for idx, line in enumerate(lines, start=1):
                 self.move_cursor(idx, 1)
                 self._out.write(line)
+                self.erase_line_to_end()
         else:
             for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
                 if old != new:
