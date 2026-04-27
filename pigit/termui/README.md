@@ -69,7 +69,7 @@ flowchart TB
 | `input_terminal.py` | `InputTerminal` protocol |
 | `input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
 | `_geometry.py` | `TerminalSize` and related helpers |
-| `_picker.py` | `SearchableListPicker` component (CLI/repo flows) |
+| `_picker.py` | Picker building blocks — `SearchableListPicker` not yet provided |
 | `picker_layout.py` | Layout helpers for pickers |
 | `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
 | `types.py` | `ActionEventType`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
@@ -111,7 +111,7 @@ Stable names are listed in `__all__` inside `__init__.py`. Highlights:
 - **Application**: `Application`, `ComponentRoot` (internal but exported), `ExitEventLoop`
 - **Loop**: `AppEventLoop`, `Session`, `Renderer`, `TerminalSize`
 - **Bindings**: `bind_keys`, `list_bindings`, `BindingError`
-- **Picker**: `SearchableListPicker`, `PickerRow`
+- **Picker**: `PickerRow` (building blocks; `SearchableListPicker` not yet provided)
 - **Text**: `sanitize_for_display`, `get_width`, `plain`
 
 Import the package once for app-level wiring:

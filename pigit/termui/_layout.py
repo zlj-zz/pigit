@@ -32,20 +32,6 @@ class SizeModifier(Protocol):
         """Return the (top, left) offset introduced by this modifier."""
 
 
-@runtime_checkable
-class LayoutEngine(Protocol):
-    """Protocol for layout engines that resize children within available space."""
-
-    def resize_children(
-        self, available: tuple[int, int], offset: tuple[int, int]
-    ) -> None:
-        """Resize all managed children within the available space.
-
-        ``offset`` is the parent container's (x, y) in screen 1-based
-        coordinates; children x/y must be set relative to the screen.
-        """
-
-
 class Padding:
     """Shrink available space by fixed offsets on each side."""
 

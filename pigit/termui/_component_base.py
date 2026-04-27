@@ -24,7 +24,6 @@ from ._renderer_context import (
 from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from ._layout import LayoutEngine
     from ._renderer import Renderer
     from ._surface import Surface
 
