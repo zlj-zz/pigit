@@ -57,8 +57,14 @@ class DiffViewer(LineTextBrowser):
         render tabs as variable-width whitespace, while our width calculations
         treat every codepoint as width 1. Without expansion, tab-heavy diff
         lines overflow their allocated columns and corrupt borders.
+
+        Carriage returns (``\\r``) are stripped because CRLF files cause
+        ``\\r`` to reset the cursor to the start of the line, corrupting
+        the rendered output.
         """
-        self._content = [line.expandtabs(8) for line in diff_lines]
+        self._content = [
+            line.replace("\r", "").expandtabs(8) for line in diff_lines
+        ]
         self._compute_heatmap()
         self._compute_line_numbers()
 
