@@ -1,5 +1,56 @@
 # Changelog of pigit
 
+## 1.8.3 (2026-04-27)
+
+### App
+
+- **StatusPanel `C` key**: opens `$EDITOR` via `Application.exec_external` (TUI suspends/resumes around the editor session); checks for staged changes before launching.
+- **Header branch name refresh**: `Signal[str]` drives branch name updates; `BranchPanel` writes the signal on successful checkout so the header updates immediately without waiting for a full re-render cycle.
+- **`_PigitWidgets` dataclass**: consolidates 11 `Optional` widget fields in `PigitApplication.__init__` into a single dataclass with a `_w` property for non-null access.
+- **Panel constructor cleanup**: removed unused `x`, `y`, `size`, `content`, `repo_path`, `repo_conf` parameters from `StatusPanel`, `BranchPanel`, and `CommitPanel`.
+- **`CommitViewMode` enum**: replaces string `"list"` / `"river"` with `CommitViewMode.LIST` / `CommitViewMode.HEATMAP`.
+- **`rel_time_cache`**: panel-owned `dict[str, str]` cache replaces mutation of `commit._rel_time` on model objects.
+- **Inspector data objects**: `FileInfo`, `BranchInfo`, `CommitInfo` dataclasses replace the `isinstance` chain in inspector dispatch.
+- **`ContributionGraph.render_into`**: public entry point so `CommitPanel` no longer calls the private `_render_surface` across classes.
+- **`_draw_diff_line` helper**: deduplicates the per-line rendering logic shared between `DiffViewer._render_surface` (bordered) and `_render_surface_borderless`.
+- **`app_palette` renamed to `app_command_palette`** with defensive checks.
+
+### TermUI
+
+- **Popup handler caching**: `Popup` pre-resolves `self` and child binding handlers in `__init__`, avoiding `resolve_key_handlers_merged` on every keypress.
+- **`Application.BINDINGS` type annotation**: `Optional[BindingsList]` replaces untyped `= None`.
+- **`BindingError` and `keys` exported**: added to `pigit.termui.__init__.__all__`.
+- **`before_mouse_event` hook**: `AppEventLoop` exposes `before_mouse_event(event)` for subclass overrides.
+- **Removed dead `LayoutEngine` Protocol**: no implementations existed; deleted from `_layout.py` and `_component_base.py`.
+- **`Component.resize()` cleanup**: removed misleading `for child in self.children: child.resize(size)` propagation; layout containers (`Column`, `Row`, `TabView`) handle their own child sizing.
+- **RGB migration completed**: all draw calls migrated to `*_rgb` methods; legacy ANSI draw methods removed from `Surface` and callers.
+- **`describe_row` API**: `ItemSelector` subclasses declare row content declaratively as `(left, main, right)` segment tuples; base class handles truncation and alignment.
+- **Color constants extracted**: `DEFAULT_BG`, `DEFAULT_FG`, etc. moved to `palette` module.
+- **`fresh()` → `refresh()`**, `ActionLiteral` → `ActionEventType`.
+- **ANSI sequence fix**: corrected 256-color and 16-color mode SGR sequences.
+
+### Git
+
+- **`load_status()` decoupled from rendering**: removed `max_width`, `ident`, `plain`, `icon` parameters; returns pure `File` data without width-dependent formatting.
+
+### Renderer
+
+- **Erase line tail on full-screen clear**: after `clear_screen()`, each written row is followed by `erase_line_to_end()` to prevent stale content from lingering on the right side when terminal width increases.
+
+### Diff
+
+- **CRLF handling**: strip `\r` before `expandtabs(8)` to prevent carriage returns from resetting the cursor mid-line.
+
+### Docs
+
+- **TermUI docstrings**: added to public classes and methods.
+- **README picker note**: `_picker.py` documented as building-blocks only; `SearchableListPicker` not yet provided.
+- **README section order**: Interaction moved before Commands.
+
+### CI
+
+- **Workflow filename**: `ci.yml` → `ci.yaml` to match PyPI trusted publisher requirements.
+
 ## 1.8.2 (2026-04-26)
 
 ### TermUI — Component model & layout
