@@ -1,5 +1,35 @@
 # Changelog of pigit
 
+## 1.8.4 (2026-04-27)
+
+### App
+
+- **Inspector update logic sunk to `InspectorPanel`**: `update_from(source)` handles `(id(source), curr_no)` caching and `get_inspector_data()` dispatch; app layer deletes `_update_inspector_content()` and `_last_inspector_key` state.
+- **`FlatTheme.bg_palette`**: command palette background color moved from local `_PALETTE_BG = (45, 45, 50)` into the theme system.
+- **`CommitPanel._max_meta_w` initialized in `__init__`**: explicit `self._max_meta_w = 0` removes the need for defensive `getattr(..., 0)` in `describe_row`.
+
+### TermUI
+
+- **`LoopKwargs` TypedDict**: `Application.__init__(**loop_kwargs: Unpack[LoopKwargs])` declares the forwarded `AppEventLoop` keyword arguments for type-checker validation.
+- **`Application._root` explicitly declared**: `self._root: Optional[ComponentRoot] = None` added to `__init__`.
+- **Surface `draw_text_rgb` performance**: pre-computes `wcswidth` before the hot loop, ASCII fast path bypasses per-char `_char_width` calls, `_SPACER_CELL` constant avoids repeated `FlatCell("")` allocations.
+- **Unused import cleanup**: removed `Callable`, `LayerKind`, `palette`, `subprocess`, and stale `TYPE_CHECKING` blocks across `app.py`, `_application.py`, `_layout.py`, `_text.py`.
+
+### Git
+
+- **Merge command branch completion**: `m`, `m.no`, `m.ff`, `m.squash` gain `arg_completion=CompletionType.BRANCH` for tab-completion of branch names.
+
+### Bug Fixes
+
+- **Event loop exception guard**: `_dispatch_semantic_string` catches non-`ExitEventLoop` exceptions in overlay handlers, binding handlers, and child `_handle_event`, preventing a single panel callback from crashing the entire TUI.
+- **`exec_external` decoupled via `ContextVar`**: `pigit.termui._session_context` provides `exec_external()` without requiring `Application` inheritance; `Session.__enter__/__exit__` correctly set/reset the context token.
+- **`GitError` exception contract**: `checkout_branch` raises `GitError` instead of returning a string; callers use `try/except` with `show_toast` for user-facing errors.
+- **`ItemSelector.previous` copy-paste fix**: removed the impossible `tmp >= len(self.content)` condition carried over from `next()`.
+
+### Tests
+
+- **`test_advanced_features` import path**: corrected `app_palette` → `app_command_palette`.
+
 ## 1.8.3 (2026-04-27)
 
 ### App
