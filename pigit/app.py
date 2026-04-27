@@ -35,7 +35,7 @@ from .app_chrome import AppFooter, PeekLabel
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
-from .app_palette import CommandPalette
+from .app_command_palette import CommandPalette
 from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.repo import Repo

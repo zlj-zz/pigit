@@ -145,6 +145,10 @@ class CommandPalette(Component):
             self._cursor += 1
             self._update_candidates()
 
+        # Defensive clamp: ensure cursor invariant even if future key
+        # handlers or external mutation leave _cursor out of bounds.
+        self._cursor = max(0, min(len(self._value), self._cursor))
+
     def _update_candidates(self) -> None:
         """Update candidate list based on current input."""
         value = self._value.strip().lower()

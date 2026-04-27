@@ -8,6 +8,8 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+import logging
+
 from typing import Optional
 
 from pigit.termui import (
@@ -21,6 +23,8 @@ from pigit.termui import (
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
+
+_logger = logging.getLogger(__name__)
 
 
 class DiffViewer(LineTextBrowser):
@@ -173,6 +177,10 @@ class DiffViewer(LineTextBrowser):
                 if m:
                     old_line = int(m.group(1))
                     new_line = int(m.group(2))
+                else:
+                    _logger.warning("Unexpected @@ line format: %r", line)
+                    old_line = 0
+                    new_line = 0
                 self._line_numbers.append("")
             elif line.startswith("+"):
                 self._line_numbers.append(str(new_line))
