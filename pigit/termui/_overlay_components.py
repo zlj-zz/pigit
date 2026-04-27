@@ -79,7 +79,9 @@ class HelpPanel(Component):
         self._scroll_h = 6
         self._outer_w = 42
         self.outer_row_count = 10
-        self._frame = BoxFrame(0, 0, title="Help   esc close")
+        self._frame = BoxFrame(
+            0, 0, title="Help   esc close", fg=DEFAULT_FG, bg=DEFAULT_BG
+        )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         # Each element is a list of (text, fg, bold) segments for one line.
         self._line_segments: list[
@@ -485,7 +487,7 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._content_lines: list[str] = []
         self._needs_rebuild = True
-        self._frame = BoxFrame(0, 0, title="Alert")
+        self._frame = BoxFrame(0, 0, title="Alert", fg=DEFAULT_FG, bg=DEFAULT_BG)
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size)
 
@@ -734,7 +736,7 @@ class Toast(Component):
         inner_w = max(len(line) for line in self._lines) if self._lines else 0
 
         if self._frame is None:
-            self._frame = BoxFrame(inner_w, inner_h)
+            self._frame = BoxFrame(inner_w, inner_h, fg=DEFAULT_FG, bg=DEFAULT_BG)
         else:
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
@@ -812,6 +814,10 @@ class Toast(Component):
         if render_col + self._outer_w <= 0 or render_col >= surface.width:
             return
 
+        # Clear background to prevent residue from previous frames or underlying content.
+        surface.fill_rect_rgb(
+            base_row, render_col, self._outer_w, self.outer_row_count, DEFAULT_BG
+        )
         self._frame.draw_onto(surface, base_row, render_col)
         self._frame.draw_content(surface, base_row, render_col, self._lines)
 

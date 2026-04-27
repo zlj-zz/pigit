@@ -204,14 +204,9 @@ class DiffViewer(LineTextBrowser):
             self._render_surface_borderless(surface)
             return
 
-        # Draw top and bottom borders
-        inner_w = w - 2
-        top_border = "\u250c" + "\u2500" * inner_w + "\u2510"
-        bottom_border = "\u2514" + "\u2500" * inner_w + "\u2518"
-        surface.draw_text_rgb(0, 0, top_border, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
-        surface.draw_text_rgb(
-            h - 1, 0, bottom_border, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-        )
+        # Draw outer box frame (content rows will overlay left/right borders with
+        # their own background colors).
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
 
         # Content area is inset by 1 row and 1 column on each side
         content_h = h - 2
@@ -239,12 +234,9 @@ class DiffViewer(LineTextBrowser):
                 bg = palette.DEFAULT_BG
                 fg = THEME.fg_primary
 
-            # Fill the entire content row background (including border columns)
-            # so colored diff bars extend seamlessly to the edges
-            surface.fill_rect_rgb(row, 0, w, 1, bg)
-
-            # Draw left border overlaid on the row background
-            surface.draw_text_rgb(row, 0, "\u2502", fg=THEME.fg_dim, bg=bg)
+            # Fill only the content area background, keeping border columns
+            # at the default background so the box frame remains clean.
+            surface.fill_rect_rgb(row, 1, w - 2, 1, bg)
 
             # Draw line number (right-aligned in line-no column)
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
@@ -263,20 +255,12 @@ class DiffViewer(LineTextBrowser):
             color = self._heatmap_colors[idx]
             surface.draw_text_rgb(row, w - 2, sym, fg=color, bg=bg)
 
-            # Draw right border overlaid on the row background
-            surface.draw_text_rgb(row, w - 1, "\u2502", fg=THEME.fg_dim, bg=bg)
-
-        # When content is shorter than viewport, remaining rows must still
-        # show left/right borders so the box frame stays complete.
-        last_content_row = end - self._i  # 0-based index of last content row
+        # When content is shorter than viewport, fill remaining rows with the
+        # default background (outer box frame already drew left/right borders).
+        last_content_row = end - self._i
         for blank_row in range(last_content_row + 1, h - 1):
-            surface.fill_rect_rgb(blank_row, 0, w, 1, palette.DEFAULT_BG)
-            surface.draw_text_rgb(
-                blank_row, 0, "\u2502", fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-            )
-            surface.draw_text_rgb(
-                blank_row, w - 1, "\u2502", fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-            )
+            # Fill only the interior so the outer box frame borders remain.
+            surface.fill_rect_rgb(blank_row, 1, w - 2, 1, palette.DEFAULT_BG)
 
     def _render_surface_borderless(self, surface) -> None:
         """Original rendering without box border, used when surface is too small."""

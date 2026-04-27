@@ -19,7 +19,7 @@ from pigit.termui import (
     keys,
     palette,
 )
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -124,137 +124,61 @@ class CommitPanel(ItemSelector):
     def _render_surface(self, surface) -> None:
         if not self.content:
             return
-
+        super()._render_surface(surface)
         if self._view_mode == "river":
-            # Render list underneath, then overlay heatmap on top half.
-            self._render_list_view(surface)
             self._render_heatmap_overlay(surface)
-            return
 
-        self._render_list_view(surface)
+    def describe_row(
+        self, idx: int, is_cursor: bool
+    ) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return row description: [cursor][unpushed][SHA][msg][tag][meta]"""
+        if idx >= len(self.commits):
+            prefix = "\u25cf " if is_cursor else "  "
+            return ([(prefix + self.content[idx], THEME.fg_muted, is_cursor)], None, [])
 
-    def _render_list_view(self, surface) -> None:
-        """Render commit list as:
-        [cursor 2cols][unpushed? 2cols][SHA 8cols][msg.........][tag][  author  reltime]
+        commit = self.commits[idx]
 
-        Meta (author + relative_time) is right-aligned using the widest meta width across
-        all commits so every row ends at the same column for vertical alignment.
-        """
-        w = surface.width
-        end = min(self._r_start + self._size[1], len(self.content))
+        # Cursor indicator (2 cols)
+        if is_cursor:
+            left = [("\u25cf", THEME.fg_primary, True), (" ", THEME.fg_primary, False)]
+        else:
+            left = [("  ", THEME.fg_primary, False)]
+
+        # Unpushed marker (2 cols)
+        if not commit.is_pushed():
+            left.append(("\u25cf", THEME.accent_yellow, is_cursor))
+            left.append((" ", THEME.fg_primary, False))
+        else:
+            left.append(("  ", THEME.fg_primary, False))
+
+        # SHA + spacer (8 cols)
+        left.append((commit.sha[:7], THEME.fg_dim, is_cursor))
+        left.append((" ", THEME.fg_primary, False))
+
+        # Main: message + optional tag
+        tag_str = f" {commit.tag[0]}" if commit.tag else ""
+        main = [
+            (commit.msg, THEME.fg_primary, is_cursor),
+            (tag_str, THEME.accent_cyan, is_cursor),
+        ]
+
+        # Right: padded meta
+        author = commit.author
+        rel = getattr(commit, "_rel_time", None) or relative_time(commit.unix_timestamp)
+        meta = f"  {author}  {rel}"
+        meta_w = wcswidth(meta)
         max_meta_w = getattr(self, "_max_meta_w", 0)
+        reserve = max(max_meta_w, meta_w)
+        pad = reserve - meta_w
+        if pad > 0:
+            meta = " " * pad + meta
+        right = [(meta, THEME.fg_muted, is_cursor)]
 
-        for idx in range(self._r_start, end):
-            row = idx - self._r_start
-            is_cursor = idx == self.curr_no
-
-            if idx >= len(self.commits):
-                # Fallback for non-commit rows (e.g. "No commits found.")
-                prefix = "\u25cf " if is_cursor else "  "
-                text = prefix + self.content[idx]
-                if wcswidth(text) > w:
-                    text = truncate_by_width(text, w - 1) + "\u2026"
-                surface.draw_text_rgb(
-                    row,
-                    0,
-                    text,
-                    fg=THEME.fg_muted,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                continue
-
-            commit = self.commits[idx]
-            x = 0
-
-            # --- Cursor indicator (reserve 2 cols for alignment) ---
-            if is_cursor:
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    "\u25cf",
-                    fg=THEME.fg_primary,
-                    bg=palette.DEFAULT_BG,
-                    bold=True,
-                )
-            x += 2
-
-            # --- Unpushed marker (2 cols) ---
-            if not commit.is_pushed():
-                marker = "\u25cf"
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    marker,
-                    fg=THEME.accent_yellow,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                x += wcswidth(marker) + 1
-            else:
-                x += 2  # empty spacer to keep alignment
-
-            # --- SHA (7 chars + 1 spacer = 8 cols) ---
-            sha = commit.sha[:7]
-            surface.draw_text_rgb(
-                row, x, sha, fg=THEME.fg_dim, bg=palette.DEFAULT_BG, bold=is_cursor
-            )
-            x += len(sha) + 1
-
-            # --- Message (truncated to leave room for tag + meta) ---
-            msg = commit.msg
-            author = commit.author
-            rel = getattr(commit, "_rel_time", None) or relative_time(
-                commit.unix_timestamp
-            )
-            meta = f"  {author}  {rel}"
-            meta_w = wcswidth(meta)
-            tag_str = f" {commit.tag[0]}" if commit.tag else ""
-            tag_w = wcswidth(tag_str)
-
-            # Reserve the widest meta width across all commits so tail info aligns vertically
-            reserve_meta_w = max(max_meta_w, meta_w)
-            avail = w - x - reserve_meta_w - tag_w - 1
-            if avail > 0:
-                if wcswidth(msg) > avail:
-                    msg = truncate_by_width(msg, avail - 1) + "\u2026"
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    msg,
-                    fg=THEME.fg_primary,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                x += wcswidth(msg)
-
-            # --- Tag ---
-            if tag_str:
-                x += 1  # spacer before tag
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    tag_str,
-                    fg=THEME.accent_cyan,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                x += tag_w
-
-            # --- Meta right-aligned using reserved width for vertical alignment ---
-            # Pad shorter meta with leading spaces so all rows end at the same column.
-            meta_x = w - reserve_meta_w
-            if meta_x >= 0:
-                pad = reserve_meta_w - meta_w
-                padded_meta = (" " * pad) + meta if pad > 0 else meta
-                surface.draw_text_rgb(
-                    row,
-                    meta_x,
-                    padded_meta,
-                    fg=THEME.fg_muted,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
+        return left, main, right
 
     def _render_heatmap_overlay(self, surface) -> None:
         """Render contribution heatmap overlay on top of panel."""

@@ -21,7 +21,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+
 
 from .app_theme import THEME
 from .git.model import File
@@ -194,114 +194,39 @@ class StatusPanel(ItemSelector):
         super().resize(size)
         self._alert_dialog.resize(size)
 
-    def _render_surface(self, surface) -> None:
-        """Render each status row as: [cursor][sp][staged][unstaged][sp][filename.......][label]
+    def describe_row(
+        self, idx: int, is_cursor: bool
+    ) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return row description: [cursor][staged][unstaged][filename.......][label]"""
+        line = self.content[idx]
+        staged = line[0] if len(line) > 0 else " "
+        unstaged = line[1] if len(line) > 1 else " "
+        filename = line[3:] if len(line) > 3 else ""
+        cursor_prefix = self.CURSOR if is_cursor else " "
 
-        The first five columns (cursor + space + staged + unstaged + space) are a fixed
-        prefix.  The filename fills the remaining width, and the status label is drawn
-        right-aligned when there is room.
-        """
-        if not self.content:
-            return
-        w = surface.width
-        end = min(self._r_start + self._size[1], len(self.content))
-        for idx in range(self._r_start, end):
-            row = idx - self._r_start
-            is_cursor = idx == self.curr_no
+        left = [
+            (cursor_prefix, THEME.fg_primary, is_cursor),
+            (" ", THEME.fg_primary, False),
+            (staged, _staged_fg(staged), is_cursor),
+            (unstaged, _unstaged_fg(unstaged), is_cursor),
+            (" ", THEME.fg_primary, False),
+        ]
 
-            line = self.content[idx]
-            staged = line[0] if len(line) > 0 else " "
-            unstaged = line[1] if len(line) > 1 else " "
-            filename = line[3:] if len(line) > 3 else ""
+        is_selected = idx in self._selected
+        filename_fg = THEME.accent_purple if is_selected else THEME.fg_primary
+        main = [(filename, filename_fg, is_cursor)]
 
-            cursor_prefix = self.CURSOR if is_cursor else " "
-            # Fixed prefix: cursor + space + staged + unstaged + space = 5 display columns
-            fixed_width = 5
+        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        if idx < len(self.files):
+            label = _status_label(self.files[idx])
+            if label:
+                right.append((label, THEME.fg_muted, False))
 
-            if fixed_width >= w:
-                # Terminal too narrow; draw truncated prefix only
-                surface.draw_text_rgb(
-                    row,
-                    0,
-                    truncate_by_width(f"{cursor_prefix} {staged}{unstaged} ", w),
-                    fg=THEME.fg_primary,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-            else:
-                # --- Draw fixed prefix (5 columns) ---
-                col = 0
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    cursor_prefix,
-                    fg=THEME.fg_primary,
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # cursor
-
-                surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=palette.DEFAULT_BG
-                )
-                col += 1  # spacer
-
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    staged,
-                    fg=_staged_fg(staged),
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # staged status
-
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    unstaged,
-                    fg=_unstaged_fg(unstaged),
-                    bg=palette.DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # unstaged status
-
-                surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=palette.DEFAULT_BG
-                )
-                col += 1  # spacer before filename
-
-                # --- Draw filename (fills remaining width) ---
-                avail = w - fixed_width
-                if wcswidth(filename) > avail:
-                    filename = truncate_by_width(filename, avail - 1) + "\u2026"
-                if filename:
-                    is_selected = idx in self._selected
-                    filename_fg = (
-                        THEME.accent_purple if is_selected else THEME.fg_primary
-                    )
-                    surface.draw_text_rgb(
-                        row,
-                        col,
-                        filename,
-                        fg=filename_fg,
-                        bg=palette.DEFAULT_BG,
-                        bold=is_cursor,
-                    )
-
-            # --- Draw status label right-aligned ---
-            if idx < len(self.files):
-                label = _status_label(self.files[idx])
-                label_w = wcswidth(label)
-                if label_w < w - 4:  # leave a small margin from the edge
-                    label_x = w - label_w
-                    surface.draw_text_rgb(
-                        row,
-                        label_x,
-                        label,
-                        fg=THEME.fg_muted,
-                        bg=palette.DEFAULT_BG,
-                    )
+        return left, main, right
 
     def on_key(self, key: str) -> None:
         if not self.files:

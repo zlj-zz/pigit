@@ -200,6 +200,63 @@ class _Subsurface:
             self._row + row, text, fg=fg, bg=bg, bold=bold, align=align
         )
 
+    def draw_box_rgb(
+        self,
+        row: int,
+        col: int,
+        width: int,
+        height: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+        title: Optional[str] = None,
+    ) -> None:
+        """Draw an RGB box-drawing border at local (row, col), clipped to bounds."""
+        clipped = self._clip(row, col, width, height)
+        if clipped is None:
+            return
+        self._parent.draw_box_rgb(*clipped, fg=fg, bg=bg, bold=bold, title=title)
+
+    def draw_vline_rgb(
+        self,
+        row: int,
+        col: int,
+        height: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+    ) -> None:
+        """Draw a vertical line at local (row, col), clipped to subsurface bounds."""
+        if col < 0 or col >= self.width or row >= self.height:
+            return
+        start = max(row, 0)
+        end = min(row + height, self.height)
+        visible_height = end - start
+        if visible_height <= 0:
+            return
+        r, c = self._to_parent(start, col)
+        self._parent.draw_vline_rgb(r, c, visible_height, fg=fg, bg=bg, bold=bold)
+
+    def draw_hline_rgb(
+        self,
+        row: int,
+        col: int,
+        width: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+    ) -> None:
+        """Draw a horizontal line at local (row, col), clipped to subsurface bounds."""
+        if row < 0 or row >= self.height or col >= self.width:
+            return
+        start = max(col, 0)
+        end = min(col + width, self.width)
+        visible_width = end - start
+        if visible_width <= 0:
+            return
+        r, c = self._to_parent(row, start)
+        self._parent.draw_hline_rgb(r, c, visible_width, fg=fg, bg=bg, bold=bold)
+
 
 class Surface:
     """2-D character buffer for declarative terminal drawing.
@@ -425,6 +482,69 @@ class Surface:
                 if w == 2:
                     self._rows[row][cur_col + 1] = FlatCell("")
             cur_col += w
+
+    def draw_box_rgb(
+        self,
+        row: int,
+        col: int,
+        width: int,
+        height: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+        title: Optional[str] = None,
+    ) -> None:
+        """Draw a box-drawing border with explicit RGB colors."""
+        if width < 2 or height < 2:
+            return
+
+        top = _BOX_TL + _BOX_H * (width - 2) + _BOX_TR
+        self.draw_text_rgb(row, col, top, fg=fg, bg=bg, bold=bold)
+        for r in range(row + 1, row + height - 1):
+            if 0 <= r < self.height:
+                if 0 <= col < self.width:
+                    self._rows[r][col] = FlatCell(_BOX_V, fg=fg, bg=bg, bold=bold)
+                end_col = col + width - 1
+                if 0 <= end_col < self.width:
+                    self._rows[r][end_col] = FlatCell(_BOX_V, fg=fg, bg=bg, bold=bold)
+        bottom = _BOX_BL + _BOX_H * (width - 2) + _BOX_BR
+        self.draw_text_rgb(row + height - 1, col, bottom, fg=fg, bg=bg, bold=bold)
+
+        if title:
+            title_text = f" {title[: max(0, width - 4)]} "
+            title_text = truncate_by_width(title_text, max(0, width - 2))
+            pad = max(0, (width - 2 - wcswidth(title_text)) // 2)
+            self.draw_text_rgb(row, col + 1 + pad, title_text, fg=fg, bg=bg, bold=bold)
+
+    def draw_vline_rgb(
+        self,
+        row: int,
+        col: int,
+        height: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+    ) -> None:
+        """Draw a vertical line with RGB colors."""
+        cell = FlatCell(_BOX_V, fg=fg, bg=bg, bold=bold)
+        for r in range(row, min(row + height, self.height)):
+            if 0 <= r < self.height and 0 <= col < self.width:
+                self._rows[r][col] = cell
+
+    def draw_hline_rgb(
+        self,
+        row: int,
+        col: int,
+        width: int,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] = DEFAULT_BG,
+        bold: bool = False,
+    ) -> None:
+        """Draw a horizontal line with RGB colors."""
+        cell = FlatCell(_BOX_H, fg=fg, bg=bg, bold=bold)
+        for c in range(col, min(col + width, self.width)):
+            if 0 <= row < self.height and 0 <= c < self.width:
+                self._rows[row][c] = cell
 
     def fill_row_bg(self, row: int, bg: tuple[int, int, int]) -> None:
         """Fill the background of an entire row, preserving characters.

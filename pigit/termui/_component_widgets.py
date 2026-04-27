@@ -153,12 +153,156 @@ class ItemSelector(Component):
         pass
 
     def _render_surface(self, surface: "Surface") -> None:
+        """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             return
         end = min(self._r_start + self._size[1], len(self.content))
         for idx in range(self._r_start, end):
-            prefix = self.CURSOR if idx == self.curr_no else " "
-            surface.draw_text(idx - self._r_start, 0, f"{prefix}{self.content[idx]}")
+            row = idx - self._r_start
+            is_cursor = idx == self.curr_no
+            left, main, right = self.describe_row(idx, is_cursor)
+            self._draw_row_layout(surface, row, left, main, right)
+
+    def describe_row(
+        self, idx: int, is_cursor: bool
+    ) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return a description of the row at ``idx`` for declarative rendering.
+
+        Subclasses override this to describe what should appear on each row;
+        the base class handles all drawing via ``_draw_row_layout``.
+
+        Returns:
+            (left_segments, main_segments, right_segments) where each segment
+            is ``(text, fg_rgb, bold)``.  Main segments are drawn sequentially
+            and truncated as a group to fit between left and right;
+            ``None`` means no main content.
+        """
+        prefix = self.CURSOR if is_cursor else " "
+        text = f"{prefix}{self.content[idx]}"
+        return ([(text, DEFAULT_FG, False)], None, [])
+
+    # --- row-rendering helpers ---
+
+    def _truncate_text(self, text: str, max_width: int) -> str:
+        """Truncate text with ellipsis if it exceeds ``max_width`` display columns."""
+        if max_width <= 0:
+            return ""
+        if wcswidth(text) > max_width:
+            return truncate_by_width(text, max_width - 1) + "\u2026"
+        return text
+
+    def _draw_segments(
+        self,
+        surface: "Surface",
+        row: int,
+        col: int,
+        segments: list[tuple[str, tuple[int, int, int], bool]],
+    ) -> int:
+        """Draw a sequence of ``(text, fg, bold)`` segments starting at ``col``.
+
+        Returns the column position after the last segment.
+        """
+        for text, fg, bold in segments:
+            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            col += wcswidth(text)
+        return col
+
+    def _draw_row_layout(
+        self,
+        surface: "Surface",
+        row: int,
+        left: list[tuple[str, tuple[int, int, int], bool]],
+        main: list[tuple[str, tuple[int, int, int], bool]] | None,
+        right: list[tuple[str, tuple[int, int, int], bool]],
+        *,
+        min_gap: int = 1,
+    ) -> None:
+        """Draw a row with left segments, main segments, and right-aligned segments.
+
+        Main segments are drawn sequentially after left segments and are truncated
+        as a group to fit before right segments, with ``min_gap`` columns of
+        minimum spacing on each side.  If the row is too narrow for right
+        segments, they are omitted and main is truncated against left only.
+        """
+        w = surface.width
+        left_w = sum(wcswidth(text) for text, _, _ in left)
+        right_w = sum(wcswidth(text) for text, _, _ in right)
+
+        # Determine how much room main has; drop right if necessary.
+        main_avail = w - left_w - right_w - min_gap * 2
+        if main_avail < 0 and right:
+            right_w = 0
+            main_avail = w - left_w - min_gap * 2
+        if main_avail < 0:
+            main_avail = max(0, w - left_w - min_gap)
+
+        # Draw left segments (truncated if they exceed surface width).
+        col = 0
+        for text, fg, bold in left:
+            text_w = wcswidth(text)
+            if col + text_w > w:
+                text = self._truncate_text(text, max(0, w - col))
+                text_w = wcswidth(text) if text else 0
+            if not text:
+                break
+            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            col += text_w
+
+        # Draw main segments (truncated as a group to fit).
+        if main and main_avail > 0:
+            col += min_gap
+            remaining = main_avail
+            for text, fg, bold in main:
+                text_w = wcswidth(text)
+                if text_w > remaining:
+                    text = self._truncate_text(text, remaining)
+                    text_w = wcswidth(text) if text else 0
+                if text:
+                    surface.draw_text_rgb(
+                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                    )
+                    col += text_w
+                remaining -= text_w
+                if remaining <= 0:
+                    break
+
+        # Draw right segments (right-aligned).
+        if right:
+            right_start = w - right_w
+            if right_start >= left_w + min_gap:
+                col = right_start
+                for text, fg, bold in right:
+                    surface.draw_text_rgb(
+                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                    )
+                    col += wcswidth(text)
+
+    def _draw_right_aligned(
+        self,
+        surface: "Surface",
+        row: int,
+        text: str,
+        fg: tuple[int, int, int],
+        *,
+        bold: bool = False,
+        margin: int = 4,
+    ) -> bool:
+        """Draw ``text`` right-aligned if it fits within ``width - margin``.
+
+        Returns ``True`` if drawn, ``False`` if skipped (too wide).
+        """
+        w = surface.width
+        text_w = wcswidth(text)
+        if text_w < w - margin:
+            surface.draw_text_rgb(
+                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, bold=bold
+            )
+            return True
+        return False
 
     def _notify_change(self) -> None:
         if self._on_change is not None:

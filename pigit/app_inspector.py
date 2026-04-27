@@ -132,12 +132,15 @@ class InspectorPanel(Component):
         if w <= 0 or h <= 0:
             return
 
-        # Left border
-        for row in range(h):
-            surface.draw_text_rgb(row, 0, "│", fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        # Left border and separator
+        content_x = 2
+        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        if h > 1:
+            surface.draw_hline_rgb(
+                1, content_x, w - content_x, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
+            )
 
         # Title
-        content_x = 2
         title = f" {self._title} "
         title_w = wcswidth(title)
         if title_w < w - content_x:
@@ -148,13 +151,6 @@ class InspectorPanel(Component):
                 fg=THEME.accent_cyan,
                 bg=palette.DEFAULT_BG,
                 bold=True,
-            )
-
-        # Separator under title
-        if h > 1:
-            sep = "─" * (w - content_x)
-            surface.draw_text_rgb(
-                1, content_x, sep, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
             )
 
         # Content lines

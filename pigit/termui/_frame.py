@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
@@ -24,10 +25,17 @@ class BoxFrame:
         inner_width: int,
         inner_height: int,
         title: Optional[str] = None,
+        *,
+        fg: Optional[tuple[int, int, int]] = None,
+        bg: Optional[tuple[int, int, int]] = None,
+        bold: bool = False,
     ) -> None:
         self.inner_width = inner_width
         self.inner_height = inner_height
         self.title = title
+        self.fg = fg
+        self.bg = bg
+        self.bold = bold
         self._recalc_outer()
 
     def _recalc_outer(self) -> None:
@@ -42,7 +50,19 @@ class BoxFrame:
 
     def draw_onto(self, surface: "Surface", row: int, col: int) -> None:
         """Draw border onto surface at (row, col)."""
-        surface.draw_box(row, col, self.outer_width, self.outer_height, self.title)
+        if self.fg is not None:
+            surface.draw_box_rgb(
+                row,
+                col,
+                self.outer_width,
+                self.outer_height,
+                fg=self.fg,
+                bg=self.bg if self.bg is not None else DEFAULT_BG,
+                bold=self.bold,
+                title=self.title,
+            )
+        else:
+            surface.draw_box(row, col, self.outer_width, self.outer_height, self.title)
 
     def draw_content(
         self, surface: "Surface", row: int, col: int, lines: list[str]
@@ -62,4 +82,14 @@ class BoxFrame:
             text = pad_by_width(
                 truncate_by_width(line, self.inner_width), self.inner_width
             )
-            surface.draw_text(content_row + i, content_col, text)
+            if self.fg is not None:
+                surface.draw_text_rgb(
+                    content_row + i,
+                    content_col,
+                    text,
+                    fg=self.fg,
+                    bg=self.bg if self.bg is not None else DEFAULT_BG,
+                    bold=self.bold,
+                )
+            else:
+                surface.draw_text(content_row + i, content_col, text)
