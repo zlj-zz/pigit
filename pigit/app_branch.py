@@ -17,6 +17,7 @@ from pigit.termui import (
     palette,
     show_toast,
 )
+from pigit.termui._reactive import Signal
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_inspector import BranchInfo
@@ -40,6 +41,7 @@ class BranchPanel(ItemSelector):
         content: Optional[list[str]] = None,
         *,
         on_selection_changed: Optional[Callable] = None,
+        branch_signal: Optional[Signal[str]] = None,
         git: "LocalGit",
         repo_path: Optional[str] = None,
         repo_conf: Optional[str] = None,
@@ -55,6 +57,7 @@ class BranchPanel(ItemSelector):
         self.repo_path = repo_path
         self.repo_conf = repo_conf
         self.git = git
+        self._branch_signal = branch_signal
         self.branches: list[Branch] = []
 
     def refresh(self) -> None:
@@ -145,4 +148,6 @@ class BranchPanel(ItemSelector):
                 show_toast(f"Checkout failed: {err}", duration=3.0)
             else:
                 show_toast(f"Switched to {local_branch.name}", duration=1.5)
+                if self._branch_signal is not None:
+                    self._branch_signal.set(local_branch.name)
             self.refresh()

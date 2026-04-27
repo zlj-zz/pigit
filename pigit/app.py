@@ -30,6 +30,7 @@ from pigit.termui import (
     TabView,
     ToastPosition,
 )
+from pigit.termui._reactive import Signal
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter, PeekLabel
 from .app_commit import CommitPanel
@@ -71,7 +72,7 @@ class PigitApplication(Application):
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
-        self._branch_name: str = ""
+        self._branch_signal: Signal[str] = Signal("")
         self._ahead: int = 0
         self._behind: int = 0
         self._current_tab: str = "Status"
@@ -95,6 +96,7 @@ class PigitApplication(Application):
         )
         branch_panel = BranchPanel(
             on_selection_changed=self._on_panel_selection_changed,
+            branch_signal=self._branch_signal,
             git=self._git,
             repo_path=self._repo_path,
             repo_conf=self._repo_conf,
@@ -198,7 +200,7 @@ class PigitApplication(Application):
             self._repo_name = (
                 os.path.basename(self._repo_path) if self._repo_path else ""
             )
-            self._branch_name = head
+            self._branch_signal.set(head)
         except Exception:
             logging.warning("Failed to initialize repo info", exc_info=True)
             show_toast(
@@ -229,7 +231,7 @@ class PigitApplication(Application):
             [
                 (self._repo_name, THEME.fg_primary, False),
                 ("  ", THEME.fg_dim, False),
-                (self._branch_name, THEME.accent_cyan, False),
+                (self._branch_signal.value, THEME.accent_cyan, False),
             ]
         )
 
