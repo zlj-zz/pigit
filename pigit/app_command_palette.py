@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from pigit.termui import Component, keys
-from pigit.termui.types import OverlayDispatchResult
+from pigit.termui import Component, keys, OverlayDispatchResult
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME

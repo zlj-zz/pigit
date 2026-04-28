@@ -24,10 +24,10 @@ from pigit.termui import (
     Popup,
     Row,
     show_toast,
+    Signal,
     TabView,
     ToastPosition,
 )
-from pigit.termui._reactive import Signal
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel

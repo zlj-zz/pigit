@@ -18,13 +18,13 @@ from pigit.termui import (
     ActionEventType,
     Component,
     LineTextBrowser,
+    SyntaxTokenizer,
     keys,
     palette,
     bind_keys,
+    plain,
 )
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._text import plain
-from pigit.termui._syntax import SyntaxTokenizer
 
 from .app_theme import THEME
 

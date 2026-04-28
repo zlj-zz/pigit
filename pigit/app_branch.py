@@ -15,8 +15,8 @@ from pigit.termui import (
     ItemSelector,
     keys,
     show_toast,
+    Signal,
 )
-from pigit.termui._reactive import Signal
 
 from .app_inspector import BranchInfo
 from .app_theme import THEME

@@ -65,6 +65,8 @@ from pigit.termui import palette
 
 # Picker
 from pigit.termui._picker import PickerRow
+from pigit.termui._syntax import SyntaxTokenizer
+from pigit.termui._text import plain
 
 __all__ = [
     # Types
@@ -123,6 +125,9 @@ __all__ = [
     "get_badge",
     # Session context
     "exec_external",
+    # Syntax highlighting
+    "SyntaxTokenizer",
+    "plain",
     # Picker
     "PickerRow",
 ]
