@@ -135,7 +135,7 @@ class MyApp(Application):
 
     def setup_root(self, root):
         # Attach overlays here
-        self._help_popup = Popup(self._help_panel, session_owner=root)
+        self._help_popup = Popup(self._help_panel)
 
     def quit(self):
         raise ExitEventLoop("Quit")
@@ -149,7 +149,7 @@ MyApp().run()
 
 `AppEventLoop` holds a single **root** `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack` and a body component. `ComponentRoot` implements `has_overlay_open()` and `try_dispatch_overlay(key)` by delegating to its `LayerStack`.
 
-Application code constructs **`Popup(help_panel, session_owner=self, …)`** (``_help_panel`` / ``_help_popup``); the shell resolves the host like **`AlertDialog`** (``session_owner`` may be the root host or a child; :meth:`~pigit.termui._overlay_components.Popup._resolved_overlay_host` uses :meth:`~pigit.termui._component_base.Component.nearest_overlay_host` or treats ``session_owner`` as the host when it owns overlay state). Call :meth:`~pigit.termui._overlay_components.HelpPanel.merge_help_entries_from_host_children` from the app when opening help if you want rows synced from ``host.children`` (not from ``Popup``). Bind ``?`` to a handler that refreshes help then **`_help_popup.toggle()`**. **`AlertDialog`** subclasses **`Popup`**, passes **`session_owner``** to the base, overrides ESC via **`_on_exit_key`**, and uses session management via the resolved host.
+Application code constructs **`Popup(help_panel)`** (``_help_panel`` / ``_help_popup``); the shell uses :mod:`~pigit.termui._overlay_context` to push/pop modal layers onto the host's ``LayerStack``. Call :meth:`~pigit.termui._overlay_components.HelpPanel.merge_help_entries_from_host_children` from the app when opening help if you want rows synced from ``host.children`` (not from ``Popup``). Bind ``?`` to a handler that refreshes help then **`_help_popup.toggle()`**. **`AlertDialog`** subclasses **`Popup`** and overrides ESC via **`_on_exit_key`**; it uses :mod:`~pigit.termui._overlay_context` for session management.
 
 Panels that open alert sessions typically expose **`_alert_dialog`** and **`_alert_popup`** (often the same `AlertDialog` instance).
 
@@ -157,7 +157,7 @@ Panels that open alert sessions typically expose **`_alert_dialog`** and **`_ale
 
 1. **State**: `LayerStack` manages layers by `LayerKind`: `NONE`, `MODAL`, `TOAST`, `SHEET`. `ComponentRoot` is the overlay host; `Popup` / `AlertDialog` push/pop `MODAL` layers.
 2. **Shell**: Any component can gain modal behavior when wrapped by :class:`~pigit.termui._overlay_components.Popup`; `ComponentRoot` delegates overlay management to `LayerStack`.
-3. **Help**: :class:`~pigit.termui._overlay_components.HelpPanel` is content only; :class:`~pigit.termui._overlay_components.Popup` with ``session_owner`` runs :meth:`~pigit.termui._overlay_components.Popup.toggle` / ESC against the resolved host. The app may sync rows via :meth:`~pigit.termui._overlay_components.HelpPanel.refresh_entries_from_source` before toggling open.
+3. **Help**: :class:`~pigit.termui._overlay_components.HelpPanel` is content only; :class:`~pigit.termui._overlay_components.Popup` runs :meth:`~pigit.termui._overlay_components.Popup.toggle` / ESC via :mod:`~pigit.termui._overlay_context`. The app may sync rows via :meth:`~pigit.termui._overlay_components.HelpPanel.refresh_entries_from_source` before toggling open.
 4. **Alert**: A panel owns `_alert_dialog` / `_alert_popup` (same `AlertDialog` instance); opening pushes a `LayerKind.MODAL` layer onto `LayerStack`.
 5. **Dispatch**: `LayerStack.dispatch` forwards keys to the top-most MODAL layer's `OverlaySurface` via ``dispatch_overlay_key`` (shell bindings, then child, then ``Popup._fallback_overlay_key`` for help ``?`` or swallow). TOAST and SHEET layers do not intercept input dispatch. Handler failures yield :data:`~pigit.termui.types.OverlayDispatchResult.CLOSED_AFTER_ERROR` and cleanup the modal slot.
 6. **Toast**: `ComponentRoot.show_toast()` creates a `Toast` on the `TOAST` layer with slide-in/out animation and auto-expiration. Only one toast is shown at a time.
