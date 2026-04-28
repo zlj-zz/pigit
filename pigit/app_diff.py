@@ -29,6 +29,8 @@ from .app_theme import THEME
 
 _logger = logging.getLogger(__name__)
 
+_HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
 
 class DiffViewer(LineTextBrowser):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
@@ -55,6 +57,7 @@ class DiffViewer(LineTextBrowser):
         self._tokenizer = SyntaxTokenizer()
         self._lang = "generic"
         self._multiline_mask: list[Optional[str]] = []
+        self._render_tokens: list[list[tuple[str, tuple[int, int, int]]]] = []
 
     def set_content(self, diff_lines: list[str]) -> None:
         """Set diff content and pre-compute heatmap and line numbers.
@@ -78,6 +81,34 @@ class DiffViewer(LineTextBrowser):
         self._multiline_mask = self._tokenizer.compute_multiline_mask(
             self._content, self._lang
         )
+        self._render_tokens = self._pre_tokenize()
+
+    def _pre_tokenize(self) -> list[list[tuple[str, tuple[int, int, int]]]]:
+        """Pre-tokenize all lines and resolve colors for the render loop."""
+        result: list[list[tuple[str, tuple[int, int, int]]]] = []
+        for i, line in enumerate(self._content):
+            if line.startswith("@@"):
+                tokens = self._tokenizer.tokenize_diff_hunk(line)
+            elif line.startswith("\\"):
+                result.append([])
+                continue
+            else:
+                code = line[1:] if line and line[0] in "+- " else line
+                ml_type = (
+                    self._multiline_mask[i]
+                    if i < len(self._multiline_mask)
+                    else None
+                )
+                if ml_type is not None:
+                    tokens = [(code, ml_type)]
+                elif self._lang == "md":
+                    tokens = self._tokenizer.tokenize_markdown(code)
+                else:
+                    tokens = self._tokenizer.tokenize(code, self._lang)
+            result.append(
+                [(text, resolve_color(ttype, self._lang)) for text, ttype in tokens]
+            )
+        return result
 
     def get_help_title(self) -> str:
         return "Diff"
@@ -101,10 +132,8 @@ class DiffViewer(LineTextBrowser):
             content = data.get("content", "")
             if isinstance(content, list):
                 self.set_content(content)
-            else:
-                self._content = content
-                self._compute_heatmap()
-                self._compute_line_numbers()
+            elif isinstance(content, str):
+                self.set_content(content.splitlines())
             self._i = self.i_cache.get(self.i_cache_key, 0)
 
     @bind_keys(keys.KEY_ESC)
@@ -188,7 +217,7 @@ class DiffViewer(LineTextBrowser):
         new_line = 0
         for line in self._content:
             if line.startswith("@@"):
-                m = re.search(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+                m = _HUNK_HEADER_RE.search(line)
                 if m:
                     old_line = int(m.group(1))
                     new_line = int(m.group(2))
@@ -198,16 +227,16 @@ class DiffViewer(LineTextBrowser):
                     new_line = 0
                 self._line_numbers.append("")
             elif line.startswith("+"):
-                self._line_numbers.append(str(new_line))
+                self._line_numbers.append(str(new_line).rjust(self.LINE_NO_WIDTH - 1))
                 new_line += 1
             elif line.startswith("-"):
-                self._line_numbers.append(str(old_line))
+                self._line_numbers.append(str(old_line).rjust(self.LINE_NO_WIDTH - 1))
                 old_line += 1
             elif line.startswith("\\"):
                 self._line_numbers.append("")
             else:
                 # Context line
-                self._line_numbers.append(str(new_line))
+                self._line_numbers.append(str(new_line).rjust(self.LINE_NO_WIDTH - 1))
                 old_line += 1
                 new_line += 1
 
@@ -228,7 +257,6 @@ class DiffViewer(LineTextBrowser):
         main_w: int,
         heatmap_x: int,
         fill_width: int,
-        fill_always: bool,
     ) -> None:
         """Render one diff line: background, line number, text, and heatmap."""
         if line.startswith("+"):
@@ -244,22 +272,21 @@ class DiffViewer(LineTextBrowser):
             bg = palette.DEFAULT_BG
             fg = THEME.fg_primary
 
-        if fill_always or bg != palette.DEFAULT_BG:
+        if bg != palette.DEFAULT_BG:
             surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
 
         line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
         if line_no:
-            no_text = line_no.rjust(self.LINE_NO_WIDTH - 1)
-            surface.draw_text_rgb(row, x_offset, no_text, fg=THEME.fg_dim, bg=bg)
+            surface.draw_text_rgb(row, x_offset, line_no, fg=THEME.fg_dim, bg=bg)
 
         # ── Syntax-highlighted text rendering ──
         text_start_col = x_offset + self.LINE_NO_WIDTH
         col = text_start_col
         max_col = text_start_col + main_w
-        tokens: Optional[list[tuple[str, str]]] = None
+        tokens: list[tuple[str, tuple[int, int, int]]] = []
 
         if line.startswith("@@"):
-            tokens = self._tokenizer.tokenize_diff_hunk(line)
+            tokens = self._render_tokens[idx]
         elif line.startswith("\\"):
             # "\ No newline at end of file" — draw as comment
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
@@ -269,32 +296,19 @@ class DiffViewer(LineTextBrowser):
                 prefix_fg = THEME.accent_green if prefix == "+" else THEME.accent_red
                 surface.draw_text_rgb(row, col, prefix, fg=prefix_fg, bg=bg)
                 col += 1
-                code = line[1:]
-            else:
-                code = line
 
-            ml_type = (
-                self._multiline_mask[idx] if idx < len(self._multiline_mask) else None
-            )
-            if ml_type is not None:
-                tokens = [(code, ml_type)]
-            elif self._lang == "md":
-                tokens = self._tokenizer.tokenize_markdown(code)
-            else:
-                tokens = self._tokenizer.tokenize(code, self._lang)
+            tokens = self._render_tokens[idx]
 
-        if tokens is not None:
-            for token_text, token_type in tokens:
-                token_fg = resolve_color(token_type, self._lang)
-                tw = wcswidth(token_text)
-                if col + tw > max_col:
-                    avail = max_col - col
-                    if avail > 1:
-                        token_text = truncate_by_width(token_text, avail - 1) + "…"
-                        surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
-                    break
-                surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
-                col += tw
+        for token_text, token_fg in tokens:
+            tw = wcswidth(token_text)
+            if col + tw > max_col:
+                avail = max_col - col
+                if avail > 1:
+                    token_text = truncate_by_width(token_text, avail - 1) + "…"
+                    surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+                break
+            surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+            col += tw
 
         sym = self._heatmap[idx]
         color = self._heatmap_colors[idx]
@@ -318,8 +332,6 @@ class DiffViewer(LineTextBrowser):
 
         for idx in range(self._i, end):
             row = idx - self._i + 1
-            if row >= h - 1:
-                break
             self._draw_diff_line(
                 surface,
                 row,
@@ -329,12 +341,14 @@ class DiffViewer(LineTextBrowser):
                 main_w=main_w,
                 heatmap_x=w - 2,
                 fill_width=w - 2,
-                fill_always=True,
             )
 
         last_content_row = end - self._i
-        for blank_row in range(last_content_row + 1, h - 1):
-            surface.fill_rect_rgb(blank_row, 1, w - 2, 1, palette.DEFAULT_BG)
+        blank_count = h - 1 - (last_content_row + 1)
+        if blank_count > 0:
+            surface.fill_rect_rgb(
+                last_content_row + 1, 1, w - 2, blank_count, palette.DEFAULT_BG
+            )
 
     def _render_surface_borderless(self, surface) -> None:
         """Original rendering without box border, used when surface is too small."""
@@ -348,8 +362,6 @@ class DiffViewer(LineTextBrowser):
 
         for idx in range(self._i, end):
             row = idx - self._i
-            if row >= h:
-                break
             self._draw_diff_line(
                 surface,
                 row,
@@ -359,5 +371,4 @@ class DiffViewer(LineTextBrowser):
                 main_w=main_w,
                 heatmap_x=w - 1,
                 fill_width=w,
-                fill_always=False,
             )

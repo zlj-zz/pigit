@@ -684,6 +684,12 @@ _STATIC_RES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(pattern), token_type) for pattern, token_type in _STATIC_RULES
 ]
 
+# Pre-compile hunk-header regexes
+_HUNK_RE: re.Pattern[str] = re.compile(
+    r"^(@@)\s+(-\d+(?:,\d+)?)\s+(\+\d+(?:,\d+)?)\s+(@@)(.*)$"
+)
+_HUNK_RANGE_RE: re.Pattern[str] = re.compile(r"(-|\+)(\d+)(,\d+)?")
+
 
 class SyntaxTokenizer:
     """Per-line syntax tokenizer with language-aware rules and LRU cache."""
@@ -763,14 +769,12 @@ class SyntaxTokenizer:
     # ── hunk header tokenize ──
 
     @staticmethod
+    @functools.lru_cache(maxsize=64)
     def tokenize_diff_hunk(line: str) -> list[tuple[str, str]]:
         """Tokenize an @@ hunk header line into colored segments."""
         # Example: @@ -45,10 +46,15 @@
         tokens: list[tuple[str, str]] = []
-        m = re.match(
-            r"^(@@)\s+(-\d+(?:,\d+)?)\s+(\+\d+(?:,\d+)?)\s+(@@)(.*)$",
-            line,
-        )
+        m = _HUNK_RE.match(line)
         if not m:
             return [(line, "diff_meta")]
 
@@ -779,7 +783,7 @@ class SyntaxTokenizer:
 
         # old range: -45,10
         old_part = m.group(2)
-        old_match = re.match(r"(-)(\d+)(,\d+)?", old_part)
+        old_match = _HUNK_RANGE_RE.match(old_part)
         if old_match:
             tokens.append((old_match.group(1), "diff_meta"))
             tokens.append((old_match.group(2), "diff_lineno"))
@@ -793,7 +797,7 @@ class SyntaxTokenizer:
 
         # new range: +46,15
         new_part = m.group(3)
-        new_match = re.match(r"(\+)(\d+)(,\d+)?", new_part)
+        new_match = _HUNK_RANGE_RE.match(new_part)
         if new_match:
             tokens.append((new_match.group(1), "diff_meta"))
             tokens.append((new_match.group(2), "diff_lineno"))
@@ -813,6 +817,7 @@ class SyntaxTokenizer:
     # ── markdown tokenize ──
 
     @staticmethod
+    @functools.lru_cache(maxsize=64)
     def tokenize_markdown(line: str) -> list[tuple[str, str]]:
         """Tokenize a Markdown line."""
         # Heading: # Title
