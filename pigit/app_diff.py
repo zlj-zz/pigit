@@ -23,6 +23,7 @@ from pigit.termui import (
 )
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui._text import plain
+from pigit.termui._syntax import SyntaxTokenizer, resolve_color
 
 from .app_theme import THEME
 
@@ -51,6 +52,9 @@ class DiffViewer(LineTextBrowser):
         self.come_from: Optional[Component] = None
         self.i_cache_key = ""
         self.i_cache: dict[str, int] = {}
+        self._tokenizer = SyntaxTokenizer()
+        self._lang = "generic"
+        self._multiline_mask: list[Optional[str]] = []
 
     def set_content(self, diff_lines: list[str]) -> None:
         """Set diff content and pre-compute heatmap and line numbers.
@@ -69,6 +73,11 @@ class DiffViewer(LineTextBrowser):
         ]
         self._compute_heatmap()
         self._compute_line_numbers()
+        if self.i_cache_key:
+            self._lang = self._tokenizer.detect_language(self.i_cache_key)
+        self._multiline_mask = self._tokenizer.compute_multiline_mask(
+            self._content, self._lang
+        )
 
     def get_help_title(self) -> str:
         return "Diff"
@@ -243,10 +252,49 @@ class DiffViewer(LineTextBrowser):
             no_text = line_no.rjust(self.LINE_NO_WIDTH - 1)
             surface.draw_text_rgb(row, x_offset, no_text, fg=THEME.fg_dim, bg=bg)
 
-        text = line
-        if wcswidth(text) > main_w:
-            text = truncate_by_width(text, main_w - 1) + "…"
-        surface.draw_text_rgb(row, x_offset + self.LINE_NO_WIDTH, text, fg=fg, bg=bg)
+        # ── Syntax-highlighted text rendering ──
+        text_start_col = x_offset + self.LINE_NO_WIDTH
+        col = text_start_col
+        max_col = text_start_col + main_w
+        tokens: Optional[list[tuple[str, str]]] = None
+
+        if line.startswith("@@"):
+            tokens = self._tokenizer.tokenize_diff_hunk(line)
+        elif line.startswith("\\"):
+            # "\ No newline at end of file" — draw as comment
+            surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
+        else:
+            if line and line[0] in "+-":
+                prefix = line[0]
+                prefix_fg = THEME.accent_green if prefix == "+" else THEME.accent_red
+                surface.draw_text_rgb(row, col, prefix, fg=prefix_fg, bg=bg)
+                col += 1
+                code = line[1:]
+            else:
+                code = line
+
+            ml_type = (
+                self._multiline_mask[idx] if idx < len(self._multiline_mask) else None
+            )
+            if ml_type is not None:
+                tokens = [(code, ml_type)]
+            elif self._lang == "md":
+                tokens = self._tokenizer.tokenize_markdown(code)
+            else:
+                tokens = self._tokenizer.tokenize(code, self._lang)
+
+        if tokens is not None:
+            for token_text, token_type in tokens:
+                token_fg = resolve_color(token_type, self._lang)
+                tw = wcswidth(token_text)
+                if col + tw > max_col:
+                    avail = max_col - col
+                    if avail > 1:
+                        token_text = truncate_by_width(token_text, avail - 1) + "…"
+                        surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+                    break
+                surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+                col += tw
 
         sym = self._heatmap[idx]
         color = self._heatmap_colors[idx]
