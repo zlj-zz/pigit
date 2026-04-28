@@ -11,13 +11,14 @@ from __future__ import annotations
 from enum import Enum, auto
 from typing import Callable, Optional, TYPE_CHECKING
 
-from pigit.ext.utils import relative_time
+from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
     ActionEventType,
     bind_keys,
     Component,
     ItemSelector,
     keys,
+    show_toast,
 )
 from pigit.termui.wcwidth_table import wcswidth
 
@@ -79,12 +80,24 @@ class CommitPanel(ItemSelector):
     def get_help_title(self) -> str:
         return "Commit"
 
+    @bind_keys("y")
+    def copy_sha(self) -> None:
+        """Copy the selected commit SHA to the clipboard."""
+        if not self.commits:
+            return
+        commit = self.commits[self.curr_no]
+        if copy_to_clipboard(commit.sha):
+            show_toast(f"Copied {commit.sha[:7]}", duration=1.5)
+        else:
+            show_toast("Failed to copy to clipboard", duration=2.0)
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for commit panel."""
         return [
             ("j/k", "Navigate"),
             ("Enter", "View"),
             ("g", "Toggle view"),
+            ("y", "Copy SHA"),
         ]
 
     def get_inspector_data(self) -> Optional[CommitInfo]:
