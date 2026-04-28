@@ -1,5 +1,40 @@
 # Changelog of pigit
 
+## 1.8.5 (2026-04-28)
+
+### Diff Syntax Highlighting
+
+- **Zero-dependency syntax highlighting in DiffViewer**: per-line regex-based tokenizer (`SyntaxTokenizer`) supports 15+ languages (Python, JavaScript/TypeScript, Go, Rust, Java/Kotlin, C/C++, Shell, Markdown, YAML, TOML, HTML/XML, CSS).
+- **Language-aware keyword classification**: tokens categorized into `keyword_control`, `keyword_decl`, `keyword_storage`, `keyword_type`, `keyword_operator`, plus `string`, `number`, `comment`, `call`, `builtin`, `type` — each with dedicated palette colors.
+- **Multi-line docstring / block-comment highlighting**: `compute_multiline_mask()` pre-computes which diff lines fall inside triple-quoted strings (`"""`) or `/* */` blocks, respecting hunk boundaries (`@@` resets state).
+- **Hunk-header tokenization**: `@@ -old +new @@` lines split into colored segments (meta markers, line numbers, change counts).
+- **Markdown inline rules**: headings, bold/italic, inline code, and links receive distinct token types.
+
+### Performance
+
+- **Pre-tokenize all lines**: `set_content()` computes tokens once; `_draw_diff_line()` reads from cache instead of tokenizing per frame.
+- **Pre-resolve colors**: RGB colors resolved at `set_content()` time, eliminating 250–750 `resolve_color()` calls per frame.
+- **Pre-compute `wcswidth`**: character widths cached alongside tokens to avoid per-frame width calculations.
+- **Remove redundant background fills**: `fill_always=False` in `_render_surface`; only `+`/`-` lines (non-default BG) are re-filled.
+- **Merge blank-row fills**: single `fill_rect_rgb` call replaces N individual row fills.
+- **Pre-pad line numbers**: `rjust()` moved from per-frame render into `_compute_line_numbers()`.
+- **Pre-compile hunk regexes**: `_HUNK_RE` and `_HUNK_RANGE_RE` as module-level compiled patterns.
+- **Lazy `expandtabs`**: only called when `\t` is actually present in the line.
+
+### Architecture
+
+- **`resolve_color`收归 `SyntaxTokenizer`**: static method with `@lru_cache(maxsize=256)` for language-specific color overrides.
+- **`_LANGUAGE_CONFIGS` 提取到独立文件**: `pigit/termui/_syntax_configs.py` (~600 lines) decouples keyword data from tokenizer logic.
+- **Palette color naming**: base colors renamed to descriptive names (`PEARL`, `SLATE`, `INK`) separate from role assignments (`DEFAULT_FG`, `DEFAULT_BG`).
+- **DiffViewer helpers extracted**: `_draw_tokens()` for token truncation logic, `_heatmap_entry()` for heatmap density logic.
+- **Hunk navigation**: pre-computed `_hunk_indices` + `bisect` for O(log H) jump to previous/next hunk.
+- **Named constants**: `SCROLL_PAGE_SIZE`, `TAB_WIDTH`, `DENSITY_*`, `BORDER_ROWS` / `BORDER_COLS` replace magic numbers.
+
+### Imports
+
+- **Unified `pigit.termui` public exports**: `SyntaxTokenizer`, `plain`, `Signal`, `OverlayDispatchResult` added to `__init__.__all__`.
+- **Import fixes across app modules**: `app_diff.py`, `app.py`, `app_branch.py`, `app_command_palette.py` now import from `pigit.termui` instead of private submodules.
+
 ## 1.8.4 (2026-04-27)
 
 ### App
