@@ -7,7 +7,6 @@ import pytest
 
 from pigit.termui._syntax import (
     SyntaxTokenizer,
-    resolve_color,
     SYNTAX_COLORS,
 )
 from pigit.app_theme import THEME
@@ -194,14 +193,14 @@ class TestTokenizeMarkdown:
 
 class TestResolveColor:
     def test_global_keyword_control(self):
-        assert resolve_color("keyword_control", "py") == SYNTAX_COLORS["keyword_control"]
+        assert SyntaxTokenizer.resolve_color("keyword_control", "py") == SYNTAX_COLORS["keyword_control"]
 
     def test_rust_override(self):
         # Rust overrides keyword_storage to accent_red
-        assert resolve_color("keyword_storage", "rs") == THEME.accent_red
+        assert SyntaxTokenizer.resolve_color("keyword_storage", "rs") == THEME.accent_red
 
     def test_fallback(self):
-        assert resolve_color("unknown_type", "py") == SYNTAX_COLORS["variable"]
+        assert SyntaxTokenizer.resolve_color("unknown_type", "py") == SYNTAX_COLORS["variable"]
 
 
 class TestCache:

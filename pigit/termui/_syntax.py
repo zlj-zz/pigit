@@ -709,6 +709,20 @@ class SyntaxTokenizer:
             return ext
         return "generic"
 
+    @staticmethod
+    @functools.lru_cache(maxsize=256)
+    def resolve_color(token_type: str, lang: str) -> tuple[int, int, int]:
+        """Return the RGB color for a token type, respecting language overrides."""
+        raw = _LANGUAGE_CONFIGS.get(lang, _LANGUAGE_CONFIGS["generic"])
+        while "_alias" in raw:
+            raw = _LANGUAGE_CONFIGS[raw["_alias"]]
+
+        overrides = raw.get("color_overrides", {})
+        if token_type in overrides:
+            return overrides[token_type]
+
+        return SYNTAX_COLORS.get(token_type, SYNTAX_COLORS["variable"])
+
     # ── regex compilation ──
 
     def _get_lang_re(self, lang: str) -> dict:
@@ -1010,20 +1024,3 @@ class SyntaxTokenizer:
             else:
                 merged.append((text, ttype))
         return merged
-
-
-# ── Public helper: resolve color for a token type ──
-
-
-@functools.lru_cache(maxsize=256)
-def resolve_color(token_type: str, lang: str) -> tuple[int, int, int]:
-    """Return the RGB color for a token type, respecting language overrides."""
-    raw = _LANGUAGE_CONFIGS.get(lang, _LANGUAGE_CONFIGS["generic"])
-    while "_alias" in raw:
-        raw = _LANGUAGE_CONFIGS[raw["_alias"]]
-
-    overrides = raw.get("color_overrides", {})
-    if token_type in overrides:
-        return overrides[token_type]
-
-    return SYNTAX_COLORS.get(token_type, SYNTAX_COLORS["variable"])

@@ -24,7 +24,7 @@ from pigit.termui import (
 )
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui._text import plain
-from pigit.termui._syntax import SyntaxTokenizer, resolve_color
+from pigit.termui._syntax import SyntaxTokenizer
 
 from .app_theme import THEME
 
@@ -122,7 +122,11 @@ class DiffViewer(LineTextBrowser):
                     tokens = self._tokenizer.tokenize(code, self._lang)
             result.append(
                 [
-                    (text, resolve_color(ttype, self._lang), wcswidth(text))
+                    (
+                        text,
+                        self._tokenizer.resolve_color(ttype, self._lang),
+                        wcswidth(text),
+                    )
                     for text, ttype in tokens
                 ]
             )
