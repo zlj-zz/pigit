@@ -541,6 +541,16 @@ class InputLine(Component):
         """Return the current input value."""
         return self._value
 
+    @property
+    def cursor(self) -> int:
+        """Return the current cursor position."""
+        return self._cursor
+
+    @property
+    def prompt(self) -> str:
+        """Return the current prompt text."""
+        return self._prompt
+
     def set_value(self, text: str) -> None:
         """Replace current value and move cursor to end."""
         if self._max_length:

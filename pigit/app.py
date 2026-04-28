@@ -16,6 +16,7 @@ from pigit.termui import (
     Column,
     Component,
     ComponentRoot,
+    exec_external,
     ExitEventLoop,
     get_badge,
     Header,
@@ -305,6 +306,7 @@ class PigitApplication(Application):
         """Handle command palette execution."""
         if self._widgets is None:
             return
+        lower = cmd.lower()
         cmd_map: dict[str, Optional[Union[Component, str]]] = {
             "status": self._w.status,
             "branch": self._w.branch,
@@ -312,11 +314,26 @@ class PigitApplication(Application):
             "diff": self._w.diff,
             "quit": "quit",
         }
-        target = cmd_map.get(cmd.lower())
+        target = cmd_map.get(lower)
         if target == "quit":
             self.quit()
         elif target is not None:
             self._w.tab_view.route_to(target)
+            return
+        if lower in ("pull", "push", "fetch"):
+            self._run_git_action(lower)
+
+    def _run_git_action(self, action: str) -> None:
+        """Run a git action via exec_external and show result toast."""
+        try:
+            result = exec_external(["git", action], cwd=self._repo_path)
+            if result.returncode == 0:
+                show_toast(f"Git {action} completed", duration=1.5)
+            else:
+                stderr = result.stderr.strip() if result.stderr else "Unknown error"
+                show_toast(f"Git {action} failed: {stderr}", duration=3.0)
+        except Exception as e:
+            show_toast(f"Git {action} error: {e}", duration=3.0)
 
     def quit(self):
         raise ExitEventLoop("Quit")
