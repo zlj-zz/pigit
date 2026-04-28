@@ -102,9 +102,13 @@ class BranchPanel(ItemSelector):
         list[tuple[str, tuple[int, int, int], bool]],
     ]:
         """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
+        focused = self.is_focus_leaf
         is_head = idx < len(self.branches) and self.branches[idx].is_head
         prefix = self.CURSOR if is_cursor else " "
-        fg = THEME.accent_green if is_head else THEME.fg_primary
+        if is_head:
+            fg = THEME.accent_green if focused else THEME.fg_dim
+        else:
+            fg = THEME.fg_primary if focused else THEME.fg_dim
         left = [(f"{prefix} {self.content[idx]}", fg, is_cursor)]
 
         right: list[tuple[str, tuple[int, int, int], bool]] = []

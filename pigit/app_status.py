@@ -214,32 +214,38 @@ class StatusPanel(ItemSelector):
         list[tuple[str, tuple[int, int, int], bool]],
     ]:
         """Return row description: [cursor][staged][unstaged][filename.......][label]"""
+        focused = self.is_focus_leaf
         if idx >= len(self.files):
             text = self.content[idx] if idx < len(self.content) else ""
             prefix = self.CURSOR if is_cursor else " "
-            return ([(f"{prefix} {text}", THEME.fg_primary, is_cursor)], None, [])
+            fg = THEME.fg_primary if focused else THEME.fg_dim
+            return ([(f"{prefix} {text}", fg, is_cursor)], None, [])
 
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         cursor_prefix = self.CURSOR if is_cursor else " "
 
+        fg_primary = THEME.fg_primary if focused else THEME.fg_dim
         left = [
-            (cursor_prefix, THEME.fg_primary, is_cursor),
-            (" ", THEME.fg_primary, False),
+            (cursor_prefix, fg_primary, is_cursor),
+            (" ", fg_primary, False),
             (staged, _staged_fg(staged), is_cursor),
             (unstaged, _unstaged_fg(unstaged), is_cursor),
-            (" ", THEME.fg_primary, False),
+            (" ", fg_primary, False),
         ]
 
         is_selected = idx in self._selected
-        filename_fg = THEME.accent_purple if is_selected else THEME.fg_primary
+        if is_selected:
+            filename_fg = THEME.accent_purple if focused else THEME.fg_dim
+        else:
+            filename_fg = fg_primary
         main = [(file.name, filename_fg, is_cursor)]
 
         right: list[tuple[str, tuple[int, int, int], bool]] = []
         label = _status_label(file)
         if label:
-            right.append((label, THEME.fg_muted, False))
+            right.append((label, THEME.fg_muted if focused else THEME.fg_dim, False))
 
         return left, main, right
 

@@ -31,6 +31,27 @@ _logger = logging.getLogger(__name__)
 
 NONE_SIZE = (0, 0)
 
+# Module-level tracking of the last focused component for focus-chain updates.
+_last_focused: Optional["Component"] = None
+
+
+def _set_focus_chain(leaf: "Component") -> None:
+    """Set _focus_level along the parent chain from leaf to root."""
+    global _last_focused
+    if _last_focused is leaf:
+        return
+    old = _last_focused
+    while old is not None:
+        old._focus_level = -1
+        old = old.parent
+    level = 0
+    node: Optional["Component"] = leaf
+    while node is not None:
+        node._focus_level = level
+        level += 1
+        node = node.parent
+    _last_focused = leaf
+
 
 class ComponentError(Exception):
     """Error class of ~Component."""
@@ -73,6 +94,7 @@ class Component(ABC):
         parent: Optional["Component"] = None,
     ) -> None:
         self._activated = False
+        self._focus_level: int = -1
 
         self.x, self.y = x, y
         self._size = size or NONE_SIZE
@@ -147,6 +169,10 @@ class Component(ABC):
         """
         pass
 
+    @property
+    def is_focus_leaf(self) -> bool:
+        return self._focus_level == 0
+
     def _handle_event(self, key: str):
         """Event process handle function.
 
@@ -160,6 +186,20 @@ class Component(ABC):
         on_key = getattr(self, "on_key", None)
         if on_key is not None and callable(on_key):
             on_key(key)
+
+        # Only leaf components should claim focus; containers (e.g. TabView)
+        # manage focus via explicit _set_focus_chain calls in their actions.
+        # If a parent (e.g. TabView) has already switched active child during
+        # handler execution, do not reclaim focus.
+        has_active_child = getattr(self, "active", None) is not None
+        parent_active = getattr(self.parent, "active", None)
+        parent_switched = parent_active is not None and parent_active is not self
+        if (
+            not has_active_child
+            and not parent_switched
+            and (handler is not None or (on_key is not None and callable(on_key)))
+        ):
+            _set_focus_chain(self)
 
     def has_overlay_open(self) -> bool:
         """True when this component is the loop root and an overlay is active."""

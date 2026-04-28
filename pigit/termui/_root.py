@@ -12,7 +12,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Optional
 
-from ._component_base import Component
+from ._component_base import Component, _set_focus_chain
 from ._layer import LayerKind, LayerStack
 from .types import OverlayDispatchResult, ToastPosition
 from . import _overlay_context
@@ -144,11 +144,53 @@ class ComponentRoot(Component):
         self._body._render_surface(surface)
         self._layer_stack.render(surface)
 
+    def _find_focus_leaf(self, start: Optional[Component] = None) -> Component:
+        """Walk down the component tree to find the deepest focusable leaf.
+
+        Follows ``active`` when available (TabView) and drills into ``children``
+        for layout containers (Column, Row) that do not define ``active``.
+        """
+        leaf = start if start is not None else self._body
+        while True:
+            active = getattr(leaf, "active", None)
+            if active is not None:
+                leaf = active
+                continue
+            children = getattr(leaf, "children", None)
+            if children:
+                for child in children:
+                    if getattr(child, "active", None) is not None:
+                        leaf = child
+                        break
+                    if getattr(child, "children", None):
+                        leaf = child
+                        break
+                else:
+                    break
+            else:
+                break
+        return leaf
+
+    def _top_open_overlay(self) -> Optional[Component]:
+        for kind in (LayerKind.MODAL, LayerKind.SHEET):
+            top = self._layer_stack.top(kind)
+            if top is not None and getattr(top, "open", False):
+                return top
+        return None
+
     def _handle_event(self, key: str) -> None:
         result = self.try_dispatch_overlay(key)
         if result != OverlayDispatchResult.DROPPED_UNBOUND:
+            top = self._top_open_overlay()
+            if top is not None:
+                _set_focus_chain(top)
+            else:
+                _set_focus_chain(self._find_focus_leaf())
             return
         self._body._handle_event(key)
+        top = self._top_open_overlay()
+        if top is not None:
+            _set_focus_chain(top)
 
     def _expire_badge(self) -> None:
         if getattr(self, "_badge_until", 0) and time.monotonic() > self._badge_until:
