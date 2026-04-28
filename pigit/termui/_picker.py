@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Sequence
 
 from ._component_base import Component
 from ._reactive import Signal
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .tty_io import truncate_line, MIN_LIST_ROWS
 
 if TYPE_CHECKING:
@@ -73,11 +74,14 @@ class PickerHeader(Component):
     def _render_surface(self, surface: "Surface") -> None:
         cols = surface.width
         sep = "=" * min(72, cols)
-        surface.draw_text(0, 0, sep)
-        surface.draw_text(1, 0, truncate_line(self._title, cols))
-        surface.draw_text(2, 0, sep)
+        surface.draw_text_rgb(0, 0, sep, fg=DEFAULT_FG, bg=DEFAULT_BG)
+        surface.draw_text_rgb(
+            1, 0, truncate_line(self._title, cols), fg=DEFAULT_FG, bg=DEFAULT_BG
+        )
+        surface.draw_text_rgb(2, 0, sep, fg=DEFAULT_FG, bg=DEFAULT_BG)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op refresh for the static header (subclasses may override)."""
         pass
 
 

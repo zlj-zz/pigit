@@ -14,7 +14,7 @@ from pigit.termui._component_layouts import Column
 
 def _make_component(name: str = "mock") -> Component:
     """Return a concrete Component subclass with the given NAME."""
-    return type(name, (Component,), {"NAME": name, "fresh": lambda self: None})()
+    return type(name, (Component,), {"NAME": name, "refresh": lambda self: None})()
 
 
 class TestColumn:

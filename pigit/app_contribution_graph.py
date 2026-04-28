@@ -81,6 +81,10 @@ class ContributionGraph(Component):
         level = min(4, int(count / self._max_count * 4))
         return _HEATMAP_COLORS[level]
 
+    def render_into(self, surface) -> None:
+        """Public entry to render this graph into the given surface."""
+        self._render_surface(surface)
+
     def _render_surface(self, surface) -> None:
         w = min(surface.width, self._size[0] if self._size else surface.width)
         h = min(surface.height, self._size[1] if self._size else surface.height)

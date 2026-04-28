@@ -11,7 +11,7 @@ from __future__ import annotations
 
 # Types and enums
 from pigit.termui.types import (
-    ActionLiteral,
+    ActionEventType,
     LayerKind,
     OverlayDispatchResult,
     OverlaySurface,
@@ -51,21 +51,26 @@ from pigit.termui._application import Application
 
 # Overlay context (module-level functions)
 from pigit.termui._overlay_context import get_badge, show_badge, show_toast, show_sheet
+from pigit.termui._session_context import exec_external
 
 # Other utilities
-from pigit.termui._bindings import bind_keys, list_bindings
+from pigit.termui._bindings import bind_keys, BindingError, list_bindings
+from pigit.termui import keys
 from pigit.termui._geometry import TerminalSize
 from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._renderer import Renderer
 from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui._surface import Cell, FlatCell, Surface
+from pigit.termui import palette
 
 # Picker
 from pigit.termui._picker import PickerRow
+from pigit.termui._syntax import SyntaxTokenizer
+from pigit.termui._text import plain
 
 __all__ = [
     # Types
-    "ActionLiteral",
+    "ActionEventType",
     "LayerKind",
     "OverlayDispatchResult",
     "OverlaySurface",
@@ -101,10 +106,13 @@ __all__ = [
     "Signal",
     # Utils
     "bind_keys",
+    "BindingError",
     "list_bindings",
+    "keys",
     "Surface",
     "FlatCell",
     "Cell",
+    "palette",
     "ColorAdapter",
     "ColorMode",
     "Renderer",
@@ -115,6 +123,11 @@ __all__ = [
     "show_sheet",
     "show_badge",
     "get_badge",
+    # Session context
+    "exec_external",
+    # Syntax highlighting
+    "SyntaxTokenizer",
+    "plain",
     # Picker
     "PickerRow",
 ]

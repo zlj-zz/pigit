@@ -186,7 +186,7 @@ class _Leaf(Component):
     def _render_surface(self, surface):
         pass
 
-    def fresh(self):
+    def refresh(self):
         pass
 
 
@@ -456,7 +456,7 @@ def test_renderer_accessed_via_context():
         def _render_surface(self, surface):
             pass
 
-        def fresh(self):
+        def refresh(self):
             pass
 
     a, b = _Leaf(), _Leaf()

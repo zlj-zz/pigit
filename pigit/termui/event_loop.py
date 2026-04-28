@@ -9,7 +9,6 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import logging
-import subprocess
 from typing import TYPE_CHECKING, Literal, Optional
 
 from ._bindings import BindingsList, resolve_key_handlers_merged
@@ -101,12 +100,17 @@ class AppEventLoop:
     def after_dispatch_key(self, key: str, outcome: KeyDispatchOutcome) -> None:
         """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
+    def before_mouse_event(self, event: str) -> None:
+        """Hook before handling a mouse event (subclasses may override)."""
+
     def clear_screen(self) -> None:
+        """Clear the terminal screen via the current renderer."""
         renderer = get_renderer()
         if renderer is not None:
             renderer.clear_screen()
 
     def get_term_size(self):
+        """Return the current terminal size as (columns, rows)."""
         from shutil import get_terminal_size
 
         return get_terminal_size()
@@ -138,6 +142,7 @@ class AppEventLoop:
         self.render()
 
     def render(self) -> None:
+        """Render the component tree to the terminal."""
         from pigit.termui._surface import Surface
 
         cols, rows = self._size
@@ -148,6 +153,7 @@ class AppEventLoop:
             renderer.render_surface(surface)
 
     def set_input_timeouts(self, timeout: float) -> None:
+        """Set the input polling timeout on the underlying input handle."""
         self._input_handle.set_input_timeouts(timeout)
 
     def _loop(self) -> None:
@@ -163,6 +169,7 @@ class AppEventLoop:
                 self.after_dispatch_key(first, outcome)
                 continue
             if is_mouse_event(first):
+                self.before_mouse_event(first)
                 continue
 
     def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
@@ -171,7 +178,12 @@ class AppEventLoop:
             self.resize()
             return "resize"
         if self._child.has_overlay_open():
-            self._child._handle_event(key)
+            try:
+                self._child._handle_event(key)
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("Overlay handler for '%s' failed", key)
             self.render()
             return "overlay"
         handler = self._key_handlers.get(key)
@@ -184,7 +196,12 @@ class AppEventLoop:
                 _logger.exception("Key handler for '%s' failed", key)
             self.render()
             return "binding"
-        self._child._handle_event(key)
+        try:
+            self._child._handle_event(key)
+        except ExitEventLoop:
+            raise
+        except Exception:
+            _logger.exception("Child handler for '%s' failed", key)
         self.render()
         return "child"
 
@@ -207,6 +224,7 @@ class AppEventLoop:
             raise
 
     def run(self) -> None:
+        """Enter a Session, bind the renderer, and run the main event loop."""
         with Session(alt_screen=self._alt) as session:
             self._session = session
             token = set_renderer(session.renderer)
@@ -216,42 +234,6 @@ class AppEventLoop:
                 reset_renderer(token)
                 self._session = None
 
-    def exec_external(
-        self,
-        cmd: list[str],
-        cwd: Optional[str] = None,
-    ) -> "subprocess.CompletedProcess[str]":
-        """Suspend TUI, run an external command, then resume TUI and redraw.
-
-        Args:
-            cmd: Command argument list (e.g. ["git", "commit"]).
-            cwd: Working directory for the command.
-
-        Returns:
-            subprocess.CompletedProcess with returncode and other fields.
-
-        Raises:
-            RuntimeError: If called outside run() lifecycle.
-        """
-        session = getattr(self, "_session", None)
-        if session is None:
-            raise RuntimeError("Session not available; call only inside run().")
-
-        session.suspend()
-        result: "subprocess.CompletedProcess[str]"
-        try:
-            result = subprocess.run(cmd, cwd=cwd, stdin=None, stdout=None, stderr=None)
-        finally:
-            try:
-                session.resume()
-            except Exception:
-                _logger.exception(
-                    "Session.resume() failed; terminal may be in bad state"
-                )
-                raise
-            self.resize()
-        return result
-
     def quit(
         self,
         msg: str = "Quit",
@@ -259,4 +241,5 @@ class AppEventLoop:
         exit_code: int = 0,
         result_message: Optional[str] = None,
     ) -> None:
+        """Raise ExitEventLoop to break out of the event loop."""
         raise ExitEventLoop(msg, exit_code=exit_code, result_message=result_message)

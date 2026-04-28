@@ -49,6 +49,9 @@ class FlatTheme:
     bg_diff_del: tuple[int, int, int] = (80, 40, 40)
     bg_diff_hunk: tuple[int, int, int] = (30, 30, 30)
 
+    # Overlay backgrounds
+    bg_palette: tuple[int, int, int] = (45, 45, 50)
+
 
 # Global singleton theme instance.
 THEME = FlatTheme()

@@ -49,7 +49,7 @@ flowchart TB
 | Module | Role |
 |--------|------|
 | `_component_base.py` | `Component` ABC, `ComponentError`, `nearest_overlay_host()` |
-| `_component_mixins.py` | `GitPanelLazyResizeMixin` (defer `fresh`), `OverlayClientMixin` (toast/sheet helpers) |
+| `_component_mixins.py` | `GitPanelLazyResizeMixin` (defer `refresh`), `OverlayClientMixin` (toast/sheet helpers) |
 | `_component_layouts.py` | `TabView` (tabbed stack), `Column`, `Row` (layout containers) |
 | `_component_widgets.py` | `ItemSelector` (cursor list), `LineTextBrowser` (scrollable text) |
 | `_overlay_components.py` | `Popup` (modal shell), `AlertDialog`, `HelpPanel`, `Toast`, `Sheet` |
@@ -69,10 +69,10 @@ flowchart TB
 | `input_terminal.py` | `InputTerminal` protocol |
 | `input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
 | `_geometry.py` | `TerminalSize` and related helpers |
-| `_picker.py` | `SearchableListPicker` component (CLI/repo flows) |
+| `_picker.py` | Picker building blocks — `SearchableListPicker` not yet provided |
 | `picker_layout.py` | Layout helpers for pickers |
 | `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
-| `types.py` | `ActionLiteral`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
+| `types.py` | `ActionEventType`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
 
 ## Minimal example
 
@@ -86,7 +86,7 @@ class DemoRoot(Component):
     NAME = "demo"
 
     def _render_surface(self, surface):
-        surface.draw_row(0, "termui minimal demo — press q to quit")
+        surface.draw_text_rgb(0, 0, "termui minimal demo — press q to quit", fg=(220, 220, 230), bg=(18, 18, 22))
 
 
 class DemoLoop(AppEventLoop):
@@ -106,12 +106,12 @@ Full Git TUI wiring (tabs, help, alerts, toasts) lives in `pigit.app` (`PigitApp
 
 Stable names are listed in `__all__` inside `__init__.py`. Highlights:
 
-- **Tree**: `Component`, `TabView`, `Column`, `Row`, `ActionLiteral`, `LazyLoadMixin`, `ItemSelector`, `LineTextBrowser`
+- **Tree**: `Component`, `TabView`, `Column`, `Row`, `ActionEventType`, `LazyLoadMixin`, `ItemSelector`, `LineTextBrowser`
 - **Overlay**: `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`
 - **Application**: `Application`, `ComponentRoot` (internal but exported), `ExitEventLoop`
 - **Loop**: `AppEventLoop`, `Session`, `Renderer`, `TerminalSize`
 - **Bindings**: `bind_keys`, `list_bindings`, `BindingError`
-- **Picker**: `SearchableListPicker`, `PickerRow`
+- **Picker**: `PickerRow` (building blocks; `SearchableListPicker` not yet provided)
 - **Text**: `sanitize_for_display`, `get_width`, `plain`
 
 Import the package once for app-level wiring:

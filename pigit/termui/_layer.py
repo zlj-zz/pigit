@@ -27,14 +27,17 @@ class Layer:
         self._stack: list[object] = []
 
     def push(self, surface: object) -> None:
+        """Push a surface onto this layer."""
         self._stack.append(surface)
 
     def pop(self) -> Optional[object]:
+        """Pop and return the top surface, or None if empty."""
         if not self._stack:
             return None
         return self._stack.pop()
 
     def top(self) -> Optional[object]:
+        """Return the top surface without removing it, or None if empty."""
         if not self._stack:
             return None
         return self._stack[-1]
@@ -44,6 +47,7 @@ class Layer:
         self._stack.clear()
 
     def is_empty(self) -> bool:
+        """Return True if this layer has no surfaces."""
         return not self._stack
 
     def __iter__(self):
@@ -64,27 +68,34 @@ class LayerStack:
         }
 
     def push(self, kind: LayerKind, surface: object) -> None:
+        """Push a surface onto the specified layer."""
         self._layers[kind].push(surface)
 
     def pop(self, kind: LayerKind) -> Optional[object]:
+        """Pop and return the top surface from the specified layer, or None if empty."""
         return self._layers[kind].pop()
 
     def top(self, kind: LayerKind) -> Optional[object]:
+        """Return the top surface of the specified layer without removing it, or None if empty."""
         return self._layers[kind].top()
 
     def is_empty(self, kind: LayerKind) -> bool:
+        """Return True if the specified layer has no surfaces."""
         return self._layers[kind].is_empty()
 
     def has_any_open(self) -> bool:
+        """Return True if any layer contains at least one surface."""
         return any(not layer.is_empty() for layer in self._layers.values())
 
     def render(self, surface: "Surface") -> None:
+        """Render all open overlays onto the given surface."""
         for kind in _VISIBLE_LAYER_KINDS:
             for overlay in self._layers[kind]:
                 if getattr(overlay, "open", False):
                     overlay._render_surface(surface)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Propagate a terminal resize to all overlays that support it."""
         for kind in _VISIBLE_LAYER_KINDS:
             for overlay in self._layers[kind]:
                 if hasattr(overlay, "resize"):

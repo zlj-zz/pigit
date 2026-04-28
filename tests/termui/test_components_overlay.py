@@ -29,7 +29,7 @@ class _Leaf(Component):
     def _render_surface(self, surface):
         pass
 
-    def fresh(self):
+    def refresh(self):
         pass
 
 
@@ -39,7 +39,7 @@ class DummyBody(Component):
     def _render_surface(self, surface):
         pass
 
-    def fresh(self):
+    def refresh(self):
         pass
 
 
@@ -532,7 +532,7 @@ class TestPopup:
             def _render_surface(self, surface):
                 pass
 
-            def fresh(self):
+            def refresh(self):
                 pass
 
         child = _KeyChild()
@@ -548,7 +548,7 @@ class TestPopup:
             def _render_surface(self, surface):
                 pass
 
-            def fresh(self):
+            def refresh(self):
                 pass
 
         host = MagicMock()

@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Sequence
 
 from ._color import ColorAdapter
-from ._surface import _DEFAULT_BG, _DEFAULT_FG
+from .palette import DEFAULT_BG, DEFAULT_FG
 
 if TYPE_CHECKING:
     from ._session import Session
-    from ._surface import FlatCell, Surface
+    from .palette import DEFAULT_BG, DEFAULT_FG
+from ._surface import FlatCell, Surface
 
 
 class Renderer:
@@ -36,12 +37,15 @@ class Renderer:
         self._color = ColorAdapter()
 
     def write(self, text: str) -> None:
+        """Write raw text to the terminal output stream."""
         self._out.write(text)
 
     def flush(self) -> None:
+        """Flush the terminal output stream."""
         self._out.flush()
 
     def clear_screen(self) -> None:
+        """Clear the entire screen and move the cursor to the top-left."""
         # Full clear then CUP (1,1), aligned with historical full-screen Git TUI.
         self._out.write("\033[2J\033[0;0f")
         self.move_cursor(1, 1)
@@ -70,9 +74,11 @@ class Renderer:
         self._out.write(text)
 
     def hide_cursor(self) -> None:
+        """Hide the terminal cursor."""
         self._out.write("\033[?25l")
 
     def show_cursor(self) -> None:
+        """Show the terminal cursor."""
         self._out.write("\033[?25h")
 
     def set_cursor(self, row: int, col: int) -> None:
@@ -150,7 +156,7 @@ class Renderer:
         has_rgb = any(
             cell.char != ""
             and cell.ansi_style is None
-            and (cell.fg != _DEFAULT_FG or cell.bg != _DEFAULT_BG or cell.bold)
+            and (cell.fg != DEFAULT_FG or cell.bg != DEFAULT_BG or cell.bold)
             for cell in row
         )
         has_legacy = any(
@@ -185,8 +191,8 @@ class Renderer:
     def _row_to_str_rgb(self, row: list["FlatCell"]) -> str:
         """Render a row where cells use RGB attributes."""
         parts = []
-        last_fg = _DEFAULT_FG
-        last_bg = _DEFAULT_BG
+        last_fg = DEFAULT_FG
+        last_bg = DEFAULT_BG
         last_bold = False
         has_style = False
 
@@ -195,13 +201,13 @@ class Renderer:
                 continue
             sgr_parts = []
             if cell.fg != last_fg:
-                if cell.fg == _DEFAULT_FG:
+                if cell.fg == DEFAULT_FG:
                     sgr_parts.append("\033[39m")
                 else:
                     sgr_parts.append(self._color.fg_sequence(cell.fg))
                 last_fg = cell.fg
             if cell.bg != last_bg:
-                if cell.bg == _DEFAULT_BG:
+                if cell.bg == DEFAULT_BG:
                     sgr_parts.append("\033[49m")
                 else:
                     sgr_parts.append(self._color.bg_sequence(cell.bg))
@@ -223,8 +229,8 @@ class Renderer:
         """Render a row containing both legacy and RGB cells."""
         parts = []
         in_legacy = False
-        last_fg = _DEFAULT_FG
-        last_bg = _DEFAULT_BG
+        last_fg = DEFAULT_FG
+        last_bg = DEFAULT_BG
         last_bold = False
 
         for cell in row:
@@ -235,10 +241,10 @@ class Renderer:
                 # Legacy cell
                 if not in_legacy:
                     # Transition from RGB to legacy
-                    if last_fg != _DEFAULT_FG or last_bg != _DEFAULT_BG or last_bold:
+                    if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_bold:
                         parts.append(self._color.reset_sequence())
-                        last_fg = _DEFAULT_FG
-                        last_bg = _DEFAULT_BG
+                        last_fg = DEFAULT_FG
+                        last_bg = DEFAULT_BG
                         last_bold = False
                 in_legacy = True
                 parts.append(cell.ansi_style)
@@ -249,19 +255,19 @@ class Renderer:
                     # Transition from legacy to RGB: reset terminal state
                     parts.append(self._color.reset_sequence())
                     in_legacy = False
-                    last_fg = _DEFAULT_FG
-                    last_bg = _DEFAULT_BG
+                    last_fg = DEFAULT_FG
+                    last_bg = DEFAULT_BG
                     last_bold = False
 
                 sgr_parts = []
                 if cell.fg != last_fg:
-                    if cell.fg == _DEFAULT_FG:
+                    if cell.fg == DEFAULT_FG:
                         sgr_parts.append("\033[39m")
                     else:
                         sgr_parts.append(self._color.fg_sequence(cell.fg))
                     last_fg = cell.fg
                 if cell.bg != last_bg:
-                    if cell.bg == _DEFAULT_BG:
+                    if cell.bg == DEFAULT_BG:
                         sgr_parts.append("\033[49m")
                     else:
                         sgr_parts.append(self._color.bg_sequence(cell.bg))
@@ -274,7 +280,7 @@ class Renderer:
                 parts.append(cell.char)
 
         # Only emit trailing reset if last active styling is non-default
-        if last_fg != _DEFAULT_FG or last_bg != _DEFAULT_BG or last_bold:
+        if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_bold:
             parts.append(self._color.reset_sequence())
 
         return "".join(parts)
@@ -293,6 +299,7 @@ class Renderer:
             for idx, line in enumerate(lines, start=1):
                 self.move_cursor(idx, 1)
                 self._out.write(line)
+                self.erase_line_to_end()
         else:
             for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
                 if old != new:

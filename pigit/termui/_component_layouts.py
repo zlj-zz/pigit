@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
 
 from ._component_base import Component, ComponentError, _render_child_to_surface
 from ._layout import layout_flex
-from .types import ActionLiteral
+from .types import ActionEventType
 
 _logger = logging.getLogger(__name__)
 
@@ -82,22 +82,23 @@ class TabView(Component):
             self._active.deactivate()
         target.activate()
         self._active = target
-        fresh_fn = getattr(target, "fresh", None)
+        fresh_fn = getattr(target, "refresh", None)
         if callable(fresh_fn):
             try:
                 fresh_fn()
             except NotImplementedError:
                 pass
             except Exception:
-                _logger.exception("fresh() failed for %s", type(target).__name__)
+                _logger.exception("refresh() failed for %s", type(target).__name__)
         if hasattr(target, "_panel_loaded"):
             target._panel_loaded = True
         if self._on_switch is not None:
             self._on_switch(target)
         return target
 
-    def accept(self, action: ActionLiteral, **data):
-        if action is ActionLiteral.goto:
+    def accept(self, action: ActionEventType, **data):
+        """Handle a goto action by routing to the target child."""
+        if action is ActionEventType.goto:
             target = data.get("target")
             if isinstance(target, Component) and target in self.children:
                 self.route_to(target)
@@ -111,6 +112,7 @@ class TabView(Component):
         _logger.warning("TabView: unsupported action %r", action)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the container and propagate the new size to all children."""
         self._size = size
         for child in self.children:
             child.resize(size)
@@ -151,6 +153,7 @@ class Column(Component):
         self._heights = list(heights)
 
     def set_heights(self, heights: Sequence[Union[int, Literal["flex"]]]) -> None:
+        """Update the height spec for each child and validate the length."""
         if len(heights) != len(self.children):
             raise ValueError(
                 f"heights length mismatch: expected {len(self.children)}, "
@@ -159,6 +162,7 @@ class Column(Component):
         self._heights = list(heights)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the column and lay out children vertically according to heights."""
         self._size = size
         width, total_h = size
         heights = layout_flex(self._heights, total_h)
@@ -189,7 +193,7 @@ class Column(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def accept(self, action: ActionLiteral, **data) -> None:
+    def accept(self, action: ActionEventType, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not
         override ``accept`` (e.g. ``_PickerHeader``).
         """
@@ -198,6 +202,7 @@ class Column(Component):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
+        """Destroy all children that implement destroy."""
         for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()
@@ -228,6 +233,7 @@ class Row(Component):
         self._widths = list(widths)
 
     def set_widths(self, widths: Sequence[Union[int, Literal["flex"]]]) -> None:
+        """Update the width spec for each child and validate the length."""
         if len(widths) != len(self.children):
             raise ValueError(
                 f"widths length mismatch: expected {len(self.children)}, "
@@ -239,6 +245,7 @@ class Row(Component):
         self._widths = new_widths
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the row and lay out children horizontally according to widths."""
         self._size = size
         width, height = size
         widths = layout_flex(self._widths, width)
@@ -269,12 +276,16 @@ class Row(Component):
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
-    def accept(self, action: ActionLiteral, **data) -> None:
+    def accept(self, action: ActionEventType, **data) -> None:
+        """Broadcast action to all children. Skip leaf components that do not
+        override ``accept``.
+        """
         for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
 
     def destroy(self) -> None:
+        """Destroy all children that implement destroy."""
         for child in self.children:
             if callable(getattr(child, "destroy", None)):
                 child.destroy()

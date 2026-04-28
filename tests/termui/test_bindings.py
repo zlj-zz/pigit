@@ -77,7 +77,7 @@ class _Base(Component):
         super().__init__()
         self.seen: list = []
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
         pass
 
     def _render_surface(self, surface):
@@ -120,7 +120,7 @@ def test_duplicate_same_callable_deduped():
         def press(self) -> None:
             self.n = 1
 
-        def fresh(self) -> None:
+        def refresh(self) -> None:
             pass
 
         def _render_surface(self, surface):

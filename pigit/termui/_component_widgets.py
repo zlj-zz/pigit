@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
-from ._surface import _DEFAULT_BG
+from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
 from .keys import (
     KEY_BACKSPACE,
     KEY_DELETE,
@@ -28,10 +28,12 @@ from .keys import (
     KEY_DOWN,
 )
 from .tty_io import truncate_line
+from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
-    from ._surface import Surface
+    from .palette import DEFAULT_BG, DEFAULT_FG
+from ._surface import Surface
 
 
 class LineTextBrowser(Component):
@@ -52,6 +54,7 @@ class LineTextBrowser(Component):
         self._r = [0, self._size[1]]
 
     def resize(self, size: tuple[int, int]):
+        """Resize the browser and update the maximum visible lines."""
         self._max_line = size[1]
         super().resize(size)
 
@@ -60,12 +63,20 @@ class LineTextBrowser(Component):
             return
         end = min(self._i + self._max_line, len(self._content))
         for idx in range(self._i, end):
-            surface.draw_text(idx - self._i, 0, self._content[idx])
+            surface.draw_text_rgb(
+                idx - self._i,
+                0,
+                self._content[idx],
+                fg=DEFAULT_FG,
+                bg=DEFAULT_BG,
+            )
 
     def scroll_up(self, line: int = 1):
+        """Scroll the view up by the given number of lines."""
         self._i = max(self._i - line, 0)
 
     def scroll_down(self, line: int = 1):
+        """Scroll the view down by the given number of lines."""
         self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
 
 
@@ -98,17 +109,18 @@ class ItemSelector(Component):
         self._panel_loaded = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the selector and refresh content if activated or not lazy."""
         self._size = size
         if self._lazy_load:
             if self.is_activated():
-                self.fresh()
+                self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
                 self.set_content(["Loading..."])
                 self.curr_no = 0
                 self._r_start = 0
         else:
-            self.fresh()
+            self.refresh()
 
     @property
     def visible_row_count(self) -> int:
@@ -126,6 +138,7 @@ class ItemSelector(Component):
         return self.content[self._r_start : self._r_start + self.visible_row_count]
 
     def set_content(self, content: list[str]):
+        """Replace the list content and clamp the current selection to the new bounds."""
         self.content = content
         if not content:
             self._r_start = 0
@@ -139,24 +152,169 @@ class ItemSelector(Component):
             self._r_start = self.curr_no
 
     def clear_items(self):
+        """Clear the selector content, leaving a single empty item."""
         self.set_content([""])
 
     def update(self, action, **data):
+        """No-op update handler for compatibility with the action system."""
         pass
 
     def _render_surface(self, surface: "Surface") -> None:
+        """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             return
         end = min(self._r_start + self._size[1], len(self.content))
         for idx in range(self._r_start, end):
-            prefix = self.CURSOR if idx == self.curr_no else " "
-            surface.draw_text(idx - self._r_start, 0, f"{prefix}{self.content[idx]}")
+            row = idx - self._r_start
+            is_cursor = idx == self.curr_no
+            left, main, right = self.describe_row(idx, is_cursor)
+            self._draw_row_layout(surface, row, left, main, right)
+
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return a description of the row at ``idx`` for declarative rendering.
+
+        Subclasses override this to describe what should appear on each row;
+        the base class handles all drawing via ``_draw_row_layout``.
+
+        Returns:
+            (left_segments, main_segments, right_segments) where each segment
+            is ``(text, fg_rgb, bold)``.  Main segments are drawn sequentially
+            and truncated as a group to fit between left and right;
+            ``None`` means no main content.
+        """
+        prefix = self.CURSOR if is_cursor else " "
+        text = f"{prefix}{self.content[idx]}"
+        return ([(text, DEFAULT_FG, False)], None, [])
+
+    # --- row-rendering helpers ---
+
+    def _truncate_text(self, text: str, max_width: int) -> str:
+        """Truncate text with ellipsis if it exceeds ``max_width`` display columns."""
+        if max_width <= 0:
+            return ""
+        if wcswidth(text) > max_width:
+            return truncate_by_width(text, max_width - 1) + "\u2026"
+        return text
+
+    def _draw_segments(
+        self,
+        surface: "Surface",
+        row: int,
+        col: int,
+        segments: list[tuple[str, tuple[int, int, int], bool]],
+    ) -> int:
+        """Draw a sequence of ``(text, fg, bold)`` segments starting at ``col``.
+
+        Returns the column position after the last segment.
+        """
+        for text, fg, bold in segments:
+            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            col += wcswidth(text)
+        return col
+
+    def _draw_row_layout(
+        self,
+        surface: "Surface",
+        row: int,
+        left: list[tuple[str, tuple[int, int, int], bool]],
+        main: list[tuple[str, tuple[int, int, int], bool]] | None,
+        right: list[tuple[str, tuple[int, int, int], bool]],
+        *,
+        min_gap: int = 1,
+    ) -> None:
+        """Draw a row with left segments, main segments, and right-aligned segments.
+
+        Main segments are drawn sequentially after left segments and are truncated
+        as a group to fit before right segments, with ``min_gap`` columns of
+        minimum spacing on each side.  If the row is too narrow for right
+        segments, they are omitted and main is truncated against left only.
+        """
+        w = surface.width
+        left_w = sum(wcswidth(text) for text, _, _ in left)
+        right_w = sum(wcswidth(text) for text, _, _ in right)
+
+        # Determine how much room main has; drop right if necessary.
+        main_avail = w - left_w - right_w - min_gap * 2
+        if main_avail < 0 and right:
+            right_w = 0
+            main_avail = w - left_w - min_gap * 2
+        if main_avail < 0:
+            main_avail = max(0, w - left_w - min_gap)
+
+        # Draw left segments (truncated if they exceed surface width).
+        col = 0
+        for text, fg, bold in left:
+            text_w = wcswidth(text)
+            if col + text_w > w:
+                text = self._truncate_text(text, max(0, w - col))
+                text_w = wcswidth(text) if text else 0
+            if not text:
+                break
+            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            col += text_w
+
+        # Draw main segments (truncated as a group to fit).
+        if main and main_avail > 0:
+            col += min_gap
+            remaining = main_avail
+            for text, fg, bold in main:
+                text_w = wcswidth(text)
+                if text_w > remaining:
+                    text = self._truncate_text(text, remaining)
+                    text_w = wcswidth(text) if text else 0
+                if text:
+                    surface.draw_text_rgb(
+                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                    )
+                    col += text_w
+                remaining -= text_w
+                if remaining <= 0:
+                    break
+
+        # Draw right segments (right-aligned).
+        if right:
+            right_start = w - right_w
+            if right_start >= left_w + min_gap:
+                col = right_start
+                for text, fg, bold in right:
+                    surface.draw_text_rgb(
+                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                    )
+                    col += wcswidth(text)
+
+    def _draw_right_aligned(
+        self,
+        surface: "Surface",
+        row: int,
+        text: str,
+        fg: tuple[int, int, int],
+        *,
+        bold: bool = False,
+        margin: int = 4,
+    ) -> bool:
+        """Draw ``text`` right-aligned if it fits within ``width - margin``.
+
+        Returns ``True`` if drawn, ``False`` if skipped (too wide).
+        """
+        w = surface.width
+        text_w = wcswidth(text)
+        if text_w < w - margin:
+            surface.draw_text_rgb(
+                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, bold=bold
+            )
+            return True
+        return False
 
     def _notify_change(self) -> None:
         if self._on_change is not None:
             self._on_change(self.curr_no)
 
     def next(self, step: int = 1):
+        """Move the selection forward by the given step."""
         tmp_no = self.curr_no + step
         if tmp_no < 0 or tmp_no >= len(self.content):
             return
@@ -167,8 +325,9 @@ class ItemSelector(Component):
         self._notify_change()
 
     def previous(self, step: int = 1):
+        """Move the selection backward by the given step."""
         tmp = self.curr_no - step
-        if tmp < 0 or tmp >= len(self.content):
+        if tmp < 0:
             return
 
         self.curr_no -= step
@@ -202,14 +361,17 @@ class Header(Component):
         self._right: list[tuple[str, tuple[int, int, int], bool]] = []
 
     def set_left(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        """Set the left header segments."""
         self._left = list(segments)
 
     def set_center(
         self, segments: list[tuple[str, tuple[int, int, int], bool]]
     ) -> None:
+        """Set the center header segments."""
         self._center = list(segments)
 
     def set_right(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+        """Set the right header segments."""
         self._right = list(segments)
 
     def _render_surface(self, surface: "Surface") -> None:
@@ -223,13 +385,13 @@ class Header(Component):
 
         if h >= 2 and self._separator:
             self._draw_content(surface, 0, w)
-            surface.fill_rect_rgb(1, 0, w, 1, _DEFAULT_BG)
-            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=_DEFAULT_BG)
+            surface.fill_rect_rgb(1, 0, w, 1, DEFAULT_BG)
+            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=DEFAULT_BG)
         else:
             self._draw_content(surface, 0, w)
 
     def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
-        surface.fill_rect_rgb(row, 0, w, 1, _DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1, DEFAULT_BG)
 
         left_w = self._slot_width(self._left)
         center_w = self._slot_width(self._center)
@@ -250,7 +412,7 @@ class Header(Component):
         # Draw left
         x = 0
         for text, fg, bold in self._left:
-            surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+            surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
             x += wcswidth(text)
 
         # Draw centre
@@ -258,7 +420,7 @@ class Header(Component):
             centre_x = max(0, (w - center_w) // 2)
             x = centre_x
             for text, fg, bold in self._center:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
                 x += wcswidth(text)
 
         # Draw right
@@ -266,7 +428,7 @@ class Header(Component):
             right_x = max(0, w - right_w)
             x = right_x
             for text, fg, bold in self._right:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=_DEFAULT_BG, bold=bold)
+                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
                 x += wcswidth(text)
 
     @staticmethod
@@ -320,17 +482,21 @@ class StatusBar(Component):
             self._text = text
 
     def set_text(self, text: str) -> None:
+        """Update the displayed status text."""
         self._text = text
 
     def _on_change(self, text: str) -> None:
         self._text = text
 
     def destroy(self) -> None:
+        """Unsubscribe from the signal and clean up resources."""
         if self._unsub:
             self._unsub()
 
     def _render_surface(self, surface: "Surface") -> None:
-        surface.draw_row(0, truncate_line(self._text, surface.width))
+        text = truncate_line(self._text, surface.width)
+        text = pad_by_width(text, surface.width)
+        surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
 
 
 class InputLine(Component):
@@ -372,6 +538,7 @@ class InputLine(Component):
 
     @property
     def value(self) -> str:
+        """Return the current input value."""
         return self._value
 
     def set_value(self, text: str) -> None:
@@ -386,9 +553,11 @@ class InputLine(Component):
             self._on_change(self._value)
 
     def set_visible(self, visible: bool) -> None:
+        """Toggle whether the input line is visible."""
         self._visible = visible
 
     def insert(self, ch: str) -> None:
+        """Insert a character at the current cursor position."""
         if self._max_length and len(self._value) >= self._max_length:
             return
         self._value = self._value[: self._cursor] + ch + self._value[self._cursor :]
@@ -404,6 +573,7 @@ class InputLine(Component):
                 self._on_change(self._value)
 
     def backspace(self) -> None:
+        """Delete the character before the cursor."""
         if self._cursor > 0:
             self._value = self._value[: self._cursor - 1] + self._value[self._cursor :]
             self._cursor -= 1
@@ -419,6 +589,7 @@ class InputLine(Component):
         self._cursor = len(self._value)
 
     def clear(self) -> None:
+        """Clear the input value and reset the cursor."""
         self._value = ""
         self._cursor = 0
         if self._on_change:
@@ -510,9 +681,11 @@ class InputLine(Component):
             self.insert(key)
 
     def cursor_left(self) -> None:
+        """Move the cursor one position to the left."""
         self._cursor = max(0, self._cursor - 1)
 
     def cursor_right(self) -> None:
+        """Move the cursor one position to the right."""
         self._cursor = min(len(self._value), self._cursor + 1)
 
     def _render_surface(self, surface: "Surface") -> None:
@@ -535,19 +708,23 @@ class InputLine(Component):
                 suffix = ""
             elif len(suffix) > avail:
                 suffix = suffix[:avail]
-            surface.draw_text(0, 0, prefix)
+            surface.draw_text_rgb(0, 0, prefix, fg=DEFAULT_FG, bg=DEFAULT_BG)
             if suffix:
-                surface.draw_text(0, len(prefix), f"\033[2m{suffix}\033[0m")
+                surface.draw_text_rgb(
+                    0, len(prefix), suffix, fg=DEFAULT_FG_DIM, bg=DEFAULT_BG
+                )
             # Block cursor at the end of the completion text.
             cursor_abs = len(prefix) + len(suffix)
             if cursor_abs < surface.width:
-                surface.draw_text(0, cursor_abs, "\033[7m \033[0m")
+                surface.draw_text_rgb(0, cursor_abs, " ", fg=DEFAULT_BG, bg=DEFAULT_FG)
         else:
-            surface.draw_row(0, truncate_line(core, surface.width))
+            text = truncate_line(core, surface.width)
+            text = pad_by_width(text, surface.width)
+            surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
             # Draw block cursor (reverse video) over the character at cursor.
             if cursor_abs < surface.width:
                 if self._cursor < len(self._value):
                     ch = self._value[self._cursor]
                 else:
                     ch = " "
-                surface.draw_text(0, cursor_abs, f"\033[7m{ch}\033[0m")
+                surface.draw_text_rgb(0, cursor_abs, ch, fg=DEFAULT_BG, bg=DEFAULT_FG)

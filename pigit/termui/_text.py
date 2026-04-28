@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_text.py
-Description: Display width and ANSI stripping — single implementation (no legacy import).
+Description: Text sanitization — ANSI stripping and control-character filtering.
 Author: Zev
 Date: 2026-04-19
 """
@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import re
 from typing import Pattern
-
-from .wcwidth_table import get_width
 
 _STYLE_ANSI_RE: Pattern[str] = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m|\033\[\d+m")
 
@@ -29,7 +27,7 @@ def sanitize_for_display(text: str, max_scalars: int = 4096) -> str:
     Truncates to ``max_scalars`` Unicode scalar values. Newlines are preserved.
     """
 
-    stripped = plain(text.replace("\x1b", ""))
+    stripped = plain(text).replace("\x1b", "")
     out: list[str] = []
     n = 0
     for ch in stripped:

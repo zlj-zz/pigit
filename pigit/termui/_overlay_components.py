@@ -17,7 +17,8 @@ from ._component_base import Component, _looks_like_overlay_host
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._surface import Surface, _DEFAULT_BG, _DEFAULT_FG
+from ._surface import Surface
+from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from . import keys
@@ -78,7 +79,9 @@ class HelpPanel(Component):
         self._scroll_h = 6
         self._outer_w = 42
         self.outer_row_count = 10
-        self._frame = BoxFrame(0, 0, title="Help   esc close")
+        self._frame = BoxFrame(
+            0, 0, title="Help   esc close", fg=DEFAULT_FG, bg=DEFAULT_BG
+        )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         # Each element is a list of (text, fg, bold) segments for one line.
         self._line_segments: list[
@@ -86,6 +89,7 @@ class HelpPanel(Component):
         ] = []
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Recalculate inner and outer dimensions for the given terminal size."""
         tw, th = int(size[0]), int(size[1])
         avail_w, avail_h = self._padding.apply((tw, th))
         inner_w = (
@@ -104,6 +108,7 @@ class HelpPanel(Component):
         super().resize(size)
 
     def set_entries(self, entries: list[HelpEntry]) -> None:
+        """Set flat help entries and rebuild rendered lines."""
         if not entries:
             self._lines = []
             self._line_segments = []
@@ -129,6 +134,7 @@ class HelpPanel(Component):
         self._offset = 0
 
     def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
+        """Set grouped help entries with category headers and rebuild rendered lines."""
         if not groups:
             self._lines = []
             self._line_segments = []
@@ -206,20 +212,23 @@ class HelpPanel(Component):
         self.set_grouped_entries(groups)
 
     def scroll_down(self) -> None:
+        """Scroll the help content down by one line."""
         max_off = max(0, len(self._lines) - self._scroll_h)
         self._offset = min(self._offset + 1, max_off)
 
     def scroll_up(self) -> None:
+        """Scroll the help content up by one line."""
         self._offset = max(0, self._offset - 1)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _render_surface(self, surface: Surface) -> None:
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
 
@@ -240,14 +249,14 @@ class HelpPanel(Component):
                     row,
                     x,
                     text,
-                    fg=fg if fg is not None else _DEFAULT_FG,
-                    bg=_DEFAULT_BG,
+                    fg=fg if fg is not None else DEFAULT_FG,
+                    bg=DEFAULT_BG,
                     bold=bold,
                 )
                 x += wcswidth(text)
             # Pad remaining width with spaces to prevent residue
             while x < content_col + self._inner_w:
-                surface.draw_text_rgb(row, x, " ", fg=_DEFAULT_FG, bg=_DEFAULT_BG)
+                surface.draw_text_rgb(row, x, " ", fg=DEFAULT_FG, bg=DEFAULT_BG)
                 x += 1
 
 
@@ -291,6 +300,12 @@ class Popup(Component):
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
+        self._resolved_handlers = resolve_key_handlers_merged(
+            self, type(self), getattr(self, "BINDINGS", None)
+        )
+        self._resolved_child_handlers = resolve_key_handlers_merged(
+            self._child, type(self._child), getattr(self._child, "BINDINGS", None)
+        )
 
     def _resolved_overlay_host(self) -> Optional[Component]:
         """
@@ -319,13 +334,17 @@ class Popup(Component):
             return OverlayDispatchResult.HANDLED_EXPLICIT
         return self._fallback_overlay_key(key)
 
-    @staticmethod
-    def _invoke_binding_target(target: Component, key: str) -> bool:
-        handlers = resolve_key_handlers_merged(
-            target,
-            type(target),
-            getattr(target, "BINDINGS", None),
-        )
+    def _invoke_binding_target(self, target: Component, key: str) -> bool:
+        if target is self:
+            handlers = self._resolved_handlers
+        elif target is self._child:
+            handlers = self._resolved_child_handlers
+        else:
+            handlers = resolve_key_handlers_merged(
+                target,
+                type(target),
+                getattr(target, "BINDINGS", None),
+            )
         fn = handlers.get(key)
         if fn is None:
             return False
@@ -347,6 +366,7 @@ class Popup(Component):
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def toggle(self) -> None:
+        """Toggle the popup session on the resolved overlay host."""
         if self._session_owner is None:
             return
         host = self._resolved_overlay_host()
@@ -378,16 +398,19 @@ class Popup(Component):
         self.hide()
 
     def show(self) -> None:
+        """Open the popup."""
         self.open = True
 
     def hide(self) -> None:
+        """Close the popup."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the popup and its child to the given terminal size."""
         self._term_size = (int(size[0]), int(size[1]))
         self._child.resize(size)
         self._layout_content()
-        self.fresh()
+        self.refresh()
 
     def relayout_content(self) -> None:
         """Recompute child ``x`` / ``y`` / ``_size`` after child geometry changes."""
@@ -414,7 +437,8 @@ class Popup(Component):
         self._child.y = col
         self._child._size = (ow, oh)
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _on_exit_key(self) -> None:
@@ -473,25 +497,29 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._content_lines: list[str] = []
         self._needs_rebuild = True
-        self._frame = BoxFrame(0, 0, title="Alert")
+        self._frame = BoxFrame(0, 0, title="Alert", fg=DEFAULT_FG, bg=DEFAULT_BG)
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size)
 
     def open_alert(self) -> None:
+        """Open the alert dialog body."""
         if self.open:
             return
         self.open = True
 
     def prepare(self, message: str, on_result: Callable[[bool], None]) -> None:
+        """Configure message and callback, then open the alert."""
         self._message = sanitize_for_display(message)
         self._on_result = on_result
         self.open_alert()
         self._needs_rebuild = True
 
     def reset_state(self) -> None:
+        """Close the alert dialog body."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the alert body and mark it for rebuild."""
         self._term_cols = int(size[0])
         self._term_lines = int(size[1])
         self._needs_rebuild = True
@@ -511,7 +539,8 @@ class AlertDialogBody(Component):
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
     def _confirm(self) -> None:
@@ -525,7 +554,7 @@ class AlertDialogBody(Component):
         # Fill the entire dialog area with default background to prevent
         # previous frame content from leaking through the borders.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, _DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)
@@ -654,6 +683,7 @@ class AlertDialog(Popup):
         self._pane.reset_state()
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the alert dialog and its child pane."""
         super().resize(size)
 
 
@@ -693,9 +723,11 @@ class Toast(Component):
         self.outer_row_count = 0
 
     def is_expired(self) -> bool:
+        """Return True if the toast has exceeded its display duration."""
         return self._clock() - self._created_at > self.duration + self._exit_duration
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the toast and mark it for rebuild if the size changed."""
         new_size = (int(size[0]), int(size[1]))
         if self._term_size != new_size:
             self._term_size = new_size
@@ -714,7 +746,7 @@ class Toast(Component):
         inner_w = max(len(line) for line in self._lines) if self._lines else 0
 
         if self._frame is None:
-            self._frame = BoxFrame(inner_w, inner_h)
+            self._frame = BoxFrame(inner_w, inner_h, fg=DEFAULT_FG, bg=DEFAULT_BG)
         else:
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
@@ -766,6 +798,7 @@ class Toast(Component):
         return base_row, base_col
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Drop all keys; toasts are non-interactive."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def _render_surface(self, surface: Surface) -> None:
@@ -791,6 +824,10 @@ class Toast(Component):
         if render_col + self._outer_w <= 0 or render_col >= surface.width:
             return
 
+        # Clear background to prevent residue from previous frames or underlying content.
+        surface.fill_rect_rgb(
+            base_row, render_col, self._outer_w, self.outer_row_count, DEFAULT_BG
+        )
         self._frame.draw_onto(surface, base_row, render_col)
         self._frame.draw_content(surface, base_row, render_col, self._lines)
 
@@ -800,9 +837,11 @@ class Toast(Component):
         return self._message
 
     def hide(self) -> None:
+        """Close the toast."""
         self.open = False
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op refresh for compatibility."""
         pass
 
 
@@ -823,6 +862,7 @@ class Sheet(Component):
         self.open = True
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Forward overlay keys to the child component if supported."""
         if self._child_dispatch is not None:
             return self._child_dispatch(key)
         return OverlayDispatchResult.DROPPED_UNBOUND
@@ -835,8 +875,10 @@ class Sheet(Component):
         self._child._render_surface(sub)
 
     def hide(self) -> None:
+        """Close the sheet."""
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the sheet and its child to the given terminal size."""
         self._size = (size[0], min(self._target_height, size[1] // 2))
         self._child.resize(self._size)

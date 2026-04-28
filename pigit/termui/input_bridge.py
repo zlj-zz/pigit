@@ -28,12 +28,15 @@ class TermuiInputBridge(InputTerminal):
         self._timeout = 0.125
 
     def start(self) -> None:
+        """No-op: terminal attributes are owned by Session."""
         return
 
     def stop(self) -> None:
+        """No-op: terminal attributes are owned by Session."""
         return
 
     def set_input_timeouts(self, timeout: Optional[float]) -> None:
+        """Set the keyboard read timeout to a non-negative finite float."""
         if timeout is None:
             return
         t = float(timeout)
@@ -44,5 +47,6 @@ class TermuiInputBridge(InputTerminal):
     def get_input(
         self, raw_keys: bool = False
     ) -> tuple[list[str], Optional[list[int]]]:
+        """Read semantic keys from the keyboard and return them (raw_keys is ignored)."""
         keys = self._kb.read_keys(timeout=self._timeout)
         return (keys, None) if not raw_keys else (keys, None)

@@ -14,32 +14,18 @@ from typing import (
     Sequence,
     Union,
     runtime_checkable,
-    TYPE_CHECKING,
 )
-
-if TYPE_CHECKING:
-    from ._component_base import Component
 
 
 @runtime_checkable
 class SizeModifier(Protocol):
+    """Protocol for objects that modify available size and report an offset."""
+
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
         """Return the actual (width, height) after modification."""
 
     def offset(self) -> tuple[int, int]:
         """Return the (top, left) offset introduced by this modifier."""
-
-
-@runtime_checkable
-class LayoutEngine(Protocol):
-    def resize_children(
-        self, available: tuple[int, int], offset: tuple[int, int]
-    ) -> None:
-        """Resize all managed children within the available space.
-
-        ``offset`` is the parent container's (x, y) in screen 1-based
-        coordinates; children x/y must be set relative to the screen.
-        """
 
 
 class Padding:
@@ -58,10 +44,12 @@ class Padding:
         self.left = left
 
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        """Shrink available space by the configured padding."""
         w, h = available
         return max(0, w - self.left - self.right), max(0, h - self.top - self.bottom)
 
     def offset(self) -> tuple[int, int]:
+        """Return the (top, left) offset introduced by this padding."""
         return self.top, self.left
 
 
@@ -73,10 +61,12 @@ class Border:
     """
 
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
+        """Shrink available space by 1 cell on each side."""
         w, h = available
         return max(0, w - 2), max(0, h - 2)
 
     def offset(self) -> tuple[int, int]:
+        """Return the (top, left) offset introduced by this border."""
         return 1, 1
 
 

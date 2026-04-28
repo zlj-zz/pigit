@@ -8,17 +8,43 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Optional, TYPE_CHECKING, Union
 
 from pigit.ext.utils import relative_time
-from pigit.termui import Component
+from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
 
 from .app_theme import THEME
 
 if TYPE_CHECKING:
     from .git.model import Branch, Commit, File
+
+
+@dataclass
+class FileInfo:
+    file: "File"
+    size: str
+    mtime: str
+
+
+@dataclass
+class BranchInfo:
+    branch: "Branch"
+    recent_msg: str
+    recent_author: str
+    created: str
+
+
+@dataclass
+class CommitInfo:
+    commit: "Commit"
+    changed_files: list[tuple[str, int, int]]
+    total_add: int
+    total_del: int
+
+
+InspectorData = Union[FileInfo, BranchInfo, CommitInfo, None]
 
 
 class InspectorPanel(Component):
@@ -39,13 +65,35 @@ class InspectorPanel(Component):
         self._content = []
         self._title = "Inspector"
 
-    def show_file(
-        self,
-        file: "File",
-        size: str = "?",
-        mtime: str = "?",
-    ) -> None:
+    def show(self, data: InspectorData) -> None:
+        """Display inspector content from a data object."""
+        self.clear()
+        if data is None:
+            return
+        if isinstance(data, FileInfo):
+            self._show_file_impl(data)
+        elif isinstance(data, BranchInfo):
+            self._show_branch_impl(data)
+        elif isinstance(data, CommitInfo):
+            self._show_commit_impl(data)
+
+    def update_from(self, source) -> None:
+        """Refresh content from *source* if it provides inspector data.
+
+        Caches by ``(id(source), curr_no)`` to avoid redundant git calls.
+        """
+        if not hasattr(source, "get_inspector_data"):
+            return
+        idx = getattr(source, "curr_no", 0)
+        key = (id(source), idx)
+        if getattr(self, "_last_key", None) == key:
+            return
+        self._last_key = key
+        self.show(source.get_inspector_data())
+
+    def _show_file_impl(self, data: FileInfo) -> None:
         """Display file details."""
+        file = data.file
         self._title = "File"
         status = []
         if file.has_staged_change:
@@ -63,19 +111,14 @@ class InspectorPanel(Component):
             file.name,
             "─" * 20,
             f"Status: {', '.join(status) if status else 'clean'}",
-            f"Size: {size}",
-            f"Modified: {mtime}",
+            f"Size: {data.size}",
+            f"Modified: {data.mtime}",
             f"Tracked: {'yes' if file.tracked else 'no'}",
         ]
 
-    def show_branch(
-        self,
-        branch: "Branch",
-        recent_msg: str = "?",
-        recent_author: str = "?",
-        created: str = "?",
-    ) -> None:
+    def _show_branch_impl(self, data: BranchInfo) -> None:
         """Display branch details."""
+        branch = data.branch
         self._title = "Branch"
         upstream = branch.upstream_name or "none"
         ahead = branch.ahead if branch.ahead != "?" else "0"
@@ -89,21 +132,16 @@ class InspectorPanel(Component):
             f"Ahead: {ahead}",
             f"Behind: {behind}",
         ]
-        if recent_msg != "?":
-            self._content.append(f"Recent: {recent_msg}")
-        if recent_author != "?":
-            self._content.append(f"By: {recent_author}")
-        if created != "?":
-            self._content.append(f"Created: {created}")
+        if data.recent_msg != "?":
+            self._content.append(f"Recent: {data.recent_msg}")
+        if data.recent_author != "?":
+            self._content.append(f"By: {data.recent_author}")
+        if data.created != "?":
+            self._content.append(f"Created: {data.created}")
 
-    def show_commit(
-        self,
-        commit: "Commit",
-        changed_files: Optional[list[tuple[str, int, int]]] = None,
-        total_add: int = 0,
-        total_del: int = 0,
-    ) -> None:
+    def _show_commit_impl(self, data: CommitInfo) -> None:
         """Display commit details."""
+        commit = data.commit
         self._title = "Commit"
         tags = ", ".join(commit.tag) if commit.tag else "none"
         rel_time = relative_time(commit.unix_timestamp)
@@ -117,15 +155,15 @@ class InspectorPanel(Component):
             f"Status: {commit.status}",
             f"Tags: {tags}",
         ]
-        if total_add or total_del:
-            self._content.append(f"Changes: +{total_add} -{total_del}")
-        if changed_files:
+        if data.total_add or data.total_del:
+            self._content.append(f"Changes: +{data.total_add} -{data.total_del}")
+        if data.changed_files:
             self._content.append("─" * 20)
             self._content.append("Files:")
-            for file_name, add, delete in changed_files[:8]:
+            for file_name, add, delete in data.changed_files[:8]:
                 self._content.append(f"  {file_name} +{add} -{delete}")
-            if len(changed_files) > 8:
-                self._content.append(f"  ... and {len(changed_files) - 8} more")
+            if len(data.changed_files) > 8:
+                self._content.append(f"  ... and {len(data.changed_files) - 8} more")
 
     def _render_surface(self, surface) -> None:
         w = surface.width
@@ -133,23 +171,26 @@ class InspectorPanel(Component):
         if w <= 0 or h <= 0:
             return
 
-        # Left border
-        for row in range(h):
-            surface.draw_text_rgb(row, 0, "│", fg=THEME.fg_dim, bg=_DEFAULT_BG)
+        # Left border and separator
+        content_x = 2
+        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        if h > 1:
+            surface.draw_hline_rgb(
+                1, content_x, w - content_x, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
+            )
 
         # Title
-        content_x = 2
         title = f" {self._title} "
         title_w = wcswidth(title)
         if title_w < w - content_x:
             surface.draw_text_rgb(
-                0, content_x, title, fg=THEME.accent_cyan, bg=_DEFAULT_BG, bold=True
+                0,
+                content_x,
+                title,
+                fg=THEME.accent_cyan,
+                bg=palette.DEFAULT_BG,
+                bold=True,
             )
-
-        # Separator under title
-        if h > 1:
-            sep = "─" * (w - content_x)
-            surface.draw_text_rgb(1, content_x, sep, fg=THEME.fg_dim, bg=_DEFAULT_BG)
 
         # Content lines
         for i, line in enumerate(self._content):
@@ -161,5 +202,5 @@ class InspectorPanel(Component):
             if wcswidth(text) > avail:
                 text = truncate_by_width(text, avail - 1) + "…"
             surface.draw_text_rgb(
-                row, content_x, text, fg=THEME.fg_primary, bg=_DEFAULT_BG
+                row, content_x, text, fg=THEME.fg_primary, bg=palette.DEFAULT_BG
             )

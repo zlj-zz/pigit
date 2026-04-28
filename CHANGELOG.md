@@ -1,5 +1,121 @@
 # Changelog of pigit
 
+## 1.8.5 (2026-04-28)
+
+### Diff Syntax Highlighting
+
+- **Zero-dependency syntax highlighting in DiffViewer**: per-line regex-based tokenizer (`SyntaxTokenizer`) supports 15+ languages (Python, JavaScript/TypeScript, Go, Rust, Java/Kotlin, C/C++, Shell, Markdown, YAML, TOML, HTML/XML, CSS).
+- **Language-aware keyword classification**: tokens categorized into `keyword_control`, `keyword_decl`, `keyword_storage`, `keyword_type`, `keyword_operator`, plus `string`, `number`, `comment`, `call`, `builtin`, `type` — each with dedicated palette colors.
+- **Multi-line docstring / block-comment highlighting**: `compute_multiline_mask()` pre-computes which diff lines fall inside triple-quoted strings (`"""`) or `/* */` blocks, respecting hunk boundaries (`@@` resets state).
+- **Hunk-header tokenization**: `@@ -old +new @@` lines split into colored segments (meta markers, line numbers, change counts).
+- **Markdown inline rules**: headings, bold/italic, inline code, and links receive distinct token types.
+
+### Performance
+
+- **Pre-tokenize all lines**: `set_content()` computes tokens once; `_draw_diff_line()` reads from cache instead of tokenizing per frame.
+- **Pre-resolve colors**: RGB colors resolved at `set_content()` time, eliminating 250–750 `resolve_color()` calls per frame.
+- **Pre-compute `wcswidth`**: character widths cached alongside tokens to avoid per-frame width calculations.
+- **Remove redundant background fills**: `fill_always=False` in `_render_surface`; only `+`/`-` lines (non-default BG) are re-filled.
+- **Merge blank-row fills**: single `fill_rect_rgb` call replaces N individual row fills.
+- **Pre-pad line numbers**: `rjust()` moved from per-frame render into `_compute_line_numbers()`.
+- **Pre-compile hunk regexes**: `_HUNK_RE` and `_HUNK_RANGE_RE` as module-level compiled patterns.
+- **Lazy `expandtabs`**: only called when `\t` is actually present in the line.
+
+### Architecture
+
+- **`resolve_color`收归 `SyntaxTokenizer`**: static method with `@lru_cache(maxsize=256)` for language-specific color overrides.
+- **`_LANGUAGE_CONFIGS` 提取到独立文件**: `pigit/termui/_syntax_configs.py` (~600 lines) decouples keyword data from tokenizer logic.
+- **Palette color naming**: base colors renamed to descriptive names (`PEARL`, `SLATE`, `INK`) separate from role assignments (`DEFAULT_FG`, `DEFAULT_BG`).
+- **DiffViewer helpers extracted**: `_draw_tokens()` for token truncation logic, `_heatmap_entry()` for heatmap density logic.
+- **Hunk navigation**: pre-computed `_hunk_indices` + `bisect` for O(log H) jump to previous/next hunk.
+- **Named constants**: `SCROLL_PAGE_SIZE`, `TAB_WIDTH`, `DENSITY_*`, `BORDER_ROWS` / `BORDER_COLS` replace magic numbers.
+
+### Imports
+
+- **Unified `pigit.termui` public exports**: `SyntaxTokenizer`, `plain`, `Signal`, `OverlayDispatchResult` added to `__init__.__all__`.
+- **Import fixes across app modules**: `app_diff.py`, `app.py`, `app_branch.py`, `app_command_palette.py` now import from `pigit.termui` instead of private submodules.
+
+## 1.8.4 (2026-04-27)
+
+### App
+
+- **Inspector update logic sunk to `InspectorPanel`**: `update_from(source)` handles `(id(source), curr_no)` caching and `get_inspector_data()` dispatch; app layer deletes `_update_inspector_content()` and `_last_inspector_key` state.
+- **`FlatTheme.bg_palette`**: command palette background color moved from local `_PALETTE_BG = (45, 45, 50)` into the theme system.
+- **`CommitPanel._max_meta_w` initialized in `__init__`**: explicit `self._max_meta_w = 0` removes the need for defensive `getattr(..., 0)` in `describe_row`.
+
+### TermUI
+
+- **`LoopKwargs` TypedDict**: `Application.__init__(**loop_kwargs: Unpack[LoopKwargs])` declares the forwarded `AppEventLoop` keyword arguments for type-checker validation.
+- **`Application._root` explicitly declared**: `self._root: Optional[ComponentRoot] = None` added to `__init__`.
+- **Surface `draw_text_rgb` performance**: pre-computes `wcswidth` before the hot loop, ASCII fast path bypasses per-char `_char_width` calls, `_SPACER_CELL` constant avoids repeated `FlatCell("")` allocations.
+- **Unused import cleanup**: removed `Callable`, `LayerKind`, `palette`, `subprocess`, and stale `TYPE_CHECKING` blocks across `app.py`, `_application.py`, `_layout.py`, `_text.py`.
+
+### Git
+
+- **Merge command branch completion**: `m`, `m.no`, `m.ff`, `m.squash` gain `arg_completion=CompletionType.BRANCH` for tab-completion of branch names.
+
+### Bug Fixes
+
+- **Event loop exception guard**: `_dispatch_semantic_string` catches non-`ExitEventLoop` exceptions in overlay handlers, binding handlers, and child `_handle_event`, preventing a single panel callback from crashing the entire TUI.
+- **`exec_external` decoupled via `ContextVar`**: `pigit.termui._session_context` provides `exec_external()` without requiring `Application` inheritance; `Session.__enter__/__exit__` correctly set/reset the context token.
+- **`GitError` exception contract**: `checkout_branch` raises `GitError` instead of returning a string; callers use `try/except` with `show_toast` for user-facing errors.
+- **`ItemSelector.previous` copy-paste fix**: removed the impossible `tmp >= len(self.content)` condition carried over from `next()`.
+
+### Tests
+
+- **`test_advanced_features` import path**: corrected `app_palette` → `app_command_palette`.
+
+## 1.8.3 (2026-04-27)
+
+### App
+
+- **StatusPanel `C` key**: opens `$EDITOR` via `Application.exec_external` (TUI suspends/resumes around the editor session); checks for staged changes before launching.
+- **Header branch name refresh**: `Signal[str]` drives branch name updates; `BranchPanel` writes the signal on successful checkout so the header updates immediately without waiting for a full re-render cycle.
+- **`_PigitWidgets` dataclass**: consolidates 11 `Optional` widget fields in `PigitApplication.__init__` into a single dataclass with a `_w` property for non-null access.
+- **Panel constructor cleanup**: removed unused `x`, `y`, `size`, `content`, `repo_path`, `repo_conf` parameters from `StatusPanel`, `BranchPanel`, and `CommitPanel`.
+- **`CommitViewMode` enum**: replaces string `"list"` / `"river"` with `CommitViewMode.LIST` / `CommitViewMode.HEATMAP`.
+- **`rel_time_cache`**: panel-owned `dict[str, str]` cache replaces mutation of `commit._rel_time` on model objects.
+- **Inspector data objects**: `FileInfo`, `BranchInfo`, `CommitInfo` dataclasses replace the `isinstance` chain in inspector dispatch.
+- **`ContributionGraph.render_into`**: public entry point so `CommitPanel` no longer calls the private `_render_surface` across classes.
+- **`_draw_diff_line` helper**: deduplicates the per-line rendering logic shared between `DiffViewer._render_surface` (bordered) and `_render_surface_borderless`.
+- **`app_palette` renamed to `app_command_palette`** with defensive checks.
+
+### TermUI
+
+- **Popup handler caching**: `Popup` pre-resolves `self` and child binding handlers in `__init__`, avoiding `resolve_key_handlers_merged` on every keypress.
+- **`Application.BINDINGS` type annotation**: `Optional[BindingsList]` replaces untyped `= None`.
+- **`BindingError` and `keys` exported**: added to `pigit.termui.__init__.__all__`.
+- **`before_mouse_event` hook**: `AppEventLoop` exposes `before_mouse_event(event)` for subclass overrides.
+- **Removed dead `LayoutEngine` Protocol**: no implementations existed; deleted from `_layout.py` and `_component_base.py`.
+- **`Component.resize()` cleanup**: removed misleading `for child in self.children: child.resize(size)` propagation; layout containers (`Column`, `Row`, `TabView`) handle their own child sizing.
+- **RGB migration completed**: all draw calls migrated to `*_rgb` methods; legacy ANSI draw methods removed from `Surface` and callers.
+- **`describe_row` API**: `ItemSelector` subclasses declare row content declaratively as `(left, main, right)` segment tuples; base class handles truncation and alignment.
+- **Color constants extracted**: `DEFAULT_BG`, `DEFAULT_FG`, etc. moved to `palette` module.
+- **`fresh()` → `refresh()`**, `ActionLiteral` → `ActionEventType`.
+- **ANSI sequence fix**: corrected 256-color and 16-color mode SGR sequences.
+
+### Git
+
+- **`load_status()` decoupled from rendering**: removed `max_width`, `ident`, `plain`, `icon` parameters; returns pure `File` data without width-dependent formatting.
+
+### Renderer
+
+- **Erase line tail on full-screen clear**: after `clear_screen()`, each written row is followed by `erase_line_to_end()` to prevent stale content from lingering on the right side when terminal width increases.
+
+### Diff
+
+- **CRLF handling**: strip `\r` before `expandtabs(8)` to prevent carriage returns from resetting the cursor mid-line.
+
+### Docs
+
+- **TermUI docstrings**: added to public classes and methods.
+- **README picker note**: `_picker.py` documented as building-blocks only; `SearchableListPicker` not yet provided.
+- **README section order**: Interaction moved before Commands.
+
+### CI
+
+- **Workflow filename**: `ci.yml` → `ci.yaml` to match PyPI trusted publisher requirements.
+
 ## 1.8.2 (2026-04-26)
 
 ### TermUI — Component model & layout
@@ -23,7 +139,7 @@
 
 - **`StatusPanel` visual mode**: `v` toggles visual selection, `s` toggles scroll-select, `Space` toggles individual selection; batch actions (`a` stage, `d` discard, `i` ignore) operate on selected files.
 - **`Repo` dependency injection**: `PigitApplication` and panels receive `Repo` via constructor, eliminating import-time side effects.
-- **`relative_time` caching in `CommitPanel`**: `fresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
+- **`relative_time` caching in `CommitPanel`**: `refresh()` computes once per commit into `commit._rel_time`; `relative_time()` decorated with `@lru_cache(maxsize=256)`.
 - **Panel render comments**: `_render_surface` methods in `StatusPanel`, `BranchPanel`, `CommitPanel` now document layout intent and coordinate calculations.
 - **`InputLine` block cursor**: physical cursor rendered as filled block; `set_content` scroll-reset bug fixed.
 - **`StatusPanel` `C` key**: opens `$EDITOR` for git commit.
@@ -133,7 +249,7 @@
 ### Git TUI (`pigit.app`)
 
 - **`GitTuiRoot`**: one overlay slot (help `Popup` vs `AlertDialog`); `?` toggles help; help rows refreshed via `HelpPanel.refresh_entries_from_source` before open.
-- **`StatusPanel._check_via_alert`**: after confirm, **`fresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
+- **`StatusPanel._check_via_alert`**: after confirm, **`refresh()`** reloads status and the cursor is clamped so the list updates on the same frame as the closing dialog (no extra keypress).
 
 ## 1.7.7 (2026-03-29)
 

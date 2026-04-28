@@ -11,18 +11,19 @@ from __future__ import annotations
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.termui import (
+    ActionEventType,
     AlertDialog,
     bind_keys,
     Component,
+    exec_external,
     ItemSelector,
     keys,
     show_badge,
     show_toast,
 )
-from pigit.termui.types import ActionLiteral
-from pigit.termui._surface import _DEFAULT_BG
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
+
+from .app_inspector import FileInfo
 from .app_theme import THEME
 from .git.model import File
 
@@ -71,29 +72,17 @@ class StatusPanel(ItemSelector):
 
     def __init__(
         self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
         *,
         alert_inner_width: Optional[int] = None,
         display: Optional[Component] = None,
         on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
-        repo_path: Optional[str] = None,
-        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(
-            x,
-            y,
-            size,
-            content,
             on_selection_changed=on_selection_changed,
             lazy_load=True,
         )
-        self.repo_path = repo_path
-        self.repo_conf = repo_conf
         self.git = git
         self._display = display
         self._on_visual_mode_changed = on_visual_mode_changed
@@ -102,9 +91,6 @@ class StatusPanel(ItemSelector):
         self._all_files: list[File] = []  # For filter reset
         self._alert_dialog = AlertDialog(
             self,
-            x=x,
-            y=y,
-            size=size,
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )
@@ -181,127 +167,54 @@ class StatusPanel(ItemSelector):
         else:
             self._selected.add(idx)
 
-    def fresh(self) -> None:
-        self.files = self.git.load_status(self._size[0], plain=True)
+    def refresh(self) -> None:
+        self.files = self.git.load_status()
         self._all_files = list(self.files)
         if not self.files:
             self.set_content(["No status changed."])
             return
-        files_str = [f.display_str for f in self.files]
-        self.set_content(files_str)
+        # content is only used for row-count bookkeeping; rendering uses
+        # describe_row which reads directly from self.files.
+        self.set_content([f.name for f in self.files])
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._alert_dialog.resize(size)
 
-    def _render_surface(self, surface) -> None:
-        """Render each status row as: [cursor][sp][staged][unstaged][sp][filename.......][label]
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return row description: [cursor][staged][unstaged][filename.......][label]"""
+        if idx >= len(self.files):
+            text = self.content[idx] if idx < len(self.content) else ""
+            prefix = self.CURSOR if is_cursor else " "
+            return ([(f"{prefix} {text}", THEME.fg_primary, is_cursor)], None, [])
 
-        The first five columns (cursor + space + staged + unstaged + space) are a fixed
-        prefix.  The filename fills the remaining width, and the status label is drawn
-        right-aligned when there is room.
-        """
-        if not self.content:
-            return
-        w = surface.width
-        end = min(self._r_start + self._size[1], len(self.content))
-        for idx in range(self._r_start, end):
-            row = idx - self._r_start
-            is_cursor = idx == self.curr_no
+        file = self.files[idx]
+        staged = file.short_status[0] if len(file.short_status) > 0 else " "
+        unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
+        cursor_prefix = self.CURSOR if is_cursor else " "
 
-            line = self.content[idx]
-            staged = line[0] if len(line) > 0 else " "
-            unstaged = line[1] if len(line) > 1 else " "
-            filename = line[3:] if len(line) > 3 else ""
+        left = [
+            (cursor_prefix, THEME.fg_primary, is_cursor),
+            (" ", THEME.fg_primary, False),
+            (staged, _staged_fg(staged), is_cursor),
+            (unstaged, _unstaged_fg(unstaged), is_cursor),
+            (" ", THEME.fg_primary, False),
+        ]
 
-            cursor_prefix = self.CURSOR if is_cursor else " "
-            # Fixed prefix: cursor + space + staged + unstaged + space = 5 display columns
-            fixed_width = 5
+        is_selected = idx in self._selected
+        filename_fg = THEME.accent_purple if is_selected else THEME.fg_primary
+        main = [(file.name, filename_fg, is_cursor)]
 
-            if fixed_width >= w:
-                # Terminal too narrow; draw truncated prefix only
-                surface.draw_text_rgb(
-                    row,
-                    0,
-                    truncate_by_width(f"{cursor_prefix} {staged}{unstaged} ", w),
-                    fg=THEME.fg_primary,
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-            else:
-                # --- Draw fixed prefix (5 columns) ---
-                col = 0
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    cursor_prefix,
-                    fg=THEME.fg_primary,
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # cursor
+        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        label = _status_label(file)
+        if label:
+            right.append((label, THEME.fg_muted, False))
 
-                surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
-                )
-                col += 1  # spacer
-
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    staged,
-                    fg=_staged_fg(staged),
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # staged status
-
-                surface.draw_text_rgb(
-                    row,
-                    col,
-                    unstaged,
-                    fg=_unstaged_fg(unstaged),
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                col += 1  # unstaged status
-
-                surface.draw_text_rgb(
-                    row, col, " ", fg=THEME.fg_primary, bg=_DEFAULT_BG
-                )
-                col += 1  # spacer before filename
-
-                # --- Draw filename (fills remaining width) ---
-                avail = w - fixed_width
-                if wcswidth(filename) > avail:
-                    filename = truncate_by_width(filename, avail - 1) + "\u2026"
-                if filename:
-                    is_selected = idx in self._selected
-                    filename_fg = (
-                        THEME.accent_purple if is_selected else THEME.fg_primary
-                    )
-                    surface.draw_text_rgb(
-                        row,
-                        col,
-                        filename,
-                        fg=filename_fg,
-                        bg=_DEFAULT_BG,
-                        bold=is_cursor,
-                    )
-
-            # --- Draw status label right-aligned ---
-            if idx < len(self.files):
-                label = _status_label(self.files[idx])
-                label_w = wcswidth(label)
-                if label_w < w - 4:  # leave a small margin from the edge
-                    label_x = w - label_w
-                    surface.draw_text_rgb(
-                        row,
-                        label_x,
-                        label,
-                        fg=THEME.fg_muted,
-                        bg=_DEFAULT_BG,
-                    )
+        return left, main, right
 
     def on_key(self, key: str) -> None:
         if not self.files:
@@ -313,7 +226,7 @@ class StatusPanel(ItemSelector):
                 "\n"
             )
             self.emit(
-                ActionLiteral.goto,
+                ActionEventType.goto,
                 target=self._display,
                 source=self,
                 key=f.name,
@@ -342,6 +255,22 @@ class StatusPanel(ItemSelector):
                 batch_msg="Discard {} file(s)",
                 needs_confirm=True,
             )
+            return
+        if key == "C":
+            if not any(f.has_staged_change for f in self.files):
+                show_toast("No staged changes to commit", duration=2.0)
+                return
+            try:
+                result = exec_external(["git", "commit"], cwd=self.git.path)
+                if result.returncode == 0:
+                    show_toast("Commit created", duration=1.5)
+                else:
+                    show_toast("Commit aborted or failed", duration=2.0)
+            except Exception:
+                show_toast("Failed to open editor", duration=2.0)
+                raise
+            finally:
+                self.refresh()
             return
 
     # --- Helpers ---
@@ -383,8 +312,20 @@ class StatusPanel(ItemSelector):
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
+            ("C", "Commit"),
             ("v", "Visual"),
         ]
+
+    def get_inspector_data(self) -> Optional[FileInfo]:
+        """Return inspector data for the currently selected file."""
+        idx = self.curr_no
+        if not self.files or not (0 <= idx < len(self.files)):
+            return None
+        file = self.files[idx]
+        size, mtime = ("?", "?")
+        if self.git is not None:
+            size, mtime = self.git.get_file_info(file)
+        return FileInfo(file=file, size=size, mtime=mtime)
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
@@ -431,7 +372,7 @@ class StatusPanel(ItemSelector):
             else:
                 callee(f)
                 show_badge(single_msg, duration=1.5)
-        self.fresh()
+        self.refresh()
 
     def _check_via_alert(
         self,
@@ -443,10 +384,10 @@ class StatusPanel(ItemSelector):
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:
-                self.fresh()
+                self.refresh()
                 return
             callee(file)
-            self.fresh()
+            self.refresh()
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
             show_badge(msg, duration=1.5)
@@ -467,7 +408,7 @@ class StatusPanel(ItemSelector):
             self._selected.clear()
             self._visual_mode = False
             self._visual_anchor = None
-            self.fresh()
+            self.refresh()
             show_badge(f"{action} {count} file(s)", duration=1.5)
 
         self._alert_dialog.alert(text, on_result)

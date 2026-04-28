@@ -207,6 +207,7 @@ class TestInputLine:
 
     def test_render_with_candidates(self):
         from pigit.termui._surface import Surface
+        from pigit.termui.palette import DEFAULT_FG, DEFAULT_FG_DIM
 
         inp = InputLine(
             prompt="> ",
@@ -220,24 +221,31 @@ class TestInputLine:
         assert s.lines()[0].startswith("> abc")
         row_cells = s.rows()[0]
         # Matched part "> a" stays normal
-        assert row_cells[0].style == ""
-        assert row_cells[2].style == ""
+        assert row_cells[0].fg == DEFAULT_FG
+        assert row_cells[2].fg == DEFAULT_FG
         # Suffix "bc" is dim
-        assert row_cells[3].style == "\033[2m"
-        assert row_cells[4].style == "\033[2m"
+        assert row_cells[3].fg == DEFAULT_FG_DIM
+        assert row_cells[4].fg == DEFAULT_FG_DIM
 
     def test_render_draws_block_cursor(self, mocker):
+        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+
         mock_surface = mocker.Mock()
         mock_surface.width = 10
         inp = InputLine(prompt="> ", size=(10, 1))
         inp.set_value("hi")
         inp._render_surface(mock_surface)
-        # Text is drawn via draw_row, then block cursor is drawn via draw_text
+        # Text is drawn via draw_text_rgb, then block cursor is drawn via draw_text_rgb
         # at cursor position (prompt_len + cursor = 2 + 2 = 4) as reverse video.
-        mock_surface.draw_row.assert_called_once()
-        mock_surface.draw_text.assert_called_once_with(0, 4, "\033[7m \033[0m")
+        assert mock_surface.draw_text_rgb.call_count == 2
+        # First call: text row; second call: block cursor
+        mock_surface.draw_text_rgb.assert_called_with(
+            0, 4, " ", fg=DEFAULT_BG, bg=DEFAULT_FG
+        )
 
     def test_render_block_cursor_in_candidate_mode(self, mocker):
+        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+
         mock_surface = mocker.Mock()
         mock_surface.width = 12
         inp = InputLine(
@@ -248,13 +256,16 @@ class TestInputLine:
         inp.on_key("tab")
         inp._render_surface(mock_surface)
         # Candidate mode draws prefix + dim suffix, then block cursor at end.
-        calls = mock_surface.draw_text.call_args_list
+        calls = mock_surface.draw_text_rgb.call_args_list
         # Last call should be the block cursor at position 3 ("o" + "pt").
-        assert calls[-1] == ((0, 3, "\033[7m \033[0m"),) or calls[-1].args == (
+        assert calls[-1] == (
+            (0, 3, " ",),
+            {"fg": DEFAULT_BG, "bg": DEFAULT_FG},
+        ) or calls[-1] == ((0, 3, " ", "DEFAULT_BG", "DEFAULT_FG"),) or calls[-1].args == (
             0,
             3,
-            "\033[7m \033[0m",
-        )
+            " ",
+        ) and calls[-1].kwargs == {"fg": DEFAULT_BG, "bg": DEFAULT_FG}
 
     def test_on_key_plain_text_editing(self):
         inp = InputLine()

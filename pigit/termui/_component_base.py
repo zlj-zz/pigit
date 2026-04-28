@@ -21,10 +21,9 @@ from ._renderer_context import (
     get_renderer,
     get_renderer_strict,
 )
-from .types import ActionLiteral, OverlayDispatchResult
+from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from ._layout import LayoutEngine
     from ._renderer import Renderer
     from ._surface import Surface
 
@@ -64,6 +63,13 @@ def _render_child_to_surface(
 
 
 class Component(ABC):
+    """Base class for all TUI components.
+
+    Provides the component tree (parent/children), size/position,
+    key-handler resolution, action dispatch, and lifecycle hooks.
+    Subclasses must implement :meth:`_render_surface`.
+    """
+
     BINDINGS: Optional[BindingsList] = None
 
     def __init__(
@@ -103,16 +109,18 @@ class Component(ABC):
         return None
 
     def activate(self):
+        """Mark the component as active. Called when it enters the visible tree."""
         self._activated = True
 
     def deactivate(self):
+        """Mark the component as inactive. Called when it leaves the visible tree."""
         self._activated = False
 
     def is_activated(self):
         """Get current activate status."""
         return self._activated
 
-    def fresh(self):
+    def refresh(self):
         """Fresh content data.
 
         Default is no-op; override if the component needs to rebuild internal
@@ -120,7 +128,7 @@ class Component(ABC):
         """
         pass
 
-    def accept(self, action: ActionLiteral, **data):
+    def accept(self, action: ActionEventType, **data):
         """Process emit action of child."""
         _logger.warning(
             "%s.accept: unsupported action %r",
@@ -128,13 +136,13 @@ class Component(ABC):
             action,
         )
 
-    def emit(self, action: ActionLiteral, **data):
+    def emit(self, action: ActionEventType, **data):
         """Emit to parent."""
         if self.parent is None:
             raise ComponentError("Has no parent to emitting.")
         self.parent.accept(action, **data)
 
-    def update(self, action: ActionLiteral, **data):
+    def update(self, action: ActionEventType, **data):
         """Process notify action of parent."""
         _logger.warning(
             "%s.update: unsupported action %r",
@@ -142,18 +150,19 @@ class Component(ABC):
             action,
         )
 
-    def notify(self, action: ActionLiteral, **data):
+    def notify(self, action: ActionEventType, **data):
         """Notify all children."""
         for child in self.children:
             child.update(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Response to the resize event."""
-        self._size = size
-        self.fresh()
+        """Response to the resize event.
 
-        for child in self.children:
-            child.resize(size)
+        Subclasses that manage child geometry (e.g. Column, Row, TabView)
+        must override this method to propagate the correct size to each child.
+        """
+        self._size = size
+        self.refresh()
 
     def _render_surface(self, surface: "Surface") -> None:
         """Render this component into the given Surface.

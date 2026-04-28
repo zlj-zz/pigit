@@ -22,7 +22,7 @@ class DummyBody(Component):
     def _render_surface(self, surface):
         pass
 
-    def fresh(self):
+    def refresh(self):
         pass
 
 
@@ -79,16 +79,16 @@ class TestComponentRoot:
         assert root._layer_stack.top(LayerKind.MODAL) is None
 
     def test_accept_forwards_to_body(self):
-        from pigit.termui.types import ActionLiteral
+        from pigit.termui.types import ActionEventType
 
         root = ComponentRoot(DummyBody())
         root.body.accept = MagicMock()
-        root.accept(ActionLiteral.goto, target="x")
-        root.body.accept.assert_called_once_with(ActionLiteral.goto, target="x")
+        root.accept(ActionEventType.goto, target="x")
+        root.body.accept.assert_called_once_with(ActionEventType.goto, target="x")
 
     def test_fresh_does_not_raise(self):
         root = ComponentRoot(DummyBody())
-        root.fresh()
+        root.refresh()
 
     def test_show_toast(self):
         root = ComponentRoot(DummyBody())
@@ -128,7 +128,7 @@ class TestComponentRoot:
             def _render_surface(self, surface):
                 pass
 
-            def fresh(self):
+            def refresh(self):
                 pass
 
         inner = _Inner()

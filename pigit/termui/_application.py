@@ -8,15 +8,30 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+import logging
+from typing import Optional, TYPE_CHECKING, TypedDict
 
-from pigit.termui._bindings import resolve_key_handlers_merged
+if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
+from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
 from pigit.termui._component_base import Component
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
 if TYPE_CHECKING:
-    import subprocess
+    from pigit.termui.input_bridge import InputTerminal
+
+_logger = logging.getLogger(__name__)
+
+
+class LoopKwargs(TypedDict, total=False):
+    """Keyword arguments forwarded to :class:`~pigit.termui.event_loop.AppEventLoop`."""
+
+    input_takeover: bool
+    input_handle: "InputTerminal"
+    real_time: bool
+    alt: bool
 
 
 class _ApplicationEventLoop(AppEventLoop):
@@ -33,6 +48,7 @@ class _ApplicationEventLoop(AppEventLoop):
         self._app_on_key = getattr(app, "on_key", None)
 
     def after_start(self):
+        """Delegate the after-start hook to the Application instance."""
         self._app.after_start()
 
     def _dispatch_semantic_string(self, key: str):
@@ -43,12 +59,22 @@ class _ApplicationEventLoop(AppEventLoop):
 
         handler = self._app_key_handlers.get(key)
         if handler is not None:
-            handler()
+            try:
+                handler()
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("App binding for '%s' failed", key)
             self.render()
             return "binding"
 
         if self._app_on_key is not None:
-            self._app_on_key(key)
+            try:
+                self._app_on_key(key)
+            except ExitEventLoop:
+                raise
+            except Exception:
+                _logger.exception("App on_key for '%s' failed", key)
             self.render()
             return "app"
 
@@ -60,10 +86,11 @@ class Application:
     High-level facade: subclasses implement build_root() and optional app-level bindings.
     """
 
-    BINDINGS = None
+    BINDINGS: Optional[BindingsList] = None
 
-    def __init__(self, **loop_kwargs) -> None:
+    def __init__(self, **loop_kwargs: "Unpack[LoopKwargs]") -> None:
         self._loop: Optional[AppEventLoop] = None
+        self._root: Optional[ComponentRoot] = None
         self._loop_kwargs = loop_kwargs
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), self.BINDINGS
@@ -99,27 +126,6 @@ class Application:
             self._loop.run()
         finally:
             root.destroy()
-
-    def run_external_process(
-        self,
-        cmd: list[str],
-        cwd: Optional[str] = None,
-    ) -> "subprocess.CompletedProcess[str]":
-        """Suspend TUI, run an external command, then resume TUI and redraw.
-
-        Args:
-            cmd: Command argument list (e.g. ["git", "commit"]).
-            cwd: Working directory for the command.
-
-        Returns:
-            subprocess.CompletedProcess with returncode and other fields.
-
-        Raises:
-            RuntimeError: If called outside run() lifecycle.
-        """
-        if self._loop is None:
-            raise RuntimeError("Application not running.")
-        return self._loop.exec_external(cmd, cwd=cwd)
 
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.

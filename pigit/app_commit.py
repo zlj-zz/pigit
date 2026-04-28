@@ -8,21 +8,28 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+from enum import Enum, auto
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
 from pigit.termui import (
+    ActionEventType,
     bind_keys,
     Component,
     ItemSelector,
     keys,
 )
-from pigit.termui.types import ActionLiteral
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui._surface import _DEFAULT_BG
+from pigit.termui.wcwidth_table import wcswidth
 
+from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
+
+
+class CommitViewMode(Enum):
+    LIST = auto()
+    HEATMAP = auto()
+
 
 if TYPE_CHECKING:
     from .git.local_git import LocalGit
@@ -36,32 +43,22 @@ class CommitPanel(ItemSelector):
 
     def __init__(
         self,
-        x: int = 1,
-        y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
         *,
         display: Optional[Component] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
-        repo_path: Optional[str] = None,
-        repo_conf: Optional[str] = None,
     ) -> None:
         super().__init__(
-            x,
-            y,
-            size,
-            content,
             on_selection_changed=on_selection_changed,
             lazy_load=True,
         )
-        self.repo_path = repo_path
-        self.repo_conf = repo_conf
         self.git = git
         self.commits: list[Commit] = []
-        self._view_mode: str = "list"
+        self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
         self._display = display
+        self._rel_time_cache: dict[str, str] = {}
+        self._max_meta_w = 0
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -74,10 +71,10 @@ class CommitPanel(ItemSelector):
     @bind_keys("g")
     def toggle_view(self) -> None:
         """Toggle between list and contribution graph view."""
-        if self._view_mode == "list":
-            self._view_mode = "river"
+        if self._view_mode is CommitViewMode.LIST:
+            self._view_mode = CommitViewMode.HEATMAP
         else:
-            self._view_mode = "list"
+            self._view_mode = CommitViewMode.LIST
 
     def get_help_title(self) -> str:
         return "Commit"
@@ -90,7 +87,23 @@ class CommitPanel(ItemSelector):
             ("g", "Toggle view"),
         ]
 
-    def fresh(self) -> None:
+    def get_inspector_data(self) -> Optional[CommitInfo]:
+        """Return inspector data for the currently selected commit."""
+        idx = self.curr_no
+        if not self.commits or not (0 <= idx < len(self.commits)):
+            return None
+        c = self.commits[idx]
+        changed_files, total_add, total_del = [], 0, 0
+        if self.git is not None:
+            changed_files, total_add, total_del = self.git.get_commit_stats(c.sha)
+        return CommitInfo(
+            commit=c,
+            changed_files=changed_files,
+            total_add=total_add,
+            total_del=total_del,
+        )
+
+    def refresh(self) -> None:
         branch_name = self.git.get_head() or ""
         self.commits = commits = self.git.load_commits(branch_name)
         self._contrib_graph.set_commits(commits)
@@ -100,12 +113,12 @@ class CommitPanel(ItemSelector):
             return
         lines = []
         max_meta_w = 0
+        self._rel_time_cache.clear()
         for commit in commits:
-            # Cache relative_time on the commit to avoid recalculation in
-            # _format_commit and _render_list_view.
-            commit._rel_time = relative_time(commit.unix_timestamp)
+            rel = relative_time(commit.unix_timestamp)
+            self._rel_time_cache[commit.sha] = rel
             lines.append(self._format_commit(commit))
-            meta = f"  {commit.author}  {commit._rel_time}"
+            meta = f"  {commit.author}  {rel}"
             max_meta_w = max(max_meta_w, wcswidth(meta))
         self.set_content(lines)
         self._max_meta_w = max_meta_w
@@ -114,7 +127,9 @@ class CommitPanel(ItemSelector):
         """Format a commit for display."""
         msg = commit.msg
         sha = commit.sha[:7]
-        rel = getattr(commit, "_rel_time", None) or relative_time(commit.unix_timestamp)
+        rel = self._rel_time_cache.get(commit.sha) or relative_time(
+            commit.unix_timestamp
+        )
         author = commit.author
         # Build a single-line summary for default content
         marker = "\u25cf" if not commit.is_pushed() else " "
@@ -124,122 +139,61 @@ class CommitPanel(ItemSelector):
     def _render_surface(self, surface) -> None:
         if not self.content:
             return
-
-        if self._view_mode == "river":
-            # Render list underneath, then overlay heatmap on top half.
-            self._render_list_view(surface)
+        super()._render_surface(surface)
+        if self._view_mode is CommitViewMode.HEATMAP:
             self._render_heatmap_overlay(surface)
-            return
 
-        self._render_list_view(surface)
+    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+        list[tuple[str, tuple[int, int, int], bool]],
+        list[tuple[str, tuple[int, int, int], bool]] | None,
+        list[tuple[str, tuple[int, int, int], bool]],
+    ]:
+        """Return row description: [cursor][unpushed][SHA][msg][tag][meta]"""
+        if idx >= len(self.commits):
+            prefix = "\u25cf " if is_cursor else "  "
+            return ([(prefix + self.content[idx], THEME.fg_muted, is_cursor)], None, [])
 
-    def _render_list_view(self, surface) -> None:
-        """Render commit list as:
-        [cursor 2cols][unpushed? 2cols][SHA 8cols][msg.........][tag][  author  reltime]
+        commit = self.commits[idx]
 
-        Meta (author + relative_time) is right-aligned using the widest meta width across
-        all commits so every row ends at the same column for vertical alignment.
-        """
-        w = surface.width
-        end = min(self._r_start + self._size[1], len(self.content))
-        max_meta_w = getattr(self, "_max_meta_w", 0)
+        # Cursor indicator (2 cols)
+        if is_cursor:
+            left = [("\u25cf", THEME.fg_primary, True), (" ", THEME.fg_primary, False)]
+        else:
+            left = [("  ", THEME.fg_primary, False)]
 
-        for idx in range(self._r_start, end):
-            row = idx - self._r_start
-            is_cursor = idx == self.curr_no
+        # Unpushed marker (2 cols)
+        if not commit.is_pushed():
+            left.append(("\u25cf", THEME.accent_yellow, is_cursor))
+            left.append((" ", THEME.fg_primary, False))
+        else:
+            left.append(("  ", THEME.fg_primary, False))
 
-            if idx >= len(self.commits):
-                # Fallback for non-commit rows (e.g. "No commits found.")
-                prefix = "\u25cf " if is_cursor else "  "
-                text = prefix + self.content[idx]
-                if wcswidth(text) > w:
-                    text = truncate_by_width(text, w - 1) + "\u2026"
-                surface.draw_text_rgb(
-                    row, 0, text, fg=THEME.fg_muted, bg=_DEFAULT_BG, bold=is_cursor
-                )
-                continue
+        # SHA + spacer (8 cols)
+        left.append((commit.sha[:7], THEME.fg_dim, is_cursor))
+        left.append((" ", THEME.fg_primary, False))
 
-            commit = self.commits[idx]
-            x = 0
+        # Main: message + optional tag
+        tag_str = f" {commit.tag[0]}" if commit.tag else ""
+        main = [
+            (commit.msg, THEME.fg_primary, is_cursor),
+            (tag_str, THEME.accent_cyan, is_cursor),
+        ]
 
-            # --- Cursor indicator (reserve 2 cols for alignment) ---
-            if is_cursor:
-                surface.draw_text_rgb(
-                    row, x, "\u25cf", fg=THEME.fg_primary, bg=_DEFAULT_BG, bold=True
-                )
-            x += 2
+        # Right: padded meta
+        author = commit.author
+        rel = self._rel_time_cache.get(commit.sha) or relative_time(
+            commit.unix_timestamp
+        )
+        meta = f"  {author}  {rel}"
+        meta_w = wcswidth(meta)
+        max_meta_w = self._max_meta_w
+        reserve = max(max_meta_w, meta_w)
+        pad = reserve - meta_w
+        if pad > 0:
+            meta = " " * pad + meta
+        right = [(meta, THEME.fg_muted, is_cursor)]
 
-            # --- Unpushed marker (2 cols) ---
-            if not commit.is_pushed():
-                marker = "\u25cf"
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    marker,
-                    fg=THEME.accent_yellow,
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                x += wcswidth(marker) + 1
-            else:
-                x += 2  # empty spacer to keep alignment
-
-            # --- SHA (7 chars + 1 spacer = 8 cols) ---
-            sha = commit.sha[:7]
-            surface.draw_text_rgb(
-                row, x, sha, fg=THEME.fg_dim, bg=_DEFAULT_BG, bold=is_cursor
-            )
-            x += len(sha) + 1
-
-            # --- Message (truncated to leave room for tag + meta) ---
-            msg = commit.msg
-            author = commit.author
-            rel = getattr(commit, "_rel_time", None) or relative_time(
-                commit.unix_timestamp
-            )
-            meta = f"  {author}  {rel}"
-            meta_w = wcswidth(meta)
-            tag_str = f" {commit.tag[0]}" if commit.tag else ""
-            tag_w = wcswidth(tag_str)
-
-            # Reserve the widest meta width across all commits so tail info aligns vertically
-            reserve_meta_w = max(max_meta_w, meta_w)
-            avail = w - x - reserve_meta_w - tag_w - 1
-            if avail > 0:
-                if wcswidth(msg) > avail:
-                    msg = truncate_by_width(msg, avail - 1) + "\u2026"
-                surface.draw_text_rgb(
-                    row, x, msg, fg=THEME.fg_primary, bg=_DEFAULT_BG, bold=is_cursor
-                )
-                x += wcswidth(msg)
-
-            # --- Tag ---
-            if tag_str:
-                x += 1  # spacer before tag
-                surface.draw_text_rgb(
-                    row,
-                    x,
-                    tag_str,
-                    fg=THEME.accent_cyan,
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
-                x += tag_w
-
-            # --- Meta right-aligned using reserved width for vertical alignment ---
-            # Pad shorter meta with leading spaces so all rows end at the same column.
-            meta_x = w - reserve_meta_w
-            if meta_x >= 0:
-                pad = reserve_meta_w - meta_w
-                padded_meta = (" " * pad) + meta if pad > 0 else meta
-                surface.draw_text_rgb(
-                    row,
-                    meta_x,
-                    padded_meta,
-                    fg=THEME.fg_muted,
-                    bg=_DEFAULT_BG,
-                    bold=is_cursor,
-                )
+        return left, main, right
 
     def _render_heatmap_overlay(self, surface) -> None:
         """Render contribution heatmap overlay on top of panel."""
@@ -250,10 +204,10 @@ class CommitPanel(ItemSelector):
 
         graph_h = min(self._contrib_graph.min_height(), h)
         self._contrib_graph.resize((w, graph_h))
-        self._contrib_graph._render_surface(surface)
+        self._contrib_graph.render_into(surface)
 
     def on_key(self, key: str) -> None:
-        if self._view_mode == "river":
+        if self._view_mode is CommitViewMode.HEATMAP:
             # Contribution graph is view-only; g toggles back to list.
             return
 
@@ -263,7 +217,7 @@ class CommitPanel(ItemSelector):
             commit = self.commits[self.curr_no]
             content = self.git.load_commit_info(commit.sha, plain=True).split("\n")
             self.emit(
-                ActionLiteral.goto,
+                ActionEventType.goto,
                 target=self._display,
                 source=self,
                 content=content,

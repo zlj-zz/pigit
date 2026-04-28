@@ -50,6 +50,7 @@ class ComponentRoot(Component):
 
     @property
     def body(self) -> Component:
+        """The root's single child component (the application body)."""
         return self._body
 
     # --- Badge API (framework-managed, not an overlay) ---
@@ -105,6 +106,7 @@ class ComponentRoot(Component):
     # --- OverlayHost protocol (backward compatible with Popup/AlertDialog) ---
 
     def begin_popup_session(self, popup) -> None:
+        """Push a modal popup onto the MODAL layer."""
         self._layer_stack.push(LayerKind.MODAL, popup)
 
     def end_popup_session(self) -> None:
@@ -112,12 +114,15 @@ class ComponentRoot(Component):
         self._layer_stack.pop(LayerKind.MODAL)
 
     def has_overlay_open(self) -> bool:
+        """Return True if any overlay (modal, toast, or sheet) is currently open."""
         return self._layer_stack.has_any_open()
 
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
+        """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)
 
     def force_close_overlay_after_error(self) -> None:
+        """Forcibly close the top modal overlay, used for error recovery."""
         top = self._layer_stack.pop(LayerKind.MODAL)
         if top is not None and hasattr(top, "hide"):
             top.hide()
@@ -127,13 +132,16 @@ class ComponentRoot(Component):
 
     # --- Component lifecycle ---
 
-    def fresh(self) -> None:
+    def refresh(self) -> None:
+        """No-op for the root; body and overlays are refreshed independently."""
         pass
 
     def accept(self, action, **data):
+        """Forward an action to the body component."""
         self._body.accept(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
+        """Resize the body and all active overlays to the new terminal size."""
         self._body.resize(size)
         self._layer_stack.resize(size)
         super().resize(size)
