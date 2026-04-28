@@ -32,14 +32,6 @@ _logger = logging.getLogger(__name__)
 NONE_SIZE = (0, 0)
 
 
-def _looks_like_overlay_host(candidate: object) -> bool:
-    """Duck-type check for a component that owns app-wide overlay session state."""
-
-    return callable(getattr(candidate, "begin_popup_session", None)) and callable(
-        getattr(candidate, "end_popup_session", None)
-    )
-
-
 class ComponentError(Exception):
     """Error class of ~Component."""
 
@@ -91,22 +83,6 @@ class Component(ABC):
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), self.BINDINGS
         )
-
-    def nearest_overlay_host(self) -> Optional["Component"]:
-        """
-        Walk parents toward the tree root; return the first ancestor that manages
-        overlay sessions (usually :class:`~pigit.termui.root.ComponentRoot`).
-
-        Callers that open modal overlays should use this instead of assuming ``self.parent``
-        is the event-loop root (cf. Flutter ``findAncestorStateOfType`` / SwiftUI environment).
-        """
-
-        current: Optional["Component"] = self.parent
-        while current is not None:
-            if _looks_like_overlay_host(current):
-                return current
-            current = current.parent
-        return None
 
     def activate(self):
         """Mark the component as active. Called when it enters the visible tree."""

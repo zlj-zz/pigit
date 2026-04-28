@@ -115,26 +115,6 @@ class TestComponentBase:
         entries = _Bound().get_help_entries()
         assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
-    def test_nearest_overlay_host_walks_up(self):
-        class _MockHost(_Leaf):
-            def begin_popup_session(self, popup):
-                pass
-
-            def end_popup_session(self):
-                pass
-
-        host = _MockHost()
-        mid = _Leaf()
-        mid.parent = host
-        leaf = _Leaf()
-        leaf.parent = mid
-        assert leaf.nearest_overlay_host() is host
-
-    def test_nearest_overlay_host_none(self):
-        leaf = _Leaf()
-        assert leaf.nearest_overlay_host() is None
-
-
 class TestTabView:
     def test_duplicate_component_name_allowed(self):
         a = MockComponent("dup")
@@ -468,34 +448,3 @@ class TestItemSelectorLazyLoad:
         assert p.content == ["a", "b"]
 
 
-class TestNearestOverlayHost:
-    def test_walks_parents_to_first_overlay_host(self) -> None:
-        class OverlayHost(Component):
-            def begin_popup_session(self, popup: object) -> None:
-                pass
-
-            def end_popup_session(self) -> None:
-                pass
-
-            def refresh(self) -> None:
-                raise NotImplementedError
-
-            def _render_surface(self, surface) -> None:
-                pass
-
-        host = OverlayHost()
-        mid = MockComponent("mid")
-        leaf = MockComponent("leaf")
-        leaf.parent = mid
-        mid.parent = host
-        host.parent = None
-
-        assert leaf.nearest_overlay_host() is host
-
-    def test_returns_none_when_no_host_in_chain(self) -> None:
-        root = MockComponent("root")
-        leaf = MockComponent("leaf")
-        leaf.parent = root
-        root.parent = None
-
-        assert leaf.nearest_overlay_host() is None

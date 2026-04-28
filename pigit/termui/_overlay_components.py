@@ -13,7 +13,7 @@ import time
 from typing import Any, Callable, ClassVar, Optional
 
 from ._bindings import resolve_key_handlers_merged
-from ._component_base import Component, _looks_like_overlay_host
+from ._component_base import Component
 from ._frame import BoxFrame
 from ._text import sanitize_for_display
 from ._layout import Padding
@@ -22,6 +22,7 @@ from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 from . import keys
+from . import _overlay_context
 
 _logger = logging.getLogger(__name__)
 
@@ -35,12 +36,10 @@ class HelpPanel(Component):
     """
     Plain help content (bordered, scrollable key list). Not modal until wrapped.
 
-    Use :class:`Popup` with ``session_owner`` set to a :class:`~pigit.termui.components.Component`
-    that can reach the modal host (typically the loop root or a panel under it); the shell
-    resolves the host via :meth:`~pigit.termui.components.Component.nearest_overlay_host` or
-    treats ``session_owner`` as the host when it owns overlay state. Bind ``?`` to a handler that
-    refreshes rows (e.g. :meth:`refresh_entries_from_source`) when opening help,
-    then calls ``popup.toggle()``.
+    Wrap with :class:`Popup` to make it modal; :class:`Popup` uses
+    :mod:`~pigit.termui._overlay_context` to manage the modal layer lifecycle.
+    Bind ``?`` to a handler that refreshes rows (e.g. :meth:`refresh_entries_from_source`)
+    when opening help, then calls ``popup.toggle()``.
 
     :data:`TOGGLE_HELP_SEMANTIC_KEYS` lists keys that toggle help while this panel's
     wrapping :class:`Popup` is active; overlay routing calls
@@ -264,27 +263,17 @@ class Popup(Component):
     """
     Modal shell around one inner :class:`~pigit.termui.components.Component`.
 
-    Pass ``session_owner`` to resolve the overlay host (usually
-    :class:`~pigit.termui.root.ComponentRoot`) the same way as :class:`AlertDialog`
-    (``session_owner`` may be the host itself or an ancestor walk via
-    :meth:`~pigit.termui.components.Component.nearest_overlay_host`).
-    :meth:`toggle` and ``exit_key`` then coordinate ``begin_popup_session`` /
-    ``end_popup_session`` when ``session_owner`` is set.
+    :meth:`toggle` and ``exit_key`` coordinate modal session lifecycle through
+    :mod:`~pigit.termui._overlay_context` (push/pop on the ``MODAL`` layer).
 
-    When ``session_owner`` is set, :meth:`_render` pulls the shared :class:`~pigit.termui.render.Renderer`
-    from ``session_owner`` (or its ``parent`` chain) so side-attached shells need no
-    ``AppEventLoop``-specific attribute names.
-
-    Subclasses that omit ``session_owner`` must override :meth:`_on_exit_key`. Wrapped
-    content may declare :data:`TOGGLE_HELP_SEMANTIC_KEYS` so :meth:`_fallback_overlay_key`
-    calls :meth:`toggle` for those keys when ``session_owner`` is set.
+    Wrapped content may declare :data:`TOGGLE_HELP_SEMANTIC_KEYS` so
+    :meth:`_fallback_overlay_key` calls :meth:`toggle` for those keys.
     """
 
     def __init__(
         self,
         child: Component,
         *,
-        session_owner: Optional[Component] = None,
         offset: Optional[tuple[int, int]] = None,
         exit_key: str = keys.KEY_ESC,
         x: int = 1,
@@ -294,7 +283,6 @@ class Popup(Component):
         self._child = child
         self._offset = offset
         self.exit_key = exit_key
-        self._session_owner = session_owner
         self.open = False
         self._term_size: tuple[int, int] = (80, 24)
 
@@ -306,21 +294,6 @@ class Popup(Component):
         self._resolved_child_handlers = resolve_key_handlers_merged(
             self._child, type(self._child), getattr(self._child, "BINDINGS", None)
         )
-
-    def _resolved_overlay_host(self) -> Optional[Component]:
-        """
-        Return the overlay host for this shell, without requiring ``self`` to be parent-linked.
-
-        If ``session_owner`` is the host (e.g. loop root), use it; else walk from
-        ``session_owner`` via :meth:`~pigit.termui.components.Component.nearest_overlay_host`.
-        """
-
-        owner = self._session_owner
-        if owner is None:
-            return None
-        if _looks_like_overlay_host(owner):
-            return owner
-        return owner.nearest_overlay_host()
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -358,26 +331,27 @@ class Popup(Component):
         """
 
         toggle_keys = getattr(type(self._child), "TOGGLE_HELP_SEMANTIC_KEYS", ())
-        if self._session_owner is not None and key in toggle_keys:
-            if self._resolved_overlay_host() is None:
-                return OverlayDispatchResult.DROPPED_UNBOUND
+        if key in toggle_keys:
             self.toggle()
             return OverlayDispatchResult.HANDLED_IMPLICIT
         return OverlayDispatchResult.DROPPED_UNBOUND
 
+    def begin_session(self) -> None:
+        """Push this popup onto the MODAL layer via overlay_context."""
+        _overlay_context.layer_push(LayerKind.MODAL, self)
+
+    def end_session(self) -> None:
+        """Pop the top component from the MODAL layer via overlay_context."""
+        _overlay_context.layer_pop(LayerKind.MODAL)
+
     def toggle(self) -> None:
-        """Toggle the popup session on the resolved overlay host."""
-        if self._session_owner is None:
-            return
-        host = self._resolved_overlay_host()
+        """Toggle the popup session via overlay_context."""
+        host = _overlay_context.get_overlay_host()
         if host is None:
             return
-        layer_stack = getattr(host, "_layer_stack", None)
-        if layer_stack is None:
-            return
-        top = layer_stack.top(LayerKind.MODAL)
+        top = host._layer_stack.top(LayerKind.MODAL)
         if top is self:
-            host.end_popup_session()
+            host._layer_stack.pop(LayerKind.MODAL)
             self.hide()
             return
         if top is not None:
@@ -387,15 +361,7 @@ class Popup(Component):
         if callable(before_show):
             before_show()
         self.show()
-        host.begin_popup_session(self)
-
-    def _sync_popup_exit_with_host(self) -> None:
-        host = self._resolved_overlay_host()
-        if host is None:
-            self.hide()
-            return
-        host.end_popup_session()
-        self.hide()
+        host._layer_stack.push(LayerKind.MODAL, self)
 
     def show(self) -> None:
         """Open the popup."""
@@ -442,12 +408,8 @@ class Popup(Component):
         pass
 
     def _on_exit_key(self) -> None:
-        if self._session_owner is not None:
-            self._sync_popup_exit_with_host()
-        else:
-            raise NotImplementedError(
-                "Subclass Popup without session_owner must override _on_exit_key."
-            )
+        self.end_session()
+        self.hide()
 
     def _render_surface(self, surface: Surface) -> None:
         if not self.open:
@@ -590,8 +552,10 @@ class AlertDialog(Popup):
     Confirmation UI as a :class:`Popup` shell around :class:`AlertDialogBody`.
 
     Call :meth:`alert` from application code with a message and ``on_result`` callback.
-    Opening uses :meth:`~pigit.termui.components_overlay.Popup.show` and host
-    ``begin_popup_session``; closing uses ``end_popup_session`` and
+    Opening uses :meth:`~pigit.termui.components_overlay.Popup.show` and
+    :meth:`~pigit.termui.components_overlay.Popup.begin_session` through
+    :mod:`~pigit.termui._overlay_context`; closing uses
+    :meth:`~pigit.termui.components_overlay.Popup.end_session` and
     :meth:`~pigit.termui.components_overlay.Popup.hide`.
 
     Panels typically set ``_alert_dialog`` and ``_alert_popup`` to this same instance.
@@ -599,7 +563,6 @@ class AlertDialog(Popup):
 
     def __init__(
         self,
-        session_owner: Component,
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
@@ -622,7 +585,6 @@ class AlertDialog(Popup):
         )
         super().__init__(
             self._pane,
-            session_owner=session_owner,
             offset=None,
             exit_key=keys.KEY_ESC,
             x=x,
@@ -638,35 +600,20 @@ class AlertDialog(Popup):
         Prepare content, show this popup, and register the overlay host alert session.
 
         Returns:
-            True if the dialog was shown; False if no host or another overlay is active.
+            True if the dialog was shown; False if another modal is already open.
         """
 
-        host = self._resolved_overlay_host()
-        if host is None:
-            return False
-        # Only block if another MODAL is already open (TOAST/SHEET are non-blocking).
-        layer_stack = getattr(host, "_layer_stack", None)
-        if layer_stack is not None:
-            if layer_stack.top(LayerKind.MODAL) is not None:
-                return False
-        elif host.has_overlay_open():
+        if _overlay_context.is_modal_open():
             return False
         self._pane.prepare(message, on_result)
         self.relayout_content()
         self.show()
-        host.begin_popup_session(self)
+        self.begin_session()
         return True
 
     def _finish_alert(self, value: bool) -> None:
         fn = self._pane._on_result
-        host = self._resolved_overlay_host()
-        if host is not None:
-            host.end_popup_session()
-        else:
-            _logger.warning(
-                "AlertDialog finished without an overlay host in the parent chain; "
-                "if begin_popup_session ran, root overlay_kind may stay stale."
-            )
+        self.end_session()
         self.hide()
         self._pane.reset_state()
         if fn is None:

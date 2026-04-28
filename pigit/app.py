@@ -190,7 +190,6 @@ class PigitApplication(Application):
         )
         self._help_popup = Popup(
             self._help_panel,
-            session_owner=root,
             exit_key=keys.KEY_ESC,
         )
         self._loop.set_input_timeouts(0.125)

@@ -90,7 +90,6 @@ class StatusPanel(ItemSelector):
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
         self._alert_dialog = AlertDialog(
-            self,
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )

@@ -103,15 +103,7 @@ class ComponentRoot(Component):
         """Current badge foreground color, or ``None`` if hidden."""
         return self._badge_fg
 
-    # --- OverlayHost protocol (backward compatible with Popup/AlertDialog) ---
-
-    def begin_popup_session(self, popup) -> None:
-        """Push a modal popup onto the MODAL layer."""
-        self._layer_stack.push(LayerKind.MODAL, popup)
-
-    def end_popup_session(self) -> None:
-        """Release the top MODAL slot. Caller (Popup/AlertDialog) is responsible for hide()."""
-        self._layer_stack.pop(LayerKind.MODAL)
+    # --- OverlayHost protocol ---
 
     def has_overlay_open(self) -> bool:
         """Return True if any overlay (modal, toast, or sheet) is currently open."""
@@ -153,10 +145,9 @@ class ComponentRoot(Component):
         self._layer_stack.render(surface)
 
     def _handle_event(self, key: str) -> None:
-        if self.has_overlay_open():
-            result = self.try_dispatch_overlay(key)
-            if result != OverlayDispatchResult.DROPPED_UNBOUND:
-                return
+        result = self.try_dispatch_overlay(key)
+        if result != OverlayDispatchResult.DROPPED_UNBOUND:
+            return
         self._body._handle_event(key)
 
     def _expire_badge(self) -> None:

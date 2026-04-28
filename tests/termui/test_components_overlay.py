@@ -61,21 +61,21 @@ class TestOverlayContext:
     def test_show_toast_no_host_returns_none(self):
         """验证无 overlay host context 时返回 None"""
         from pigit.termui._overlay_context import (
-            _get_host,
+            get_overlay_host,
             reset_overlay_host,
             set_overlay_host,
             show_toast,
         )
 
         # 清除可能由其他测试遗留的 overlay host
-        prev_host = _get_host()
+        prev_host = get_overlay_host()
         if prev_host is not None:
             token = set_overlay_host(None)
         else:
             token = None
 
         try:
-            assert _get_host() is None
+            assert get_overlay_host() is None
             result = show_toast("test message")
             assert result is None
         finally:
@@ -495,31 +495,60 @@ class TestHelpPanel:
 
 
 class TestPopup:
-    def test_popup_toggle_with_session_owner(self):
+    def _with_host(self, host):
+        from pigit.termui._overlay_context import set_overlay_host, reset_overlay_host
+
+        token = set_overlay_host(host)
+        return token
+
+    def test_popup_toggle_opens_when_no_modal(self):
+        from pigit.termui._overlay_context import reset_overlay_host
+
         host = MagicMock()
-        host.has_overlay_open.return_value = False
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = None
         child = _Leaf()
-        popup = Popup(child, session_owner=host)
-
-        popup.toggle()
-
-        assert popup.open is True
-        host.begin_popup_session.assert_called_once_with(popup)
+        popup = Popup(child)
+        token = self._with_host(host)
+        try:
+            popup.toggle()
+            assert popup.open is True
+            host._layer_stack.push.assert_called_once()
+        finally:
+            reset_overlay_host(token)
 
     def test_popup_toggle_close_when_self_is_active(self):
+        from pigit.termui._overlay_context import reset_overlay_host
+
         host = MagicMock()
-        host.has_overlay_open.return_value = True
-        child = _Leaf()
-        popup = Popup(child, session_owner=host)
         host._layer_stack = MagicMock()
-        host._layer_stack.top.return_value = popup
+        host._layer_stack.top.return_value = None
+        child = _Leaf()
+        popup = Popup(child)
+        token = self._with_host(host)
+        try:
+            popup.toggle()
+            host._layer_stack.top.return_value = popup
+            popup.toggle()
+            assert popup.open is False
+            host._layer_stack.pop.assert_called_once()
+        finally:
+            reset_overlay_host(token)
 
-        popup.toggle()
+    def test_popup_toggle_blocked_when_other_modal_active(self):
+        from pigit.termui._overlay_context import reset_overlay_host
 
-        assert popup.open is False
-        host.end_popup_session.assert_called_once()
+        host = MagicMock()
+        host._layer_stack = MagicMock()
+        host._layer_stack.top.return_value = MagicMock()
+        child = _Leaf()
+        popup = Popup(child)
+        token = self._with_host(host)
+        try:
+            popup.toggle()
+            assert popup.open is False
+        finally:
+            reset_overlay_host(token)
 
     def test_popup_dispatch_overlay_key_explicit(self):
         class _KeyChild(Component):
@@ -541,6 +570,8 @@ class TestPopup:
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
 
     def test_popup_fallback_overlay_key_help_toggle(self):
+        from pigit.termui._overlay_context import reset_overlay_host
+
         class _HelpChild(Component):
             NAME = "help_child"
             TOGGLE_HELP_SEMANTIC_KEYS = ("?",)
@@ -552,14 +583,16 @@ class TestPopup:
                 pass
 
         host = MagicMock()
-        host.has_overlay_open.return_value = False
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = None
         child = _HelpChild()
-        popup = Popup(child, session_owner=host)
-
-        result = popup.dispatch_overlay_key("?")
-        assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+        popup = Popup(child)
+        token = self._with_host(host)
+        try:
+            result = popup.dispatch_overlay_key("?")
+            assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+        finally:
+            reset_overlay_host(token)
 
     def test_popup_fallback_swallows_unbound(self):
         child = _Leaf()

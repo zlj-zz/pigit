@@ -421,24 +421,31 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
     from pigit.termui._layer import LayerStack
     from pigit.termui._overlay_components import HelpPanel, Popup
     from pigit.termui.types import LayerKind, OverlayDispatchResult
+    from pigit.termui._overlay_context import set_overlay_host
 
-    # Create LayerStack and mock host that uses it
+    # Create LayerStack and real host mock that uses it
     stack = LayerStack()
     root = MagicMock()
     root._layer_stack = stack
 
-    help_panel = HelpPanel()
-    popup = Popup(help_panel, session_owner=root)
-    popup.open = True
+    token = set_overlay_host(root)
+    try:
+        help_panel = HelpPanel()
+        popup = Popup(help_panel)
+        popup.open = True
 
-    # Push popup to MODAL layer
-    stack.push(LayerKind.MODAL, popup)
+        # Push popup to MODAL layer
+        stack.push(LayerKind.MODAL, popup)
 
-    # Dispatch "?" key
-    result = stack.dispatch("?")
+        # Dispatch "?" key
+        result = stack.dispatch("?")
 
-    assert result is OverlayDispatchResult.HANDLED_IMPLICIT
-    root.end_popup_session.assert_called_once()
+        assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+        assert not stack.has_any_open()
+    finally:
+        from pigit.termui._overlay_context import reset_overlay_host
+
+        reset_overlay_host(token)
 
 
 def test_renderer_accessed_via_context():
