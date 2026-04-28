@@ -95,9 +95,7 @@ class DiffViewer(LineTextBrowser):
             else:
                 code = line[1:] if line and line[0] in "+- " else line
                 ml_type = (
-                    self._multiline_mask[i]
-                    if i < len(self._multiline_mask)
-                    else None
+                    self._multiline_mask[i] if i < len(self._multiline_mask) else None
                 )
                 if ml_type is not None:
                     tokens = [(code, ml_type)]
