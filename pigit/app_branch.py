@@ -42,6 +42,7 @@ class BranchPanel(ItemSelector):
         on_selection_changed: Optional[Callable] = None,
         branch_signal: Optional[Signal[str]] = None,
         git: "LocalGit",
+        on_merge_request: Optional[Callable[[str, str], None]] = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -49,6 +50,7 @@ class BranchPanel(ItemSelector):
         )
         self.git = git
         self._branch_signal = branch_signal
+        self._on_merge_request = on_merge_request
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -87,6 +89,7 @@ class BranchPanel(ItemSelector):
             ("n", "New branch"),
             ("r", "Rename"),
             ("R", f"Scope ({scope_label})"),
+            ("m", "Merge into selected"),
         ]
 
     def get_inspector_data(self) -> Optional[BranchInfo]:
@@ -192,6 +195,30 @@ class BranchPanel(ItemSelector):
                 show_toast("Cannot rename remote branch.", duration=1.5)
                 return
             self._show_rename_sheet(branch.name)
+        elif key == "m":
+            self._trigger_merge()
+
+    def _trigger_merge(self) -> None:
+        """Validate constraints and emit merge request via callback."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_remote:
+            show_toast("Cannot merge into remote branch", duration=2.0)
+            return
+        if branch.is_head:
+            show_toast("Already on this branch", duration=1.5)
+            return
+        try:
+            if self.git.has_staged_changes():
+                show_toast("Uncommitted changes, stash or commit first", duration=2.0)
+                return
+        except Exception:
+            pass
+        source = self.git.get_head() or ""
+        target = branch.name
+        if self._on_merge_request is not None:
+            self._on_merge_request(source, target)
 
     def _do_sheet_action(
         self,

@@ -6,12 +6,14 @@ Author: Zev
 Date: 2026-04-17
 """
 
+import json
 import logging
 import os
 from dataclasses import dataclass
 from typing import Optional, Union
 
 from pigit.termui import (
+    AlertDialog,
     Application,
     Column,
     Component,
@@ -21,14 +23,17 @@ from pigit.termui import (
     get_badge,
     Header,
     HelpPanel,
+    hide_spinner,
     keys,
     Popup,
     Row,
+    show_spinner,
     show_toast,
     Signal,
     TabView,
     ToastPosition,
 )
+from pigit.git.local_git import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -81,6 +86,12 @@ class PigitApplication(Application):
         self._current_tab: str = "Status"
         self._current_tab_key: str = "1"
         self._mode: str = ""
+        # Merge workflow state
+        self._merge_state: Optional[dict] = None
+        self._alert_dialog = AlertDialog(
+            inner_width=50,
+            on_result=lambda _: None,
+        )
 
     def build_root(self) -> Component:
         diff_viewer = DiffViewer()
@@ -94,6 +105,7 @@ class PigitApplication(Application):
             on_selection_changed=self._on_panel_selection_changed,
             branch_signal=self._branch_signal,
             git=self._git,
+            on_merge_request=self._on_merge_request,
         )
         commit_panel = CommitPanel(
             display=diff_viewer,
@@ -219,6 +231,7 @@ class PigitApplication(Application):
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,
         )
+        self._try_restore_merge_state()
 
     def _on_visual_mode_changed(self, mode: str) -> None:
         self._mode = mode
@@ -243,6 +256,9 @@ class PigitApplication(Application):
             center.append((f"\u2193{self._behind}", THEME.accent_yellow, False))
 
         right: list[tuple[str, tuple[int, int, int], bool]] = []
+        if self._merge_state:
+            target = self._merge_state.get("target", "")
+            right.append((f"[MERGE] {target}  ", THEME.accent_red, True))
         if self._mode:
             right.append((f"[{self._mode}]  ", THEME.fg_primary, True))
         right.append((self._current_tab, THEME.fg_muted, True))
@@ -321,6 +337,9 @@ class PigitApplication(Application):
             return
         if lower in ("pull", "push", "fetch"):
             self._run_git_action(lower)
+            return
+        if lower == "continue-merge":
+            self._continue_merge()
 
     def _run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""
@@ -333,6 +352,147 @@ class PigitApplication(Application):
                 show_toast(f"Git {action} failed: {stderr}", duration=3.0)
         except Exception as e:
             show_toast(f"Git {action} error: {e}", duration=3.0)
+
+    def _merge_state_path(self) -> str:
+        """Return the path to the persistent merge state file."""
+        git_dir = self._git.get_git_dir()
+        return os.path.join(git_dir, "pigit_merge_state")
+
+    def _save_merge_state(self, source: str, target: str) -> None:
+        try:
+            with open(self._merge_state_path(), "w") as f:
+                json.dump({"source": source, "target": target}, f)
+        except Exception:
+            pass
+
+    def _load_merge_state(self) -> Optional[dict]:
+        try:
+            with open(self._merge_state_path()) as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None
+
+    def _clear_merge_state(self) -> None:
+        try:
+            os.remove(self._merge_state_path())
+        except FileNotFoundError:
+            pass
+
+    def _try_restore_merge_state(self) -> None:
+        """On startup: recover pending merge state if merge is still in progress."""
+        state = self._load_merge_state()
+        if state is None:
+            return
+        if self._git.is_merge_in_progress():
+            self._merge_state = state
+            show_toast(
+                f"Resume merge: {state['source']} \u2192 {state['target']} (continue-merge)",
+                duration=3.0,
+            )
+        else:
+            self._clear_merge_state()
+
+    def _on_merge_request(self, source: str, target: str) -> None:
+        """Callback from BranchPanel: confirm then execute merge workflow."""
+
+        def on_confirm(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            try:
+                self._do_merge_workflow(source, target)
+            except GitError as e:
+                hide_spinner()
+                err_msg = str(e).lower()
+                if "conflict" in err_msg:
+                    self._merge_state = {"source": source, "target": target}
+                    self._save_merge_state(source, target)
+                    show_toast(
+                        "Conflict! Resolve in Status, then continue-merge",
+                        duration=3.0,
+                    )
+                    self._w.tab_view.route_to(self._w.status)
+                    return
+                show_toast(f"Merge failed: {e}", duration=3.0)
+                return
+            self._confirm_push_and_finish(target, source)
+
+        self._alert_dialog.alert(f"Merge {source} into {target}?", on_confirm)
+
+    def _do_merge_workflow(self, source: str, target: str) -> None:
+        """Atomically: checkout target \u2192 pull \u2192 merge source.
+
+        On any step failure, best-effort checkout back to source then raise.
+        """
+        steps = [
+            (f"Checking out {target}", lambda: self._git.checkout_branch(target)),
+            (f"Pulling {target}", lambda: self._git.pull()),
+            (f"Merging {source}", lambda: self._git.merge(source)),
+        ]
+        for msg, step in steps:
+            show_spinner(msg)
+            try:
+                step()
+            except GitError:
+                hide_spinner()
+                self._try_checkout_back(source)
+                raise
+        hide_spinner()
+
+    def _try_checkout_back(self, source: str) -> None:
+        """Best-effort checkout back to source branch on failure."""
+        try:
+            self._git.checkout_branch(source)
+        except GitError:
+            pass
+
+    def _confirm_push_and_finish(self, target: str, source: str) -> None:
+        """Alert confirm push, then checkout back to source branch."""
+
+        def on_push_confirmed(confirmed: bool) -> None:
+            if confirmed:
+                show_spinner(f"Pushing {target}")
+                try:
+                    self._run_git_action("push")
+                finally:
+                    hide_spinner()
+            try:
+                self._git.checkout_branch(source)
+            except GitError as e:
+                show_toast(f"Checkout back failed: {e}", duration=3.0)
+                return
+            self._merge_state = None
+            self._clear_merge_state()
+            self._w.tab_view.route_to(self._w.branch)
+            self._w.branch.refresh()
+            show_toast(f"Merged into {target}", duration=2.0)
+
+        self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)
+
+    def _continue_merge(self) -> None:
+        """Resume a pending merge after conflicts have been resolved."""
+        state = self._merge_state
+        if not state:
+            show_toast("No pending merge", duration=2.0)
+            return
+
+        target = state["target"]
+        source = state["source"]
+
+        if self._git.is_merge_in_progress():
+            try:
+                self._git.commit_no_edit()
+            except GitError as e:
+                err = str(e).lower()
+                if "conflict" in err or "unmerged" in err:
+                    show_toast(
+                        "Unresolved conflicts remain. Fix in Status, then retry.",
+                        duration=3.0,
+                    )
+                else:
+                    show_toast(f"Merge commit failed: {e}", duration=3.0)
+                return
+
+        self._confirm_push_and_finish(target, source)
 
     def quit(self):
         raise ExitEventLoop("Quit")

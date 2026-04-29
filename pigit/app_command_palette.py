@@ -36,6 +36,7 @@ DEFAULT_COMMANDS: list[str] = [
     "config",
     "help",
     "quit",
+    "continue-merge",
 ]
 
 

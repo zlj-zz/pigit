@@ -123,3 +123,25 @@ def get_badge() -> tuple[
     if host is None:
         return None, None, None
     return host.badge_text, host.badge_bg, host.badge_fg
+
+
+def show_spinner(message: str) -> Optional["Toast"]:
+    """Display a persistent spinner toast (duration=3600s), replacing any current toast.
+
+    The message is prefixed with ``\u00bb`` and suffixed with ``\u2026`` automatically.
+    """
+    from .types import ToastPosition
+
+    host = get_overlay_host()
+    if host is None:
+        return None
+    return host.show_toast(
+        f"\u00bb {message}\u2026", duration=3600.0, position=ToastPosition.BOTTOM_LEFT
+    )
+
+
+def hide_spinner() -> None:
+    """Dismiss the current spinner toast."""
+    host = get_overlay_host()
+    if host is not None:
+        host.dismiss_toast()

@@ -961,3 +961,95 @@ class LocalGit:
             return False, f"Failed to open the repo; {e}"
         else:
             return True, "Successfully opened repo."
+
+    def get_git_dir(self, path: Optional[str] = None) -> str:
+        """Return the git directory path via ``git rev-parse --git-dir``."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            "git rev-parse --git-dir",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0 or not out:
+            raise GitError(err or "Failed to get git directory")
+        git_dir_raw = out.strip()
+        if Path(git_dir_raw).is_absolute():
+            return str(Path(git_dir_raw).resolve())
+        repo_root, _ = self.confirm_repo(path)
+        return str((Path(repo_root) / git_dir_raw).resolve())
+
+    def merge(self, source: str, path: Optional[str] = None) -> None:
+        """Merge ``source`` into the current branch. Raises GitError on failure.
+
+        If the merge results in conflicts, the error message will contain
+        the word "conflict" so the caller can detect it.
+        """
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            f"git merge {shlex.quote(source)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            msg = err or f"Merge failed: {source}"
+            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in err):
+                raise GitError(f"Merge conflict: {msg}")
+            raise GitError(msg)
+
+    def is_merge_in_progress(self, path: Optional[str] = None) -> bool:
+        """Return True if MERGE_HEAD exists in the git directory."""
+        try:
+            git_dir = self.get_git_dir(path)
+        except GitError:
+            return False
+        return (Path(git_dir) / "MERGE_HEAD").exists()
+
+    def checkout_ours(self, file: Union[File, str], path: Optional[str] = None) -> None:
+        """Checkout ``--ours`` version of a conflicted file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git checkout --ours -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"checkout --ours failed: {file_name}")
+
+    def checkout_theirs(
+        self, file: Union[File, str], path: Optional[str] = None
+    ) -> None:
+        """Checkout ``--theirs`` version of a conflicted file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git checkout --theirs -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"checkout --theirs failed: {file_name}")
+
+    def add_file(self, file: Union[File, str], path: Optional[str] = None) -> None:
+        """Stage a file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git add -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"add failed: {file_name}")
+
+    def commit_no_edit(self, path: Optional[str] = None) -> None:
+        """Complete a merge with the default message (``git commit --no-edit``)."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            "git commit --no-edit",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            msg = err or "Commit failed"
+            raise GitError(msg)

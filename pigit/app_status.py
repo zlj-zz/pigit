@@ -8,6 +8,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+import os
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.termui import (
@@ -305,8 +306,39 @@ class StatusPanel(ItemSelector):
             finally:
                 self.refresh()
             return
+        if key == "E":
+            self._open_external_editor(f)
+            return
+        if key == "o" and f.has_merged_conflicts:
+            try:
+                self.git.checkout_ours(f)
+                self.git.add_file(f)
+                show_badge("Ours", duration=1.0)
+            except Exception as e:
+                show_toast(f"Ours failed: {e}", duration=2.0)
+            self.refresh()
+            return
+        if key == "t" and f.has_merged_conflicts:
+            try:
+                self.git.checkout_theirs(f)
+                self.git.add_file(f)
+                show_badge("Theirs", duration=1.0)
+            except Exception as e:
+                show_toast(f"Theirs failed: {e}", duration=2.0)
+            self.refresh()
+            return
 
     # --- Helpers ---
+
+    def _open_external_editor(self, file: File) -> None:
+        """Open file in external editor, suspending TUI."""
+        editor = os.environ.get("EDITOR", "vim")
+        try:
+            exec_external([editor, file.name], cwd=self.git.path)
+        except Exception:
+            show_toast("Failed to open editor", duration=2.0)
+        finally:
+            self.refresh()
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
@@ -347,6 +379,9 @@ class StatusPanel(ItemSelector):
             ("i", "Ignore"),
             ("C", "Commit"),
             ("v", "Visual"),
+            ("E", "Edit file"),
+            ("o", "Ours"),
+            ("t", "Theirs"),
         ]
 
     def get_inspector_data(self) -> Optional[FileInfo]:

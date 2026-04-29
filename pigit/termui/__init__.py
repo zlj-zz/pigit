@@ -53,7 +53,9 @@ from pigit.termui._application import Application
 from pigit.termui._overlay_context import (
     dismiss_sheet,
     get_badge,
+    hide_spinner,
     show_badge,
+    show_spinner,
     show_toast,
     show_sheet,
 )
@@ -130,6 +132,8 @@ __all__ = [
     "dismiss_sheet",
     "show_badge",
     "get_badge",
+    "show_spinner",
+    "hide_spinner",
     # Session context
     "exec_external",
     # Syntax highlighting
