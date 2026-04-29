@@ -788,6 +788,36 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"checkout failed: {branch_name}")
 
+    def rename_branch(
+        self,
+        old_name: str,
+        new_name: str,
+        path: Optional[str] = None,
+    ) -> None:
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            f"git branch -m {shlex.quote(old_name)} {shlex.quote(new_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"rename failed: {old_name} -> {new_name}")
+
+    def create_branch(
+        self,
+        branch_name: str,
+        path: Optional[str] = None,
+    ) -> None:
+        """Create a new branch from HEAD and switch to it."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            f"git checkout -b {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"create branch failed: {branch_name}")
+
     def get_file_info(
         self, file: Union[File, str], path: Optional[str] = None
     ) -> tuple[str, str]:

@@ -12,8 +12,11 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from pigit.termui import (
     bind_keys,
+    dismiss_sheet,
+    InputLine,
     ItemSelector,
     keys,
+    show_sheet,
     show_toast,
     Signal,
 )
@@ -48,6 +51,17 @@ class BranchPanel(ItemSelector):
         self._branch_signal = branch_signal
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
+        self._rename_branch_name: str = ""
+        self._rename_input = InputLine(
+            prompt="Rename branch: ",
+            on_submit=self._on_rename_submit,
+            on_cancel=dismiss_sheet,
+        )
+        self._new_branch_input = InputLine(
+            prompt="New branch: ",
+            on_submit=self._on_new_branch_submit,
+            on_cancel=dismiss_sheet,
+        )
 
     def refresh(self) -> None:
         scope = self._SCOPES[self._scope_idx]
@@ -70,6 +84,8 @@ class BranchPanel(ItemSelector):
         return [
             ("j/k", "Navigate"),
             ("c", "Checkout"),
+            ("n", "New branch"),
+            ("r", "Rename"),
             ("R", f"Scope ({scope_label})"),
         ]
 
@@ -166,3 +182,71 @@ class BranchPanel(ItemSelector):
             if self._branch_signal is not None:
                 self._branch_signal.set(local_branch.name)
             self.refresh()
+        elif key == "n":
+            self._show_new_branch_sheet()
+        elif key == "r":
+            if not self.branches:
+                return
+            branch = self.branches[self.curr_no]
+            if branch.is_remote:
+                show_toast("Cannot rename remote branch.", duration=1.5)
+                return
+            self._show_rename_sheet(branch.name)
+
+    def _do_sheet_action(
+        self,
+        action: Callable[[], None],
+        success_msg: str,
+        error_prefix: str,
+    ) -> bool:
+        """Run a git action, toast the result, refresh and dismiss the sheet."""
+        try:
+            action()
+        except Exception as e:
+            show_toast(f"{error_prefix} failed: {e}", duration=3.0)
+            dismiss_sheet()
+            return False
+        show_toast(success_msg, duration=1.5)
+        self.refresh()
+        dismiss_sheet()
+        return True
+
+    def _show_new_branch_sheet(self) -> None:
+        self._new_branch_input.clear()
+        show_sheet(self._new_branch_input, height=3)
+
+    def _on_new_branch_submit(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            dismiss_sheet()
+            return
+        if (
+            self._do_sheet_action(
+                lambda: self.git.create_branch(name),
+                f"Created and switched to {name}",
+                "Create branch",
+            )
+            and self._branch_signal is not None
+        ):
+            self._branch_signal.set(name)
+
+    def _show_rename_sheet(self, branch_name: str) -> None:
+        self._rename_branch_name = branch_name
+        self._rename_input.set_value(branch_name)
+        show_sheet(self._rename_input, height=3)
+
+    def _on_rename_submit(self, new_name: str) -> None:
+        new_name = new_name.strip()
+        if not new_name or new_name == self._rename_branch_name:
+            dismiss_sheet()
+            return
+        if (
+            self._do_sheet_action(
+                lambda: self.git.rename_branch(self._rename_branch_name, new_name),
+                f"Renamed to {new_name}",
+                "Rename",
+            )
+            and self._branch_signal is not None
+        ):
+            if self._branch_signal.value == self._rename_branch_name:
+                self._branch_signal.set(new_name)
