@@ -298,8 +298,14 @@ class Renderer:
             self.clear_screen()
             for idx, line in enumerate(lines, start=1):
                 self.move_cursor(idx, 1)
+                # Do NOT call erase_line_to_end() here. In terminals like
+                # Ghostty, writing a character to the last column leaves the
+                # cursor in a "pending wrap" state; the subsequent EL0
+                # (\033[K) can clear that last character, causing full-width
+                # rows (e.g. header separator) to appear one column short.
+                # Since clear_screen() already blanked the screen, EL0 is
+                # redundant on this path anyway.
                 self._out.write(line)
-                self.erase_line_to_end()
         else:
             for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
                 if old != new:
