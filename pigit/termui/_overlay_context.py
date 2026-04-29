@@ -88,6 +88,13 @@ def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
     return host.show_sheet(child, height)
 
 
+def dismiss_sheet() -> None:
+    """Dismiss the current bottom sheet via the overlay host."""
+    host = get_overlay_host()
+    if host is not None:
+        host.dismiss_sheet()
+
+
 def show_badge(
     text: str,
     duration: Optional[float] = None,

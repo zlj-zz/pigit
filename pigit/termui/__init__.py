@@ -50,7 +50,13 @@ from pigit.termui._root import ComponentRoot
 from pigit.termui._application import Application
 
 # Overlay context (module-level functions)
-from pigit.termui._overlay_context import get_badge, show_badge, show_toast, show_sheet
+from pigit.termui._overlay_context import (
+    dismiss_sheet,
+    get_badge,
+    show_badge,
+    show_toast,
+    show_sheet,
+)
 from pigit.termui._session_context import exec_external
 
 # Other utilities
@@ -121,6 +127,7 @@ __all__ = [
     # Overlay context
     "show_toast",
     "show_sheet",
+    "dismiss_sheet",
     "show_badge",
     "get_badge",
     # Session context

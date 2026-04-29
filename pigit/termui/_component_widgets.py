@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from ._component_base import Component, ComponentError
 from ._reactive import Signal
+from .types import OverlayDispatchResult
 from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
 from .keys import (
     KEY_BACKSPACE,
@@ -689,6 +690,11 @@ class InputLine(Component):
             self.end()
         elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
             self.insert(key)
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Route keys to this input line when it is inside an overlay (Sheet/Popup)."""
+        self.on_key(key)
+        return OverlayDispatchResult.HANDLED_EXPLICIT
 
     def cursor_left(self) -> None:
         """Move the cursor one position to the left."""
