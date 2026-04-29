@@ -318,13 +318,25 @@ class LocalGit:
     # =============
     # Special info
     # =============
-    def load_branches(self, path: Optional[str] = None) -> list[Branch]:
+    def load_branches(
+        self,
+        path: Optional[str] = None,
+        *,
+        scope: str = "local",
+    ) -> list[Branch]:
         path = path or self.path
-        branches = []
+        branches: list[Branch] = []
+
+        if scope == "remote":
+            flag = "-r"
+        elif scope == "all":
+            flag = "-a"
+        else:
+            flag = ""
 
         _, _, resp = self.executor.exec(
-            "git branch --sort=-committerdate "
-            '--format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" ',
+            f"git branch {flag} --sort=-committerdate "
+            '--format="%(HEAD)|%(refname:short)|%(refname)|%(upstream:short)|%(upstream:track)" ',
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -336,19 +348,31 @@ class LocalGit:
 
         for line in lines:
             items = line.split("|")
+            short_name = items[1]
+            full_ref = items[2]
+            is_remote = full_ref.startswith("refs/remotes/")
+
+            # Skip the symbolic HEAD ref for remotes (e.g. origin/HEAD)
+            if is_remote and short_name.endswith("/HEAD"):
+                continue
+
             branch = Branch(
-                name=items[1], ahead="?", behind="?", is_head=items[0] == "*"
+                name=short_name,
+                ahead="?",
+                behind="?",
+                is_head=items[0] == "*" and not is_remote,
+                is_remote=is_remote,
             )
 
-            upstream_name = items[2]
+            upstream_name = items[3]
 
-            if not upstream_name:
+            if not upstream_name or is_remote:
                 branches.append(branch)
                 continue
 
             branch.upstream_name = upstream_name
 
-            track = items[3]
+            track = items[4]
             branch.ahead = (
                 str(m[1]) if (m := self._RE_BRANCH_AHEAD.search(track)) else "0"
             )

@@ -30,6 +30,8 @@ class BranchPanel(ItemSelector):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
+    _SCOPES = ["local", "remote", "all"]
+    _SCOPE_LABELS = {"local": "Local", "remote": "Remote", "all": "All"}
 
     def __init__(
         self,
@@ -45,11 +47,13 @@ class BranchPanel(ItemSelector):
         self.git = git
         self._branch_signal = branch_signal
         self.branches: list[Branch] = []
+        self._scope_idx: int = 0
 
     def refresh(self) -> None:
-        self.branches = branches = self.git.load_branches()
+        scope = self._SCOPES[self._scope_idx]
+        self.branches = branches = self.git.load_branches(scope=scope)
         if not branches:
-            self.set_content(["No branches found."])
+            self.set_content([f"No {scope} branches found."])
             return
         lines = []
         for branch in branches:
@@ -62,9 +66,11 @@ class BranchPanel(ItemSelector):
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for branch panel."""
+        scope_label = self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]
         return [
             ("j/k", "Navigate"),
             ("c", "Checkout"),
+            ("R", f"Scope ({scope_label})"),
         ]
 
     def get_inspector_data(self) -> Optional[BranchInfo]:
@@ -86,7 +92,10 @@ class BranchPanel(ItemSelector):
 
     def _format_branch(self, branch: "Branch") -> str:
         """Format a branch for display."""
-        return branch.name
+        name = branch.name
+        if name.startswith("remotes/"):
+            name = name[len("remotes/") :]
+        return name
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -114,16 +123,28 @@ class BranchPanel(ItemSelector):
         right: list[tuple[str, tuple[int, int, int], bool]] = []
         if idx < len(self.branches):
             branch = self.branches[idx]
-            ahead = branch.ahead if branch.ahead != "?" else ""
-            behind = branch.behind if branch.behind != "?" else ""
-            if ahead:
-                right.append((f"\u2191{ahead}", THEME.accent_green, False))
-            if behind:
-                if right:
-                    right.append((" ", THEME.fg_muted, False))
-                right.append((f"\u2193{behind}", THEME.accent_yellow, False))
+            if not branch.is_remote:
+                ahead = branch.ahead if branch.ahead != "?" else ""
+                behind = branch.behind if branch.behind != "?" else ""
+                if ahead:
+                    right.append((f"\u2191{ahead}", THEME.accent_green, False))
+                if behind:
+                    if right:
+                        right.append((" ", THEME.fg_muted, False))
+                    right.append((f"\u2193{behind}", THEME.accent_yellow, False))
 
         return left, None, right
+
+    @bind_keys("R")
+    def toggle_scope(self) -> None:
+        """Cycle branch scope: local -> remote -> all -> local."""
+        self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
+        scope = self._SCOPES[self._scope_idx]
+        label = self._SCOPE_LABELS[scope]
+        show_toast(f"Branch scope: {label}", duration=2.0)
+        self.curr_no = 0
+        self._r_start = 0
+        self.refresh()
 
     def on_key(self, key: str) -> None:
         if key == "c":
@@ -132,6 +153,9 @@ class BranchPanel(ItemSelector):
             local_branch = self.branches[self.curr_no]
             if local_branch.is_head:
                 show_toast("Already on this branch.", duration=1.5)
+                return
+            if local_branch.is_remote:
+                show_toast("Cannot checkout remote branch directly.", duration=1.5)
                 return
             try:
                 self.git.checkout_branch(local_branch.name)
