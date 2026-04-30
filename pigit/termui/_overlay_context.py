@@ -9,7 +9,7 @@ Date: 2026-04-25
 from __future__ import annotations
 
 import contextvars
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Sequence, TYPE_CHECKING
 
 from ._layer import LayerKind
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from ._component_base import Component
     from ._overlay_components import Sheet, Toast
     from ._root import ComponentRoot
+    from ._segment import Segment
     from .types import ToastPosition
 
 _overlay_host_ctx: contextvars.ContextVar[Optional["ComponentRoot"]] = (
@@ -68,8 +69,9 @@ def is_modal_open() -> bool:
 
 
 def show_toast(
-    message: str,
+    message: str = "",
     *,
+    segments: Optional[Sequence["Segment"]] = None,
     duration: float = 2.0,
     position: Optional[ToastPosition] = None,
 ) -> Optional["Toast"]:
@@ -77,7 +79,9 @@ def show_toast(
     host = get_overlay_host()
     if host is None:
         return None
-    return host.show_toast(message, duration=duration, position=position)
+    return host.show_toast(
+        message, segments=segments, duration=duration, position=position
+    )
 
 
 def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
@@ -130,13 +134,17 @@ def show_spinner(message: str) -> Optional["Toast"]:
 
     The message is prefixed with ``\u00bb`` and suffixed with ``\u2026`` automatically.
     """
+    from ._segment import Segment
     from .types import ToastPosition
 
     host = get_overlay_host()
     if host is None:
         return None
     return host.show_toast(
-        f"\u00bb {message}\u2026", duration=3600.0, position=ToastPosition.BOTTOM_LEFT
+        "",
+        segments=[Segment(f"\u00bb {message}\u2026")],
+        duration=3600.0,
+        position=ToastPosition.BOTTOM_LEFT,
     )
 
 

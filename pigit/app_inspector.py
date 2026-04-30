@@ -189,7 +189,7 @@ class InspectorPanel(Component):
                 title,
                 fg=THEME.accent_cyan,
                 bg=palette.DEFAULT_BG,
-                bold=True,
+                style_flags=palette.STYLE_BOLD,
             )
 
         # Content lines

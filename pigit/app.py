@@ -25,8 +25,10 @@ from pigit.termui import (
     HelpPanel,
     hide_spinner,
     keys,
+    palette,
     Popup,
     Row,
+    Segment,
     show_spinner,
     show_toast,
     Signal,
@@ -238,32 +240,60 @@ class PigitApplication(Application):
 
     def _refresh_header(self, header: Header) -> None:
         badge, badge_bg, badge_fg = get_badge()
-        left: list[tuple[str, tuple[int, int, int], bool]] = []
+        left: list[Segment] = []
         if badge:
-            left.append((f"{badge} ", badge_fg or THEME.fg_primary, True))
+            left.append(
+                Segment(
+                    f"{badge} ",
+                    fg=badge_fg or THEME.fg_primary,
+                    style_flags=palette.STYLE_BOLD,
+                )
+            )
         left.extend(
             [
-                (self._repo_name, THEME.fg_primary, False),
-                ("  ", THEME.fg_dim, False),
-                (self._branch_signal.value, THEME.accent_cyan, False),
+                Segment(self._repo_name, fg=THEME.fg_primary),
+                Segment("  ", fg=THEME.fg_dim),
+                Segment(self._branch_signal.value, fg=THEME.accent_cyan),
             ]
         )
 
-        center: list[tuple[str, tuple[int, int, int], bool]] = []
+        center: list[Segment] = []
         if self._ahead > 0:
-            center.append((f"\u2191{self._ahead} ", THEME.accent_green, False))
+            center.append(Segment(f"\u2191{self._ahead} ", fg=THEME.accent_green))
         if self._behind > 0:
-            center.append((f"\u2193{self._behind}", THEME.accent_yellow, False))
+            center.append(Segment(f"\u2193{self._behind}", fg=THEME.accent_yellow))
 
-        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        right: list[Segment] = []
         if self._merge_state:
             target = self._merge_state.get("target", "")
-            right.append((f"[MERGE] {target}  ", THEME.accent_red, True))
+            right.append(
+                Segment(
+                    f"[MERGE] {target}  ",
+                    fg=THEME.accent_red,
+                    style_flags=palette.STYLE_BOLD,
+                )
+            )
         if self._mode:
-            right.append((f"[{self._mode}]  ", THEME.fg_primary, True))
-        right.append((self._current_tab, THEME.fg_muted, True))
+            right.append(
+                Segment(
+                    f"[{self._mode}]  ",
+                    fg=THEME.fg_primary,
+                    style_flags=palette.STYLE_BOLD,
+                )
+            )
+        right.append(
+            Segment(
+                self._current_tab, fg=THEME.fg_muted, style_flags=palette.STYLE_BOLD
+            )
+        )
         if self._current_tab_key:
-            right.append((f" [{self._current_tab_key}]", THEME.fg_primary, True))
+            right.append(
+                Segment(
+                    f" [{self._current_tab_key}]",
+                    fg=THEME.fg_primary,
+                    style_flags=palette.STYLE_BOLD,
+                )
+            )
 
         header.set_left(left)
         header.set_center(center)

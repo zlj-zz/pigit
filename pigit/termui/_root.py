@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ._component_base import Component, _set_focus_chain
 from ._layer import LayerKind, LayerStack
@@ -19,6 +19,7 @@ from . import _overlay_context
 
 if TYPE_CHECKING:
     from ._overlay_components import Sheet, Toast
+    from ._segment import Segment
     from ._surface import Surface
 
 _logger = logging.getLogger(__name__)
@@ -203,14 +204,17 @@ class ComponentRoot(Component):
 
     def show_toast(
         self,
-        message: str,
+        message: str = "",
+        *,
+        segments: Optional[Sequence["Segment"]] = None,
         duration: float = 2.0,
         position: Optional[ToastPosition] = None,
     ) -> "Toast":
         """Display a transient toast notification on the TOAST layer.
 
         Args:
-            message: Toast message content.
+            message: Toast message content (backward compat).
+            segments: Optional styled segments for rich toast content.
             duration: Display duration in seconds.
             position: ToastPosition enum value (None for default TOP_RIGHT).
 
@@ -226,7 +230,7 @@ class ComponentRoot(Component):
         if position is None:
             position = ToastPosition.TOP_RIGHT
 
-        toast = Toast(message, duration=duration, position=position)
+        toast = Toast(message, segments=segments, duration=duration, position=position)
         toast.resize(self._size)
         self._layer_stack.push(LayerKind.TOAST, toast)
         return toast

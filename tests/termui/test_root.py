@@ -55,6 +55,7 @@ class TestComponentRoot:
         body._handle_event = MagicMock()
         popup = MagicMock()
         popup.open = True
+        popup.parent = None
         popup.dispatch_overlay_key.return_value = OverlayDispatchResult.HANDLED_EXPLICIT
         root._layer_stack.push(LayerKind.MODAL, popup)
         root._handle_event("k")
@@ -95,7 +96,8 @@ class TestComponentRoot:
         root.resize((80, 24))
         toast = root.show_toast("hello", duration=1.5)
         assert root._layer_stack.top(LayerKind.TOAST) is toast
-        assert toast._message == "hello"
+        assert len(toast._segments) == 1
+        assert toast._segments[0].text == "hello"
         assert toast.duration == 1.5
 
     def test_show_toast_with_position(self):

@@ -18,6 +18,8 @@ from pigit.termui import (
     Component,
     ItemSelector,
     keys,
+    palette,
+    Segment,
     show_toast,
 )
 from pigit.termui.wcwidth_table import wcswidth
@@ -157,47 +159,62 @@ class CommitPanel(ItemSelector):
             self._render_heatmap_overlay(surface)
 
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return row description: [cursor][unpushed][SHA][msg][tag][meta]"""
         focused = self.is_focus_leaf
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         if idx >= len(self.commits):
             prefix = "\u25cf " if is_cursor else "  "
-            return ([(prefix + self.content[idx], THEME.fg_muted, is_cursor)], None, [])
+            return (
+                [
+                    Segment(
+                        prefix + self.content[idx],
+                        fg=THEME.fg_muted,
+                        style_flags=cursor_flags,
+                    )
+                ],
+                None,
+                [],
+            )
 
         commit = self.commits[idx]
 
         # Cursor indicator (2 cols)
         if is_cursor:
             left = [
-                ("\u25cf", THEME.fg_primary, True),
-                (" ", THEME.fg_primary, False),
+                Segment("\u25cf", fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD),
+                Segment(" ", fg=THEME.fg_primary),
             ]
         else:
-            left = [("  ", THEME.fg_primary, False)]
+            left = [Segment("  ", fg=THEME.fg_primary)]
 
         # Unpushed marker (2 cols)
         if not commit.is_pushed():
-            left.append(("\u25cf", THEME.accent_yellow, is_cursor))
-            left.append((" ", THEME.fg_dim if not focused else THEME.fg_primary, False))
+            left.append(
+                Segment("\u25cf", fg=THEME.accent_yellow, style_flags=cursor_flags)
+            )
+            left.append(
+                Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary)
+            )
         else:
             left.append(
-                ("  ", THEME.fg_dim if not focused else THEME.fg_primary, False)
+                Segment("  ", fg=THEME.fg_dim if not focused else THEME.fg_primary)
             )
 
         # SHA + spacer (8 cols)
-        left.append((commit.sha[:7], THEME.fg_dim, is_cursor))
-        left.append((" ", THEME.fg_dim if not focused else THEME.fg_primary, False))
+        left.append(Segment(commit.sha[:7], fg=THEME.fg_dim, style_flags=cursor_flags))
+        left.append(Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary))
 
         # Main: message + optional tag
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
         fg_msg = THEME.fg_primary if focused else THEME.fg_dim
         fg_tag = THEME.accent_cyan if focused else THEME.fg_dim
         main = [
-            (commit.msg, fg_msg, is_cursor),
-            (tag_str, fg_tag, is_cursor),
+            Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags),
+            Segment(tag_str, fg=fg_tag, style_flags=cursor_flags),
         ]
 
         # Right: padded meta
@@ -213,7 +230,7 @@ class CommitPanel(ItemSelector):
         if pad > 0:
             meta = " " * pad + meta
         fg_meta = THEME.fg_muted if focused else THEME.fg_dim
-        right = [(meta, fg_meta, is_cursor)]
+        right = [Segment(meta, fg=fg_meta, style_flags=cursor_flags)]
 
         return left, main, right
 

@@ -28,14 +28,14 @@ class BoxFrame:
         *,
         fg: tuple[int, int, int] = DEFAULT_FG,
         bg: tuple[int, int, int] = DEFAULT_BG,
-        bold: bool = False,
+        style_flags: int = 0,
     ) -> None:
         self.inner_width = inner_width
         self.inner_height = inner_height
         self.title = title
         self.fg = fg
         self.bg = bg
-        self.bold = bold
+        self.style_flags = style_flags
         self._recalc_outer()
 
     def _recalc_outer(self) -> None:
@@ -57,7 +57,7 @@ class BoxFrame:
             self.outer_height,
             fg=self.fg,
             bg=self.bg,
-            bold=self.bold,
+            style_flags=self.style_flags,
             title=self.title,
         )
 
@@ -85,5 +85,5 @@ class BoxFrame:
                 text,
                 fg=self.fg,
                 bg=self.bg,
-                bold=self.bold,
+                style_flags=self.style_flags,
             )

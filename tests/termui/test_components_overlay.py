@@ -56,7 +56,7 @@ class TestOverlayContext:
 
         # 应该成功创建 Toast
         assert result is not None
-        assert result._message == "test message"
+        assert result.message == "test message"
 
     def test_show_toast_no_host_returns_none(self):
         """验证无 overlay host context 时返回 None"""
@@ -338,7 +338,7 @@ class TestToast:
         toast._rebuild_frame()
 
         # 3 行内容，inner_h 应该为 3
-        assert len(toast._lines) == 3
+        assert len(toast._line_segments) == 3
         # outer_row_count 应该包含边框（上下各1行）
         assert toast.outer_row_count == 5  # 3 + 2
 
@@ -351,7 +351,9 @@ class TestToast:
         toast._rebuild_frame()
 
         # 内容应该被截断以适应终端宽度
-        max_line_len = max(len(line) for line in toast._lines)
+        max_line_len = max(
+            sum(len(seg.text) for seg in line) for line in toast._line_segments
+        )
         # 内框宽度最大为 surface.width - 4（左右边框+内边距）
         assert max_line_len <= 16  # 20 - 4
 

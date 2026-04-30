@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.termui._surface import Cell, FlatCell, Surface
-from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 
 class TestCell:
@@ -162,7 +162,7 @@ class TestFlatCell:
         assert c.char == " "
         assert c.fg == (220, 220, 230)
         assert c.bg == (18, 18, 22)
-        assert c.bold is False
+        assert c.style_flags == 0
         assert c.ansi_style is None
         assert c.style == ""  # backward compat
 
@@ -178,10 +178,10 @@ class TestFlatCell:
         assert c.style == "\033[31m"
 
     def test_rgb_values(self):
-        c = FlatCell("A", fg=(255, 0, 0), bg=(0, 255, 0), bold=True)
+        c = FlatCell("A", fg=(255, 0, 0), bg=(0, 255, 0), style_flags=STYLE_BOLD)
         assert c.fg == (255, 0, 0)
         assert c.bg == (0, 255, 0)
-        assert c.bold is True
+        assert c.style_flags == STYLE_BOLD
 
     def test_equality(self):
         a = FlatCell("x", fg=(255, 0, 0))

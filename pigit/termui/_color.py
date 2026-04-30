@@ -14,6 +14,8 @@ from enum import Enum
 from functools import lru_cache
 from typing import Optional
 
+from . import palette
+
 _logger = logging.getLogger(__name__)
 
 
@@ -106,9 +108,33 @@ class ColorAdapter:
         # COLOR_16: map 0-7 to 40-47, 8-15 to 100-107
         return f"\033[{40 + code}m" if code < 8 else f"\033[{92 + code}m"
 
-    def bold_sequence(self, bold: bool) -> str:
-        """Return ANSI SGR sequence for bold weight."""
-        return "\033[1m" if bold else "\033[22m"
+    def style_sequence(self, flags: int) -> str:
+        """Return combined ANSI SGR sequence for style flags."""
+        if not flags:
+            return ""
+        parts = []
+        if flags & palette.STYLE_BOLD:
+            parts.append("1")
+        if flags & palette.STYLE_DIM:
+            parts.append("2")
+        if flags & palette.STYLE_ITALIC:
+            parts.append("3")
+        if flags & palette.STYLE_UNDERLINE:
+            parts.append("4")
+        if flags & palette.STYLE_REVERSE:
+            parts.append("7")
+        return f"\033[{';'.join(parts)}m"
+
+    def reset_style_sequence(self) -> str:
+        """Reset all style attributes (not colors).
+
+        SGR codes:
+        - 22 = normal intensity (off bold / off dim)
+        - 23 = off italic
+        - 24 = off underline
+        - 27 = off reverse
+        """
+        return "\033[22;23;24;27m"
 
     def reset_sequence(self) -> str:
         """Return ANSI reset sequence."""

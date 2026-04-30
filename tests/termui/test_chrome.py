@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from pigit.app_chrome import AppFooter
 from pigit.app_theme import THEME
-from pigit.termui import Header
+from pigit.termui import Header, Segment
+from pigit.termui.palette import STYLE_BOLD
 from pigit.termui._surface import Surface
 
 
@@ -14,15 +15,15 @@ class TestHeader:
         h = Header(separator=True, sep_fg=THEME.fg_dim)
         h.set_left(
             [
-                ("my-repo", THEME.fg_primary, False),
-                ("  ", THEME.fg_dim, False),
-                ("main", THEME.accent_cyan, False),
+                Segment("my-repo", fg=THEME.fg_primary),
+                Segment("  ", fg=THEME.fg_dim),
+                Segment("main", fg=THEME.accent_cyan),
             ]
         )
         h.set_right(
             [
-                ("Status", THEME.fg_muted, True),
-                (" [1]", THEME.fg_primary, True),
+                Segment("Status", fg=THEME.fg_muted, style_flags=STYLE_BOLD),
+                Segment(" [1]", fg=THEME.fg_primary, style_flags=STYLE_BOLD),
             ]
         )
         s = Surface(40, 2)
@@ -38,15 +39,15 @@ class TestHeader:
         h = Header(separator=True, sep_fg=THEME.fg_dim)
         h.set_left(
             [
-                ("r", THEME.fg_primary, False),
-                ("  ", THEME.fg_dim, False),
-                ("b", THEME.accent_cyan, False),
+                Segment("r", fg=THEME.fg_primary),
+                Segment("  ", fg=THEME.fg_dim),
+                Segment("b", fg=THEME.accent_cyan),
             ]
         )
         h.set_center(
             [
-                ("\u21912 ", THEME.accent_green, False),
-                ("\u21931", THEME.accent_yellow, False),
+                Segment("\u21912 ", fg=THEME.accent_green),
+                Segment("\u21931", fg=THEME.accent_yellow),
             ]
         )
         s = Surface(30, 2)
@@ -61,9 +62,9 @@ class TestHeader:
         h = Header(separator=True, sep_fg=THEME.fg_dim)
         h.set_left(
             [
-                ("very-long-repo-name", THEME.fg_primary, False),
-                ("  ", THEME.fg_dim, False),
-                ("feature", THEME.accent_cyan, False),
+                Segment("very-long-repo-name", fg=THEME.fg_primary),
+                Segment("  ", fg=THEME.fg_dim),
+                Segment("feature", fg=THEME.accent_cyan),
             ]
         )
         s = Surface(10, 2)
@@ -75,12 +76,12 @@ class TestHeader:
 
     def test_set_slots_updates_fields(self):
         h = Header()
-        h.set_left([("repo", THEME.fg_primary, False)])
-        h.set_center([("center", THEME.fg_dim, False)])
-        h.set_right([("right", THEME.fg_muted, True)])
-        assert h._left == [("repo", THEME.fg_primary, False)]
-        assert h._center == [("center", THEME.fg_dim, False)]
-        assert h._right == [("right", THEME.fg_muted, True)]
+        h.set_left([Segment("repo", fg=THEME.fg_primary)])
+        h.set_center([Segment("center", fg=THEME.fg_dim)])
+        h.set_right([Segment("right", fg=THEME.fg_muted, style_flags=STYLE_BOLD)])
+        assert h._left == [Segment("repo", fg=THEME.fg_primary)]
+        assert h._center == [Segment("center", fg=THEME.fg_dim)]
+        assert h._right == [Segment("right", fg=THEME.fg_muted, style_flags=STYLE_BOLD)]
 
 
 class TestAppFooter:

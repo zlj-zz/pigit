@@ -11,12 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Sequence
 
 from ._color import ColorAdapter
+from ._surface import FlatCell, Surface
 from .palette import DEFAULT_BG, DEFAULT_FG
 
 if TYPE_CHECKING:
     from ._session import Session
     from .palette import DEFAULT_BG, DEFAULT_FG
-from ._surface import FlatCell, Surface
 
 
 class Renderer:
@@ -156,7 +156,7 @@ class Renderer:
         has_rgb = any(
             cell.char != ""
             and cell.ansi_style is None
-            and (cell.fg != DEFAULT_FG or cell.bg != DEFAULT_BG or cell.bold)
+            and (cell.fg != DEFAULT_FG or cell.bg != DEFAULT_BG or cell.style_flags)
             for cell in row
         )
         has_legacy = any(
@@ -193,8 +193,7 @@ class Renderer:
         parts = []
         last_fg = DEFAULT_FG
         last_bg = DEFAULT_BG
-        last_bold = False
-        has_style = False
+        last_style = 0
 
         for cell in row:
             if cell.char == "":
@@ -212,16 +211,18 @@ class Renderer:
                 else:
                     sgr_parts.append(self._color.bg_sequence(cell.bg))
                 last_bg = cell.bg
-            if cell.bold != last_bold:
-                sgr_parts.append(self._color.bold_sequence(cell.bold))
-                last_bold = cell.bold
+            if cell.style_flags != last_style:
+                if last_style:
+                    sgr_parts.append(self._color.reset_style_sequence())
+                if cell.style_flags:
+                    sgr_parts.append(self._color.style_sequence(cell.style_flags))
+                last_style = cell.style_flags
 
             if sgr_parts:
                 parts.extend(sgr_parts)
-                has_style = True
             parts.append(cell.char)
 
-        if has_style:
+        if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_style:
             parts.append(self._color.reset_sequence())
         return "".join(parts)
 
@@ -231,7 +232,7 @@ class Renderer:
         in_legacy = False
         last_fg = DEFAULT_FG
         last_bg = DEFAULT_BG
-        last_bold = False
+        last_style = 0
 
         for cell in row:
             if cell.char == "":
@@ -241,11 +242,11 @@ class Renderer:
                 # Legacy cell
                 if not in_legacy:
                     # Transition from RGB to legacy
-                    if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_bold:
+                    if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_style:
                         parts.append(self._color.reset_sequence())
                         last_fg = DEFAULT_FG
                         last_bg = DEFAULT_BG
-                        last_bold = False
+                        last_style = 0
                 in_legacy = True
                 parts.append(cell.ansi_style)
                 parts.append(cell.char)
@@ -257,7 +258,7 @@ class Renderer:
                     in_legacy = False
                     last_fg = DEFAULT_FG
                     last_bg = DEFAULT_BG
-                    last_bold = False
+                    last_style = 0
 
                 sgr_parts = []
                 if cell.fg != last_fg:
@@ -272,15 +273,18 @@ class Renderer:
                     else:
                         sgr_parts.append(self._color.bg_sequence(cell.bg))
                     last_bg = cell.bg
-                if cell.bold != last_bold:
-                    sgr_parts.append(self._color.bold_sequence(cell.bold))
-                    last_bold = cell.bold
+                if cell.style_flags != last_style:
+                    if last_style:
+                        sgr_parts.append(self._color.reset_style_sequence())
+                    if cell.style_flags:
+                        sgr_parts.append(self._color.style_sequence(cell.style_flags))
+                    last_style = cell.style_flags
 
                 parts.extend(sgr_parts)
                 parts.append(cell.char)
 
         # Only emit trailing reset if last active styling is non-default
-        if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_bold:
+        if last_fg != DEFAULT_FG or last_bg != DEFAULT_BG or last_style:
             parts.append(self._color.reset_sequence())
 
         return "".join(parts)

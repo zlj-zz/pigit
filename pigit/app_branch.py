@@ -16,6 +16,8 @@ from pigit.termui import (
     InputLine,
     ItemSelector,
     keys,
+    palette,
+    Segment,
     show_sheet,
     show_toast,
     Signal,
@@ -125,9 +127,9 @@ class BranchPanel(ItemSelector):
         super().previous(step)
 
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
         focused = self.is_focus_leaf
@@ -137,20 +139,26 @@ class BranchPanel(ItemSelector):
             fg = THEME.accent_green if focused else THEME.fg_dim
         else:
             fg = THEME.fg_primary if focused else THEME.fg_dim
-        left = [(f"{prefix} {self.content[idx]}", fg, is_cursor)]
+        left = [
+            Segment(
+                f"{prefix} {self.content[idx]}",
+                fg=fg,
+                style_flags=palette.STYLE_BOLD if is_cursor else 0,
+            )
+        ]
 
-        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        right: list[Segment] = []
         if idx < len(self.branches):
             branch = self.branches[idx]
             if not branch.is_remote:
                 ahead = branch.ahead if branch.ahead != "?" else ""
                 behind = branch.behind if branch.behind != "?" else ""
                 if ahead:
-                    right.append((f"\u2191{ahead}", THEME.accent_green, False))
+                    right.append(Segment(f"\u2191{ahead}", fg=THEME.accent_green))
                 if behind:
                     if right:
-                        right.append((" ", THEME.fg_muted, False))
-                    right.append((f"\u2193{behind}", THEME.accent_yellow, False))
+                        right.append(Segment(" ", fg=THEME.fg_muted))
+                    right.append(Segment(f"\u2193{behind}", fg=THEME.accent_yellow))
 
         return left, None, right
 

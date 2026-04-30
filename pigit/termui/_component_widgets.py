@@ -8,9 +8,11 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
 from ._component_base import Component, ComponentError
+from ._segment import Segment
+from ._surface import Surface
 from ._reactive import Signal
 from .types import OverlayDispatchResult
 from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
@@ -34,7 +36,6 @@ from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
     from .palette import DEFAULT_BG, DEFAULT_FG
-from ._surface import Surface
 
 
 class LineTextBrowser(Component):
@@ -172,9 +173,9 @@ class ItemSelector(Component):
             self._draw_row_layout(surface, row, left, main, right)
 
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return a description of the row at ``idx`` for declarative rendering.
 
@@ -182,14 +183,14 @@ class ItemSelector(Component):
         the base class handles all drawing via ``_draw_row_layout``.
 
         Returns:
-            (left_segments, main_segments, right_segments) where each segment
-            is ``(text, fg_rgb, bold)``.  Main segments are drawn sequentially
+            (left_segments, main_segments, right_segments) where each element
+            is a :class:`Segment`.  Main segments are drawn sequentially
             and truncated as a group to fit between left and right;
             ``None`` means no main content.
         """
         prefix = self.CURSOR if is_cursor else " "
         text = f"{prefix}{self.content[idx]}"
-        return ([(text, DEFAULT_FG, False)], None, [])
+        return ([Segment(text, fg=DEFAULT_FG)], None, [])
 
     # --- row-rendering helpers ---
 
@@ -206,24 +207,21 @@ class ItemSelector(Component):
         surface: "Surface",
         row: int,
         col: int,
-        segments: list[tuple[str, tuple[int, int, int], bool]],
+        segments: Sequence[Segment],
     ) -> int:
-        """Draw a sequence of ``(text, fg, bold)`` segments starting at ``col``.
+        """Draw a sequence of segments starting at ``col``.
 
         Returns the column position after the last segment.
         """
-        for text, fg, bold in segments:
-            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-            col += wcswidth(text)
-        return col
+        return surface.draw_segments(row, col, segments)
 
     def _draw_row_layout(
         self,
         surface: "Surface",
         row: int,
-        left: list[tuple[str, tuple[int, int, int], bool]],
-        main: list[tuple[str, tuple[int, int, int], bool]] | None,
-        right: list[tuple[str, tuple[int, int, int], bool]],
+        left: Sequence[Segment],
+        main: Sequence[Segment] | None,
+        right: Sequence[Segment],
         *,
         min_gap: int = 1,
     ) -> None:
@@ -235,8 +233,8 @@ class ItemSelector(Component):
         segments, they are omitted and main is truncated against left only.
         """
         w = surface.width
-        left_w = sum(wcswidth(text) for text, _, _ in left)
-        right_w = sum(wcswidth(text) for text, _, _ in right)
+        left_w = sum(wcswidth(seg.text) for seg in left)
+        right_w = sum(wcswidth(seg.text) for seg in right)
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2
@@ -248,28 +246,42 @@ class ItemSelector(Component):
 
         # Draw left segments (truncated if they exceed surface width).
         col = 0
-        for text, fg, bold in left:
+        for seg in left:
+            text = seg.text
             text_w = wcswidth(text)
             if col + text_w > w:
                 text = self._truncate_text(text, max(0, w - col))
                 text_w = wcswidth(text) if text else 0
             if not text:
                 break
-            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            surface.draw_text_rgb(
+                row,
+                col,
+                text,
+                fg=seg.fg,
+                bg=seg.bg,
+                style_flags=seg.style_flags,
+            )
             col += text_w
 
         # Draw main segments (truncated as a group to fit).
         if main and main_avail > 0:
             col += min_gap
             remaining = main_avail
-            for text, fg, bold in main:
+            for seg in main:
+                text = seg.text
                 text_w = wcswidth(text)
                 if text_w > remaining:
                     text = self._truncate_text(text, remaining)
                     text_w = wcswidth(text) if text else 0
                 if text:
                     surface.draw_text_rgb(
-                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                        row,
+                        col,
+                        text,
+                        fg=seg.fg,
+                        bg=seg.bg,
+                        style_flags=seg.style_flags,
                     )
                     col += text_w
                 remaining -= text_w
@@ -280,12 +292,7 @@ class ItemSelector(Component):
         if right:
             right_start = w - right_w
             if right_start >= left_w + min_gap:
-                col = right_start
-                for text, fg, bold in right:
-                    surface.draw_text_rgb(
-                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
-                    )
-                    col += wcswidth(text)
+                surface.draw_segments(row, right_start, right)
 
     def _draw_right_aligned(
         self,
@@ -294,7 +301,7 @@ class ItemSelector(Component):
         text: str,
         fg: tuple[int, int, int],
         *,
-        bold: bool = False,
+        style_flags: int = 0,
         margin: int = 4,
     ) -> bool:
         """Draw ``text`` right-aligned if it fits within ``width - margin``.
@@ -305,7 +312,7 @@ class ItemSelector(Component):
         text_w = wcswidth(text)
         if text_w < w - margin:
             surface.draw_text_rgb(
-                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, style_flags=style_flags
             )
             return True
         return False
@@ -340,7 +347,7 @@ class ItemSelector(Component):
 class Header(Component):
     """Generic header bar with left/center/right segments.
 
-    Each slot is a list of ``(text, fg_rgb, bold)`` tuples.  Center is
+    Each slot is a sequence of :class:`Segment`.  Center is
     horizontally centred; right is right-aligned.  If the total width
     exceeds the available space, the centre group is dropped first, then
     the left group is truncated with an ellipsis.
@@ -357,21 +364,19 @@ class Header(Component):
         self._separator = separator
         self._sep_fg = sep_fg
         self._on_refresh = on_refresh
-        self._left: list[tuple[str, tuple[int, int, int], bool]] = []
-        self._center: list[tuple[str, tuple[int, int, int], bool]] = []
-        self._right: list[tuple[str, tuple[int, int, int], bool]] = []
+        self._left: list[Segment] = []
+        self._center: list[Segment] = []
+        self._right: list[Segment] = []
 
-    def set_left(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+    def set_left(self, segments: Sequence[Segment]) -> None:
         """Set the left header segments."""
         self._left = list(segments)
 
-    def set_center(
-        self, segments: list[tuple[str, tuple[int, int, int], bool]]
-    ) -> None:
+    def set_center(self, segments: Sequence[Segment]) -> None:
         """Set the center header segments."""
         self._center = list(segments)
 
-    def set_right(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+    def set_right(self, segments: Sequence[Segment]) -> None:
         """Set the right header segments."""
         self._right = list(segments)
 
@@ -412,50 +417,70 @@ class Header(Component):
 
         # Draw left
         x = 0
-        for text, fg, bold in self._left:
-            surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-            x += wcswidth(text)
+        for seg in self._left:
+            surface.draw_text_rgb(
+                row,
+                x,
+                seg.text,
+                fg=seg.fg,
+                bg=seg.bg,
+                style_flags=seg.style_flags,
+            )
+            x += wcswidth(seg.text)
 
         # Draw centre
         if self._center and center_w:
             centre_x = max(0, (w - center_w) // 2)
             x = centre_x
-            for text, fg, bold in self._center:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-                x += wcswidth(text)
+            for seg in self._center:
+                surface.draw_text_rgb(
+                    row,
+                    x,
+                    seg.text,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
+                )
+                x += wcswidth(seg.text)
 
         # Draw right
         if self._right and right_w:
             right_x = max(0, w - right_w)
             x = right_x
-            for text, fg, bold in self._right:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-                x += wcswidth(text)
+            for seg in self._right:
+                surface.draw_text_rgb(
+                    row,
+                    x,
+                    seg.text,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
+                )
+                x += wcswidth(seg.text)
 
     @staticmethod
-    def _slot_width(
-        slot: list[tuple[str, tuple[int, int, int], bool]],
-    ) -> int:
-        return sum(wcswidth(text) for text, _, _ in slot)
+    def _slot_width(slot: Sequence[Segment]) -> int:
+        return sum(wcswidth(seg.text) for seg in slot)
 
     @staticmethod
-    def _truncate_slot(
-        slot: list[tuple[str, tuple[int, int, int], bool]],
-        max_width: int,
-    ) -> list[tuple[str, tuple[int, int, int], bool]]:
+    def _truncate_slot(slot: Sequence[Segment], max_width: int) -> list[Segment]:
         if max_width <= 0 or not slot:
             return []
-        result: list[tuple[str, tuple[int, int, int], bool]] = []
+        result: list[Segment] = []
         current_w = 0
-        for text, fg, bold in slot:
-            text_w = wcswidth(text)
+        for seg in slot:
+            text_w = wcswidth(seg.text)
             if current_w + text_w > max_width - 1:
                 avail = max_width - current_w - 1
                 if avail > 0:
-                    truncated = truncate_by_width(text, avail) + "\u2026"
-                    result.append((truncated, fg, bold))
+                    truncated = truncate_by_width(seg.text, avail) + "\u2026"
+                    result.append(
+                        Segment(
+                            truncated, fg=seg.fg, bg=seg.bg, style_flags=seg.style_flags
+                        )
+                    )
                 break
-            result.append((text, fg, bold))
+            result.append(seg)
             current_w += text_w
         return result
 

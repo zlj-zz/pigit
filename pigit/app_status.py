@@ -19,6 +19,8 @@ from pigit.termui import (
     exec_external,
     ItemSelector,
     keys,
+    palette,
+    Segment,
     show_badge,
     show_toast,
 )
@@ -210,9 +212,9 @@ class StatusPanel(ItemSelector):
             surface.draw_text_rgb(row, col, line, fg=fg)
 
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return row description: [cursor][staged][unstaged][filename.......][label]"""
         focused = self.is_focus_leaf
@@ -220,7 +222,17 @@ class StatusPanel(ItemSelector):
             text = self.content[idx] if idx < len(self.content) else ""
             prefix = self.CURSOR if is_cursor else " "
             fg = THEME.fg_primary if focused else THEME.fg_dim
-            return ([(f"{prefix} {text}", fg, is_cursor)], None, [])
+            return (
+                [
+                    Segment(
+                        f"{prefix} {text}",
+                        fg=fg,
+                        style_flags=palette.STYLE_BOLD if is_cursor else 0,
+                    )
+                ],
+                None,
+                [],
+            )
 
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
@@ -228,12 +240,13 @@ class StatusPanel(ItemSelector):
         cursor_prefix = self.CURSOR if is_cursor else " "
 
         fg_primary = THEME.fg_primary if focused else THEME.fg_dim
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            (cursor_prefix, fg_primary, is_cursor),
-            (" ", fg_primary, False),
-            (staged, _staged_fg(staged), is_cursor),
-            (unstaged, _unstaged_fg(unstaged), is_cursor),
-            (" ", fg_primary, False),
+            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
+            Segment(staged, fg=_staged_fg(staged), style_flags=cursor_flags),
+            Segment(unstaged, fg=_unstaged_fg(unstaged), style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
         ]
 
         is_selected = idx in self._selected
@@ -241,12 +254,12 @@ class StatusPanel(ItemSelector):
             filename_fg = THEME.accent_purple if focused else THEME.fg_dim
         else:
             filename_fg = fg_primary
-        main = [(file.name, filename_fg, is_cursor)]
+        main = [Segment(file.name, fg=filename_fg, style_flags=cursor_flags)]
 
-        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append((label, THEME.fg_muted if focused else THEME.fg_dim, False))
+            right.append(Segment(label, fg=THEME.fg_muted if focused else THEME.fg_dim))
 
         return left, main, right
 

@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, ClassVar, Optional
+from typing import Any, Callable, ClassVar, Optional, Sequence
 
 from ._bindings import resolve_key_handlers_merged
 from ._component_base import Component
 from ._frame import BoxFrame
+from ._segment import Segment
 from ._text import sanitize_for_display
 from ._layout import Padding
 from ._surface import Surface
@@ -82,10 +83,8 @@ class HelpPanel(Component):
             0, 0, title="Help   esc close", fg=DEFAULT_FG, bg=DEFAULT_BG
         )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
-        # Each element is a list of (text, fg, bold) segments for one line.
-        self._line_segments: list[
-            list[tuple[str, Optional[tuple[int, int, int]], bool]]
-        ] = []
+        # Each element is a list of Segment for one line.
+        self._line_segments: list[list[Segment]] = []
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recalculate inner and outer dimensions for the given terminal size."""
@@ -115,18 +114,18 @@ class HelpPanel(Component):
             return
         max_key_w = max(wcswidth(key_disp) for key_disp, _ in entries)
         lines: list[str] = []
-        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
+        segments: list[list[Segment]] = []
         for key_disp, desc in entries:
             pad = max_key_w - wcswidth(key_disp)
             line = f"{key_disp}{' ' * pad}  {desc}"
             lines.append(line)
-            seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
+            seg: list[Segment] = []
             if self._key_fg is not None:
-                seg.append((key_disp, self._key_fg, False))
-                seg.append((" " * pad + "  ", None, False))
+                seg.append(Segment(key_disp, fg=self._key_fg))
+                seg.append(Segment(" " * pad + "  "))
             else:
-                seg.append((key_disp + " " * pad + "  ", None, False))
-            seg.append((desc, None, False))
+                seg.append(Segment(key_disp + " " * pad + "  "))
+            seg.append(Segment(desc))
             segments.append(seg)
         self._lines = lines
         self._line_segments = segments
@@ -134,6 +133,8 @@ class HelpPanel(Component):
 
     def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
         """Set grouped help entries with category headers and rebuild rendered lines."""
+        from .palette import STYLE_BOLD
+
         if not groups:
             self._lines = []
             self._line_segments = []
@@ -145,26 +146,26 @@ class HelpPanel(Component):
                 max_key_w = max(max_key_w, wcswidth(key_disp))
 
         lines: list[str] = []
-        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
+        segments: list[list[Segment]] = []
         for title, entries in groups:
             if not entries:
                 continue
             # Category header
             lines.append(title)
-            segments.append([(title, None, True)])
+            segments.append([Segment(title, style_flags=STYLE_BOLD)])
             # Indented entries
             for key_disp, desc in entries:
                 pad = max_key_w - wcswidth(key_disp)
                 line = f"  {key_disp}{' ' * pad}  {desc}"
                 lines.append(line)
-                seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
-                seg.append(("  ", None, False))
+                seg: list[Segment] = []
+                seg.append(Segment("  "))
                 if self._key_fg is not None:
-                    seg.append((key_disp, self._key_fg, False))
-                    seg.append((" " * pad + "  ", None, False))
+                    seg.append(Segment(key_disp, fg=self._key_fg))
+                    seg.append(Segment(" " * pad + "  "))
                 else:
-                    seg.append((key_disp + " " * pad + "  ", None, False))
-                seg.append((desc, None, False))
+                    seg.append(Segment(key_disp + " " * pad + "  "))
+                seg.append(Segment(desc))
                 segments.append(seg)
             # Blank line between groups
             lines.append("")
@@ -235,11 +236,10 @@ class HelpPanel(Component):
         content_col = self.y + 1
         chunk = self._line_segments[self._offset : self._offset + self._scroll_h]
         for i, segments in enumerate(chunk):
-            x = content_col
             row = content_row + i
-            for text, fg, bold in segments:
-                if x >= content_col + self._inner_w:
-                    break
+            x = content_col
+            for seg in segments:
+                text = seg.text
                 text_w = wcswidth(text)
                 avail = content_col + self._inner_w - x
                 if text_w > avail:
@@ -248,15 +248,16 @@ class HelpPanel(Component):
                     row,
                     x,
                     text,
-                    fg=fg if fg is not None else DEFAULT_FG,
-                    bg=DEFAULT_BG,
-                    bold=bold,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
                 )
                 x += wcswidth(text)
             # Pad remaining width with spaces to prevent residue
-            while x < content_col + self._inner_w:
-                surface.draw_text_rgb(row, x, " ", fg=DEFAULT_FG, bg=DEFAULT_BG)
-                x += 1
+            if x < content_col + self._inner_w:
+                surface.fill_rect_rgb(
+                    row, x, content_col + self._inner_w - x, 1, DEFAULT_BG
+                )
 
 
 class Popup(Component):
@@ -639,7 +640,9 @@ class Toast(Component):
 
     def __init__(
         self,
-        message: str,
+        message: str = "",
+        *,
+        segments: Optional[Sequence[Segment]] = None,
         duration: float = 2.0,
         size: Optional[tuple[int, int]] = None,
         clock: Callable[[], float] = time.monotonic,
@@ -648,7 +651,9 @@ class Toast(Component):
         exit_duration: float = 0.5,
     ) -> None:
         super().__init__(size=size)
-        self._message = message
+        self._segments: list[Segment] = (
+            list(segments) if segments else [Segment(message)]
+        )
         self.duration = duration
         self._clock = clock
         self._position = position
@@ -684,13 +689,47 @@ class Toast(Component):
     def _rebuild_frame(self) -> None:
         """Rebuild BoxFrame and content lines based on current terminal size."""
         max_inner_w = max(0, self._term_size[0] - 4)
-        lines = [
-            truncate_by_width(line, max_inner_w) for line in self._message.split("\n")
-        ]
-        # Safety limit to prevent memory issues with malicious input
-        self._lines = lines[:MAX_TOAST_LINES]
-        inner_h = len(self._lines)
-        inner_w = max(len(line) for line in self._lines) if self._lines else 0
+        # Split segments into lines by \n
+        line_segments: list[list[Segment]] = [[]]
+        for seg in self._segments:
+            parts = seg.text.split("\n")
+            for i, part in enumerate(parts):
+                if i > 0:
+                    line_segments.append([])
+                if part:
+                    line_segments[-1].append(
+                        Segment(part, fg=seg.fg, bg=seg.bg, style_flags=seg.style_flags)
+                    )
+        # Truncate each line to max_inner_w and compute inner width
+        truncated: list[list[Segment]] = []
+        inner_w = 0
+        for line in line_segments[:MAX_TOAST_LINES]:
+            line_w = 0
+            new_line: list[Segment] = []
+            for seg in line:
+                seg_w = wcswidth(seg.text)
+                if line_w + seg_w > max_inner_w:
+                    # Truncate this segment to fit
+                    avail = max(0, max_inner_w - line_w)
+                    if avail > 0:
+                        truncated_text = truncate_by_width(seg.text, avail)
+                        new_line.append(
+                            Segment(
+                                truncated_text,
+                                fg=seg.fg,
+                                bg=seg.bg,
+                                style_flags=seg.style_flags,
+                            )
+                        )
+                        line_w += wcswidth(truncated_text)
+                    break
+                new_line.append(seg)
+                line_w += seg_w
+            truncated.append(new_line)
+            inner_w = max(inner_w, line_w)
+
+        self._line_segments = truncated
+        inner_h = len(self._line_segments)
 
         if self._frame is None:
             self._frame = BoxFrame(inner_w, inner_h, fg=DEFAULT_FG, bg=DEFAULT_BG)
@@ -776,12 +815,26 @@ class Toast(Component):
             base_row, render_col, self._outer_w, self.outer_row_count, DEFAULT_BG
         )
         self._frame.draw_onto(surface, base_row, render_col)
-        self._frame.draw_content(surface, base_row, render_col, self._lines)
+        # Draw content lines using segments
+        content_row = base_row + 1
+        content_col = render_col + 1
+        for i, segments in enumerate(self._line_segments):
+            row = content_row + i
+            if row >= surface.height:
+                break
+            surface.draw_segments(row, content_col, segments)
+            # Pad remaining width to prevent residue
+            line_text = "".join(s.text for s in segments)
+            line_w = wcswidth(line_text)
+            pad_col = content_col + line_w
+            pad_w = content_col + self._frame.inner_width - pad_col
+            if pad_w > 0:
+                surface.fill_rect_rgb(row, pad_col, pad_w, 1, DEFAULT_BG)
 
     @property
     def message(self) -> str:
         """Toast message content (backward compatibility)."""
-        return self._message
+        return "".join(s.text for s in self._segments)
 
     def hide(self) -> None:
         """Close the toast."""
