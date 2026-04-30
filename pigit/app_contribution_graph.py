@@ -16,7 +16,7 @@ import math
 from collections import defaultdict
 from typing import Optional
 
-from pigit.termui import Component
+from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
@@ -33,6 +33,16 @@ _HEATMAP_COLORS: list[tuple[int, int, int]] = [
     (64, 196, 99),  # level 3 (medium green)
     (48, 161, 78),  # level 4 (dark green)
     (33, 110, 57),  # level 5 (very dark green)
+]
+
+# Author line chart colors (top 6 authors)
+_AUTHOR_COLORS: list[tuple[int, int, int]] = [
+    THEME.accent_cyan,
+    THEME.accent_yellow,
+    THEME.accent_purple,
+    THEME.accent_red,
+    THEME.accent_green,
+    THEME.accent_blue,
 ]
 
 _CELL_CHAR = "■"
@@ -61,19 +71,31 @@ class ContributionGraph(Component):
     ) -> None:
         super().__init__(x, y, size)
         self._day_counts: dict[datetime.date, int] = {}
+        self._author_day_counts: dict[str, dict[datetime.date, int]] = {}
         self._max_count = 0
 
     def min_height(self) -> int:
-        """Return minimum rows needed to render labels, heatmap, and legend."""
-        return _TOP_MARGIN + 7 + 2
+        """Return minimum rows needed to render heatmap + line chart."""
+        # heatmap: month labels + 7 days + legend = 10
+        # gap: 1
+        # line chart: title(1) + plot(7) + x-axis(2) + legend(2) = 12
+        return _TOP_MARGIN + 7 + 2 + 1 + 12
 
     def set_commits(self, commits: list) -> None:
-        """Build daily commit counts from the given commit list."""
+        """Build daily commit counts and per-author counts from the given commit list."""
         counts = defaultdict(int)
+        author_counts: dict[str, dict[datetime.date, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         for c in commits:
             dt = datetime.datetime.fromtimestamp(c.unix_timestamp)
-            counts[dt.date()] += 1
+            d = dt.date()
+            counts[d] += 1
+            author_counts[c.author][d] += 1
         self._day_counts = dict(counts)
+        self._author_day_counts = {
+            author: dict(dates) for author, dates in author_counts.items()
+        }
         self._max_count = max(counts.values()) if counts else 0
 
     def _color_for(self, count: int) -> tuple[int, int, int]:
@@ -155,6 +177,166 @@ class ContributionGraph(Component):
             surface.draw_text_rgb(
                 row, start_col + 10, value, fg=THEME.fg_primary, bg=_GRAPH_BG
             )
+
+    def _render_line_chart(
+        self,
+        surface,
+        start_row: int,
+        width: int,
+        height: int,
+    ) -> None:
+        """Render author commit line chart with fixed dimensions."""
+        # Fixed dimensions
+        plot_w = 55
+        plot_h = 7
+        title_h = 1
+        x_axis_h = 2
+        legend_h = 2
+
+        # Check minimum space
+        total_h = title_h + plot_h + x_axis_h + legend_h
+        if height < total_h:
+            return
+
+        # Top authors by total commits
+        author_totals = {
+            author: sum(dates.values())
+            for author, dates in self._author_day_counts.items()
+        }
+        top_authors = sorted(
+            author_totals.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )[:6]
+        authors = [a for a, _ in top_authors]
+
+        if not authors:
+            return
+
+        today = datetime.date.today()
+        days_back = 30
+        start_date = today - datetime.timedelta(days=days_back)
+
+        # Title
+        surface.draw_text_rgb(
+            start_row,
+            _PADDING_LEFT,
+            "Commits per Day",
+            fg=THEME.fg_primary,
+            bg=_GRAPH_BG,
+            style_flags=palette.STYLE_BOLD,
+        )
+
+        # Build per-author series
+        author_series: dict[str, list[int]] = {}
+        overall_max = 0
+        for author in authors:
+            series = []
+            for i in range(days_back + 1):
+                d = start_date + datetime.timedelta(days=i)
+                count = self._author_day_counts.get(author, {}).get(d, 0)
+                series.append(count)
+                overall_max = max(overall_max, count)
+            author_series[author] = series
+
+        if overall_max == 0:
+            return
+
+        chart_top = start_row + title_h
+        chart_bottom = chart_top + plot_h - 1
+
+        # Y-axis layout
+        y_axis_label_w = 5
+        y_axis_col = _PADDING_LEFT + y_axis_label_w
+
+        # Y-axis labels (one per horizontal grid line, top to bottom)
+        for i in range(plot_h):
+            row = chart_top + i
+            value = int(round(overall_max * (plot_h - 1 - i) / (plot_h - 1)))
+            label = str(value)
+            # right-align within y_axis_label_w
+            pad = max(0, y_axis_label_w - len(label))
+            surface.draw_text_rgb(
+                row, _PADDING_LEFT + pad, label, fg=THEME.fg_muted, bg=_GRAPH_BG
+            )
+
+        # Y-axis line with ticks: ┤ for ticks, ┼ for origin
+        for r in range(chart_top, chart_bottom + 1):
+            if r == chart_bottom:
+                surface.draw_text_rgb(r, y_axis_col, "┼", fg=THEME.fg_dim, bg=_GRAPH_BG)
+            else:
+                surface.draw_text_rgb(r, y_axis_col, "┤", fg=THEME.fg_dim, bg=_GRAPH_BG)
+
+        # X-axis line
+        x_axis_row = chart_bottom
+        surface.draw_text_rgb(
+            x_axis_row, y_axis_col + 1, "─" * plot_w, fg=THEME.fg_dim, bg=_GRAPH_BG
+        )
+
+        # X-axis date labels
+        label_dates = [
+            start_date,
+            start_date + datetime.timedelta(days=days_back // 2),
+            today,
+        ]
+        for d in label_dates:
+            day_offset = (d - start_date).days
+            col = y_axis_col + 1 + int(day_offset * plot_w / (days_back + 1))
+            label = d.strftime("%b %d")
+            if col + len(label) <= width:
+                surface.draw_text_rgb(
+                    x_axis_row + 1, col, label, fg=THEME.fg_muted, bg=_GRAPH_BG
+                )
+
+        # Draw lines (uniformly mapped to plot_w columns)
+        for aidx, author in enumerate(authors):
+            color = _AUTHOR_COLORS[aidx % len(_AUTHOR_COLORS)]
+            series = author_series[author]
+
+            # Map data points uniformly onto plot_w columns
+            num_points = len(series)
+            mapped_rows: list[int] = []
+            for c in range(plot_w):
+                idx = min(int(c * num_points / plot_w), num_points - 1)
+                count = series[idx]
+                row = chart_bottom - int((count / overall_max) * (plot_h - 1))
+                mapped_rows.append(row)
+
+            # First pass: horizontal platforms on every column
+            for c in range(plot_w):
+                row = mapped_rows[c]
+                col = y_axis_col + 1 + c
+                surface.draw_text_rgb(row, col, "─", fg=color, bg=_GRAPH_BG)
+
+            # Second pass: rounded step connections at column boundaries
+            for c in range(plot_w - 1):
+                row = mapped_rows[c]
+                next_row = mapped_rows[c + 1]
+                col = y_axis_col + 1 + c + 1
+                if next_row < row:  # ascending (next point is higher)
+                    surface.draw_text_rgb(row, col, "╯", fg=color, bg=_GRAPH_BG)
+                    for r in range(next_row + 1, row):
+                        surface.draw_text_rgb(r, col, "│", fg=color, bg=_GRAPH_BG)
+                    surface.draw_text_rgb(next_row, col, "╭", fg=color, bg=_GRAPH_BG)
+                elif next_row > row:  # descending (next point is lower)
+                    surface.draw_text_rgb(row, col, "╮", fg=color, bg=_GRAPH_BG)
+                    for r in range(row + 1, next_row):
+                        surface.draw_text_rgb(r, col, "│", fg=color, bg=_GRAPH_BG)
+                    surface.draw_text_rgb(next_row, col, "╰", fg=color, bg=_GRAPH_BG)
+
+        # Legend
+        legend_row = x_axis_row + 2
+        x = _PADDING_LEFT
+        for aidx, author in enumerate(authors):
+            color = _AUTHOR_COLORS[aidx % len(_AUTHOR_COLORS)]
+            name = author[:10]
+            entry_width = 2 + len(name) + 3
+            if x + entry_width > width:
+                break
+            surface.draw_text_rgb(legend_row, x, "*", fg=color, bg=_GRAPH_BG)
+            x += 2
+            surface.draw_text_rgb(legend_row, x, name, fg=THEME.fg_muted, bg=_GRAPH_BG)
+            x += len(name) + 3
 
     def render_into(self, surface) -> None:
         """Public entry to render this graph into the given surface."""
@@ -242,3 +424,9 @@ class ContributionGraph(Component):
         if stats_col + 16 < w:
             stats = self._calc_stats(first_monday, today)
             self._draw_stats(surface, stats, stats_col, _TOP_MARGIN, _TOP_MARGIN + 7)
+
+        # --- Author line chart ---
+        chart_start_row = _TOP_MARGIN + 7 + 2 + 1  # after heatmap + legend + gap
+        chart_h = h - chart_start_row
+        if chart_h >= 12:
+            self._render_line_chart(surface, chart_start_row, w, chart_h)
