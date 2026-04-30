@@ -22,6 +22,7 @@ from pigit.termui.types import (
 # Core components
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import Column, Row, TabView
+from pigit.termui._component_graph import HeatmapGrid, StepLineChart
 from pigit.termui._component_widgets import (
     Header,
     InputLine,
@@ -94,7 +95,9 @@ __all__ = [
     "Row",
     # Widgets
     "Header",
+    "HeatmapGrid",
     "InputLine",
+    "StepLineChart",
     "ItemSelector",
     "LineTextBrowser",
     "StatusBar",
