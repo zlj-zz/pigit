@@ -444,6 +444,10 @@ class PigitApplication(Application):
                     return
                 show_toast(f"Merge failed: {e}", duration=3.0)
                 return
+            except Exception:
+                hide_spinner()
+                logging.exception("Merge workflow failed with unexpected error")
+                return
             self._confirm_push_and_finish(target, source)
 
         self._alert_dialog.alert(f"Merge {source} into {target}?", on_confirm)
@@ -463,6 +467,10 @@ class PigitApplication(Application):
             try:
                 step()
             except GitError:
+                hide_spinner()
+                self._try_checkout_back(source)
+                raise
+            except Exception:
                 hide_spinner()
                 self._try_checkout_back(source)
                 raise

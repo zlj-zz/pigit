@@ -978,6 +978,17 @@ class LocalGit:
         repo_root, _ = self.confirm_repo(path)
         return str((Path(repo_root) / git_dir_raw).resolve())
 
+    def pull(self, path: Optional[str] = None) -> None:
+        """Pull from the upstream remote. Raises GitError on failure."""
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            "git pull",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or "Pull failed")
+
     def merge(self, source: str, path: Optional[str] = None) -> None:
         """Merge ``source`` into the current branch. Raises GitError on failure.
 
