@@ -1,5 +1,55 @@
 # Changelog of pigit
 
+## 1.8.6 (2026-04-30)
+
+### TermUI — Segment Architecture
+
+- **`Segment` dataclass replaces `(text, fg, bold)` tuples**: structured `Segment(text, fg, bg, style_flags)` with `__slots__` for memory efficiency; fg/bg support `None` to fall back to `DEFAULT_FG` / `DEFAULT_BG` at draw time.
+- **Style flags bitmask**: `STYLE_BOLD`, `STYLE_DIM`, `STYLE_ITALIC`, `STYLE_UNDERLINE`, `STYLE_REVERSE` via `palette` module; `FlatCell` maps legacy `bold=True` kwarg to `style_flags |= STYLE_BOLD` for backward compatibility.
+- **`draw_segments()` batch draw**: `Surface` and `_Subsurface` gain `draw_segments(row, col, segments)` for efficient multi-segment row painting without per-segment boilerplate.
+- **Renderer style sequences**: `ColorAdapter.style_sequence()` emits precise SGR codes per style flags; `reset_style_sequence()` resets only style attrs (22;23;24;27m) without touching colors.
+- **Unified internal imports**: all `pigit.termui` modules use `from . import palette` / `from . import keys` with qualified access (`palette.DEFAULT_FG`, `keys.KEY_ENTER`).
+
+### App — Merge Workflow
+
+- **One-click merge (`m`)**: initiates merge from the current branch; auto-detects conflicts and transitions to conflict-resolution mode.
+- **Conflict resolution panel**: when conflicts exist, presents `ours` / `theirs` choices per file; `m` continues merge after all conflicts resolved.
+- **`MERGE` badge**: Header shows merge state badge while a merge is in progress.
+
+### App — Branch Panel
+
+- **Rename branch (`r`)**: renames the selected branch with an `InputLine` prompt.
+- **Create branch (`n`)**: creates a new branch based on the selected branch.
+- **Toggle scope (`R`)**: cycles branch listing between local / remote / all.
+
+### App — Commit Panel
+
+- **Copy SHA (`y`)**: copies the selected commit's SHA to the system clipboard.
+
+### App — Status Panel
+
+- **Cute empty state**: when no changes exist, renders a checkmark art (`(_)`) instead of a blank list.
+
+### TermUI — Focus Chain
+
+- **Focus tracking**: `ComponentRoot` tracks the active focus chain; non-focused sibling panels render with dimmed foreground (`DEFAULT_FG_DIM`) for visual hierarchy.
+- **`focus()` / `blur()` hooks**: components receive lifecycle callbacks when gaining or losing focus.
+
+### TermUI — Overlay Context
+
+- **`Popup` decoupled from `ComponentRoot`**: `_overlay_context` module (ContextVar-based) provides overlay host lookup; `Popup` no longer requires `ComponentRoot` MRO.
+- **`dismiss_sheet()`**: module-level function to close the active sheet overlay without reaching into component internals.
+- **InputLine overlay key dispatch**: `InputLine` correctly routes overlay-dismiss keys (e.g. `Esc`) while preserving text-editing behavior.
+
+### TermUI — Renderer Fixes
+
+- **EL0 fix**: `erase_line_to_end()` no longer clears the last character on full-screen list-picker rows when content exactly fills the terminal width.
+
+### Palette
+
+- **Editing delegated to `InputLine`**: branch rename and new-branch creation use `InputLine` with inline completion instead of raw tty prompts.
+- **`pull` / `push` / `fetch` shortcuts**: quick-action keys in the command palette for common remote operations.
+
 ## 1.8.5 (2026-04-28)
 
 ### Diff Syntax Highlighting
