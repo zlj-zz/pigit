@@ -10,32 +10,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
+from . import keys, palette
 from ._component_base import Component, ComponentError
 from ._segment import Segment
 from ._surface import Surface
 from ._reactive import Signal
 from .types import OverlayDispatchResult
-from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
-from .keys import (
-    KEY_BACKSPACE,
-    KEY_DELETE,
-    KEY_END,
-    KEY_ENTER,
-    KEY_ESC,
-    KEY_HOME,
-    KEY_LEFT,
-    KEY_RIGHT,
-    KEY_SHIFT_TAB,
-    KEY_TAB,
-    KEY_UP,
-    KEY_DOWN,
-)
 from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
-    from .palette import DEFAULT_BG, DEFAULT_FG
+    pass
 
 
 class LineTextBrowser(Component):
@@ -69,8 +55,8 @@ class LineTextBrowser(Component):
                 idx - self._i,
                 0,
                 self._content[idx],
-                fg=DEFAULT_FG,
-                bg=DEFAULT_BG,
+                fg=palette.DEFAULT_FG,
+                bg=palette.DEFAULT_BG,
             )
 
     def scroll_up(self, line: int = 1):
@@ -190,7 +176,7 @@ class ItemSelector(Component):
         """
         prefix = self.CURSOR if is_cursor else " "
         text = f"{prefix}{self.content[idx]}"
-        return ([Segment(text, fg=DEFAULT_FG)], None, [])
+        return ([Segment(text, fg=palette.DEFAULT_FG)], None, [])
 
     # --- row-rendering helpers ---
 
@@ -312,7 +298,12 @@ class ItemSelector(Component):
         text_w = wcswidth(text)
         if text_w < w - margin:
             surface.draw_text_rgb(
-                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, style_flags=style_flags
+                row,
+                w - text_w,
+                text,
+                fg=fg,
+                bg=palette.DEFAULT_BG,
+                style_flags=style_flags,
             )
             return True
         return False
@@ -391,13 +382,15 @@ class Header(Component):
 
         if h >= 2 and self._separator:
             self._draw_content(surface, 0, w)
-            surface.fill_rect_rgb(1, 0, w, 1, DEFAULT_BG)
-            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=DEFAULT_BG)
+            surface.fill_rect_rgb(1, 0, w, 1, palette.DEFAULT_BG)
+            surface.draw_text_rgb(
+                1, 0, "\u2500" * w, fg=self._sep_fg, bg=palette.DEFAULT_BG
+            )
         else:
             self._draw_content(surface, 0, w)
 
     def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
-        surface.fill_rect_rgb(row, 0, w, 1, DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
         left_w = self._slot_width(self._left)
         center_w = self._slot_width(self._center)
@@ -522,7 +515,7 @@ class StatusBar(Component):
     def _render_surface(self, surface: "Surface") -> None:
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
-        surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
+        surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
 
 
 class InputLine(Component):
@@ -653,7 +646,7 @@ class InputLine(Component):
         Callers (e.g. ``Application`` subclasses) are responsible for
         ensuring this method is only invoked when the input line is active.
         """
-        if key == KEY_ENTER:
+        if key == keys.KEY_ENTER:
             if self._showing_candidates:
                 self._value = self._candidates[self._candidate_idx]
                 self._cursor = len(self._value)
@@ -664,7 +657,7 @@ class InputLine(Component):
                 self._on_submit(self._value)
             return
 
-        if key == KEY_ESC:
+        if key == keys.KEY_ESC:
             if self._showing_candidates:
                 self._value = self._original_value
                 self._cursor = len(self._value)
@@ -675,14 +668,14 @@ class InputLine(Component):
                 self._on_cancel()
             return
 
-        if key in (KEY_TAB, KEY_SHIFT_TAB) and self._candidate_provider:
+        if key in (keys.KEY_TAB, keys.KEY_SHIFT_TAB) and self._candidate_provider:
             if not self._showing_candidates:
                 self._showing_candidates = True
                 self._original_value = self._value
                 self._candidates = self._candidate_provider(self._value)
                 self._candidate_idx = 0
             else:
-                step = 1 if key == KEY_TAB else -1
+                step = 1 if key == keys.KEY_TAB else -1
                 self._candidate_idx = max(
                     0, min(self._candidate_idx + step, len(self._candidates) - 1)
                 )
@@ -691,8 +684,8 @@ class InputLine(Component):
                 self._cursor = len(self._value)
             return
 
-        if key in (KEY_UP, KEY_DOWN) and self._showing_candidates:
-            step = -1 if key == KEY_UP else 1
+        if key in (keys.KEY_UP, keys.KEY_DOWN) and self._showing_candidates:
+            step = -1 if key == keys.KEY_UP else 1
             self._candidate_idx = max(
                 0, min(self._candidate_idx + step, len(self._candidates) - 1)
             )
@@ -701,17 +694,17 @@ class InputLine(Component):
             return
 
         # Plain text editing
-        if key == KEY_BACKSPACE:
+        if key == keys.KEY_BACKSPACE:
             self.backspace()
-        elif key == KEY_DELETE:
+        elif key == keys.KEY_DELETE:
             self.delete()
-        elif key == KEY_LEFT:
+        elif key == keys.KEY_LEFT:
             self.cursor_left()
-        elif key == KEY_RIGHT:
+        elif key == keys.KEY_RIGHT:
             self.cursor_right()
-        elif key == KEY_HOME:
+        elif key == keys.KEY_HOME:
             self.home()
-        elif key == KEY_END:
+        elif key == keys.KEY_END:
             self.end()
         elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
             self.insert(key)
@@ -749,23 +742,35 @@ class InputLine(Component):
                 suffix = ""
             elif len(suffix) > avail:
                 suffix = suffix[:avail]
-            surface.draw_text_rgb(0, 0, prefix, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            surface.draw_text_rgb(
+                0, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
             if suffix:
                 surface.draw_text_rgb(
-                    0, len(prefix), suffix, fg=DEFAULT_FG_DIM, bg=DEFAULT_BG
+                    0,
+                    len(prefix),
+                    suffix,
+                    fg=palette.DEFAULT_FG_DIM,
+                    bg=palette.DEFAULT_BG,
                 )
             # Block cursor at the end of the completion text.
             cursor_abs = len(prefix) + len(suffix)
             if cursor_abs < surface.width:
-                surface.draw_text_rgb(0, cursor_abs, " ", fg=DEFAULT_BG, bg=DEFAULT_FG)
+                surface.draw_text_rgb(
+                    0, cursor_abs, " ", fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+                )
         else:
             text = truncate_line(core, surface.width)
             text = pad_by_width(text, surface.width)
-            surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            surface.draw_text_rgb(
+                0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
             # Draw block cursor (reverse video) over the character at cursor.
             if cursor_abs < surface.width:
                 if self._cursor < len(self._value):
                     ch = self._value[self._cursor]
                 else:
                     ch = " "
-                surface.draw_text_rgb(0, cursor_abs, ch, fg=DEFAULT_BG, bg=DEFAULT_FG)
+                surface.draw_text_rgb(
+                    0, cursor_abs, ch, fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+                )

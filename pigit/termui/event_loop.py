@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal, Optional
 
+from . import keys
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component_base import Component
 from ._renderer_context import (
@@ -19,7 +20,6 @@ from ._renderer_context import (
     get_renderer,
 )
 from ._session import Session
-from .keys import is_mouse_event
 
 if TYPE_CHECKING:
     from .input_terminal import InputTerminal
@@ -168,7 +168,7 @@ class AppEventLoop:
                 outcome = self._dispatch_semantic_string(first)
                 self.after_dispatch_key(first, outcome)
                 continue
-            if is_mouse_event(first):
+            if keys.is_mouse_event(first):
                 self.before_mouse_event(first)
                 continue
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from .palette import DEFAULT_BG, DEFAULT_FG
+from . import palette
 from .wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
@@ -26,8 +26,8 @@ class BoxFrame:
         inner_height: int,
         title: Optional[str] = None,
         *,
-        fg: tuple[int, int, int] = DEFAULT_FG,
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        fg: tuple[int, int, int] = palette.DEFAULT_FG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         self.inner_width = inner_width

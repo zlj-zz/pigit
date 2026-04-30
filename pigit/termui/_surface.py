@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Sequence
 
-from .palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
+from . import palette
 from .wcwidth_table import (
     _char_width,
     truncate_by_width,
@@ -47,8 +47,8 @@ class FlatCell:
         self,
         char: str = " ",
         style: str = "",
-        fg: tuple[int, int, int] = DEFAULT_FG,
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        fg: tuple[int, int, int] = palette.DEFAULT_FG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
         ansi_style: Optional[str] = None,
         *,
@@ -58,7 +58,7 @@ class FlatCell:
         self.fg = fg
         self.bg = bg
         # Backward compat: bold=True maps to style_flags with BOLD bit set
-        self.style_flags = style_flags | STYLE_BOLD if bold else style_flags
+        self.style_flags = style_flags | palette.STYLE_BOLD if bold else style_flags
         # Backward compat: 'style' kwarg maps to ansi_style
         self.ansi_style = ansi_style if ansi_style is not None else (style or None)
         self._hash = hash(
@@ -184,7 +184,7 @@ class _Subsurface:
         width: int,
         height: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
         title: Optional[str] = None,
     ) -> None:
@@ -202,7 +202,7 @@ class _Subsurface:
         col: int,
         height: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a vertical line at local (row, col), clipped to subsurface bounds."""
@@ -224,7 +224,7 @@ class _Subsurface:
         col: int,
         width: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a horizontal line at local (row, col), clipped to subsurface bounds."""
@@ -313,12 +313,12 @@ class Surface:
         Args:
             row, col: Starting position.
             text: String to write.
-            fg: Foreground RGB tuple, or None to use DEFAULT_FG.
-            bg: Background RGB tuple, or None to use DEFAULT_BG.
+            fg: Foreground RGB tuple, or None to use palette.DEFAULT_FG.
+            bg: Background RGB tuple, or None to use palette.DEFAULT_BG.
             style_flags: Bitmask of terminal style flags.
         """
-        actual_fg = fg if fg is not None else DEFAULT_FG
-        actual_bg = bg if bg is not None else DEFAULT_BG
+        actual_fg = fg if fg is not None else palette.DEFAULT_FG
+        actual_bg = bg if bg is not None else palette.DEFAULT_BG
 
         if row < 0 or row >= self.height or col >= self.width:
             return
@@ -405,7 +405,7 @@ class Surface:
         width: int,
         height: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
         title: Optional[str] = None,
     ) -> None:
@@ -445,7 +445,7 @@ class Surface:
         col: int,
         height: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a vertical line with RGB colors."""
@@ -460,7 +460,7 @@ class Surface:
         col: int,
         width: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = DEFAULT_BG,
+        bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a horizontal line with RGB colors."""

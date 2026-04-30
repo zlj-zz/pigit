@@ -12,6 +12,7 @@ import logging
 import time
 from typing import Any, Callable, ClassVar, Optional, Sequence
 
+from . import _overlay_context, keys, palette
 from ._bindings import resolve_key_handlers_merged
 from ._component_base import Component
 from ._frame import BoxFrame
@@ -19,11 +20,8 @@ from ._segment import Segment
 from ._text import sanitize_for_display
 from ._layout import Padding
 from ._surface import Surface
-from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
-from . import keys
-from . import _overlay_context
 
 _logger = logging.getLogger(__name__)
 
@@ -80,7 +78,7 @@ class HelpPanel(Component):
         self._outer_w = 42
         self.outer_row_count = 10
         self._frame = BoxFrame(
-            0, 0, title="Help   esc close", fg=DEFAULT_FG, bg=DEFAULT_BG
+            0, 0, title="Help   esc close", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
         )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         # Each element is a list of Segment for one line.
@@ -133,8 +131,6 @@ class HelpPanel(Component):
 
     def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
         """Set grouped help entries with category headers and rebuild rendered lines."""
-        from .palette import STYLE_BOLD
-
         if not groups:
             self._lines = []
             self._line_segments = []
@@ -152,7 +148,7 @@ class HelpPanel(Component):
                 continue
             # Category header
             lines.append(title)
-            segments.append([Segment(title, style_flags=STYLE_BOLD)])
+            segments.append([Segment(title, style_flags=palette.STYLE_BOLD)])
             # Indented entries
             for key_disp, desc in entries:
                 pad = max_key_w - wcswidth(key_disp)
@@ -228,7 +224,7 @@ class HelpPanel(Component):
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
 
@@ -256,7 +252,7 @@ class HelpPanel(Component):
             # Pad remaining width with spaces to prevent residue
             if x < content_col + self._inner_w:
                 surface.fill_rect_rgb(
-                    row, x, content_col + self._inner_w - x, 1, DEFAULT_BG
+                    row, x, content_col + self._inner_w - x, 1, palette.DEFAULT_BG
                 )
 
 
@@ -460,7 +456,9 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._content_lines: list[str] = []
         self._needs_rebuild = True
-        self._frame = BoxFrame(0, 0, title="Alert", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        self._frame = BoxFrame(
+            0, 0, title="Alert", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+        )
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size)
 
@@ -517,7 +515,7 @@ class AlertDialogBody(Component):
         # Fill the entire dialog area with default background to prevent
         # previous frame content from leaking through the borders.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)
@@ -732,7 +730,9 @@ class Toast(Component):
         inner_h = len(self._line_segments)
 
         if self._frame is None:
-            self._frame = BoxFrame(inner_w, inner_h, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            self._frame = BoxFrame(
+                inner_w, inner_h, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
         else:
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
@@ -812,7 +812,11 @@ class Toast(Component):
 
         # Clear background to prevent residue from previous frames or underlying content.
         surface.fill_rect_rgb(
-            base_row, render_col, self._outer_w, self.outer_row_count, DEFAULT_BG
+            base_row,
+            render_col,
+            self._outer_w,
+            self.outer_row_count,
+            palette.DEFAULT_BG,
         )
         self._frame.draw_onto(surface, base_row, render_col)
         # Draw content lines using segments
@@ -829,7 +833,7 @@ class Toast(Component):
             pad_col = content_col + line_w
             pad_w = content_col + self._frame.inner_width - pad_col
             if pad_w > 0:
-                surface.fill_rect_rgb(row, pad_col, pad_w, 1, DEFAULT_BG)
+                surface.fill_rect_rgb(row, pad_col, pad_w, 1, palette.DEFAULT_BG)
 
     @property
     def message(self) -> str:
