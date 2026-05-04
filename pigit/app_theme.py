@@ -43,6 +43,8 @@ class FlatTheme:
     accent_red: tuple[int, int, int] = (244, 135, 113)
     accent_blue: tuple[int, int, int] = (150, 200, 255)
     accent_purple: tuple[int, int, int] = (210, 170, 240)
+    accent_magenta: tuple[int, int, int] = (240, 130, 200)
+    accent_orange: tuple[int, int, int] = (255, 175, 80)
 
     # Diff viewer backgrounds
     bg_diff_add: tuple[int, int, int] = (35, 65, 45)

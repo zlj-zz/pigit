@@ -30,6 +30,48 @@ from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
 
 
+def _parse_decoration(
+    extra_info: str, remotes: tuple[str, ...]
+) -> tuple[str, list[str], list[str]]:
+    """Split git's ``%d`` decoration into ``(head_ref, locals, remotes)``.
+
+    ``%d`` packs HEAD, branches, remote-tracking refs, and tags into one
+    parenthesized comma-separated list — the only structural cue between
+    them is text prefix. ``head_ref`` is the local branch HEAD points to,
+    ``"HEAD"`` for a detached HEAD entry, or ``""`` if HEAD is absent. The
+    branch HEAD points at is *not* repeated in ``locals`` so the renderer
+    can emit it as part of the HEAD badge without de-duping. Tag entries
+    are skipped — they are surfaced via :attr:`Commit.tag` already.
+    """
+    s = extra_info.strip()
+    if not (s.startswith("(") and s.endswith(")")):
+        return "", [], []
+    body = s[1:-1].strip()
+    if not body:
+        return "", [], []
+
+    head_ref = ""
+    local_refs: list[str] = []
+    remote_refs: list[str] = []
+
+    for raw in body.split(","):
+        entry = raw.strip()
+        if not entry:
+            continue
+        if entry.startswith("HEAD -> "):
+            head_ref = entry.removeprefix("HEAD -> ").strip()
+        elif entry == "HEAD":
+            head_ref = "HEAD"
+        elif entry.startswith("tag: "):
+            continue
+        elif any(entry.startswith(r + "/") for r in remotes):
+            remote_refs.append(entry)
+        else:
+            local_refs.append(entry)
+
+    return head_ref, local_refs, remote_refs
+
+
 class CommitViewMode(Enum):
     LIST = auto()
     HEATMAP = auto()
@@ -75,6 +117,8 @@ class CommitPanel(ItemSelector):
         self._rel_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
         self._graph_rows: list[GraphRow] = []
+        self._remotes: tuple[str, ...] = ()
+        self._refs_cache: dict[str, tuple[str, list[str], list[str]]] = {}
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -135,6 +179,8 @@ class CommitPanel(ItemSelector):
         branch_name = self.git.get_head() or ""
         self.commits = commits = self.git.load_commits(branch_name)
         self._contrib_graph.set_commits(commits)
+        self._remotes = tuple(self.git.get_remotes())
+        self._refs_cache.clear()
         if not commits:
             self.set_content(["No commits found."])
             self._max_meta_w = 0
@@ -199,7 +245,9 @@ class CommitPanel(ItemSelector):
         # Cursor indicator (2 cols)
         if is_cursor:
             left = [
-                Segment(self.CURSOR, fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD),
+                Segment(
+                    self.CURSOR, fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD
+                ),
                 Segment(" ", fg=THEME.fg_primary),
             ]
         else:
@@ -220,14 +268,11 @@ class CommitPanel(ItemSelector):
         left.append(Segment(commit.sha[:7], fg=THEME.fg_dim, style_flags=cursor_flags))
         left.append(Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary))
 
-        # Main: message + optional tag
-        tag_str = f" {commit.tag[0]}" if commit.tag else ""
         fg_msg = THEME.fg_primary if focused else THEME.fg_dim
-        fg_tag = THEME.accent_cyan if focused else THEME.fg_dim
-        main = [
-            Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags),
-            Segment(tag_str, fg=fg_tag, style_flags=cursor_flags),
-        ]
+        main: list[Segment] = self._ref_segments(
+            commit, focused=focused, cursor_flags=cursor_flags
+        )
+        main.append(Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags))
 
         # Right: padded meta
         author = commit.author
@@ -245,6 +290,57 @@ class CommitPanel(ItemSelector):
         right = [Segment(meta, fg=fg_meta, style_flags=cursor_flags)]
 
         return left, main, right
+
+    def _ref_segments(
+        self,
+        commit: "Commit",
+        *,
+        focused: bool,
+        cursor_flags: int,
+    ) -> list[Segment]:
+        """Render branch-ref badges wrapped in orange parens, comma-separated."""
+        cached = self._refs_cache.get(commit.sha)
+        if cached is None:
+            cached = _parse_decoration(commit.extra_info, self._remotes)
+            self._refs_cache[commit.sha] = cached
+        head_ref, local_refs, remote_refs = cached
+        if not (head_ref or local_refs or remote_refs or commit.tag):
+            return []
+
+        paren_fg = THEME.accent_orange if focused else THEME.fg_dim
+        head_fg = THEME.accent_blue if focused else THEME.fg_dim
+        local_fg = THEME.accent_green if focused else THEME.fg_dim
+        remote_fg = THEME.accent_magenta if focused else THEME.fg_dim
+        tag_fg = THEME.accent_cyan if focused else THEME.fg_dim
+        arrow_fg = THEME.fg_primary
+
+        entries: list[list[Segment]] = []
+        if head_ref == "HEAD":
+            entries.append([Segment("HEAD", fg=head_fg, style_flags=cursor_flags)])
+        elif head_ref:
+            entries.append(
+                [
+                    Segment("HEAD", fg=head_fg, style_flags=cursor_flags),
+                    Segment("->", fg=arrow_fg, style_flags=cursor_flags),
+                    Segment(head_ref, fg=local_fg, style_flags=cursor_flags),
+                ]
+            )
+        for name in local_refs:
+            entries.append([Segment(name, fg=local_fg, style_flags=cursor_flags)])
+        for name in remote_refs:
+            entries.append([Segment(name, fg=remote_fg, style_flags=cursor_flags)])
+        if commit.tag:
+            entries.append(
+                [Segment(commit.tag[0], fg=tag_fg, style_flags=cursor_flags)]
+            )
+
+        segs: list[Segment] = [Segment("(", fg=paren_fg, style_flags=cursor_flags)]
+        for i, entry in enumerate(entries):
+            if i > 0:
+                segs.append(Segment(", ", fg=paren_fg, style_flags=cursor_flags))
+            segs.extend(entry)
+        segs.append(Segment(") ", fg=paren_fg, style_flags=cursor_flags))
+        return segs
 
     def _render_rails(
         self,
@@ -280,9 +376,7 @@ class CommitPanel(ItemSelector):
         lane_fg = lane_color if focused else THEME.fg_dim
 
         if i == row.commit_lane:
-            commit_color = (
-                THEME.accent_yellow if not commit.is_pushed() else lane_color
-            )
+            commit_color = THEME.accent_yellow if not commit.is_pushed() else lane_color
             return self.GRAPH_COMMIT, commit_color
 
         if i in row.closed_lanes:
