@@ -1,5 +1,41 @@
 # Changelog of pigit
 
+## 1.8.7 (2026-05-04)
+
+### App — Commit Panel
+
+- **Inline merge graph**: branch/merge topology is rendered as colored rails between the cursor column and the SHA. The standalone unpushed marker is folded into the commit dot's color (yellow). Lane allocation lives in `pigit/app_commit_graph.py` as a pure algorithm with unit tests.
+- **Branch ref badges**: git's `%d` decoration is parsed and shown as colored badges between SHA and subject — `HEAD` sky blue, local branches grass green, remote-tracking refs magenta, tags cyan, all wrapped in orange parens. Parsed results are cached per-commit and cleared on `refresh()`.
+- **Expanded view (`z`)**: toggles between compact (one-line) and expanded (`git log --graph --decorate` style) layouts. Expanded rows show `Merge:`, `Author:`, `Date:`, and the full multi-line commit body — fetched once via `git log --format=%H%x1f%B%x1e` framing so newlines survive shell parsing.
+
+### App — Contribution Graph
+
+- **6-level heatmap palette**: smoother 0→5 progression with logarithmic scaling so a single peak day no longer crushes lower-activity cells.
+- **Glyph and spacing refinement**: middle dot (`·`) for empty cells, squares (`■`) for active cells, no column gaps inside the heatmap, label colors raised to `fg_muted` for visibility, and a 2-column left padding so content doesn't sit flush against the panel edge.
+- **Summary stats panel**: when the panel is wide enough, a sidebar to the right of the heatmap shows Commits, Active, Streak, Best, and Peak counts.
+- **Author commit line chart**: a stepped line chart below the heatmap plots the top 6 authors by commit count over the last 30 days. Uses rounded box-drawing corners (`╯│╭` / `╮│╰`) for smooth transitions; legend markers match the line style.
+
+### TermUI — Reusable Graph Components
+
+- **`HeatmapGrid`**: generic cell-color grid component with log-scale color mapping, extracted into `pigit/termui/_component_graph.py`.
+- **`StepLineChart`**: generic multi-series stepped line chart with axes, grid, and legend.
+- **`ContributionGraph` refactor**: ~200 lines of inline rendering removed by delegating to the two new components; remaining logic focuses on data shaping and layout.
+
+### TermUI — Multi-Row Items
+
+- **`ItemSelector` multi-row mode**: panels can opt into multiple terminal rows per item via `set_item_starts(starts)`. While opted in, `curr_no` tracks the ITEM index, `next` / `previous` step by items, and `describe_row` receives `item_idx` / `sub_row` keyword arguments. Legacy 1:1 panels keep the original two-positional-argument signature unchanged.
+- **`cursor_row()` / `row_to_item(row)`**: helpers for translating between the visual row and the logical item under the cursor; used internally by the renderer.
+- **Unified scroll math**: `_scroll_into_view()` replaces the parallel viewport bookkeeping in `next` / `previous` / `set_content`, removing the legacy / multi-row branching.
+
+### Git Layer
+
+- **`LocalGit.get_commit_bodies(branch, max_commits, path)`**: returns `{sha: full body}` for a branch, framed with ASCII RS (`\x1e`) record separators and US (`\x1f`) field separators so multi-line `%B` survives shell parsing.
+- **`LocalGit.pull()` added**: previously referenced but undefined, causing the merge workflow's spinner to hang on `AttributeError`. The merge workflow's exception handling now distinguishes `GitError` (conflict detection) from generic `Exception` (log-only) on rollback.
+
+### Documentation
+
+- **TermUI README rewrite**: restructured with Mermaid diagrams (layer stacking, component tree, Segment render pipeline), Markdown link syntax replacing rST, a Public API table, a Design constraints section (7 rules for future iterations), and an Import style section.
+
 ## 1.8.6 (2026-04-30)
 
 ### TermUI — Segment Architecture
