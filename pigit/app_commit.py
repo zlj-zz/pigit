@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/app_commit.py
-Description: CommitPanel v3 with list view, relative time, and unpushed markers.
+Description: CommitPanel v3 with list view, relative time, and inline merge graph.
 Author: Zev
 Date: 2026-04-23
 """
@@ -24,6 +24,7 @@ from pigit.termui import (
 )
 from pigit.termui.wcwidth_table import wcswidth
 
+from .app_commit_graph import GraphRow, compute_graph_rows
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -40,9 +41,20 @@ if TYPE_CHECKING:
 
 
 class CommitPanel(ItemSelector):
-    """Commit panel with list view, relative time, and unpushed markers."""
+    """Commit panel with list view, relative time, and inline merge graph."""
 
-    CURSOR = "\u25cf"
+    CURSOR = "●"
+    GRAPH_COMMIT = "◉"
+    GRAPH_VERTICAL = "│"
+    GRAPH_OPEN = "╮"
+    GRAPH_CLOSE = "╯"
+    LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
+        THEME.accent_cyan,
+        THEME.accent_green,
+        THEME.accent_purple,
+        THEME.accent_blue,
+        THEME.accent_red,
+    )
 
     def __init__(
         self,
@@ -62,6 +74,7 @@ class CommitPanel(ItemSelector):
         self._display = display
         self._rel_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
+        self._graph_rows: list[GraphRow] = []
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -125,7 +138,9 @@ class CommitPanel(ItemSelector):
         if not commits:
             self.set_content(["No commits found."])
             self._max_meta_w = 0
+            self._graph_rows = []
             return
+        self._graph_rows = compute_graph_rows(commits)
         lines = []
         max_meta_w = 0
         self._rel_time_cache.clear()
@@ -146,10 +161,9 @@ class CommitPanel(ItemSelector):
             commit.unix_timestamp
         )
         author = commit.author
-        # Build a single-line summary for default content
-        marker = "\u25cf" if not commit.is_pushed() else " "
+        # Plain-text fallback used during lazy load; rich rendering goes via describe_row.
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
-        return f"{marker} {sha} {msg}{tag_str}  {author}  {rel}"
+        return f"{sha} {msg}{tag_str}  {author}  {rel}"
 
     def _render_surface(self, surface) -> None:
         if not self.content:
@@ -163,11 +177,11 @@ class CommitPanel(ItemSelector):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Return row description: [cursor][unpushed][SHA][msg][tag][meta]"""
+        """Return row description: [cursor][graph rails][SHA][msg][tag][meta]"""
         focused = self.is_focus_leaf
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         if idx >= len(self.commits):
-            prefix = "\u25cf " if is_cursor else "  "
+            prefix = self.CURSOR + " " if is_cursor else "  "
             return (
                 [
                     Segment(
@@ -185,23 +199,21 @@ class CommitPanel(ItemSelector):
         # Cursor indicator (2 cols)
         if is_cursor:
             left = [
-                Segment("\u25cf", fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD),
+                Segment(self.CURSOR, fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD),
                 Segment(" ", fg=THEME.fg_primary),
             ]
         else:
             left = [Segment("  ", fg=THEME.fg_primary)]
 
-        # Unpushed marker (2 cols)
-        if not commit.is_pushed():
-            left.append(
-                Segment("\u25cf", fg=THEME.accent_yellow, style_flags=cursor_flags)
-            )
-            left.append(
-                Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary)
-            )
-        else:
-            left.append(
-                Segment("  ", fg=THEME.fg_dim if not focused else THEME.fg_primary)
+        # Graph rails (2 cols per lane)
+        if idx < len(self._graph_rows):
+            left.extend(
+                self._render_rails(
+                    self._graph_rows[idx],
+                    commit,
+                    cursor_flags=cursor_flags,
+                    focused=focused,
+                )
             )
 
         # SHA + spacer (8 cols)
@@ -233,6 +245,58 @@ class CommitPanel(ItemSelector):
         right = [Segment(meta, fg=fg_meta, style_flags=cursor_flags)]
 
         return left, main, right
+
+    def _render_rails(
+        self,
+        row: GraphRow,
+        commit: "Commit",
+        *,
+        cursor_flags: int,
+        focused: bool,
+    ) -> list[Segment]:
+        """Render graph rails for one row.
+
+        Layout per lane: [rail char][space], 2 columns wide. All active lanes
+        are rendered; if total width pushes the message column too narrow, the
+        renderer truncates the message segment instead of the rails.
+        """
+        total_lanes = max(len(row.lanes_before), len(row.lanes_after))
+        segments: list[Segment] = []
+        for i in range(total_lanes):
+            ch, fg = self._lane_glyph(row, i, commit, focused=focused)
+            segments.append(Segment(ch + " ", fg=fg, style_flags=cursor_flags))
+        return segments
+
+    def _lane_glyph(
+        self,
+        row: GraphRow,
+        i: int,
+        commit: "Commit",
+        *,
+        focused: bool,
+    ) -> tuple[str, tuple[int, int, int]]:
+        """Pick the glyph and color for lane ``i`` on this row."""
+        lane_color = self.LANE_PALETTE[i % len(self.LANE_PALETTE)]
+        lane_fg = lane_color if focused else THEME.fg_dim
+
+        if i == row.commit_lane:
+            commit_color = (
+                THEME.accent_yellow if not commit.is_pushed() else lane_color
+            )
+            return self.GRAPH_COMMIT, commit_color
+
+        if i in row.closed_lanes:
+            return self.GRAPH_CLOSE, lane_fg
+
+        if i in row.opened_lanes:
+            return self.GRAPH_OPEN, lane_fg
+
+        before_active = i < len(row.lanes_before) and row.lanes_before[i] is not None
+        after_active = i < len(row.lanes_after) and row.lanes_after[i] is not None
+        if before_active or after_active:
+            return self.GRAPH_VERTICAL, lane_fg
+
+        return " ", THEME.fg_dim
 
     def _render_heatmap_overlay(self, surface) -> None:
         """Render contribution heatmap overlay on top of panel."""
