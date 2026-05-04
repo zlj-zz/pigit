@@ -1,5 +1,91 @@
 # Changelog of pigit
 
+## 1.8.7 (2026-05-04)
+
+### App — Commit Panel
+
+- **Inline merge graph**: branch/merge topology is rendered as colored rails between the cursor column and the SHA. The standalone unpushed marker is folded into the commit dot's color (yellow). Lane allocation lives in `pigit/app_commit_graph.py` as a pure algorithm with unit tests.
+- **Branch ref badges**: git's `%d` decoration is parsed and shown as colored badges between SHA and subject — `HEAD` sky blue, local branches grass green, remote-tracking refs magenta, tags cyan, all wrapped in orange parens. Parsed results are cached per-commit and cleared on `refresh()`.
+- **Expanded view (`z`)**: toggles between compact (one-line) and expanded (`git log --graph --decorate` style) layouts. Expanded rows show `Merge:`, `Author:`, `Date:`, and the full multi-line commit body — fetched once via `git log --format=%H%x1f%B%x1e` framing so newlines survive shell parsing.
+
+### App — Contribution Graph
+
+- **6-level heatmap palette**: smoother 0→5 progression with logarithmic scaling so a single peak day no longer crushes lower-activity cells.
+- **Glyph and spacing refinement**: middle dot (`·`) for empty cells, squares (`■`) for active cells, no column gaps inside the heatmap, label colors raised to `fg_muted` for visibility, and a 2-column left padding so content doesn't sit flush against the panel edge.
+- **Summary stats panel**: when the panel is wide enough, a sidebar to the right of the heatmap shows Commits, Active, Streak, Best, and Peak counts.
+- **Author commit line chart**: a stepped line chart below the heatmap plots the top 6 authors by commit count over the last 30 days. Uses rounded box-drawing corners (`╯│╭` / `╮│╰`) for smooth transitions; legend markers match the line style.
+
+### TermUI — Reusable Graph Components
+
+- **`HeatmapGrid`**: generic cell-color grid component with log-scale color mapping, extracted into `pigit/termui/_component_graph.py`.
+- **`StepLineChart`**: generic multi-series stepped line chart with axes, grid, and legend.
+- **`ContributionGraph` refactor**: ~200 lines of inline rendering removed by delegating to the two new components; remaining logic focuses on data shaping and layout.
+
+### TermUI — Multi-Row Items
+
+- **`ItemSelector` multi-row mode**: panels can opt into multiple terminal rows per item via `set_item_starts(starts)`. While opted in, `curr_no` tracks the ITEM index, `next` / `previous` step by items, and `describe_row` receives `item_idx` / `sub_row` keyword arguments. Legacy 1:1 panels keep the original two-positional-argument signature unchanged.
+- **`cursor_row()` / `row_to_item(row)`**: helpers for translating between the visual row and the logical item under the cursor; used internally by the renderer.
+- **Unified scroll math**: `_scroll_into_view()` replaces the parallel viewport bookkeeping in `next` / `previous` / `set_content`, removing the legacy / multi-row branching.
+
+### Git Layer
+
+- **`LocalGit.get_commit_bodies(branch, max_commits, path)`**: returns `{sha: full body}` for a branch, framed with ASCII RS (`\x1e`) record separators and US (`\x1f`) field separators so multi-line `%B` survives shell parsing.
+- **`LocalGit.pull()` added**: previously referenced but undefined, causing the merge workflow's spinner to hang on `AttributeError`. The merge workflow's exception handling now distinguishes `GitError` (conflict detection) from generic `Exception` (log-only) on rollback.
+
+### Documentation
+
+- **TermUI README rewrite**: restructured with Mermaid diagrams (layer stacking, component tree, Segment render pipeline), Markdown link syntax replacing rST, a Public API table, a Design constraints section (7 rules for future iterations), and an Import style section.
+
+## 1.8.6 (2026-04-30)
+
+### TermUI — Segment Architecture
+
+- **`Segment` dataclass replaces `(text, fg, bold)` tuples**: structured `Segment(text, fg, bg, style_flags)` with `__slots__` for memory efficiency; fg/bg support `None` to fall back to `DEFAULT_FG` / `DEFAULT_BG` at draw time.
+- **Style flags bitmask**: `STYLE_BOLD`, `STYLE_DIM`, `STYLE_ITALIC`, `STYLE_UNDERLINE`, `STYLE_REVERSE` via `palette` module; `FlatCell` maps legacy `bold=True` kwarg to `style_flags |= STYLE_BOLD` for backward compatibility.
+- **`draw_segments()` batch draw**: `Surface` and `_Subsurface` gain `draw_segments(row, col, segments)` for efficient multi-segment row painting without per-segment boilerplate.
+- **Renderer style sequences**: `ColorAdapter.style_sequence()` emits precise SGR codes per style flags; `reset_style_sequence()` resets only style attrs (22;23;24;27m) without touching colors.
+- **Unified internal imports**: all `pigit.termui` modules use `from . import palette` / `from . import keys` with qualified access (`palette.DEFAULT_FG`, `keys.KEY_ENTER`).
+
+### App — Merge Workflow
+
+- **One-click merge (`m`)**: initiates merge from the current branch; auto-detects conflicts and transitions to conflict-resolution mode.
+- **Conflict resolution panel**: when conflicts exist, presents `ours` / `theirs` choices per file; `m` continues merge after all conflicts resolved.
+- **`MERGE` badge**: Header shows merge state badge while a merge is in progress.
+
+### App — Branch Panel
+
+- **Rename branch (`r`)**: renames the selected branch with an `InputLine` prompt.
+- **Create branch (`n`)**: creates a new branch based on the selected branch.
+- **Toggle scope (`R`)**: cycles branch listing between local / remote / all.
+
+### App — Commit Panel
+
+- **Copy SHA (`y`)**: copies the selected commit's SHA to the system clipboard.
+
+### App — Status Panel
+
+- **Cute empty state**: when no changes exist, renders a checkmark art (`(_)`) instead of a blank list.
+
+### TermUI — Focus Chain
+
+- **Focus tracking**: `ComponentRoot` tracks the active focus chain; non-focused sibling panels render with dimmed foreground (`DEFAULT_FG_DIM`) for visual hierarchy.
+- **`focus()` / `blur()` hooks**: components receive lifecycle callbacks when gaining or losing focus.
+
+### TermUI — Overlay Context
+
+- **`Popup` decoupled from `ComponentRoot`**: `_overlay_context` module (ContextVar-based) provides overlay host lookup; `Popup` no longer requires `ComponentRoot` MRO.
+- **`dismiss_sheet()`**: module-level function to close the active sheet overlay without reaching into component internals.
+- **InputLine overlay key dispatch**: `InputLine` correctly routes overlay-dismiss keys (e.g. `Esc`) while preserving text-editing behavior.
+
+### TermUI — Renderer Fixes
+
+- **EL0 fix**: `erase_line_to_end()` no longer clears the last character on full-screen list-picker rows when content exactly fills the terminal width.
+
+### Palette
+
+- **Editing delegated to `InputLine`**: branch rename and new-branch creation use `InputLine` with inline completion instead of raw tty prompts.
+- **`pull` / `push` / `fetch` shortcuts**: quick-action keys in the command palette for common remote operations.
+
 ## 1.8.5 (2026-04-28)
 
 ### Diff Syntax Highlighting

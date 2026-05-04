@@ -60,8 +60,6 @@ class TestFunc:
         [
             (lambda x: x + 1, 2, "second", ""),
             (lambda _: time.sleep(1.2), None, "second", ""),
-            (lambda _: time.sleep(61), None, "minute", ""),
-            # (lambda _: time.sleep(3600), None, "hour", ""),
             (lambda x, y: x * y, 20, "second", "multiplication"),
         ],
     )
@@ -83,3 +81,20 @@ class TestFunc:
         captured = capsys.readouterr()
         assert expected_output == result
         assert expected_time_unit in captured.out
+
+    def test_time_it_minute_unit(self, monkeypatch, capsys):
+        """Verify minute unit conversion without real sleep."""
+        call_count = 0
+        timestamps = [0.0, 61.0]
+
+        def fake_time():
+            nonlocal call_count
+            val = timestamps[call_count]
+            call_count += 1
+            return val
+
+        monkeypatch.setattr(time, "time", fake_time)
+        decorated = time_it(lambda x: x)
+        decorated(1)
+        captured = capsys.readouterr()
+        assert "minute" in captured.out

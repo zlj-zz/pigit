@@ -8,6 +8,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+import os
 from typing import Callable, Optional, TYPE_CHECKING
 
 from pigit.termui import (
@@ -18,10 +19,12 @@ from pigit.termui import (
     exec_external,
     ItemSelector,
     keys,
+    palette,
+    Segment,
     show_badge,
     show_toast,
 )
-
+from pigit.termui.wcwidth_table import wcswidth
 
 from .app_inspector import FileInfo
 from .app_theme import THEME
@@ -90,7 +93,6 @@ class StatusPanel(ItemSelector):
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
         self._alert_dialog = AlertDialog(
-            self,
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )
@@ -181,38 +183,83 @@ class StatusPanel(ItemSelector):
         super().resize(size)
         self._alert_dialog.resize(size)
 
+    def _render_surface(self, surface) -> None:
+        if self.files:
+            super()._render_surface(surface)
+            return
+
+        w = surface.width
+        h = surface.height
+        if w <= 0 or h <= 0:
+            return
+
+        art_lines = [
+            "    (\\__/)",
+            "    ( \u2022_\u2022 )",
+            "    / > \u2713",
+            "  Pigit Clean",
+            "Working tree clean",
+        ]
+
+        total_height = len(art_lines)
+        start_row = (h - total_height) // 2
+
+        for i, line in enumerate(art_lines):
+            row = start_row + i
+            line_w = wcswidth(line)
+            col = max(0, (w - line_w) // 2)
+            fg = THEME.accent_green if i < 3 else THEME.fg_dim
+            surface.draw_text_rgb(row, col, line, fg=fg)
+
     def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return row description: [cursor][staged][unstaged][filename.......][label]"""
+        focused = self.is_focus_leaf
         if idx >= len(self.files):
             text = self.content[idx] if idx < len(self.content) else ""
             prefix = self.CURSOR if is_cursor else " "
-            return ([(f"{prefix} {text}", THEME.fg_primary, is_cursor)], None, [])
+            fg = THEME.fg_primary if focused else THEME.fg_dim
+            return (
+                [
+                    Segment(
+                        f"{prefix} {text}",
+                        fg=fg,
+                        style_flags=palette.STYLE_BOLD if is_cursor else 0,
+                    )
+                ],
+                None,
+                [],
+            )
 
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         cursor_prefix = self.CURSOR if is_cursor else " "
 
+        fg_primary = THEME.fg_primary if focused else THEME.fg_dim
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            (cursor_prefix, THEME.fg_primary, is_cursor),
-            (" ", THEME.fg_primary, False),
-            (staged, _staged_fg(staged), is_cursor),
-            (unstaged, _unstaged_fg(unstaged), is_cursor),
-            (" ", THEME.fg_primary, False),
+            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
+            Segment(staged, fg=_staged_fg(staged), style_flags=cursor_flags),
+            Segment(unstaged, fg=_unstaged_fg(unstaged), style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
         ]
 
         is_selected = idx in self._selected
-        filename_fg = THEME.accent_purple if is_selected else THEME.fg_primary
-        main = [(file.name, filename_fg, is_cursor)]
+        if is_selected:
+            filename_fg = THEME.accent_purple if focused else THEME.fg_dim
+        else:
+            filename_fg = fg_primary
+        main = [Segment(file.name, fg=filename_fg, style_flags=cursor_flags)]
 
-        right: list[tuple[str, tuple[int, int, int], bool]] = []
+        right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append((label, THEME.fg_muted, False))
+            right.append(Segment(label, fg=THEME.fg_muted if focused else THEME.fg_dim))
 
         return left, main, right
 
@@ -272,8 +319,39 @@ class StatusPanel(ItemSelector):
             finally:
                 self.refresh()
             return
+        if key == "E":
+            self._open_external_editor(f)
+            return
+        if key == "o" and f.has_merged_conflicts:
+            try:
+                self.git.checkout_ours(f)
+                self.git.add_file(f)
+                show_badge("Ours", duration=1.0)
+            except Exception as e:
+                show_toast(f"Ours failed: {e}", duration=2.0)
+            self.refresh()
+            return
+        if key == "t" and f.has_merged_conflicts:
+            try:
+                self.git.checkout_theirs(f)
+                self.git.add_file(f)
+                show_badge("Theirs", duration=1.0)
+            except Exception as e:
+                show_toast(f"Theirs failed: {e}", duration=2.0)
+            self.refresh()
+            return
 
     # --- Helpers ---
+
+    def _open_external_editor(self, file: File) -> None:
+        """Open file in external editor, suspending TUI."""
+        editor = os.environ.get("EDITOR", "vim")
+        try:
+            exec_external([editor, file.name], cwd=self.git.path)
+        except Exception:
+            show_toast("Failed to open editor", duration=2.0)
+        finally:
+            self.refresh()
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
@@ -314,6 +392,9 @@ class StatusPanel(ItemSelector):
             ("i", "Ignore"),
             ("C", "Commit"),
             ("v", "Visual"),
+            ("E", "Edit file"),
+            ("o", "Ours"),
+            ("t", "Theirs"),
         ]
 
     def get_inspector_data(self) -> Optional[FileInfo]:

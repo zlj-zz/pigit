@@ -153,7 +153,7 @@ class TestExecutor:
                 import time
 
                 print({0}, end='')
-                time.sleep(int({0}))
+                time.sleep(int({0}) / 10)
                 print({0}, end='')
             """
         )
@@ -173,7 +173,7 @@ class TestExecutor:
         # results = self.executor.exec_async(*cmds, flags=REPLY)
         # results = self.executor.exec_async(*cmds, flags=REPLY | SILENT)
         end_t = time.time()
-        assert end_t - start_t < 4
+        assert end_t - start_t < 0.5
 
         results2 = self.executor.exec_parallel(*cmds, flags=REPLY | DECODE)
         assert results2 == [(0, "", "{0}{0}".format(i)) for i in range(3, 0, -1)]

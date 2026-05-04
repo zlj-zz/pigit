@@ -118,7 +118,8 @@ class TestRenderSurface:
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
         assert "\033[38;2;255;0;0m" in written
-        assert "\033[0m" in written
+        # Trailing reset is omitted when the last cell returns to default
+        assert "\033[39m" in written
 
 
 class TestRendererUtilities:
@@ -219,7 +220,8 @@ class TestRowToStrRGB:
         ]
         result = r._row_to_str(row)
         assert "\033[39m" in result
-        assert result.endswith("\033[0m")
+        # Trailing reset is omitted when the last cell returns to default
+        assert not result.endswith("\033[0m")
 
     def test_mixed_legacy_and_rgb(self):
         r = Renderer(FakeSession())
@@ -250,7 +252,8 @@ class TestRenderSurfaceRGB:
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
         assert "\033[38;2;255;0;0m" in written
-        assert "\033[0m" in written
+        # Trailing reset is omitted when the last cell returns to default
+        assert "\033[39m" in written
 
     def test_256_mode_generates_256_codes(self):
         sess = FakeSession()

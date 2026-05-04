@@ -22,6 +22,7 @@ from pigit.termui.types import (
 # Core components
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import Column, Row, TabView
+from pigit.termui._component_graph import HeatmapGrid, StepLineChart
 from pigit.termui._component_widgets import (
     Header,
     InputLine,
@@ -50,7 +51,15 @@ from pigit.termui._root import ComponentRoot
 from pigit.termui._application import Application
 
 # Overlay context (module-level functions)
-from pigit.termui._overlay_context import get_badge, show_badge, show_toast, show_sheet
+from pigit.termui._overlay_context import (
+    dismiss_sheet,
+    get_badge,
+    hide_spinner,
+    show_badge,
+    show_spinner,
+    show_toast,
+    show_sheet,
+)
 from pigit.termui._session_context import exec_external
 
 # Other utilities
@@ -61,6 +70,7 @@ from pigit.termui._color import ColorAdapter, ColorMode
 from pigit.termui._renderer import Renderer
 from pigit.termui._renderer_context import get_renderer_strict
 from pigit.termui._surface import Cell, FlatCell, Surface
+from pigit.termui._segment import Segment
 from pigit.termui import palette
 
 # Picker
@@ -85,7 +95,9 @@ __all__ = [
     "Row",
     # Widgets
     "Header",
+    "HeatmapGrid",
     "InputLine",
+    "StepLineChart",
     "ItemSelector",
     "LineTextBrowser",
     "StatusBar",
@@ -112,6 +124,7 @@ __all__ = [
     "Surface",
     "FlatCell",
     "Cell",
+    "Segment",
     "palette",
     "ColorAdapter",
     "ColorMode",
@@ -121,8 +134,11 @@ __all__ = [
     # Overlay context
     "show_toast",
     "show_sheet",
+    "dismiss_sheet",
     "show_badge",
     "get_badge",
+    "show_spinner",
+    "hide_spinner",
     # Session context
     "exec_external",
     # Syntax highlighting

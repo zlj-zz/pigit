@@ -109,3 +109,6 @@ class Branch:
 
     # The branch up-stream name. Default is "".
     upstream_name: str = ""
+
+    # True if this is a remote-tracking branch.
+    is_remote: bool = False

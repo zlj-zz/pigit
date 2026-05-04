@@ -30,34 +30,30 @@ def create_repo(test_repo: str):
             ),
         )
     os.makedirs(test_repo, exist_ok=True)
-    print(executor.exec("git init", flags=WAITING, cwd=test_repo))
-    print(executor.exec("git config user.name Zachary", flags=WAITING, cwd=test_repo))
-    print(
-        executor.exec(
-            "git config user.email zlj19971222@outlook.com",
-            flags=WAITING,
-            cwd=test_repo,
-        )
+    executor.exec("git init", flags=WAITING, cwd=test_repo)
+    executor.exec("git config user.name Zachary", flags=WAITING, cwd=test_repo)
+    executor.exec(
+        "git config user.email zlj19971222@outlook.com",
+        flags=WAITING,
+        cwd=test_repo,
     )
-    print(executor.exec("git branch -m A", flags=WAITING, cwd=test_repo))
-    print(
-        executor.exec(
-            "git remote add origin https://github.com/zlj-zz/test-repo.git",
-            flags=WAITING,
-            cwd=test_repo,
-        )
+    executor.exec("git branch -m A", flags=WAITING, cwd=test_repo)
+    executor.exec(
+        "git remote add origin https://github.com/zlj-zz/test-repo.git",
+        flags=WAITING,
+        cwd=test_repo,
     )
 
     # create no.1 file and first commit
     with open(os.path.join(test_repo, "test1.txt"), "w") as f:
         f.write("""This is a test file.""")
-    print(executor.exec("git add .", flags=WAITING, cwd=test_repo))
-    print(executor.exec("git commit -m 'init'", flags=WAITING, cwd=test_repo))
+    executor.exec("git add .", flags=WAITING, cwd=test_repo)
+    executor.exec("git commit -m 'init'", flags=WAITING, cwd=test_repo)
 
     # create new branch
     for name in ["B", "C", "D"]:
-        print(executor.exec(f"git checkout -b {name}", flags=WAITING, cwd=test_repo))
-    print(executor.exec("git checkout A", flags=WAITING, cwd=test_repo))
+        executor.exec(f"git checkout -b {name}", flags=WAITING, cwd=test_repo)
+    executor.exec("git checkout A", flags=WAITING, cwd=test_repo)
 
     # create no.2 file
     with open(os.path.join(test_repo, "test2.py"), "w") as f:
@@ -96,18 +92,17 @@ class TestRepo:
 
         assert git.get_remote_url() == "https://github.com/zlj-zz/test-repo"
 
-        print()
-        print(git.get_repo_desc())
-        print(git.get_config())
+        assert git.get_repo_desc()
+        assert git.get_config()
 
     def test_api(self):
         git = self.git
-        print(git.load_branches())
-        print(git.load_log())
-        print(git.load_status())
-        print(git.load_file_diff("example.py", tracked=False))
-        print(git.load_commits("A"))
-        print(git.load_commit_info())
+        git.load_branches()
+        git.load_log()
+        git.load_status()
+        git.load_file_diff("example.py", tracked=False)
+        git.load_commits("A")
+        git.load_commit_info()
 
     @pytest.mark.parametrize(
         ["side_effect", "expected"],

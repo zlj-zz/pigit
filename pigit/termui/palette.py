@@ -25,3 +25,10 @@ DIM: tuple[int, int, int] = (100, 100, 100)
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK
+
+# ── Style flags (bitmask) ──
+STYLE_BOLD = 1 << 0
+STYLE_DIM = 1 << 1
+STYLE_ITALIC = 1 << 2
+STYLE_UNDERLINE = 1 << 3
+STYLE_REVERSE = 1 << 4

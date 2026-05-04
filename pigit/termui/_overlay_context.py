@@ -9,12 +9,15 @@ Date: 2026-04-25
 from __future__ import annotations
 
 import contextvars
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Sequence, TYPE_CHECKING
+
+from ._layer import LayerKind
 
 if TYPE_CHECKING:
     from ._component_base import Component
     from ._overlay_components import Sheet, Toast
     from ._root import ComponentRoot
+    from ._segment import Segment
     from .types import ToastPosition
 
 _overlay_host_ctx: contextvars.ContextVar[Optional["ComponentRoot"]] = (
@@ -32,30 +35,68 @@ def reset_overlay_host(token: contextvars.Token) -> None:
     _overlay_host_ctx.reset(token)
 
 
-def _get_host() -> Optional["ComponentRoot"]:
-    """Get the current overlay host from context."""
+def get_overlay_host() -> Optional["ComponentRoot"]:
+    """Return the current overlay host, or ``None`` if not inside a TUI session."""
     return _overlay_host_ctx.get()
 
 
+def layer_push(kind: "LayerKind", overlay: "Component") -> None:
+    """Push an overlay onto the specified layer."""
+    host = get_overlay_host()
+    if host is not None:
+        host._layer_stack.push(kind, overlay)
+
+
+def layer_pop(kind: "LayerKind") -> Optional["Component"]:
+    """Pop the top component from the specified layer."""
+    host = get_overlay_host()
+    if host is not None:
+        return host._layer_stack.pop(kind)
+    return None
+
+
+def layer_top(kind: "LayerKind") -> Optional["Component"]:
+    """Return the top component on the specified layer, or ``None``."""
+    host = get_overlay_host()
+    if host is not None:
+        return host._layer_stack.top(kind)
+    return None
+
+
+def is_modal_open() -> bool:
+    """Return ``True`` if a modal popup is currently open."""
+    return layer_top(LayerKind.MODAL) is not None
+
+
 def show_toast(
-    message: str,
+    message: str = "",
     *,
+    segments: Optional[Sequence["Segment"]] = None,
     duration: float = 2.0,
     position: Optional[ToastPosition] = None,
 ) -> Optional["Toast"]:
     """Display a transient toast notification via the current overlay host."""
-    host = _get_host()
+    host = get_overlay_host()
     if host is None:
         return None
-    return host.show_toast(message, duration=duration, position=position)
+    return host.show_toast(
+        message, segments=segments, duration=duration, position=position
+    )
 
 
 def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
     """Display a bottom sheet via the current overlay host."""
-    host = _get_host()
+    host = get_overlay_host()
     if host is None:
         return None
     return host.show_sheet(child, height)
+
+
+def dismiss_sheet() -> None:
+    """Dismiss the current bottom sheet via the overlay host."""
+    host = get_overlay_host()
+    if host is not None:
+        host.dismiss_sheet()
 
 
 def show_badge(
@@ -65,7 +106,7 @@ def show_badge(
     fg: Optional[tuple[int, int, int]] = None,
 ) -> None:
     """Show a badge on the overlay host."""
-    host = _get_host()
+    host = get_overlay_host()
     if host is None:
         return
     host.show_badge(text, duration=duration, bg=bg, fg=fg)
@@ -82,7 +123,33 @@ def get_badge() -> tuple[
         Tuple of (badge_text, badge_bg, badge_fg). All None if no badge
         or no host is active.
     """
-    host = _get_host()
+    host = get_overlay_host()
     if host is None:
         return None, None, None
     return host.badge_text, host.badge_bg, host.badge_fg
+
+
+def show_spinner(message: str) -> Optional["Toast"]:
+    """Display a persistent spinner toast (duration=3600s), replacing any current toast.
+
+    The message is prefixed with ``\u00bb`` and suffixed with ``\u2026`` automatically.
+    """
+    from ._segment import Segment
+    from .types import ToastPosition
+
+    host = get_overlay_host()
+    if host is None:
+        return None
+    return host.show_toast(
+        "",
+        segments=[Segment(f"\u00bb {message}\u2026")],
+        duration=3600.0,
+        position=ToastPosition.BOTTOM_LEFT,
+    )
+
+
+def hide_spinner() -> None:
+    """Dismiss the current spinner toast."""
+    host = get_overlay_host()
+    if host is not None:
+        host.dismiss_toast()

@@ -126,7 +126,6 @@ def run_repo_cd_picker(
             self._help_panel = HelpPanel()
             self._help_popup = Popup(
                 self._help_panel,
-                session_owner=root,
                 exit_key=keys.KEY_ESC,
             )
             self._state.selected_idx.subscribe(self._update_status)

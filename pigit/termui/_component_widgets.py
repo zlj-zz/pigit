@@ -8,32 +8,20 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
+from . import keys, palette
 from ._component_base import Component, ComponentError
+from ._segment import Segment
+from ._surface import Surface
 from ._reactive import Signal
-from .palette import DEFAULT_BG, DEFAULT_FG, DEFAULT_FG_DIM
-from .keys import (
-    KEY_BACKSPACE,
-    KEY_DELETE,
-    KEY_END,
-    KEY_ENTER,
-    KEY_ESC,
-    KEY_HOME,
-    KEY_LEFT,
-    KEY_RIGHT,
-    KEY_SHIFT_TAB,
-    KEY_TAB,
-    KEY_UP,
-    KEY_DOWN,
-)
+from .types import OverlayDispatchResult
 from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
 if TYPE_CHECKING:
-    from .palette import DEFAULT_BG, DEFAULT_FG
-from ._surface import Surface
+    pass
 
 
 class LineTextBrowser(Component):
@@ -67,8 +55,8 @@ class LineTextBrowser(Component):
                 idx - self._i,
                 0,
                 self._content[idx],
-                fg=DEFAULT_FG,
-                bg=DEFAULT_BG,
+                fg=palette.DEFAULT_FG,
+                bg=palette.DEFAULT_BG,
             )
 
     def scroll_up(self, line: int = 1):
@@ -107,6 +95,10 @@ class ItemSelector(Component):
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False
+        # When set, the selector renders multiple rows per item: ``_item_starts[i]``
+        # is the row index where item ``i`` begins. ``curr_no`` then tracks the
+        # ITEM index, not the row index. ``None`` keeps legacy 1:1 behaviour.
+        self._item_starts: Optional[list[int]] = None
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -138,18 +130,79 @@ class ItemSelector(Component):
         return self.content[self._r_start : self._r_start + self.visible_row_count]
 
     def set_content(self, content: list[str]):
-        """Replace the list content and clamp the current selection to the new bounds."""
+        """Replace the list content and clamp the current selection to the new bounds.
+
+        Resets multi-row item layout — subclasses using :meth:`set_item_starts`
+        must call it again after every ``set_content``.
+        """
         self.content = content
+        self._item_starts = None
         if not content:
             self._r_start = 0
             self.curr_no = 0
             return
         self.curr_no = min(self.curr_no, len(content) - 1)
+        self._scroll_into_view()
+
+    def set_item_starts(self, starts: Optional[Sequence[int]]) -> None:
+        """Switch the selector into multi-row mode.
+
+        ``starts[i]`` is the row index at which item ``i`` begins. The list
+        must be ascending and start at 0. Pass ``None`` or an empty sequence
+        to revert to 1:1 row-per-item rendering.
+
+        After calling this, :attr:`curr_no` represents the ITEM index;
+        :meth:`next` / :meth:`previous` step by items, and the renderer
+        uses :meth:`row_to_item` to dispatch sub-rows to ``describe_row``.
+        """
+        if not starts:
+            self._item_starts = None
+            return
+        self._item_starts = list(starts)
+        if self.curr_no >= len(self._item_starts):
+            self.curr_no = len(self._item_starts) - 1
+        if self.curr_no < 0:
+            self.curr_no = 0
+        self._scroll_into_view()
+
+    def cursor_row(self) -> int:
+        """Return the terminal-row index where the cursor lives."""
+        if self._item_starts is None:
+            return self.curr_no
+        if not self._item_starts:
+            return 0
+        return self._item_starts[min(self.curr_no, len(self._item_starts) - 1)]
+
+    def row_to_item(self, row: int) -> tuple[int, int]:
+        """Translate a row index to ``(item_idx, sub_row)``.
+
+        Falls back to ``(row, 0)`` when not in multi-row mode.
+        """
+        starts = self._item_starts
+        if not starts:
+            return row, 0
+        # Largest i such that starts[i] <= row.
+        lo, hi = 0, len(starts) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if starts[mid] <= row:
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo, row - starts[lo]
+
+    def _scroll_into_view(self) -> None:
+        """Adjust ``_r_start`` so the cursor row is visible."""
+        row = self.cursor_row()
         visible_h = self._size[1]
-        if self.curr_no >= self._r_start + visible_h:
-            self._r_start = max(0, self.curr_no - visible_h + 1)
-        elif self.curr_no < self._r_start:
-            self._r_start = self.curr_no
+        if visible_h <= 0:
+            return
+        if row >= self._r_start + visible_h:
+            self._r_start = row - visible_h + 1
+        elif row < self._r_start:
+            self._r_start = row
+        if self._r_start < 0:
+            self._r_start = 0
 
     def clear_items(self):
         """Clear the selector content, leaving a single empty item."""
@@ -164,31 +217,53 @@ class ItemSelector(Component):
         if not self.content:
             return
         end = min(self._r_start + self._size[1], len(self.content))
+        if self._item_starts is None:
+            for idx in range(self._r_start, end):
+                row = idx - self._r_start
+                is_cursor = idx == self.curr_no
+                left, main, right = self.describe_row(idx, is_cursor)
+                self._draw_row_layout(surface, row, left, main, right)
+            return
+        cursor_r = self.cursor_row()
         for idx in range(self._r_start, end):
             row = idx - self._r_start
-            is_cursor = idx == self.curr_no
-            left, main, right = self.describe_row(idx, is_cursor)
+            is_cursor = idx == cursor_r
+            item_idx, sub_row = self.row_to_item(idx)
+            left, main, right = self.describe_row(
+                idx, is_cursor, item_idx=item_idx, sub_row=sub_row
+            )
             self._draw_row_layout(surface, row, left, main, right)
 
-    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
-        list[tuple[str, tuple[int, int, int], bool]],
-        list[tuple[str, tuple[int, int, int], bool]] | None,
-        list[tuple[str, tuple[int, int, int], bool]],
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: Optional[int] = None,
+        sub_row: int = 0,
+    ) -> tuple[
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
     ]:
         """Return a description of the row at ``idx`` for declarative rendering.
 
         Subclasses override this to describe what should appear on each row;
         the base class handles all drawing via ``_draw_row_layout``.
 
+        ``item_idx`` and ``sub_row`` are only passed when the panel has
+        opted into multi-row layout via :meth:`set_item_starts`. Legacy
+        1:1 panels can keep the two-positional-argument signature.
+
         Returns:
-            (left_segments, main_segments, right_segments) where each segment
-            is ``(text, fg_rgb, bold)``.  Main segments are drawn sequentially
+            (left_segments, main_segments, right_segments) where each element
+            is a :class:`Segment`.  Main segments are drawn sequentially
             and truncated as a group to fit between left and right;
             ``None`` means no main content.
         """
         prefix = self.CURSOR if is_cursor else " "
         text = f"{prefix}{self.content[idx]}"
-        return ([(text, DEFAULT_FG, False)], None, [])
+        return ([Segment(text, fg=palette.DEFAULT_FG)], None, [])
 
     # --- row-rendering helpers ---
 
@@ -205,24 +280,21 @@ class ItemSelector(Component):
         surface: "Surface",
         row: int,
         col: int,
-        segments: list[tuple[str, tuple[int, int, int], bool]],
+        segments: Sequence[Segment],
     ) -> int:
-        """Draw a sequence of ``(text, fg, bold)`` segments starting at ``col``.
+        """Draw a sequence of segments starting at ``col``.
 
         Returns the column position after the last segment.
         """
-        for text, fg, bold in segments:
-            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-            col += wcswidth(text)
-        return col
+        return surface.draw_segments(row, col, segments)
 
     def _draw_row_layout(
         self,
         surface: "Surface",
         row: int,
-        left: list[tuple[str, tuple[int, int, int], bool]],
-        main: list[tuple[str, tuple[int, int, int], bool]] | None,
-        right: list[tuple[str, tuple[int, int, int], bool]],
+        left: Sequence[Segment],
+        main: Sequence[Segment] | None,
+        right: Sequence[Segment],
         *,
         min_gap: int = 1,
     ) -> None:
@@ -234,8 +306,8 @@ class ItemSelector(Component):
         segments, they are omitted and main is truncated against left only.
         """
         w = surface.width
-        left_w = sum(wcswidth(text) for text, _, _ in left)
-        right_w = sum(wcswidth(text) for text, _, _ in right)
+        left_w = sum(wcswidth(seg.text) for seg in left)
+        right_w = sum(wcswidth(seg.text) for seg in right)
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2
@@ -247,28 +319,42 @@ class ItemSelector(Component):
 
         # Draw left segments (truncated if they exceed surface width).
         col = 0
-        for text, fg, bold in left:
+        for seg in left:
+            text = seg.text
             text_w = wcswidth(text)
             if col + text_w > w:
                 text = self._truncate_text(text, max(0, w - col))
                 text_w = wcswidth(text) if text else 0
             if not text:
                 break
-            surface.draw_text_rgb(row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold)
+            surface.draw_text_rgb(
+                row,
+                col,
+                text,
+                fg=seg.fg,
+                bg=seg.bg,
+                style_flags=seg.style_flags,
+            )
             col += text_w
 
         # Draw main segments (truncated as a group to fit).
         if main and main_avail > 0:
             col += min_gap
             remaining = main_avail
-            for text, fg, bold in main:
+            for seg in main:
+                text = seg.text
                 text_w = wcswidth(text)
                 if text_w > remaining:
                     text = self._truncate_text(text, remaining)
                     text_w = wcswidth(text) if text else 0
                 if text:
                     surface.draw_text_rgb(
-                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                        row,
+                        col,
+                        text,
+                        fg=seg.fg,
+                        bg=seg.bg,
+                        style_flags=seg.style_flags,
                     )
                     col += text_w
                 remaining -= text_w
@@ -279,12 +365,7 @@ class ItemSelector(Component):
         if right:
             right_start = w - right_w
             if right_start >= left_w + min_gap:
-                col = right_start
-                for text, fg, bold in right:
-                    surface.draw_text_rgb(
-                        row, col, text, fg=fg, bg=DEFAULT_BG, bold=bold
-                    )
-                    col += wcswidth(text)
+                surface.draw_segments(row, right_start, right)
 
     def _draw_right_aligned(
         self,
@@ -293,7 +374,7 @@ class ItemSelector(Component):
         text: str,
         fg: tuple[int, int, int],
         *,
-        bold: bool = False,
+        style_flags: int = 0,
         margin: int = 4,
     ) -> bool:
         """Draw ``text`` right-aligned if it fits within ``width - margin``.
@@ -304,7 +385,12 @@ class ItemSelector(Component):
         text_w = wcswidth(text)
         if text_w < w - margin:
             surface.draw_text_rgb(
-                row, w - text_w, text, fg=fg, bg=DEFAULT_BG, bold=bold
+                row,
+                w - text_w,
+                text,
+                fg=fg,
+                bg=palette.DEFAULT_BG,
+                style_flags=style_flags,
             )
             return True
         return False
@@ -315,31 +401,32 @@ class ItemSelector(Component):
 
     def next(self, step: int = 1):
         """Move the selection forward by the given step."""
+        n_total = (
+            len(self._item_starts)
+            if self._item_starts is not None
+            else len(self.content)
+        )
         tmp_no = self.curr_no + step
-        if tmp_no < 0 or tmp_no >= len(self.content):
+        if tmp_no < 0 or tmp_no >= n_total:
             return
-
-        self.curr_no += step
-        if self.curr_no >= self._r_start + self._size[1]:
-            self._r_start += step
+        self.curr_no = tmp_no
+        self._scroll_into_view()
         self._notify_change()
 
     def previous(self, step: int = 1):
         """Move the selection backward by the given step."""
-        tmp = self.curr_no - step
-        if tmp < 0:
+        tmp_no = self.curr_no - step
+        if tmp_no < 0:
             return
-
-        self.curr_no -= step
-        if self.curr_no < self._r_start:
-            self._r_start -= step
+        self.curr_no = tmp_no
+        self._scroll_into_view()
         self._notify_change()
 
 
 class Header(Component):
     """Generic header bar with left/center/right segments.
 
-    Each slot is a list of ``(text, fg_rgb, bold)`` tuples.  Center is
+    Each slot is a sequence of :class:`Segment`.  Center is
     horizontally centred; right is right-aligned.  If the total width
     exceeds the available space, the centre group is dropped first, then
     the left group is truncated with an ellipsis.
@@ -356,21 +443,19 @@ class Header(Component):
         self._separator = separator
         self._sep_fg = sep_fg
         self._on_refresh = on_refresh
-        self._left: list[tuple[str, tuple[int, int, int], bool]] = []
-        self._center: list[tuple[str, tuple[int, int, int], bool]] = []
-        self._right: list[tuple[str, tuple[int, int, int], bool]] = []
+        self._left: list[Segment] = []
+        self._center: list[Segment] = []
+        self._right: list[Segment] = []
 
-    def set_left(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+    def set_left(self, segments: Sequence[Segment]) -> None:
         """Set the left header segments."""
         self._left = list(segments)
 
-    def set_center(
-        self, segments: list[tuple[str, tuple[int, int, int], bool]]
-    ) -> None:
+    def set_center(self, segments: Sequence[Segment]) -> None:
         """Set the center header segments."""
         self._center = list(segments)
 
-    def set_right(self, segments: list[tuple[str, tuple[int, int, int], bool]]) -> None:
+    def set_right(self, segments: Sequence[Segment]) -> None:
         """Set the right header segments."""
         self._right = list(segments)
 
@@ -385,13 +470,15 @@ class Header(Component):
 
         if h >= 2 and self._separator:
             self._draw_content(surface, 0, w)
-            surface.fill_rect_rgb(1, 0, w, 1, DEFAULT_BG)
-            surface.draw_text_rgb(1, 0, "\u2500" * w, fg=self._sep_fg, bg=DEFAULT_BG)
+            surface.fill_rect_rgb(1, 0, w, 1, palette.DEFAULT_BG)
+            surface.draw_text_rgb(
+                1, 0, "\u2500" * w, fg=self._sep_fg, bg=palette.DEFAULT_BG
+            )
         else:
             self._draw_content(surface, 0, w)
 
     def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
-        surface.fill_rect_rgb(row, 0, w, 1, DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
         left_w = self._slot_width(self._left)
         center_w = self._slot_width(self._center)
@@ -411,50 +498,70 @@ class Header(Component):
 
         # Draw left
         x = 0
-        for text, fg, bold in self._left:
-            surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-            x += wcswidth(text)
+        for seg in self._left:
+            surface.draw_text_rgb(
+                row,
+                x,
+                seg.text,
+                fg=seg.fg,
+                bg=seg.bg,
+                style_flags=seg.style_flags,
+            )
+            x += wcswidth(seg.text)
 
         # Draw centre
         if self._center and center_w:
             centre_x = max(0, (w - center_w) // 2)
             x = centre_x
-            for text, fg, bold in self._center:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-                x += wcswidth(text)
+            for seg in self._center:
+                surface.draw_text_rgb(
+                    row,
+                    x,
+                    seg.text,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
+                )
+                x += wcswidth(seg.text)
 
         # Draw right
         if self._right and right_w:
             right_x = max(0, w - right_w)
             x = right_x
-            for text, fg, bold in self._right:
-                surface.draw_text_rgb(row, x, text, fg=fg, bg=DEFAULT_BG, bold=bold)
-                x += wcswidth(text)
+            for seg in self._right:
+                surface.draw_text_rgb(
+                    row,
+                    x,
+                    seg.text,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
+                )
+                x += wcswidth(seg.text)
 
     @staticmethod
-    def _slot_width(
-        slot: list[tuple[str, tuple[int, int, int], bool]],
-    ) -> int:
-        return sum(wcswidth(text) for text, _, _ in slot)
+    def _slot_width(slot: Sequence[Segment]) -> int:
+        return sum(wcswidth(seg.text) for seg in slot)
 
     @staticmethod
-    def _truncate_slot(
-        slot: list[tuple[str, tuple[int, int, int], bool]],
-        max_width: int,
-    ) -> list[tuple[str, tuple[int, int, int], bool]]:
+    def _truncate_slot(slot: Sequence[Segment], max_width: int) -> list[Segment]:
         if max_width <= 0 or not slot:
             return []
-        result: list[tuple[str, tuple[int, int, int], bool]] = []
+        result: list[Segment] = []
         current_w = 0
-        for text, fg, bold in slot:
-            text_w = wcswidth(text)
+        for seg in slot:
+            text_w = wcswidth(seg.text)
             if current_w + text_w > max_width - 1:
                 avail = max_width - current_w - 1
                 if avail > 0:
-                    truncated = truncate_by_width(text, avail) + "\u2026"
-                    result.append((truncated, fg, bold))
+                    truncated = truncate_by_width(seg.text, avail) + "\u2026"
+                    result.append(
+                        Segment(
+                            truncated, fg=seg.fg, bg=seg.bg, style_flags=seg.style_flags
+                        )
+                    )
                 break
-            result.append((text, fg, bold))
+            result.append(seg)
             current_w += text_w
         return result
 
@@ -496,7 +603,7 @@ class StatusBar(Component):
     def _render_surface(self, surface: "Surface") -> None:
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
-        surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
+        surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
 
 
 class InputLine(Component):
@@ -540,6 +647,16 @@ class InputLine(Component):
     def value(self) -> str:
         """Return the current input value."""
         return self._value
+
+    @property
+    def cursor(self) -> int:
+        """Return the current cursor position."""
+        return self._cursor
+
+    @property
+    def prompt(self) -> str:
+        """Return the current prompt text."""
+        return self._prompt
 
     def set_value(self, text: str) -> None:
         """Replace current value and move cursor to end."""
@@ -617,7 +734,7 @@ class InputLine(Component):
         Callers (e.g. ``Application`` subclasses) are responsible for
         ensuring this method is only invoked when the input line is active.
         """
-        if key == KEY_ENTER:
+        if key == keys.KEY_ENTER:
             if self._showing_candidates:
                 self._value = self._candidates[self._candidate_idx]
                 self._cursor = len(self._value)
@@ -628,7 +745,7 @@ class InputLine(Component):
                 self._on_submit(self._value)
             return
 
-        if key == KEY_ESC:
+        if key == keys.KEY_ESC:
             if self._showing_candidates:
                 self._value = self._original_value
                 self._cursor = len(self._value)
@@ -639,14 +756,14 @@ class InputLine(Component):
                 self._on_cancel()
             return
 
-        if key in (KEY_TAB, KEY_SHIFT_TAB) and self._candidate_provider:
+        if key in (keys.KEY_TAB, keys.KEY_SHIFT_TAB) and self._candidate_provider:
             if not self._showing_candidates:
                 self._showing_candidates = True
                 self._original_value = self._value
                 self._candidates = self._candidate_provider(self._value)
                 self._candidate_idx = 0
             else:
-                step = 1 if key == KEY_TAB else -1
+                step = 1 if key == keys.KEY_TAB else -1
                 self._candidate_idx = max(
                     0, min(self._candidate_idx + step, len(self._candidates) - 1)
                 )
@@ -655,8 +772,8 @@ class InputLine(Component):
                 self._cursor = len(self._value)
             return
 
-        if key in (KEY_UP, KEY_DOWN) and self._showing_candidates:
-            step = -1 if key == KEY_UP else 1
+        if key in (keys.KEY_UP, keys.KEY_DOWN) and self._showing_candidates:
+            step = -1 if key == keys.KEY_UP else 1
             self._candidate_idx = max(
                 0, min(self._candidate_idx + step, len(self._candidates) - 1)
             )
@@ -665,20 +782,25 @@ class InputLine(Component):
             return
 
         # Plain text editing
-        if key == KEY_BACKSPACE:
+        if key == keys.KEY_BACKSPACE:
             self.backspace()
-        elif key == KEY_DELETE:
+        elif key == keys.KEY_DELETE:
             self.delete()
-        elif key == KEY_LEFT:
+        elif key == keys.KEY_LEFT:
             self.cursor_left()
-        elif key == KEY_RIGHT:
+        elif key == keys.KEY_RIGHT:
             self.cursor_right()
-        elif key == KEY_HOME:
+        elif key == keys.KEY_HOME:
             self.home()
-        elif key == KEY_END:
+        elif key == keys.KEY_END:
             self.end()
         elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
             self.insert(key)
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        """Route keys to this input line when it is inside an overlay (Sheet/Popup)."""
+        self.on_key(key)
+        return OverlayDispatchResult.HANDLED_EXPLICIT
 
     def cursor_left(self) -> None:
         """Move the cursor one position to the left."""
@@ -708,23 +830,35 @@ class InputLine(Component):
                 suffix = ""
             elif len(suffix) > avail:
                 suffix = suffix[:avail]
-            surface.draw_text_rgb(0, 0, prefix, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            surface.draw_text_rgb(
+                0, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
             if suffix:
                 surface.draw_text_rgb(
-                    0, len(prefix), suffix, fg=DEFAULT_FG_DIM, bg=DEFAULT_BG
+                    0,
+                    len(prefix),
+                    suffix,
+                    fg=palette.DEFAULT_FG_DIM,
+                    bg=palette.DEFAULT_BG,
                 )
             # Block cursor at the end of the completion text.
             cursor_abs = len(prefix) + len(suffix)
             if cursor_abs < surface.width:
-                surface.draw_text_rgb(0, cursor_abs, " ", fg=DEFAULT_BG, bg=DEFAULT_FG)
+                surface.draw_text_rgb(
+                    0, cursor_abs, " ", fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+                )
         else:
             text = truncate_line(core, surface.width)
             text = pad_by_width(text, surface.width)
-            surface.draw_text_rgb(0, 0, text, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            surface.draw_text_rgb(
+                0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
             # Draw block cursor (reverse video) over the character at cursor.
             if cursor_abs < surface.width:
                 if self._cursor < len(self._value):
                     ch = self._value[self._cursor]
                 else:
                     ch = " "
-                surface.draw_text_rgb(0, cursor_abs, ch, fg=DEFAULT_BG, bg=DEFAULT_FG)
+                surface.draw_text_rgb(
+                    0, cursor_abs, ch, fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+                )

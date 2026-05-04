@@ -12,40 +12,32 @@ import functools
 import re
 from typing import Optional
 
+from . import palette
 from ._syntax_configs import _LANGUAGE_CONFIGS
-from .palette import (
-    PEARL,
-    BLUE,
-    CYAN,
-    GREEN,
-    PURPLE,
-    RED,
-    YELLOW,
-)
 
 # ── Default syntax color mapping (uses palette constants) ──
 # Callers can override via set_color_map() on SyntaxTokenizer.
 _DEFAULT_COLORS: dict[str, tuple[int, int, int]] = {
-    "keyword_control": PURPLE,
-    "keyword_decl": BLUE,
-    "keyword_storage": YELLOW,
-    "keyword_type": CYAN,
-    "keyword_operator": PURPLE,
-    "string": RED,
-    "number": BLUE,
-    "comment": GREEN,
-    "call": PEARL,
-    "builtin": CYAN,
-    "type": CYAN,
-    "variable": PEARL,
-    "operator": PEARL,
-    "punct": PEARL,
-    "decorator": YELLOW,
-    "special": RED,
-    "docstring": RED,
-    "diff_meta": BLUE,
-    "diff_lineno": YELLOW,
-    "diff_count": PURPLE,
+    "keyword_control": palette.PURPLE,
+    "keyword_decl": palette.BLUE,
+    "keyword_storage": palette.YELLOW,
+    "keyword_type": palette.CYAN,
+    "keyword_operator": palette.PURPLE,
+    "string": palette.RED,
+    "number": palette.BLUE,
+    "comment": palette.GREEN,
+    "call": palette.PEARL,
+    "builtin": palette.CYAN,
+    "type": palette.CYAN,
+    "variable": palette.PEARL,
+    "operator": palette.PEARL,
+    "punct": palette.PEARL,
+    "decorator": palette.YELLOW,
+    "special": palette.RED,
+    "docstring": palette.RED,
+    "diff_meta": palette.BLUE,
+    "diff_lineno": palette.YELLOW,
+    "diff_count": palette.PURPLE,
 }
 
 # Public alias for backward compatibility and external callers.

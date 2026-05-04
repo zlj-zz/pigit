@@ -37,14 +37,14 @@ class TestComponentRoot:
         root = ComponentRoot(DummyBody())
         assert not root.has_overlay_open()
 
-    def test_begin_end_popup_session(self):
+    def test_layer_push_pop_modal(self):
         root = ComponentRoot(DummyBody())
         popup = MagicMock()
         popup.open = True
-        root.begin_popup_session(popup)
+        root._layer_stack.push(LayerKind.MODAL, popup)
         assert root.has_overlay_open()
         assert root._layer_stack.top(LayerKind.MODAL) is popup
-        root.end_popup_session()
+        root._layer_stack.pop(LayerKind.MODAL)
         popup.hide.assert_not_called()
         assert not root.has_overlay_open()
         assert root._layer_stack.top(LayerKind.MODAL) is None
@@ -55,8 +55,9 @@ class TestComponentRoot:
         body._handle_event = MagicMock()
         popup = MagicMock()
         popup.open = True
+        popup.parent = None
         popup.dispatch_overlay_key.return_value = OverlayDispatchResult.HANDLED_EXPLICIT
-        root.begin_popup_session(popup)
+        root._layer_stack.push(LayerKind.MODAL, popup)
         root._handle_event("k")
         popup.dispatch_overlay_key.assert_called_once_with("k")
         body._handle_event.assert_not_called()
@@ -72,7 +73,7 @@ class TestComponentRoot:
         root = ComponentRoot(DummyBody())
         popup = MagicMock()
         popup.open = True
-        root.begin_popup_session(popup)
+        root._layer_stack.push(LayerKind.MODAL, popup)
         root.force_close_overlay_after_error()
         popup.hide.assert_called_once()
         assert not root.has_overlay_open()
@@ -95,7 +96,8 @@ class TestComponentRoot:
         root.resize((80, 24))
         toast = root.show_toast("hello", duration=1.5)
         assert root._layer_stack.top(LayerKind.TOAST) is toast
-        assert toast._message == "hello"
+        assert len(toast._segments) == 1
+        assert toast._segments[0].text == "hello"
         assert toast.duration == 1.5
 
     def test_show_toast_with_position(self):

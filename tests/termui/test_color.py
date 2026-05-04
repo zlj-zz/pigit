@@ -35,10 +35,19 @@ class TestColorAdapter:
         seq = adapter.bg_sequence((0, 0, 255))
         assert seq == "\033[48;2;0;0;255m"
 
-    def test_bold_sequence(self):
+    def test_style_sequence(self):
+        from pigit.termui.palette import STYLE_BOLD, STYLE_DIM, STYLE_ITALIC
+
         adapter = ColorAdapter(ColorMode.TRUECOLOR)
-        assert adapter.bold_sequence(True) == "\033[1m"
-        assert adapter.bold_sequence(False) == "\033[22m"
+        assert adapter.style_sequence(STYLE_BOLD) == "\033[1m"
+        assert adapter.style_sequence(STYLE_DIM) == "\033[2m"
+        assert adapter.style_sequence(STYLE_ITALIC) == "\033[3m"
+        assert adapter.style_sequence(STYLE_BOLD | STYLE_DIM) == "\033[1;2m"
+        assert adapter.style_sequence(0) == ""
+
+    def test_reset_style_sequence(self):
+        adapter = ColorAdapter(ColorMode.TRUECOLOR)
+        assert adapter.reset_style_sequence() == "\033[22;23;24;27m"
 
     def test_reset_sequence(self):
         adapter = ColorAdapter(ColorMode.TRUECOLOR)

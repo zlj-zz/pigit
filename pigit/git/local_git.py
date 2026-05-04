@@ -318,13 +318,25 @@ class LocalGit:
     # =============
     # Special info
     # =============
-    def load_branches(self, path: Optional[str] = None) -> list[Branch]:
+    def load_branches(
+        self,
+        path: Optional[str] = None,
+        *,
+        scope: str = "local",
+    ) -> list[Branch]:
         path = path or self.path
-        branches = []
+        branches: list[Branch] = []
+
+        if scope == "remote":
+            flag = "-r"
+        elif scope == "all":
+            flag = "-a"
+        else:
+            flag = ""
 
         _, _, resp = self.executor.exec(
-            "git branch --sort=-committerdate "
-            '--format="%(HEAD)|%(refname:short)|%(upstream:short)|%(upstream:track)" ',
+            f"git branch {flag} --sort=-committerdate "
+            '--format="%(HEAD)|%(refname:short)|%(refname)|%(upstream:short)|%(upstream:track)" ',
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -336,19 +348,31 @@ class LocalGit:
 
         for line in lines:
             items = line.split("|")
+            short_name = items[1]
+            full_ref = items[2]
+            is_remote = full_ref.startswith("refs/remotes/")
+
+            # Skip the symbolic HEAD ref for remotes (e.g. origin/HEAD)
+            if is_remote and short_name.endswith("/HEAD"):
+                continue
+
             branch = Branch(
-                name=items[1], ahead="?", behind="?", is_head=items[0] == "*"
+                name=short_name,
+                ahead="?",
+                behind="?",
+                is_head=items[0] == "*" and not is_remote,
+                is_remote=is_remote,
             )
 
-            upstream_name = items[2]
+            upstream_name = items[3]
 
-            if not upstream_name:
+            if not upstream_name or is_remote:
                 branches.append(branch)
                 continue
 
             branch.upstream_name = upstream_name
 
-            track = items[3]
+            track = items[4]
             branch.ahead = (
                 str(m[1]) if (m := self._RE_BRANCH_AHEAD.search(track)) else "0"
             )
@@ -626,6 +650,34 @@ class LocalGit:
             )
         )
 
+    def get_commit_bodies(
+        self,
+        branch_name: str,
+        max_commits: int = 300,
+        path: Optional[str] = None,
+    ) -> dict[str, str]:
+        """Return a ``{sha: full body}`` map for ``branch_name``.
+
+        ``%B`` in ``git log`` includes the subject and any extra lines from
+        ``git commit -m`` separated by blank lines, so callers needing the
+        full message must read it instead of ``%s``. Records are framed with
+        ASCII RS (``\\x1e``) and SHA/body split with US (``\\x1f``) so multi-line
+        bodies survive shell parsing without ambiguity.
+        """
+        path = path or self.path
+        branch_part = shlex.quote(branch_name) if branch_name else ""
+        cmd = (f"git log {branch_part} --format=%H%x1f%B%x1e -n {max_commits}").strip()
+        _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
+
+        bodies: dict[str, str] = {}
+        for record in (resp or "").split("\x1e"):
+            record = record.strip("\n")
+            if not record or "\x1f" not in record:
+                continue
+            sha, body = record.split("\x1f", 1)
+            bodies[sha.strip()] = body.strip("\n")
+        return bodies
+
     def load_commit_info(
         self,
         commit_sha: str = "",
@@ -763,6 +815,36 @@ class LocalGit:
         )
         if code != 0:
             raise GitError(err or f"checkout failed: {branch_name}")
+
+    def rename_branch(
+        self,
+        old_name: str,
+        new_name: str,
+        path: Optional[str] = None,
+    ) -> None:
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            f"git branch -m {shlex.quote(old_name)} {shlex.quote(new_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"rename failed: {old_name} -> {new_name}")
+
+    def create_branch(
+        self,
+        branch_name: str,
+        path: Optional[str] = None,
+    ) -> None:
+        """Create a new branch from HEAD and switch to it."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            f"git checkout -b {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"create branch failed: {branch_name}")
 
     def get_file_info(
         self, file: Union[File, str], path: Optional[str] = None
@@ -907,3 +989,106 @@ class LocalGit:
             return False, f"Failed to open the repo; {e}"
         else:
             return True, "Successfully opened repo."
+
+    def get_git_dir(self, path: Optional[str] = None) -> str:
+        """Return the git directory path via ``git rev-parse --git-dir``."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            "git rev-parse --git-dir",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0 or not out:
+            raise GitError(err or "Failed to get git directory")
+        git_dir_raw = out.strip()
+        if Path(git_dir_raw).is_absolute():
+            return str(Path(git_dir_raw).resolve())
+        repo_root, _ = self.confirm_repo(path)
+        return str((Path(repo_root) / git_dir_raw).resolve())
+
+    def pull(self, path: Optional[str] = None) -> None:
+        """Pull from the upstream remote. Raises GitError on failure."""
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            "git pull",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or "Pull failed")
+
+    def merge(self, source: str, path: Optional[str] = None) -> None:
+        """Merge ``source`` into the current branch. Raises GitError on failure.
+
+        If the merge results in conflicts, the error message will contain
+        the word "conflict" so the caller can detect it.
+        """
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            f"git merge {shlex.quote(source)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            msg = err or f"Merge failed: {source}"
+            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in err):
+                raise GitError(f"Merge conflict: {msg}")
+            raise GitError(msg)
+
+    def is_merge_in_progress(self, path: Optional[str] = None) -> bool:
+        """Return True if MERGE_HEAD exists in the git directory."""
+        try:
+            git_dir = self.get_git_dir(path)
+        except GitError:
+            return False
+        return (Path(git_dir) / "MERGE_HEAD").exists()
+
+    def checkout_ours(self, file: Union[File, str], path: Optional[str] = None) -> None:
+        """Checkout ``--ours`` version of a conflicted file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git checkout --ours -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"checkout --ours failed: {file_name}")
+
+    def checkout_theirs(
+        self, file: Union[File, str], path: Optional[str] = None
+    ) -> None:
+        """Checkout ``--theirs`` version of a conflicted file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git checkout --theirs -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"checkout --theirs failed: {file_name}")
+
+    def add_file(self, file: Union[File, str], path: Optional[str] = None) -> None:
+        """Stage a file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git add -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"add failed: {file_name}")
+
+    def commit_no_edit(self, path: Optional[str] = None) -> None:
+        """Complete a merge with the default message (``git commit --no-edit``)."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            "git commit --no-edit",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            msg = err or "Commit failed"
+            raise GitError(msg)

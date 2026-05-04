@@ -108,7 +108,12 @@ class AppFooter(Component):
             # Draw key bright + bold
             key_w = wcswidth(key)
             surface.draw_text_rgb(
-                row, x, key, fg=self._theme.fg_primary, bg=palette.DEFAULT_BG, bold=True
+                row,
+                x,
+                key,
+                fg=self._theme.fg_primary,
+                bg=palette.DEFAULT_BG,
+                style_flags=palette.STYLE_BOLD,
             )
             x += key_w
 

@@ -1,11 +1,41 @@
 # -*- coding:utf-8 -*-
 
+import subprocess
 import sys
 import time
 from collections import Counter
 from functools import lru_cache
 from math import sqrt
 from typing import Iterable
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Copy text to the system clipboard."""
+    platform = sys.platform
+    try:
+        if platform == "darwin":
+            subprocess.run(["pbcopy"], input=text.encode(), check=True)
+            return True
+        elif platform == "win32":
+            subprocess.run(["clip"], input=text.encode(), check=True)
+            return True
+        else:
+            # Try wl-copy (Wayland) first, then xclip (X11)
+            try:
+                subprocess.run(
+                    ["wl-copy"], input=text.encode(), check=True, capture_output=True
+                )
+                return True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                subprocess.run(
+                    ["xclip", "-selection", "clipboard"],
+                    input=text.encode(),
+                    check=True,
+                    capture_output=True,
+                )
+                return True
+    except Exception:
+        return False
 
 
 @lru_cache(maxsize=256)

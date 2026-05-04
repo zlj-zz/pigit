@@ -8,7 +8,7 @@ Date: 2026-04-28
 
 from __future__ import annotations
 
-from .palette import RED
+from . import palette
 
 # ── Language configurations ──
 _LANGUAGE_CONFIGS: dict[str, dict] = {
@@ -354,7 +354,7 @@ _LANGUAGE_CONFIGS: dict[str, dict] = {
             "operator": {"as", "in", "where"},
         },
         "color_overrides": {
-            "keyword_storage": RED,
+            "keyword_storage": palette.RED,
         },
         "special_patterns": [(r"'[a-zA-Z_]\w*", "special")],
         "comment": "//",

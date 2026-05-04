@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from pigit.termui import Component, keys, OverlayDispatchResult
+from pigit.termui import Component, InputLine, keys, OverlayDispatchResult
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -36,6 +36,7 @@ DEFAULT_COMMANDS: list[str] = [
     "config",
     "help",
     "quit",
+    "continue-merge",
 ]
 
 
@@ -55,8 +56,10 @@ class CommandPalette(Component):
         self._on_execute = on_execute
         self._on_dismiss = on_dismiss
         self._commands = commands or list(DEFAULT_COMMANDS)
-        self._value = ""
-        self._cursor = 0
+        self._input_line = InputLine(
+            prompt="> ",
+            on_value_changed=self._on_input_changed,
+        )
         self._candidates: list[str] = []
         self._selected = 0
         self._active = False
@@ -68,16 +71,14 @@ class CommandPalette(Component):
     def open(self) -> None:
         """Activate the palette."""
         self._active = True
-        self._value = ""
-        self._cursor = 0
+        self._input_line.clear()
         self._candidates = []
         self._selected = 0
 
     def close(self) -> None:
         """Deactivate the palette."""
         self._active = False
-        self._value = ""
-        self._cursor = 0
+        self._input_line.clear()
         self._candidates = []
         self._selected = 0
         if self._on_dismiss is not None:
@@ -97,7 +98,7 @@ class CommandPalette(Component):
             if self._candidates and self._selected < len(self._candidates):
                 cmd = self._candidates[self._selected]
             else:
-                cmd = self._value.strip()
+                cmd = self._input_line.value.strip()
             if cmd and self._on_execute:
                 self._on_execute(cmd)
             self.close()
@@ -110,47 +111,16 @@ class CommandPalette(Component):
             if self._candidates:
                 self._selected = min(len(self._candidates) - 1, self._selected + 1)
             return
-        if key == keys.KEY_BACKSPACE:
-            if self._cursor > 0:
-                self._value = (
-                    self._value[: self._cursor - 1] + self._value[self._cursor :]
-                )
-                self._cursor -= 1
-                self._update_candidates()
-            return
-        if key == keys.KEY_LEFT:
-            self._cursor = max(0, self._cursor - 1)
-            return
-        if key == keys.KEY_RIGHT:
-            self._cursor = min(len(self._value), self._cursor + 1)
-            return
-        if key == keys.KEY_HOME:
-            self._cursor = 0
-            return
-        if key == keys.KEY_END:
-            self._cursor = len(self._value)
-            return
-        if key == keys.KEY_DELETE:
-            if self._cursor < len(self._value):
-                self._value = (
-                    self._value[: self._cursor] + self._value[self._cursor + 1 :]
-                )
-                self._update_candidates()
-            return
-        if len(key) == 1 and key.isprintable() and ord(key) >= 32:
-            self._value = (
-                self._value[: self._cursor] + key + self._value[self._cursor :]
-            )
-            self._cursor += 1
-            self._update_candidates()
+        # Delegate all editing keys to InputLine.
+        self._input_line.on_key(key)
 
-        # Defensive clamp: ensure cursor invariant even if future key
-        # handlers or external mutation leave _cursor out of bounds.
-        self._cursor = max(0, min(len(self._value), self._cursor))
+    def _on_input_changed(self, value: str) -> None:
+        """Callback fired by InputLine when value changes."""
+        self._update_candidates()
 
     def _update_candidates(self) -> None:
         """Update candidate list based on current input."""
-        value = self._value.strip().lower()
+        value = self._input_line.value.strip().lower()
         if not value:
             self._candidates = []
             self._selected = 0
@@ -174,9 +144,9 @@ class CommandPalette(Component):
 
         # Input line at bottom
         input_row = h - 1
-        prompt = "> "
-        core = f"{prompt}{self._value}"
-        cursor_abs = len(prompt) + self._cursor
+        prompt = self._input_line.prompt
+        core = f"{prompt}{self._input_line.value}"
+        cursor_abs = len(prompt) + self._input_line.cursor
 
         # Draw input text
         if wcswidth(core) > w:
@@ -187,7 +157,11 @@ class CommandPalette(Component):
 
         # Block cursor
         if cursor_abs < w:
-            ch = self._value[self._cursor] if self._cursor < len(self._value) else " "
+            ch = (
+                self._input_line.value[self._input_line.cursor]
+                if self._input_line.cursor < len(self._input_line.value)
+                else " "
+            )
             surface.draw_text_rgb(
                 input_row, cursor_abs, ch, fg=THEME.bg_palette, bg=THEME.fg_primary
             )

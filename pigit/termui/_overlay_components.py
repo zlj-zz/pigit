@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, ClassVar, Optional
+from typing import Any, Callable, ClassVar, Optional, Sequence
 
+from . import _overlay_context, keys, palette
 from ._bindings import resolve_key_handlers_merged
-from ._component_base import Component, _looks_like_overlay_host
+from ._component_base import Component
 from ._frame import BoxFrame
+from ._segment import Segment
 from ._text import sanitize_for_display
 from ._layout import Padding
 from ._surface import Surface
-from .palette import DEFAULT_BG, DEFAULT_FG
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
-from . import keys
 
 _logger = logging.getLogger(__name__)
 
@@ -35,12 +35,10 @@ class HelpPanel(Component):
     """
     Plain help content (bordered, scrollable key list). Not modal until wrapped.
 
-    Use :class:`Popup` with ``session_owner`` set to a :class:`~pigit.termui.components.Component`
-    that can reach the modal host (typically the loop root or a panel under it); the shell
-    resolves the host via :meth:`~pigit.termui.components.Component.nearest_overlay_host` or
-    treats ``session_owner`` as the host when it owns overlay state. Bind ``?`` to a handler that
-    refreshes rows (e.g. :meth:`refresh_entries_from_source`) when opening help,
-    then calls ``popup.toggle()``.
+    Wrap with :class:`Popup` to make it modal; :class:`Popup` uses
+    :mod:`~pigit.termui._overlay_context` to manage the modal layer lifecycle.
+    Bind ``?`` to a handler that refreshes rows (e.g. :meth:`refresh_entries_from_source`)
+    when opening help, then calls ``popup.toggle()``.
 
     :data:`TOGGLE_HELP_SEMANTIC_KEYS` lists keys that toggle help while this panel's
     wrapping :class:`Popup` is active; overlay routing calls
@@ -80,13 +78,11 @@ class HelpPanel(Component):
         self._outer_w = 42
         self.outer_row_count = 10
         self._frame = BoxFrame(
-            0, 0, title="Help   esc close", fg=DEFAULT_FG, bg=DEFAULT_BG
+            0, 0, title="Help   esc close", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
         )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
-        # Each element is a list of (text, fg, bold) segments for one line.
-        self._line_segments: list[
-            list[tuple[str, Optional[tuple[int, int, int]], bool]]
-        ] = []
+        # Each element is a list of Segment for one line.
+        self._line_segments: list[list[Segment]] = []
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recalculate inner and outer dimensions for the given terminal size."""
@@ -116,18 +112,18 @@ class HelpPanel(Component):
             return
         max_key_w = max(wcswidth(key_disp) for key_disp, _ in entries)
         lines: list[str] = []
-        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
+        segments: list[list[Segment]] = []
         for key_disp, desc in entries:
             pad = max_key_w - wcswidth(key_disp)
             line = f"{key_disp}{' ' * pad}  {desc}"
             lines.append(line)
-            seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
+            seg: list[Segment] = []
             if self._key_fg is not None:
-                seg.append((key_disp, self._key_fg, False))
-                seg.append((" " * pad + "  ", None, False))
+                seg.append(Segment(key_disp, fg=self._key_fg))
+                seg.append(Segment(" " * pad + "  "))
             else:
-                seg.append((key_disp + " " * pad + "  ", None, False))
-            seg.append((desc, None, False))
+                seg.append(Segment(key_disp + " " * pad + "  "))
+            seg.append(Segment(desc))
             segments.append(seg)
         self._lines = lines
         self._line_segments = segments
@@ -146,26 +142,26 @@ class HelpPanel(Component):
                 max_key_w = max(max_key_w, wcswidth(key_disp))
 
         lines: list[str] = []
-        segments: list[list[tuple[str, Optional[tuple[int, int, int]], bool]]] = []
+        segments: list[list[Segment]] = []
         for title, entries in groups:
             if not entries:
                 continue
             # Category header
             lines.append(title)
-            segments.append([(title, None, True)])
+            segments.append([Segment(title, style_flags=palette.STYLE_BOLD)])
             # Indented entries
             for key_disp, desc in entries:
                 pad = max_key_w - wcswidth(key_disp)
                 line = f"  {key_disp}{' ' * pad}  {desc}"
                 lines.append(line)
-                seg: list[tuple[str, Optional[tuple[int, int, int]], bool]] = []
-                seg.append(("  ", None, False))
+                seg: list[Segment] = []
+                seg.append(Segment("  "))
                 if self._key_fg is not None:
-                    seg.append((key_disp, self._key_fg, False))
-                    seg.append((" " * pad + "  ", None, False))
+                    seg.append(Segment(key_disp, fg=self._key_fg))
+                    seg.append(Segment(" " * pad + "  "))
                 else:
-                    seg.append((key_disp + " " * pad + "  ", None, False))
-                seg.append((desc, None, False))
+                    seg.append(Segment(key_disp + " " * pad + "  "))
+                seg.append(Segment(desc))
                 segments.append(seg)
             # Blank line between groups
             lines.append("")
@@ -228,7 +224,7 @@ class HelpPanel(Component):
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
 
@@ -236,11 +232,10 @@ class HelpPanel(Component):
         content_col = self.y + 1
         chunk = self._line_segments[self._offset : self._offset + self._scroll_h]
         for i, segments in enumerate(chunk):
-            x = content_col
             row = content_row + i
-            for text, fg, bold in segments:
-                if x >= content_col + self._inner_w:
-                    break
+            x = content_col
+            for seg in segments:
+                text = seg.text
                 text_w = wcswidth(text)
                 avail = content_col + self._inner_w - x
                 if text_w > avail:
@@ -249,42 +244,33 @@ class HelpPanel(Component):
                     row,
                     x,
                     text,
-                    fg=fg if fg is not None else DEFAULT_FG,
-                    bg=DEFAULT_BG,
-                    bold=bold,
+                    fg=seg.fg,
+                    bg=seg.bg,
+                    style_flags=seg.style_flags,
                 )
                 x += wcswidth(text)
             # Pad remaining width with spaces to prevent residue
-            while x < content_col + self._inner_w:
-                surface.draw_text_rgb(row, x, " ", fg=DEFAULT_FG, bg=DEFAULT_BG)
-                x += 1
+            if x < content_col + self._inner_w:
+                surface.fill_rect_rgb(
+                    row, x, content_col + self._inner_w - x, 1, palette.DEFAULT_BG
+                )
 
 
 class Popup(Component):
     """
     Modal shell around one inner :class:`~pigit.termui.components.Component`.
 
-    Pass ``session_owner`` to resolve the overlay host (usually
-    :class:`~pigit.termui.root.ComponentRoot`) the same way as :class:`AlertDialog`
-    (``session_owner`` may be the host itself or an ancestor walk via
-    :meth:`~pigit.termui.components.Component.nearest_overlay_host`).
-    :meth:`toggle` and ``exit_key`` then coordinate ``begin_popup_session`` /
-    ``end_popup_session`` when ``session_owner`` is set.
+    :meth:`toggle` and ``exit_key`` coordinate modal session lifecycle through
+    :mod:`~pigit.termui._overlay_context` (push/pop on the ``MODAL`` layer).
 
-    When ``session_owner`` is set, :meth:`_render` pulls the shared :class:`~pigit.termui.render.Renderer`
-    from ``session_owner`` (or its ``parent`` chain) so side-attached shells need no
-    ``AppEventLoop``-specific attribute names.
-
-    Subclasses that omit ``session_owner`` must override :meth:`_on_exit_key`. Wrapped
-    content may declare :data:`TOGGLE_HELP_SEMANTIC_KEYS` so :meth:`_fallback_overlay_key`
-    calls :meth:`toggle` for those keys when ``session_owner`` is set.
+    Wrapped content may declare :data:`TOGGLE_HELP_SEMANTIC_KEYS` so
+    :meth:`_fallback_overlay_key` calls :meth:`toggle` for those keys.
     """
 
     def __init__(
         self,
         child: Component,
         *,
-        session_owner: Optional[Component] = None,
         offset: Optional[tuple[int, int]] = None,
         exit_key: str = keys.KEY_ESC,
         x: int = 1,
@@ -294,7 +280,6 @@ class Popup(Component):
         self._child = child
         self._offset = offset
         self.exit_key = exit_key
-        self._session_owner = session_owner
         self.open = False
         self._term_size: tuple[int, int] = (80, 24)
 
@@ -306,21 +291,6 @@ class Popup(Component):
         self._resolved_child_handlers = resolve_key_handlers_merged(
             self._child, type(self._child), getattr(self._child, "BINDINGS", None)
         )
-
-    def _resolved_overlay_host(self) -> Optional[Component]:
-        """
-        Return the overlay host for this shell, without requiring ``self`` to be parent-linked.
-
-        If ``session_owner`` is the host (e.g. loop root), use it; else walk from
-        ``session_owner`` via :meth:`~pigit.termui.components.Component.nearest_overlay_host`.
-        """
-
-        owner = self._session_owner
-        if owner is None:
-            return None
-        if _looks_like_overlay_host(owner):
-            return owner
-        return owner.nearest_overlay_host()
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -358,26 +328,27 @@ class Popup(Component):
         """
 
         toggle_keys = getattr(type(self._child), "TOGGLE_HELP_SEMANTIC_KEYS", ())
-        if self._session_owner is not None and key in toggle_keys:
-            if self._resolved_overlay_host() is None:
-                return OverlayDispatchResult.DROPPED_UNBOUND
+        if key in toggle_keys:
             self.toggle()
             return OverlayDispatchResult.HANDLED_IMPLICIT
         return OverlayDispatchResult.DROPPED_UNBOUND
 
+    def begin_session(self) -> None:
+        """Push this popup onto the MODAL layer via overlay_context."""
+        _overlay_context.layer_push(LayerKind.MODAL, self)
+
+    def end_session(self) -> None:
+        """Pop the top component from the MODAL layer via overlay_context."""
+        _overlay_context.layer_pop(LayerKind.MODAL)
+
     def toggle(self) -> None:
-        """Toggle the popup session on the resolved overlay host."""
-        if self._session_owner is None:
-            return
-        host = self._resolved_overlay_host()
+        """Toggle the popup session via overlay_context."""
+        host = _overlay_context.get_overlay_host()
         if host is None:
             return
-        layer_stack = getattr(host, "_layer_stack", None)
-        if layer_stack is None:
-            return
-        top = layer_stack.top(LayerKind.MODAL)
+        top = host._layer_stack.top(LayerKind.MODAL)
         if top is self:
-            host.end_popup_session()
+            host._layer_stack.pop(LayerKind.MODAL)
             self.hide()
             return
         if top is not None:
@@ -387,15 +358,7 @@ class Popup(Component):
         if callable(before_show):
             before_show()
         self.show()
-        host.begin_popup_session(self)
-
-    def _sync_popup_exit_with_host(self) -> None:
-        host = self._resolved_overlay_host()
-        if host is None:
-            self.hide()
-            return
-        host.end_popup_session()
-        self.hide()
+        host._layer_stack.push(LayerKind.MODAL, self)
 
     def show(self) -> None:
         """Open the popup."""
@@ -442,12 +405,8 @@ class Popup(Component):
         pass
 
     def _on_exit_key(self) -> None:
-        if self._session_owner is not None:
-            self._sync_popup_exit_with_host()
-        else:
-            raise NotImplementedError(
-                "Subclass Popup without session_owner must override _on_exit_key."
-            )
+        self.end_session()
+        self.hide()
 
     def _render_surface(self, surface: Surface) -> None:
         if not self.open:
@@ -497,7 +456,9 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._content_lines: list[str] = []
         self._needs_rebuild = True
-        self._frame = BoxFrame(0, 0, title="Alert", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        self._frame = BoxFrame(
+            0, 0, title="Alert", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+        )
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size)
 
@@ -554,7 +515,7 @@ class AlertDialogBody(Component):
         # Fill the entire dialog area with default background to prevent
         # previous frame content from leaking through the borders.
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, DEFAULT_BG
+            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
         self._frame.draw_onto(surface, self.x, self.y)
         self._frame.draw_content(surface, self.x, self.y, self._content_lines)
@@ -590,8 +551,10 @@ class AlertDialog(Popup):
     Confirmation UI as a :class:`Popup` shell around :class:`AlertDialogBody`.
 
     Call :meth:`alert` from application code with a message and ``on_result`` callback.
-    Opening uses :meth:`~pigit.termui.components_overlay.Popup.show` and host
-    ``begin_popup_session``; closing uses ``end_popup_session`` and
+    Opening uses :meth:`~pigit.termui.components_overlay.Popup.show` and
+    :meth:`~pigit.termui.components_overlay.Popup.begin_session` through
+    :mod:`~pigit.termui._overlay_context`; closing uses
+    :meth:`~pigit.termui.components_overlay.Popup.end_session` and
     :meth:`~pigit.termui.components_overlay.Popup.hide`.
 
     Panels typically set ``_alert_dialog`` and ``_alert_popup`` to this same instance.
@@ -599,7 +562,6 @@ class AlertDialog(Popup):
 
     def __init__(
         self,
-        session_owner: Component,
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
@@ -622,7 +584,6 @@ class AlertDialog(Popup):
         )
         super().__init__(
             self._pane,
-            session_owner=session_owner,
             offset=None,
             exit_key=keys.KEY_ESC,
             x=x,
@@ -638,35 +599,20 @@ class AlertDialog(Popup):
         Prepare content, show this popup, and register the overlay host alert session.
 
         Returns:
-            True if the dialog was shown; False if no host or another overlay is active.
+            True if the dialog was shown; False if another modal is already open.
         """
 
-        host = self._resolved_overlay_host()
-        if host is None:
-            return False
-        # Only block if another MODAL is already open (TOAST/SHEET are non-blocking).
-        layer_stack = getattr(host, "_layer_stack", None)
-        if layer_stack is not None:
-            if layer_stack.top(LayerKind.MODAL) is not None:
-                return False
-        elif host.has_overlay_open():
+        if _overlay_context.is_modal_open():
             return False
         self._pane.prepare(message, on_result)
         self.relayout_content()
         self.show()
-        host.begin_popup_session(self)
+        self.begin_session()
         return True
 
     def _finish_alert(self, value: bool) -> None:
         fn = self._pane._on_result
-        host = self._resolved_overlay_host()
-        if host is not None:
-            host.end_popup_session()
-        else:
-            _logger.warning(
-                "AlertDialog finished without an overlay host in the parent chain; "
-                "if begin_popup_session ran, root overlay_kind may stay stale."
-            )
+        self.end_session()
         self.hide()
         self._pane.reset_state()
         if fn is None:
@@ -692,7 +638,9 @@ class Toast(Component):
 
     def __init__(
         self,
-        message: str,
+        message: str = "",
+        *,
+        segments: Optional[Sequence[Segment]] = None,
         duration: float = 2.0,
         size: Optional[tuple[int, int]] = None,
         clock: Callable[[], float] = time.monotonic,
@@ -701,7 +649,9 @@ class Toast(Component):
         exit_duration: float = 0.5,
     ) -> None:
         super().__init__(size=size)
-        self._message = message
+        self._segments: list[Segment] = (
+            list(segments) if segments else [Segment(message)]
+        )
         self.duration = duration
         self._clock = clock
         self._position = position
@@ -737,16 +687,52 @@ class Toast(Component):
     def _rebuild_frame(self) -> None:
         """Rebuild BoxFrame and content lines based on current terminal size."""
         max_inner_w = max(0, self._term_size[0] - 4)
-        lines = [
-            truncate_by_width(line, max_inner_w) for line in self._message.split("\n")
-        ]
-        # Safety limit to prevent memory issues with malicious input
-        self._lines = lines[:MAX_TOAST_LINES]
-        inner_h = len(self._lines)
-        inner_w = max(len(line) for line in self._lines) if self._lines else 0
+        # Split segments into lines by \n
+        line_segments: list[list[Segment]] = [[]]
+        for seg in self._segments:
+            parts = seg.text.split("\n")
+            for i, part in enumerate(parts):
+                if i > 0:
+                    line_segments.append([])
+                if part:
+                    line_segments[-1].append(
+                        Segment(part, fg=seg.fg, bg=seg.bg, style_flags=seg.style_flags)
+                    )
+        # Truncate each line to max_inner_w and compute inner width
+        truncated: list[list[Segment]] = []
+        inner_w = 0
+        for line in line_segments[:MAX_TOAST_LINES]:
+            line_w = 0
+            new_line: list[Segment] = []
+            for seg in line:
+                seg_w = wcswidth(seg.text)
+                if line_w + seg_w > max_inner_w:
+                    # Truncate this segment to fit
+                    avail = max(0, max_inner_w - line_w)
+                    if avail > 0:
+                        truncated_text = truncate_by_width(seg.text, avail)
+                        new_line.append(
+                            Segment(
+                                truncated_text,
+                                fg=seg.fg,
+                                bg=seg.bg,
+                                style_flags=seg.style_flags,
+                            )
+                        )
+                        line_w += wcswidth(truncated_text)
+                    break
+                new_line.append(seg)
+                line_w += seg_w
+            truncated.append(new_line)
+            inner_w = max(inner_w, line_w)
+
+        self._line_segments = truncated
+        inner_h = len(self._line_segments)
 
         if self._frame is None:
-            self._frame = BoxFrame(inner_w, inner_h, fg=DEFAULT_FG, bg=DEFAULT_BG)
+            self._frame = BoxFrame(
+                inner_w, inner_h, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            )
         else:
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
@@ -826,15 +812,33 @@ class Toast(Component):
 
         # Clear background to prevent residue from previous frames or underlying content.
         surface.fill_rect_rgb(
-            base_row, render_col, self._outer_w, self.outer_row_count, DEFAULT_BG
+            base_row,
+            render_col,
+            self._outer_w,
+            self.outer_row_count,
+            palette.DEFAULT_BG,
         )
         self._frame.draw_onto(surface, base_row, render_col)
-        self._frame.draw_content(surface, base_row, render_col, self._lines)
+        # Draw content lines using segments
+        content_row = base_row + 1
+        content_col = render_col + 1
+        for i, segments in enumerate(self._line_segments):
+            row = content_row + i
+            if row >= surface.height:
+                break
+            surface.draw_segments(row, content_col, segments)
+            # Pad remaining width to prevent residue
+            line_text = "".join(s.text for s in segments)
+            line_w = wcswidth(line_text)
+            pad_col = content_col + line_w
+            pad_w = content_col + self._frame.inner_width - pad_col
+            if pad_w > 0:
+                surface.fill_rect_rgb(row, pad_col, pad_w, 1, palette.DEFAULT_BG)
 
     @property
     def message(self) -> str:
         """Toast message content (backward compatibility)."""
-        return self._message
+        return "".join(s.text for s in self._segments)
 
     def hide(self) -> None:
         """Close the toast."""

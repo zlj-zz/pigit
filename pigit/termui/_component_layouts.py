@@ -11,7 +11,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
 
-from ._component_base import Component, ComponentError, _render_child_to_surface
+from ._component_base import (
+    Component,
+    ComponentError,
+    _render_child_to_surface,
+    _set_focus_chain,
+)
 from ._layout import layout_flex
 from .types import ActionEventType
 
@@ -61,6 +66,7 @@ class TabView(Component):
             )
         self._active = start
         self._active.activate()
+        _set_focus_chain(start)
 
     @property
     def active(self) -> Optional[Component]:
@@ -94,6 +100,7 @@ class TabView(Component):
             target._panel_loaded = True
         if self._on_switch is not None:
             self._on_switch(target)
+        _set_focus_chain(target)
         return target
 
     def accept(self, action: ActionEventType, **data):

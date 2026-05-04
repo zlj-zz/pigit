@@ -15,7 +15,7 @@ class TestCommandPalette:
     def test_init(self):
         p = CommandPalette()
         assert not p.is_active
-        assert p._value == ""
+        assert p._input_line.value == ""
 
     def test_open_close(self):
         p = CommandPalette()
