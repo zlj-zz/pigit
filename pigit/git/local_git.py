@@ -650,6 +650,34 @@ class LocalGit:
             )
         )
 
+    def get_commit_bodies(
+        self,
+        branch_name: str,
+        max_commits: int = 300,
+        path: Optional[str] = None,
+    ) -> dict[str, str]:
+        """Return a ``{sha: full body}`` map for ``branch_name``.
+
+        ``%B`` in ``git log`` includes the subject and any extra lines from
+        ``git commit -m`` separated by blank lines, so callers needing the
+        full message must read it instead of ``%s``. Records are framed with
+        ASCII RS (``\\x1e``) and SHA/body split with US (``\\x1f``) so multi-line
+        bodies survive shell parsing without ambiguity.
+        """
+        path = path or self.path
+        branch_part = shlex.quote(branch_name) if branch_name else ""
+        cmd = (f"git log {branch_part} --format=%H%x1f%B%x1e -n {max_commits}").strip()
+        _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
+
+        bodies: dict[str, str] = {}
+        for record in (resp or "").split("\x1e"):
+            record = record.strip("\n")
+            if not record or "\x1f" not in record:
+                continue
+            sha, body = record.split("\x1f", 1)
+            bodies[sha.strip()] = body.strip("\n")
+        return bodies
+
     def load_commit_info(
         self,
         commit_sha: str = "",

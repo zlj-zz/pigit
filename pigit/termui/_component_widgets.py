@@ -95,6 +95,10 @@ class ItemSelector(Component):
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False
+        # When set, the selector renders multiple rows per item: ``_item_starts[i]``
+        # is the row index where item ``i`` begins. ``curr_no`` then tracks the
+        # ITEM index, not the row index. ``None`` keeps legacy 1:1 behaviour.
+        self._item_starts: Optional[list[int]] = None
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -126,18 +130,79 @@ class ItemSelector(Component):
         return self.content[self._r_start : self._r_start + self.visible_row_count]
 
     def set_content(self, content: list[str]):
-        """Replace the list content and clamp the current selection to the new bounds."""
+        """Replace the list content and clamp the current selection to the new bounds.
+
+        Resets multi-row item layout — subclasses using :meth:`set_item_starts`
+        must call it again after every ``set_content``.
+        """
         self.content = content
+        self._item_starts = None
         if not content:
             self._r_start = 0
             self.curr_no = 0
             return
         self.curr_no = min(self.curr_no, len(content) - 1)
+        self._scroll_into_view()
+
+    def set_item_starts(self, starts: Optional[Sequence[int]]) -> None:
+        """Switch the selector into multi-row mode.
+
+        ``starts[i]`` is the row index at which item ``i`` begins. The list
+        must be ascending and start at 0. Pass ``None`` or an empty sequence
+        to revert to 1:1 row-per-item rendering.
+
+        After calling this, :attr:`curr_no` represents the ITEM index;
+        :meth:`next` / :meth:`previous` step by items, and the renderer
+        uses :meth:`row_to_item` to dispatch sub-rows to ``describe_row``.
+        """
+        if not starts:
+            self._item_starts = None
+            return
+        self._item_starts = list(starts)
+        if self.curr_no >= len(self._item_starts):
+            self.curr_no = len(self._item_starts) - 1
+        if self.curr_no < 0:
+            self.curr_no = 0
+        self._scroll_into_view()
+
+    def cursor_row(self) -> int:
+        """Return the terminal-row index where the cursor lives."""
+        if self._item_starts is None:
+            return self.curr_no
+        if not self._item_starts:
+            return 0
+        return self._item_starts[min(self.curr_no, len(self._item_starts) - 1)]
+
+    def row_to_item(self, row: int) -> tuple[int, int]:
+        """Translate a row index to ``(item_idx, sub_row)``.
+
+        Falls back to ``(row, 0)`` when not in multi-row mode.
+        """
+        starts = self._item_starts
+        if not starts:
+            return row, 0
+        # Largest i such that starts[i] <= row.
+        lo, hi = 0, len(starts) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if starts[mid] <= row:
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo, row - starts[lo]
+
+    def _scroll_into_view(self) -> None:
+        """Adjust ``_r_start`` so the cursor row is visible."""
+        row = self.cursor_row()
         visible_h = self._size[1]
-        if self.curr_no >= self._r_start + visible_h:
-            self._r_start = max(0, self.curr_no - visible_h + 1)
-        elif self.curr_no < self._r_start:
-            self._r_start = self.curr_no
+        if visible_h <= 0:
+            return
+        if row >= self._r_start + visible_h:
+            self._r_start = row - visible_h + 1
+        elif row < self._r_start:
+            self._r_start = row
+        if self._r_start < 0:
+            self._r_start = 0
 
     def clear_items(self):
         """Clear the selector content, leaving a single empty item."""
@@ -152,13 +217,31 @@ class ItemSelector(Component):
         if not self.content:
             return
         end = min(self._r_start + self._size[1], len(self.content))
+        if self._item_starts is None:
+            for idx in range(self._r_start, end):
+                row = idx - self._r_start
+                is_cursor = idx == self.curr_no
+                left, main, right = self.describe_row(idx, is_cursor)
+                self._draw_row_layout(surface, row, left, main, right)
+            return
+        cursor_r = self.cursor_row()
         for idx in range(self._r_start, end):
             row = idx - self._r_start
-            is_cursor = idx == self.curr_no
-            left, main, right = self.describe_row(idx, is_cursor)
+            is_cursor = idx == cursor_r
+            item_idx, sub_row = self.row_to_item(idx)
+            left, main, right = self.describe_row(
+                idx, is_cursor, item_idx=item_idx, sub_row=sub_row
+            )
             self._draw_row_layout(surface, row, left, main, right)
 
-    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: Optional[int] = None,
+        sub_row: int = 0,
+    ) -> tuple[
         list[Segment],
         list[Segment] | None,
         list[Segment],
@@ -167,6 +250,10 @@ class ItemSelector(Component):
 
         Subclasses override this to describe what should appear on each row;
         the base class handles all drawing via ``_draw_row_layout``.
+
+        ``item_idx`` and ``sub_row`` are only passed when the panel has
+        opted into multi-row layout via :meth:`set_item_starts`. Legacy
+        1:1 panels can keep the two-positional-argument signature.
 
         Returns:
             (left_segments, main_segments, right_segments) where each element
@@ -314,24 +401,25 @@ class ItemSelector(Component):
 
     def next(self, step: int = 1):
         """Move the selection forward by the given step."""
+        n_total = (
+            len(self._item_starts)
+            if self._item_starts is not None
+            else len(self.content)
+        )
         tmp_no = self.curr_no + step
-        if tmp_no < 0 or tmp_no >= len(self.content):
+        if tmp_no < 0 or tmp_no >= n_total:
             return
-
-        self.curr_no += step
-        if self.curr_no >= self._r_start + self._size[1]:
-            self._r_start += step
+        self.curr_no = tmp_no
+        self._scroll_into_view()
         self._notify_change()
 
     def previous(self, step: int = 1):
         """Move the selection backward by the given step."""
-        tmp = self.curr_no - step
-        if tmp < 0:
+        tmp_no = self.curr_no - step
+        if tmp_no < 0:
             return
-
-        self.curr_no -= step
-        if self.curr_no < self._r_start:
-            self._r_start -= step
+        self.curr_no = tmp_no
+        self._scroll_into_view()
         self._notify_change()
 
 
