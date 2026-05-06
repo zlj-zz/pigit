@@ -8,7 +8,8 @@ from plenty import get_console
 if TYPE_CHECKING:
     from ..config import Config
     from ..context import Context
-    from ..git.repo import Repo
+    from ..git.local_git import LocalGit
+    from ..git.managed_repos import ManagedRepos
 
 
 class BaseHandler(ABC):
@@ -23,8 +24,12 @@ class BaseHandler(ABC):
         return self.ctx.config
 
     @property
-    def repo(self) -> "Repo":
-        return self.ctx.repo
+    def local_git(self) -> "LocalGit":
+        return self.ctx.local_git
+
+    @property
+    def managed_repos(self) -> "ManagedRepos":
+        return self.ctx.managed_repos
 
     def preprocess(self) -> bool:
         """Return False to skip ``execute`` (e.g. unsupported platform)."""

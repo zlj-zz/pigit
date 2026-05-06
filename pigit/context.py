@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from .config import Config
     from .ext.executor_factory import ExecutorStrategy
-    from .git.repo import Repo
+    from .git.local_git import LocalGit
+    from .git.managed_repos import ManagedRepos
 
 _ctx_var: ContextVar[Optional["Context"]] = ContextVar("pigit_context", default=None)
 
@@ -27,7 +28,8 @@ class Context:
 
     config: "Config"
     executor: "ExecutorStrategy"
-    repo: "Repo"
+    local_git: "LocalGit"
+    managed_repos: "ManagedRepos"
     log: logging.Logger
     _token: Optional[Token] = field(default=None, init=False, repr=False)
 
@@ -72,11 +74,12 @@ class Context:
         repo_json_path: str,
         log_name: str = "pigit",
     ) -> "Context":
-        """Build default context: logging, shared executor, :class:`Repo`, and named logger."""
+        """Build default context: logging, shared executor, git helpers, and named logger."""
         from .const import LOG_FILE_PATH
         from .ext.executor_factory import ExecutorFactory, LocalExecutor
         from .ext.log import logger, setup_logging
-        from .git.repo import Repo
+        from .git.local_git import LocalGit
+        from .git.managed_repos import ManagedRepos
 
         setup_logging(
             debug=config.get().log.debug,
@@ -86,10 +89,12 @@ class Context:
         app_log = logger(log_name)
         executor = LocalExecutor(log=app_log)
         ExecutorFactory.set_strategy(executor)
-        repo = Repo(repo_json_path=repo_json_path, executor=executor)
+        local_git = LocalGit(executor=executor)
+        managed_repos = ManagedRepos(executor=executor, repo_json_path=repo_json_path)
         return cls(
             config=config,
             executor=executor,
-            repo=repo,
+            local_git=local_git,
+            managed_repos=managed_repos,
             log=app_log,
         )

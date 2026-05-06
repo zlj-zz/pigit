@@ -32,7 +32,7 @@ from .git.model import File
 
 if TYPE_CHECKING:
     from .git.local_git import LocalGit
-    from .git.repo import GitFileT, GitFuncT
+    from .git.model import GitFileT, GitFuncT
 
 
 def _staged_fg(ch: str) -> tuple[int, int, int]:

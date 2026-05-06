@@ -46,6 +46,15 @@ class ManagedRepos:
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
         self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
+        self._local_git = None
+
+    @property
+    def _git(self):
+        if self._local_git is None:
+            from .local_git import LocalGit
+
+            self._local_git = LocalGit(executor=self.executor, log=self.log)
+        return self._local_git
 
     @staticmethod
     def _make_repo_name(path: str, repos: dict[str, str], name_counts: Counter) -> str:
@@ -72,17 +81,17 @@ class ManagedRepos:
     def load_repos(self) -> dict:
         """Load repos info from cache file."""
 
-        if not self.repo_json_path.is_file():
+        try:
+            with self.repo_json_path.open(mode="r") as fp:
+                return json.load(fp)
+        except (FileNotFoundError, json.JSONDecodeError):
             return {}
-
-        with self.repo_json_path.open(mode="r") as fp:
-            return json.load(fp)
 
     def dump_repos(self, repos: dict) -> bool:
         """Dump repos info to cache file, re-write mode."""
 
         try:
-            with self.repo_json_path.open(mode="w+") as fp:
+            with self.repo_json_path.open(mode="w") as fp:
                 json.dump(repos, fp, indent=2)
                 return True
         except Exception as e:
@@ -147,7 +156,7 @@ class ManagedRepos:
         for repo_name in iter_managed_repo_names(exist_repos):
             prop = exist_repos[repo_name]
             repo_path = prop["path"]
-            head = self.get_head(repo_path)
+            head = self._git.get_head(repo_path)
 
             # jump invalid repo.
             if head is None:
@@ -169,10 +178,10 @@ class ManagedRepos:
                     flags=REPLY | DECODE,
                     cwd=repo_path,
                 )
-                commit_hash = self.get_first_pushed_commit(
+                commit_hash = self._git.get_first_pushed_commit(
                     path=repo_path, branch_name=head
                 )
-                commit = self.load_log(
+                commit = self._git.load_log(
                     limit=1,
                     arg_str="--format='%s (%cd)||%C(auto)%d%n' --date=relative --color",
                     path=repo_path,
@@ -210,7 +219,7 @@ class ManagedRepos:
 
         new_git_paths = []
         for path in paths:
-            repo_path, _ = self.confirm_repo(path)
+            repo_path, _ = self._git.confirm_repo(path)
             if repo_path and repo_path not in exist_paths_set:
                 new_git_paths.append(repo_path)
 

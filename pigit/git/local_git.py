@@ -13,6 +13,7 @@ from plenty.str_utils import shorten, byte_str2str
 from plenty.console import Console
 
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
+from pigit.ext.executor_factory import ExecutorFactory
 from pigit.ext.utils import adjudgment_type, get_file_icon
 from .model import File, Commit, Branch
 
@@ -44,12 +45,12 @@ class LocalGit:
 
     def __init__(
         self,
-        executor: Executor,
+        executor: Optional[Executor] = None,
         path: Optional[str] = None,
         log: Optional[logging.Logger] = None,
     ) -> None:
-        self.executor = executor
-        self.log = log
+        self.executor = executor or ExecutorFactory.get()
+        self.log = log or logging.getLogger(__name__)
         self.path = path
 
     def confirm_repo(
@@ -102,6 +103,10 @@ class LocalGit:
             git_conf_path = str((Path(repo_path) / git_dir_raw).resolve())
 
         return repo_path, git_conf_path
+
+    def bind_path(self, path: str) -> "LocalGit":
+        """Return a new LocalGit instance pinned to the given path."""
+        return LocalGit(executor=self.executor, path=path, log=self.log)
 
     def get_config(self, path: Optional[str] = None) -> dict[str, dict[str, str]]:
         """Try to read git config and parse, return a config dict.

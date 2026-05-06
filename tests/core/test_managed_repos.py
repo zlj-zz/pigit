@@ -10,7 +10,6 @@ import pytest
 from pigit.ext.executor_factory import MockExecutor
 from pigit.git.local_git import LocalGit
 from pigit.git.managed_repos import ManagedRepos
-from pigit.git.repo import Repo
 
 
 @pytest.fixture
@@ -141,7 +140,7 @@ def test_add_repos_dry_run(tmp_path, tmp_repos_json):
     root.mkdir()
     responses = _rev_parse_responses(root)
     ex = MockExecutor(responses=responses)
-    r = Repo(executor=ex, repo_json_path=str(tmp_repos_json))
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
     added = r.add_repos([str(root)], dry_run=True)
     assert len(added) == 1
     assert not tmp_repos_json.is_file()
@@ -152,7 +151,7 @@ def test_add_repos_persists(tmp_path, tmp_repos_json):
     root.mkdir()
     responses = _rev_parse_responses(root)
     ex = MockExecutor(responses=responses)
-    r = Repo(executor=ex, repo_json_path=str(tmp_repos_json))
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
     added = r.add_repos([str(root)], dry_run=False)
     assert added
     data = json.loads(tmp_repos_json.read_text())
@@ -256,7 +255,7 @@ def test_process_repos_option_filtered(tmp_repos_json):
 def test_ll_repos_reverse_invalid(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"bad": {"path": "/nope"}}))
     ex = MockExecutor()
-    r = Repo(executor=ex, repo_json_path=str(tmp_repos_json))
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
     with patch.object(LocalGit, "get_head", return_value=None):
         rows = list(r.ll_repos(reverse=True))
     assert rows and rows[0][0][0] == "bad"
@@ -271,7 +270,7 @@ def test_ll_repos_normal_summary(tmp_repos_json):
             "git ls-files -zo --exclude-standard": (0, "", ""),
         }
     )
-    r = Repo(executor=ex, repo_json_path=str(tmp_repos_json))
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
     with patch.object(LocalGit, "get_head", return_value="main"):
         with patch.object(LocalGit, "get_first_pushed_commit", return_value="deadbeef"):
             with patch.object(LocalGit, "load_log", return_value="hello||[main]"):

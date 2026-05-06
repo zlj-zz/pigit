@@ -3,6 +3,7 @@
 """This file save some model class of git info class."""
 
 from dataclasses import dataclass, field
+from typing import Callable, Union
 
 
 # flake8: noqa
@@ -112,3 +113,7 @@ class Branch:
 
     # True if this is a remote-tracking branch.
     is_remote: bool = False
+
+
+GitFileT = Union[File, str]
+GitFuncT = Callable[[GitFileT], None]

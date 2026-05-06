@@ -7,7 +7,7 @@ from plenty.table import UintTable
 from plenty.style import Style
 
 from .const import __url__, __version__
-from .git import Repo, git_version
+from .git import LocalGit, git_version
 
 
 def introduce() -> str:
@@ -58,7 +58,7 @@ def show_gitconfig(
         color (bool, optional): _description_. Defaults to True.
 
     """
-    repo_handle = Repo(path)
+    repo_handle = LocalGit(path=path)
     repo_path, _ = repo_handle.confirm_repo()
 
     if not repo_path:

@@ -29,7 +29,7 @@ def build_context_signals() -> dict[str, bool]:
     if ctx is None:
         return signals
     try:
-        files = ctx.repo.load_status()
+        files = ctx.local_git.load_status()
     except Exception:
         return signals
 

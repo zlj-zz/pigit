@@ -12,12 +12,12 @@ from pigit.handlers.tui_handler import TuiHandler
 
 @pytest.fixture
 def mock_ctx():
-    repo = MagicMock()
-    repo.cd_repo.return_value = (0, None)
-    repo.add_repos.return_value = ["/a", "/b"]
-    repo.rm_repos.return_value = [("n", "/p")]
-    repo.rename_repo.return_value = (True, "ok")
-    repo.ll_repos.return_value = iter(
+    managed_repos = MagicMock()
+    managed_repos.cd_repo.return_value = (0, None)
+    managed_repos.add_repos.return_value = ["/a", "/b"]
+    managed_repos.rm_repos.return_value = [("n", "/p")]
+    managed_repos.rename_repo.return_value = (True, "ok")
+    managed_repos.ll_repos.return_value = iter(
         [
             [
                 ("repo1", ""),
@@ -29,9 +29,9 @@ def mock_ctx():
             ]
         ]
     )
-    repo.report_repos.return_value = "report-text"
-    repo.open_repo_in_browser.return_value = (0, "opened")
-    return SimpleNamespace(repo=repo, config=MagicMock())
+    managed_repos.report_repos.return_value = "report-text"
+    managed_repos.open_repo_in_browser.return_value = (0, "opened")
+    return SimpleNamespace(managed_repos=managed_repos, config=MagicMock())
 
 
 def test_repo_handler_add_found(mock_ctx):
@@ -40,12 +40,12 @@ def test_repo_handler_add_found(mock_ctx):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(paths=["/x"], dry_run=False)
         h.add(args)
-    mock_ctx.repo.add_repos.assert_called_once()
+    mock_ctx.managed_repos.add_repos.assert_called_once()
     assert echo.call_count >= 2
 
 
 def test_repo_handler_add_none(mock_ctx):
-    mock_ctx.repo.add_repos.return_value = []
+    mock_ctx.managed_repos.add_repos.return_value = []
     echo = MagicMock()
     with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
         h = RepoCommandHandler(mock_ctx)
@@ -70,13 +70,13 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         h.open_browser(
             SimpleNamespace(branch=None, issue=None, commit=None, print=False)
         )
-    mock_ctx.repo.clear_repos.assert_called_once()
-    mock_ctx.repo.report_repos.assert_called_once()
-    mock_ctx.repo.cd_repo.assert_called_once_with(
+    mock_ctx.managed_repos.clear_repos.assert_called_once()
+    mock_ctx.managed_repos.report_repos.assert_called_once()
+    mock_ctx.managed_repos.cd_repo.assert_called_once_with(
         "r", pick=False, pick_alt_screen=False
     )
-    mock_ctx.repo.process_repos_option.assert_called_once()
-    mock_ctx.repo.open_repo_in_browser.assert_called_once()
+    mock_ctx.managed_repos.process_repos_option.assert_called_once()
+    mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
 
 def test_tui_handler_preprocess_windows():
@@ -107,7 +107,7 @@ def test_tui_handler_execute_runs_app():
 
 def test_repo_handler_cd_pick_no_tty(mock_ctx):
     echo = MagicMock()
-    mock_ctx.repo.cd_repo.return_value = (1, "needs tty")
+    mock_ctx.managed_repos.cd_repo.return_value = (1, "needs tty")
     args = SimpleNamespace(repo=None, repo_cd_pick=True)
     with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
         with pytest.raises(SystemExit) as exc:

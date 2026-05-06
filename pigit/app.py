@@ -44,7 +44,8 @@ from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
 from .app_status import StatusPanel
 from .app_theme import THEME
-from .git.repo import Repo
+from .git.local_git import LocalGit
+from .git.managed_repos import ManagedRepos
 
 
 @dataclass
@@ -73,11 +74,25 @@ class PigitApplication(Application):
         ("I", "toggle_inspector"),
     ]
 
-    def __init__(self, repo: Optional[Repo] = None) -> None:
+    def __init__(
+        self,
+        local_git: Optional[LocalGit] = None,
+        managed_repos: Optional[ManagedRepos] = None,
+    ) -> None:
         super().__init__(input_takeover=True)
-        self._repo = repo or Repo()
-        self._repo_path, self._repo_conf = self._repo.confirm_repo()
-        self._git = self._repo.bind_path(self._repo_path)
+        self._local_git = local_git or LocalGit()
+        self._managed_repos = managed_repos
+        self._repo_path, self._repo_conf = self._local_git.confirm_repo()
+        if self._repo_path and self._managed_repos is not None:
+            try:
+                from .context import Context
+
+                ctx = Context.try_current()
+                if ctx is not None and ctx.config.get().repo.auto_append:
+                    self._managed_repos.add_repos([self._repo_path])
+            except Exception:
+                logging.debug("auto_append failed", exc_info=True)
+        self._git = self._local_git.bind_path(self._repo_path)
         self._widgets: Optional[_PigitWidgets] = None
         self._inspector_visible = False
         # Header state

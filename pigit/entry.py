@@ -58,7 +58,7 @@ def pigit(args: "Namespace", _) -> None:
         console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
-        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.get().info.repo_include))
+        console.echo(ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include))
 
     elif args.complete:
         # Generate completion vars dict.
