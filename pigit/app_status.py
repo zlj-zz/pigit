@@ -372,11 +372,11 @@ class StatusPanel(ItemSelector):
         if self._visual_mode:
             if self._visual_scroll:
                 return [
-                    ("j/k", "Navigate & select"),
+                    ("jk/↑↓", "Navigate & select"),
                     ("s", "Exit scroll mode"),
                 ]
             return [
-                ("j/k", "Navigate"),
+                ("jk/↑↓", "Navigate"),
                 ("Space", "Select"),
                 ("a", "Stage selected"),
                 ("d", "Discard selected"),
@@ -385,7 +385,7 @@ class StatusPanel(ItemSelector):
                 ("s", "Toggle scroll mode"),
             ]
         return [
-            ("j/k", "Navigate"),
+            ("jk/↑↓", "Navigate"),
             ("Enter", "Open"),
             ("a", "Stage"),
             ("d", "Discard"),

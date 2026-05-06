@@ -86,7 +86,7 @@ class BranchPanel(ItemSelector):
         """Return help pairs for branch panel."""
         scope_label = self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]
         return [
-            ("j/k", "Navigate"),
+            ("jk/↑↓", "Navigate"),
             ("c", "Checkout"),
             ("n", "New branch"),
             ("r", "Rename"),
