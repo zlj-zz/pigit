@@ -39,6 +39,7 @@ class DiffViewer(LineTextBrowser):
     _CACHE_MAX = 64
     LINE_NO_WIDTH = 5
     LINE_NO_STR_WIDTH = 4  # LINE_NO_WIDTH - 1
+    DIFF_PREFIX_WIDTH = 1
     SCROLL_PAGE_SIZE = 5
     TAB_WIDTH = 8
     DENSITY_SHORT = 10
@@ -46,6 +47,21 @@ class DiffViewer(LineTextBrowser):
     DENSITY_LONG = 60
     BORDER_ROWS = 2
     BORDER_COLS = 2
+
+    @staticmethod
+    def _is_file_header(line: str) -> bool:
+        return line.startswith("--- ") or line.startswith("+++ ")
+
+    @staticmethod
+    def _is_add_line(line: str) -> bool:
+        return line.startswith("+") and not line.startswith("+++")
+
+    @staticmethod
+    def _is_del_line(line: str) -> bool:
+        return line.startswith("-") and not line.startswith("---")
+
+    def _main_width(self, available: int) -> int:
+        return available - self.LINE_NO_WIDTH - self.DIFF_PREFIX_WIDTH - 1
 
     def __init__(
         self,
@@ -110,7 +126,12 @@ class DiffViewer(LineTextBrowser):
                 result.append([])
                 continue
             else:
-                code = line[1:] if line and line[0] in "+- " else line
+                if self._is_file_header(line):
+                    code = line
+                elif line and line[0] in "+- ":
+                    code = line[1:]
+                else:
+                    code = line
                 ml_type = (
                     self._multiline_mask[i] if i < len(self._multiline_mask) else None
                 )
@@ -208,13 +229,15 @@ class DiffViewer(LineTextBrowser):
 
     def _heatmap_entry(self, line: str) -> tuple[str, tuple[int, int, int]]:
         """Return (density_symbol, color) for a single diff line."""
-        if line.startswith("+"):
+        if self._is_file_header(line):
+            return " ", THEME.fg_dim
+        if self._is_add_line(line):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
                 THEME.accent_green,
             )
-        if line.startswith("-"):
+        if self._is_del_line(line):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
@@ -249,11 +272,13 @@ class DiffViewer(LineTextBrowser):
                     old_line = 0
                     new_line = 0
                 self._line_numbers.append("")
-            elif line.startswith("+"):
+            elif self._is_file_header(line):
+                self._line_numbers.append("")
+            elif self._is_add_line(line):
                 self._line_numbers.append(str(new_line).rjust(self.LINE_NO_STR_WIDTH))
                 new_line += 1
-            elif line.startswith("-"):
-                self._line_numbers.append(str(old_line).rjust(self.LINE_NO_WIDTH - 1))
+            elif self._is_del_line(line):
+                self._line_numbers.append(str(old_line).rjust(self.LINE_NO_STR_WIDTH))
                 old_line += 1
             elif line.startswith("\\"):
                 self._line_numbers.append("")
@@ -282,10 +307,13 @@ class DiffViewer(LineTextBrowser):
         fill_width: int,
     ) -> None:
         """Render one diff line: background, line number, text, and heatmap."""
-        if line.startswith("+"):
+        is_add = self._is_add_line(line)
+        is_del = self._is_del_line(line)
+
+        if is_add:
             bg = THEME.bg_success
             fg = THEME.fg_primary
-        elif line.startswith("-"):
+        elif is_del:
             bg = THEME.bg_danger
             fg = THEME.fg_primary
         elif line.startswith("@@"):
@@ -302,24 +330,21 @@ class DiffViewer(LineTextBrowser):
         if line_no:
             surface.draw_text_rgb(row, x_offset, line_no, fg=THEME.fg_dim, bg=bg)
 
+        prefix_x = x_offset + self.LINE_NO_WIDTH
+        if is_add:
+            surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.accent_green, bg=bg)
+        elif is_del:
+            surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.accent_red, bg=bg)
+
         # ── Syntax-highlighted text rendering ──
-        text_start_col = x_offset + self.LINE_NO_WIDTH
+        text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
         col = text_start_col
         max_col = text_start_col + main_w
         tokens: list[tuple[str, tuple[int, int, int], int]] = []
 
-        if line.startswith("@@"):
-            tokens = self._render_tokens[idx]
-        elif line.startswith("\\"):
-            # "\ No newline at end of file" — draw as comment
+        if line.startswith("\\"):
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
         else:
-            if line and line[0] in "+-":
-                prefix = line[0]
-                prefix_fg = THEME.accent_green if prefix == "+" else THEME.accent_red
-                surface.draw_text_rgb(row, col, prefix, fg=prefix_fg, bg=bg)
-                col += 1
-
             tokens = self._render_tokens[idx]
 
         self._draw_tokens(surface, row, col, max_col, tokens, bg)
@@ -361,7 +386,7 @@ class DiffViewer(LineTextBrowser):
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS
-        main_w = content_w - self.LINE_NO_WIDTH - 1
+        main_w = self._main_width(content_w)
         end = min(self._i + content_h, len(self._content))
 
         for idx in range(self._i, end):
@@ -395,7 +420,7 @@ class DiffViewer(LineTextBrowser):
         if w <= self.LINE_NO_WIDTH + 1:
             return
 
-        main_w = w - self.LINE_NO_WIDTH - 1
+        main_w = self._main_width(w)
         end = min(self._i + h, len(self._content))
 
         for idx in range(self._i, end):
