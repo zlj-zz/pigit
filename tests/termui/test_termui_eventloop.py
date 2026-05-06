@@ -417,7 +417,7 @@ def test_layer_stack_error_recovery_closes_modal() -> None:
 
 
 def test_layer_stack_question_mark_toggles_help_popup() -> None:
-    """``?`` toggles help popup via Popup.dispatch_overlay_key (implicit HANDLED_IMPLICIT)."""
+    """``?`` toggles help popup via HelpPanel.toggle (explicit HANDLED_EXPLICIT)."""
     from pigit.termui._layer import LayerStack
     from pigit.termui._overlay_components import HelpPanel, Popup
     from pigit.termui.types import LayerKind, OverlayDispatchResult
@@ -432,6 +432,7 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
     try:
         help_panel = HelpPanel()
         popup = Popup(help_panel)
+        # Popup auto-binds toggle; no manual wiring needed.
         popup.open = True
 
         # Push popup to MODAL layer
@@ -440,7 +441,7 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
         # Dispatch "?" key
         result = stack.dispatch("?")
 
-        assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+        assert result is OverlayDispatchResult.HANDLED_EXPLICIT
         assert not stack.has_any_open()
     finally:
         from pigit.termui._overlay_context import reset_overlay_host

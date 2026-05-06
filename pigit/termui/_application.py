@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
 from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
-from pigit.termui._component_base import Component
+from pigit.termui._component_base import Component, _set_focus_chain
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 
@@ -59,26 +59,28 @@ class _ApplicationEventLoop(AppEventLoop):
 
         handler = self._app_key_handlers.get(key)
         if handler is not None:
-            try:
-                handler()
-            except ExitEventLoop:
-                raise
-            except Exception:
-                _logger.exception("App binding for '%s' failed", key)
-            self.render()
+            self._run_app_handler(handler, key, "App binding for '%s' failed")
             return "binding"
 
         if self._app_on_key is not None:
-            try:
-                self._app_on_key(key)
-            except ExitEventLoop:
-                raise
-            except Exception:
-                _logger.exception("App on_key for '%s' failed", key)
-            self.render()
+            self._run_app_handler(
+                lambda: self._app_on_key(key), key, "App on_key for '%s' failed"
+            )
             return "app"
 
         return super()._dispatch_semantic_string(key)
+
+    def _run_app_handler(self, handler, key: str, log_fmt: str) -> None:
+        overlay_was_open = self._child.has_overlay_open()
+        try:
+            handler()
+        except ExitEventLoop:
+            raise
+        except Exception:
+            _logger.exception(log_fmt, key)
+        if overlay_was_open and not self._child.has_overlay_open():
+            _set_focus_chain(self._child._find_focus_leaf())
+        self.render()
 
 
 class Application:

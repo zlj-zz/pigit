@@ -571,30 +571,28 @@ class TestPopup:
         result = popup.dispatch_overlay_key("x")
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def test_popup_fallback_overlay_key_help_toggle(self):
-        from pigit.termui._overlay_context import reset_overlay_host
+    def test_help_panel_toggle_binding(self):
+        """HelpPanel binds '?' to toggle and delegates to on_toggle callback."""
+        toggled = []
+        panel = HelpPanel(on_toggle=lambda: toggled.append(True))
+        panel.toggle()
+        assert toggled == [True]
 
-        class _HelpChild(Component):
-            NAME = "help_child"
-            TOGGLE_HELP_SEMANTIC_KEYS = ("?",)
+    def test_help_panel_toggle_noop_without_callback(self):
+        """HelpPanel.toggle() is safe when on_toggle is None."""
+        panel = HelpPanel()
+        panel.toggle()  # should not raise
 
-            def _render_surface(self, surface):
-                pass
-
-            def refresh(self):
-                pass
-
-        host = MagicMock()
-        host._layer_stack = MagicMock()
-        host._layer_stack.top.return_value = None
-        child = _HelpChild()
-        popup = Popup(child)
-        token = self._with_host(host)
-        try:
-            result = popup.dispatch_overlay_key("?")
-            assert result is OverlayDispatchResult.HANDLED_IMPLICIT
-        finally:
-            reset_overlay_host(token)
+    def test_popup_auto_binds_child_toggle(self):
+        """Popup auto-wires its toggle() to child.set_on_toggle if available."""
+        toggled = []
+        panel = HelpPanel()
+        popup = Popup(panel)
+        # Popup should have auto-bound its toggle to the panel
+        panel.toggle()
+        assert popup.open is True
+        panel.toggle()
+        assert popup.open is False
 
     def test_popup_fallback_swallows_unbound(self):
         child = _Leaf()

@@ -14,7 +14,7 @@ from typing import Any, Callable, ClassVar, Optional, Sequence
 
 from . import _overlay_context, keys, palette
 from ._bindings import resolve_key_handlers_merged
-from ._component_base import Component
+from ._component_base import Component, _set_focus_chain
 from ._frame import BoxFrame
 from ._segment import Segment
 from ._text import sanitize_for_display
@@ -40,19 +40,14 @@ class HelpPanel(Component):
     Bind ``?`` to a handler that refreshes rows (e.g. :meth:`refresh_entries_from_source`)
     when opening help, then calls ``popup.toggle()``.
 
-    :data:`TOGGLE_HELP_SEMANTIC_KEYS` lists keys that toggle help while this panel's
-    wrapping :class:`Popup` is active; overlay routing calls
-    :meth:`Popup.dispatch_overlay_key`, which runs :meth:`Popup.toggle` for those keys
-    when shell and child bindings do not handle them.
     """
-
-    TOGGLE_HELP_SEMANTIC_KEYS: ClassVar[tuple[str, ...]] = ("?",)
 
     BINDINGS = [
         (keys.KEY_DOWN, "scroll_down"),
         (keys.KEY_UP, "scroll_up"),
         ("j", "scroll_down"),
         ("k", "scroll_up"),
+        ("?", "toggle"),
     ]
 
     def __init__(
@@ -65,12 +60,14 @@ class HelpPanel(Component):
         *,
         entries_source: Optional[Component] = None,
         key_fg: Optional[tuple[int, int, int]] = None,
+        on_toggle: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(x=x, y=y, size=size)
         self._inner_w_cfg = inner_width
         self._inner_h_cfg = inner_height
         self._entries_source = entries_source
         self._key_fg = key_fg
+        self._on_toggle = on_toggle
         self._lines: list[str] = []
         self._offset = 0
         self._inner_w = 40
@@ -216,6 +213,15 @@ class HelpPanel(Component):
         """Scroll the help content up by one line."""
         self._offset = max(0, self._offset - 1)
 
+    def set_on_toggle(self, cb: Optional[Callable[[], None]]) -> None:
+        """Set the callback invoked by :meth:`toggle`."""
+        self._on_toggle = cb
+
+    def toggle(self) -> None:
+        """Delegate toggle to the wrapping popup shell, if any."""
+        if self._on_toggle is not None:
+            self._on_toggle()
+
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
         pass
@@ -278,6 +284,9 @@ class Popup(Component):
         size: Optional[tuple[int, int]] = None,
     ) -> None:
         self._child = child
+        # Auto-bind toggle callback for children that support it (e.g. HelpPanel)
+        if hasattr(child, "set_on_toggle"):
+            child.set_on_toggle(self.toggle)
         self._offset = offset
         self.exit_key = exit_key
         self.open = False
@@ -322,20 +331,13 @@ class Popup(Component):
         return True
 
     def _fallback_overlay_key(self, key: str) -> OverlayDispatchResult:
-        """
-        After shell and child miss: if the wrapped component defines semantic toggle keys,
-        call :meth:`toggle`; otherwise swallow.
-        """
-
-        toggle_keys = getattr(type(self._child), "TOGGLE_HELP_SEMANTIC_KEYS", ())
-        if key in toggle_keys:
-            self.toggle()
-            return OverlayDispatchResult.HANDLED_IMPLICIT
+        """After shell and child miss: swallow unbound keys."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
     def begin_session(self) -> None:
         """Push this popup onto the MODAL layer via overlay_context."""
         _overlay_context.layer_push(LayerKind.MODAL, self)
+        _set_focus_chain(self)
 
     def end_session(self) -> None:
         """Pop the top component from the MODAL layer via overlay_context."""
@@ -359,6 +361,7 @@ class Popup(Component):
             before_show()
         self.show()
         host._layer_stack.push(LayerKind.MODAL, self)
+        _set_focus_chain(self)
 
     def show(self) -> None:
         """Open the popup."""
