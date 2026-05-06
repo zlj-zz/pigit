@@ -539,7 +539,7 @@ class CommitPanel(ItemSelector):
             entries.append(
                 [
                     Segment("HEAD", fg=head_fg, style_flags=cursor_flags),
-                    Segment("->", fg=arrow_fg, style_flags=cursor_flags),
+                    Segment(" -> ", fg=arrow_fg, style_flags=cursor_flags),
                     Segment(head_ref, fg=local_fg, style_flags=cursor_flags),
                 ]
             )
