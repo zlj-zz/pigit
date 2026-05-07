@@ -153,24 +153,25 @@ class Parser(ArgumentParser):
         conflict_handler: str = "error",
         add_help: bool = True,
         allow_abbrev: bool = True,
-        # exit_on_error: bool = True,  # python3.9 feature
         callback: Optional[Callable] = None,
+        **kwargs,
     ) -> None:
         if parents is None:
             parents = []
         super().__init__(
-            prog,
-            usage,
-            description,
-            epilog,
-            parents,
-            formatter_class,
-            prefix_chars,
-            fromfile_prefix_chars,
-            argument_default,
-            conflict_handler,
-            add_help,
-            allow_abbrev,
+            prog=prog,
+            usage=usage,
+            description=description,
+            epilog=epilog,
+            parents=parents,
+            formatter_class=formatter_class,
+            prefix_chars=prefix_chars,
+            fromfile_prefix_chars=fromfile_prefix_chars,
+            argument_default=argument_default,
+            conflict_handler=conflict_handler,
+            add_help=add_help,
+            allow_abbrev=allow_abbrev,
+            **kwargs,
         )
 
         self.subparsers_action: Optional["_SubParsersAction"] = None
