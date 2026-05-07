@@ -20,7 +20,6 @@ from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
 
-
 _GRAPH_BG = (45, 45, 50)
 
 # GitHub-style green heatmap palette (0 → 5)

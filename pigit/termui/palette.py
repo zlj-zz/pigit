@@ -8,7 +8,6 @@ Date: 2026-04-27
 
 from __future__ import annotations
 
-
 PEARL: tuple[int, int, int] = (220, 220, 230)
 SLATE: tuple[int, int, int] = (120, 120, 130)
 INK: tuple[int, int, int] = (18, 18, 22)

@@ -12,7 +12,6 @@ from typing import Optional
 
 from . import palette
 
-
 _STYLE_NAMES: dict[int, str] = {
     palette.STYLE_BOLD: "bold",
     palette.STYLE_DIM: "dim",

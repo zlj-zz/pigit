@@ -11,7 +11,6 @@ import textwrap
 from .base import ShellCompletion
 from .widgets import WIDGETS
 
-
 # Git helper functions for bash completion
 BASH_HELPERS = {
     "branch": '_git_branches() { git branch -a 2>/dev/null | sed "s/^[\\* ]*//" | sed "s|^remotes/||" | sort -u; }',
@@ -30,8 +29,7 @@ class BashCompletion(ShellCompletion):
     SHELL: str = "bash"
 
     # Enhanced template with git-aware completion
-    TEMPLATE_SRC: str = textwrap.dedent(
-        """\
+    TEMPLATE_SRC: str = textwrap.dedent("""\
         #!/usr/bin/env bash
         # PIGIT shell completion script
         # Generated for bash
@@ -115,8 +113,7 @@ class BashCompletion(ShellCompletion):
         complete -F %(func_name)s %(prop)s
 
 %(widget)s
-        """
-    )
+        """)
 
     def _escape_case_pattern(self, pattern: str) -> str:
         """Escape case statement patterns to prevent wildcard matching.
@@ -179,11 +176,9 @@ class BashCompletion(ShellCompletion):
                     helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
                     # Escape case pattern to handle wildcards like '.' in 'b.o'
                     escaped_pattern = self._escape_case_pattern(cmd_name)
-                    cmd_arg_cases.append(
-                        f"""        {escaped_pattern})
+                    cmd_arg_cases.append(f"""        {escaped_pattern})
                         COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
-                        ;;"""
-                    )
+                        ;;""")
 
         # Extract top-level options and commands
         top_options = []

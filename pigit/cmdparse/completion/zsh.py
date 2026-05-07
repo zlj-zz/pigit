@@ -188,15 +188,13 @@ class ZshCompletion(ShellCompletion):
         all_cases = relation_str + "\n".join(arg_completion_cases)
 
         if all_cases.strip():
-            case_block = textwrap.dedent(
-                """
+            case_block = textwrap.dedent("""
                 if [[ ${{#line}} -eq {depth} ]]; then
                   case $line[{idx}] in
                 {cases}
                   esac
                 fi
-                """
-            ).format(depth=idx + 1, idx=idx, cases=all_cases.rstrip())
+                """).format(depth=idx + 1, idx=idx, cases=all_cases.rstrip())
             relationship.append(case_block)
 
     def _generate_git_helpers(self) -> str:
@@ -226,13 +224,11 @@ class ZshCompletion(ShellCompletion):
                 _subs.append(f"'{opt_name}[{help_str}]' \\")
 
             _sub_opt_str = (
-                textwrap.dedent(
-                    """
+                textwrap.dedent("""
                     ######################
                     # sub-commands helper
                     ######################
-                    """
-                )
+                    """)
                 + _TEMP_V % ("sub_opt", textwrap.indent("\n".join(_subs), "    "))
             )
 
@@ -244,12 +240,10 @@ class ZshCompletion(ShellCompletion):
 
         if _sub_opt_str:
             _arguments.append("'1: :->opts'\\")
-            _opt_case_str = textwrap.dedent(
-                """
+            _opt_case_str = textwrap.dedent("""
                 case $state in
                 opts) __sub_opt_values ;;
-                """
-            )
+                """)
 
         if _sub_sub_opt_comps:
             _arguments.append("'*::arg:->args'\\")

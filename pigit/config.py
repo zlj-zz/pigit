@@ -29,8 +29,7 @@ class ConfigError(Exception):
 class Config(metaclass=Singleton):
     """PIGIT configuration class."""
 
-    CONFIG_TEMPLATE: str = textwrap.dedent(
-        """\
+    CONFIG_TEMPLATE: str = textwrap.dedent("""\
         #? Config file for pigit v. {version}
 
         #  ____ ___ ____ ___ _____                            __ _
@@ -87,8 +86,7 @@ class Config(metaclass=Singleton):
 
         # (bool) Whether output log in terminal.
         output = {log_output}
-        """
-    )
+        """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
     _git_config_format_candidate: list[str] = ["normal", "table"]

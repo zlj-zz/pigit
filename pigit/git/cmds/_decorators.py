@@ -12,7 +12,6 @@ from functools import wraps
 from ._models import CommandDef, CommandMeta, CommandCategory, SecurityLevel
 from ._registry import get_registry
 
-
 if TYPE_CHECKING:
     from ._security import SecureExecutor
     from ._completion_types import CompletionType
