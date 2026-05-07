@@ -14,7 +14,8 @@ def introduce() -> str:
     """Print the description information."""
 
     # Print version.
-    introduce_str = textwrap.dedent("""\
+    introduce_str = textwrap.dedent(
+        """\
         ` ____ ___ ____ ___ _____
         |  _ \\_ _/ ___|_ _|_   _|
         | |_) | | |  _ | |  | |
@@ -30,7 +31,8 @@ def introduce() -> str:
         The open source path on github: u`{url}`<sky_blue>
 
         You can use `-h`<ok> or `--help`<ok> to get help and usage.
-        """)
+        """
+    )
 
     # Print git version.
     _git_version = git_version() or "`Don't found Git, maybe need install.`<error>"
