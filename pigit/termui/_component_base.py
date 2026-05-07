@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_component_base.py
 Description: Base Component class and related utilities for the TUI framework.
@@ -10,7 +9,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
+from typing import TYPE_CHECKING
+from collections.abc import Callable, Sequence
 
 from ._bindings import (
     BindingsList,
@@ -33,10 +33,10 @@ _logger = logging.getLogger(__name__)
 NONE_SIZE = (0, 0)
 
 # Module-level tracking of the last focused component for focus-chain updates.
-_last_focused: Optional["Component"] = None
+_last_focused: Component | None = None
 
 
-def _set_focus_chain(leaf: "Component") -> None:
+def _set_focus_chain(leaf: Component) -> None:
     """Set _focus_level along the parent chain from leaf to root."""
     global _last_focused
     if _last_focused is leaf:
@@ -46,7 +46,7 @@ def _set_focus_chain(leaf: "Component") -> None:
         old._focus_level = -1
         old = old.parent
     level = 0
-    node: Optional["Component"] = leaf
+    node: Component | None = leaf
     while node is not None:
         node._focus_level = level
         level += 1
@@ -59,7 +59,7 @@ class ComponentError(Exception):
 
 
 def _render_child_to_surface(
-    component: "Component", surface: "Surface", log_prefix: str
+    component: Component, surface: Surface, log_prefix: str
 ) -> None:
     w, h = component._size
     if w <= 0 or h <= 0:
@@ -84,16 +84,16 @@ class Component(ABC):
     Subclasses must implement :meth:`_render_surface`.
     """
 
-    BINDINGS: Optional[BindingsList] = None
+    BINDINGS: BindingsList | None = None
 
     def __init__(
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        children: Optional[Sequence["Component"]] = None,
-        parent: Optional["Component"] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        children: Sequence[Component] | None = None,
+        parent: Component | None = None,
+        id: str | None = None,
     ) -> None:
         self._activated = False
         self._focus_level: int = -1
@@ -151,7 +151,6 @@ class Component(ABC):
         Default is no-op; override if the component needs to rebuild internal
         state when resized or notified.
         """
-        pass
 
     def accept(self, action: ActionEventType, **data):
         """Process emit action of child."""
@@ -198,12 +197,11 @@ class Component(ABC):
         self._size = size
         self.refresh()
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Render this component into the given Surface.
 
         New components should implement this instead of `_render`.
         """
-        pass
 
     @property
     def is_focus_leaf(self) -> bool:
@@ -271,7 +269,7 @@ class Component(ABC):
         return _default_help_entries(self)
 
     @property
-    def renderer(self) -> Optional["Renderer"]:
+    def renderer(self) -> Renderer | None:
         """Get the current renderer from context.
 
         Returns:
@@ -280,7 +278,7 @@ class Component(ABC):
         return get_renderer()
 
     @property
-    def renderer_strict(self) -> "Renderer":
+    def renderer_strict(self) -> Renderer:
         """Get renderer, raising if not available.
 
         Returns:
@@ -298,7 +296,7 @@ def _truncate_help_line(text: str, max_len: int = 120) -> str:
     return text[: max_len - 1] + "\u2026"
 
 
-def _default_help_entries(component: "Component") -> list[tuple[str, str]]:
+def _default_help_entries(component: Component) -> list[tuple[str, str]]:
     cls = type(component)
     rows: list[tuple[str, str]] = []
     for semantic_key, target in list_bindings(component, cls)[:64]:
@@ -308,8 +306,8 @@ def _default_help_entries(component: "Component") -> list[tuple[str, str]]:
 
 
 def _describe_binding_target(
-    owner: "Component",
-    target: Union[str, Callable[..., object]],
+    owner: Component,
+    target: str | Callable[..., object],
 ) -> str:
     if isinstance(target, str):
         fn = getattr(owner, target, None)
@@ -323,8 +321,8 @@ def _describe_binding_target(
 
 def bind_signals(
     component: Component,
-    *signals: Union[Signal, Computed],
-    callback: Optional[Callable[[], None]] = None,
+    *signals: Signal | Computed,
+    callback: Callable[[], None] | None = None,
 ) -> Callable[[], None]:
     """Subscribe component to signals. Returns an unsubscribe function.
 

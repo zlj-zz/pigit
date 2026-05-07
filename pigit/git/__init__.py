@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pigit.ext.executor import REPLY, DECODE
 from pigit.ext.executor_factory import ExecutorFactory
 

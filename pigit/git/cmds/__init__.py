@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/__init__.py
 Description: cmd_new command system - unified exports and main processor.
@@ -6,22 +5,23 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 import os
-from typing import TYPE_CHECKING, Callable, Optional, Union
 
 # Import all command modules to trigger registration
 from . import branch
 from . import commit
-from . import index
-from . import working_tree
-from . import push_pull
-from . import remote
-from . import history
-from . import merge
 from . import conflict
-from . import submodule
-from . import settings
+from . import history
+from . import index
+from . import merge
+from . import push_pull
 from . import rebase
+from . import remote
+from . import settings
+from . import submodule
+from . import working_tree
 
 # Core exports
 from ._models import (
@@ -49,14 +49,10 @@ from ._decorators import command, alias, dangerous
 from ._utils import is_truthy
 from ._mru import record_command_use
 
-# Import for type checking
-if TYPE_CHECKING:
-    pass
-
 
 def register_user_commands(
-    registry: Optional[CommandRegistry] = None,
-    config: Optional[UserCommandConfig] = None,
+    registry: CommandRegistry | None = None,
+    config: UserCommandConfig | None = None,
 ) -> None:
     """Register user-defined aliases and scripts into the command registry.
 
@@ -88,10 +84,10 @@ class GitCommandNew:
 
     def __init__(
         self,
-        registry: Optional[CommandRegistry] = None,
-        resolver: Optional[CommandResolver] = None,
-        config: Optional[UserCommandConfig] = None,
-        executor: Optional[SecureExecutor] = None,
+        registry: CommandRegistry | None = None,
+        resolver: CommandResolver | None = None,
+        config: UserCommandConfig | None = None,
+        executor: SecureExecutor | None = None,
     ):
         """Initialize GitCommandNew processor.
 
@@ -109,7 +105,7 @@ class GitCommandNew:
         # Load user commands from config
         register_user_commands(self._registry, self._config)
 
-    def execute(self, cmd: str, args: Optional[list[str]] = None) -> tuple[int, str]:
+    def execute(self, cmd: str, args: list[str] | None = None) -> tuple[int, str]:
         """Execute a command.
 
         Args:
@@ -164,7 +160,7 @@ class GitCommandNew:
         except Exception as e:
             return 1, f"Error executing command: {e}"
 
-    def preview(self, cmd: str, args: Optional[list[str]] = None) -> tuple[int, str]:
+    def preview(self, cmd: str, args: list[str] | None = None) -> tuple[int, str]:
         """Resolve and format a command without executing it.
 
         Args:
@@ -229,7 +225,7 @@ class GitCommandNew:
 
     def get_help(
         self,
-        category: Optional[CommandCategory] = None,
+        category: CommandCategory | None = None,
         dangerous_only: bool = False,
     ) -> str:
         """Get formatted help text.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_overlay_components.py
 Description: Overlay components including HelpPanel, Popup, AlertDialog, Toast, and Sheet.
@@ -10,7 +9,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable, ClassVar, Optional, Sequence
+from typing import Any
+from collections.abc import Callable, Sequence
 
 from . import _overlay_context, keys, palette
 from ._bindings import resolve_key_handlers_merged
@@ -52,15 +52,15 @@ class HelpPanel(Component):
 
     def __init__(
         self,
-        inner_width: Optional[int] = None,
-        inner_height: Optional[int] = None,
+        inner_width: int | None = None,
+        inner_height: int | None = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         *,
-        entries_source: Optional[Component] = None,
-        key_fg: Optional[tuple[int, int, int]] = None,
-        on_toggle: Optional[Callable[[], None]] = None,
+        entries_source: Component | None = None,
+        key_fg: tuple[int, int, int] | None = None,
+        on_toggle: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(x=x, y=y, size=size)
         self._inner_w_cfg = inner_width
@@ -213,7 +213,7 @@ class HelpPanel(Component):
         """Scroll the help content up by one line."""
         self._offset = max(0, self._offset - 1)
 
-    def set_on_toggle(self, cb: Optional[Callable[[], None]]) -> None:
+    def set_on_toggle(self, cb: Callable[[], None] | None) -> None:
         """Set the callback invoked by :meth:`toggle`."""
         self._on_toggle = cb
 
@@ -224,7 +224,6 @@ class HelpPanel(Component):
 
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
-        pass
 
     def _render_surface(self, surface: Surface) -> None:
         # Fill the entire panel area with default background to prevent
@@ -277,11 +276,11 @@ class Popup(Component):
         self,
         child: Component,
         *,
-        offset: Optional[tuple[int, int]] = None,
+        offset: tuple[int, int] | None = None,
         exit_key: str = keys.KEY_ESC,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
     ) -> None:
         self._child = child
         # Auto-bind toggle callback for children that support it (e.g. HelpPanel)
@@ -405,7 +404,6 @@ class Popup(Component):
 
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
-        pass
 
     def _on_exit_key(self) -> None:
         self.end_session()
@@ -433,13 +431,13 @@ class AlertDialogBody(Component):
 
     def __init__(
         self,
-        shell: "AlertDialog",
+        shell: AlertDialog,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         message: str = "",
-        on_result: Optional[Callable[[bool], None]] = None,
-        inner_width: Optional[int] = None,
+        on_result: Callable[[bool], None] | None = None,
+        inner_width: int | None = None,
         confirm_key: str = keys.KEY_ENTER,
         cancel_key: str = keys.KEY_ESC,
     ) -> None:
@@ -505,7 +503,6 @@ class AlertDialogBody(Component):
 
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
-        pass
 
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
@@ -567,9 +564,9 @@ class AlertDialog(Popup):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        inner_width: Optional[int] = None,
-        on_result: Optional[Callable[[bool], None]] = None,
+        size: tuple[int, int] | None = None,
+        inner_width: int | None = None,
+        on_result: Callable[[bool], None] | None = None,
         confirm_key: str = keys.KEY_ENTER,
         cancel_key: str = keys.KEY_ESC,
     ) -> None:
@@ -643,9 +640,9 @@ class Toast(Component):
         self,
         message: str = "",
         *,
-        segments: Optional[Sequence[Segment]] = None,
+        segments: Sequence[Segment] | None = None,
         duration: float = 2.0,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         clock: Callable[[], float] = time.monotonic,
         position: ToastPosition = ToastPosition.TOP_RIGHT,
         enter_duration: float = 0.5,
@@ -670,7 +667,7 @@ class Toast(Component):
 
         self._term_size: tuple[int, int] = (0, 0)
         self._needs_rebuild = True
-        self._frame: Optional[BoxFrame] = None
+        self._frame: BoxFrame | None = None
         self._lines: list[str] = []
         self._outer_w = 0
         self.outer_row_count = 0
@@ -849,7 +846,6 @@ class Toast(Component):
 
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
-        pass
 
 
 class Sheet(Component):
@@ -859,7 +855,7 @@ class Sheet(Component):
         self,
         child: Component,
         height: int = 8,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(size=size)
         self._child = child

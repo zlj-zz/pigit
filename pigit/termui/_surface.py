@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_surface.py
 Description: 2-D character buffer for declarative terminal drawing.
@@ -8,7 +7,8 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from . import palette
 from .wcwidth_table import (
@@ -50,7 +50,7 @@ class FlatCell:
         fg: tuple[int, int, int] = palette.DEFAULT_FG,
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        ansi_style: Optional[str] = None,
+        ansi_style: str | None = None,
         *,
         bold: bool = False,
     ) -> None:
@@ -102,7 +102,7 @@ class _Subsurface:
     """Proxy that translates local coordinates to a parent Surface."""
 
     def __init__(
-        self, parent: "Surface", row: int, col: int, width: int, height: int
+        self, parent: Surface, row: int, col: int, width: int, height: int
     ) -> None:
         self._parent = parent
         self._row = row
@@ -126,7 +126,7 @@ class _Subsurface:
             return None
         return r, c, w, h
 
-    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+    def subsurface(self, row: int, col: int, width: int, height: int) -> _Subsurface:
         """Return a nested subsurface relative to this one."""
         return _Subsurface(
             self._parent, self._row + row, self._col + col, width, height
@@ -139,8 +139,8 @@ class _Subsurface:
         row: int,
         col: int,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
     ) -> None:
         """Write text with RGB colors at local (row, col), clipped to bounds."""
@@ -153,7 +153,7 @@ class _Subsurface:
         self,
         row: int,
         col: int,
-        segments: Sequence["Segment"],
+        segments: Sequence[Segment],
     ) -> int:
         """Draw a list of styled segments and return the column after the last one."""
         for seg in segments:
@@ -186,7 +186,7 @@ class _Subsurface:
         fg: tuple[int, int, int],
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> None:
         """Draw an RGB box-drawing border at local (row, col), clipped to bounds."""
         clipped = self._clip(row, col, width, height)
@@ -265,7 +265,7 @@ class Surface:
             for i in range(self.width):
                 row[i] = _BLANK_CELL
 
-    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+    def subsurface(self, row: int, col: int, width: int, height: int) -> _Subsurface:
         """Return a proxy that translates local coordinates to this surface."""
         return _Subsurface(self, row, col, width, height)
 
@@ -279,7 +279,7 @@ class Surface:
         margin_bottom: int = 0,
         margin_left: int = 0,
         margin_right: int = 0,
-    ) -> "_Subsurface":
+    ) -> _Subsurface:
         """Return a subsurface inset by margins.
 
         Args:
@@ -304,8 +304,8 @@ class Surface:
         row: int,
         col: int,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
     ) -> None:
         """Write text with explicit RGB foreground and background colors.
@@ -370,7 +370,7 @@ class Surface:
         self,
         row: int,
         col: int,
-        segments: Sequence["Segment"],
+        segments: Sequence[Segment],
     ) -> int:
         """Draw a list of styled segments and return the column after the last one."""
         for seg in segments:
@@ -407,7 +407,7 @@ class Surface:
         fg: tuple[int, int, int],
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> None:
         """Draw a box-drawing border with explicit RGB colors."""
         if width < 2 or height < 2:

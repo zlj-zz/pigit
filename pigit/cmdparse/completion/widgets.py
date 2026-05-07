@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/cmdparse/completion/widgets.py
 Description: Shell widget code for pigit cmd picker integration.
 Author: Zev
 Date: 2026-04-15
 """
+
+from __future__ import annotations
 
 
 def _widget_body(shell_set_cmd: str) -> str:

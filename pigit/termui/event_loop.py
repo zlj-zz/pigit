@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/event_loop.py
 Description: Full-screen TUI main loop (``AppEventLoop``); runs inside :class:`~pigit.termui.session.Session`.
@@ -9,7 +8,7 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 from . import keys
 from ._bindings import BindingsList, resolve_key_handlers_merged
@@ -47,7 +46,7 @@ class ExitEventLoop(Exception):
         msg: str = "Quit",
         *,
         exit_code: int = 0,
-        result_message: Optional[str] = None,
+        result_message: str | None = None,
     ) -> None:
         super().__init__(msg)
         self.exit_code = exit_code
@@ -64,13 +63,13 @@ class AppEventLoop:
     :class:`~pigit.termui.input_keyboard.KeyboardInput` is used.
     """
 
-    BINDINGS: Optional[BindingsList] = None
+    BINDINGS: BindingsList | None = None
 
     def __init__(
         self,
         child: Component,
         input_takeover: bool = False,
-        input_handle: Optional["InputTerminal"] = None,
+        input_handle: InputTerminal | None = None,
         real_time: bool = True,
         alt: bool = True,
     ) -> None:
@@ -239,7 +238,7 @@ class AppEventLoop:
         msg: str = "Quit",
         *,
         exit_code: int = 0,
-        result_message: Optional[str] = None,
+        result_message: str | None = None,
     ) -> None:
         """Raise ExitEventLoop to break out of the event loop."""
         raise ExitEventLoop(msg, exit_code=exit_code, result_message=result_message)

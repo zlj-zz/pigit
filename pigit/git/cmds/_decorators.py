@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+from __future__ import annotations
+
 """
 Module: pigit/git/cmds/_decorators.py
 Description: Command and alias decorators for cmd_new.
@@ -6,7 +7,8 @@ Author: Zev
 Date: 2026-04-10
 """
 
-from typing import TYPE_CHECKING, Union, Optional, Callable
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 from functools import wraps
 
 from ._models import CommandDef, CommandMeta, CommandCategory, SecurityLevel
@@ -22,15 +24,15 @@ def command(
     category: CommandCategory,
     help: str,
     has_args: bool = False,
-    arg_completion: Union["CompletionType", list["CompletionType"]] = None,
+    arg_completion: CompletionType | list[CompletionType] = None,
     dangerous: bool = False,
     confirm_msg: str = "",
-    examples: Optional[list[str]] = None,
-    related: Optional[list[str]] = None,
+    examples: list[str] | None = None,
+    related: list[str] | None = None,
     deprecated: bool = False,
     deprecated_use: str = "",
     security_level: SecurityLevel = SecurityLevel.SAFE,
-) -> Callable[[Union[Callable, str]], CommandDef]:
+) -> Callable[[Callable | str], CommandDef]:
     """Decorator to register a command.
 
     Args:
@@ -51,7 +53,7 @@ def command(
         Decorator function
     """
 
-    def decorator(handler: Union[Callable, str]) -> CommandDef:
+    def decorator(handler: Callable | str) -> CommandDef:
         meta = CommandMeta(
             short=short,
             category=category,
@@ -102,10 +104,10 @@ def alias(name: str, target: str) -> Callable[[], None]:
 
 
 # Module-level executor singleton for dangerous decorator
-_dangerous_executor: Optional["SecureExecutor"] = None
+_dangerous_executor: SecureExecutor | None = None
 
 
-def _get_dangerous_executor() -> "SecureExecutor":
+def _get_dangerous_executor() -> SecureExecutor:
     """Get or create the shared SecureExecutor for dangerous decorator."""
     global _dangerous_executor
     if _dangerous_executor is None:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/input_keyboard.py
 Description: Cross-platform semantic keyboard input (timeout read; no termios here).
@@ -11,7 +10,8 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import BinaryIO, Callable, Optional
+from typing import BinaryIO
+from collections.abc import Callable
 
 from ._geometry import TerminalSize
 from .input_trie import match_esc_sequence
@@ -41,13 +41,13 @@ class KeyboardInput:
 
     def __init__(
         self,
-        stdin: Optional[BinaryIO] = None,
-        read_hook: Optional[_ReadHook] = None,
+        stdin: BinaryIO | None = None,
+        read_hook: _ReadHook | None = None,
     ) -> None:
         self._stdin = stdin
         self._read_hook = read_hook
         self._buffer = bytearray()
-        self._last_size: Optional[TerminalSize] = None
+        self._last_size: TerminalSize | None = None
 
     def _default_stdin(self) -> BinaryIO:
         if self._stdin is not None:
@@ -100,7 +100,7 @@ class KeyboardInput:
             time.sleep(0.001)
         return b""
 
-    def _consume_one(self) -> tuple[Optional[str], int]:
+    def _consume_one(self) -> tuple[str | None, int]:
         buf = self._buffer
         if not buf:
             return None, 0

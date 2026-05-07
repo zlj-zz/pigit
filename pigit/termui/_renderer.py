@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_renderer.py
 Description: Session-bound Renderer for ANSI drawing (1-based row/column).
@@ -8,7 +7,8 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from . import palette
 from ._color import ColorAdapter
@@ -26,12 +26,12 @@ class Renderer:
     (``Session.renderer``).
     """
 
-    def __init__(self, session: "Session") -> None:
+    def __init__(self, session: Session) -> None:
         self._out = session.stdout
-        self._prev_frame: Optional[list[str]] = None
-        self._prev_size: Optional[tuple[int, int]] = None
-        self._cursor_pos: Optional[tuple[int, int]] = None
-        self._last_cursor: Optional[tuple[int, int]] = None
+        self._prev_frame: list[str] | None = None
+        self._prev_size: tuple[int, int] | None = None
+        self._cursor_pos: tuple[int, int] | None = None
+        self._last_cursor: tuple[int, int] | None = None
         self._cursor_visible: bool = False
         self._color = ColorAdapter()
 
@@ -145,7 +145,7 @@ class Renderer:
     # Row rendering (FlatCell-aware)
     # ------------------------------------------------------------------ #
 
-    def _row_to_str(self, row: list["FlatCell"]) -> str:
+    def _row_to_str(self, row: list[FlatCell]) -> str:
         """Convert a row of FlatCells to an ANSI string.
 
         Dispatches to specialized handlers based on whether the row contains
@@ -173,7 +173,7 @@ class Renderer:
             return self._row_to_str_rgb(row)
         return self._row_to_str_mixed(row)
 
-    def _row_to_str_legacy(self, row: list["FlatCell"]) -> str:
+    def _row_to_str_legacy(self, row: list[FlatCell]) -> str:
         """Render a row where every cell uses legacy ``ansi_style``."""
         parts = []
         last_style = ""
@@ -191,7 +191,7 @@ class Renderer:
             parts.append("\033[0m")
         return "".join(parts)
 
-    def _row_to_str_rgb(self, row: list["FlatCell"]) -> str:
+    def _row_to_str_rgb(self, row: list[FlatCell]) -> str:
         """Render a row where cells use RGB attributes."""
         parts = []
         last_fg = palette.DEFAULT_FG
@@ -229,7 +229,7 @@ class Renderer:
             parts.append(self._color.reset_sequence())
         return "".join(parts)
 
-    def _row_to_str_mixed(self, row: list["FlatCell"]) -> str:
+    def _row_to_str_mixed(self, row: list[FlatCell]) -> str:
         """Render a row containing both legacy and RGB cells."""
         parts = []
         in_legacy = False
@@ -296,7 +296,7 @@ class Renderer:
 
         return "".join(parts)
 
-    def render_surface(self, surface: "Surface") -> None:
+    def render_surface(self, surface: Surface) -> None:
         """Draw a full Surface to the terminal using row-level diff."""
         lines = [self._row_to_str(row) for row in surface.rows()]
         curr_size = (surface.width, surface.height)

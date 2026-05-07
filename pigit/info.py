@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import os
 import textwrap
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from plenty import box
 from plenty.table import UintTable
@@ -46,10 +48,10 @@ def introduce() -> str:
 
 
 def show_gitconfig(
-    path: Optional[str] = None,
+    path: str | None = None,
     format_type: Literal["normal", "table"] = "table",
     color: bool = True,
-) -> Union[str, UintTable]:
+) -> str | UintTable:
     """Return git config info with format.
 
     Args:
@@ -78,7 +80,7 @@ def show_gitconfig(
         )
 
     if format_type == "table":
-        style: list[Union[str, "Style"]] = ["", "pale_green" if color else ""]
+        style: list[str | Style] = ["", "pale_green" if color else ""]
 
         tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
         for header, values in config.items():

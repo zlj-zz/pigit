@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_renderer_context.py
 Description: Renderer context management using ContextVar.
@@ -9,14 +8,14 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import contextvars
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ._renderer import Renderer
 
 # Module-level ContextVar for renderer injection
 # Using ContextVar instead of global variables to support nested contexts and concurrency safety
-_renderer_ctx: contextvars.ContextVar[Optional["Renderer"]] = contextvars.ContextVar(
+_renderer_ctx: contextvars.ContextVar[Renderer | None] = contextvars.ContextVar(
     "renderer",
     default=None,
 )
@@ -32,7 +31,7 @@ class RendererNotBoundError(RuntimeError):
         )
 
 
-def get_renderer() -> Optional["Renderer"]:
+def get_renderer() -> Renderer | None:
     """Get the current renderer from context.
 
     Returns:
@@ -41,7 +40,7 @@ def get_renderer() -> Optional["Renderer"]:
     return _renderer_ctx.get()
 
 
-def get_renderer_strict() -> "Renderer":
+def get_renderer_strict() -> Renderer:
     """Get the current renderer, raising if not set.
 
     Returns:
@@ -56,7 +55,7 @@ def get_renderer_strict() -> "Renderer":
     return renderer
 
 
-def set_renderer(renderer: "Renderer") -> contextvars.Token:
+def set_renderer(renderer: Renderer) -> contextvars.Token:
     """Set renderer in current context.
 
     ContextVar automatically handles nesting: each set creates a new context

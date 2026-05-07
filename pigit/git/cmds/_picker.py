@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_picker.py
 Description: Interactive picker for cmd commands (--pick functionality).
@@ -11,7 +10,7 @@ from __future__ import annotations
 import os
 import shlex
 import sys
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from pigit.termui import (
     Application,
@@ -73,12 +72,12 @@ _tty_ok = tty_ok
 
 
 def run_cmd_new_picker(
-    processor: Optional[GitCommandNew] = None,
+    processor: GitCommandNew | None = None,
     *,
     pick_alt_screen: bool = False,
-    category: Optional[str] = None,
+    category: str | None = None,
     print_only: bool = False,
-) -> tuple[int, Optional[str]]:
+) -> tuple[int, str | None]:
     """Run interactive picker for cmd commands.
 
     Args:
@@ -142,13 +141,13 @@ def run_cmd_new_picker(
             super().__init__(input_takeover=True, alt=True)
             self._state = PickerState()
             self._mode = PickerMode.BROWSE
-            self._number_buf: Optional[str] = None
+            self._number_buf: str | None = None
             self._print_only = print_only
             self._processor = processor
             self._rows = rows
             self._filtered_rows = list(rows)
             self._render_line = render_line
-            self._pending_entry: Optional[CmdNewEntry] = None
+            self._pending_entry: CmdNewEntry | None = None
             self._last_needle: str = ""
 
         def build_root(self) -> Component:
@@ -338,7 +337,7 @@ def run_cmd_new_picker(
             extra_args = shlex.split(extra_raw.strip()) if extra_raw.strip() else []
             if self._print_only:
                 cmd_parts = ["pigit", "cmd", ent.name, *extra_args]
-                result = " ".join(shlex.quote(p) for p in cmd_parts)
+                result = shlex.join(cmd_parts)
                 raise ExitEventLoop("done", exit_code=0, result_message=result)
             exit_code, output = self._processor.execute(ent.name, extra_args)
             raise ExitEventLoop("done", exit_code=exit_code, result_message=output)
@@ -378,9 +377,7 @@ def run_cmd_new_picker(
             cols, _ = terminal_size()
             renderer.draw_absolute_row(1, " " * cols)
 
-        def quit(
-            self, exit_code: int = 0, result_message: Optional[str] = None
-        ) -> None:
+        def quit(self, exit_code: int = 0, result_message: str | None = None) -> None:
             raise ExitEventLoop(
                 "quit", exit_code=exit_code, result_message=result_message
             )

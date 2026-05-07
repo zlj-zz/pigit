@@ -1,9 +1,9 @@
-# -*- coding:utf-8 -*-
-
 """This file save some model class of git info class."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Callable, Union
+from collections.abc import Callable
 
 
 # flake8: noqa
@@ -115,5 +115,5 @@ class Branch:
     is_remote: bool = False
 
 
-GitFileT = Union[File, str]
+GitFileT = File | str
 GitFuncT = Callable[[GitFileT], None]

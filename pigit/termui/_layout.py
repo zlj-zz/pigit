@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_layout.py
 Description: Lightweight layout containers for the terminal UI framework.
@@ -11,10 +10,9 @@ from __future__ import annotations
 from typing import (
     Literal,
     Protocol,
-    Sequence,
-    Union,
     runtime_checkable,
 )
+from collections.abc import Sequence
 
 
 @runtime_checkable
@@ -71,7 +69,7 @@ class Border:
 
 
 def layout_flex(
-    sizes: Sequence[Union[int, Literal["flex"]]],
+    sizes: Sequence[int | Literal["flex"]],
     total: int,
 ) -> list[int]:
     """Allocate space for fixed + flex children along one axis.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_theme.py
 Description: Flat color theme for Pigit Neo UI.

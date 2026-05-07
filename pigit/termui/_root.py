@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_root.py
 Description: Internal framework root that wraps body + LayerStack.
@@ -10,7 +9,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Callable, Sequence
 
 from ._component_base import Component, _set_focus_chain
 from ._layer import LayerKind, LayerStack
@@ -35,7 +35,7 @@ class ComponentRoot(Component):
     def __init__(
         self,
         body: Component,
-        registry: Optional["ComponentRegistry"] = None,
+        registry: ComponentRegistry | None = None,
     ) -> None:
         super().__init__()
         self._body = body
@@ -43,11 +43,11 @@ class ComponentRoot(Component):
         self._registry = registry
         self._layer_stack = LayerStack()
         self._overlay_host_token = _overlay_context.set_overlay_host(self)
-        self._badge_text: Optional[str] = None
-        self._badge_bg: Optional[tuple[int, int, int]] = None
-        self._badge_fg: Optional[tuple[int, int, int]] = None
+        self._badge_text: str | None = None
+        self._badge_bg: tuple[int, int, int] | None = None
+        self._badge_fg: tuple[int, int, int] | None = None
         self._badge_until = 0
-        self._app_on_event: Optional[Callable] = None
+        self._app_on_event: Callable | None = None
 
     def destroy(self) -> None:
         """Clean up overlay host token and destroy all children."""
@@ -75,9 +75,9 @@ class ComponentRoot(Component):
     def show_badge(
         self,
         text: str,
-        duration: Optional[float] = None,
-        bg: Optional[tuple[int, int, int]] = None,
-        fg: Optional[tuple[int, int, int]] = None,
+        duration: float | None = None,
+        bg: tuple[int, int, int] | None = None,
+        fg: tuple[int, int, int] | None = None,
     ) -> None:
         """Set badge text to display in the chrome header.
 
@@ -109,17 +109,17 @@ class ComponentRoot(Component):
             sig.set(None)
 
     @property
-    def badge_text(self) -> Optional[str]:
+    def badge_text(self) -> str | None:
         """Current badge text, or ``None`` if hidden."""
         return self._badge_text
 
     @property
-    def badge_bg(self) -> Optional[tuple[int, int, int]]:
+    def badge_bg(self) -> tuple[int, int, int] | None:
         """Current badge background color, or ``None`` if hidden."""
         return self._badge_bg
 
     @property
-    def badge_fg(self) -> Optional[tuple[int, int, int]]:
+    def badge_fg(self) -> tuple[int, int, int] | None:
         """Current badge foreground color, or ``None`` if hidden."""
         return self._badge_fg
 
@@ -146,7 +146,6 @@ class ComponentRoot(Component):
 
     def refresh(self) -> None:
         """No-op for the root; body and overlays are refreshed independently."""
-        pass
 
     def accept(self, action, **data):
         """Forward an action to the body component."""
@@ -158,13 +157,13 @@ class ComponentRoot(Component):
         self._layer_stack.resize(size)
         super().resize(size)
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._expire_toasts()
         self._expire_badge()
         self._body._render_surface(surface)
         self._layer_stack.render(surface)
 
-    def _find_focus_leaf(self, start: Optional[Component] = None) -> Component:
+    def _find_focus_leaf(self, start: Component | None = None) -> Component:
         """Walk down the component tree to find the deepest focusable leaf.
 
         Follows ``active`` when available (TabView) and drills into ``children``
@@ -191,7 +190,7 @@ class ComponentRoot(Component):
                 break
         return leaf
 
-    def _top_open_overlay(self) -> Optional[Component]:
+    def _top_open_overlay(self) -> Component | None:
         for kind in (LayerKind.MODAL, LayerKind.SHEET):
             top = self._layer_stack.top(kind)
             if top is not None and getattr(top, "open", False):
@@ -225,10 +224,10 @@ class ComponentRoot(Component):
         self,
         message: str = "",
         *,
-        segments: Optional[Sequence["Segment"]] = None,
+        segments: Sequence[Segment] | None = None,
         duration: float = 2.0,
-        position: Optional[ToastPosition] = None,
-    ) -> "Toast":
+        position: ToastPosition | None = None,
+    ) -> Toast:
         """Display a transient toast notification on the TOAST layer.
 
         Args:
@@ -254,7 +253,7 @@ class ComponentRoot(Component):
         self._layer_stack.push(LayerKind.TOAST, toast)
         return toast
 
-    def show_sheet(self, child: Component, height: int = 8) -> "Sheet":
+    def show_sheet(self, child: Component, height: int = 8) -> Sheet:
         """Display a bottom sheet on the SHEET layer."""
         from ._overlay_components import Sheet
 

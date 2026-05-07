@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_header_state.py
 Description: Reactive header display state with Signal-backed properties.

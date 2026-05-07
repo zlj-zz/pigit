@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_reactive.py
 Description: Lightweight reactive primitives: Signal and Computed.
@@ -8,12 +7,10 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
-from typing import Callable, Generic, Optional, TypeVar, Union
+from typing import Generic, TypeAlias, TypeVar
+from collections.abc import Callable
 
 T = TypeVar("T")
-
-# Type alias for component props that accept both static and reactive data.
-ValueRef = Union[T, "Signal[T]", "Computed[T]"]
 
 
 class Signal(Generic[T]):
@@ -55,7 +52,7 @@ class Computed(Generic[T]):
     def __init__(
         self,
         fn: Callable[[], T],
-        deps: Optional[list[Signal]] = None,
+        deps: list[Signal] | None = None,
     ) -> None:
         self._fn = fn
         self.deps = deps
@@ -94,3 +91,7 @@ class Computed(Generic[T]):
             self._subs.append(callback)
             return lambda: self._subs.remove(callback)
         return self._signal.subscribe(callback)
+
+
+# Type alias for component props that accept both static and reactive data.
+ValueRef: TypeAlias = T | Signal[T] | Computed[T]

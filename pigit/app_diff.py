@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_diff.py
 Description: DiffViewer with TrueColor diff rendering and heatmap column.
@@ -12,7 +11,6 @@ import bisect
 import logging
 import re
 
-from typing import Optional
 
 from pigit.termui import (
     ActionEventType,
@@ -67,8 +65,8 @@ class DiffViewer(LineTextBrowser):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, "", id=id)
         # LineTextBrowser sets _max_line to full height; adjust for border rows
@@ -77,12 +75,12 @@ class DiffViewer(LineTextBrowser):
         self._heatmap: list[str] = []
         self._heatmap_colors: list[tuple[int, int, int]] = []
         self._line_numbers: list[str] = []
-        self.come_from: Optional[Component] = None
+        self.come_from: Component | None = None
         self.i_cache_key = ""
         self.i_cache: dict[str, int] = {}
         self._tokenizer = SyntaxTokenizer()
         self._lang = "generic"
-        self._multiline_mask: list[Optional[str]] = []
+        self._multiline_mask: list[str | None] = []
         # _render_tokens holds (text, fg_color, display_width) per token
         self._render_tokens: list[list[tuple[str, tuple[int, int, int], int]]] = []
         self._hunk_indices: list[int] = []

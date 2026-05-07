@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_component_widgets.py
 Description: Widget components for the TUI framework: LineTextBrowser and ItemSelector.
@@ -8,7 +7,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
 
 from . import keys, palette
 from ._component_base import Component, ComponentError, bind_signals
@@ -20,18 +19,15 @@ from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
-if TYPE_CHECKING:
-    pass
-
 
 class LineTextBrowser(Component):
     def __init__(
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        content: list[str] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
 
@@ -47,7 +43,7 @@ class LineTextBrowser(Component):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if self._content is None:
             return
         end = min(self._i + self._max_line, len(self._content))
@@ -78,12 +74,12 @@ class ItemSelector(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        content: Optional[list[str]] = None,
-        on_selection_changed: Optional[Callable[[int], None]] = None,
+        size: tuple[int, int] | None = None,
+        content: list[str] | None = None,
+        on_selection_changed: Callable[[int], None] | None = None,
         *,
         lazy_load: bool = False,
-        id: Optional[str] = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
 
@@ -100,7 +96,7 @@ class ItemSelector(Component):
         # When set, the selector renders multiple rows per item: ``_item_starts[i]``
         # is the row index where item ``i`` begins. ``curr_no`` then tracks the
         # ITEM index, not the row index. ``None`` keeps legacy 1:1 behaviour.
-        self._item_starts: Optional[list[int]] = None
+        self._item_starts: list[int] | None = None
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -146,7 +142,7 @@ class ItemSelector(Component):
         self.curr_no = min(self.curr_no, len(content) - 1)
         self._scroll_into_view()
 
-    def set_item_starts(self, starts: Optional[Sequence[int]]) -> None:
+    def set_item_starts(self, starts: Sequence[int] | None) -> None:
         """Switch the selector into multi-row mode.
 
         ``starts[i]`` is the row index at which item ``i`` begins. The list
@@ -212,9 +208,8 @@ class ItemSelector(Component):
 
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
-        pass
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             return
@@ -241,7 +236,7 @@ class ItemSelector(Component):
         idx: int,
         is_cursor: bool,
         *,
-        item_idx: Optional[int] = None,
+        item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[
         list[Segment],
@@ -279,7 +274,7 @@ class ItemSelector(Component):
 
     def _draw_segments(
         self,
-        surface: "Surface",
+        surface: Surface,
         row: int,
         col: int,
         segments: Sequence[Segment],
@@ -292,7 +287,7 @@ class ItemSelector(Component):
 
     def _draw_row_layout(
         self,
-        surface: "Surface",
+        surface: Surface,
         row: int,
         left: Sequence[Segment],
         main: Sequence[Segment] | None,
@@ -371,7 +366,7 @@ class ItemSelector(Component):
 
     def _draw_right_aligned(
         self,
-        surface: "Surface",
+        surface: Surface,
         row: int,
         text: str,
         fg: tuple[int, int, int],
@@ -440,12 +435,12 @@ class Header(Component):
     def __init__(
         self,
         *,
-        left: Optional[ValueRef[list[Segment]]] = None,
-        center: Optional[ValueRef[list[Segment]]] = None,
-        right: Optional[ValueRef[list[Segment]]] = None,
+        left: ValueRef[list[Segment]] | None = None,
+        center: ValueRef[list[Segment]] | None = None,
+        right: ValueRef[list[Segment]] | None = None,
         separator: bool = True,
         sep_fg: tuple[int, int, int] = (100, 100, 100),
-        id: Optional[str] = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(id=id)
         self._separator = separator
@@ -505,7 +500,7 @@ class Header(Component):
             unsub()
         super().destroy()
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w <= 0:
@@ -520,7 +515,7 @@ class Header(Component):
         else:
             self._draw_content(surface, 0, w)
 
-    def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
+    def _draw_content(self, surface: Surface, row: int, w: int) -> None:
         surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
         left = self._get(self._left_src)
@@ -625,11 +620,11 @@ class StatusBar(Component):
         text: ValueRef[str] = "",
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(x, y, size)
         self._text_src: ValueRef[str] = text
-        self._unsub: Optional[Callable[[], None]] = None
+        self._unsub: Callable[[], None] | None = None
         if isinstance(text, (Signal, Computed)):
             self._text = text.value
             self._unsub = bind_signals(self, text)
@@ -650,7 +645,7 @@ class StatusBar(Component):
             self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
         surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
@@ -668,14 +663,14 @@ class InputLine(Component):
         self,
         prompt: str = "",
         visible: bool = True,
-        max_length: Optional[int] = None,
-        on_value_changed: Optional[Callable[[str], None]] = None,
-        on_submit: Optional[Callable[[str], None]] = None,
-        on_cancel: Optional[Callable[[], None]] = None,
-        candidate_provider: Optional[Callable[[str], list[str]]] = None,
+        max_length: int | None = None,
+        on_value_changed: Callable[[str], None] | None = None,
+        on_submit: Callable[[str], None] | None = None,
+        on_cancel: Callable[[], None] | None = None,
+        candidate_provider: Callable[[str], list[str]] | None = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(x, y, size)
         self._prompt = prompt
@@ -767,7 +762,7 @@ class InputLine(Component):
         self._prompt = prompt
 
     def set_candidate_provider(
-        self, provider: Optional[Callable[[str], list[str]]]
+        self, provider: Callable[[str], list[str]] | None
     ) -> None:
         """Switch or clear the candidate provider at runtime.
 
@@ -860,7 +855,7 @@ class InputLine(Component):
         """Move the cursor one position to the right."""
         self._cursor = min(len(self._value), self._cursor + 1)
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self._visible:
             return
         core = f"{self._prompt}{self._value}"

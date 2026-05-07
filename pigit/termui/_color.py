@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_color.py
 Description: TrueColor rendering support with automatic terminal capability fallback.
@@ -12,7 +11,6 @@ import logging
 import os
 from enum import Enum
 from functools import lru_cache
-from typing import Optional
 
 from . import palette
 
@@ -77,7 +75,7 @@ class ColorAdapter:
     performance.  The adapter is stateless and safe to share across threads.
     """
 
-    def __init__(self, mode: Optional[ColorMode] = None) -> None:
+    def __init__(self, mode: ColorMode | None = None) -> None:
         self.mode = mode or _detect_color_mode()
 
     # ------------------------------------------------------------------ #
@@ -144,7 +142,7 @@ class ColorAdapter:
     # Quantization
     # ------------------------------------------------------------------ #
 
-    def _quantized_code(self, rgb: tuple[int, int, int]) -> Optional[int]:
+    def _quantized_code(self, rgb: tuple[int, int, int]) -> int | None:
         """Return ANSI color code for the given RGB, or None for NONE mode."""
         if self.mode == ColorMode.NONE:
             return None

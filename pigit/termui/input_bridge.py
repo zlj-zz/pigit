@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/input_bridge.py
 Description: InputTerminal-compatible adapter over KeyboardInput (Session owns termios).
@@ -9,7 +8,6 @@ Date: 2026-03-26
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 from .input_keyboard import KeyboardInput
 from .input_terminal import InputTerminal
@@ -35,7 +33,7 @@ class TermuiInputBridge(InputTerminal):
         """No-op: terminal attributes are owned by Session."""
         return
 
-    def set_input_timeouts(self, timeout: Optional[float]) -> None:
+    def set_input_timeouts(self, timeout: float | None) -> None:
         """Set the keyboard read timeout to a non-negative finite float."""
         if timeout is None:
             return
@@ -44,9 +42,7 @@ class TermuiInputBridge(InputTerminal):
             raise ValueError("timeout must be a non-negative finite float")
         self._timeout = t
 
-    def get_input(
-        self, raw_keys: bool = False
-    ) -> tuple[list[str], Optional[list[int]]]:
+    def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
         """Read semantic keys from the keyboard and return them (raw_keys is ignored)."""
         keys = self._kb.read_keys(timeout=self._timeout)
         return (keys, None) if not raw_keys else (keys, None)

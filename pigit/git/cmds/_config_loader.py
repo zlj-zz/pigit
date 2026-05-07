@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_config_loader.py
 Description: User configuration loading for cmd_new aliases and overrides.
@@ -6,11 +5,13 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 import os
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union, Optional, Any
+from typing import Any
 
 from ._models import (
     ScriptConfig,
@@ -38,7 +39,7 @@ class UserCommandConfig:
     settings: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_toml(cls, path: Union[str, Path]) -> "UserCommandConfig":
+    def from_toml(cls, path: str | Path) -> "UserCommandConfig":
         """Load configuration from TOML file.
 
         Args:
@@ -133,7 +134,7 @@ class UserCommandConfig:
             base = Path.home() / ".config" / "pigit"
             return base / "pigit.cmds.toml"
 
-    def get_alias(self, name: str) -> Optional[str]:
+    def get_alias(self, name: str) -> str | None:
         """Get alias target.
 
         Args:
@@ -155,7 +156,7 @@ class UserCommandConfig:
         """
         return name in self.overrides
 
-    def get_override(self, name: str) -> Optional[str]:
+    def get_override(self, name: str) -> str | None:
         """Get override handler.
 
         Args:
@@ -166,7 +167,7 @@ class UserCommandConfig:
         """
         return self.overrides.get(name)
 
-    def get_script(self, name: str) -> Optional[ScriptConfig]:
+    def get_script(self, name: str) -> ScriptConfig | None:
         """Get script config.
 
         Args:
@@ -237,7 +238,7 @@ class UserCommandConfig:
         return commands
 
 
-def load_user_config(path: Optional[Union[str, Path]] = None) -> UserCommandConfig:
+def load_user_config(path: str | Path | None = None) -> UserCommandConfig:
     """Load user configuration.
 
     Args:

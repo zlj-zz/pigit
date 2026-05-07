@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import asyncio
-import copy
 import contextlib
 import dataclasses
 import logging
@@ -7,11 +8,12 @@ import os
 import shlex
 import sys
 from subprocess import Popen, PIPE
-from typing import Any, ByteString, Final, Iterator, Optional, Union
+from typing import Any, Final
+from collections.abc import ByteString, Iterator
 
 # Type defined
-ExecResult = tuple[int, Union[None, str, ByteString], Union[None, str, ByteString]]
-ExecResType = Union[None, str, ByteString]
+ExecResult = tuple[int, None | str | ByteString, None | str | ByteString]
+ExecResType = None | str | ByteString
 
 # Const
 WAIT_ENTER: Final = 1 << 0  # wait for enter-press afterwards. not support async.
@@ -63,7 +65,7 @@ class ExecState:
 
 
 class Executor:
-    def __init__(self, log: Optional[logging.Logger] = None) -> None:
+    def __init__(self, log: logging.Logger | None = None) -> None:
         self.log = log
 
     def _log_warning(self, msg: object, *args: object) -> None:
@@ -81,9 +83,7 @@ class Executor:
         sys.stdout.write("Press ENTER to continue")
         input()
 
-    def generate_popen_state(
-        self, flags: int, popen_kws: dict[str, Any]
-    ) -> "ExecState":
+    def generate_popen_state(self, flags: int, popen_kws: dict[str, Any]) -> ExecState:
         """Generate the state context for executing a command.
 
         Args:
@@ -116,7 +116,7 @@ class Executor:
         # output will be discarded.
         if flags & SILENT:
             devnull_writable = open(os.devnull, "w", encoding="utf-8")
-            devnull_readable = open(os.devnull, "r", encoding="utf-8")
+            devnull_readable = open(os.devnull, encoding="utf-8")
 
             popen_kws["stdin"] = devnull_readable
             for key in ("stdout", "stderr"):
@@ -124,7 +124,7 @@ class Executor:
 
         return es
 
-    def _try_decode(self, content: ExecResType, state: "ExecState") -> ExecResType:
+    def _try_decode(self, content: ExecResType, state: ExecState) -> ExecResType:
         """Try to decode the output if decoding is enabled.
 
         Args:
@@ -155,10 +155,10 @@ class Executor:
         if err:
             print(err)
 
-    def __call__(self, cmd: Union[str, list, tuple], *, flags: int = 0, **kws) -> tuple:
+    def __call__(self, cmd: str | list | tuple, *, flags: int = 0, **kws) -> tuple:
         return self.exec(cmd, flags=flags, **kws)
 
-    def exec(self, cmd: Union[str, list, tuple], *, flags: int = 0, **kws) -> tuple:
+    def exec(self, cmd: str | list | tuple, *, flags: int = 0, **kws) -> tuple:
         """Execute a command synchronously.
 
         ``kws`` is passed to :class:`subprocess.Popen` after applying ``flags``; flag bits
@@ -206,7 +206,7 @@ class Executor:
 
     def exec_stream(
         self,
-        cmd: Union[str, list, tuple],
+        cmd: str | list | tuple,
         *,
         flags: int = 0,
         **kws: Any,
@@ -275,8 +275,8 @@ class Executor:
 
     async def run_async_subprocess(
         self,
-        es: "ExecState",
-        cmd: Union[str, list, tuple],
+        es: ExecState,
+        cmd: str | list | tuple,
         cur_kws: dict[str, Any],
     ) -> tuple:
         """Run one subprocess asynchronously.
@@ -333,9 +333,9 @@ class Executor:
     async def exec_async(
         self,
         *cmds,
-        orders: Optional[list[dict[str, Any]]] = None,
+        orders: list[dict[str, Any]] | None = None,
         flags: int = 0,
-        max_concurrent: Optional[int] = None,
+        max_concurrent: int | None = None,
         **kws,
     ) -> list[tuple]:
         """Execute multiple commands concurrently (asyncio).
@@ -359,7 +359,7 @@ class Executor:
         es = self.generate_popen_state(flags, kws)
 
         n = len(cmds)
-        sem: Optional[asyncio.Semaphore] = None
+        sem: asyncio.Semaphore | None = None
         if max_concurrent is not None and n > 0:
             mc = max(1, min(int(max_concurrent), n))
             sem = asyncio.Semaphore(mc)
@@ -376,9 +376,9 @@ class Executor:
     def exec_parallel(
         self,
         *cmds,
-        orders: Optional[list[dict[str, Any]]] = None,
+        orders: list[dict[str, Any]] | None = None,
         flags: int = 0,
-        max_concurrent: Optional[int] = None,
+        max_concurrent: int | None = None,
         **kws,
     ) -> list[tuple]:
         """Run multiple commands in parallel (``asyncio.run`` + :meth:`exec_async`).

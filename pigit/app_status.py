@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_status.py
 Description: StatusPanel v3 with whole-row backgrounds, filter, and visual mode.
@@ -9,7 +8,8 @@ Date: 2026-04-23
 from __future__ import annotations
 
 import os
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.termui import (
     ActionEventType,
@@ -76,11 +76,11 @@ class StatusPanel(ItemSelector):
     def __init__(
         self,
         *,
-        alert_inner_width: Optional[int] = None,
-        display: Optional[Component] = None,
-        on_selection_changed: Optional[Callable] = None,
-        git: "LocalGit",
-        id: Optional[str] = None,
+        alert_inner_width: int | None = None,
+        display: Component | None = None,
+        on_selection_changed: Callable | None = None,
+        git: LocalGit,
+        id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -99,7 +99,7 @@ class StatusPanel(ItemSelector):
 
         # Visual mode state
         self._visual_mode = False
-        self._visual_anchor: Optional[int] = None
+        self._visual_anchor: int | None = None
         self._selected: set[int] = set()
         self._visual_scroll = False  # auto-select while navigating
 
@@ -396,7 +396,7 @@ class StatusPanel(ItemSelector):
             ("t", "Theirs"),
         ]
 
-    def get_inspector_data(self) -> Optional[FileInfo]:
+    def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""
         idx = self.curr_no
         if not self.files or not (0 <= idx < len(self.files)):

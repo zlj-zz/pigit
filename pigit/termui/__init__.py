@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Package: pigit.termui
 Description: Unified lightweight terminal UI framework.

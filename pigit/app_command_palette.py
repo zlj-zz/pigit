@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_palette.py
 Description: Command palette with InputLine and candidate list.
@@ -8,7 +7,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from pigit.termui import Component, InputLine, keys, OverlayDispatchResult
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
@@ -44,13 +43,13 @@ class CommandPalette(Component):
 
     def __init__(
         self,
-        on_execute: Optional[Callable[[str], None]] = None,
-        on_dismiss: Optional[Callable[[], None]] = None,
-        commands: Optional[list[str]] = None,
+        on_execute: Callable[[str], None] | None = None,
+        on_dismiss: Callable[[], None] | None = None,
+        commands: list[str] | None = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._on_execute = on_execute

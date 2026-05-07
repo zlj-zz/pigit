@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_layer.py
 Description: Layer-based overlay stack for multi-level modal/toast/sheet support.
@@ -9,7 +8,7 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .types import LayerKind, OverlayDispatchResult
 
@@ -30,13 +29,13 @@ class Layer:
         """Push a surface onto this layer."""
         self._stack.append(surface)
 
-    def pop(self) -> Optional[object]:
+    def pop(self) -> object | None:
         """Pop and return the top surface, or None if empty."""
         if not self._stack:
             return None
         return self._stack.pop()
 
-    def top(self) -> Optional[object]:
+    def top(self) -> object | None:
         """Return the top surface without removing it, or None if empty."""
         if not self._stack:
             return None
@@ -71,11 +70,11 @@ class LayerStack:
         """Push a surface onto the specified layer."""
         self._layers[kind].push(surface)
 
-    def pop(self, kind: LayerKind) -> Optional[object]:
+    def pop(self, kind: LayerKind) -> object | None:
         """Pop and return the top surface from the specified layer, or None if empty."""
         return self._layers[kind].pop()
 
-    def top(self, kind: LayerKind) -> Optional[object]:
+    def top(self, kind: LayerKind) -> object | None:
         """Return the top surface of the specified layer without removing it, or None if empty."""
         return self._layers[kind].top()
 
@@ -87,7 +86,7 @@ class LayerStack:
         """Return True if any layer contains at least one surface."""
         return any(not layer.is_empty() for layer in self._layers.values())
 
-    def render(self, surface: "Surface") -> None:
+    def render(self, surface: Surface) -> None:
         """Render all open overlays onto the given surface."""
         for kind in _VISIBLE_LAYER_KINDS:
             for overlay in self._layers[kind]:

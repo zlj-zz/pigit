@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/cmdparse/completion/fish.py
 Description: Fish shell completion generator.
 Author: Zev
 Date: 2026-04-15
 """
+
+from __future__ import annotations
 
 import textwrap
 

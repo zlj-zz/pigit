@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_picker_sorter.py
 Description: Context-aware sorting for picker command entries.
 Author: Zev
 Date: 2026-04-15
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING
 

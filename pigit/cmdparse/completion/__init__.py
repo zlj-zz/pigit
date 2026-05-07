@@ -1,6 +1,5 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
-from typing import Optional, Type
 
 from .base import ShellCompletion
 from .bash import BashCompletion
@@ -16,7 +15,7 @@ __all__ = [
     "get_shell",
 ]
 
-_Supported_Shell: dict[str, Type[ShellCompletion]] = {
+_Supported_Shell: dict[str, type[ShellCompletion]] = {
     "bash": BashCompletion,
     "zsh": ZshCompletion,
     "fish": FishCompletion,
@@ -25,10 +24,10 @@ _Supported_Shell: dict[str, Type[ShellCompletion]] = {
 
 def shell_complete(
     complete_vars: dict,
-    shell: Optional[str] = None,
-    prog: Optional[str] = None,
-    script_dir: Optional[str] = None,
-    script_name: Optional[str] = None,
+    shell: str | None = None,
+    prog: str | None = None,
+    script_dir: str | None = None,
+    script_name: str | None = None,
 ) -> None:
     """Generate completion script source and print.
 

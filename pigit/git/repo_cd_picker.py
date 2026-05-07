@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/repo_cd_picker.py
 Description: TTY picker for ``pigit repo cd --pick``.
@@ -8,7 +7,8 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from pigit.ext.executor import WAITING
 
@@ -57,11 +57,11 @@ EMPTY_MANAGED_REPOS_MSG = "No managed repos; use `pigit repo add`."
 
 def run_repo_cd_picker(
     rows: Sequence[PickerRow],
-    executor: "Executor",
+    executor: Executor,
     *,
     initial_filter: str = "",
     pick_alt_screen: bool = False,
-) -> tuple[int, Optional[str]]:
+) -> tuple[int, str | None]:
     """
     Interactive repo directory picker; on confirm runs shell ``cd`` + ``exec $SHELL``.
 
@@ -236,9 +236,7 @@ def run_repo_cd_picker(
                 text = f"-- {n} row(s) --"
             self._state.status_text.set(text)
 
-        def quit(
-            self, exit_code: int = 0, result_message: Optional[str] = None
-        ) -> None:
+        def quit(self, exit_code: int = 0, result_message: str | None = None) -> None:
             raise ExitEventLoop(
                 "quit", exit_code=exit_code, result_message=result_message
             )

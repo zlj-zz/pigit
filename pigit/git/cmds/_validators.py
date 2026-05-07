@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_validators.py
 Description: Command validation system for cmd_new.
@@ -6,8 +5,9 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 import re
-from typing import Optional
 from abc import ABC, abstractmethod
 
 from ._models import CommandDef, ValidationResult, SecurityLevel
@@ -30,7 +30,6 @@ class CommandValidator(ABC):
         Returns:
             ValidationResult indicating success or failure with errors
         """
-        pass
 
 
 class CommandNameValidator(CommandValidator):
@@ -93,7 +92,7 @@ class DangerousCommandValidator(CommandValidator):
 class CompositeValidator(CommandValidator):
     """Composite validator that runs multiple validation rules."""
 
-    def __init__(self, validators: Optional[list[CommandValidator]] = None):
+    def __init__(self, validators: list[CommandValidator] | None = None):
         self._validators = validators or [
             CommandNameValidator(),
             DangerousCommandValidator(),

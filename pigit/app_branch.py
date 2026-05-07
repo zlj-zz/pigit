@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_branch.py
 Description: BranchPanel v3 with ahead/behind display and current branch highlighting.
@@ -8,7 +7,8 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.termui import (
     ActionEventType,
@@ -42,10 +42,10 @@ class BranchPanel(ItemSelector):
     def __init__(
         self,
         *,
-        on_selection_changed: Optional[Callable] = None,
-        branch_signal: Optional[Signal[str]] = None,
-        git: "LocalGit",
-        id: Optional[str] = None,
+        on_selection_changed: Callable | None = None,
+        branch_signal: Signal[str] | None = None,
+        git: LocalGit,
+        id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -95,7 +95,7 @@ class BranchPanel(ItemSelector):
             ("m", "Merge into selected"),
         ]
 
-    def get_inspector_data(self) -> Optional[BranchInfo]:
+    def get_inspector_data(self) -> BranchInfo | None:
         """Return inspector data for the currently selected branch."""
         idx = self.curr_no
         if not self.branches or not (0 <= idx < len(self.branches)):
@@ -112,7 +112,7 @@ class BranchPanel(ItemSelector):
             created=created,
         )
 
-    def _format_branch(self, branch: "Branch") -> str:
+    def _format_branch(self, branch: Branch) -> str:
         """Format a branch for display."""
         name = branch.name
         if name.startswith("remotes/"):

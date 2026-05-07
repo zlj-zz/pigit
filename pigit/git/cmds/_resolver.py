@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_resolver.py
 Description: Command resolver with hierarchical naming and alias resolution.
@@ -6,8 +5,9 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
 
 from ._models import ResolvedCommand, CommandDef
 from ._registry import CommandRegistry, get_registry
@@ -16,13 +16,9 @@ from ._registry import CommandRegistry, get_registry
 class ResolverError(Exception):
     """Command resolution error."""
 
-    pass
-
 
 class AliasCycleError(ResolverError):
     """Alias cycle detected error."""
-
-    pass
 
 
 @dataclass
@@ -86,7 +82,7 @@ class CommandResolver:
         "S": "status_full",
     }
 
-    def __init__(self, registry: Optional[CommandRegistry] = None):
+    def __init__(self, registry: CommandRegistry | None = None):
         self._registry = registry or get_registry()
 
     def resolve(self, input_name: str) -> ResolvedCommand:
@@ -159,7 +155,7 @@ class CommandResolver:
 
         raise ResolverError(f"Unknown command: '{name}'")
 
-    def _try_hierarchical(self, name: str) -> Optional[tuple[str, CommandDef]]:
+    def _try_hierarchical(self, name: str) -> tuple[str, CommandDef] | None:
         """Try hierarchical naming resolution.
 
         Examples:

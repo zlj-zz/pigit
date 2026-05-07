@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_syntax_configs.py
 Description: Language syntax keyword configurations for the tokenizer.

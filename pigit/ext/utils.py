@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import subprocess
 import sys
@@ -6,7 +6,7 @@ import time
 from collections import Counter
 from functools import lru_cache
 from math import sqrt
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def copy_to_clipboard(text: str) -> bool:

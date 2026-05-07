@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app.py
 Description: Git TUI panels and application entry.
@@ -6,10 +5,11 @@ Author: Zev
 Date: 2026-04-17
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
-from typing import Optional
 
 from pigit.termui import (
     ActionEventType,
@@ -62,8 +62,8 @@ class PigitApplication(Application):
 
     def __init__(
         self,
-        local_git: Optional[LocalGit] = None,
-        managed_repos: Optional[ManagedRepos] = None,
+        local_git: LocalGit | None = None,
+        managed_repos: ManagedRepos | None = None,
     ) -> None:
         super().__init__(input_takeover=True)
         self._local_git = local_git or LocalGit()
@@ -85,7 +85,7 @@ class PigitApplication(Application):
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         # Merge workflow state
-        self._merge_state: Optional[dict] = None
+        self._merge_state: dict | None = None
         self._alert_dialog = AlertDialog(
             inner_width=50,
             on_result=lambda _: None,
@@ -311,7 +311,7 @@ class PigitApplication(Application):
         except Exception:
             pass
 
-    def _load_merge_state(self) -> Optional[dict]:
+    def _load_merge_state(self) -> dict | None:
         try:
             with open(self._merge_state_path()) as f:
                 return json.load(f)

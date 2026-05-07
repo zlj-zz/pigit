@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_security.py
 Description: Secure command execution and dangerous command handling.
@@ -6,10 +5,11 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 import re
 from collections import deque
 from dataclasses import dataclass
-from typing import Union, Optional, Callable
 
 from pigit.ext.executor import Executor, WAITING
 from pigit.ext.executor_factory import ExecutorFactory
@@ -17,8 +17,6 @@ from pigit.ext.executor_factory import ExecutorFactory
 
 class SecurityError(Exception):
     """Security violation error."""
-
-    pass
 
 
 @dataclass
@@ -60,15 +58,15 @@ class SecureExecutor:
     # Maximum audit log entries to prevent unbounded growth
     _MAX_AUDIT_LOG_SIZE = 1000
 
-    def __init__(self, base_executor: Optional[Executor] = None):
+    def __init__(self, base_executor: Executor | None = None):
         self._base = base_executor or ExecutorFactory.get()
         self._audit_log: deque[dict] = deque(maxlen=self._MAX_AUDIT_LOG_SIZE)
 
     def exec(
         self,
-        cmd: Union[str, list[str]],
-        args: Optional[list[str]] = None,
-        policy: Optional[SecurityPolicy] = None,
+        cmd: str | list[str],
+        args: list[str] | None = None,
+        policy: SecurityPolicy | None = None,
     ) -> tuple[int, str]:
         """Execute command securely.
 
@@ -106,7 +104,7 @@ class SecureExecutor:
         return exit_code, output
 
     def _normalize_command(
-        self, cmd: Union[str, list[str]], args: Optional[list[str]]
+        self, cmd: str | list[str], args: list[str] | None
     ) -> list[str]:
         """Normalize command to list format."""
         if isinstance(cmd, list):
@@ -137,7 +135,6 @@ class SecureExecutor:
         Returns:
             True if user confirms, False otherwise
         """
-        import sys
 
         try:
             response = input(f"{message} [y/N]: ").strip().lower()

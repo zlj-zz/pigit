@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/input_terminal.py
 Description: Base class for terminal input drivers used by ``AppEventLoop`` and bridges.
@@ -10,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any, Optional
+from typing import Any
 
 import termios
 
@@ -33,7 +32,7 @@ class InputTerminal:
         start: Any = None,
         stop: Any = None,
         susp: Any = None,
-        fileno: Optional[int] = None,
+        fileno: int | None = None,
     ) -> Any:
         """
         Read and/or set the tty's signal character settings.

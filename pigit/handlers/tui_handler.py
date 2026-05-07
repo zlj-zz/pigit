@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 from ..const import IS_FIRST_RUN, IS_WIN
 from ..ext.utils import confirm

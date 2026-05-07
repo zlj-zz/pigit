@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 """Explicit runtime context
 
 Uses :class:`contextvars.ContextVar` (not ``threading.local`` on a dataclass field) so
@@ -11,7 +10,7 @@ from __future__ import annotations
 import logging
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .config import Config
@@ -19,26 +18,26 @@ if TYPE_CHECKING:
     from .git.local_git import LocalGit
     from .git.managed_repos import ManagedRepos
 
-_ctx_var: ContextVar[Optional["Context"]] = ContextVar("pigit_context", default=None)
+_ctx_var: ContextVar[Context | None] = ContextVar("pigit_context", default=None)
 
 
 @dataclass
 class Context:
     """Holds primary services for one logical run (CLI process or test override)."""
 
-    config: "Config"
-    executor: "ExecutorStrategy"
-    local_git: "LocalGit"
-    managed_repos: "ManagedRepos"
+    config: Config
+    executor: ExecutorStrategy
+    local_git: LocalGit
+    managed_repos: ManagedRepos
     log: logging.Logger
-    _token: Optional[Token] = field(default=None, init=False, repr=False)
+    _token: Token | None = field(default=None, init=False, repr=False)
 
     @staticmethod
-    def try_current() -> Optional["Context"]:
+    def try_current() -> Context | None:
         return _ctx_var.get()
 
     @staticmethod
-    def current() -> "Context":
+    def current() -> Context:
         c = _ctx_var.get()
         if c is None:
             raise RuntimeError(
@@ -48,7 +47,7 @@ class Context:
         return c
 
     @staticmethod
-    def install(ctx: "Context") -> None:
+    def install(ctx: Context) -> None:
         """Attach context for this task (CLI: once at import / startup)."""
         _ctx_var.set(ctx)
 
@@ -57,7 +56,7 @@ class Context:
         """Remove context for the current task (mainly for tests)."""
         _ctx_var.set(None)
 
-    def __enter__(self) -> "Context":
+    def __enter__(self) -> Context:
         self._token = _ctx_var.set(self)
         return self
 
@@ -70,10 +69,10 @@ class Context:
     def bootstrap(
         cls,
         *,
-        config: "Config",
+        config: Config,
         repo_json_path: str,
         log_name: str = "pigit",
-    ) -> "Context":
+    ) -> Context:
         """Build default context: logging, shared executor, git helpers, and named logger."""
         from .const import LOG_FILE_PATH
         from .ext.executor_factory import ExecutorFactory, LocalExecutor

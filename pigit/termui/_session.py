@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/session.py
 Description: Terminal session — cbreak/raw only here; alternate screen and cursor.
@@ -10,7 +9,7 @@ from __future__ import annotations
 
 import sys
 from types import TracebackType
-from typing import Optional, TextIO, Type
+from typing import TextIO
 
 from ._renderer import Renderer
 from ._session_context import set_session, reset_session
@@ -26,17 +25,17 @@ class Session:
     def __init__(
         self,
         alt_screen: bool = False,
-        stdin: Optional[TextIO] = None,
-        stdout: Optional[TextIO] = None,
+        stdin: TextIO | None = None,
+        stdout: TextIO | None = None,
     ):
         self.alt_screen = alt_screen
         self.stdin = stdin or sys.stdin
         self.stdout = stdout or sys.stdout
         self._fd = self.stdin.fileno()
-        self._old_termios: Optional[list] = None
+        self._old_termios: list | None = None
         self.renderer = Renderer(self)
 
-    def __enter__(self) -> "Session":
+    def __enter__(self) -> Session:
         if not self.stdin.isatty() or not self.stdout.isatty():
             raise RuntimeError("A TTY is required for interactive terminal mode.")
         self._suspended = False
@@ -92,9 +91,9 @@ class Session:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         try:
             if self.alt_screen:

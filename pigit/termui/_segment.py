@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_segment.py
 Description: Styled text fragment for terminal rendering.
@@ -8,7 +7,6 @@ Date: 2026-04-30
 
 from __future__ import annotations
 
-from typing import Optional
 
 from . import palette
 
@@ -33,8 +31,8 @@ class Segment:
     def __init__(
         self,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
     ) -> None:
         self.text = text
@@ -43,22 +41,22 @@ class Segment:
         self.style_flags = style_flags
 
     @classmethod
-    def bold(cls, text: str, fg: Optional[tuple[int, int, int]] = None) -> "Segment":
+    def bold(cls, text: str, fg: tuple[int, int, int] | None = None) -> Segment:
         return cls(text, fg=fg, style_flags=palette.STYLE_BOLD)
 
     @classmethod
     def dim(
-        cls, text: str, fg: Optional[tuple[int, int, int]] = palette.DEFAULT_FG_DIM
-    ) -> "Segment":
+        cls, text: str, fg: tuple[int, int, int] | None = palette.DEFAULT_FG_DIM
+    ) -> Segment:
         return cls(text, fg=fg, style_flags=palette.STYLE_DIM)
 
     @classmethod
     def reverse(
         cls,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
-    ) -> "Segment":
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
+    ) -> Segment:
         return cls(text, fg=fg, bg=bg, style_flags=palette.STYLE_REVERSE)
 
     def has_style(self, flag: int) -> bool:

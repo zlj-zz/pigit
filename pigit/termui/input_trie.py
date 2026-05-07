@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/input_trie.py
 Description: Escape-sequence matching (CSI/SS3) for KeyboardInput — one trie-style path.
@@ -8,7 +7,6 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import Optional
 
 from . import keys
 
@@ -37,7 +35,7 @@ def _csi_or_ss3_byte_count(buf: bytes) -> int:
     return 0
 
 
-def match_esc_sequence(buf: bytes) -> tuple[Optional[str], int, bool]:
+def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
     """
     Match a leading escape sequence.
 

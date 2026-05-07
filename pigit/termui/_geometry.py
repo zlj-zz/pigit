@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_geometry.py
 Description: Terminal column/row sizes aligned with shutil.get_terminal_size.
@@ -19,7 +18,7 @@ class TerminalSize(NamedTuple):
     lines: int
 
     @classmethod
-    def from_os(cls) -> "TerminalSize":
+    def from_os(cls) -> TerminalSize:
         """Read current terminal size from the environment."""
 
         s = get_terminal_size()

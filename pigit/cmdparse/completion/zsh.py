@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/cmdparse/completion/zsh.py
 Description: Zsh shell completion with git-aware argument completion.
 Author: Zev
 Date: 2026-04-12
 """
+
+from __future__ import annotations
 
 import textwrap
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/palette.py
 Description: Default terminal color palette constants.

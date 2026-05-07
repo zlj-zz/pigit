@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_contribution_graph.py
 Description: GitHub-style contribution heatmap for commit history.
@@ -13,9 +12,8 @@ from __future__ import annotations
 
 import datetime
 from collections import defaultdict
-from typing import Optional
 
-from pigit.termui import Component, HeatmapGrid, StepLineChart, palette
+from pigit.termui import Component, HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
@@ -65,7 +63,7 @@ class ContributionGraph(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(x, y, size)
         self._day_counts: dict[datetime.date, int] = {}

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_component_registry.py
 Description: ContextVar-based component registry for id-based O(1) lookup.
@@ -10,7 +9,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 from ._component_base import Component
 
@@ -18,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Component)
 
-_registry_ctx: contextvars.ContextVar[Optional["ComponentRegistry"]] = (
+_registry_ctx: contextvars.ContextVar[ComponentRegistry | None] = (
     contextvars.ContextVar("registry", default=None)
 )
 
@@ -45,16 +44,16 @@ class ComponentRegistry:
         if component.id:
             self._by_id.pop(component.id, None)
 
-    def by_id(self, id: str) -> Optional[Component]:
+    def by_id(self, id: str) -> Component | None:
         return self._by_id.get(id)
 
 
-def get_registry() -> Optional[ComponentRegistry]:
+def get_registry() -> ComponentRegistry | None:
     """Get current registry from context."""
     return _registry_ctx.get()
 
 
-def by_id(id: str, expect_type: Optional[type[T]] = None) -> Optional[T]:
+def by_id(id: str, expect_type: type[T] | None = None) -> T | None:
     """Find component by its unique identifier in the current registry context.
 
     Args:

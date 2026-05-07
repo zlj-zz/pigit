@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_component_layouts.py
 Description: Layout container components for the TUI framework.
@@ -9,11 +8,11 @@ Date: 2026-04-20
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Literal
+from collections.abc import Callable, Sequence
 
 from ._component_base import (
     Component,
-    ComponentError,
     _render_child_to_surface,
     _set_focus_chain,
 )
@@ -32,12 +31,12 @@ class TabView(Component):
     def __init__(
         self,
         children: list[Component],
-        start: Optional[str] = None,
-        on_switch: Optional[Callable[[Component], None]] = None,
+        start: str | None = None,
+        on_switch: Callable[[Component], None] | None = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
 
@@ -72,11 +71,11 @@ class TabView(Component):
         _set_focus_chain(self._active)
 
     @property
-    def active(self) -> Optional[Component]:
+    def active(self) -> Component | None:
         """Return the currently active child panel."""
         return self._active
 
-    def route_to(self, id: str) -> Optional[Component]:
+    def route_to(self, id: str) -> Component | None:
         """Switch to the child component with the given id."""
         resolved = self._id_map().get(id)
         if resolved is None:
@@ -143,7 +142,7 @@ class TabView(Component):
         for child in self.children:
             child.resize(size)
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if self._active is not None:
             _render_child_to_surface(self._active, surface, "TabView")
 
@@ -161,11 +160,11 @@ class Column(Component):
     def __init__(
         self,
         children: Sequence[Component],
-        heights: Sequence[Union[int, Literal["flex"]]],
+        heights: Sequence[int | Literal["flex"]],
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self.children = list(children)
@@ -173,7 +172,7 @@ class Column(Component):
             child.parent = self
         self._heights = list(heights)
 
-    def set_heights(self, heights: Sequence[Union[int, Literal["flex"]]]) -> None:
+    def set_heights(self, heights: Sequence[int | Literal["flex"]]) -> None:
         """Update the height spec for each child and validate the length."""
         if len(heights) != len(self.children):
             raise ValueError(
@@ -203,7 +202,7 @@ class Column(Component):
             )
             y += h
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
@@ -236,11 +235,11 @@ class Row(Component):
     def __init__(
         self,
         children: Sequence[Component],
-        widths: Sequence[Union[int, Literal["flex"]]],
+        widths: Sequence[int | Literal["flex"]],
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
-        id: Optional[str] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self.children = list(children)
@@ -248,7 +247,7 @@ class Row(Component):
             child.parent = self
         self._widths = list(widths)
 
-    def set_widths(self, widths: Sequence[Union[int, Literal["flex"]]]) -> None:
+    def set_widths(self, widths: Sequence[int | Literal["flex"]]) -> None:
         """Update the width spec for each child and validate the length."""
         if len(widths) != len(self.children):
             raise ValueError(
@@ -281,7 +280,7 @@ class Row(Component):
             )
             x += w
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:

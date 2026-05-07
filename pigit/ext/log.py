@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 """
 Module: pigit/ext/log.py
 Description: Root logging setup, named loggers, and uncaught-exception forwarding.
@@ -6,12 +5,13 @@ Author: Zev
 Date: 2024-01-01
 """
 
+from __future__ import annotations
+
 import logging
 import logging.handlers
 import os
 import sys
 import threading
-from typing import Optional
 
 _PIGIT_HANDLER_ATTR = "_pigit_log_handler"
 _UNCAUGHT_HOOKS_INSTALLED = False
@@ -37,7 +37,7 @@ def _remove_pigit_handlers(root_logger: logging.Logger) -> None:
         handler.close()
 
 
-def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> None:
+def setup_logging(debug: bool = False, log_file: str | None = None) -> None:
     """Configure the root logger and install uncaught-exception logging once."""
 
     # logging.getLogger() with no args returns the root logger (global parent of all loggers)
@@ -62,7 +62,7 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> None:
                 log_file, maxBytes=1048576, backupCount=4
             )
         except PermissionError:
-            print("No permission to write to '{0}' directory!".format(log_file))
+            print(f"No permission to write to '{log_file}' directory!")
             raise SystemExit(1) from None
 
     log_handle.setFormatter(formatter)
@@ -91,7 +91,7 @@ def install_uncaught_exception_logging() -> None:
     def _excepthook(
         exc_type: type,
         exc_value: BaseException,
-        exc_tb: Optional[object],
+        exc_tb: object | None,
     ) -> None:
         logging.getLogger().error(
             "Uncaught exception",
@@ -119,7 +119,7 @@ def install_uncaught_exception_logging() -> None:
 _logger_cache: dict[str, "logging.Logger"] = {}
 
 
-def logger(name: Optional[str] = None) -> "logging.Logger":
+def logger(name: str | None = None) -> "logging.Logger":
     # not cache no name logger
     if name is None:
         return logging.getLogger()

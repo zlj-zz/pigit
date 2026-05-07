@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_completion.py
 Description: Git completion data source for picker argument prompting.
@@ -6,8 +5,10 @@ Author: Zev
 Date: 2026-04-15
 """
 
+from __future__ import annotations
+
 import subprocess
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ._completion_types import CompletionType
 
@@ -47,11 +48,11 @@ def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
 
     if comp_type == CompletionType.REMOTE:
         stdout = _git_run_text(["remote"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+        return sorted({ln.strip() for ln in stdout.splitlines() if ln.strip()})
 
     if comp_type == CompletionType.TAG:
         stdout = _git_run_text(["tag"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+        return sorted({ln.strip() for ln in stdout.splitlines() if ln.strip()})
 
     if comp_type == CompletionType.STASH:
         stdout = _git_run_text(["stash", "list"])
@@ -59,14 +60,14 @@ def _git_completion_candidates(comp_type: CompletionType) -> list[str]:
 
     if comp_type == CompletionType.REF:
         stdout = _git_run_text(["for-each-ref", "--format=%(refname:short)"])
-        return sorted(set(ln.strip() for ln in stdout.splitlines() if ln.strip()))
+        return sorted({ln.strip() for ln in stdout.splitlines() if ln.strip()})
 
     return []
 
 
 def make_candidate_provider(
-    comp: Optional[CompletionType],
-) -> Optional[Callable]:
+    comp: CompletionType | None,
+) -> Callable | None:
     """Build a candidate provider callback for tab completion.
 
     Args:

@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/branch.py
 Description: Branch commands for cmd_new (b.* namespace).
 Author: Zev
 Date: 2026-04-10
 """
+
+from __future__ import annotations
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_commit.py
 Description: CommitPanel v3 with list view, relative time, and inline merge graph.
@@ -10,7 +9,8 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum, auto
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
@@ -113,10 +113,10 @@ class CommitPanel(ItemSelector):
     def __init__(
         self,
         *,
-        display: Optional[Component] = None,
-        on_selection_changed: Optional[Callable] = None,
-        git: "LocalGit",
-        id: Optional[str] = None,
+        display: Component | None = None,
+        on_selection_changed: Callable | None = None,
+        git: LocalGit,
+        id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -135,7 +135,7 @@ class CommitPanel(ItemSelector):
         self._remotes: tuple[str, ...] = ()
         self._refs_cache: dict[str, tuple[str, list[str], list[str]]] = {}
         self._expanded = False
-        self._bodies: Optional[dict[str, str]] = None
+        self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
 
     @bind_keys("j", keys.KEY_DOWN)
@@ -192,7 +192,7 @@ class CommitPanel(ItemSelector):
             ("y", "Copy SHA"),
         ]
 
-    def _current_commit(self) -> Optional["Commit"]:
+    def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""
         if not self.commits:
             return None
@@ -200,7 +200,7 @@ class CommitPanel(ItemSelector):
             return self.commits[self.curr_no]
         return None
 
-    def get_inspector_data(self) -> Optional[CommitInfo]:
+    def get_inspector_data(self) -> CommitInfo | None:
         """Return inspector data for the currently selected commit."""
         c = self._current_commit()
         if c is None:
@@ -247,7 +247,7 @@ class CommitPanel(ItemSelector):
         self._bodies = self.git.get_commit_bodies(branch_name)
         self._body_lines_cache.clear()
 
-    def _body_lines(self, commit: "Commit") -> list[str]:
+    def _body_lines(self, commit: Commit) -> list[str]:
         """Return body lines for ``commit`` (subject excluded), cached per-sha."""
         cached = self._body_lines_cache.get(commit.sha)
         if cached is not None:
@@ -308,7 +308,7 @@ class CommitPanel(ItemSelector):
             lines.extend([""] * len(self._schema_for(commit)))
         return lines, starts
 
-    def _schema_for(self, commit: "Commit") -> list[tuple[_SubRow, int]]:
+    def _schema_for(self, commit: Commit) -> list[tuple[_SubRow, int]]:
         """Pure function of ``(commit.is_merge, len(body_lines))``.
 
         Cheap to recompute since ``_body_lines`` is cached; returning a fresh
@@ -327,7 +327,7 @@ class CommitPanel(ItemSelector):
         schema.append((_SubRow.TAIL, 0))
         return schema
 
-    def _format_compact(self, commit: "Commit") -> str:
+    def _format_compact(self, commit: Commit) -> str:
         """Plain-text used for ``set_content`` width measurements; rich
         rendering is produced by ``describe_row``."""
         msg = commit.msg
@@ -351,7 +351,7 @@ class CommitPanel(ItemSelector):
         idx: int,
         is_cursor: bool,
         *,
-        item_idx: Optional[int] = None,
+        item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[
         list[Segment],
@@ -394,7 +394,7 @@ class CommitPanel(ItemSelector):
 
     def _describe_compact(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         is_cursor: bool,
         focused: bool,
@@ -416,7 +416,7 @@ class CommitPanel(ItemSelector):
 
     def _commit_left_main(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         is_cursor: bool,
         focused: bool,
@@ -453,7 +453,7 @@ class CommitPanel(ItemSelector):
 
     def _describe_sub_row(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         kind: _SubRow,
         payload: int,
@@ -513,7 +513,7 @@ class CommitPanel(ItemSelector):
 
     def _ref_segments(
         self,
-        commit: "Commit",
+        commit: Commit,
         *,
         focused: bool,
         cursor_flags: int,
@@ -565,7 +565,7 @@ class CommitPanel(ItemSelector):
     def _render_rails(
         self,
         row: GraphRow,
-        commit: Optional["Commit"],
+        commit: Commit | None,
         *,
         sub: bool = False,
         cursor_flags: int,
@@ -604,7 +604,7 @@ class CommitPanel(ItemSelector):
         self,
         row: GraphRow,
         i: int,
-        commit: "Commit",
+        commit: Commit,
         *,
         focused: bool,
     ) -> tuple[str, tuple[int, int, int]]:

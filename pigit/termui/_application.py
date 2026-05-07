@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_application.py
 Description: Application facade that composes a root component tree and an event loop.
@@ -9,7 +8,7 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -30,7 +29,7 @@ class LoopKwargs(TypedDict, total=False):
     """Keyword arguments forwarded to :class:`~pigit.termui.event_loop.AppEventLoop`."""
 
     input_takeover: bool
-    input_handle: "InputTerminal"
+    input_handle: InputTerminal
     real_time: bool
     alt: bool
 
@@ -42,7 +41,7 @@ class _ApplicationEventLoop(AppEventLoop):
     When an overlay is open, keys are routed exclusively to the overlay stack.
     """
 
-    def __init__(self, root: Component, app: "Application", **kwargs):
+    def __init__(self, root: Component, app: Application, **kwargs):
         super().__init__(root, **kwargs)
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
@@ -89,11 +88,11 @@ class Application:
     High-level facade: subclasses implement build_root() and optional app-level bindings.
     """
 
-    BINDINGS: Optional[BindingsList] = None
+    BINDINGS: BindingsList | None = None
 
-    def __init__(self, **loop_kwargs: "Unpack[LoopKwargs]") -> None:
-        self._loop: Optional[AppEventLoop] = None
-        self._root: Optional[ComponentRoot] = None
+    def __init__(self, **loop_kwargs: Unpack[LoopKwargs]) -> None:
+        self._loop: AppEventLoop | None = None
+        self._root: ComponentRoot | None = None
         self._loop_kwargs = loop_kwargs
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), self.BINDINGS
@@ -108,11 +107,9 @@ class Application:
         Hook after ComponentRoot is created but before loop starts.
         Attach overlays (Popup, AlertDialog) here.
         """
-        pass
 
     def after_start(self) -> None:
         """Lifecycle hook invoked after the loop is ready."""
-        pass
 
     def resize(self, size: tuple[int, int]) -> None:
         """Manually trigger resize on the root component tree."""
@@ -155,7 +152,7 @@ class Application:
         except ExitEventLoop:
             pass
 
-    def run_with_result(self) -> tuple[int, Optional[str]]:
+    def run_with_result(self) -> tuple[int, str | None]:
         """Short-lived TUI entry returning (exit_code, message).
 
         Used by pickers and other one-shot interactive flows.

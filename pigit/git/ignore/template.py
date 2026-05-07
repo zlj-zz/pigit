@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 # https://github.com/github/gitignore
 # Generate by script `gitignore.py`.
 
@@ -2403,6 +2402,8 @@ $tf/
 *.gpState
 
 # ReSharper is a .NET coding add-in
+from __future__ import annotations
+
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user

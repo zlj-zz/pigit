@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_overlay_context.py
 Description: Overlay host context management (Toast/Sheet) via ContextVar.
@@ -9,12 +8,13 @@ Date: 2026-04-25
 from __future__ import annotations
 
 import contextvars
-from typing import Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from ._layer import LayerKind
 from ._reactive import Signal
 
-_badge_signal: Signal[Optional[str]] = Signal(None)
+_badge_signal: Signal[str | None] = Signal(None)
 
 if TYPE_CHECKING:
     from ._component_base import Component
@@ -23,12 +23,12 @@ if TYPE_CHECKING:
     from ._segment import Segment
     from .types import ToastPosition
 
-_overlay_host_ctx: contextvars.ContextVar[Optional["ComponentRoot"]] = (
+_overlay_host_ctx: contextvars.ContextVar[ComponentRoot | None] = (
     contextvars.ContextVar("overlay_host", default=None)
 )
 
 
-def set_overlay_host(host: "ComponentRoot") -> contextvars.Token:
+def set_overlay_host(host: ComponentRoot) -> contextvars.Token:
     """Set the current overlay host in context."""
     return _overlay_host_ctx.set(host)
 
@@ -38,19 +38,19 @@ def reset_overlay_host(token: contextvars.Token) -> None:
     _overlay_host_ctx.reset(token)
 
 
-def get_overlay_host() -> Optional["ComponentRoot"]:
+def get_overlay_host() -> ComponentRoot | None:
     """Return the current overlay host, or ``None`` if not inside a TUI session."""
     return _overlay_host_ctx.get()
 
 
-def layer_push(kind: "LayerKind", overlay: "Component") -> None:
+def layer_push(kind: LayerKind, overlay: Component) -> None:
     """Push an overlay onto the specified layer."""
     host = get_overlay_host()
     if host is not None:
         host._layer_stack.push(kind, overlay)
 
 
-def layer_pop(kind: "LayerKind") -> Optional["Component"]:
+def layer_pop(kind: LayerKind) -> Component | None:
     """Pop the top component from the specified layer."""
     host = get_overlay_host()
     if host is not None:
@@ -58,7 +58,7 @@ def layer_pop(kind: "LayerKind") -> Optional["Component"]:
     return None
 
 
-def layer_top(kind: "LayerKind") -> Optional["Component"]:
+def layer_top(kind: LayerKind) -> Component | None:
     """Return the top component on the specified layer, or ``None``."""
     host = get_overlay_host()
     if host is not None:
@@ -74,10 +74,10 @@ def is_modal_open() -> bool:
 def show_toast(
     message: str = "",
     *,
-    segments: Optional[Sequence["Segment"]] = None,
+    segments: Sequence[Segment] | None = None,
     duration: float = 2.0,
-    position: Optional[ToastPosition] = None,
-) -> Optional["Toast"]:
+    position: ToastPosition | None = None,
+) -> Toast | None:
     """Display a transient toast notification via the current overlay host."""
     host = get_overlay_host()
     if host is None:
@@ -87,7 +87,7 @@ def show_toast(
     )
 
 
-def show_sheet(child: "Component", height: int = 8) -> Optional["Sheet"]:
+def show_sheet(child: Component, height: int = 8) -> Sheet | None:
     """Display a bottom sheet via the current overlay host."""
     host = get_overlay_host()
     if host is None:
@@ -102,16 +102,16 @@ def dismiss_sheet() -> None:
         host.dismiss_sheet()
 
 
-def get_badge_signal() -> Signal[Optional[str]]:
+def get_badge_signal() -> Signal[str | None]:
     """Return the global badge-change signal for reactive header binding."""
     return _badge_signal
 
 
 def show_badge(
     text: str,
-    duration: Optional[float] = None,
-    bg: Optional[tuple[int, int, int]] = None,
-    fg: Optional[tuple[int, int, int]] = None,
+    duration: float | None = None,
+    bg: tuple[int, int, int] | None = None,
+    fg: tuple[int, int, int] | None = None,
 ) -> None:
     """Show a badge on the overlay host."""
     host = get_overlay_host()
@@ -123,9 +123,9 @@ def show_badge(
 
 
 def get_badge() -> tuple[
-    Optional[str],
-    Optional[tuple[int, int, int]],
-    Optional[tuple[int, int, int]],
+    str | None,
+    tuple[int, int, int] | None,
+    tuple[int, int, int] | None,
 ]:
     """Get current badge state from the overlay host.
 
@@ -139,7 +139,7 @@ def get_badge() -> tuple[
     return host.badge_text, host.badge_bg, host.badge_fg
 
 
-def show_spinner(message: str) -> Optional["Toast"]:
+def show_spinner(message: str) -> Toast | None:
     """Display a persistent spinner toast (duration=3600s), replacing any current toast.
 
     The message is prefixed with ``\u00bb`` and suffixed with ``\u2026`` automatically.

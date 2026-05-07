@@ -1,5 +1,5 @@
-# -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
+from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING
@@ -46,7 +46,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: "Namespace", _) -> None:
+def pigit(args: Namespace, _) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -66,7 +66,6 @@ def pigit(args: "Namespace", _) -> None:
 
         # Add cmd commands to completion with arg_completion metadata
         from .git.cmds import get_registry, register_user_commands
-        from .git.cmds._completion_types import CompletionType
         register_user_commands()
         registry = get_registry()
 
@@ -163,7 +162,7 @@ def pigit(args: "Namespace", _) -> None:
                     f"{f_num_str} `{f_change_str}`<{'#98fb98' if f_change_str.startswith('+') else '#ff6347'}>",
                     f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
                 )
-            tb.caption = " Total: {0}".format(total_size)
+            tb.caption = f" Total: {total_size}"
             console.echo(tb)
         else:
             print("Invalid display format!")
@@ -275,7 +274,7 @@ tools_group.add_argument(
     nargs="*",
     help="Command to execute with arguments.",
 )
-def _(args: "Namespace", _):
+def _(args: Namespace, _):
     """Execute short git commands."""
     from .handlers.cmd_handler import handle_cmd
 
@@ -376,7 +375,7 @@ for sub_cmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _(args: "Namespace", _):
+def _(args: Namespace, _):
     RepoCommandHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

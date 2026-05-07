@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/settings.py
 Description: Git settings commands for cmd_new (set.* namespace).
@@ -6,8 +5,10 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 from ._decorators import command, alias
-from ._models import CommandCategory, SecurityLevel
+from ._models import CommandCategory
 
 
 @command(

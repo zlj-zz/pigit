@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/tty_io.py
 Description: Low-level TTY helpers for picker scenes (cbreak reads, escape sequences, viewport math).

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_frame.py
 Description: Reusable bordered frame layout helpers for declarative terminal drawing.
@@ -8,7 +7,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from . import palette
 from .wcwidth_table import pad_by_width, truncate_by_width
@@ -24,7 +23,7 @@ class BoxFrame:
         self,
         inner_width: int,
         inner_height: int,
-        title: Optional[str] = None,
+        title: str | None = None,
         *,
         fg: tuple[int, int, int] = palette.DEFAULT_FG,
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
@@ -48,7 +47,7 @@ class BoxFrame:
         self.inner_height = inner_height
         self._recalc_outer()
 
-    def draw_onto(self, surface: "Surface", row: int, col: int) -> None:
+    def draw_onto(self, surface: Surface, row: int, col: int) -> None:
         """Draw border onto surface at (row, col)."""
         surface.draw_box_rgb(
             row,
@@ -62,7 +61,7 @@ class BoxFrame:
         )
 
     def draw_content(
-        self, surface: "Surface", row: int, col: int, lines: list[str]
+        self, surface: Surface, row: int, col: int, lines: list[str]
     ) -> None:
         """Draw content lines inside the box, clipped to inner dimensions.
 

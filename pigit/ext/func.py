@@ -1,4 +1,7 @@
-from typing import Any, Callable
+from __future__ import annotations
+
+from typing import Any
+from collections.abc import Callable
 from functools import wraps
 import time, contextlib, inspect
 
@@ -31,7 +34,7 @@ def time_it(fn: Callable) -> Callable:
                     break
             else:
                 i = 2
-            print("\n# runtime: {0:.2f} {1}".format(used_time, time_unit[i]))
+            print(f"\n# runtime: {used_time:.2f} {time_unit[i]}")
         return res
 
     return wrap

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_picker.py
 Description: Full-screen searchable list picker as a Component driven by AppEventLoop.
@@ -10,7 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from . import palette
 from ._component_base import Component
@@ -71,7 +71,7 @@ class PickerHeader(Component):
         super().__init__()
         self._title = title_line
 
-    def _render_surface(self, surface: "Surface") -> None:
+    def _render_surface(self, surface: Surface) -> None:
         cols = surface.width
         sep = "=" * min(72, cols)
         surface.draw_text_rgb(0, 0, sep, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
@@ -86,7 +86,6 @@ class PickerHeader(Component):
 
     def refresh(self) -> None:
         """No-op refresh for the static header (subclasses may override)."""
-        pass
 
 
 class PickerState:

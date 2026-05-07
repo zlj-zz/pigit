@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import json
 import logging
@@ -6,7 +6,7 @@ import os
 import pprint
 from collections import Counter
 from pathlib import Path
-from typing import Generator, Optional
+from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
@@ -37,8 +37,8 @@ class ManagedRepos:
     def __init__(
         self,
         executor: Executor,
-        repo_json_path: Optional[str] = None,
-        log: Optional[logging.Logger] = None,
+        repo_json_path: str | None = None,
+        log: logging.Logger | None = None,
     ) -> None:
         self.executor = executor
         self.log = log
@@ -284,11 +284,11 @@ class ManagedRepos:
 
     def cd_repo(
         self,
-        repo: Optional[str] = None,
+        repo: str | None = None,
         *,
         pick: bool = False,
         pick_alt_screen: bool = False,
-    ) -> tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         """Quick jump to repo dir.
 
         Args:
@@ -347,7 +347,7 @@ class ManagedRepos:
             print("Error: index need input a number.")
         return 0, None
 
-    def process_repos_option(self, repos: Optional[list[str]], cmd: str):
+    def process_repos_option(self, repos: list[str] | None, cmd: str):
         exist_repos = self.load_repos()
         print(f":: {cmd}\n")
 

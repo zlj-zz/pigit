@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/types.py
 Description: Base types, enums, and protocols (no runtime dependencies).

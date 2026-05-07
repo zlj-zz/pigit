@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_models.py
 Description: Data models for cmd_new command system.
@@ -6,8 +5,11 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Union, Optional, Callable, Protocol
+from typing import Protocol
+from collections.abc import Callable
 from enum import Enum, auto
 
 from ._completion_types import CompletionType
@@ -77,7 +79,7 @@ class CommandMeta:
     category: CommandCategory
     help: str
     has_args: bool = False
-    arg_completion: Union[CompletionType, list[CompletionType]] = None
+    arg_completion: CompletionType | list[CompletionType] = None
     dangerous: bool = False
     confirm_msg: str = ""
     examples: list[str] = field(default_factory=list)
@@ -120,7 +122,7 @@ class CommandDef:
     """
 
     meta: CommandMeta
-    handler: Union[str, Callable[[list[str]], str], ScriptConfig]
+    handler: str | Callable[[list[str]], str] | ScriptConfig
 
 
 @dataclass
@@ -162,7 +164,7 @@ class CompletionItem:
 class ValidationResult:
     """Result of command validation."""
 
-    def __init__(self, is_valid: bool, errors: Optional[list[str]] = None):
+    def __init__(self, is_valid: bool, errors: list[str] | None = None):
         self.is_valid = is_valid
         self.errors = errors or []
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/wcwidth_table.py
 Description: Display-width lookup table for terminal column counting (moved from legacy ``tui.utils``).

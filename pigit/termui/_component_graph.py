@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_component_graph.py
 Description: Generic heatmap grid and stepped line chart components.
@@ -9,7 +8,7 @@ Date: 2026-04-30
 from __future__ import annotations
 
 import math
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from . import palette
 from ._component_base import Component
@@ -38,7 +37,7 @@ class HeatmapGrid(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         *,
         rows: int = 7,
         cols: int = 53,
@@ -48,7 +47,7 @@ class HeatmapGrid(Component):
         empty_char: str = "·",
         margin_left: int = 0,
         margin_top: int = 0,
-        color_fn: Optional[Callable[[int, int], tuple[int, int, int]]] = None,
+        color_fn: Callable[[int, int], tuple[int, int, int]] | None = None,
     ) -> None:
         super().__init__(x, y, size)
         self._rows = rows
@@ -65,8 +64,8 @@ class HeatmapGrid(Component):
 
     def resize(
         self,
-        rows: Optional[int] = None,
-        cols: Optional[int] = None,
+        rows: int | None = None,
+        cols: int | None = None,
     ) -> None:
         """Resize the grid geometry."""
         if rows is not None:
@@ -77,7 +76,7 @@ class HeatmapGrid(Component):
     def set_values(
         self,
         values: dict[tuple[int, int], int],
-        max_value: Optional[int] = None,
+        max_value: int | None = None,
     ) -> None:
         """Set cell values as {(col, row): intensity}.
 
@@ -125,7 +124,7 @@ class StepLineChart(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         *,
         plot_w: int = 55,
         plot_h: int = 7,
@@ -164,7 +163,7 @@ class StepLineChart(Component):
     def set_series(
         self,
         series: dict[str, list[int]],
-        x_labels: Optional[list[tuple[int, str]]] = None,
+        x_labels: list[tuple[int, str]] | None = None,
     ) -> None:
         """Set data series and optional X-axis labels."""
         self._series = series
