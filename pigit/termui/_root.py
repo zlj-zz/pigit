@@ -104,6 +104,9 @@ class ComponentRoot(Component):
         self._badge_bg = None
         self._badge_fg = None
         self._badge_until = 0
+        sig = _overlay_context.get_badge_signal()
+        if sig.value is not None:
+            sig.set(None)
 
     @property
     def badge_text(self) -> Optional[str]:

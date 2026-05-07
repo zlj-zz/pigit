@@ -21,6 +21,7 @@ from ._renderer_context import (
     get_renderer,
     get_renderer_strict,
 )
+from ._reactive import Computed, Signal
 from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
@@ -318,3 +319,34 @@ def _describe_binding_target(
                 return doc.strip().splitlines()[0].strip()
         return f"{target} action"
     return "bound command"
+
+
+def bind_signals(
+    component: Component,
+    *signals: Union[Signal, Computed],
+    callback: Optional[Callable[[], None]] = None,
+) -> Callable[[], None]:
+    """Subscribe component to signals. Returns an unsubscribe function.
+
+    Args:
+        component: The component to refresh when signals change.
+        *signals: One or more Signal/Computed instances to watch.
+        callback: Optional handler. Defaults to component.refresh().
+
+    Returns:
+        Unsubscribe function. Caller must store and call on destroy.
+    """
+    cb = callback or component.refresh
+
+    def _handler(_: object) -> None:
+        cb()
+
+    unsubs: list[Callable[[], None]] = []
+    for sig in signals:
+        unsubs.append(sig.subscribe(_handler))
+
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    return unsubscribe

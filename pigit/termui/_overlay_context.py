@@ -12,6 +12,9 @@ import contextvars
 from typing import Optional, Sequence, TYPE_CHECKING
 
 from ._layer import LayerKind
+from ._reactive import Signal
+
+_badge_signal: Signal[Optional[str]] = Signal(None)
 
 if TYPE_CHECKING:
     from ._component_base import Component
@@ -99,6 +102,11 @@ def dismiss_sheet() -> None:
         host.dismiss_sheet()
 
 
+def get_badge_signal() -> Signal[Optional[str]]:
+    """Return the global badge-change signal for reactive header binding."""
+    return _badge_signal
+
+
 def show_badge(
     text: str,
     duration: Optional[float] = None,
@@ -110,6 +118,8 @@ def show_badge(
     if host is None:
         return
     host.show_badge(text, duration=duration, bg=bg, fg=fg)
+    if _badge_signal.value != text:
+        _badge_signal.set(text)
 
 
 def get_badge() -> tuple[

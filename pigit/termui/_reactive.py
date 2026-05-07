@@ -8,9 +8,12 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
-from typing import Callable, Generic, TypeVar
+from typing import Callable, Generic, Optional, TypeVar, Union
 
 T = TypeVar("T")
+
+# Type alias for component props that accept both static and reactive data.
+ValueRef = Union[T, "Signal[T]", "Computed[T]"]
 
 
 class Signal(Generic[T]):
@@ -40,16 +43,46 @@ class Signal(Generic[T]):
 
 
 class Computed(Generic[T]):
-    """Derived signal. Cached; only notifies subscribers when value actually changes."""
+    """Derived signal.  Two modes:
 
-    def __init__(self, fn: Callable[[], T]) -> None:
+    - **Lazy mode** (``deps`` is *None*, default): recompute on every
+      ``.value`` read; notify subscribers when the result changes.
+    - **Reactive mode** (``deps`` is a list): subscribe to the given Signals
+      and recompute automatically when any dependency changes.  ``.value``
+      returns the cached result.
+    """
+
+    def __init__(
+        self,
+        fn: Callable[[], T],
+        deps: Optional[list[Signal]] = None,
+    ) -> None:
         self._fn = fn
+        self.deps = deps
         self._value: T = fn()
-        self._signal = Signal(self._value)
+
+        if deps is not None:
+            # Reactive mode: subscribe to deps
+            self._subs: list[Callable[[T], None]] = []
+            self._unsubs: list[Callable[[], None]] = []
+            for dep in deps:
+                self._unsubs.append(dep.subscribe(lambda _: self._recompute()))
+        else:
+            # Lazy mode: backwards-compatible, recompute on each .value read
+            self._signal = Signal(self._value)
+
+    def _recompute(self) -> None:
+        new = self._fn()
+        if new != self._value:
+            self._value = new
+            for cb in self._subs:
+                cb(new)
 
     @property
     def value(self) -> T:
-        """Return the current derived value, recomputing and notifying if changed."""
+        if self.deps is not None:
+            return self._value
+        # Lazy mode: recompute and notify on each read
         new = self._fn()
         if new != self._value:
             self._value = new
@@ -57,5 +90,7 @@ class Computed(Generic[T]):
         return self._value
 
     def subscribe(self, callback: Callable[[T], None]) -> Callable[[], None]:
-        """Proxy to underlying signal so callers can observe derived value changes."""
+        if self.deps is not None:
+            self._subs.append(callback)
+            return lambda: self._subs.remove(callback)
         return self._signal.subscribe(callback)

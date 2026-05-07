@@ -8,13 +8,13 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence
 
 from . import keys, palette
-from ._component_base import Component, ComponentError
+from ._component_base import Component, ComponentError, bind_signals
 from ._segment import Segment
 from ._surface import Surface
-from ._reactive import Signal
+from ._reactive import Computed, Signal, ValueRef
 from .types import ActionEventType, OverlayDispatchResult
 from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
@@ -430,44 +430,82 @@ class ItemSelector(Component):
 class Header(Component):
     """Generic header bar with left/center/right segments.
 
-    Each slot is a sequence of :class:`Segment`.  Center is
-    horizontally centred; right is right-aligned.  If the total width
-    exceeds the available space, the centre group is dropped first, then
-    the left group is truncated with an ellipsis.
+    Each slot accepts a static list, a Signal, or a Computed value.
+    When a Signal/Computed changes, Header auto-refreshes.
+    Center is horizontally centred; right is right-aligned.
+    If total width exceeds available space, centre is dropped first,
+    then left is truncated with an ellipsis.
     """
 
     def __init__(
         self,
         *,
+        left: Optional[ValueRef[list[Segment]]] = None,
+        center: Optional[ValueRef[list[Segment]]] = None,
+        right: Optional[ValueRef[list[Segment]]] = None,
         separator: bool = True,
         sep_fg: tuple[int, int, int] = (100, 100, 100),
-        on_refresh: Optional[Callable[["Header"], None]] = None,
         id: Optional[str] = None,
     ) -> None:
         super().__init__(id=id)
         self._separator = separator
         self._sep_fg = sep_fg
-        self._on_refresh = on_refresh
-        self._left: list[Segment] = []
-        self._center: list[Segment] = []
-        self._right: list[Segment] = []
 
-    def set_left(self, segments: Sequence[Segment]) -> None:
-        """Set the left header segments."""
-        self._left = list(segments)
+        self._left_src = left or []
+        self._center_src = center or []
+        self._right_src = right or []
 
-    def set_center(self, segments: Sequence[Segment]) -> None:
-        """Set the center header segments."""
-        self._center = list(segments)
+        # Auto-subscribe to Signal/Computed
+        self._unsubs: list[Callable[[], None]] = []
+        for src in (self._left_src, self._center_src, self._right_src):
+            if isinstance(src, (Signal, Computed)):
+                self._unsubs.append(bind_signals(self, src))
 
-    def set_right(self, segments: Sequence[Segment]) -> None:
-        """Set the right header segments."""
-        self._right = list(segments)
+    def _get(self, src: ValueRef[list[Segment]]) -> list[Segment]:
+        if isinstance(src, (Signal, Computed)):
+            return src.value
+        return src
+
+    @property
+    def left(self) -> list[Segment]:
+        return self._get(self._left_src)
+
+    def _set_src(self, attr: str, segments: list[Segment]) -> None:
+        src = getattr(self, attr)
+        if isinstance(src, Signal):
+            src.set(segments)
+        elif isinstance(src, Computed):
+            raise TypeError("Cannot assign to a Computed slot")
+        else:
+            setattr(self, attr, segments)
+            self.refresh()
+
+    @left.setter
+    def left(self, segments: list[Segment]) -> None:
+        self._set_src("_left_src", segments)
+
+    @property
+    def center(self) -> list[Segment]:
+        return self._get(self._center_src)
+
+    @center.setter
+    def center(self, segments: list[Segment]) -> None:
+        self._set_src("_center_src", segments)
+
+    @property
+    def right(self) -> list[Segment]:
+        return self._get(self._right_src)
+
+    @right.setter
+    def right(self, segments: list[Segment]) -> None:
+        self._set_src("_right_src", segments)
+
+    def destroy(self) -> None:
+        for unsub in self._unsubs:
+            unsub()
+        super().destroy()
 
     def _render_surface(self, surface: "Surface") -> None:
-        if self._on_refresh is not None:
-            self._on_refresh(self)
-
         w = surface.width
         h = surface.height
         if w <= 0:
@@ -485,9 +523,13 @@ class Header(Component):
     def _draw_content(self, surface: "Surface", row: int, w: int) -> None:
         surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
-        left_w = self._slot_width(self._left)
-        center_w = self._slot_width(self._center)
-        right_w = self._slot_width(self._right)
+        left = self._get(self._left_src)
+        center = self._get(self._center_src)
+        right = self._get(self._right_src)
+
+        left_w = self._slot_width(left)
+        center_w = self._slot_width(center)
+        right_w = self._slot_width(right)
 
         # Drop centre if total exceeds width
         total = left_w + (2 if center_w else 0) + center_w + right_w
@@ -498,12 +540,12 @@ class Header(Component):
         # Truncate left if still exceeds
         if total > w:
             max_left = max(0, w - right_w - 1)
-            self._left = self._truncate_slot(self._left, max_left)
-            left_w = self._slot_width(self._left)
+            left = self._truncate_slot(left, max_left)
+            left_w = self._slot_width(left)
 
         # Draw left
         x = 0
-        for seg in self._left:
+        for seg in left:
             surface.draw_text_rgb(
                 row,
                 x,
@@ -515,10 +557,10 @@ class Header(Component):
             x += wcswidth(seg.text)
 
         # Draw centre
-        if self._center and center_w:
+        if center and center_w:
             centre_x = max(0, (w - center_w) // 2)
             x = centre_x
-            for seg in self._center:
+            for seg in center:
                 surface.draw_text_rgb(
                     row,
                     x,
@@ -530,10 +572,10 @@ class Header(Component):
                 x += wcswidth(seg.text)
 
         # Draw right
-        if self._right and right_w:
+        if right and right_w:
             right_x = max(0, w - right_w)
             x = right_x
-            for seg in self._right:
+            for seg in right:
                 surface.draw_text_rgb(
                     row,
                     x,
@@ -580,30 +622,33 @@ class StatusBar(Component):
 
     def __init__(
         self,
-        text: Union[str, Signal[str]] = "",
+        text: ValueRef[str] = "",
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
     ) -> None:
         super().__init__(x, y, size)
+        self._text_src: ValueRef[str] = text
         self._unsub: Optional[Callable[[], None]] = None
-        if isinstance(text, Signal):
+        if isinstance(text, (Signal, Computed)):
             self._text = text.value
-            self._unsub = text.subscribe(self._on_change)
+            self._unsub = bind_signals(self, text)
         else:
             self._text = text
 
+    def refresh(self) -> None:
+        if isinstance(self._text_src, (Signal, Computed)):
+            self._text = self._text_src.value
+
     def set_text(self, text: str) -> None:
         """Update the displayed status text."""
-        self._text = text
-
-    def _on_change(self, text: str) -> None:
         self._text = text
 
     def destroy(self) -> None:
         """Unsubscribe from the signal and clean up resources."""
         if self._unsub:
             self._unsub()
+        super().destroy()
 
     def _render_surface(self, surface: "Surface") -> None:
         text = truncate_line(self._text, surface.width)

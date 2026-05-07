@@ -9,7 +9,7 @@ Date: 2026-04-17
 import json
 import logging
 import os
-from typing import Optional, Union
+from typing import Optional
 
 from pigit.termui import (
     ActionEventType,
@@ -21,23 +21,20 @@ from pigit.termui import (
     ComponentRoot,
     exec_external,
     ExitEventLoop,
-    get_badge,
     Header,
-    HeaderState,
     HelpPanel,
     hide_spinner,
     keys,
-    palette,
     Popup,
     Row,
-    Segment,
     show_spinner,
     show_toast,
     Signal,
     TabView,
     ToastPosition,
 )
-from pigit.git.local_git import GitError
+from .app_header_state import HeaderState
+from .git.local_git import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -85,11 +82,8 @@ class PigitApplication(Application):
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
-        self._branch_signal: Signal[str] = Signal("")
-        self._ahead: int = 0
-        self._behind: int = 0
-        self._mode: str = ""
         self._header_state = HeaderState(THEME)
+        self._branch_signal: Signal[str] = self._header_state.branch_signal
         # Merge workflow state
         self._merge_state: Optional[dict] = None
         self._alert_dialog = AlertDialog(
@@ -131,9 +125,11 @@ class PigitApplication(Application):
         )
 
         Header(
+            left=self._header_state.left,
+            center=self._header_state.center,
+            right=self._header_state.right,
             separator=True,
             sep_fg=THEME.fg_dim,
-            on_refresh=self._refresh_header,
             id="header",
         )
         footer = AppFooter(theme=THEME, id="footer")
@@ -185,7 +181,8 @@ class PigitApplication(Application):
             self._repo_name = (
                 os.path.basename(self._repo_path) if self._repo_path else ""
             )
-            self._branch_signal.set(head)
+            self._header_state.repo = self._repo_name
+            self._header_state.branch = head
         except Exception:
             logging.warning("Failed to initialize repo info", exc_info=True)
             show_toast(
@@ -200,18 +197,6 @@ class PigitApplication(Application):
             position=ToastPosition.BOTTOM_LEFT,
         )
         self._try_restore_merge_state()
-
-    def _refresh_header(self, header: Header) -> None:
-        """Synchronize state into HeaderState and render."""
-        self._header_state.repo = self._repo_name
-        self._header_state.branch = self._branch_signal.value
-        self._header_state.ahead = self._ahead
-        self._header_state.behind = self._behind
-        if self._merge_state:
-            self._header_state.merge_target = self._merge_state.get("target", "")
-        else:
-            self._header_state.merge_target = ""
-        self._header_state.apply_to(header, get_badge)
 
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
@@ -346,12 +331,14 @@ class PigitApplication(Application):
             return
         if self._git.is_merge_in_progress():
             self._merge_state = state
+            self._header_state.merge_target = state.get("target", "")
             show_toast(
                 f"Resume merge: {state['source']} \u2192 {state['target']} (continue-merge)",
                 duration=3.0,
             )
         else:
             self._clear_merge_state()
+            self._header_state.merge_target = ""
 
     def _on_merge_request(self, source: str, target: str) -> None:
         """Callback from BranchPanel: confirm then execute merge workflow."""
@@ -366,6 +353,7 @@ class PigitApplication(Application):
                 err_msg = str(e).lower()
                 if "conflict" in err_msg:
                     self._merge_state = {"source": source, "target": target}
+                    self._header_state.merge_target = target
                     self._save_merge_state(source, target)
                     show_toast(
                         "Conflict! Resolve in Status, then continue-merge",
@@ -430,6 +418,7 @@ class PigitApplication(Application):
                 show_toast(f"Checkout back failed: {e}", duration=3.0)
                 return
             self._merge_state = None
+            self._header_state.merge_target = ""
             self._clear_merge_state()
             by_id("tab_view", TabView).route_to("branch")
             by_id("branch", BranchPanel).refresh()

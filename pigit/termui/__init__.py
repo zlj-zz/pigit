@@ -20,10 +20,9 @@ from pigit.termui.types import (
 )
 
 # Core components
-from pigit.termui._component_base import Component, ComponentError
+from pigit.termui._component_base import Component, ComponentError, bind_signals
 from pigit.termui._component_layouts import Column, Row, TabView
 from pigit.termui._component_graph import HeatmapGrid, StepLineChart
-from pigit.termui._header_state import HeaderState
 from pigit.termui._component_widgets import (
     Header,
     InputLine,
@@ -31,7 +30,7 @@ from pigit.termui._component_widgets import (
     LineTextBrowser,
     StatusBar,
 )
-from pigit.termui._reactive import Computed, Signal
+from pigit.termui._reactive import Computed, Signal, ValueRef
 
 # Overlay components
 from pigit.termui._overlay_components import (
@@ -55,6 +54,7 @@ from pigit.termui._application import Application
 from pigit.termui._overlay_context import (
     dismiss_sheet,
     get_badge,
+    get_badge_signal,
     hide_spinner,
     show_badge,
     show_spinner,
@@ -93,12 +93,11 @@ __all__ = [
     # Core
     "Component",
     "ComponentError",
+    "bind_signals",
     # Containers
     "TabView",
     "Column",
     "Row",
-    # Header state
-    "HeaderState",
     # Widgets
     "Header",
     "HeatmapGrid",
@@ -125,6 +124,7 @@ __all__ = [
     # Reactive
     "Computed",
     "Signal",
+    "ValueRef",
     # Utils
     "bind_keys",
     "BindingError",
@@ -146,6 +146,7 @@ __all__ = [
     "dismiss_sheet",
     "show_badge",
     "get_badge",
+    "get_badge_signal",
     "show_spinner",
     "hide_spinner",
     # Session context
