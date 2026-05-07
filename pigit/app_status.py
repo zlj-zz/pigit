@@ -78,17 +78,17 @@ class StatusPanel(ItemSelector):
         *,
         alert_inner_width: Optional[int] = None,
         display: Optional[Component] = None,
-        on_visual_mode_changed: Optional[Callable] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
+        id: Optional[str] = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
+            id=id,
         )
         self.git = git
         self._display = display
-        self._on_visual_mode_changed = on_visual_mode_changed
 
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
@@ -355,14 +355,13 @@ class StatusPanel(ItemSelector):
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
-        if self._on_visual_mode_changed is not None:
-            if not self._visual_mode:
-                mode = ""
-            elif self._visual_scroll:
-                mode = "Visual-scroll"
-            else:
-                mode = "Visual"
-            self._on_visual_mode_changed(mode)
+        if not self._visual_mode:
+            mode = ""
+        elif self._visual_scroll:
+            mode = "Visual-scroll"
+        else:
+            mode = "Visual"
+        self.emit(ActionEventType.mode_changed, mode=mode)
 
     def get_help_title(self) -> str:
         return "Status"

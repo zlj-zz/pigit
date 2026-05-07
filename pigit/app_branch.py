@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Optional
 
 from pigit.termui import (
+    ActionEventType,
     bind_keys,
     dismiss_sheet,
     InputLine,
@@ -44,15 +45,15 @@ class BranchPanel(ItemSelector):
         on_selection_changed: Optional[Callable] = None,
         branch_signal: Optional[Signal[str]] = None,
         git: "LocalGit",
-        on_merge_request: Optional[Callable[[str, str], None]] = None,
+        id: Optional[str] = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
+            id=id,
         )
         self.git = git
         self._branch_signal = branch_signal
-        self._on_merge_request = on_merge_request
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -225,8 +226,12 @@ class BranchPanel(ItemSelector):
             pass
         source = self.git.get_head() or ""
         target = branch.name
-        if self._on_merge_request is not None:
-            self._on_merge_request(source, target)
+        self.emit(
+            ActionEventType.action_requested,
+            action="merge",
+            source=source,
+            target=target,
+        )
 
     def _do_sheet_action(
         self,

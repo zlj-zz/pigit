@@ -19,9 +19,9 @@ class _Leaf(Component):
 
 
 class MockComponent(Component):
-    def __init__(self, name):
+    def __init__(self, name, id=None):
         self._name = name
-        super().__init__()
+        super().__init__(id=id)
 
     def _render_surface(self, surface):
         pass
@@ -42,18 +42,18 @@ class MockTabView(TabView):
 
 
 class TestComponentBase:
-    def test_emit_to_parent(self):
+    def test_emit_bubbles_to_on_event(self):
         parent = _Leaf()
         child = _Leaf()
         child.parent = parent
-        parent.accept = MagicMock()
+        parent.on_event = MagicMock(return_value=True)
         child.emit(ActionEventType.goto, target="x")
-        parent.accept.assert_called_once_with(ActionEventType.goto, target="x")
+        parent.on_event.assert_called_once_with(ActionEventType.goto, target="x")
 
-    def test_emit_without_parent_raises(self):
+    def test_emit_without_parent_logs_warning(self):
         child = _Leaf()
-        with pytest.raises(ComponentError, match="Has no parent"):
-            child.emit(ActionEventType.goto, target="x")
+        # No parent: emit logs a warning instead of raising
+        child.emit(ActionEventType.goto, target="x")
 
     def test_notify_children(self):
         a, b = _Leaf(), _Leaf()
@@ -122,13 +122,13 @@ class TestTabView:
         assert a._name == "dup"
         assert b._name == "dup"
 
-    def test_container_key_routing_via_shortcuts(self):
+    def test_container_key_routing(self):
         received: list = []
 
         class RecordingChild(Component):
             def __init__(self, label: str) -> None:
                 self._label = label
-                super().__init__()
+                super().__init__(id=label)
 
             def _handle_event(self, key: str) -> None:
                 received.append((self._label, key))
@@ -146,16 +146,11 @@ class TestTabView:
         main = RecordingChild("main")
         secondary = RecordingChild("secondary")
 
-        # shortcut "2" switches to secondary; after switch, key is NOT re-dispatched
-        tv = RoutingTabView(
-            children=[main, secondary],
-            shortcuts={"2": secondary},
-            start=main,
-        )
-        received.clear()
-        tv._handle_event("2")
+        tv = RoutingTabView(children=[main, secondary], start="main")
+
+        # route_to switches to secondary
+        tv.route_to("secondary")
         assert secondary.is_activated() is True
-        assert received == []
 
         # key "k" delegates to active child
         received.clear()
@@ -175,19 +170,17 @@ class TestTabView:
         self, start_idx, switch_target_idx, expected_active_idx
     ):
         # Arrange
-        main = MockComponent("main")
-        secondary = MockComponent("secondary")
+        main = MockComponent("main", id="main")
+        secondary = MockComponent("secondary", id="secondary")
         children = [main, secondary]
-        shortcuts = {}
-        if switch_target_idx is not None:
-            shortcuts["x"] = children[switch_target_idx]
+        start_id = children[start_idx].id
 
         # Act
         tab_view = MockTabView(
-            children=children, shortcuts=shortcuts or None, start=children[start_idx]
+            children=children, start=start_id
         )
         if switch_target_idx is not None:
-            tab_view._handle_event("x")
+            tab_view.route_to(children[switch_target_idx].id)
 
         # Assert
         assert children[

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import Callable, TYPE_CHECKING, Optional, Sequence
 
 from ._component_base import Component, _set_focus_chain
 from ._layer import LayerKind, LayerStack
@@ -18,6 +18,7 @@ from .types import OverlayDispatchResult, ToastPosition
 from . import _overlay_context
 
 if TYPE_CHECKING:
+    from ._component_registry import ComponentRegistry
     from ._overlay_components import Sheet, Toast
     from ._segment import Segment
     from ._surface import Surface
@@ -31,23 +32,32 @@ class ComponentRoot(Component):
     Not exported in the public termui API.
     """
 
-    def __init__(self, body: Component) -> None:
+    def __init__(
+        self,
+        body: Component,
+        registry: Optional["ComponentRegistry"] = None,
+    ) -> None:
         super().__init__()
         self._body = body
         self._body.parent = self
+        self._registry = registry
         self._layer_stack = LayerStack()
         self._overlay_host_token = _overlay_context.set_overlay_host(self)
         self._badge_text: Optional[str] = None
         self._badge_bg: Optional[tuple[int, int, int]] = None
         self._badge_fg: Optional[tuple[int, int, int]] = None
         self._badge_until = 0
+        self._app_on_event: Optional[Callable] = None
 
     def destroy(self) -> None:
-        """Clean up overlay host token. Call when the TUI exits."""
+        """Clean up overlay host token and destroy all children."""
         try:
             _overlay_context.reset_overlay_host(self._overlay_host_token)
         except (RuntimeError, ValueError):
             _logger.error("Failed to reset overlay host token", exc_info=True)
+        if callable(getattr(self._body, "destroy", None)):
+            self._body.destroy()
+        super().destroy()
 
     @property
     def body(self) -> Component:
@@ -55,6 +65,12 @@ class ComponentRoot(Component):
         return self._body
 
     # --- Badge API (framework-managed, not an overlay) ---
+
+    def on_event(self, action, **data) -> bool:
+        """Delegate unhandled events to the Application handler, if set."""
+        if self._app_on_event is not None:
+            return self._app_on_event(action, **data)
+        return False
 
     def show_badge(
         self,

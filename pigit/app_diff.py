@@ -68,8 +68,9 @@ class DiffViewer(LineTextBrowser):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size, "")
+        super().__init__(x, y, size, "", id=id)
         # LineTextBrowser sets _max_line to full height; adjust for border rows
         if self._size[1] >= 3:
             self._max_line = self._size[1] - 2

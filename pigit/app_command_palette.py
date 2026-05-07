@@ -15,7 +15,6 @@ from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
 
-
 # Default command palette commands
 DEFAULT_COMMANDS: list[str] = [
     "status",
@@ -51,8 +50,9 @@ class CommandPalette(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self._on_execute = on_execute
         self._on_dismiss = on_dismiss
         self._commands = commands or list(DEFAULT_COMMANDS)

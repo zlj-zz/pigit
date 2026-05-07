@@ -15,7 +15,7 @@ from ._component_base import Component, ComponentError
 from ._segment import Segment
 from ._surface import Surface
 from ._reactive import Signal
-from .types import OverlayDispatchResult
+from .types import ActionEventType, OverlayDispatchResult
 from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
@@ -31,8 +31,9 @@ class LineTextBrowser(Component):
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
         content: Optional[list[str]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
 
         self._content = content
         self._max_line = self._size[1]
@@ -82,8 +83,9 @@ class ItemSelector(Component):
         on_selection_changed: Optional[Callable[[int], None]] = None,
         *,
         lazy_load: bool = False,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
 
         if len(self.CURSOR) > 1:
             raise ComponentError("CURSOR must be a single character")
@@ -398,6 +400,8 @@ class ItemSelector(Component):
     def _notify_change(self) -> None:
         if self._on_change is not None:
             self._on_change(self.curr_no)
+        else:
+            self.emit(ActionEventType.selection_changed, index=self.curr_no)
 
     def next(self, step: int = 1):
         """Move the selection forward by the given step."""
@@ -438,8 +442,9 @@ class Header(Component):
         separator: bool = True,
         sep_fg: tuple[int, int, int] = (100, 100, 100),
         on_refresh: Optional[Callable[["Header"], None]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(id=id)
         self._separator = separator
         self._sep_fg = sep_fg
         self._on_refresh = on_refresh

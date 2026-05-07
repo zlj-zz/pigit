@@ -116,10 +116,12 @@ class CommitPanel(ItemSelector):
         display: Optional[Component] = None,
         on_selection_changed: Optional[Callable] = None,
         git: "LocalGit",
+        id: Optional[str] = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
+            id=id,
         )
         self.git = git
         self.commits: list[Commit] = []

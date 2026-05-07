@@ -18,6 +18,7 @@ from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
 from pigit.termui._component_base import Component, _set_focus_chain
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
+from pigit.termui.types import ActionEventType
 
 if TYPE_CHECKING:
     from pigit.termui.input_bridge import InputTerminal
@@ -118,16 +119,30 @@ class Application:
         if self._root is not None:
             self._root.resize(size)
 
+    def on_event(self, action: ActionEventType, **data) -> bool:
+        """Override to handle events bubbled from component tree.
+
+        Return True to stop bubbling, False to let it continue up.
+        """
+        return False
+
     def _run_body(self) -> None:
         """Assemble root, create loop, and start TUI. Does NOT catch ExitEventLoop."""
-        body = self.build_root()
-        self._root = root = ComponentRoot(body)
-        self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
-        self.setup_root(root)
+        from ._component_registry import ComponentRegistry, _registry_ctx
+
+        registry = ComponentRegistry()
+        token = _registry_ctx.set(registry)
         try:
+            body = self.build_root()
+            self._root = root = ComponentRoot(body, registry)
+            root._app_on_event = self.on_event
+            self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
+            self.setup_root(root)
             self._loop.run()
         finally:
-            root.destroy()
+            if self._root is not None:
+                self._root.destroy()
+            _registry_ctx.reset(token)
 
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.

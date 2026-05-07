@@ -92,6 +92,7 @@ class Component(ABC):
         size: Optional[tuple[int, int]] = None,
         children: Optional[Sequence["Component"]] = None,
         parent: Optional["Component"] = None,
+        id: Optional[str] = None,
     ) -> None:
         self._activated = False
         self._focus_level: int = -1
@@ -106,6 +107,9 @@ class Component(ABC):
             self, type(self), self.BINDINGS
         )
 
+        self.id = id
+        self._try_register()
+
     def activate(self):
         """Mark the component as active. Called when it enters the visible tree."""
         self._activated = True
@@ -117,6 +121,28 @@ class Component(ABC):
     def is_activated(self):
         """Get current activate status."""
         return self._activated
+
+    def _try_register(self) -> None:
+        """Auto-register to current registry context if id is set."""
+        if not self.id:
+            return
+        from ._component_registry import get_registry
+
+        reg = get_registry()
+        if reg is not None:
+            reg.register(self)
+
+    def destroy(self) -> None:
+        """Auto-unregister from registry and destroy children."""
+        if self.id:
+            from ._component_registry import get_registry
+
+            reg = get_registry()
+            if reg is not None:
+                reg.unregister(self)
+        for child in self.children:
+            if callable(getattr(child, "destroy", None)):
+                child.destroy()
 
     def refresh(self):
         """Fresh content data.
@@ -135,10 +161,19 @@ class Component(ABC):
         )
 
     def emit(self, action: ActionEventType, **data):
-        """Emit to parent."""
-        if self.parent is None:
-            raise ComponentError("Has no parent to emitting.")
-        self.parent.accept(action, **data)
+        """Bubble action up through parent chain to Application.
+
+        Stops at the first ancestor whose ``on_event`` returns True.
+        If no handler consumes it, logs a warning.
+        """
+        node = self.parent
+        while node is not None:
+            handler = getattr(node, "on_event", None)
+            if callable(handler):
+                if handler(action, **data):
+                    return  # handled, stop bubbling
+            node = node.parent
+        _logger.warning("Unhandled event %r from %s", action, type(self).__name__)
 
     def update(self, action: ActionEventType, **data):
         """Process notify action of parent."""

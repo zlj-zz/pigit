@@ -99,9 +99,8 @@ class TestDiffViewer:
 
         d = DiffViewer()
         d.come_from = FakeSource()
-        # emit requires a parent; should raise ComponentError
-        with pytest.raises(ComponentError):
-            d._leave_display()
+        # emit without parent logs a warning instead of raising
+        d._leave_display()
 
     def test_leave_display_with_parent(self):
         from pigit.termui._component_base import Component
@@ -117,8 +116,9 @@ class TestDiffViewer:
             def _render_surface(self, surface):
                 pass
 
-            def accept(self, action, **data):
+            def on_event(self, action, **data):
                 self._received.append((action, data))
+                return True
 
         class FakeSource(Component):
             def _render_surface(self, surface):

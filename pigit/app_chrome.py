@@ -19,8 +19,12 @@ from .app_theme import FlatTheme
 class AppFooter(Component):
     """Bottom chrome bar: current item context + shortcut hints."""
 
-    def __init__(self, theme: FlatTheme) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        theme: FlatTheme,
+        id: Optional[str] = None,
+    ) -> None:
+        super().__init__(id=id)
         self._theme = theme
         self._context_text = ""
         self._global_help: list[tuple[str, str]] = []

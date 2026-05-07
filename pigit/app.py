@@ -9,12 +9,13 @@ Date: 2026-04-17
 import json
 import logging
 import os
-from dataclasses import dataclass
 from typing import Optional, Union
 
 from pigit.termui import (
+    ActionEventType,
     AlertDialog,
     Application,
+    by_id,
     Column,
     Component,
     ComponentRoot,
@@ -22,6 +23,7 @@ from pigit.termui import (
     ExitEventLoop,
     get_badge,
     Header,
+    HeaderState,
     HelpPanel,
     hide_spinner,
     keys,
@@ -48,22 +50,6 @@ from .git.local_git import LocalGit
 from .git.managed_repos import ManagedRepos
 
 
-@dataclass
-class _PigitWidgets:
-    """Container for all major UI widgets created in build_root()."""
-
-    header: Header
-    footer: AppFooter
-    tab_view: TabView
-    body_row: Row
-    palette: CommandPalette
-    inspector: InspectorPanel
-    status: StatusPanel
-    branch: BranchPanel
-    commit: CommitPanel
-    diff: DiffViewer
-
-
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
@@ -72,6 +58,9 @@ class PigitApplication(Application):
         ("?", "toggle_help"),
         (";", "toggle_palette"),
         ("I", "toggle_inspector"),
+        ("1", "goto_status"),
+        ("2", "goto_branch"),
+        ("3", "goto_commit"),
     ]
 
     def __init__(
@@ -93,16 +82,14 @@ class PigitApplication(Application):
             except Exception:
                 logging.debug("auto_append failed", exc_info=True)
         self._git = self._local_git.bind_path(self._repo_path)
-        self._widgets: Optional[_PigitWidgets] = None
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
         self._branch_signal: Signal[str] = Signal("")
         self._ahead: int = 0
         self._behind: int = 0
-        self._current_tab: str = "Status"
-        self._current_tab_key: str = "1"
         self._mode: str = ""
+        self._header_state = HeaderState(THEME)
         # Merge workflow state
         self._merge_state: Optional[dict] = None
         self._alert_dialog = AlertDialog(
@@ -110,111 +97,71 @@ class PigitApplication(Application):
             on_result=lambda _: None,
         )
 
+    _TAB_CONFIG: dict[type, tuple[str, str]] = {
+        StatusPanel: ("Status", "1"),
+        BranchPanel: ("Branch", "2"),
+        CommitPanel: ("Commit", "3"),
+        DiffViewer: ("Display", ""),
+    }
+
     def build_root(self) -> Component:
-        diff_viewer = DiffViewer()
-        status_panel = StatusPanel(
-            display=diff_viewer,
-            on_visual_mode_changed=self._on_visual_mode_changed,
-            on_selection_changed=self._on_panel_selection_changed,
+        DiffViewer(id="diff")
+        StatusPanel(display=by_id("diff"), git=self._git, id="status")
+        BranchPanel(
             git=self._git,
-        )
-        branch_panel = BranchPanel(
-            on_selection_changed=self._on_panel_selection_changed,
             branch_signal=self._branch_signal,
-            git=self._git,
-            on_merge_request=self._on_merge_request,
+            id="branch",
         )
-        commit_panel = CommitPanel(
-            display=diff_viewer,
-            on_selection_changed=self._on_panel_selection_changed,
-            git=self._git,
+        CommitPanel(display=by_id("diff"), git=self._git, id="commit")
+
+        def _on_tab_switch(panel: Component) -> None:
+            footer = by_id("footer")
+            provider = getattr(panel, "get_help_entries", None)
+            footer.set_help_provider(provider)
+            self._header_state.tab, self._header_state.tab_key = self._TAB_CONFIG.get(
+                type(panel), ("", "")
+            )
+            by_id("inspector").update_from(panel)
+
+        TabView(
+            children=[by_id("status"), by_id("branch"), by_id("commit"), by_id("diff")],
+            start="status",
+            on_switch=_on_tab_switch,
+            id="tab_view",
         )
 
-        _GLOBAL_HELP: list[tuple[str, str]] = [
-            ("Q", "Quit"),
-            ("I", "Inspector"),
-            (";", "Palette"),
-        ]
-        _TAB_LABELS: dict[Component, str] = {
-            status_panel: "Status",
-            branch_panel: "Branch",
-            commit_panel: "Commit",
-            diff_viewer: "Display",
-        }
-        _TAB_KEYS: dict[Component, str] = {
-            status_panel: "1",
-            branch_panel: "2",
-            commit_panel: "3",
-            diff_viewer: "",
-        }
-
-        header = Header(
+        Header(
             separator=True,
             sep_fg=THEME.fg_dim,
             on_refresh=self._refresh_header,
+            id="header",
         )
-        footer = AppFooter(theme=THEME)
-        footer.set_global_help(_GLOBAL_HELP)
-
-        def _on_tab_switch(panel: Component) -> None:
-            provider = getattr(panel, "get_help_entries", None)
-            footer.set_help_provider(provider)
-            self._current_tab = _TAB_LABELS.get(panel, "")
-            self._current_tab_key = _TAB_KEYS.get(panel, "")
-            self._w.inspector.update_from(panel)
-
-        tab_view = TabView(
-            children=[status_panel, branch_panel, commit_panel, diff_viewer],
-            shortcuts={
-                "1": status_panel,
-                "2": branch_panel,
-                "3": commit_panel,
-            },
-            start=status_panel,
-            on_switch=_on_tab_switch,
-        )
-        provider = getattr(tab_view.active, "get_help_entries", None)
+        footer = AppFooter(theme=THEME, id="footer")
+        footer.set_global_help([("Q", "Quit"), ("I", "Inspector"), (";", "Palette")])
+        provider = getattr(by_id("tab_view").active, "get_help_entries", None)
         footer.set_help_provider(provider)
 
-        palette = CommandPalette(
+        InspectorPanel(id="inspector")
+        Row(
+            children=[by_id("tab_view"), by_id("inspector")],
+            widths=["flex", 0],
+            id="body_row",
+        )
+
+        CommandPalette(
             on_execute=self._on_palette_execute,
             on_dismiss=self._dismiss_palette,
+            id="palette",
         )
 
-        inspector = InspectorPanel()
-        body_row = Row(
-            children=[tab_view, inspector],
-            widths=["flex", 0],
-        )
-
-        self._widgets = _PigitWidgets(
-            header=header,
-            footer=footer,
-            tab_view=tab_view,
-            body_row=body_row,
-            palette=palette,
-            inspector=inspector,
-            status=status_panel,
-            branch=branch_panel,
-            commit=commit_panel,
-            diff=diff_viewer,
-        )
-
-        chrome_column = Column(
-            children=[header, body_row, footer],
+        return Column(
+            children=[by_id("header"), by_id("body_row"), by_id("footer")],
             heights=[2, "flex", 2],
         )
-        return chrome_column
-
-    @property
-    def _w(self) -> _PigitWidgets:
-        """Shorthand for accessing widgets; raises if build_root() has not run."""
-        assert self._widgets is not None
-        return self._widgets
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            entries_source=self._w.tab_view,
+            entries_source=by_id("tab_view"),
             key_fg=THEME.accent_blue,
         )
         self._help_popup = Popup(
@@ -250,74 +197,17 @@ class PigitApplication(Application):
         )
         self._try_restore_merge_state()
 
-    def _on_visual_mode_changed(self, mode: str) -> None:
-        self._mode = mode
-
     def _refresh_header(self, header: Header) -> None:
-        badge, badge_bg, badge_fg = get_badge()
-        left: list[Segment] = []
-        if badge:
-            left.append(
-                Segment(
-                    f"{badge} ",
-                    fg=badge_fg or THEME.fg_primary,
-                    style_flags=palette.STYLE_BOLD,
-                )
-            )
-        left.extend(
-            [
-                Segment(self._repo_name, fg=THEME.fg_primary),
-                Segment("  ", fg=THEME.fg_dim),
-                Segment(self._branch_signal.value, fg=THEME.accent_cyan),
-            ]
-        )
-
-        center: list[Segment] = []
-        if self._ahead > 0:
-            center.append(Segment(f"\u2191{self._ahead} ", fg=THEME.accent_green))
-        if self._behind > 0:
-            center.append(Segment(f"\u2193{self._behind}", fg=THEME.accent_yellow))
-
-        right: list[Segment] = []
+        """Synchronize state into HeaderState and render."""
+        self._header_state.repo = self._repo_name
+        self._header_state.branch = self._branch_signal.value
+        self._header_state.ahead = self._ahead
+        self._header_state.behind = self._behind
         if self._merge_state:
-            target = self._merge_state.get("target", "")
-            right.append(
-                Segment(
-                    f"[MERGE] {target}  ",
-                    fg=THEME.accent_red,
-                    style_flags=palette.STYLE_BOLD,
-                )
-            )
-        if self._mode:
-            right.append(
-                Segment(
-                    f"[{self._mode}]  ",
-                    fg=THEME.fg_primary,
-                    style_flags=palette.STYLE_BOLD,
-                )
-            )
-        right.append(
-            Segment(
-                self._current_tab, fg=THEME.fg_muted, style_flags=palette.STYLE_BOLD
-            )
-        )
-        if self._current_tab_key:
-            right.append(
-                Segment(
-                    f" [{self._current_tab_key}]",
-                    fg=THEME.fg_primary,
-                    style_flags=palette.STYLE_BOLD,
-                )
-            )
-
-        header.set_left(left)
-        header.set_center(center)
-        header.set_right(right)
-
-    def _on_panel_selection_changed(self, idx: int) -> None:
-        """Callback when panel selection changes via j/k navigation."""
-        if self._widgets is not None:
-            self._w.inspector.update_from(self._w.tab_view.active)
+            self._header_state.merge_target = self._merge_state.get("target", "")
+        else:
+            self._header_state.merge_target = ""
+        self._header_state.apply_to(header, get_badge)
 
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
@@ -326,13 +216,16 @@ class PigitApplication(Application):
 
     def toggle_palette(self):
         """Toggle command palette visibility."""
-        if self._widgets is None or self._root is None:
+        if self._root is None:
             return
-        if self._w.palette.is_active:
-            self._w.palette.close()
+        palette_widget = by_id("palette")
+        if palette_widget is None:
+            return
+        if palette_widget.is_active:
+            palette_widget.close()
         else:
-            self._w.palette.open()
-            self._root.show_sheet(self._w.palette, height=8)
+            palette_widget.open()
+            self._root.show_sheet(palette_widget, height=8)
 
     def _dismiss_palette(self) -> None:
         """Dismiss the palette sheet from the root."""
@@ -345,40 +238,59 @@ class PigitApplication(Application):
 
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
-        if self._widgets is None:
-            return
         self._inspector_visible = not self._inspector_visible
         size = self._loop.get_term_size()
+        body_row = by_id("body_row")
+        inspector = by_id("inspector")
+        tab_view = by_id("tab_view")
         if self._inspector_visible:
-            self._w.body_row.set_widths(["flex", self._inspector_width(size.columns)])
-            self._w.inspector.update_from(self._w.tab_view.active)
+            body_row.set_widths(["flex", self._inspector_width(size.columns)])
+            inspector.update_from(tab_view.active)
         else:
-            self._w.body_row.set_widths(["flex", 0])
+            body_row.set_widths(["flex", 0])
         self._root.resize(size)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute inspector width on terminal resize."""
-        if self._inspector_visible and self._widgets is not None:
-            self._w.body_row.set_widths(["flex", self._inspector_width(size[0])])
+        if self._inspector_visible:
+            body_row = by_id("body_row")
+            if body_row is not None:
+                body_row.set_widths(["flex", self._inspector_width(size[0])])
         super().resize(size)
+
+    def goto_status(self):
+        by_id("tab_view").route_to("status")
+
+    def goto_branch(self):
+        by_id("tab_view").route_to("branch")
+
+    def goto_commit(self):
+        by_id("tab_view").route_to("commit")
+
+    def on_event(self, action: ActionEventType, **data) -> bool:
+        """Central event router: all panel events bubble up to here."""
+        if action is ActionEventType.mode_changed:
+            self._header_state.mode = data.get("mode", "")
+            return True
+        if action is ActionEventType.action_requested:
+            if data.get("action") == "merge":
+                self._on_merge_request(data["source"], data["target"])
+                return True
+        if action is ActionEventType.selection_changed:
+            inspector = by_id("inspector")
+            tab_view = by_id("tab_view")
+            if inspector is not None and tab_view is not None:
+                inspector.update_from(tab_view.active)
+            return True
+        return False
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
-        if self._widgets is None:
-            return
         lower = cmd.lower()
-        cmd_map: dict[str, Optional[Union[Component, str]]] = {
-            "status": self._w.status,
-            "branch": self._w.branch,
-            "commit": self._w.commit,
-            "diff": self._w.diff,
-            "quit": "quit",
-        }
-        target = cmd_map.get(lower)
-        if target == "quit":
+        tab_view = by_id("tab_view")
+        if lower == "quit":
             self.quit()
-        elif target is not None:
-            self._w.tab_view.route_to(target)
+        elif tab_view.route_to(lower) is not None:
             return
         if lower in ("pull", "push", "fetch"):
             self._run_git_action(lower)
@@ -455,7 +367,7 @@ class PigitApplication(Application):
                         "Conflict! Resolve in Status, then continue-merge",
                         duration=3.0,
                     )
-                    self._w.tab_view.route_to(self._w.status)
+                    by_id("tab_view").route_to("status")
                     return
                 show_toast(f"Merge failed: {e}", duration=3.0)
                 return
@@ -515,8 +427,8 @@ class PigitApplication(Application):
                 return
             self._merge_state = None
             self._clear_merge_state()
-            self._w.tab_view.route_to(self._w.branch)
-            self._w.branch.refresh()
+            by_id("tab_view").route_to("branch")
+            by_id("branch").refresh()
             show_toast(f"Merged into {target}", duration=2.0)
 
         self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)

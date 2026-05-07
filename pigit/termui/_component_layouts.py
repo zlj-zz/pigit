@@ -32,14 +32,14 @@ class TabView(Component):
     def __init__(
         self,
         children: list[Component],
-        shortcuts: Optional[dict[str, Component]] = None,
-        start: Optional[Component] = None,
+        start: Optional[str] = None,
         on_switch: Optional[Callable[[Component], None]] = None,
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
 
         self._on_switch = on_switch
         self.children = list(children)
@@ -48,37 +48,41 @@ class TabView(Component):
                 _logger.warning("Reparenting %s to TabView", type(child).__name__)
             child.parent = self
 
-        self._shortcuts = dict(shortcuts) if shortcuts else {}
-        for key, panel in self._shortcuts.items():
-            if panel not in self.children:
-                raise ComponentError(
-                    f"shortcuts['{key}'] -> {type(panel).__name__} not in children"
-                )
+        self._start_id = start
+        self._resolve_start()
 
-        if not self.children:
-            raise ComponentError("children cannot be empty.")
-        if start is None:
-            start = self.children[0]
-        if start not in self.children:
-            raise ComponentError(
-                f"start {type(start).__name__} not in children. "
-                f"Available: {[type(c).__name__ for c in self.children]}."
-            )
-        self._active = start
+    def _id_map(self) -> dict[str, Component]:
+        return {c.id: c for c in self.children if c.id}
+
+    def _resolve_start(self) -> None:
+        """Resolve start id to component reference after children are ready."""
+        id_map = self._id_map()
+
+        resolved = id_map.get(self._start_id) if self._start_id else None
+        if resolved is not None:
+            self._active = resolved
+        else:
+            if self._start_id:
+                _logger.warning(
+                    "TabView start id '%s' not found, falling back to first child",
+                    self._start_id,
+                )
+            self._active = self.children[0]
         self._active.activate()
-        _set_focus_chain(start)
+        _set_focus_chain(self._active)
 
     @property
     def active(self) -> Optional[Component]:
         """Return the currently active child panel."""
         return self._active
 
-    def route_to(self, target: Component) -> Optional[Component]:
-        """Switch to the given child component."""
-        if target not in self.children:
+    def route_to(self, id: str) -> Optional[Component]:
+        """Switch to the child component with the given id."""
+        resolved = self._id_map().get(id)
+        if resolved is None:
             return None
-        if target is self._active:
-            return target
+        if resolved is self._active:
+            return resolved
         # Force full redraw; previous panel content would otherwise ghost
         # through incremental row diff.
         r = self.renderer
@@ -86,30 +90,45 @@ class TabView(Component):
             r.clear_cache()
         if self._active is not None:
             self._active.deactivate()
-        target.activate()
-        self._active = target
-        fresh_fn = getattr(target, "refresh", None)
+        resolved.activate()
+        self._active = resolved
+        fresh_fn = getattr(resolved, "refresh", None)
         if callable(fresh_fn):
             try:
                 fresh_fn()
             except NotImplementedError:
                 pass
             except Exception:
-                _logger.exception("refresh() failed for %s", type(target).__name__)
-        if hasattr(target, "_panel_loaded"):
-            target._panel_loaded = True
+                _logger.exception("refresh() failed for %s", type(resolved).__name__)
+        if hasattr(resolved, "_panel_loaded"):
+            resolved._panel_loaded = True
         if self._on_switch is not None:
-            self._on_switch(target)
-        _set_focus_chain(target)
-        return target
+            self._on_switch(resolved)
+        _set_focus_chain(resolved)
+        return resolved
+
+    def on_event(self, action: ActionEventType, **data) -> bool:
+        """Route goto to accept; let all other events bubble up."""
+        if action is ActionEventType.goto:
+            self.accept(action, **data)
+            return True
+        return False
 
     def accept(self, action: ActionEventType, **data):
         """Handle a goto action by routing to the target child."""
         if action is ActionEventType.goto:
             target = data.get("target")
-            if isinstance(target, Component) and target in self.children:
-                self.route_to(target)
-                self._active.update(action, **data)
+            target_id = None
+            if isinstance(target, str):
+                target_id = target
+            elif (
+                isinstance(target, Component) and target in self.children and target.id
+            ):
+                target_id = target.id
+            if target_id:
+                self.route_to(target_id)
+                if self._active is not None:
+                    self._active.update(action, **data)
             else:
                 _logger.warning(
                     "TabView.goto: target %r not found in children",
@@ -129,12 +148,6 @@ class TabView(Component):
             _render_child_to_surface(self._active, surface, "TabView")
 
     def _handle_event(self, key: str):
-        if self._shortcuts:
-            panel = self._shortcuts.get(key)
-            if panel is not None and panel in self.children:
-                if panel is not self._active:
-                    self.route_to(panel)
-                    return
         if self._active is not None:
             self._active._handle_event(key)
 
@@ -152,8 +165,9 @@ class Column(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self.children = list(children)
         for child in self.children:
             child.parent = self
@@ -208,12 +222,6 @@ class Column(Component):
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
 
-    def destroy(self) -> None:
-        """Destroy all children that implement destroy."""
-        for child in self.children:
-            if callable(getattr(child, "destroy", None)):
-                child.destroy()
-
     def _handle_event(self, key: str) -> None:
         for child in self.children:
             child._handle_event(key)
@@ -232,8 +240,9 @@ class Row(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self.children = list(children)
         for child in self.children:
             child.parent = self
@@ -290,12 +299,6 @@ class Row(Component):
         for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)
-
-    def destroy(self) -> None:
-        """Destroy all children that implement destroy."""
-        for child in self.children:
-            if callable(getattr(child, "destroy", None)):
-                child.destroy()
 
     def _handle_event(self, key: str) -> None:
         for child in self.children:

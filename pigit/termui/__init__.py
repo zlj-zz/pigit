@@ -23,6 +23,7 @@ from pigit.termui.types import (
 from pigit.termui._component_base import Component, ComponentError
 from pigit.termui._component_layouts import Column, Row, TabView
 from pigit.termui._component_graph import HeatmapGrid, StepLineChart
+from pigit.termui._header_state import HeaderState
 from pigit.termui._component_widgets import (
     Header,
     InputLine,
@@ -73,6 +74,9 @@ from pigit.termui._surface import Cell, FlatCell, Surface
 from pigit.termui._segment import Segment
 from pigit.termui import palette
 
+# Registry
+from pigit.termui._component_registry import by_id, get_registry
+
 # Picker
 from pigit.termui._picker import PickerRow
 from pigit.termui._syntax import SyntaxTokenizer
@@ -93,6 +97,8 @@ __all__ = [
     "TabView",
     "Column",
     "Row",
+    # Header state
+    "HeaderState",
     # Widgets
     "Header",
     "HeatmapGrid",
@@ -113,6 +119,9 @@ __all__ = [
     "ComponentRoot",
     "Application",
     "ExitEventLoop",
+    # Registry
+    "by_id",
+    "get_registry",
     # Reactive
     "Computed",
     "Signal",

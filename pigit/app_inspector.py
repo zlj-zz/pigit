@@ -55,8 +55,9 @@ class InspectorPanel(Component):
         x: int = 1,
         y: int = 1,
         size: Optional[tuple[int, int]] = None,
+        id: Optional[str] = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self._content: list[str] = []
         self._title = "Inspector"
 

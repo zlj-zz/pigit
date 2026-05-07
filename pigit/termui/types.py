@@ -17,6 +17,10 @@ class ActionEventType(Enum):
     """Action event types for parent-child communication in the component tree."""
 
     goto = auto()  # Navigate to a target (e.g. open a file or branch)
+    mode_changed = auto()  # Mode switch (visual mode, filter mode, etc.)
+    action_requested = auto()  # User requested an action (merge, push, fetch, etc.)
+    selection_changed = auto()  # Cursor / selection changed
+    state_changed = auto()  # Generic state change notification
 
 
 # Toast positions
