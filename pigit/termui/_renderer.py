@@ -318,7 +318,9 @@ class Renderer:
                 # redundant on this path anyway.
                 self._out.write(line)
         else:
-            for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
+            for idx, (old, new) in enumerate(
+                zip(self._prev_frame, lines, strict=True), start=1
+            ):
                 if old != new:
                     self.move_cursor(idx, 1)
                     self._out.write(self._color.reset_sequence())

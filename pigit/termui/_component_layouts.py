@@ -188,7 +188,7 @@ class Column(Component):
         heights = layout_flex(self._heights, total_h)
 
         y = 0
-        for child, h in zip(self.children, heights):
+        for child, h in zip(self.children, heights, strict=True):
             child.x = y + 1
             child.y = 1
             if h > 0:
@@ -266,7 +266,7 @@ class Row(Component):
         widths = layout_flex(self._widths, width)
 
         x = 0
-        for child, w in zip(self.children, widths):
+        for child, w in zip(self.children, widths, strict=True):
             child.x = 1
             child.y = x + 1
             if w > 0:

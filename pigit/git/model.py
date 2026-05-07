@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 
 # flake8: noqa
-@dataclass
+@dataclass(slots=True)
 class File:
     """Model class of git file."""
 
@@ -53,7 +53,7 @@ class File:
         return self.get_file_str()
 
 
-@dataclass
+@dataclass(slots=True)
 class Commit:
     """Model class of a git commit."""
 
@@ -92,7 +92,7 @@ class Commit:
         return bool(self.parents and len(self.parents) > 1)
 
 
-@dataclass
+@dataclass(slots=True)
 class Branch:
     """Model class of git branch."""
 

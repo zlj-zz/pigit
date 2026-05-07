@@ -135,7 +135,7 @@ class ManagedRepos:
         )
 
         report_dict = {}
-        for (repo_name, _prop), (_code, _err, resp) in zip(items, results):
+        for (repo_name, _prop), (_code, _err, resp) in zip(items, results, strict=True):
             commits = []
             for line in (resp or "").split("\n"):
                 if line == "":
@@ -253,7 +253,7 @@ class ManagedRepos:
             del exist_repos[repo]
 
         self.dump_repos(exist_repos)
-        return list(zip(del_repos, del_paths))
+        return list(zip(del_repos, del_paths, strict=True))
 
     def rename_repo(self, repo: str, name: str) -> tuple[bool, str]:
         """Rename repo
