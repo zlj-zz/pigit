@@ -10,7 +10,7 @@ Usage:
 from __future__ import annotations
 
 # Types and enums
-from pigit.termui.types import (
+from .types import (
     ActionEventType,
     LayerKind,
     OverlayDispatchResult,
@@ -20,20 +20,20 @@ from pigit.termui.types import (
 )
 
 # Core components
-from pigit.termui._component_base import Component, ComponentError, bind_signals
-from pigit.termui._component_layouts import Column, Row, TabView
-from pigit.termui._component_graph import HeatmapGrid, StepLineChart
-from pigit.termui._component_widgets import (
+from ._component_base import Component, ComponentError, bind_signals
+from ._component_layouts import Column, Row, TabView
+from ._component_graph import HeatmapGrid, StepLineChart
+from ._component_widgets import (
     Header,
     InputLine,
     ItemSelector,
     LineTextBrowser,
     StatusBar,
 )
-from pigit.termui._reactive import Computed, Signal, ValueRef
+from ._reactive import Computed, Signal, ValueRef
 
 # Overlay components
-from pigit.termui._overlay_components import (
+from ._overlay_components import (
     AlertDialog,
     AlertDialogBody,
     HelpEntry,
@@ -44,14 +44,14 @@ from pigit.termui._overlay_components import (
 )
 
 # Event loop
-from pigit.termui.event_loop import ExitEventLoop
+from .event_loop import ExitEventLoop
 
 # Root and application
-from pigit.termui._root import ComponentRoot
-from pigit.termui._application import Application
+from ._root import ComponentRoot
+from ._application import Application
 
 # Overlay context (module-level functions)
-from pigit.termui._overlay_context import (
+from ._overlay_context import (
     dismiss_sheet,
     get_badge,
     get_badge_signal,
@@ -61,26 +61,26 @@ from pigit.termui._overlay_context import (
     show_toast,
     show_sheet,
 )
-from pigit.termui._session_context import exec_external
+from ._session_context import exec_external
 
 # Other utilities
-from pigit.termui._bindings import bind_keys, BindingError, list_bindings
-from pigit.termui import keys
-from pigit.termui._geometry import TerminalSize
-from pigit.termui._color import ColorAdapter, ColorMode
-from pigit.termui._renderer import Renderer
-from pigit.termui._renderer_context import get_renderer_strict
-from pigit.termui._surface import Cell, FlatCell, Surface
-from pigit.termui._segment import Segment
-from pigit.termui import palette
+from ._bindings import bind_keys, BindingError, list_bindings
+from . import keys
+from ._geometry import TerminalSize
+from ._color import ColorAdapter, ColorMode
+from ._renderer import Renderer
+from ._renderer_context import get_renderer_strict
+from ._surface import Cell, FlatCell, Surface
+from ._segment import Segment
+from . import palette
 
 # Registry
-from pigit.termui._component_registry import by_id, get_registry
+from ._component_registry import by_id, get_registry
 
 # Picker
-from pigit.termui._picker import PickerRow
-from pigit.termui._syntax import SyntaxTokenizer
-from pigit.termui._text import plain
+from ._picker import PickerRow
+from ._syntax import SyntaxTokenizer
+from ._text import plain
 
 __all__ = [
     # Types

@@ -180,11 +180,18 @@ def next(self): ...
 Segment("bold text", style_flags=palette.STYLE_BOLD)
 ```
 
-Inside `pigit.termui` itself, use relative imports:
+Inside `pigit.termui` itself, **all** cross-module imports must use relative paths. Never use `from pigit.termui.xxx import ...` inside the package:
 
 ```python
+# Correct
 from . import keys
 from . import palette
+from ._component_base import Component, bind_signals
+from ._reactive import Signal, Computed
+
+# Wrong — absolute paths are forbidden inside the package
+from pigit.termui import keys
+from pigit.termui._component_base import Component
 ```
 
 ## Architecture (detail)
@@ -328,7 +335,7 @@ When adding new components or extending existing ones, follow these rules so the
    - Use `keys.KEY_ESC`, `keys.KEY_ENTER`, `keys.KEY_DOWN`, etc.
 
 4. **Import style**
-   - Inside `pigit.termui`: `from . import keys` / `from . import palette`.
+   - Inside `pigit.termui`: always use relative imports (`from . import keys`, `from ._reactive import Signal`).
    - Outside `pigit.termui`: `from pigit.termui import keys, palette`.
    - Access qualified: `keys.KEY_DOWN`, `palette.STYLE_BOLD`.
 

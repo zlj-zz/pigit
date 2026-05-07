@@ -80,7 +80,7 @@ class AppEventLoop:
         self._input_takeover = input_takeover
 
         if input_handle is None:
-            from pigit.termui.input_bridge import TermuiInputBridge
+            from .input_bridge import TermuiInputBridge
 
             input_handle = TermuiInputBridge()
         self._input_handle = input_handle
@@ -143,7 +143,7 @@ class AppEventLoop:
 
     def render(self) -> None:
         """Render the component tree to the terminal."""
-        from pigit.termui._surface import Surface
+        from ._surface import Surface
 
         cols, rows = self._size
         surface = Surface(cols, rows)

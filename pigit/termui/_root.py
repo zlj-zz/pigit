@@ -240,7 +240,7 @@ class ComponentRoot(Component):
         Returns:
             Toast instance.
         """
-        from pigit.termui._overlay_components import Toast
+        from ._overlay_components import Toast
 
         existing = self._layer_stack.top(LayerKind.TOAST)
         if existing is not None:
@@ -256,7 +256,7 @@ class ComponentRoot(Component):
 
     def show_sheet(self, child: Component, height: int = 8) -> "Sheet":
         """Display a bottom sheet on the SHEET layer."""
-        from pigit.termui._overlay_components import Sheet
+        from ._overlay_components import Sheet
 
         sheet = Sheet(child, height)
         sheet.resize(self._size)

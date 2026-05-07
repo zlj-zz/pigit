@@ -14,14 +14,14 @@ from typing import Optional, TYPE_CHECKING, TypedDict
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-from pigit.termui._bindings import BindingsList, resolve_key_handlers_merged
-from pigit.termui._component_base import Component, _set_focus_chain
-from pigit.termui._root import ComponentRoot
-from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
-from pigit.termui.types import ActionEventType
+from ._bindings import BindingsList, resolve_key_handlers_merged
+from ._component_base import Component, _set_focus_chain
+from ._root import ComponentRoot
+from .event_loop import AppEventLoop, ExitEventLoop
+from .types import ActionEventType
 
 if TYPE_CHECKING:
-    from pigit.termui.input_bridge import InputTerminal
+    from .input_bridge import InputTerminal
 
 _logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class Application:
 
         Used by pickers and other one-shot interactive flows.
         """
-        from pigit.termui._picker import PICK_EXIT_CTRL_C
+        from ._picker import PICK_EXIT_CTRL_C
 
         try:
             self._run_body()
