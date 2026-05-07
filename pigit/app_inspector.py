@@ -68,14 +68,13 @@ class InspectorPanel(Component):
     def show(self, data: InspectorData) -> None:
         """Display inspector content from a data object."""
         self.clear()
-        if data is None:
-            return
-        if isinstance(data, FileInfo):
-            self._show_file_impl(data)
-        elif isinstance(data, BranchInfo):
-            self._show_branch_impl(data)
-        elif isinstance(data, CommitInfo):
-            self._show_commit_impl(data)
+        match data:
+            case FileInfo():
+                self._show_file_impl(data)
+            case BranchInfo():
+                self._show_branch_impl(data)
+            case CommitInfo():
+                self._show_commit_impl(data)
 
     def update_from(self, source) -> None:
         """Refresh content from *source* if it provides inspector data.

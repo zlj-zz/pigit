@@ -172,10 +172,11 @@ class DiffViewer(LineTextBrowser):
             self.come_from = src if isinstance(src, Component) else None
             self.i_cache_key = data.get("key", "")
             content = data.get("content", "")
-            if isinstance(content, list):
-                self.set_content(content)
-            elif isinstance(content, str):
-                self.set_content(content.splitlines())
+            match content:
+                case list():
+                    self.set_content(content)
+                case str():
+                    self.set_content(content.splitlines())
             self._i = self.i_cache.get(self.i_cache_key, 0)
 
     @bind_keys(keys.KEY_ESC)

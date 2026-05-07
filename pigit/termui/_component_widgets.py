@@ -467,13 +467,14 @@ class Header(Component):
 
     def _set_src(self, attr: str, segments: list[Segment]) -> None:
         src = getattr(self, attr)
-        if isinstance(src, Signal):
-            src.set(segments)
-        elif isinstance(src, Computed):
-            raise TypeError("Cannot assign to a Computed slot")
-        else:
-            setattr(self, attr, segments)
-            self.refresh()
+        match src:
+            case Signal():
+                src.set(segments)
+            case Computed():
+                raise TypeError("Cannot assign to a Computed slot")
+            case _:
+                setattr(self, attr, segments)
+                self.refresh()
 
     @left.setter
     def left(self, segments: list[Segment]) -> None:

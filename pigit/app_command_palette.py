@@ -90,28 +90,26 @@ class CommandPalette(Component):
 
     def on_key(self, key: str) -> None:
         """Process keyboard input."""
-        if key == keys.KEY_ESC:
-            self.close()
-            return
-        if key == keys.KEY_ENTER:
-            if self._candidates and self._selected < len(self._candidates):
-                cmd = self._candidates[self._selected]
-            else:
-                cmd = self._input_line.value.strip()
-            if cmd and self._on_execute:
-                self._on_execute(cmd)
-            self.close()
-            return
-        if key == keys.KEY_UP:
-            if self._candidates:
-                self._selected = max(0, self._selected - 1)
-            return
-        if key == keys.KEY_DOWN:
-            if self._candidates:
-                self._selected = min(len(self._candidates) - 1, self._selected + 1)
-            return
-        # Delegate all editing keys to InputLine.
-        self._input_line.on_key(key)
+        match key:
+            case keys.KEY_ESC:
+                self.close()
+            case keys.KEY_ENTER:
+                if self._candidates and self._selected < len(self._candidates):
+                    cmd = self._candidates[self._selected]
+                else:
+                    cmd = self._input_line.value.strip()
+                if cmd and self._on_execute:
+                    self._on_execute(cmd)
+                self.close()
+            case keys.KEY_UP:
+                if self._candidates:
+                    self._selected = max(0, self._selected - 1)
+            case keys.KEY_DOWN:
+                if self._candidates:
+                    self._selected = min(len(self._candidates) - 1, self._selected + 1)
+            case _:
+                # Delegate all editing keys to InputLine.
+                self._input_line.on_key(key)
 
     def _on_input_changed(self, value: str) -> None:
         """Callback fired by InputLine when value changes."""
