@@ -115,13 +115,13 @@ class PigitApplication(Application):
         CommitPanel(display=by_id("diff"), git=self._git, id="commit")
 
         def _on_tab_switch(panel: Component) -> None:
-            footer = by_id("footer")
+            footer = by_id("footer", AppFooter)
             provider = getattr(panel, "get_help_entries", None)
             footer.set_help_provider(provider)
             self._header_state.tab, self._header_state.tab_key = self._TAB_CONFIG.get(
                 type(panel), ("", "")
             )
-            by_id("inspector").update_from(panel)
+            by_id("inspector", InspectorPanel).update_from(panel)
 
         TabView(
             children=[by_id("status"), by_id("branch"), by_id("commit"), by_id("diff")],
@@ -138,12 +138,12 @@ class PigitApplication(Application):
         )
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([("Q", "Quit"), ("I", "Inspector"), (";", "Palette")])
-        provider = getattr(by_id("tab_view").active, "get_help_entries", None)
+        provider = getattr(by_id("tab_view", TabView).active, "get_help_entries", None)
         footer.set_help_provider(provider)
 
         InspectorPanel(id="inspector")
         Row(
-            children=[by_id("tab_view"), by_id("inspector")],
+            children=[by_id("tab_view", TabView), by_id("inspector", InspectorPanel)],
             widths=["flex", 0],
             id="body_row",
         )
@@ -155,13 +155,17 @@ class PigitApplication(Application):
         )
 
         return Column(
-            children=[by_id("header"), by_id("body_row"), by_id("footer")],
+            children=[
+                by_id("header"),
+                by_id("body_row", Row),
+                by_id("footer", AppFooter),
+            ],
             heights=[2, "flex", 2],
         )
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            entries_source=by_id("tab_view"),
+            entries_source=by_id("tab_view", TabView),
             key_fg=THEME.accent_blue,
         )
         self._help_popup = Popup(
@@ -218,7 +222,7 @@ class PigitApplication(Application):
         """Toggle command palette visibility."""
         if self._root is None:
             return
-        palette_widget = by_id("palette")
+        palette_widget = by_id("palette", CommandPalette)
         if palette_widget is None:
             return
         if palette_widget.is_active:
@@ -240,9 +244,9 @@ class PigitApplication(Application):
         """Toggle inspector panel visibility."""
         self._inspector_visible = not self._inspector_visible
         size = self._loop.get_term_size()
-        body_row = by_id("body_row")
-        inspector = by_id("inspector")
-        tab_view = by_id("tab_view")
+        body_row = by_id("body_row", Row)
+        inspector = by_id("inspector", InspectorPanel)
+        tab_view = by_id("tab_view", TabView)
         if self._inspector_visible:
             body_row.set_widths(["flex", self._inspector_width(size.columns)])
             inspector.update_from(tab_view.active)
@@ -253,19 +257,19 @@ class PigitApplication(Application):
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute inspector width on terminal resize."""
         if self._inspector_visible:
-            body_row = by_id("body_row")
+            body_row = by_id("body_row", Row)
             if body_row is not None:
                 body_row.set_widths(["flex", self._inspector_width(size[0])])
         super().resize(size)
 
     def goto_status(self):
-        by_id("tab_view").route_to("status")
+        by_id("tab_view", TabView).route_to("status")
 
     def goto_branch(self):
-        by_id("tab_view").route_to("branch")
+        by_id("tab_view", TabView).route_to("branch")
 
     def goto_commit(self):
-        by_id("tab_view").route_to("commit")
+        by_id("tab_view", TabView).route_to("commit")
 
     def on_event(self, action: ActionEventType, **data) -> bool:
         """Central event router: all panel events bubble up to here."""
@@ -277,8 +281,8 @@ class PigitApplication(Application):
                 self._on_merge_request(data["source"], data["target"])
                 return True
         if action is ActionEventType.selection_changed:
-            inspector = by_id("inspector")
-            tab_view = by_id("tab_view")
+            inspector = by_id("inspector", InspectorPanel)
+            tab_view = by_id("tab_view", TabView)
             if inspector is not None and tab_view is not None:
                 inspector.update_from(tab_view.active)
             return True
@@ -287,7 +291,7 @@ class PigitApplication(Application):
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
         lower = cmd.lower()
-        tab_view = by_id("tab_view")
+        tab_view = by_id("tab_view", TabView)
         if lower == "quit":
             self.quit()
         elif tab_view.route_to(lower) is not None:
@@ -367,7 +371,7 @@ class PigitApplication(Application):
                         "Conflict! Resolve in Status, then continue-merge",
                         duration=3.0,
                     )
-                    by_id("tab_view").route_to("status")
+                    by_id("tab_view", TabView).route_to("status")
                     return
                 show_toast(f"Merge failed: {e}", duration=3.0)
                 return
@@ -427,8 +431,8 @@ class PigitApplication(Application):
                 return
             self._merge_state = None
             self._clear_merge_state()
-            by_id("tab_view").route_to("branch")
-            by_id("branch").refresh()
+            by_id("tab_view", TabView).route_to("branch")
+            by_id("branch", BranchPanel).refresh()
             show_toast(f"Merged into {target}", duration=2.0)
 
         self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)
