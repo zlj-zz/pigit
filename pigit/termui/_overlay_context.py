@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Sequence
 
 from ._layer import LayerKind
-from ._reactive import Signal
+from .reactive import Signal
 
 _badge_signal: Signal[str | None] = Signal(None)
 

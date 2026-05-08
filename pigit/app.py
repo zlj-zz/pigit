@@ -29,10 +29,10 @@ from pigit.termui import (
     Row,
     show_spinner,
     show_toast,
-    Signal,
     TabView,
     ToastPosition,
 )
+from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
 from .git.local_git import GitError
 from .app_branch import BranchPanel

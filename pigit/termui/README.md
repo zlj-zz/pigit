@@ -110,20 +110,23 @@ flowchart LR
 
 | Module | Role |
 |--------|------|
-| `_component_base.py` | `Component` ABC, `ComponentError`, `nearest_overlay_host()` |
-| `_component_mixins.py` | `GitPanelLazyResizeMixin` (defer `refresh`), `OverlayClientMixin` (toast/sheet helpers) |
+| `_component_base.py` | `Component` ABC, `ComponentError`, `bind_signals`, `nearest_overlay_host()` |
 | `_component_layouts.py` | `TabView` (tabbed stack), `Column`, `Row` (layout containers) |
 | `_component_widgets.py` | `ItemSelector` (cursor list), `Header`, `InputLine`, `LineTextBrowser`, `StatusBar` |
+| `_component_graph.py` | `HeatmapGrid`, `StepLineChart` |
+| `_component_registry.py` | `by_id`, `get_registry` |
 | `_overlay_components.py` | `Popup` (modal shell), `AlertDialog`, `HelpPanel`, `Toast`, `Sheet` |
 | `_layer.py` | `LayerStack`, `Layer`, `LayerKind` (`NONE` / `MODAL` / `TOAST` / `SHEET`) |
 | `_segment.py` | `Segment` dataclass for styled text (fg/bg, style flags) |
+| `_color.py` | `ColorAdapter`, `ColorMode` — color mode detection and ANSI adapter |
 | `palette.py` | Color constants (`DEFAULT_FG`, `DEFAULT_BG`, `DEFAULT_FG_DIM`) and style flags (`STYLE_BOLD`, `STYLE_DIM`, etc.) |
-| `_reactive.py` | `Signal`, `Computed` reactive primitives |
+| `reactive.py` | `Signal`, `Computed` reactive primitives (not exported from `__init__`) |
 | `_root.py` | `ComponentRoot`: internal framework root, wraps body + LayerStack |
+| `_overlay_context.py` | Overlay host context — `show_toast`, `show_sheet`, `show_badge`, `get_badge`, `exec_external` |
 | `_application.py` | `Application` facade: high-level entry point for app wiring |
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize -> overlay -> main dispatch |
-| `picker_event_loop.py` | `PickerAppEventLoop`: full-screen picker with `(exit_code, message)` returns |
 | `_session.py` | `Session`: TTY setup, creates `Renderer` |
+| `_session_context.py` | Session ContextVar — `exec_external` and session getter/setter |
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
 | `_renderer_context.py` | `get_renderer()`, `get_renderer_strict()`, `set_renderer()` via `ContextVar` |
 | `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
@@ -134,8 +137,11 @@ flowchart LR
 | `input_terminal.py` | `InputTerminal` protocol |
 | `input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
 | `_geometry.py` | `TerminalSize` and related helpers |
-| `_picker.py` | Picker building blocks — `SearchableListPicker` not yet provided |
-| `picker_layout.py` | Layout helpers for pickers |
+| `_frame.py` | `BoxFrame`: reusable bordered frame layout helpers |
+| `_layout.py` | `SizeModifier` protocol and layout utilities |
+| `_syntax.py` | `SyntaxTokenizer` |
+| `_syntax_configs.py` | Language syntax keyword configurations |
+| `_picker.py` | Picker building blocks — `PickerRow` |
 | `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
 | `types.py` | `ActionEventType`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
 
@@ -145,16 +151,16 @@ Stable names are listed in `__all__` inside `__init__.py`.
 
 | Category | Names |
 |----------|-------|
-| **Core** | `Component`, `ComponentError`, `ActionEventType` |
+| **Core** | `Component`, `ComponentError`, `ActionEventType`, `bind_signals` |
 | **Containers** | `TabView`, `Column`, `Row` |
-| **Widgets** | `ItemSelector`, `LineTextBrowser`, `Header`, `InputLine`, `StatusBar` |
+| **Widgets** | `ItemSelector`, `LineTextBrowser`, `Header`, `InputLine`, `StatusBar`, `HeatmapGrid`, `StepLineChart` |
 | **Overlays** | `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast` |
 | **Overlay types** | `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, `OverlaySurface` |
-| **Application** | `Application`, `ComponentRoot`, `ExitEventLoop`, `AppEventLoop`, `Session` |
+| **Application** | `Application`, `ComponentRoot`, `ExitEventLoop` |
 | **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `TerminalSize`, `SurfaceProtocol` |
 | **Bindings** | `bind_keys`, `list_bindings`, `BindingError` |
-| **Reactive** | `Signal`, `Computed` |
-| **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `show_spinner`, `hide_spinner`, `exec_external` |
+| **Registry** | `by_id`, `get_registry` |
+| **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `get_badge_signal`, `show_spinner`, `hide_spinner`, `exec_external` |
 | **Picker** | `PickerRow` |
 | **Text** | `plain`, `SyntaxTokenizer` |
 | **Keys** | `keys` (submodule) |
@@ -187,7 +193,7 @@ Inside `pigit.termui` itself, **all** cross-module imports must use relative pat
 from . import keys
 from . import palette
 from ._component_base import Component, bind_signals
-from ._reactive import Signal, Computed
+from .reactive import Signal, Computed
 
 # Wrong — absolute paths are forbidden inside the package
 from pigit.termui import keys
@@ -335,8 +341,12 @@ When adding new components or extending existing ones, follow these rules so the
    - Use `keys.KEY_ESC`, `keys.KEY_ENTER`, `keys.KEY_DOWN`, etc.
 
 4. **Import style**
-   - Inside `pigit.termui`: always use relative imports (`from . import keys`, `from ._reactive import Signal`).
+   - Inside `pigit.termui`: always use relative imports (`from . import keys`, `from .reactive import Signal`).
    - Outside `pigit.termui`: `from pigit.termui import keys, palette`.
+   - **Reactive primitives are NOT exported from `__init__.py`**. Import them explicitly:
+     ```python
+     from pigit.termui.reactive import Signal, Computed
+     ```
    - Access qualified: `keys.KEY_DOWN`, `palette.STYLE_BOLD`.
 
 5. **Render interface**

@@ -13,7 +13,7 @@ from . import keys, palette
 from ._component_base import Component, ComponentError, bind_signals
 from ._segment import Segment
 from ._surface import Surface
-from ._reactive import Computed, Signal, ValueRef
+from .reactive import Computed, Signal, ValueRef
 from .types import ActionEventType, OverlayDispatchResult
 from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width

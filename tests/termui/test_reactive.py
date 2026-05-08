@@ -8,7 +8,7 @@ Date: 2026-04-20
 
 import pytest
 
-from pigit.termui._reactive import Computed, Signal
+from pigit.termui.reactive import Computed, Signal
 
 
 class TestSignal:

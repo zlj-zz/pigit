@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_reactive.py
+Module: pigit/termui/reactive.py
 Description: Lightweight reactive primitives: Signal and Computed.
 Author: Zev
 Date: 2026-04-20

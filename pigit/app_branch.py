@@ -21,8 +21,8 @@ from pigit.termui import (
     Segment,
     show_sheet,
     show_toast,
-    Signal,
 )
+from pigit.termui.reactive import Signal
 
 from .app_inspector import BranchInfo
 from .app_theme import THEME

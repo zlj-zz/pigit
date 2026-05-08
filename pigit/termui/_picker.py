@@ -14,7 +14,7 @@ from collections.abc import Sequence
 
 from . import palette
 from ._component_base import Component
-from ._reactive import Signal
+from .reactive import Signal
 from .tty_io import truncate_line, MIN_LIST_ROWS
 
 if TYPE_CHECKING:

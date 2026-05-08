@@ -21,7 +21,7 @@ from ._renderer_context import (
     get_renderer,
     get_renderer_strict,
 )
-from ._reactive import Computed, Signal
+from .reactive import Computed, Signal
 from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:

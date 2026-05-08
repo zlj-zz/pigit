@@ -11,7 +11,7 @@ from pigit.termui._component_widgets import (
     ItemSelector,
     StatusBar,
 )
-from pigit.termui._reactive import Signal
+from pigit.termui.reactive import Signal
 
 
 class TestItemSelector:

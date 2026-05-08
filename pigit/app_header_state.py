@@ -7,7 +7,8 @@ Date: 2026-05-07
 
 from __future__ import annotations
 
-from pigit.termui import Computed, get_badge, get_badge_signal, palette, Segment, Signal
+from pigit.termui import get_badge, get_badge_signal, palette, Segment
+from pigit.termui.reactive import Computed, Signal
 
 
 class _SignalProp:
