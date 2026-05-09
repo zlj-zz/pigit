@@ -16,7 +16,8 @@ from .widgets import WIDGETS
 class FishCompletion(ShellCompletion):
     SHELL: str = "fish"
 
-    TEMPLATE_SRC: str = textwrap.dedent("""\
+    TEMPLATE_SRC: str = textwrap.dedent(
+        """\
         function %(func_name)s;
             set -l response;
 
@@ -42,7 +43,8 @@ class FishCompletion(ShellCompletion):
         "(%(func_name)s)";
 
 %(widget)s
-        """)
+        """
+    )
 
     # TODO:improve `fish` completion script.
 
