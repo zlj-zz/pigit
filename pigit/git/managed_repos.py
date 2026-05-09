@@ -19,6 +19,21 @@ def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     return sorted(repos.keys())
 
 
+def _fuzzy_match(text: str, query: str) -> bool:
+    """Check if all characters of `query` appear in `text` in order (case-insensitive)."""
+    if not query:
+        return True
+    text = text.lower()
+    query = query.lower()
+    idx = 0
+    for ch in query:
+        idx = text.find(ch, idx)
+        if idx == -1:
+            return False
+        idx += 1
+    return True
+
+
 class ManagedRepos:
     """Persisted multi-repo registry (`repos.json`) and bulk commands."""
 
@@ -150,10 +165,14 @@ class ManagedRepos:
             report_dict[repo_name] = commits
         pprint.pprint(report_dict)
 
-    def ll_repos(self, reverse: bool = False) -> Generator[list[tuple], None, None]:
+    def ll_repos(
+        self, reverse: bool = False, filter_query: str = ""
+    ) -> Generator[list[tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name in iter_managed_repo_names(exist_repos):
+            if filter_query and not _fuzzy_match(repo_name, filter_query):
+                continue
             prop = exist_repos[repo_name]
             repo_path = prop["path"]
             head = self._git.get_head(repo_path)

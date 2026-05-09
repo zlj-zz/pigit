@@ -41,8 +41,11 @@ class RepoCommandHandler:
     def ll(self, args: "Namespace") -> None:
         simple = args.simple
         reverse = args.reverse
+        filter_query = getattr(args, "filter", "")
 
-        for info in self.managed_repos.ll_repos(reverse=reverse):
+        for info in self.managed_repos.ll_repos(
+            reverse=reverse, filter_query=filter_query
+        ):
             if simple:
                 if reverse:
                     self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
@@ -50,19 +53,23 @@ class RepoCommandHandler:
                     self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
             else:
                 if reverse:
-                    summary_string = textwrap.dedent(f"""\
+                    summary_string = textwrap.dedent(
+                        f"""\
                         b`{info[0][0]}`
                             {info[1][0]}: `{info[1][1]}`<sky_blue>
-                        """)
+                        """
+                    )
                 else:
-                    summary_string = textwrap.dedent(f"""\
+                    summary_string = textwrap.dedent(
+                        f"""\
                         b`{info[0][0]}`
                             {info[1][0]}: {info[1][1]}
                             {info[2][0]}: {info[2][1]}
                             {info[3][0]}: `{info[3][1]}`<khaki>
                             {info[4][0]}: `{info[4][1]}`<ok>
                             {info[5][0]}: `{info[5][1]}`<sky_blue>
-                        """)
+                        """
+                    )
                 self.console.echo(summary_string)
 
     def clear(self) -> None:

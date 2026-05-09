@@ -313,6 +313,7 @@ def repo_rename(args, _):
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
+@argument("filter", nargs="?", default="", help="filter repos by fuzzy name match.")
 def repo_ll(args, _):
     RepoCommandHandler(ctx.current()).ll(args)
 

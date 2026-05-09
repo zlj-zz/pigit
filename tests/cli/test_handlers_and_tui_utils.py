@@ -79,6 +79,14 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
     mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
 
+def test_repo_handler_ll_filter(mock_ctx):
+    echo = MagicMock()
+    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+        h = RepoCommandHandler(mock_ctx)
+        h.ll(SimpleNamespace(simple=True, reverse=False, filter="web"))
+    mock_ctx.managed_repos.ll_repos.assert_called_once_with(reverse=False, filter_query="web")
+
+
 def test_tui_handler_preprocess_windows():
     with patch("pigit.handlers.tui_handler.IS_WIN", True):
         h = TuiHandler(MagicMock())

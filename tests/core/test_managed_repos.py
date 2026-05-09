@@ -9,7 +9,7 @@ import pytest
 
 from pigit.ext.executor_factory import MockExecutor
 from pigit.git.local_git import LocalGit
-from pigit.git.managed_repos import ManagedRepos
+from pigit.git.managed_repos import ManagedRepos, _fuzzy_match
 
 
 @pytest.fixture
@@ -277,3 +277,38 @@ def test_ll_repos_normal_summary(tmp_repos_json):
                 rows = list(r.ll_repos(reverse=False))
     assert len(rows) == 1
     assert rows[0][1][0] == "Branch"
+
+
+def test_fuzzy_match():
+    assert _fuzzy_match("api-gateway", "apig") is True
+    assert _fuzzy_match("api-gateway", "API") is True
+    assert _fuzzy_match("core-api", "api") is True
+    assert _fuzzy_match("frontend", "api") is False
+    assert _fuzzy_match("anything", "") is True
+
+
+def test_ll_repos_filter(tmp_repos_json):
+    tmp_repos_json.write_text(
+        json.dumps({"alpha": {"path": "/p1"}, "beta": {"path": "/p2"}, "gamma": {"path": "/p3"}})
+    )
+    ex = MockExecutor()
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    with patch.object(LocalGit, "get_head", return_value=None):
+        rows = list(r.ll_repos(reverse=True, filter_query="et"))
+    names = [row[0][0] for row in rows]
+    assert "beta" in names
+    assert "alpha" not in names
+    assert "gamma" not in names
+
+
+def test_ll_repos_filter_case_insensitive(tmp_repos_json):
+    tmp_repos_json.write_text(
+        json.dumps({"AlphaGo": {"path": "/p1"}, "beta": {"path": "/p2"}})
+    )
+    ex = MockExecutor()
+    r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    with patch.object(LocalGit, "get_head", return_value=None):
+        rows = list(r.ll_repos(reverse=True, filter_query="alp"))
+    names = [row[0][0] for row in rows]
+    assert "AlphaGo" in names
+    assert "beta" not in names
