@@ -228,7 +228,7 @@ class BranchPanel(ItemSelector):
         target = branch.name
         self.emit(
             ActionEventType.action_requested,
-            action="merge",
+            cmd="merge",
             source=source,
             target=target,
         )

@@ -262,7 +262,7 @@ class PigitApplication(Application):
             self._header_state.mode = data.get("mode", "")
             return True
         if action is ActionEventType.action_requested:
-            if data.get("action") == "merge":
+            if data.get("cmd") == "merge":
                 self._on_merge_request(data["source"], data["target"])
                 return True
         if action is ActionEventType.selection_changed:
