@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import sys
+import time
+import contextlib
+import inspect
 from typing import Any
 from collections.abc import Callable
 from functools import wraps
-import time, contextlib, inspect
 
 
 def time_it(fn: Callable) -> Callable:
@@ -34,7 +37,10 @@ def time_it(fn: Callable) -> Callable:
                     break
             else:
                 i = 2
-            print(f"\033[2m# runtime: {used_time:.2f} {time_unit[i]}\033[0m")
+            msg = f"# runtime: {used_time:.2f} {time_unit[i]}"
+            if sys.stdout.isatty():
+                msg = f"\033[2m{msg}\033[0m"
+            print(f"\n{msg}")
         return res
 
     return wrap
