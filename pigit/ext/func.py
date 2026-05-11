@@ -34,7 +34,7 @@ def time_it(fn: Callable) -> Callable:
                     break
             else:
                 i = 2
-            print(f"\n# runtime: {used_time:.2f} {time_unit[i]}")
+            print(f"\033[2m# runtime: {used_time:.2f} {time_unit[i]}\033[0m")
         return res
 
     return wrap

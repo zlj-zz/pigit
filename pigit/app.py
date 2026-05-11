@@ -173,7 +173,10 @@ class PigitApplication(Application):
     def after_start(self):
         size = self._loop.get_term_size()
         if size.columns < 65 or size.lines < 10:
-            self._loop.quit("No enough space to running.")
+            self._loop.quit(
+                f"Terminal too small ({size.columns}x{size.lines}, need at least 65x10).",
+                exit_code=1,
+            )
 
         # Initialize header with repo info
         try:
@@ -454,3 +457,10 @@ class PigitApplication(Application):
 
     def quit(self):
         raise ExitEventLoop("Quit")
+
+    def run(self):
+        try:
+            self._run_body()
+        except ExitEventLoop as e:
+            if e.exit_code != 0:
+                print(f"\n{e}\n")
