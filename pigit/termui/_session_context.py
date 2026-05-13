@@ -12,6 +12,8 @@ import logging
 import subprocess
 from typing import TYPE_CHECKING
 
+from ._renderer_context import get_renderer
+
 if TYPE_CHECKING:
     from ._session import Session
 
@@ -59,4 +61,7 @@ def exec_external(
         except Exception:
             _logger.exception("Session.resume() failed; terminal may be in bad state")
             raise
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
     return result
