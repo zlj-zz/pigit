@@ -502,7 +502,7 @@ class LocalGit:
             if name.endswith('"'):
                 # may is chinese char code.
                 name = byte_str2str(name[1:-1])
-            untracked = change in ["??", "A ", "AM"]
+            untracked = change == "??"
             has_no_staged_change = staged_change in [" ", "U", "?"]
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
             has_inline_merged_conflicts = change in ["UU", "AA"]
