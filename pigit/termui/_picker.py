@@ -7,6 +7,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -53,6 +54,7 @@ class PickerRow:
     title: str
     detail: str = ""
     ref: object = None
+    checked: bool = False
 
 
 def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRow]:
@@ -62,6 +64,18 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRo
         return list(rows)
     q = needle.lower()
     return [r for r in rows if q in r.title.lower() or q in (r.detail or "").lower()]
+
+
+def apply_picker_filter_regex(rows: Sequence[PickerRow], pattern: str) -> list[PickerRow]:
+    """Regex match on ``title`` and ``detail`` (case-insensitive)."""
+
+    if not pattern.strip():
+        return list(rows)
+    try:
+        rx = re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return list(rows)
+    return [r for r in rows if rx.search(r.title) or rx.search(r.detail)]
 
 
 class PickerHeader(Component):

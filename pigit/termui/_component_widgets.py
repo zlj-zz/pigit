@@ -422,6 +422,69 @@ class ItemSelector(Component):
         self._notify_change()
 
 
+class CheckList(ItemSelector):
+    """Multi-select list with checkbox prefix."""
+
+    CURSOR: str = "→"
+    CHECKED: str = "[x]"
+    UNCHECKED: str = "[ ]"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._checked: set[int] = set()
+
+    # --- public API ---
+
+    def toggle(self, idx: int | None = None) -> None:
+        """Toggle checkbox at ``idx`` (defaults to current cursor)."""
+
+        if idx is None:
+            idx = self.curr_no
+        if idx in self._checked:
+            self._checked.discard(idx)
+        else:
+            self._checked.add(idx)
+        self.refresh()
+
+    def select_all(self) -> None:
+        self._checked = set(range(len(self.content)))
+        self.refresh()
+
+    def select_none(self) -> None:
+        self._checked.clear()
+        self.refresh()
+
+    def get_selected(self) -> set[int]:
+        return set(self._checked)
+
+    def set_content(self, content: list[str]) -> None:
+        """Override to clamp checked indices on content change."""
+
+        super().set_content(content)
+        self._checked = {i for i in self._checked if i < len(content)}
+
+    # --- rendering ---
+
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
+    ]:
+        """Render ``[x] title  detail`` with cursor indicator."""
+
+        check = self.CHECKED if idx in self._checked else self.UNCHECKED
+        cursor = self.CURSOR if is_cursor else " "
+        text = f"{cursor} {check} {self.content[idx]}"
+        return ([Segment(text, fg=palette.DEFAULT_FG)], None, [])
+
+
 class Header(Component):
     """Generic header bar with left/center/right segments.
 

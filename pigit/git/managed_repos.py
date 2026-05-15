@@ -389,3 +389,151 @@ class ManagedRepos:
 
         for _, prop in exist_repos.items():
             self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
+
+    def branch_new_repos(
+        self,
+        branch_name: str,
+        repos: list[str] | None = None,
+        *,
+        checkout: bool = False,
+        base: str | None = None,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+        """Batch create new branches across managed repos.
+
+        Returns:
+            (all_ok, blockers, results)
+            - all_ok: bool, whether pre-flight passed and execution succeeded.
+            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - results: list of (repo_name, exit_code, stderr_or_none) from execution.
+              Empty if pre-flight failed or dry_run.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos:
+            return True, [], []
+
+        blockers = self._branch_new_preflight(
+            target_repos, branch_name, checkout=checkout, base=base, force=force
+        )
+        if blockers:
+            return False, blockers, []
+
+        if dry_run:
+            return True, [], []
+
+        results = self._branch_new_execute(
+            target_repos, branch_name, checkout=checkout, base=base, force=force
+        )
+        return True, [], results
+
+    def _branch_new_preflight(
+        self,
+        target_repos: dict[str, dict],
+        branch_name: str,
+        *,
+        checkout: bool,
+        base: str | None,
+        force: bool,
+    ) -> list[tuple[str, str]]:
+        """Run three-phase pre-flight checks in parallel."""
+        blockers: list[tuple[str, str]] = []
+        repo_items = list(target_repos.items())
+
+        # 1. validity check
+        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
+        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        validity_results = self.executor.exec_parallel(
+            *validity_cmds,
+            orders=validity_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        valid_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, _out) in zip(repo_items, validity_results, strict=True):
+            if code != 0:
+                blockers.append((name, "invalid repo"))
+            else:
+                valid_repos[name] = prop
+
+        if not valid_repos:
+            return blockers
+
+        # 2. branch existence check
+        branch_cmds = [f"git branch --list {branch_name}"] * len(valid_repos)
+        branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        branch_results = self.executor.exec_parallel(
+            *branch_cmds,
+            orders=branch_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        clean_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, out) in zip(valid_repos.items(), branch_results, strict=True):
+            if out and out.strip():
+                if not force:
+                    blockers.append((name, f"branch '{branch_name}' already exists"))
+                    continue
+            clean_repos[name] = prop
+
+        if not clean_repos:
+            return blockers
+
+        # 3. workspace cleanliness check (only when checkout or base)
+        if checkout or base:
+            status_cmds = ["git status --porcelain"] * len(clean_repos)
+            status_orders = [{"cwd": prop["path"]} for prop in clean_repos.values()]
+            status_results = self.executor.exec_parallel(
+                *status_cmds,
+                orders=status_orders,
+                flags=REPLY | DECODE,
+                max_concurrent=self._repo_parallel_workers(),
+            )
+
+            for (name, prop), (code, _err, out) in zip(clean_repos.items(), status_results, strict=True):
+                if out and out.strip():
+                    blockers.append((name, "uncommitted changes"))
+
+        return blockers
+
+    def _branch_new_execute(
+        self,
+        target_repos: dict[str, dict],
+        branch_name: str,
+        *,
+        checkout: bool,
+        base: str | None,
+        force: bool,
+    ) -> list[tuple[str, int, str | None]]:
+        """Execute branch creation across repos in parallel."""
+        parts: list[str] = []
+        if base:
+            parts.append(f"git checkout {base}")
+        if checkout:
+            parts.append(f"git checkout -b {branch_name}")
+        else:
+            flag = " -f" if force else ""
+            parts.append(f"git branch{flag} {branch_name}")
+        cmd = " && ".join(parts)
+
+        repo_items = list(target_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        return [
+            (name, code, stderr if code != 0 else None)
+            for (name, _), (code, stderr, _stdout) in zip(repo_items, results, strict=True)
+        ]

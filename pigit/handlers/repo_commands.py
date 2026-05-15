@@ -105,3 +105,66 @@ class RepoCommandHandler:
             print=args.print,
         )
         self.console.echo(msg)
+
+    def mkbranch(self, args: "Namespace") -> None:
+        from pigit.git.repo_multi_select_picker import (
+            EMPTY_MANAGED_REPOS_MSG,
+            run_multi_select_picker,
+        )
+        from pigit.termui._picker import PickerRow
+
+        branch_name = args.branch_name
+        checkout = getattr(args, "checkout", False)
+        base = getattr(args, "base", None)
+        force = getattr(args, "force", False)
+        dry_run = getattr(args, "dry_run", False)
+        filter_regex = getattr(args, "filter_regex", "")
+
+        repo_names: list[str] = []
+        if args.repos:
+            repo_names = list(args.repos)
+        else:
+            exist_repos = self.managed_repos.load_repos()
+            if not exist_repos:
+                self.console.echo(EMPTY_MANAGED_REPOS_MSG)
+                return
+            rows = [
+                PickerRow(title=name, detail=prop.get("path", ""), ref=name)
+                for name, prop in sorted(exist_repos.items())
+            ]
+            exit_code, selected = run_multi_select_picker(
+                rows,
+                title=f"pigit repo mkbranch {branch_name}",
+                initial_filter=filter_regex,
+            )
+            if exit_code != 0 or not selected:
+                return
+            repo_names = selected
+
+        all_ok, blockers, results = self.managed_repos.branch_new_repos(
+            branch_name,
+            repo_names,
+            checkout=checkout,
+            base=base,
+            force=force,
+            dry_run=dry_run,
+        )
+
+        if blockers:
+            self.console.echo("Pre-flight blocked:")
+            for name, reason in blockers:
+                self.console.echo(f"  ✗ {name} — {reason}")
+            self.console.echo("\nFix the issues and retry.")
+            raise SystemExit(1)
+
+        if dry_run:
+            self.console.echo(f'Would create branch "{branch_name}" in:')
+            for name in repo_names:
+                self.console.echo(f"  - {name}")
+            return
+
+        for name, code, stderr in results:
+            if code == 0:
+                self.console.echo(f"✓ {name}")
+            else:
+                self.console.echo(f"✗ {name} — {stderr or 'unknown error'}")

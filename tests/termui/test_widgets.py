@@ -7,6 +7,7 @@ Date: 2026-04-20
 """
 
 from pigit.termui._component_widgets import (
+    CheckList,
     InputLine,
     ItemSelector,
     StatusBar,
@@ -278,3 +279,44 @@ class TestInputLine:
         assert inp._cursor == 0
         inp.on_key("delete")
         assert inp.value == ""
+
+
+class TestCheckList:
+    def test_toggle_adds_to_checked(self):
+        cl = CheckList(content=["a", "b", "c"])
+        cl.toggle(0)
+        assert cl.get_selected() == {0}
+        cl.toggle(0)
+        assert cl.get_selected() == set()
+
+    def test_toggle_defaults_to_cursor(self):
+        cl = CheckList(content=["a", "b", "c"])
+        cl.curr_no = 1
+        cl.toggle()
+        assert cl.get_selected() == {1}
+
+    def test_select_all_and_none(self):
+        cl = CheckList(content=["a", "b"])
+        cl.select_all()
+        assert cl.get_selected() == {0, 1}
+        cl.select_none()
+        assert cl.get_selected() == set()
+
+    def test_set_content_clamps_checked(self):
+        cl = CheckList(content=["a", "b", "c"])
+        cl.select_all()
+        assert cl.get_selected() == {0, 1, 2}
+        cl.set_content(["x"])
+        assert cl.get_selected() == {0}
+
+    def test_describe_row_renders_checkbox(self):
+        cl = CheckList(content=["item"])
+        left, _main, _right = cl.describe_row(0, is_cursor=False)
+        assert left[0].text == "  [ ] item"
+
+    def test_describe_row_checked_and_cursor(self):
+        cl = CheckList(content=["item"])
+        cl.toggle(0)
+        left, _main, _right = cl.describe_row(0, is_cursor=True)
+        assert "→" in left[0].text
+        assert "[x]" in left[0].text

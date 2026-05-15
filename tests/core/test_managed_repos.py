@@ -312,3 +312,134 @@ def test_ll_repos_filter_case_insensitive(tmp_repos_json):
     names = [row[0][0] for row in rows]
     assert "AlphaGo" in names
     assert "beta" not in names
+
+
+class TestBranchNewRepos:
+    def test_empty_repos(self, tmp_repos_json):
+        ex = MockExecutor()
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x")
+        assert ok is True
+        assert blockers == []
+        assert results == []
+
+    def test_preflight_passes_and_executes(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", ""),
+                "git branch feat/x": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
+        assert ok is True
+        assert blockers == []
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+
+    def test_preflight_blocks_existing_branch(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", "  feat/x\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
+        assert ok is False
+        assert any("already exists" in r for _, r in blockers)
+        assert results == []
+
+    def test_preflight_blocks_unclean_workspace(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", ""),
+                "git status --porcelain": (0, "", " M file.py\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"], checkout=True)
+        assert ok is False
+        assert any("uncommitted" in r for _, r in blockers)
+        assert results == []
+
+    def test_dry_run(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"], dry_run=True)
+        assert ok is True
+        assert blockers == []
+        assert results == []
+
+    def test_force_eliminates_existing_branch_blocker(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", "  feat/x\n"),
+                "git branch -f feat/x": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"], force=True)
+        assert ok is True
+        assert blockers == []
+        assert len(results) == 1
+        assert results[0][1] == 0
+
+    def test_preflight_blocks_invalid_repo(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (1, "not a git repo", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
+        assert ok is False
+        assert any("invalid repo" in r for _, r in blockers)
+        assert results == []
+
+    def test_execute_failure_returns_stderr(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", ""),
+                "git branch feat/x": (1, "some error", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
+        assert ok is True
+        assert blockers == []
+        assert results[0] == ("repo-a", 1, "some error")
+
+    def test_checkout_with_base(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list feat/x": (0, "", ""),
+                "git status --porcelain": (0, "", ""),
+                "git checkout develop && git checkout -b feat/x": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.branch_new_repos(
+            "feat/x", ["repo-a"], checkout=True, base="develop"
+        )
+        assert ok is True
+        assert blockers == []
+        assert results[0] == ("repo-a", 0, None)
