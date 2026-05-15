@@ -19,6 +19,11 @@ from .tty_io import truncate_line
 from .wcwidth_table import pad_by_width
 from .wcwidth_table import truncate_by_width, wcswidth
 
+# Background colors for picker row states
+BG_HOVER: tuple[int, int, int] = (42, 45, 46)
+BG_ACTIVE: tuple[int, int, int] = (40, 45, 55)
+BG_DANGER_ROW: tuple[int, int, int] = (55, 35, 35)
+
 
 class LineTextBrowser(Component):
     def __init__(
@@ -97,6 +102,8 @@ class ItemSelector(Component):
         # is the row index where item ``i`` begins. ``curr_no`` then tracks the
         # ITEM index, not the row index. ``None`` keeps legacy 1:1 behaviour.
         self._item_starts: list[int] | None = None
+        # Content indices that should be skipped during navigation (e.g. separators).
+        self._skip_indices: set[int] = set()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -202,6 +209,10 @@ class ItemSelector(Component):
         if self._r_start < 0:
             self._r_start = 0
 
+    def set_skip_indices(self, indices: set[int]) -> None:
+        """Set content indices that should be skipped during navigation."""
+        self._skip_indices = indices
+
     def clear_items(self):
         """Clear the selector content, leaving a single empty item."""
         self.set_content([""])
@@ -258,9 +269,7 @@ class ItemSelector(Component):
             and truncated as a group to fit between left and right;
             ``None`` means no main content.
         """
-        prefix = self.CURSOR if is_cursor else " "
-        text = f"{prefix}{self.content[idx]}"
-        return ([Segment(text, fg=palette.DEFAULT_FG)], None, [])
+        return ([Segment(self.content[idx], fg=palette.DEFAULT_FG)], None, [])
 
     # --- row-rendering helpers ---
 
@@ -305,6 +314,18 @@ class ItemSelector(Component):
         w = surface.width
         left_w = sum(wcswidth(seg.text) for seg in left)
         right_w = sum(wcswidth(seg.text) for seg in right)
+
+        # If any segment declares a background, pre-fill the whole row so
+        # gaps between left / main / right and trailing space look uniform.
+        row_bg = None
+        for seg in list(left) + list(main or []) + list(right):
+            if seg.bg is not None:
+                row_bg = seg.bg
+                break
+        if row_bg is not None:
+            surface.draw_text_rgb(
+                row, 0, " " * w, fg=palette.DEFAULT_FG, bg=row_bg
+            )
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2
@@ -399,13 +420,15 @@ class ItemSelector(Component):
             self.emit(ActionEventType.selection_changed, index=self.curr_no)
 
     def next(self, step: int = 1):
-        """Move the selection forward by the given step."""
+        """Move the selection forward by the given step, skipping separators."""
         n_total = (
             len(self._item_starts)
             if self._item_starts is not None
             else len(self.content)
         )
         tmp_no = self.curr_no + step
+        while 0 <= tmp_no < n_total and tmp_no in self._skip_indices:
+            tmp_no += 1
         if tmp_no < 0 or tmp_no >= n_total:
             return
         self.curr_no = tmp_no
@@ -413,8 +436,15 @@ class ItemSelector(Component):
         self._notify_change()
 
     def previous(self, step: int = 1):
-        """Move the selection backward by the given step."""
+        """Move the selection backward by the given step, skipping separators."""
+        n_total = (
+            len(self._item_starts)
+            if self._item_starts is not None
+            else len(self.content)
+        )
         tmp_no = self.curr_no - step
+        while 0 <= tmp_no < n_total and tmp_no in self._skip_indices:
+            tmp_no -= 1
         if tmp_no < 0:
             return
         self.curr_no = tmp_no
@@ -425,9 +455,9 @@ class ItemSelector(Component):
 class CheckList(ItemSelector):
     """Multi-select list with checkbox prefix."""
 
-    CURSOR: str = "→"
-    CHECKED: str = "[x]"
-    UNCHECKED: str = "[ ]"
+    CURSOR: str = ""
+    CHECKED: str = "✓"
+    UNCHECKED: str = "·"
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -477,12 +507,21 @@ class CheckList(ItemSelector):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Render ``[x] title  detail`` with cursor indicator."""
-
-        check = self.CHECKED if idx in self._checked else self.UNCHECKED
-        cursor = self.CURSOR if is_cursor else " "
-        text = f"{cursor} {check} {self.content[idx]}"
-        return ([Segment(text, fg=palette.DEFAULT_FG)], None, [])
+        """Render compact checkbox with bg_active for selected rows."""
+        is_checked = idx in self._checked
+        if is_checked:
+            bg = BG_ACTIVE
+        elif is_cursor:
+            bg = BG_HOVER
+        else:
+            bg = palette.DEFAULT_BG
+        marker = (
+            Segment(self.CHECKED, fg=palette.GREEN, bg=bg, style_flags=palette.STYLE_BOLD)
+            if is_checked
+            else Segment(self.UNCHECKED, fg=palette.DIM, bg=bg)
+        )
+        text = Segment(self.content[idx], fg=palette.DEFAULT_FG, bg=bg)
+        return ([marker, Segment(" ", fg=palette.DEFAULT_FG, bg=bg)], [text], [])
 
 
 class Header(Component):

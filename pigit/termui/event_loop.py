@@ -8,7 +8,7 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from . import keys
 from ._bindings import BindingsList, resolve_key_handlers_merged
@@ -46,7 +46,7 @@ class ExitEventLoop(Exception):
         msg: str = "Quit",
         *,
         exit_code: int = 0,
-        result_message: str | None = None,
+        result_message: Any | None = None,
     ) -> None:
         super().__init__(msg)
         self.exit_code = exit_code

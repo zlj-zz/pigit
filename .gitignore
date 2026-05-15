@@ -52,3 +52,10 @@ _Users_*
 
 # worktrees
 .worktrees/
+
+.cursor/
+.specify/
+.claude/
+
+ANNOCHANGELOG.md
+

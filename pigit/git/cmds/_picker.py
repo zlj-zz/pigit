@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import shlex
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from pigit.termui import (
     Application,
@@ -25,7 +25,9 @@ from pigit.termui import (
     Popup,
     keys,
     get_renderer_strict,
+    palette,
 )
+from pigit.termui._component_widgets import BG_HOVER
 from pigit.termui._picker import (
     PICK_EXIT_CTRL_C,
     PickerHeader,
@@ -35,11 +37,13 @@ from pigit.termui._picker import (
     apply_picker_filter,
     picker_terminal_ok,
 )
+from pigit.termui._segment import Segment
 from pigit.termui.tty_io import (
     terminal_size,
     truncate_line,
     tty_ok,
 )
+from pigit.termui.wcwidth_table import wcswidth
 
 from ._completion import make_candidate_provider
 from ._mru import load_mru
@@ -64,6 +68,54 @@ _TERMINAL_TOO_SMALL_MSG = (
 
 # Tests can patch this
 _tty_ok = tty_ok
+
+# Semantic colors reused across row rendering
+_CYAN = palette.CYAN
+_YELLOW = palette.YELLOW
+_FG_PRIMARY = palette.DEFAULT_FG
+_FG_MUTED = palette.DEFAULT_FG_DIM
+_FG_DIM = palette.DIM
+_BOLD = palette.STYLE_BOLD
+_UNDERLINE = palette.STYLE_UNDERLINE
+
+
+def _highlight_match(
+    text: str,
+    needle: str,
+    *,
+    fg: tuple[int, int, int],
+    bg: tuple[int, int, int] | None = None,
+) -> list[Segment]:
+    """Split text into Segments with matched chars highlighted."""
+    if not needle:
+        return [Segment(text, fg=fg, bg=bg)]
+
+    segments: list[Segment] = []
+    lower_text = text.lower()
+    lower_needle = needle.lower()
+    t_idx = 0
+    n_idx = 0
+
+    while t_idx < len(text) and n_idx < len(needle):
+        pos = lower_text.find(lower_needle[n_idx], t_idx)
+        if pos == -1:
+            break
+        if pos > t_idx:
+            segments.append(Segment(text[t_idx:pos], fg=fg, bg=bg))
+        segments.append(
+            Segment(
+                text[pos],
+                fg=_CYAN,
+                bg=bg,
+                style_flags=_BOLD | _UNDERLINE,
+            )
+        )
+        t_idx = pos + 1
+        n_idx += 1
+
+    if t_idx < len(text):
+        segments.append(Segment(text[t_idx:], fg=fg, bg=bg))
+    return segments
 
 
 # ---------------------------------------------------------------------------
@@ -121,8 +173,6 @@ def run_cmd_new_picker(
         danger_mark = "▲" if ent.is_dangerous else " "
         return f"{mru_mark}{danger_mark} {ent.name:<15} {ent.help_text}"
 
-    all_rendered = [render_line(r) for r in rows]
-
     pick_suffix = f" {category}" if category else ""
     mode_hint = "print" if print_only else "run"
     title = (
@@ -130,7 +180,69 @@ def run_cmd_new_picker(
         f"[j/k scroll  Enter {mode_hint}  ? preview  / filter  q/Esc quit]"
     )
 
-    # 2. Local Application (used only inside this function)
+    # 2. Custom selector with category-aware rendering
+    class _CmdItemSelector(ItemSelector):
+        def __init__(
+            self,
+            app,
+            **kwargs,
+        ) -> None:
+            super().__init__(**kwargs)
+            self._app = app
+
+        def describe_row(
+            self,
+            idx: int,
+            is_cursor: bool,
+            *,
+            item_idx: int | None = None,
+            sub_row: int = 0,
+        ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
+            app = self._app
+            cols = self._size[0]
+
+            if idx in app._separator_indices:
+                sep_text = self.content[idx]
+                sep_w = wcswidth(sep_text)
+                if sep_w < cols:
+                    sep_text = sep_text + "─" * (cols - sep_w)
+                return ([], [Segment(sep_text, fg=_FG_DIM)], [])
+
+            row = app._row_data[idx]
+            assert row is not None
+            ent = cast(CmdNewEntry, row.ref)
+
+            bg = BG_HOVER if is_cursor else None
+            row_style = _BOLD if is_cursor else 0
+            in_mru = ent.name in app._mru_set
+
+            if in_mru:
+                left = [Segment("◆ ", fg=_CYAN, bg=bg, style_flags=_BOLD | row_style)]
+            elif ent.is_dangerous:
+                left = [Segment("⚠ ", fg=_YELLOW, bg=bg, style_flags=row_style)]
+            else:
+                left = [Segment("  ", fg=_FG_PRIMARY, bg=bg, style_flags=row_style)]
+
+            name_fg = _CYAN if in_mru else _FG_PRIMARY
+            name_style = _BOLD if in_mru else 0
+
+            name_segs = _highlight_match(ent.name, app._filter_needle, fg=name_fg, bg=bg)
+            for seg in name_segs:
+                seg.style_flags |= name_style | row_style
+
+            name_w = sum(wcswidth(s.text) for s in name_segs)
+            name_pad = 15 - name_w
+            if name_pad > 0:
+                name_segs.append(Segment(" " * name_pad, fg=_FG_PRIMARY, bg=bg, style_flags=row_style))
+
+            help_segs = _highlight_match(ent.help_text, app._filter_needle, fg=_FG_MUTED, bg=bg)
+            for seg in help_segs:
+                seg.style_flags |= row_style
+            main = name_segs + [Segment("  ", fg=_FG_PRIMARY, bg=bg, style_flags=row_style)] + help_segs
+
+            return (left, main, [])
+
+    # 3. Local Application (used only inside this function)
     class _CmdPickerApp(Application):
         BINDINGS = [
             ("Q", "quit"),
@@ -149,13 +261,28 @@ def run_cmd_new_picker(
             self._render_line = render_line
             self._pending_entry: CmdNewEntry | None = None
             self._last_needle: str = ""
+            self._mru_set = mru_set
+            self._separator_indices: set[int] = set()
+            self._row_data: list[PickerRow | None] = []
+            self._filter_needle = ""
+            self._collapsed_groups: set[str] = set()
+            self._sep_category_map: dict[int, str] = {}
 
         def build_root(self) -> Component:
             self._header = PickerHeader(title)
-            self._list = ItemSelector(
-                content=list(all_rendered),
+            content, row_data, sep_indices, sep_cats = self._build_grouped_content(
+                self._filtered_rows,
+                collapsed_groups=self._collapsed_groups,
+            )
+            self._row_data = row_data
+            self._separator_indices = sep_indices
+            self._sep_category_map = sep_cats
+            self._list = _CmdItemSelector(
+                self,
+                content=content,
                 on_selection_changed=lambda idx: self._state.selected_idx.set(idx),
             )
+            self._list.set_skip_indices(sep_indices)
             self._status = StatusBar(self._state.status_text)
             self._input = InputLine(
                 prompt="/",
@@ -167,9 +294,38 @@ def run_cmd_new_picker(
 
             self._layout = Column(
                 [self._header, self._list, self._status, self._input],
-                heights=[3, "flex", 1, 0],
+                heights=[2, "flex", 1, 0],
             )
             return self._layout
+
+        def _build_grouped_content(
+            self,
+            rows: list[PickerRow],
+            *,
+            collapsed_groups: set[str] | None = None,
+        ) -> tuple[list[str], list[PickerRow | None], set[int], dict[int, str]]:
+            content: list[str] = []
+            row_data: list[PickerRow | None] = []
+            separators: set[int] = set()
+            sep_categories: dict[int, str] = {}
+            last_cat = None
+            collapsed = collapsed_groups or set()
+            for r in rows:
+                ent = cast(CmdNewEntry, r.ref)
+                cat = ent.category
+                if cat != last_cat:
+                    prefix = "▸" if cat in collapsed else "─"
+                    content.append(f"{prefix}── {cat} ")
+                    row_data.append(None)
+                    sep_idx = len(content) - 1
+                    separators.add(sep_idx)
+                    sep_categories[sep_idx] = cat
+                    last_cat = cat
+                if cat in collapsed:
+                    continue
+                content.append(self._render_line(r))
+                row_data.append(r)
+            return content, row_data, separators, sep_categories
 
         def setup_root(self, root: ComponentRoot) -> None:
             self._loop.set_input_timeouts(0.125)
@@ -213,6 +369,12 @@ def run_cmd_new_picker(
                 self._list.next()
             elif key in ("k", keys.KEY_UP):
                 self._list.previous()
+            elif key == "g":
+                self._jump_to_first()
+            elif key == "G":
+                self._jump_to_last()
+            elif key == keys.KEY_TAB:
+                self._toggle_group_at_cursor()
             elif key == "enter":
                 self._enter_param_input()
             elif key == "/":
@@ -224,6 +386,19 @@ def run_cmd_new_picker(
             elif len(key) == 1 and key.isdigit():
                 self._number_buf = key
                 self._echo_number(key)
+
+        def _jump_to_first(self) -> None:
+            self._list.curr_no = 0
+            self._list._scroll_into_view()
+            self._list._notify_change()
+
+        def _jump_to_last(self) -> None:
+            n = len(self._list.content)
+            if n == 0:
+                return
+            self._list.curr_no = n - 1
+            self._list._scroll_into_view()
+            self._list._notify_change()
 
         def _on_number_prefix(self, key: str) -> None:
             buf = self._number_buf
@@ -259,14 +434,34 @@ def run_cmd_new_picker(
             self._input.set_prompt("/")
             self._input.set_candidate_provider(None)
             self._input.set_visible(True)
-            self._layout.set_heights([3, "flex", 1, 1])
+            self._layout.set_heights([2, "flex", 1, 1])
             self.resize(self._loop.get_term_size())
 
         def _exit_filter(self) -> None:
             self._mode = PickerMode.BROWSE
             self._input.set_visible(False)
-            self._layout.set_heights([3, "flex", 1, 0])
+            self._layout.set_heights([2, "flex", 1, 0])
             self.resize(self._loop.get_term_size())
+
+        def _sync_content(self, rows: list[PickerRow], *, reset_cursor: bool = False) -> None:
+            content, row_data, sep_indices, sep_cats = self._build_grouped_content(
+                rows,
+                collapsed_groups=self._collapsed_groups if reset_cursor else None,
+            )
+            self._row_data = row_data
+            self._separator_indices = sep_indices
+            self._sep_category_map = sep_cats
+            self._list.set_content(content)
+            self._list.set_skip_indices(sep_indices)
+            if reset_cursor:
+                self._list.curr_no = 0
+                self._state.selected_idx.set(0)
+            else:
+                n = len(content)
+                if self._list.curr_no >= n:
+                    self._list.curr_no = max(0, n - 1)
+                self._state.selected_idx.set(self._list.curr_no)
+            self._update_status(self._list.curr_no)
 
         def _apply_filter(self) -> None:
             if self._mode != PickerMode.FILTER:
@@ -275,20 +470,34 @@ def run_cmd_new_picker(
             if needle == self._last_needle:
                 return
             self._last_needle = needle
+            self._filter_needle = needle.lower()
             filtered = apply_picker_filter(self._rows, needle)
             self._filtered_rows = filtered
-            self._list.set_content([self._format_row(r) for r in filtered])
-            self._list.curr_no = 0
-            self._state.selected_idx.set(0)
-            self._update_status(0)
+            self._sync_content(filtered, reset_cursor=True)
+
+        def _rebuild_content(self) -> None:
+            self._sync_content(self._filtered_rows, reset_cursor=False)
+
+        def _toggle_group_at_cursor(self) -> None:
+            idx = self._list.curr_no
+            cat = self._sep_category_map.get(idx)
+            if cat is None:
+                return
+            if cat in self._collapsed_groups:
+                self._collapsed_groups.discard(cat)
+            else:
+                self._collapsed_groups.add(cat)
+            self._rebuild_content()
 
         # --- Param input mode ---
 
         def _enter_param_input(self) -> None:
             idx = self._list.curr_no
-            if idx < 0 or idx >= len(self._filtered_rows):
+            if idx < 0 or idx >= len(self._row_data):
                 return
-            row = self._filtered_rows[idx]
+            row = self._row_data[idx]
+            if row is None:
+                return
             ent = row.ref
             assert isinstance(ent, CmdNewEntry)
 
@@ -304,7 +513,7 @@ def run_cmd_new_picker(
                 make_candidate_provider(ent.arg_completion)
             )
             self._input.set_visible(True)
-            self._layout.set_heights([3, "flex", 1, 1])
+            self._layout.set_heights([2, "flex", 1, 1])
             self.resize(self._loop.get_term_size())
 
         def _exit_param_input(self) -> None:
@@ -314,7 +523,7 @@ def run_cmd_new_picker(
             self._input.clear()
             self._input.set_prompt("/")
             self._input.set_visible(False)
-            self._layout.set_heights([3, "flex", 1, 0])
+            self._layout.set_heights([2, "flex", 1, 0])
             self.resize(self._loop.get_term_size())
 
         def _on_input_submit(self, value: str) -> None:
@@ -347,20 +556,18 @@ def run_cmd_new_picker(
 
         def _update_status(self, idx: int) -> None:
             n = len(self._list.content)
-            vp = self._list.visible_row_count
-            if n > vp:
-                lo = self._list.viewport_start + 1
-                hi = min(self._list.viewport_start + vp, n)
-                text = f"-- rows {lo}-{hi} of {n} --"
-            else:
-                text = f"-- {n} row(s) --"
+            cat_count = len({cast(CmdNewEntry, e.ref).category for e in self._rows})
+            text = f"{n} commands · {cat_count} categories"
             self._state.status_text.set(text)
 
         def _show_preview(self) -> None:
             idx = self._list.curr_no
-            if idx < 0 or idx >= len(self._filtered_rows):
+            if idx < 0 or idx >= len(self._row_data):
                 return
-            ent = self._filtered_rows[idx].ref
+            row = self._row_data[idx]
+            if row is None:
+                return
+            ent = row.ref
             assert isinstance(ent, CmdNewEntry)
             preview = self._processor.preview(ent.name, [])
             if preview[1]:

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 PICK_EXIT_CTRL_C = 130
 
-PICKER_HEADER_ROWS = 3
+PICKER_HEADER_ROWS = 2
 PICKER_FOOTER_ROWS = 2
 
 
@@ -87,16 +87,17 @@ class PickerHeader(Component):
 
     def _render_surface(self, surface: Surface) -> None:
         cols = surface.width
-        sep = "=" * min(72, cols)
-        surface.draw_text_rgb(0, 0, sep, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
         surface.draw_text_rgb(
-            1,
+            0,
             0,
             truncate_line(self._title, cols),
             fg=palette.DEFAULT_FG,
             bg=palette.DEFAULT_BG,
+            style_flags=palette.STYLE_BOLD,
         )
-        surface.draw_text_rgb(2, 0, sep, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
+        surface.draw_text_rgb(
+            1, 0, "─" * cols, fg=palette.DEFAULT_FG_DIM, bg=palette.DEFAULT_BG
+        )
 
     def refresh(self) -> None:
         """No-op refresh for the static header (subclasses may override)."""

@@ -129,7 +129,7 @@ class RepoCommandHandler:
                 self.console.echo(EMPTY_MANAGED_REPOS_MSG)
                 return
             rows = [
-                PickerRow(title=name, detail=prop.get("path", ""), ref=name)
+                PickerRow(title=name, detail=prop.get("path", ""), ref=prop.get("path", ""))
                 for name, prop in sorted(exist_repos.items())
             ]
             exit_code, selected = run_multi_select_picker(

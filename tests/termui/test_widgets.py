@@ -311,12 +311,13 @@ class TestCheckList:
 
     def test_describe_row_renders_checkbox(self):
         cl = CheckList(content=["item"])
-        left, _main, _right = cl.describe_row(0, is_cursor=False)
-        assert left[0].text == "  [ ] item"
+        left, main, _right = cl.describe_row(0, is_cursor=False)
+        assert left[0].text == "·"
+        assert main[0].text == "item"
 
     def test_describe_row_checked_and_cursor(self):
         cl = CheckList(content=["item"])
         cl.toggle(0)
-        left, _main, _right = cl.describe_row(0, is_cursor=True)
-        assert "→" in left[0].text
-        assert "[x]" in left[0].text
+        left, main, _right = cl.describe_row(0, is_cursor=True)
+        assert left[0].text == "✓"
+        assert main[0].text == "item"
