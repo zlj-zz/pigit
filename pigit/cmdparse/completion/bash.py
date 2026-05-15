@@ -151,7 +151,7 @@ class BashCompletion(ShellCompletion):
         ]
         return "\n\n".join(helpers) + "\n"
 
-    def generate_content(self) -> dict:
+    def generate_content(self) -> dict[str, str]:
         """Generate template variables for bash completion.
 
         Returns:

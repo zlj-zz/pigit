@@ -12,6 +12,8 @@ from abc import ABC, abstractmethod
 from typing import Any
 from collections.abc import Iterator
 
+from typing import cast
+
 from .executor import DECODE, Executor, ExecResult, REPLY
 
 CmdT = str | list[Any] | tuple[Any, ...]
@@ -40,7 +42,7 @@ class ExecutorStrategy(ABC):
             return
         if not out:
             return
-        yield from out.splitlines()
+        yield from cast(str, out).splitlines()
 
 
 class LocalExecutor(Executor, ExecutorStrategy):

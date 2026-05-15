@@ -8,8 +8,8 @@ import os
 import shlex
 import sys
 from subprocess import Popen, PIPE
-from typing import Any, Final
-from collections.abc import ByteString, Iterator
+from typing import Any, Final, cast
+from collections.abc import Iterator
 
 # Type defined
 ExecResult = tuple[int | None, str | bytes | None, str | bytes | None]
@@ -24,7 +24,7 @@ REPLY: Final = 1 << 4  # fetch command result and return.
 SILENT: Final = 1 << 5  # silent mode. output will be discarded.
 
 
-def _detect_encoding(data: ByteString) -> str:
+def _detect_encoding(data: bytes) -> str:
     encodings = ["utf-8", "gbk", "latin-1", "iso-8859-1"]
 
     for encoding in encodings:
@@ -135,11 +135,12 @@ class Executor:
             The decoded output if decoding is enabled, otherwise the original output.
         """
         if state.decoding and content is not None and not isinstance(content, str):
+            content_bytes = cast(bytes, content)
             try:
-                return content.decode()
+                return content_bytes.decode()
             except UnicodeDecodeError:
                 # Default encoding may not is 'utf-8' on windows.
-                return content.decode(_detect_encoding(content))
+                return content_bytes.decode(_detect_encoding(content_bytes))
         else:
             return content
 

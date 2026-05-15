@@ -118,7 +118,7 @@ class ShellCompletion:
 
         return _arguments, _positions, _sub_opts
 
-    def generate_content(self):
+    def generate_content(self) -> str | dict[str, str]:
         """Generate script content.
 
         Process self.complete_var to generate completion script content part.

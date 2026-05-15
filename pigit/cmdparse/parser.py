@@ -62,7 +62,7 @@ class ColorHelpFormatter(HelpFormatter):
 
     def _format_usage(
         self,
-        usage: str,
+        usage: str | None,
         actions: Iterable[Action],
         groups: Iterable,
         prefix: str | None,
@@ -376,12 +376,9 @@ class Parser(ArgumentParser):
             attr_params = kwargs.pop("params", None)
             params = attr_params if attr_params is not None else []
 
-            try:
-                decorator_params = fn.__parser_params__
-            except AttributeError:
-                pass
-            else:
-                del fn.__parser_params__
+            decorator_params = getattr(fn, "__parser_params__", None)
+            if decorator_params is not None:
+                delattr(fn, "__parser_params__")
                 params.extend(decorator_params)
 
             if "description" not in kwargs:
@@ -458,12 +455,9 @@ def command(
         attr_params = kwargs.pop("params", None)
         params = attr_params if attr_params is not None else []
 
-        try:
-            decorator_params = fn.__parser_params__
-        except AttributeError:
-            pass
-        else:
-            del fn.__parser_params__
+        decorator_params = getattr(fn, "__parser_params__", None)
+        if decorator_params is not None:
+            delattr(fn, "__parser_params__")
             params.extend(decorator_params)
 
         if "description" not in kwargs:
@@ -485,9 +479,9 @@ def command(
 
 def _param_memo(fn: Callable[..., Any], params) -> None:
     if not hasattr(fn, "__parser_params__"):
-        fn.__parser_params__ = []
+        setattr(fn, "__parser_params__", [])
 
-    fn.__parser_params__.append(params)
+    getattr(fn, "__parser_params__").append(params)
 
 
 @overload

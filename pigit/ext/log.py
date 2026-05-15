@@ -12,6 +12,7 @@ import logging.handlers
 import os
 import sys
 import threading
+from types import TracebackType
 
 _PIGIT_HANDLER_ATTR = "_pigit_log_handler"
 _UNCAUGHT_HOOKS_INSTALLED = False
@@ -91,7 +92,7 @@ def install_uncaught_exception_logging() -> None:
     def _excepthook(
         exc_type: type,
         exc_value: BaseException,
-        exc_tb: object | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         logging.getLogger().error(
             "Uncaught exception",
