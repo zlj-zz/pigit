@@ -120,7 +120,7 @@ def log_contributors(args: list[str]) -> str:
 )
 def stash(args: list[str]) -> str:
     """Stash changes."""
-    base = "git stash"
+    base = "git stash --include-untracked"
     if args:
         return f"{base} {' '.join(args)}"
     return base
