@@ -12,8 +12,8 @@ from typing import Any, Final
 from collections.abc import ByteString, Iterator
 
 # Type defined
-ExecResult = tuple[int, None | str | ByteString, None | str | ByteString]
-ExecResType = None | str | ByteString
+ExecResult = tuple[int | None, str | bytes | None, str | bytes | None]
+ExecResType = str | bytes | None
 
 # Const
 WAIT_ENTER: Final = 1 << 0  # wait for enter-press afterwards. not support async.
@@ -158,7 +158,7 @@ class Executor:
     def __call__(self, cmd: str | list | tuple, *, flags: int = 0, **kws) -> tuple:
         return self.exec(cmd, flags=flags, **kws)
 
-    def exec(self, cmd: str | list | tuple, *, flags: int = 0, **kws) -> tuple:
+    def exec(self, cmd: str | list | tuple, *, flags: int = 0, **kws) -> ExecResult:
         """Execute a command synchronously.
 
         ``kws`` is passed to :class:`subprocess.Popen` after applying ``flags``; flag bits

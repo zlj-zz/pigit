@@ -11,8 +11,10 @@ from collections.abc import Iterator
 
 from plenty.str_utils import byte_str2str
 
+from typing import cast
+
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
-from pigit.ext.executor_factory import ExecutorFactory
+from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
 from .model import File, Commit, Branch
 
 
@@ -43,7 +45,7 @@ class LocalGit:
 
     def __init__(
         self,
-        executor: Executor | None = None,
+        executor: Executor | ExecutorStrategy | None = None,
         path: str | None = None,
         log: logging.Logger | None = None,
     ) -> None:
@@ -158,7 +160,7 @@ class LocalGit:
             cwd=path,
         )
         if head is not None:
-            head = head.rstrip()
+            head = cast(str, head).rstrip()
         return head
 
     def get_first_pushed_commit(
@@ -177,7 +179,9 @@ class LocalGit:
             shlex.quote(branch_name),
         )
         _, _, commit_msg = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
-        return commit_msg.strip()
+        if commit_msg is None:
+            return ""
+        return cast(str, commit_msg).strip()
 
     def get_branches(
         self,
@@ -199,7 +203,7 @@ class LocalGit:
 
         if res is None:
             return []
-        return [branch[2:] for branch in res.rstrip().split("\n")]
+        return [branch[2:] for branch in cast(str, res).rstrip().splitlines()]
 
     def get_remotes(self, path: str | None = None) -> list[str]:
         """Get repo remote url."""
@@ -210,7 +214,7 @@ class LocalGit:
             "git remote show", flags=REPLY | DECODE, cwd=path
         )
 
-        return res.strip().split("\n") if res else []
+        return cast(str, res).strip().splitlines() if res else []
 
     def get_remote_url(
         self, path: str | None = None, remote_name: str | None = None
@@ -231,10 +235,10 @@ class LocalGit:
             cwd=path,
         )
 
-        if err:
+        if err or remote_url is None:
             return ""
 
-        remote_url = remote_url[:-5]
+        remote_url = cast(str, remote_url)[:-5]
         return remote_url
 
     def get_summary(self, path: str | None = None, plain: bool = True) -> str:
@@ -245,7 +249,9 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return summary
+        if summary is None:
+            return ""
+        return cast(str, summary)
 
     def get_repo_desc(
         self,
@@ -307,7 +313,7 @@ class LocalGit:
                 flags=REPLY | DECODE,
                 cwd=path,
             )
-            git_log = "\t" + error_str if err else textwrap.indent(res, "\t")
+            git_log = "\t" + error_str if err else textwrap.indent(cast(str, res), "\t")
             gen.append("Latest log:\n%s\n" % git_log)
 
         # FIXME: will broken in a init repo.
@@ -343,16 +349,16 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        resp = resp.strip()
+        if resp is None:
+            return branches
+        resp = cast(str, resp).strip()
         if not resp:
             return branches
 
-        lines = resp.split("\n")
-
-        for line in lines:
+        for line in resp.splitlines():
             items = line.split("|")
-            short_name = items[1]
-            full_ref = items[2]
+            short_name = cast(str, items[1])
+            full_ref = cast(str, items[2])
             is_remote = full_ref.startswith("refs/remotes/")
 
             # Skip the symbolic HEAD ref for remotes (e.g. origin/HEAD)
@@ -373,14 +379,18 @@ class LocalGit:
                 branches.append(branch)
                 continue
 
-            branch.upstream_name = upstream_name
+            branch.upstream_name = cast(str, upstream_name)
 
             track = items[4]
             branch.ahead = (
-                str(m[1]) if (m := self._RE_BRANCH_AHEAD.search(track)) else "0"
+                str(m[1])
+                if (m := self._RE_BRANCH_AHEAD.search(cast(str, track)))
+                else "0"
             )
             branch.behind = (
-                str(m[1]) if (m := self._RE_BRANCH_BEHIND.search(track)) else "0"
+                str(m[1])
+                if (m := self._RE_BRANCH_BEHIND.search(cast(str, track)))
+                else "0"
             )
             branches.append(branch)
 
@@ -408,7 +418,7 @@ class LocalGit:
             cwd=path,
         )
 
-        return "" if resp is None else resp.strip()
+        return "" if resp is None else cast(str, resp).strip()
 
     @staticmethod
     def _find_dot_git_dir(cwd: str) -> str | None:
@@ -488,9 +498,9 @@ class LocalGit:
         _, err, files = self.executor.exec(
             "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=workdir
         )
-        if err:
+        if err or files is None:
             return file_items
-        for file in files.rstrip().split("\n"):
+        for file in cast(str, files).rstrip().splitlines():
             if not file.strip():
                 # skip blank line.
                 continue
@@ -565,7 +575,9 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return "Can't get diff." if err else res.rstrip()
+        if err or res is None:
+            return "Can't get diff."
+        return cast(str, res).rstrip()
 
     def iter_commits(
         self,
@@ -673,7 +685,10 @@ class LocalGit:
         _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
 
         bodies: dict[str, str] = {}
-        for record in (resp or "").split("\x1e"):
+        if resp is None:
+            return bodies
+        resp_str = cast(str, resp)
+        for record in resp_str.split("\x1e"):
             record = record.strip("\n")
             if not record or "\x1f" not in record:
                 continue
@@ -707,7 +722,9 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return resp.rstrip()
+        if resp is None:
+            return ""
+        return cast(str, resp).rstrip()
 
     # ===============
     # Options of git
@@ -858,6 +875,8 @@ class LocalGit:
             (size_str, mtime_str) like ("12.5K", "2026-04-24 10:30").
         """
         path = path or self.path
+        if path is None:
+            return "", ""
         file_name = _file_path_for_cmd(file)
         file_path = Path(path) / file_name
         try:
@@ -888,7 +907,8 @@ class LocalGit:
         )
         if not resp:
             return "?", "?"
-        parts = resp.split("|")
+        resp_str = cast(str, resp)
+        parts = resp_str.split("|")
         return parts[0], parts[1] if len(parts) > 1 else "?"
 
     def get_branch_creation_time(
@@ -932,7 +952,8 @@ class LocalGit:
         total_add = 0
         total_del = 0
 
-        for line in resp.strip().split("\n"):
+        resp_str = cast(str, resp)
+        for line in resp_str.strip().splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -1003,7 +1024,7 @@ class LocalGit:
         )
         if code != 0 or not out:
             raise GitError(err or "Failed to get git directory")
-        git_dir_raw = out.strip()
+        git_dir_raw = cast(str, out).strip()
         if Path(git_dir_raw).is_absolute():
             return str(Path(git_dir_raw).resolve())
         repo_root, _ = self.confirm_repo(path)
@@ -1033,8 +1054,8 @@ class LocalGit:
             flags=WAITING | REPLY | DECODE,
         )
         if code != 0:
-            msg = err or f"Merge failed: {source}"
-            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in err):
+            msg = cast(str, err) if err else f"Merge failed: {source}"
+            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in msg):
                 raise GitError(f"Merge conflict: {msg}")
             raise GitError(msg)
 
