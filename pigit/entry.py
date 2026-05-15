@@ -1,6 +1,7 @@
 # The PIGIT terminal tool entry file.
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,16 @@ conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_war
 # ==============
 ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
+
+# auto_append: add current repo to managed repos on any command invocation.
+_confirm_result = ctx.local_git.confirm_repo()
+_repo_path = _confirm_result[0]
+if _repo_path and ctx.config.get().repo.auto_append:
+    try:
+        ctx.managed_repos.add_repos([_repo_path])
+    except Exception:
+        logging.debug("auto_append failed", exc_info=True)
+
 console = get_console()
 
 # =====================
@@ -46,7 +57,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: Namespace, _) -> None:
+def _pigit_main(args: Namespace, _) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -62,7 +73,7 @@ def pigit(args: Namespace, _) -> None:
 
     elif args.complete:
         # Generate completion vars dict.
-        complete_vars = pigit.to_dict()
+        complete_vars = _pigit_main.to_dict()
 
         # Add cmd commands to completion with arg_completion metadata
         from .git.cmds import get_registry, register_user_commands
@@ -177,6 +188,7 @@ def pigit(args: Namespace, _) -> None:
             handler.execute()
 
 # yapf: enable
+pigit = _pigit_main
 pigit.add_argument(
     "-v",
     "--version",

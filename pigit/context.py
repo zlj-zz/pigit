@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from .git.local_git import LocalGit
     from .git.managed_repos import ManagedRepos
 
-_ctx_var: ContextVar[Context | None] = ContextVar("pigit_context", default=None)
-
 
 @dataclass
 class Context:
@@ -97,3 +95,6 @@ class Context:
             managed_repos=managed_repos,
             log=app_log,
         )
+
+
+_ctx_var: ContextVar[Context | None] = ContextVar("pigit_context", default=None)
