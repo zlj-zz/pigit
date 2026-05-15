@@ -19,7 +19,7 @@ from .reactive import Signal
 from .tty_io import truncate_line, MIN_LIST_ROWS
 
 if TYPE_CHECKING:
-    from ._surface import Surface
+    from ._surface import Surface, _Subsurface
 
 PICK_EXIT_CTRL_C = 130
 
@@ -66,7 +66,9 @@ def apply_picker_filter(rows: Sequence[PickerRow], needle: str) -> list[PickerRo
     return [r for r in rows if q in r.title.lower() or q in (r.detail or "").lower()]
 
 
-def apply_picker_filter_regex(rows: Sequence[PickerRow], pattern: str) -> list[PickerRow]:
+def apply_picker_filter_regex(
+    rows: Sequence[PickerRow], pattern: str
+) -> list[PickerRow]:
     """Regex match on ``title`` and ``detail`` (case-insensitive)."""
 
     if not pattern.strip():
@@ -85,7 +87,7 @@ class PickerHeader(Component):
         super().__init__()
         self._title = title_line
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         cols = surface.width
         surface.draw_text_rgb(
             0,

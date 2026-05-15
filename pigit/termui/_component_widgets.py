@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from . import keys, palette
 from ._component_base import Component, ComponentError, bind_signals
 from ._segment import Segment
-from ._surface import Surface
+from ._surface import Surface, _Subsurface
 from .reactive import Computed, Signal, ValueRef
 from .types import ActionEventType, OverlayDispatchResult
 from .tty_io import truncate_line
@@ -48,7 +48,7 @@ class LineTextBrowser(Component):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if self._content is None:
             return
         end = min(self._i + self._max_line, len(self._content))
@@ -67,6 +67,8 @@ class LineTextBrowser(Component):
 
     def scroll_down(self, line: int = 1):
         """Scroll the view down by the given number of lines."""
+        if not self._content:
+            return
         self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
 
 
@@ -220,7 +222,7 @@ class ItemSelector(Component):
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             return
@@ -296,7 +298,7 @@ class ItemSelector(Component):
 
     def _draw_row_layout(
         self,
-        surface: Surface,
+        surface: Surface | _Subsurface,
         row: int,
         left: Sequence[Segment],
         main: Sequence[Segment] | None,
@@ -323,9 +325,7 @@ class ItemSelector(Component):
                 row_bg = seg.bg
                 break
         if row_bg is not None:
-            surface.draw_text_rgb(
-                row, 0, " " * w, fg=palette.DEFAULT_FG, bg=row_bg
-            )
+            surface.draw_text_rgb(row, 0, " " * w, fg=palette.DEFAULT_FG, bg=row_bg)
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2
@@ -516,7 +516,9 @@ class CheckList(ItemSelector):
         else:
             bg = palette.DEFAULT_BG
         marker = (
-            Segment(self.CHECKED, fg=palette.GREEN, bg=bg, style_flags=palette.STYLE_BOLD)
+            Segment(
+                self.CHECKED, fg=palette.GREEN, bg=bg, style_flags=palette.STYLE_BOLD
+            )
             if is_checked
             else Segment(self.UNCHECKED, fg=palette.DIM, bg=bg)
         )
@@ -603,7 +605,7 @@ class Header(Component):
             unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         w = surface.width
         h = surface.height
         if w <= 0:
@@ -618,7 +620,7 @@ class Header(Component):
         else:
             self._draw_content(surface, 0, w)
 
-    def _draw_content(self, surface: Surface, row: int, w: int) -> None:
+    def _draw_content(self, surface: Surface | _Subsurface, row: int, w: int) -> None:
         surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
 
         left = self._get(self._left_src)
@@ -748,7 +750,7 @@ class StatusBar(Component):
             self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
         surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
@@ -958,7 +960,7 @@ class InputLine(Component):
         """Move the cursor one position to the right."""
         self._cursor = min(len(self._value), self._cursor + 1)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self._visible:
             return
         core = f"{self._prompt}{self._value}"

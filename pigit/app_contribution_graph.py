@@ -332,7 +332,7 @@ class ContributionGraph(Component):
             self._heatmap_values,
             max_value=self._max_count,
         )
-        self._heatmap.resize(cols=num_weeks)
+        self._heatmap.resize_grid(cols=num_weeks)
         self._heatmap._render_surface(surface)
 
         # --- Legend (Less → More) ---

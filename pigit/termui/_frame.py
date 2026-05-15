@@ -13,7 +13,7 @@ from . import palette
 from .wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
-    from ._surface import Surface
+    from ._surface import Surface, _Subsurface
 
 
 class BoxFrame:
@@ -47,7 +47,7 @@ class BoxFrame:
         self.inner_height = inner_height
         self._recalc_outer()
 
-    def draw_onto(self, surface: Surface, row: int, col: int) -> None:
+    def draw_onto(self, surface: Surface | _Subsurface, row: int, col: int) -> None:
         """Draw border onto surface at (row, col)."""
         surface.draw_box_rgb(
             row,
@@ -61,7 +61,7 @@ class BoxFrame:
         )
 
     def draw_content(
-        self, surface: Surface, row: int, col: int, lines: list[str]
+        self, surface: Surface | _Subsurface, row: int, col: int, lines: list[str]
     ) -> None:
         """Draw content lines inside the box, clipped to inner dimensions.
 

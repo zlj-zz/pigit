@@ -26,7 +26,7 @@ from .types import ActionEventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from ._renderer import Renderer
-    from ._surface import Surface
+    from ._surface import Surface, _Subsurface
 
 _logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class ComponentError(Exception):
 
 
 def _render_child_to_surface(
-    component: Component, surface: Surface, log_prefix: str
+    component: Component, surface: Surface | _Subsurface, log_prefix: str
 ) -> None:
     w, h = component._size
     if w <= 0 or h <= 0:
@@ -197,7 +197,7 @@ class Component(ABC):
         self._size = size
         self.refresh()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         """Render this component into the given Surface.
 
         New components should implement this instead of `_render`.

@@ -30,6 +30,7 @@ KeyDispatchOutcome = Literal[
     "resize",
     "child",
     "overlay",
+    "app",
 ]
 
 

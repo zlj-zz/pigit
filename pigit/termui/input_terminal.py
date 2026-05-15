@@ -47,6 +47,7 @@ class InputTerminal:
         """
         if fileno is None:
             fileno = sys.stdin.fileno()
+        assert fileno is not None
         if not os.isatty(fileno):
             return
 
@@ -93,3 +94,11 @@ class InputTerminal:
             self._signal_keys_set = True
 
         return skeys
+
+    def set_input_timeouts(self, timeout: float | None) -> None:
+        """Set the keyboard read timeout. No-op by default; override in subclasses."""
+        return
+
+    def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
+        """Read semantic keys from the input source. Must be overridden in subclasses."""
+        raise NotImplementedError("Subclasses must implement get_input()")

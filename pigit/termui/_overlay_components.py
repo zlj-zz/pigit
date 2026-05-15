@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 from collections.abc import Callable, Sequence
 
 from . import _overlay_context, keys, palette
@@ -19,7 +19,7 @@ from ._frame import BoxFrame
 from ._segment import Segment
 from ._text import sanitize_for_display
 from ._layout import Padding
-from ._surface import Surface
+from ._surface import Surface, _Subsurface
 from .wcwidth_table import truncate_by_width, wcswidth
 from .types import ToastPosition, OverlayDispatchResult, LayerKind
 
@@ -198,7 +198,7 @@ class HelpPanel(Component):
                 continue
             title_getter = getattr(panel, "get_help_title", None)
             if callable(title_getter):
-                title = title_getter()
+                title = cast(str, title_getter())
             else:
                 title = panel.__class__.__name__.replace("Panel", "")
             groups.append((title, entries))
@@ -225,7 +225,7 @@ class HelpPanel(Component):
     def refresh(self) -> None:
         """No-op refresh for compatibility."""
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         # Fill the entire panel area with default background to prevent
         # underlying panel content from leaking through.
         surface.fill_rect_rgb(
@@ -284,8 +284,9 @@ class Popup(Component):
     ) -> None:
         self._child = child
         # Auto-bind toggle callback for children that support it (e.g. HelpPanel)
-        if hasattr(child, "set_on_toggle"):
-            child.set_on_toggle(self.toggle)
+        set_on_toggle = getattr(child, "set_on_toggle", None)
+        if callable(set_on_toggle):
+            set_on_toggle(self.toggle)
         self._offset = offset
         self.exit_key = exit_key
         self.open = False
@@ -391,8 +392,8 @@ class Popup(Component):
             if rebuild is not None:
                 rebuild()
         tw, th = self._term_size
-        ow = self._child._outer_w
-        oh = self._child.outer_row_count
+        ow = getattr(self._child, "_outer_w", 0)
+        oh = getattr(self._child, "outer_row_count", 0)
         if self._offset is None:
             row = max(0, (th - oh) // 2)
             col = max(0, (tw - ow) // 2)
@@ -409,7 +410,7 @@ class Popup(Component):
         self.end_session()
         self.hide()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self.open:
             return
         # Ensure the popup and its child are sized for the current surface before
@@ -507,7 +508,7 @@ class AlertDialogBody(Component):
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self.open:
             return
         if self._needs_rebuild:
@@ -787,7 +788,7 @@ class Toast(Component):
         """Drop all keys; toasts are non-interactive."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self.open:
             return
 
@@ -870,7 +871,7 @@ class Sheet(Component):
             return self._child_dispatch(key)
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if self._size[1] <= 0:
             return
         y = surface.height - self._size[1]

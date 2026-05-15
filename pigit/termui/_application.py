@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component_base import Component, _set_focus_chain
 from ._root import ComponentRoot
-from .event_loop import AppEventLoop, ExitEventLoop
+from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
 from .types import ActionEventType
 
 if TYPE_CHECKING:
@@ -41,7 +41,9 @@ class _ApplicationEventLoop(AppEventLoop):
     When an overlay is open, keys are routed exclusively to the overlay stack.
     """
 
-    def __init__(self, root: Component, app: Application, **kwargs):
+    _child: ComponentRoot
+
+    def __init__(self, root: ComponentRoot, app: Application, **kwargs):
         super().__init__(root, **kwargs)
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
@@ -51,7 +53,7 @@ class _ApplicationEventLoop(AppEventLoop):
         """Delegate the after-start hook to the Application instance."""
         self._app.after_start()
 
-    def _dispatch_semantic_string(self, key: str):
+    def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
         self.before_dispatch_key(key)
         if key == "window resize":
             self.resize()
@@ -62,9 +64,10 @@ class _ApplicationEventLoop(AppEventLoop):
             self._run_app_handler(handler, key, "App binding for '%s' failed")
             return "binding"
 
-        if self._app_on_key is not None:
+        app_on_key = self._app_on_key
+        if app_on_key is not None:
             self._run_app_handler(
-                lambda: self._app_on_key(key), key, "App on_key for '%s' failed"
+                lambda: app_on_key(key), key, "App on_key for '%s' failed"
             )
             return "app"
 

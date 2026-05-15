@@ -22,7 +22,7 @@ from .types import ActionEventType
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ._surface import Surface
+    from ._surface import Surface, _Subsurface
 
 
 class TabView(Component):
@@ -100,7 +100,7 @@ class TabView(Component):
             except Exception:
                 _logger.exception("refresh() failed for %s", type(resolved).__name__)
         if hasattr(resolved, "_panel_loaded"):
-            resolved._panel_loaded = True
+            setattr(resolved, "_panel_loaded", True)
         if self._on_switch is not None:
             self._on_switch(resolved)
         _set_focus_chain(resolved)
@@ -142,7 +142,7 @@ class TabView(Component):
         for child in self.children:
             child.resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if self._active is not None:
             _render_child_to_surface(self._active, surface, "TabView")
 
@@ -202,7 +202,7 @@ class Column(Component):
             )
             y += h
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
@@ -280,7 +280,7 @@ class Row(Component):
             )
             x += w
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:

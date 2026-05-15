@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from ._component_registry import ComponentRegistry
     from ._overlay_components import Sheet, Toast
     from ._segment import Segment
-    from ._surface import Surface
+    from ._surface import Surface, _Subsurface
 
 _logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ class ComponentRoot(Component):
         self._layer_stack.resize(size)
         super().resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
         self._expire_toasts()
         self._expire_badge()
         self._body._render_surface(surface)

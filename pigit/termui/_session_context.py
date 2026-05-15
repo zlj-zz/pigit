@@ -42,7 +42,7 @@ def get_session() -> Session | None:
 def exec_external(
     cmd: list[str],
     cwd: str | None = None,
-) -> subprocess.CompletedProcess[str]:
+) -> subprocess.CompletedProcess[bytes]:
     """Suspend TUI, run an external command, then resume TUI and redraw.
 
     Works from anywhere inside a :class:`~pigit.termui.session.Session` context.
@@ -52,7 +52,7 @@ def exec_external(
         raise RuntimeError("No active TUI session; call only inside Session context.")
 
     session.suspend()
-    result: subprocess.CompletedProcess[str]
+    result: subprocess.CompletedProcess[bytes]
     try:
         result = subprocess.run(cmd, cwd=cwd, stdin=None, stdout=None, stderr=None)
     finally:

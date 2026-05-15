@@ -186,7 +186,8 @@ def _nearest_256(rgb: tuple[int, int, int]) -> int:
     gray = int(round((r + g + b) / 3.0))
     gray_idx = _find_nearest_index(gray, _GRAYSCALE_LEVELS)
     gray_color = 232 + gray_idx
-    gray_rgb = (_GRAYSCALE_LEVELS[gray_idx],) * 3
+    gray_val = _GRAYSCALE_LEVELS[gray_idx]
+    gray_rgb = (gray_val, gray_val, gray_val)
     gray_dist = _color_distance(rgb, gray_rgb)
 
     return cube_color if cube_dist <= gray_dist else gray_color

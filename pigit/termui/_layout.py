@@ -21,9 +21,11 @@ class SizeModifier(Protocol):
 
     def apply(self, available: tuple[int, int]) -> tuple[int, int]:
         """Return the actual (width, height) after modification."""
+        ...
 
     def offset(self) -> tuple[int, int]:
         """Return the (top, left) offset introduced by this modifier."""
+        ...
 
 
 class Padding:

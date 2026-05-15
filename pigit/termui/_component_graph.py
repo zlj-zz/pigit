@@ -62,7 +62,7 @@ class HeatmapGrid(Component):
         self._values: dict[tuple[int, int], int] = {}
         self._max_value = 0
 
-    def resize(
+    def resize_grid(
         self,
         rows: int | None = None,
         cols: int | None = None,

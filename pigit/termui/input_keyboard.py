@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import BinaryIO
+from typing import Any, BinaryIO
 from collections.abc import Callable
 
 from ._geometry import TerminalSize
@@ -83,18 +83,19 @@ class KeyboardInput:
     def _read_chunk_windows(self, timeout: float) -> bytes:
         import msvcrt
 
+        _msvcrt: Any = msvcrt
         deadline = time.monotonic() + timeout
         out = bytearray()
         while time.monotonic() < deadline:
-            if msvcrt.kbhit():
-                ch = msvcrt.getch()
+            if _msvcrt.kbhit():
+                ch = _msvcrt.getch()
                 if ch in (b"\x00", b"\xe0"):
-                    ch += msvcrt.getch()
+                    ch += _msvcrt.getch()
                 out.extend(ch)
-                while msvcrt.kbhit():
-                    ch2 = msvcrt.getch()
+                while _msvcrt.kbhit():
+                    ch2 = _msvcrt.getch()
                     if ch2 in (b"\x00", b"\xe0"):
-                        ch2 += msvcrt.getch()
+                        ch2 += _msvcrt.getch()
                     out.extend(ch2)
                 return bytes(out)
             time.sleep(0.001)
