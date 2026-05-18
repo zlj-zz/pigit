@@ -21,7 +21,8 @@ from pigit.git.cmds._picker_sorter import (
 )
 from pigit.git.cmds._picker_adapter import CmdNewEntry
 from pigit.git.model import File
-from pigit.git.repo import Repo
+from pigit.git.local_git import LocalGit
+from pigit.git.managed_repos import ManagedRepos
 
 
 @pytest.fixture(autouse=True)
@@ -45,8 +46,14 @@ class TestBuildContextSignals:
     def test_repo_status_detects_signals(self, monkeypatch):
         cfg = Config(path="/nonexistent/pigit-test.conf", version="0", auto_load=False)
         ex = MockExecutor()
-        repo = Repo(executor=ex)
-        ctx = Context(config=cfg, executor=ex, repo=repo, log=logging.getLogger("test"))
+        repo = LocalGit(executor=ex)
+        ctx = Context(
+            config=cfg,
+            executor=ex,
+            local_git=repo,
+            managed_repos=ManagedRepos(executor=ex),
+            log=logging.getLogger("test"),
+        )
         Context.install(ctx)
 
         mock_files = [
@@ -97,8 +104,14 @@ class TestBuildContextSignals:
     def test_repo_status_exception_falls_back(self):
         cfg = Config(path="/nonexistent/pigit-test.conf", version="0", auto_load=False)
         ex = MockExecutor()
-        repo = Repo(executor=ex)
-        ctx = Context(config=cfg, executor=ex, repo=repo, log=logging.getLogger("test"))
+        repo = LocalGit(executor=ex)
+        ctx = Context(
+            config=cfg,
+            executor=ex,
+            local_git=repo,
+            managed_repos=ManagedRepos(executor=ex),
+            log=logging.getLogger("test"),
+        )
         Context.install(ctx)
 
         # repo.load_status may raise without a real git repo

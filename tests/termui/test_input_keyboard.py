@@ -6,14 +6,14 @@ Author: Zev
 Date: 2026-04-18
 """
 
+import os
 import sys
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pigit.termui._geometry import TerminalSize
-from pigit.termui.input_keyboard import KeyboardInput
+from pigit.termui.input import KeyboardInput
 from pigit.termui import keys
 
 
@@ -157,13 +157,11 @@ class TestKeyboardInputReadKeys:
         result = ki.read_keys(timeout=0.01)
         assert result == ["ctrl a"]
 
-    @patch("pigit.termui.input_keyboard.TerminalSize.from_os")
+    @patch("pigit.termui.input.get_terminal_size")
     def test_read_resize_event(self, mock_from_os):
-        from pigit.termui._geometry import TerminalSize
-
         mock_from_os.side_effect = [
-            TerminalSize(80, 24),
-            TerminalSize(100, 40),
+            os.terminal_size((80, 24)),
+            os.terminal_size((100, 40)),
         ]
         ki = KeyboardInput()
         ki._read_chunk = MagicMock(return_value=b"")
@@ -310,11 +308,11 @@ class TestKeyboardInputGoldenSequences:
 
     def test_window_resize_emitted_when_columns_change(self):
         with mock.patch(
-            "pigit.termui.input_keyboard.TerminalSize.from_os",
+            "pigit.termui.input.get_terminal_size",
             side_effect=[
-                TerminalSize(80, 24),
-                TerminalSize(80, 24),
-                TerminalSize(100, 24),
+                os.terminal_size((80, 24)),
+                os.terminal_size((80, 24)),
+                os.terminal_size((100, 24)),
             ],
         ):
             kb = KeyboardInput(read_hook=lambda _t: b"")

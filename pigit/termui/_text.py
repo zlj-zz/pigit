@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_text.py
 Description: Text sanitization — ANSI stripping and control-character filtering.
@@ -9,7 +8,7 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import re
-from typing import Pattern
+from re import Pattern
 
 _STYLE_ANSI_RE: Pattern[str] = re.compile(r"\033\[\d+;\d?;?\d*;?\d*;?\d*m|\033\[\d+m")
 

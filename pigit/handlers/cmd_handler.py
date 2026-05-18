@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/handlers/cmd_handler.py
 Description: Handler for cmd subcommand.
 Author: Zev
 Date: 2026-04-10
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING
 

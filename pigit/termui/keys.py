@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/keys.py
 Description: Semantic key strings and golden escape-sequence tables for KeyboardInput.
@@ -8,7 +7,7 @@ Date: 2026-03-26
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 # Stable semantic tokens (public documentation; values match existing app conventions).
 KEY_SPACE = " "

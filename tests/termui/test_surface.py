@@ -5,8 +5,6 @@ Tests for pigit.termui.surface.
 
 from __future__ import annotations
 
-import pytest
-
 from pigit.termui._surface import Cell, FlatCell, Surface
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
@@ -15,12 +13,13 @@ class TestCell:
     def test_default_cell_is_blank(self):
         c = Cell()
         assert c.char == " "
-        assert c.style == ""
+        assert c.fg == DEFAULT_FG
+        assert c.bg == DEFAULT_BG
 
     def test_cell_with_values(self):
-        c = Cell(char="X", style="\033[31m")
+        c = Cell(char="X", fg=(255, 0, 0))
         assert c.char == "X"
-        assert c.style == "\033[31m"
+        assert c.fg == (255, 0, 0)
 
 
 class TestSurface:
@@ -152,7 +151,9 @@ class TestSubsurfaceEdgeCases:
     def test_draw_box_rgb_clipped_to_zero_is_noop(self):
         parent = Surface(5, 5)
         sub = parent.subsurface(1, 1, 3, 3)
-        sub.draw_box_rgb(0, 2, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG)  # col=2 >= width=3 -> clipped None
+        sub.draw_box_rgb(
+            0, 2, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG
+        )  # col=2 >= width=3 -> clipped None
         assert parent.lines()[1] == "     "
 
 
@@ -163,19 +164,6 @@ class TestFlatCell:
         assert c.fg == (220, 220, 230)
         assert c.bg == (18, 18, 22)
         assert c.style_flags == 0
-        assert c.ansi_style is None
-        assert c.style == ""  # backward compat
-
-    def test_legacy_style_kwarg(self):
-        c = FlatCell("X", style="\033[31m")
-        assert c.char == "X"
-        assert c.ansi_style == "\033[31m"
-        assert c.style == "\033[31m"
-
-    def test_ansi_style_kwarg(self):
-        c = FlatCell("X", ansi_style="\033[31m")
-        assert c.ansi_style == "\033[31m"
-        assert c.style == "\033[31m"
 
     def test_rgb_values(self):
         c = FlatCell("A", fg=(255, 0, 0), bg=(0, 255, 0), style_flags=STYLE_BOLD)
@@ -192,9 +180,9 @@ class TestFlatCell:
         assert hash(a) == hash(b)
 
     def test_cell_alias(self):
-        c = Cell("X", style="\033[31m")
+        c = Cell("X", fg=(255, 0, 0))
         assert isinstance(c, FlatCell)
-        assert c.ansi_style == "\033[31m"
+        assert c.fg == (255, 0, 0)
 
 
 class TestSurfaceRGB:
@@ -205,7 +193,6 @@ class TestSurfaceRGB:
         assert row[0].char == "h"
         assert row[0].fg == (255, 0, 0)
         assert row[0].bg == (0, 0, 0)
-        assert row[0].ansi_style is None
 
     def test_draw_text_rgb_clipping(self):
         s = Surface(3, 1)
@@ -306,4 +293,3 @@ class TestSurfaceRGBWideChars:
         assert row[1].char == "中"
         assert row[2].char == ""  # spacer
         assert row[3].char == "B"  # C is clipped
-

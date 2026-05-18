@@ -16,7 +16,6 @@ from pigit.cmdparse.completion import (
     get_shell,
 )
 
-
 argparse_dict = {
     "prog": "pigit",
     "prefix_chars": "-",

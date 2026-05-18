@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_commit_graph.py
 Description: Pure algorithm for inline merge-graph layout per commit row.
@@ -9,7 +8,8 @@ Date: 2026-05-04
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 if TYPE_CHECKING:
     from pigit.git.model import Commit
@@ -26,14 +26,14 @@ class GraphRow:
     so the renderer can use a single direction of curve glyphs.
     """
 
-    lanes_before: list[Optional[str]]
+    lanes_before: list[str | None]
     commit_lane: int
     closed_lanes: list[int]
     opened_lanes: list[int]
-    lanes_after: list[Optional[str]]
+    lanes_after: list[str | None]
 
 
-def compute_graph_rows(commits: Sequence["Commit"]) -> list[GraphRow]:
+def compute_graph_rows(commits: Sequence[Commit]) -> list[GraphRow]:
     """Compute graph layout for ``commits`` (newest-first, as ``git log`` emits).
 
     For each commit:
@@ -45,7 +45,7 @@ def compute_graph_rows(commits: Sequence["Commit"]) -> list[GraphRow]:
        ``commit_lane``.
     4. Trim trailing ``None`` slots so column count tracks the active set.
     """
-    lanes: list[Optional[str]] = []
+    lanes: list[str | None] = []
     rows: list[GraphRow] = []
 
     for commit in commits:
@@ -96,10 +96,10 @@ def compute_graph_rows(commits: Sequence["Commit"]) -> list[GraphRow]:
 
 
 def _alloc_lane(
-    lanes: list[Optional[str]],
+    lanes: list[str | None],
     *,
     prefer_after: int = 0,
-    exclude: Optional[set[int]] = None,
+    exclude: set[int] | None = None,
 ) -> int:
     """First ``None`` slot at index ``>= prefer_after`` and not in ``exclude``;
     append a new lane otherwise."""

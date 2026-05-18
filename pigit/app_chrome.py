@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_chrome.py
 Description: Application chrome components (header, footer).
@@ -8,7 +7,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
@@ -19,12 +18,16 @@ from .app_theme import FlatTheme
 class AppFooter(Component):
     """Bottom chrome bar: current item context + shortcut hints."""
 
-    def __init__(self, theme: FlatTheme) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        theme: FlatTheme,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
         self._theme = theme
         self._context_text = ""
         self._global_help: list[tuple[str, str]] = []
-        self._help_provider: Optional[Callable[[], list[tuple[str, str]]]] = None
+        self._help_provider: Callable[[], list[tuple[str, str]]] | None = None
 
     def set_context(self, item_name: str = "") -> None:
         self._context_text = f"\u2192 {item_name}" if item_name else ""
@@ -33,7 +36,7 @@ class AppFooter(Component):
         self._global_help = list(pairs)
 
     def set_help_provider(
-        self, provider: Optional[Callable[[], list[tuple[str, str]]]]
+        self, provider: Callable[[], list[tuple[str, str]]] | None
     ) -> None:
         self._help_provider = provider
 

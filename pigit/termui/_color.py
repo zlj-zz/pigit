@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_color.py
 Description: TrueColor rendering support with automatic terminal capability fallback.
@@ -12,7 +11,6 @@ import logging
 import os
 from enum import Enum
 from functools import lru_cache
-from typing import Optional
 
 from . import palette
 
@@ -77,7 +75,7 @@ class ColorAdapter:
     performance.  The adapter is stateless and safe to share across threads.
     """
 
-    def __init__(self, mode: Optional[ColorMode] = None) -> None:
+    def __init__(self, mode: ColorMode | None = None) -> None:
         self.mode = mode or _detect_color_mode()
 
     # ------------------------------------------------------------------ #
@@ -144,7 +142,7 @@ class ColorAdapter:
     # Quantization
     # ------------------------------------------------------------------ #
 
-    def _quantized_code(self, rgb: tuple[int, int, int]) -> Optional[int]:
+    def _quantized_code(self, rgb: tuple[int, int, int]) -> int | None:
         """Return ANSI color code for the given RGB, or None for NONE mode."""
         if self.mode == ColorMode.NONE:
             return None
@@ -188,7 +186,8 @@ def _nearest_256(rgb: tuple[int, int, int]) -> int:
     gray = int(round((r + g + b) / 3.0))
     gray_idx = _find_nearest_index(gray, _GRAYSCALE_LEVELS)
     gray_color = 232 + gray_idx
-    gray_rgb = (_GRAYSCALE_LEVELS[gray_idx],) * 3
+    gray_val = _GRAYSCALE_LEVELS[gray_idx]
+    gray_rgb = (gray_val, gray_val, gray_val)
     gray_dist = _color_distance(rgb, gray_rgb)
 
     return cube_color if cube_dist <= gray_dist else gray_color

@@ -145,8 +145,7 @@ class TestExecutor:
         assert mock_exec.call_args[0][:2] == ("echo", "hello world")
 
     def test_exec_parallel(self):
-        code = textwrap.dedent(
-            """\
+        code = textwrap.dedent("""\
             # -*- coding:utf-8 -*-
 
             if __name__ == '__main__':
@@ -155,8 +154,7 @@ class TestExecutor:
                 print({0}, end='')
                 time.sleep(int({0}) / 10)
                 print({0}, end='')
-            """
-        )
+            """)
 
         cmd = (
             "python"

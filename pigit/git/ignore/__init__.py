@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+
 from shutil import get_terminal_size
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from .template import IGNORE_TEMPLATE
 __all__ = ("get_ignore_source", "create_gitignore")
 
 
-def get_ignore_source(t: str) -> Optional[str]:
+def get_ignore_source(t: str) -> str | None:
     """Get gitignore source follow type."""
 
     return IGNORE_TEMPLATE.get(t)
@@ -16,7 +17,7 @@ def get_ignore_source(t: str) -> Optional[str]:
 def create_gitignore(
     t: str,
     file_name: str = ".gitignore",
-    dir_path: Optional[str] = None,
+    dir_path: str | None = None,
     writing: bool = True,
 ) -> tuple[int, str]:
     """Try to create a gitignore file.

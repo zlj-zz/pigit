@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_registry.py
 Description: Command registry core for cmd_new.
@@ -6,7 +5,8 @@ Author: Zev
 Date: 2026-04-10
 """
 
-from typing import Optional, Callable
+from __future__ import annotations
+
 from threading import Lock
 
 from ._models import CommandDef, CommandCategory, ValidationResult
@@ -16,8 +16,6 @@ from ._validators import CompositeValidator
 class RegistryError(Exception):
     """Registry operation error."""
 
-    pass
-
 
 class CommandRegistry:
     """Command registration center.
@@ -26,7 +24,7 @@ class CommandRegistry:
     register command definitions.
     """
 
-    _instance: "Optional[CommandRegistry]" = None
+    _instance: CommandRegistry | None = None
     _lock: Lock = Lock()
 
     def __new__(cls) -> "CommandRegistry":
@@ -100,7 +98,7 @@ class CommandRegistry:
 
         self._aliases[alias] = target
 
-    def get(self, name: str) -> Optional[CommandDef]:
+    def get(self, name: str) -> CommandDef | None:
         """Get command definition by name.
 
         Args:
@@ -111,7 +109,7 @@ class CommandRegistry:
         """
         return self._commands.get(name)
 
-    def get_all(self, category: Optional[CommandCategory] = None) -> list[CommandDef]:
+    def get_all(self, category: CommandCategory | None = None) -> list[CommandDef]:
         """Get all command definitions.
 
         Args:

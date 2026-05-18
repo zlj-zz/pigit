@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import os
 import textwrap
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from plenty import box
 from plenty.table import UintTable
 from plenty.style import Style
 
 from .const import __url__, __version__
-from .git import Repo, git_version
+from .git import LocalGit, git_version
 
 
 def introduce() -> str:
     """Print the description information."""
 
     # Print version.
-    introduce_str = textwrap.dedent(
-        """\
+    introduce_str = textwrap.dedent("""\
         ` ____ ___ ____ ___ _____
         |  _ \\_ _/ ___|_ _|_   _|
         | |_) | | |  _ | |  | |
@@ -31,8 +32,7 @@ def introduce() -> str:
         The open source path on github: u`{url}`<sky_blue>
 
         You can use `-h`<ok> or `--help`<ok> to get help and usage.
-        """
-    )
+        """)
 
     # Print git version.
     _git_version = git_version() or "`Don't found Git, maybe need install.`<error>"
@@ -46,10 +46,10 @@ def introduce() -> str:
 
 
 def show_gitconfig(
-    path: Optional[str] = None,
+    path: str | None = None,
     format_type: Literal["normal", "table"] = "table",
     color: bool = True,
-) -> Union[str, UintTable]:
+) -> str | UintTable:
     """Return git config info with format.
 
     Args:
@@ -58,7 +58,7 @@ def show_gitconfig(
         color (bool, optional): _description_. Defaults to True.
 
     """
-    repo_handle = Repo(path)
+    repo_handle = LocalGit(path=path)
     repo_path, _ = repo_handle.confirm_repo()
 
     if not repo_path:
@@ -78,7 +78,7 @@ def show_gitconfig(
         )
 
     if format_type == "table":
-        style: list[Union[str, "Style"]] = ["", "pale_green" if color else ""]
+        style: list[str | Style] = ["", "pale_green" if color else ""]
 
         tb = UintTable(title="Git Local Config", box=box.DOUBLE_EDGE)
         for header, values in config.items():

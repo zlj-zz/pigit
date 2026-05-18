@@ -1,26 +1,32 @@
-from typing import Any, Callable
+from __future__ import annotations
+
+import sys
+import time
+import contextlib
+import inspect
+from typing import Any
+from collections.abc import Callable
 from functools import wraps
-import time, contextlib, inspect
 
 
 def time_it(fn: Callable) -> Callable:
     """Print the overall running time.
     When recursive calls exist, only the outermost layer is printed.
     """
-    time_it.deep = 0  # Mark recursion levels.
+    _state = {"deep": 0}  # Mark recursion levels.
     time_unit = ["second", "minute", "hour"]
 
     @wraps(fn)
     def wrap(*args, **kwargs):
-        time_it.deep += 1
+        _state["deep"] += 1
         start_time = time.time()
         res = None
         with contextlib.suppress(SystemExit, EOFError):
             res = fn(*args, **kwargs)
-        time_it.deep -= 1
+        _state["deep"] -= 1
 
         # Indicates that the decorated method does not or end a recursive call.
-        if time_it.deep == 0:
+        if _state["deep"] == 0:
             used_time = time.time() - start_time
 
             # Do unit optimization.
@@ -31,7 +37,10 @@ def time_it(fn: Callable) -> Callable:
                     break
             else:
                 i = 2
-            print("\n# runtime: {0:.2f} {1}".format(used_time, time_unit[i]))
+            msg = f"# runtime: {used_time:.2f} {time_unit[i]}"
+            if sys.stdout.isatty():
+                msg = f"\033[2m{msg}\033[0m"
+            print(f"\n{msg}")
         return res
 
     return wrap

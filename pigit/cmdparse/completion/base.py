@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 """
 Module: pigit/cmdparse/completion/base.py
 Description: Base shell completion class.
@@ -6,15 +5,14 @@ Author: Zev
 Date: 2026-04-12
 """
 
+from __future__ import annotations
+
 import os
 import re
-from typing import Optional
 
 
 class ShellCompletionError(Exception):
     """ShellCompletion error class."""
-
-    pass
 
 
 class ShellCompletion:
@@ -37,10 +35,10 @@ class ShellCompletion:
 
     def __init__(
         self,
-        prog_name: Optional[str] = None,
-        complete_vars: Optional[dict] = None,
-        script_dir: Optional[str] = None,
-        script_name: Optional[str] = None,
+        prog_name: str | None = None,
+        complete_vars: dict | None = None,
+        script_dir: str | None = None,
+        script_name: str | None = None,
     ) -> None:
         """Initialize shell completion generator.
 
@@ -67,7 +65,7 @@ class ShellCompletion:
             raise ShellCompletionError("Can't get prog name anywhere.") from None
 
         self.script_dir = script_dir or "."
-        self.script_name = script_name or "{0}_{1}_comp".format(
+        self.script_name = script_name or "{}_{}_comp".format(
             self.prog_name, self.SHELL
         )
 
@@ -120,7 +118,7 @@ class ShellCompletion:
 
         return _arguments, _positions, _sub_opts
 
-    def generate_content(self):
+    def generate_content(self) -> str | dict[str, str]:
         """Generate script content.
 
         Process self.complete_var to generate completion script content part.

@@ -1,6 +1,7 @@
-# -*- coding:utf-8 -*-
 # The PIGIT terminal tool entry file.
+from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,16 @@ conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_war
 # ==============
 ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
+
+# auto_append: add current repo to managed repos on any command invocation.
+_confirm_result = ctx.local_git.confirm_repo()
+_repo_path = _confirm_result[0]
+if _repo_path and ctx.config.get().repo.auto_append:
+    try:
+        ctx.managed_repos.add_repos([_repo_path])
+    except Exception:
+        logging.debug("auto_append failed", exc_info=True)
+
 console = get_console()
 
 # =====================
@@ -46,7 +57,7 @@ console = get_console()
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def pigit(args: "Namespace", _) -> None:
+def _pigit_main(args: Namespace, _) -> None:
     if args.report:
         console.echo(introduce())
 
@@ -58,15 +69,14 @@ def pigit(args: "Namespace", _) -> None:
         console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
-        console.echo(ctx.repo.get_repo_desc(include_part=ctx.config.get().info.repo_include))
+        console.echo(ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include))
 
     elif args.complete:
         # Generate completion vars dict.
-        complete_vars = pigit.to_dict()
+        complete_vars = _pigit_main.to_dict()
 
         # Add cmd commands to completion with arg_completion metadata
         from .git.cmds import get_registry, register_user_commands
-        from .git.cmds._completion_types import CompletionType
         register_user_commands()
         registry = get_registry()
 
@@ -163,7 +173,7 @@ def pigit(args: "Namespace", _) -> None:
                     f"{f_num_str} `{f_change_str}`<{'#98fb98' if f_change_str.startswith('+') else '#ff6347'}>",
                     f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
                 )
-            tb.caption = " Total: {0}".format(total_size)
+            tb.caption = f" Total: {total_size}"
             console.echo(tb)
         else:
             print("Invalid display format!")
@@ -178,6 +188,7 @@ def pigit(args: "Namespace", _) -> None:
             handler.execute()
 
 # yapf: enable
+pigit = _pigit_main
 pigit.add_argument(
     "-v",
     "--version",
@@ -275,7 +286,7 @@ tools_group.add_argument(
     nargs="*",
     help="Command to execute with arguments.",
 )
-def _(args: "Namespace", _):
+def _(args: Namespace, _):
     """Execute short git commands."""
     from .handlers.cmd_handler import handle_cmd
 
@@ -314,6 +325,7 @@ def repo_rename(args, _):
 @repo.sub_parser("ll", help="display summary of all repos.")
 @argument("--simple", action="store_true", help="display simple summary.")
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
+@argument("filter", nargs="?", default="", help="filter repos by fuzzy name match.")
 def repo_ll(args, _):
     RepoCommandHandler(ctx.current()).ll(args)
 
@@ -338,15 +350,27 @@ def repo_report(args, _):
     dest="repo_cd_pick",
     help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
 )
-@argument(
-    "--pick-alt-screen",
-    action="store_true",
-    dest="repo_cd_pick_alt_screen",
-    help="Use alternate screen for the repo picker (with --pick).",
-)
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)
+
+
+@repo.sub_parser("mkbranch", help="batch create new branch across managed repos.")
+@argument("branch_name", help="name of the new branch.")
+@argument("repos", nargs="*", help="target repo names (interactive picker if omitted).")
+@argument(
+    "-c --checkout", action="store_true", help="checkout the new branch after creation."
+)
+@argument(
+    "-b --base", type=str, default=None, help="create from specified base branch."
+)
+@argument("-f --force", action="store_true", help="reset branch if already exists.")
+@argument("--dry-run", action="store_true", help="preview only, do not execute.")
+@argument(
+    "--filter-regex", type=str, default="", help="pre-filter repos in interactive mode."
+)
+def repo_mkbranch(args, _):
+    RepoCommandHandler(ctx.current()).mkbranch(args)
 
 
 repo_options = {
@@ -376,7 +400,7 @@ for sub_cmd, prop in repo_options.items():
 @argument("-c --commit", help="the current commit in the repo website.")
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
-def _(args: "Namespace", _):
+def _(args: Namespace, _):
     RepoCommandHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

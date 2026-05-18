@@ -1,12 +1,11 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import datetime
 import os
 import platform
 
-
 __project__ = "pigit"
-__version__ = "1.8.7"
+__version__ = "1.8.9"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 

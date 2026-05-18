@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import logging
 import os
@@ -8,7 +8,7 @@ from typing import Any
 try:
     import tomllib  # type: ignore
 except ImportError:
-    import tomli  # type: ignore
+    import tomli as tomllib  # type: ignore
 
 from .config_data import (
     ConfigData,
@@ -29,8 +29,7 @@ class ConfigError(Exception):
 class Config(metaclass=Singleton):
     """PIGIT configuration class."""
 
-    CONFIG_TEMPLATE: str = textwrap.dedent(
-        """\
+    CONFIG_TEMPLATE: str = textwrap.dedent("""\
         #? Config file for pigit v. {version}
 
         #  ____ ___ ____ ___ _____                            __ _
@@ -87,8 +86,7 @@ class Config(metaclass=Singleton):
 
         # (bool) Whether output log in terminal.
         output = {log_output}
-        """
-    )
+        """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
     _git_config_format_candidate: list[str] = ["normal", "table"]
@@ -140,10 +138,7 @@ class Config(metaclass=Singleton):
             ConfigData populated from the TOML file.
         """
         with open(path, "rb") as f:
-            try:
-                raw: dict[str, Any] = tomllib.load(f)
-            except NameError:
-                raw = tomli.load(f)
+            raw: dict[str, Any] = tomllib.load(f)
 
         version = raw.get("version", self.current_version)
 

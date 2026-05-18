@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Package: pigit.termui
 Description: Unified lightweight terminal UI framework.
@@ -10,30 +9,18 @@ Usage:
 from __future__ import annotations
 
 # Types and enums
-from pigit.termui.types import (
+from .types import (
     ActionEventType,
     LayerKind,
     OverlayDispatchResult,
-    OverlaySurface,
-    SurfaceProtocol,
     ToastPosition,
 )
 
 # Core components
-from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_layouts import Column, Row, TabView
-from pigit.termui._component_graph import HeatmapGrid, StepLineChart
-from pigit.termui._component_widgets import (
-    Header,
-    InputLine,
-    ItemSelector,
-    LineTextBrowser,
-    StatusBar,
-)
-from pigit.termui._reactive import Computed, Signal
+from ._component import Component, ComponentError, bind_signals
 
 # Overlay components
-from pigit.termui._overlay_components import (
+from .widgets import (
     AlertDialog,
     AlertDialogBody,
     HelpEntry,
@@ -44,63 +31,48 @@ from pigit.termui._overlay_components import (
 )
 
 # Event loop
-from pigit.termui.event_loop import ExitEventLoop
+from .event_loop import ExitEventLoop
 
 # Root and application
-from pigit.termui._root import ComponentRoot
-from pigit.termui._application import Application
+from ._root import ComponentRoot
+from ._application import Application
 
-# Overlay context (module-level functions)
-from pigit.termui._overlay_context import (
+# Runtime context — single source of truth for all context state
+from ._runtime_context import (
+    by_id,
     dismiss_sheet,
+    exec_external,
     get_badge,
+    get_badge_signal,
+    get_registry,
+    get_renderer_strict,
     hide_spinner,
     show_badge,
+    show_sheet,
     show_spinner,
     show_toast,
-    show_sheet,
 )
-from pigit.termui._session_context import exec_external
 
 # Other utilities
-from pigit.termui._bindings import bind_keys, BindingError, list_bindings
-from pigit.termui import keys
-from pigit.termui._geometry import TerminalSize
-from pigit.termui._color import ColorAdapter, ColorMode
-from pigit.termui._renderer import Renderer
-from pigit.termui._renderer_context import get_renderer_strict
-from pigit.termui._surface import Cell, FlatCell, Surface
-from pigit.termui._segment import Segment
-from pigit.termui import palette
+from ._bindings import bind_keys, BindingError, list_bindings
+from . import keys
+from ._renderer import Renderer
+from ._surface import Surface
+from ._segment import Segment
+from . import palette
 
-# Picker
-from pigit.termui._picker import PickerRow
-from pigit.termui._syntax import SyntaxTokenizer
-from pigit.termui._text import plain
+from ._syntax import SyntaxTokenizer
 
 __all__ = [
     # Types
     "ActionEventType",
     "LayerKind",
     "OverlayDispatchResult",
-    "OverlaySurface",
-    "SurfaceProtocol",
     "ToastPosition",
     # Core
     "Component",
     "ComponentError",
-    # Containers
-    "TabView",
-    "Column",
-    "Row",
-    # Widgets
-    "Header",
-    "HeatmapGrid",
-    "InputLine",
-    "StepLineChart",
-    "ItemSelector",
-    "LineTextBrowser",
-    "StatusBar",
+    "bind_signals",
     # Overlays
     "AlertDialog",
     "AlertDialogBody",
@@ -113,37 +85,30 @@ __all__ = [
     "ComponentRoot",
     "Application",
     "ExitEventLoop",
-    # Reactive
-    "Computed",
-    "Signal",
+    # Registry
+    "by_id",
+    "get_registry",
     # Utils
     "bind_keys",
     "BindingError",
     "list_bindings",
     "keys",
     "Surface",
-    "FlatCell",
-    "Cell",
     "Segment",
     "palette",
-    "ColorAdapter",
-    "ColorMode",
     "Renderer",
     "get_renderer_strict",
-    "TerminalSize",
     # Overlay context
     "show_toast",
     "show_sheet",
     "dismiss_sheet",
     "show_badge",
     "get_badge",
+    "get_badge_signal",
     "show_spinner",
     "hide_spinner",
     # Session context
     "exec_external",
     # Syntax highlighting
     "SyntaxTokenizer",
-    "plain",
-    # Picker
-    "PickerRow",
 ]

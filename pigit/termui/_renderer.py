@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_renderer.py
 Description: Session-bound Renderer for ANSI drawing (1-based row/column).
@@ -8,7 +7,8 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from . import palette
 from ._color import ColorAdapter
@@ -26,12 +26,12 @@ class Renderer:
     (``Session.renderer``).
     """
 
-    def __init__(self, session: "Session") -> None:
+    def __init__(self, session: Session) -> None:
         self._out = session.stdout
-        self._prev_frame: Optional[list[str]] = None
-        self._prev_size: Optional[tuple[int, int]] = None
-        self._cursor_pos: Optional[tuple[int, int]] = None
-        self._last_cursor: Optional[tuple[int, int]] = None
+        self._prev_frame: list[str] | None = None
+        self._prev_size: tuple[int, int] | None = None
+        self._cursor_pos: tuple[int, int] | None = None
+        self._last_cursor: tuple[int, int] | None = None
         self._cursor_visible: bool = False
         self._color = ColorAdapter()
 
@@ -145,54 +145,8 @@ class Renderer:
     # Row rendering (FlatCell-aware)
     # ------------------------------------------------------------------ #
 
-    def _row_to_str(self, row: list["FlatCell"]) -> str:
-        """Convert a row of FlatCells to an ANSI string.
-
-        Dispatches to specialized handlers based on whether the row contains
-        legacy ``ansi_style`` cells, RGB cells, or a mix.
-        """
-        # Determine if any cell actually uses RGB features (non-default colors/bold)
-        has_rgb = any(
-            cell.char != ""
-            and cell.ansi_style is None
-            and (
-                cell.fg != palette.DEFAULT_FG
-                or cell.bg != palette.DEFAULT_BG
-                or cell.style_flags
-            )
-            for cell in row
-        )
-        has_legacy = any(
-            cell.char != "" and cell.ansi_style is not None for cell in row
-        )
-
-        if not has_rgb:
-            # All cells are legacy or plain default — use legacy renderer
-            return self._row_to_str_legacy(row)
-        if not has_legacy:
-            return self._row_to_str_rgb(row)
-        return self._row_to_str_mixed(row)
-
-    def _row_to_str_legacy(self, row: list["FlatCell"]) -> str:
-        """Render a row where every cell uses legacy ``ansi_style``."""
-        parts = []
-        last_style = ""
-        for cell in row:
-            if cell.char == "":
-                continue
-            if cell.ansi_style != last_style:
-                if last_style:
-                    parts.append("\033[0m")
-                if cell.ansi_style:
-                    parts.append(cell.ansi_style)
-                last_style = cell.ansi_style
-            parts.append(cell.char)
-        if last_style:
-            parts.append("\033[0m")
-        return "".join(parts)
-
-    def _row_to_str_rgb(self, row: list["FlatCell"]) -> str:
-        """Render a row where cells use RGB attributes."""
+    def _row_to_str(self, row: list[FlatCell]) -> str:
+        """Convert a row of FlatCells to an ANSI string."""
         parts = []
         last_fg = palette.DEFAULT_FG
         last_bg = palette.DEFAULT_BG
@@ -229,74 +183,7 @@ class Renderer:
             parts.append(self._color.reset_sequence())
         return "".join(parts)
 
-    def _row_to_str_mixed(self, row: list["FlatCell"]) -> str:
-        """Render a row containing both legacy and RGB cells."""
-        parts = []
-        in_legacy = False
-        last_fg = palette.DEFAULT_FG
-        last_bg = palette.DEFAULT_BG
-        last_style = 0
-
-        for cell in row:
-            if cell.char == "":
-                continue
-
-            if cell.ansi_style is not None:
-                # Legacy cell
-                if not in_legacy:
-                    # Transition from RGB to legacy
-                    if (
-                        last_fg != palette.DEFAULT_FG
-                        or last_bg != palette.DEFAULT_BG
-                        or last_style
-                    ):
-                        parts.append(self._color.reset_sequence())
-                        last_fg = palette.DEFAULT_FG
-                        last_bg = palette.DEFAULT_BG
-                        last_style = 0
-                in_legacy = True
-                parts.append(cell.ansi_style)
-                parts.append(cell.char)
-            else:
-                # RGB cell
-                if in_legacy:
-                    # Transition from legacy to RGB: reset terminal state
-                    parts.append(self._color.reset_sequence())
-                    in_legacy = False
-                    last_fg = palette.DEFAULT_FG
-                    last_bg = palette.DEFAULT_BG
-                    last_style = 0
-
-                sgr_parts = []
-                if cell.fg != last_fg:
-                    if cell.fg == palette.DEFAULT_FG:
-                        sgr_parts.append("\033[39m")
-                    else:
-                        sgr_parts.append(self._color.fg_sequence(cell.fg))
-                    last_fg = cell.fg
-                if cell.bg != last_bg:
-                    if cell.bg == palette.DEFAULT_BG:
-                        sgr_parts.append("\033[49m")
-                    else:
-                        sgr_parts.append(self._color.bg_sequence(cell.bg))
-                    last_bg = cell.bg
-                if cell.style_flags != last_style:
-                    if last_style:
-                        sgr_parts.append(self._color.reset_style_sequence())
-                    if cell.style_flags:
-                        sgr_parts.append(self._color.style_sequence(cell.style_flags))
-                    last_style = cell.style_flags
-
-                parts.extend(sgr_parts)
-                parts.append(cell.char)
-
-        # Only emit trailing reset if last active styling is non-default
-        if last_fg != palette.DEFAULT_FG or last_bg != palette.DEFAULT_BG or last_style:
-            parts.append(self._color.reset_sequence())
-
-        return "".join(parts)
-
-    def render_surface(self, surface: "Surface") -> None:
+    def render_surface(self, surface: Surface) -> None:
         """Draw a full Surface to the terminal using row-level diff."""
         lines = [self._row_to_str(row) for row in surface.rows()]
         curr_size = (surface.width, surface.height)
@@ -318,7 +205,9 @@ class Renderer:
                 # redundant on this path anyway.
                 self._out.write(line)
         else:
-            for idx, (old, new) in enumerate(zip(self._prev_frame, lines), start=1):
+            for idx, (old, new) in enumerate(
+                zip(self._prev_frame, lines, strict=True), start=1
+            ):
                 if old != new:
                     self.move_cursor(idx, 1)
                     self._out.write(self._color.reset_sequence())

@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 """Global executor selection for subprocess-backed git and helpers.
 
 Production uses :class:`LocalExecutor` (subclass of :class:`~pigit.ext.executor.Executor`).
@@ -10,11 +9,14 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, Optional, Union
+from typing import Any
+from collections.abc import Iterator
+
+from typing import cast
 
 from .executor import DECODE, Executor, ExecResult, REPLY
 
-CmdT = Union[str, list[Any], tuple[Any, ...]]
+CmdT = str | list[Any] | tuple[Any, ...]
 
 
 class ExecutorStrategy(ABC):
@@ -27,9 +29,9 @@ class ExecutorStrategy(ABC):
     def exec_parallel(
         self,
         *cmds: CmdT,
-        orders: Optional[list[dict[str, Any]]] = None,
+        orders: list[dict[str, Any]] | None = None,
         flags: int = 0,
-        max_concurrent: Optional[int] = None,
+        max_concurrent: int | None = None,
         **kws: Any,
     ) -> list[ExecResult]: ...
 
@@ -40,7 +42,7 @@ class ExecutorStrategy(ABC):
             return
         if not out:
             return
-        yield from out.splitlines()
+        yield from cast(str, out).splitlines()
 
 
 class LocalExecutor(Executor, ExecutorStrategy):
@@ -58,7 +60,7 @@ class MockExecutor(ExecutorStrategy):
 
     def __init__(
         self,
-        responses: Optional[dict[str, ExecResult]] = None,
+        responses: dict[str, ExecResult] | None = None,
         default: ExecResult = (0, "", ""),
     ) -> None:
         self.responses = dict(responses) if responses else {}
@@ -67,9 +69,9 @@ class MockExecutor(ExecutorStrategy):
         self.parallel_calls: list[
             tuple[
                 tuple[CmdT, ...],
-                Optional[list[dict[str, Any]]],
+                list[dict[str, Any]] | None,
                 int,
-                Optional[int],
+                int | None,
                 dict[str, Any],
             ]
         ] = []
@@ -84,9 +86,9 @@ class MockExecutor(ExecutorStrategy):
     def exec_parallel(
         self,
         *cmds: CmdT,
-        orders: Optional[list[dict[str, Any]]] = None,
+        orders: list[dict[str, Any]] | None = None,
         flags: int = 0,
-        max_concurrent: Optional[int] = None,
+        max_concurrent: int | None = None,
         **kws: Any,
     ) -> list[ExecResult]:
         self.parallel_calls.append((cmds, orders, flags, max_concurrent, dict(kws)))
@@ -101,14 +103,14 @@ class MockExecutor(ExecutorStrategy):
 
 
 class ExecutorFactory:
-    _instance: Optional[ExecutorStrategy] = None
+    _instance: ExecutorStrategy | None = None
 
     @classmethod
     def reset(cls) -> None:
         cls._instance = None
 
     @classmethod
-    def set_strategy(cls, strategy: Optional[ExecutorStrategy]) -> None:
+    def set_strategy(cls, strategy: ExecutorStrategy | None) -> None:
         """Replace the global executor; ``None`` clears so next ``get()`` builds default."""
         cls._instance = strategy
 

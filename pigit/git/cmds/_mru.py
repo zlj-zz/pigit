@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_mru.py
 Description: Most-recently-used command persistence for cmd picker.
@@ -6,15 +5,15 @@ Author: Zev
 Date: 2026-04-14
 """
 
+from __future__ import annotations
+
 import json
-import os
 from pathlib import Path
-from typing import Union
 
 from ...const import CMD_MRU_PATH
 
 
-def load_mru(path: Union[str, Path] = CMD_MRU_PATH) -> list[str]:
+def load_mru(path: str | Path = CMD_MRU_PATH) -> list[str]:
     """Load MRU command list from JSON file.
 
     Args:
@@ -24,7 +23,7 @@ def load_mru(path: Union[str, Path] = CMD_MRU_PATH) -> list[str]:
         List of command short names in MRU order
     """
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, list):
                 return [str(item) for item in data if isinstance(item, str)]
@@ -33,7 +32,7 @@ def load_mru(path: Union[str, Path] = CMD_MRU_PATH) -> list[str]:
     return []
 
 
-def save_mru(names: list[str], path: Union[str, Path] = CMD_MRU_PATH) -> None:
+def save_mru(names: list[str], path: str | Path = CMD_MRU_PATH) -> None:
     """Save MRU command list to JSON file.
 
     Args:
@@ -50,7 +49,7 @@ def save_mru(names: list[str], path: Union[str, Path] = CMD_MRU_PATH) -> None:
 
 
 def record_command_use(
-    name: str, max_size: int = 20, path: Union[str, Path] = CMD_MRU_PATH
+    name: str, max_size: int = 20, path: str | Path = CMD_MRU_PATH
 ) -> None:
     """Record a command use in the MRU list.
 

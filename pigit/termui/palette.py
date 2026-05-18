@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/palette.py
 Description: Default terminal color palette constants.
@@ -7,7 +6,6 @@ Date: 2026-04-27
 """
 
 from __future__ import annotations
-
 
 PEARL: tuple[int, int, int] = (220, 220, 230)
 SLATE: tuple[int, int, int] = (120, 120, 130)
@@ -25,6 +23,11 @@ DIM: tuple[int, int, int] = (100, 100, 100)
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK
+
+# ── Row state backgrounds (widgets) ──
+BG_HOVER: tuple[int, int, int] = (42, 45, 46)
+BG_ACTIVE: tuple[int, int, int] = (40, 45, 55)
+BG_DANGER_ROW: tuple[int, int, int] = (55, 35, 35)
 
 # ── Style flags (bitmask) ──
 STYLE_BOLD = 1 << 0

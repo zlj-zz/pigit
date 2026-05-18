@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_bindings.py
 Description: Resolve declarative ``BINDINGS`` and ``@bind_keys`` into key handlers.
@@ -12,9 +11,10 @@ Decorator metadata is read after the class body completes; runtime mutation of
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any
+from collections.abc import Callable, Sequence
 
-BindingTarget = Union[str, Callable[[], Any]]
+BindingTarget = str | Callable[[], Any]
 BindingEntry = tuple[str, BindingTarget]
 BindingsList = list[BindingEntry]
 
@@ -28,10 +28,10 @@ class BindingError(TypeError):
         self,
         message: str,
         *,
-        semantic_key: Optional[str] = None,
-        first_target: Optional[str] = None,
-        second_target: Optional[str] = None,
-        owner_class_name: Optional[str] = None,
+        semantic_key: str | None = None,
+        first_target: str | None = None,
+        second_target: str | None = None,
+        owner_class_name: str | None = None,
     ) -> None:
         super().__init__(message)
         self.semantic_key = semantic_key
@@ -51,24 +51,28 @@ def bind_keys(*semantic_keys: str) -> Callable[[Any], Any]:
 
 
 def collect_decorator_bindings(cls: type) -> BindingsList:
-    """Collect ``(key, method_name)`` from ``@bind_keys`` in class definition order."""
+    """Collect ``(key, method_name)`` from ``@bind_keys`` across the MRO.
+
+    Parent class bindings are collected before subclass bindings, so
+    overrides in subclasses are discovered naturally.
+    """
 
     out: BindingsList = []
-    for name in cls.__dict__:
-        obj = cls.__dict__[name]
-        keys = getattr(obj, _PIGIT_BINDING_ATTR, None)
-        if not keys:
-            continue
-        if not isinstance(keys, tuple):
-            continue
-        for semantic_key in keys:
-            out.append((semantic_key, name))
+    for klass in reversed(cls.__mro__[:-1]):  # exclude object
+        for name, obj in klass.__dict__.items():
+            keys = getattr(obj, _PIGIT_BINDING_ATTR, None)
+            if not keys:
+                continue
+            if not isinstance(keys, tuple):
+                continue
+            for semantic_key in keys:
+                out.append((semantic_key, name))
     return out
 
 
 def merge_binding_entries(
     decorator_entries: BindingsList,
-    class_bindings: Optional[Sequence[BindingEntry]],
+    class_bindings: Sequence[BindingEntry] | None,
 ) -> BindingsList:
     """Order: decorator-expanded entries first, then ``cls.BINDINGS``."""
 
@@ -122,7 +126,7 @@ def _resolve_one_target(
 
 def resolve_key_handlers(
     owner: object,
-    bindings: Optional[Sequence[BindingEntry]],
+    bindings: Sequence[BindingEntry] | None,
 ) -> dict[str, Callable[..., Any]]:
     """
     Build ``semantic_key -> callable`` from a declarative binding list.
@@ -141,7 +145,7 @@ def resolve_key_handlers(
 def resolve_key_handlers_merged(
     owner: object,
     cls: type,
-    bindings: Optional[Sequence[BindingEntry]],
+    bindings: Sequence[BindingEntry] | None,
 ) -> dict[str, Callable[..., Any]]:
     """
     Merge ``@bind_keys`` metadata with ``BINDINGS``, then resolve to callables.

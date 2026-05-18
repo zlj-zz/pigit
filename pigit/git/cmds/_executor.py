@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_executor.py
 Description: Command execution helpers for GitCommandNew.
@@ -6,10 +5,12 @@ Author: Zev
 Date: 2026-04-15
 """
 
+from __future__ import annotations
+
 import os
 import string
 import subprocess
-from typing import Callable, Union
+from collections.abc import Callable
 
 from ._models import ScriptConfig
 from ._registry import CommandRegistry
@@ -19,7 +20,7 @@ SHELL_COMMAND_PREFIX = "!:"
 
 
 def _execute_handler(
-    handler: Union[str, Callable, ScriptConfig],
+    handler: str | Callable | ScriptConfig,
     args: list[str],
     executor: SecureExecutor,
     execute_step: Callable[[str, list[str]], tuple[int, str]],

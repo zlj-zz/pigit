@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_commit.py
 Description: CommitPanel v3 with list view, relative time, and inline merge graph.
@@ -10,19 +9,20 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum, auto
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
     ActionEventType,
     bind_keys,
-    Component,
-    ItemSelector,
     keys,
     palette,
     Segment,
     show_toast,
 )
+from pigit.termui._async_task import AsyncTask
+from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_commit_graph import GraphRow, compute_graph_rows
@@ -94,7 +94,7 @@ class _SubRow(Enum):
     TAIL = auto()  # blank trailer between commits
 
 
-class CommitPanel(ItemSelector):
+class CommitPanel(ItemList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
     CURSOR = "●"
@@ -113,19 +113,21 @@ class CommitPanel(ItemSelector):
     def __init__(
         self,
         *,
-        display: Optional[Component] = None,
-        on_selection_changed: Optional[Callable] = None,
-        git: "LocalGit",
+        on_selection_changed: Callable | None = None,
+        git: LocalGit,
+        id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
+            id=id,
         )
         self.git = git
+        self._loader = AsyncTask()
+
         self.commits: list[Commit] = []
         self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
-        self._display = display
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
@@ -133,7 +135,7 @@ class CommitPanel(ItemSelector):
         self._remotes: tuple[str, ...] = ()
         self._refs_cache: dict[str, tuple[str, list[str], list[str]]] = {}
         self._expanded = False
-        self._bodies: Optional[dict[str, str]] = None
+        self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
 
     @bind_keys("j", keys.KEY_DOWN)
@@ -183,14 +185,14 @@ class CommitPanel(ItemSelector):
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for commit panel."""
         return [
-            ("j/k", "Navigate"),
+            ("jk/↑↓", "Navigate"),
             ("Enter", "View"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),
             ("y", "Copy SHA"),
         ]
 
-    def _current_commit(self) -> Optional["Commit"]:
+    def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""
         if not self.commits:
             return None
@@ -198,7 +200,7 @@ class CommitPanel(ItemSelector):
             return self.commits[self.curr_no]
         return None
 
-    def get_inspector_data(self) -> Optional[CommitInfo]:
+    def get_inspector_data(self) -> CommitInfo | None:
         """Return inspector data for the currently selected commit."""
         c = self._current_commit()
         if c is None:
@@ -215,9 +217,30 @@ class CommitPanel(ItemSelector):
 
     def refresh(self) -> None:
         branch_name = self.git.get_head() or ""
-        self.commits = commits = self.git.load_commits(branch_name)
+        self._loader.start(
+            lambda: self._load_commit_data(branch_name),
+            self._on_commits_loaded,
+        )
+
+    def _load_commit_data(
+        self, branch_name: str
+    ) -> tuple[list[Commit], list[GraphRow], tuple[str, ...]]:
+        """Synchronous data load executed on a background thread."""
+        commits = self.git.load_commits(branch_name)
+        remotes = tuple(self.git.get_remotes())
+        graph_rows = compute_graph_rows(commits) if commits else []
+        return commits, graph_rows, remotes
+
+    def _on_commits_loaded(
+        self,
+        payload: tuple[list[Commit], list[GraphRow], tuple[str, ...]],
+    ) -> None:
+        if not self.is_activated():
+            return
+        commits, graph_rows, remotes = payload
+        self.commits = commits
         self._contrib_graph.set_commits(commits)
-        self._remotes = tuple(self.git.get_remotes())
+        self._remotes = remotes
         self._refs_cache.clear()
         self._bodies = None
         self._body_lines_cache.clear()
@@ -226,7 +249,7 @@ class CommitPanel(ItemSelector):
             self._max_meta_w = 0
             self._graph_rows = []
             return
-        self._graph_rows = compute_graph_rows(commits)
+        self._graph_rows = graph_rows
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
         for commit in commits:
@@ -238,6 +261,10 @@ class CommitPanel(ItemSelector):
             self._ensure_bodies()
         self._rebuild_rows()
 
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._loader.cancel()
+
     def _ensure_bodies(self) -> None:
         if self._bodies is not None or not self.commits:
             return
@@ -245,7 +272,7 @@ class CommitPanel(ItemSelector):
         self._bodies = self.git.get_commit_bodies(branch_name)
         self._body_lines_cache.clear()
 
-    def _body_lines(self, commit: "Commit") -> list[str]:
+    def _body_lines(self, commit: Commit) -> list[str]:
         """Return body lines for ``commit`` (subject excluded), cached per-sha."""
         cached = self._body_lines_cache.get(commit.sha)
         if cached is not None:
@@ -306,7 +333,7 @@ class CommitPanel(ItemSelector):
             lines.extend([""] * len(self._schema_for(commit)))
         return lines, starts
 
-    def _schema_for(self, commit: "Commit") -> list[tuple[_SubRow, int]]:
+    def _schema_for(self, commit: Commit) -> list[tuple[_SubRow, int]]:
         """Pure function of ``(commit.is_merge, len(body_lines))``.
 
         Cheap to recompute since ``_body_lines`` is cached; returning a fresh
@@ -325,7 +352,7 @@ class CommitPanel(ItemSelector):
         schema.append((_SubRow.TAIL, 0))
         return schema
 
-    def _format_compact(self, commit: "Commit") -> str:
+    def _format_compact(self, commit: Commit) -> str:
         """Plain-text used for ``set_content`` width measurements; rich
         rendering is produced by ``describe_row``."""
         msg = commit.msg
@@ -349,7 +376,7 @@ class CommitPanel(ItemSelector):
         idx: int,
         is_cursor: bool,
         *,
-        item_idx: Optional[int] = None,
+        item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[
         list[Segment],
@@ -392,7 +419,7 @@ class CommitPanel(ItemSelector):
 
     def _describe_compact(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         is_cursor: bool,
         focused: bool,
@@ -414,7 +441,7 @@ class CommitPanel(ItemSelector):
 
     def _commit_left_main(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         is_cursor: bool,
         focused: bool,
@@ -451,7 +478,7 @@ class CommitPanel(ItemSelector):
 
     def _describe_sub_row(
         self,
-        commit: "Commit",
+        commit: Commit,
         item_idx: int,
         kind: _SubRow,
         payload: int,
@@ -511,7 +538,7 @@ class CommitPanel(ItemSelector):
 
     def _ref_segments(
         self,
-        commit: "Commit",
+        commit: Commit,
         *,
         focused: bool,
         cursor_flags: int,
@@ -539,7 +566,7 @@ class CommitPanel(ItemSelector):
             entries.append(
                 [
                     Segment("HEAD", fg=head_fg, style_flags=cursor_flags),
-                    Segment("->", fg=arrow_fg, style_flags=cursor_flags),
+                    Segment(" -> ", fg=arrow_fg, style_flags=cursor_flags),
                     Segment(head_ref, fg=local_fg, style_flags=cursor_flags),
                 ]
             )
@@ -563,7 +590,7 @@ class CommitPanel(ItemSelector):
     def _render_rails(
         self,
         row: GraphRow,
-        commit: Optional["Commit"],
+        commit: Commit | None,
         *,
         sub: bool = False,
         cursor_flags: int,
@@ -593,6 +620,7 @@ class CommitPanel(ItemSelector):
 
         total_lanes = max(len(row.lanes_before), len(row.lanes_after))
         segments = []
+        assert commit is not None
         for i in range(total_lanes):
             ch, fg = self._lane_glyph(row, i, commit, focused=focused)
             segments.append(Segment(ch + " ", fg=fg, style_flags=cursor_flags))
@@ -602,7 +630,7 @@ class CommitPanel(ItemSelector):
         self,
         row: GraphRow,
         i: int,
-        commit: "Commit",
+        commit: Commit,
         *,
         focused: bool,
     ) -> tuple[str, tuple[int, int, int]]:
@@ -650,7 +678,7 @@ class CommitPanel(ItemSelector):
             content = self.git.load_commit_info(commit.sha, plain=True).split("\n")
             self.emit(
                 ActionEventType.goto,
-                target=self._display,
+                target="diff",
                 source=self,
                 content=content,
             )

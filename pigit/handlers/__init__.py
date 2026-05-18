@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 from .base_handler import BaseHandler
 from .cmd_handler import CmdHandler

@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import json
 import logging
@@ -6,17 +6,32 @@ import os
 import pprint
 from collections import Counter
 from pathlib import Path
-from typing import Generator, Optional
+from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
-from pigit.termui._picker import PickerRow
+from pigit.picker_app import PickerRow
 
 
 def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     """Return managed repo names sorted by Unicode code points (stable across platforms)."""
 
     return sorted(repos.keys())
+
+
+def _fuzzy_match(text: str, query: str) -> bool:
+    """Check if all characters of `query` appear in `text` in order (case-insensitive)."""
+    if not query:
+        return True
+    text = text.lower()
+    query = query.lower()
+    idx = 0
+    for ch in query:
+        idx = text.find(ch, idx)
+        if idx == -1:
+            return False
+        idx += 1
+    return True
 
 
 class ManagedRepos:
@@ -37,8 +52,8 @@ class ManagedRepos:
     def __init__(
         self,
         executor: Executor,
-        repo_json_path: Optional[str] = None,
-        log: Optional[logging.Logger] = None,
+        repo_json_path: str | None = None,
+        log: logging.Logger | None = None,
     ) -> None:
         self.executor = executor
         self.log = log
@@ -46,6 +61,15 @@ class ManagedRepos:
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
         self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
+        self._local_git = None
+
+    @property
+    def _git(self):
+        if self._local_git is None:
+            from .local_git import LocalGit
+
+            self._local_git = LocalGit(executor=self.executor, log=self.log)
+        return self._local_git
 
     @staticmethod
     def _make_repo_name(path: str, repos: dict[str, str], name_counts: Counter) -> str:
@@ -72,17 +96,17 @@ class ManagedRepos:
     def load_repos(self) -> dict:
         """Load repos info from cache file."""
 
-        if not self.repo_json_path.is_file():
+        try:
+            with self.repo_json_path.open(mode="r") as fp:
+                return json.load(fp)
+        except (FileNotFoundError, json.JSONDecodeError):
             return {}
-
-        with self.repo_json_path.open(mode="r") as fp:
-            return json.load(fp)
 
     def dump_repos(self, repos: dict) -> bool:
         """Dump repos info to cache file, re-write mode."""
 
         try:
-            with self.repo_json_path.open(mode="w+") as fp:
+            with self.repo_json_path.open(mode="w") as fp:
                 json.dump(repos, fp, indent=2)
                 return True
         except Exception as e:
@@ -126,7 +150,7 @@ class ManagedRepos:
         )
 
         report_dict = {}
-        for (repo_name, _prop), (_code, _err, resp) in zip(items, results):
+        for (repo_name, _prop), (_code, _err, resp) in zip(items, results, strict=True):
             commits = []
             for line in (resp or "").split("\n"):
                 if line == "":
@@ -141,13 +165,17 @@ class ManagedRepos:
             report_dict[repo_name] = commits
         pprint.pprint(report_dict)
 
-    def ll_repos(self, reverse: bool = False) -> Generator[list[tuple], None, None]:
+    def ll_repos(
+        self, reverse: bool = False, filter_query: str = ""
+    ) -> Generator[list[tuple], None, None]:
         exist_repos = self.load_repos()
 
         for repo_name in iter_managed_repo_names(exist_repos):
+            if filter_query and not _fuzzy_match(repo_name, filter_query):
+                continue
             prop = exist_repos[repo_name]
             repo_path = prop["path"]
-            head = self.get_head(repo_path)
+            head = self._git.get_head(repo_path)
 
             # jump invalid repo.
             if head is None:
@@ -169,16 +197,22 @@ class ManagedRepos:
                     flags=REPLY | DECODE,
                     cwd=repo_path,
                 )
-                commit_hash = self.get_first_pushed_commit(
+                commit_hash = self._git.get_first_pushed_commit(
                     path=repo_path, branch_name=head
                 )
-                commit = self.load_log(
+                commit = self._git.load_log(
                     limit=1,
-                    arg_str="--format='%s (%cd)||%C(auto)%d%n' --date=relative --color",
+                    arg_str="--format='%s (%cd)||%C(auto)%d||%an <%ae>%n' --date=relative --color",
                     path=repo_path,
                 )
 
-                commit_msg, branch_status = commit.strip().split("||")
+                if "||" in commit:
+                    parts = commit.strip().split("||")
+                    commit_msg = parts[0]
+                    branch_status = parts[1] if len(parts) > 1 else ""
+                    author = parts[2] if len(parts) > 2 else ""
+                else:
+                    commit_msg, branch_status, author = commit.strip() or "", "", ""
                 unstaged_symbol = "*" if unstaged else " "
                 staged_symbol = "+" if staged else " "
                 untracked_symbol = "?" if untracked else " "
@@ -192,6 +226,7 @@ class ManagedRepos:
                     ("Status", branch_status),
                     ("Commit Hash", commit_hash),
                     ("Commit Msg", commit_msg),
+                    ("Author", author),
                     ("Local Path", repo_path),
                 ]
 
@@ -210,7 +245,7 @@ class ManagedRepos:
 
         new_git_paths = []
         for path in paths:
-            repo_path, _ = self.confirm_repo(path)
+            repo_path, _ = self._git.confirm_repo(path)
             if repo_path and repo_path not in exist_paths_set:
                 new_git_paths.append(repo_path)
 
@@ -244,7 +279,7 @@ class ManagedRepos:
             del exist_repos[repo]
 
         self.dump_repos(exist_repos)
-        return list(zip(del_repos, del_paths))
+        return list(zip(del_repos, del_paths, strict=True))
 
     def rename_repo(self, repo: str, name: str) -> tuple[bool, str]:
         """Rename repo
@@ -275,11 +310,10 @@ class ManagedRepos:
 
     def cd_repo(
         self,
-        repo: Optional[str] = None,
+        repo: str | None = None,
         *,
         pick: bool = False,
-        pick_alt_screen: bool = False,
-    ) -> tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         """Quick jump to repo dir.
 
         Args:
@@ -314,7 +348,6 @@ class ManagedRepos:
                 rows,
                 self.executor,
                 initial_filter=initial_filter,
-                pick_alt_screen=pick_alt_screen,
             )
 
         if repo is not None and repo in exist_repos:
@@ -338,7 +371,7 @@ class ManagedRepos:
             print("Error: index need input a number.")
         return 0, None
 
-    def process_repos_option(self, repos: Optional[list[str]], cmd: str):
+    def process_repos_option(self, repos: list[str] | None, cmd: str):
         exist_repos = self.load_repos()
         print(f":: {cmd}\n")
 
@@ -361,3 +394,159 @@ class ManagedRepos:
 
         for _, prop in exist_repos.items():
             self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
+
+    def branch_new_repos(
+        self,
+        branch_name: str,
+        repos: list[str] | None = None,
+        *,
+        checkout: bool = False,
+        base: str | None = None,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+        """Batch create new branches across managed repos.
+
+        Returns:
+            (all_ok, blockers, results)
+            - all_ok: bool, whether pre-flight passed and execution succeeded.
+            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - results: list of (repo_name, exit_code, stderr_or_none) from execution.
+              Empty if pre-flight failed or dry_run.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos:
+            return True, [], []
+
+        blockers = self._branch_new_preflight(
+            target_repos, branch_name, checkout=checkout, base=base, force=force
+        )
+        if blockers:
+            return False, blockers, []
+
+        if dry_run:
+            return True, [], []
+
+        results = self._branch_new_execute(
+            target_repos, branch_name, checkout=checkout, base=base, force=force
+        )
+        return True, [], results
+
+    def _branch_new_preflight(
+        self,
+        target_repos: dict[str, dict],
+        branch_name: str,
+        *,
+        checkout: bool,
+        base: str | None,
+        force: bool,
+    ) -> list[tuple[str, str]]:
+        """Run three-phase pre-flight checks in parallel."""
+        blockers: list[tuple[str, str]] = []
+        repo_items = list(target_repos.items())
+
+        # 1. validity check
+        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
+        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        validity_results = self.executor.exec_parallel(
+            *validity_cmds,
+            orders=validity_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        valid_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, _out) in zip(
+            repo_items, validity_results, strict=True
+        ):
+            if code != 0:
+                blockers.append((name, "invalid repo"))
+            else:
+                valid_repos[name] = prop
+
+        if not valid_repos:
+            return blockers
+
+        # 2. branch existence check
+        branch_cmds = [f"git branch --list {branch_name}"] * len(valid_repos)
+        branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        branch_results = self.executor.exec_parallel(
+            *branch_cmds,
+            orders=branch_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        clean_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), branch_results, strict=True
+        ):
+            if out and out.strip():
+                if not force:
+                    blockers.append((name, f"branch '{branch_name}' already exists"))
+                    continue
+            clean_repos[name] = prop
+
+        if not clean_repos:
+            return blockers
+
+        # 3. workspace cleanliness check (only when checkout or base)
+        if checkout or base:
+            status_cmds = ["git status --porcelain"] * len(clean_repos)
+            status_orders = [{"cwd": prop["path"]} for prop in clean_repos.values()]
+            status_results = self.executor.exec_parallel(
+                *status_cmds,
+                orders=status_orders,
+                flags=REPLY | DECODE,
+                max_concurrent=self._repo_parallel_workers(),
+            )
+
+            for (name, prop), (code, _err, out) in zip(
+                clean_repos.items(), status_results, strict=True
+            ):
+                if out and out.strip():
+                    blockers.append((name, "uncommitted changes"))
+
+        return blockers
+
+    def _branch_new_execute(
+        self,
+        target_repos: dict[str, dict],
+        branch_name: str,
+        *,
+        checkout: bool,
+        base: str | None,
+        force: bool,
+    ) -> list[tuple[str, int, str | None]]:
+        """Execute branch creation across repos in parallel."""
+        parts: list[str] = []
+        if base:
+            parts.append(f"git checkout {base}")
+        if checkout:
+            parts.append(f"git checkout -b {branch_name}")
+        else:
+            flag = " -f" if force else ""
+            parts.append(f"git branch{flag} {branch_name}")
+        cmd = " && ".join(parts)
+
+        repo_items = list(target_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        return [
+            (name, code, stderr if code != 0 else None)
+            for (name, _), (code, stderr, _stdout) in zip(
+                repo_items, results, strict=True
+            )
+        ]

@@ -12,27 +12,47 @@ ComponentRoot exposes the same backward-compatible interface.
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
-from pigit.termui._component_base import Component
-from pigit.termui.input_bridge import TermuiInputBridge
+from pigit.termui._component import Component
+from pigit.termui.input import TermuiInputBridge
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
-from pigit.termui.input_terminal import InputTerminal
-from pigit.termui._renderer_context import set_renderer, reset_renderer
+from pigit.termui.input import InputTerminal
+from pigit.termui._runtime_context import (
+    RuntimeContext,
+    _runtime_ctx,
+    set_renderer,
+    reset_renderer,
+)
 
 EventLoop = AppEventLoop
+
+
+@pytest.fixture(autouse=True)
+def _runtime_context():
+    """Provide a fresh RuntimeContext for event loop tests."""
+    runtime = RuntimeContext()
+    token = _runtime_ctx.set(runtime)
+    yield
+    _runtime_ctx.reset(token)
 
 
 @pytest.fixture
 def mock_renderer():
     """Provide a mock renderer in context for unit tests."""
     renderer = MagicMock()
-    token = set_renderer(renderer)
+    set_renderer(renderer)
     try:
         yield renderer
     finally:
-        reset_renderer(token)
+        reset_renderer()
 
 
-class ComponentMock:
+from pigit.termui.types import OverlayDispatchResult
+
+
+class ComponentMock(Component):
+    def __init__(self):
+        super().__init__()
+
     def resize(self, size):
         pass
 
@@ -46,8 +66,6 @@ class ComponentMock:
         return False
 
     def try_dispatch_overlay(self, key):
-        from pigit.termui.types import OverlayDispatchResult
-
         return OverlayDispatchResult.DROPPED_UNBOUND
 
 
@@ -183,6 +201,12 @@ def test_set_input_timeouts(timeout, expected_set_timeout_calls):
 class _Leaf(Component):
     NAME = "leaf"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def has_overlay_open(self):
+        return False
+
     def _render_surface(self, surface):
         pass
 
@@ -284,52 +308,22 @@ def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
         loop._run_impl()
 
     loop._child._handle_event.assert_called_once_with("k")
-    assert ("k", "overlay") in loop.trace
-
-
-def test_loop_overlay_open_maps_to_overlay_outcome(mock_renderer):
-    """When overlay is open, outcome is ``overlay`` regardless of inner result."""
-
-    class _OverlayRoot(ComponentMock):
-        def has_overlay_open(self):
-            return True
-
-    class _Hooked(AppEventLoop):
-        def __init__(self) -> None:
-            super().__init__(_OverlayRoot(), alt=False)
-            self.trace: list = []
-
-        def after_dispatch_key(self, key: str, outcome: str) -> None:
-            self.trace.append((key, outcome))
-
-    loop = _Hooked()
-    # renderer from mock_renderer fixture
-    loop.get_term_size = Mock(return_value=(80, 24))
-    loop._child._handle_event = Mock()
-
-    loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], ExitEventLoop("stop")]
-
-    with pytest.raises(ExitEventLoop):
-        loop._run_impl()
-
-    loop._child._handle_event.assert_called_once_with("k")
-    assert ("k", "overlay") in loop.trace
+    assert ("k", "child") in loop.trace
 
 
 def test_resize_calls_renderer_clear_cache():
-    from pigit.termui._renderer_context import set_renderer, reset_renderer
+    from pigit.termui._runtime_context import set_renderer, reset_renderer
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop.get_term_size = Mock(return_value=(80, 24))
     mock_renderer = MagicMock()
-    token = set_renderer(mock_renderer)
+    set_renderer(mock_renderer)
     try:
         event_loop.resize()
         mock_renderer.clear_cache.assert_called_once()
     finally:
-        reset_renderer(token)
+        reset_renderer()
 
 
 def test_render_surface_path(mock_renderer):
@@ -350,7 +344,7 @@ def test_render_surface_path(mock_renderer):
     assert surface.height == 5
 
 
-def test_dispatch_semantic_string_binding_renders(mock_renderer):
+def test_dispatch_semantic_string_binding_requests_render(mock_renderer):
     class _Quick(AppEventLoop):
         BINDINGS = [("r", "on_r")]
 
@@ -360,12 +354,11 @@ def test_dispatch_semantic_string_binding_renders(mock_renderer):
     loop = _Quick(_Leaf(), alt=False)
     # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
-    loop.render = Mock()
 
     outcome = loop._dispatch_semantic_string("r")
 
     assert outcome == "binding"
-    loop.render.assert_called_once()
+    assert loop._render_requested is True
 
 
 def test_app_event_loop_accepts_callable_binding(mock_renderer):
@@ -417,21 +410,22 @@ def test_layer_stack_error_recovery_closes_modal() -> None:
 
 
 def test_layer_stack_question_mark_toggles_help_popup() -> None:
-    """``?`` toggles help popup via Popup.dispatch_overlay_key (implicit HANDLED_IMPLICIT)."""
+    """``?`` toggles help popup via HelpPanel.toggle (explicit HANDLED_EXPLICIT)."""
     from pigit.termui._layer import LayerStack
-    from pigit.termui._overlay_components import HelpPanel, Popup
+    from pigit.termui.widgets import HelpPanel, Popup
     from pigit.termui.types import LayerKind, OverlayDispatchResult
-    from pigit.termui._overlay_context import set_overlay_host
+    from pigit.termui._runtime_context import set_overlay_host
 
     # Create LayerStack and real host mock that uses it
     stack = LayerStack()
     root = MagicMock()
     root._layer_stack = stack
 
-    token = set_overlay_host(root)
+    set_overlay_host(root)
     try:
         help_panel = HelpPanel()
         popup = Popup(help_panel)
+        # Popup auto-binds toggle; no manual wiring needed.
         popup.open = True
 
         # Push popup to MODAL layer
@@ -440,18 +434,18 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
         # Dispatch "?" key
         result = stack.dispatch("?")
 
-        assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+        assert result is OverlayDispatchResult.HANDLED_EXPLICIT
         assert not stack.has_any_open()
     finally:
-        from pigit.termui._overlay_context import reset_overlay_host
+        from pigit.termui._runtime_context import reset_overlay_host
 
-        reset_overlay_host(token)
+        reset_overlay_host()
 
 
 def test_renderer_accessed_via_context():
     """Renderer is now accessed via ContextVar instead of explicit binding."""
-    from pigit.termui._component_layouts import TabView
-    from pigit.termui._renderer_context import (
+    from pigit.termui.containers import TabView
+    from pigit.termui._runtime_context import (
         set_renderer,
         reset_renderer,
         get_renderer,
@@ -471,7 +465,7 @@ def test_renderer_accessed_via_context():
 
     # Set renderer via ContextVar
     renderer = MagicMock()
-    token = set_renderer(renderer)
+    set_renderer(renderer)
     try:
         # All components can now access renderer via context
         assert root.renderer is renderer
@@ -479,7 +473,7 @@ def test_renderer_accessed_via_context():
         assert b.renderer is renderer
         assert get_renderer() is renderer
     finally:
-        reset_renderer(token)
+        reset_renderer()
 
 
 def test_clear_screen_when_renderer_none_does_not_crash():

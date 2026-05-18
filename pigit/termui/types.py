@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/types.py
 Description: Base types, enums, and protocols (no runtime dependencies).
@@ -17,6 +16,10 @@ class ActionEventType(Enum):
     """Action event types for parent-child communication in the component tree."""
 
     goto = auto()  # Navigate to a target (e.g. open a file or branch)
+    mode_changed = auto()  # Mode switch (visual mode, filter mode, etc.)
+    action_requested = auto()  # User requested an action (merge, push, fetch, etc.)
+    selection_changed = auto()  # Cursor / selection changed
+    state_changed = auto()  # Generic state change notification
 
 
 # Toast positions
@@ -62,12 +65,15 @@ class OverlaySurface(Protocol):
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """Route one key for this modal (shell, then child, then fallback)."""
+        ...
 
     def hide(self) -> None:
         """Release visible state for this shell."""
+        ...
 
     def _render_surface(self, surface: SurfaceProtocol) -> None:
         """Render this shell into the given Surface when active."""
+        ...
 
 
 # Surface protocol (distinguished from the Surface implementation class)

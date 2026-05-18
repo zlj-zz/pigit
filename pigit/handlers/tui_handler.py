@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 from ..const import IS_FIRST_RUN, IS_WIN
 from ..ext.utils import confirm
@@ -23,4 +23,7 @@ class TuiHandler(BaseHandler):
 
         from ..app import PigitApplication
 
-        PigitApplication().run()
+        PigitApplication(
+            local_git=self.local_git,
+            managed_repos=self.managed_repos,
+        ).run()

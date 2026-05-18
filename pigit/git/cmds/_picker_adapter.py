@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_picker_adapter.py
 Description: Command source adapter for cmd_new --pick functionality.
@@ -6,8 +5,10 @@ Author: Zev
 Date: 2026-04-10
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 from ._completion_types import CompletionType
 from ._registry import get_registry
@@ -31,7 +32,7 @@ class CmdNewEntry:
     category: str
     is_dangerous: bool
     has_args: bool
-    arg_completion: Optional[CompletionType] = None
+    arg_completion: CompletionType | None = None
 
 
 def iter_cmd_new_entries() -> Iterator[CmdNewEntry]:

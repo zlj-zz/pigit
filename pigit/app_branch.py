@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_branch.py
 Description: BranchPanel v3 with ahead/behind display and current branch highlighting.
@@ -8,20 +7,22 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.termui import (
+    ActionEventType,
     bind_keys,
     dismiss_sheet,
-    InputLine,
-    ItemSelector,
     keys,
     palette,
     Segment,
     show_sheet,
     show_toast,
-    Signal,
 )
+from pigit.termui._async_task import AsyncTask
+from pigit.termui.widgets import InputLine, ItemList
+from pigit.termui.reactive import Signal
 
 from .app_inspector import BranchInfo
 from .app_theme import THEME
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(ItemSelector):
+class BranchPanel(ItemList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
@@ -41,18 +42,20 @@ class BranchPanel(ItemSelector):
     def __init__(
         self,
         *,
-        on_selection_changed: Optional[Callable] = None,
-        branch_signal: Optional[Signal[str]] = None,
-        git: "LocalGit",
-        on_merge_request: Optional[Callable[[str, str], None]] = None,
+        on_selection_changed: Callable | None = None,
+        branch_signal: Signal[str] | None = None,
+        git: LocalGit,
+        id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
+            id=id,
         )
         self.git = git
         self._branch_signal = branch_signal
-        self._on_merge_request = on_merge_request
+        self._loader = AsyncTask()
+
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -69,8 +72,17 @@ class BranchPanel(ItemSelector):
 
     def refresh(self) -> None:
         scope = self._SCOPES[self._scope_idx]
-        self.branches = branches = self.git.load_branches(scope=scope)
+        self._loader.start(
+            lambda: self.git.load_branches(scope=scope),
+            self._on_branches_loaded,
+        )
+
+    def _on_branches_loaded(self, branches: list[Branch]) -> None:
+        if not self.is_activated():
+            return
+        self.branches = branches
         if not branches:
+            scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
             return
         lines = []
@@ -79,6 +91,10 @@ class BranchPanel(ItemSelector):
             lines.append(line)
         self.set_content(lines)
 
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._loader.cancel()
+
     def get_help_title(self) -> str:
         return "Branch"
 
@@ -86,7 +102,7 @@ class BranchPanel(ItemSelector):
         """Return help pairs for branch panel."""
         scope_label = self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]
         return [
-            ("j/k", "Navigate"),
+            ("jk/↑↓", "Navigate"),
             ("c", "Checkout"),
             ("n", "New branch"),
             ("r", "Rename"),
@@ -94,7 +110,7 @@ class BranchPanel(ItemSelector):
             ("m", "Merge into selected"),
         ]
 
-    def get_inspector_data(self) -> Optional[BranchInfo]:
+    def get_inspector_data(self) -> BranchInfo | None:
         """Return inspector data for the currently selected branch."""
         idx = self.curr_no
         if not self.branches or not (0 <= idx < len(self.branches)):
@@ -111,7 +127,7 @@ class BranchPanel(ItemSelector):
             created=created,
         )
 
-    def _format_branch(self, branch: "Branch") -> str:
+    def _format_branch(self, branch: Branch) -> str:
         """Format a branch for display."""
         name = branch.name
         if name.startswith("remotes/"):
@@ -126,7 +142,14 @@ class BranchPanel(ItemSelector):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[
         list[Segment],
         list[Segment] | None,
         list[Segment],
@@ -225,8 +248,12 @@ class BranchPanel(ItemSelector):
             pass
         source = self.git.get_head() or ""
         target = branch.name
-        if self._on_merge_request is not None:
-            self._on_merge_request(source, target)
+        self.emit(
+            ActionEventType.action_requested,
+            cmd="merge",
+            source=source,
+            target=target,
+        )
 
     def _do_sheet_action(
         self,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/config_data.py
 Description: Typed TOML configuration dataclasses for pigit.

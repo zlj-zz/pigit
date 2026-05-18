@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 import logging
 import re
@@ -7,13 +7,14 @@ import time
 import shutil
 import textwrap
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from collections.abc import Iterator
 
-from plenty.str_utils import shorten, byte_str2str
-from plenty.console import Console
+from plenty.str_utils import byte_str2str
+
+from typing import cast
 
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
-from pigit.ext.utils import adjudgment_type, get_file_icon
+from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
 from .model import File, Commit, Branch
 
 
@@ -25,7 +26,7 @@ class GitError(Exception):
     """Raised when a git command fails."""
 
 
-def _file_path_for_cmd(file: Union[File, str]) -> str:
+def _file_path_for_cmd(file: File | str) -> str:
     if isinstance(file, File):
         return file.get_file_str()
     s = str(file)
@@ -44,16 +45,16 @@ class LocalGit:
 
     def __init__(
         self,
-        executor: Executor,
-        path: Optional[str] = None,
-        log: Optional[logging.Logger] = None,
+        executor: Executor | ExecutorStrategy | None = None,
+        path: str | None = None,
+        log: logging.Logger | None = None,
     ) -> None:
-        self.executor = executor
-        self.log = log
+        self.executor = executor or ExecutorFactory.get()
+        self.log = log or logging.getLogger(__name__)
         self.path = path
 
     def confirm_repo(
-        self, given_path: Optional[str] = None, exclude_submodule: bool = False
+        self, given_path: str | None = None, exclude_submodule: bool = False
     ) -> tuple[str, str]:
         """Confirm given path whether a git repo. And return repo path info.
         Get the current git repository path. If not, the path is empty.
@@ -103,7 +104,11 @@ class LocalGit:
 
         return repo_path, git_conf_path
 
-    def get_config(self, path: Optional[str] = None) -> dict[str, dict[str, str]]:
+    def bind_path(self, path: str) -> "LocalGit":
+        """Return a new LocalGit instance pinned to the given path."""
+        return LocalGit(executor=self.executor, path=path, log=self.log)
+
+    def get_config(self, path: str | None = None) -> dict[str, dict[str, str]]:
         """Try to read git config and parse, return a config dict.
 
         Args:
@@ -116,7 +121,7 @@ class LocalGit:
 
         _, config_path = self.confirm_repo(path)
         try:
-            with open(Path(config_path) / "config", "r") as cf:
+            with open(Path(config_path) / "config") as cf:
                 context = cf.read()
         except Exception as e:
             self.log.warning(f"Can not read config with: {e}")
@@ -145,7 +150,7 @@ class LocalGit:
 
             return conf_dict
 
-    def get_head(self, path: Optional[str] = None) -> Optional[str]:
+    def get_head(self, path: str | None = None) -> str | None:
         """Get current repo head. Return a branch name or a commit sha string."""
         path = path or self.path
 
@@ -155,11 +160,11 @@ class LocalGit:
             cwd=path,
         )
         if head is not None:
-            head = head.rstrip()
+            head = cast(str, head).rstrip()
         return head
 
     def get_first_pushed_commit(
-        self, path: Optional[str] = None, branch_name: Optional[str] = None
+        self, path: str | None = None, branch_name: str | None = None
     ) -> str:
         path = path or self.path
 
@@ -169,16 +174,18 @@ class LocalGit:
             else:
                 return ""
 
-        command = "git merge-base %s %s@{u}" % (
+        command = "git merge-base {} {}@{{u}}".format(
             shlex.quote(branch_name),
             shlex.quote(branch_name),
         )
         _, _, commit_msg = self.executor.exec(command, flags=REPLY | DECODE, cwd=path)
-        return commit_msg.strip()
+        if commit_msg is None:
+            return ""
+        return cast(str, commit_msg).strip()
 
     def get_branches(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         include_remote: bool = False,
         plain: bool = True,
     ) -> list[str]:
@@ -196,9 +203,9 @@ class LocalGit:
 
         if res is None:
             return []
-        return [branch[2:] for branch in res.rstrip().split("\n")]
+        return [branch[2:] for branch in cast(str, res).rstrip().splitlines()]
 
-    def get_remotes(self, path: Optional[str] = None) -> list[str]:
+    def get_remotes(self, path: str | None = None) -> list[str]:
         """Get repo remote url."""
 
         # Get remote name, exit when error.
@@ -207,10 +214,10 @@ class LocalGit:
             "git remote show", flags=REPLY | DECODE, cwd=path
         )
 
-        return res.strip().split("\n") if res else []
+        return cast(str, res).strip().splitlines() if res else []
 
     def get_remote_url(
-        self, path: Optional[str] = None, remote_name: Optional[str] = None
+        self, path: str | None = None, remote_name: str | None = None
     ) -> str:
         """Get repo remote url."""
         path = path or self.path
@@ -228,13 +235,13 @@ class LocalGit:
             cwd=path,
         )
 
-        if err:
+        if err or remote_url is None:
             return ""
 
-        remote_url = remote_url[:-5]
+        remote_url = cast(str, remote_url)[:-5]
         return remote_url
 
-    def get_summary(self, path: Optional[str] = None, plain: bool = True) -> str:
+    def get_summary(self, path: str | None = None, plain: bool = True) -> str:
         path = path or self.path
         color = "never" if plain else "always"
         _, _, summary = self.executor.exec(
@@ -242,12 +249,14 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return summary
+        if summary is None:
+            return ""
+        return cast(str, summary)
 
     def get_repo_desc(
         self,
-        include_part: Optional[list] = None,
-        path: Optional[str] = None,
+        include_part: list | None = None,
+        path: str | None = None,
         color: bool = True,
     ) -> str:
         """Return a string of repo various information.
@@ -276,7 +285,7 @@ class LocalGit:
         # Get remote url.
         if not include_part or "remote" in include_part:
             try:
-                with open(Path(repo_path) / ".git" / "config", "r") as cf:
+                with open(Path(repo_path) / ".git" / "config") as cf:
                     config = cf.read()
             except Exception:
                 remote = error_str
@@ -304,7 +313,7 @@ class LocalGit:
                 flags=REPLY | DECODE,
                 cwd=path,
             )
-            git_log = "\t" + error_str if err else textwrap.indent(res, "\t")
+            git_log = "\t" + error_str if err else textwrap.indent(cast(str, res), "\t")
             gen.append("Latest log:\n%s\n" % git_log)
 
         # FIXME: will broken in a init repo.
@@ -320,7 +329,7 @@ class LocalGit:
     # =============
     def load_branches(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         *,
         scope: str = "local",
     ) -> list[Branch]:
@@ -340,16 +349,16 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        resp = resp.strip()
+        if resp is None:
+            return branches
+        resp = cast(str, resp).strip()
         if not resp:
             return branches
 
-        lines = resp.split("\n")
-
-        for line in lines:
+        for line in resp.splitlines():
             items = line.split("|")
-            short_name = items[1]
-            full_ref = items[2]
+            short_name = cast(str, items[1])
+            full_ref = cast(str, items[2])
             is_remote = full_ref.startswith("refs/remotes/")
 
             # Skip the symbolic HEAD ref for remotes (e.g. origin/HEAD)
@@ -370,14 +379,18 @@ class LocalGit:
                 branches.append(branch)
                 continue
 
-            branch.upstream_name = upstream_name
+            branch.upstream_name = cast(str, upstream_name)
 
             track = items[4]
             branch.ahead = (
-                str(m[1]) if (m := self._RE_BRANCH_AHEAD.search(track)) else "0"
+                str(m[1])
+                if (m := self._RE_BRANCH_AHEAD.search(cast(str, track)))
+                else "0"
             )
             branch.behind = (
-                str(m[1]) if (m := self._RE_BRANCH_BEHIND.search(track)) else "0"
+                str(m[1])
+                if (m := self._RE_BRANCH_BEHIND.search(cast(str, track)))
+                else "0"
             )
             branches.append(branch)
 
@@ -386,10 +399,10 @@ class LocalGit:
     def load_log(
         self,
         branch_name: str = "",
-        limit: Optional[int] = None,
+        limit: int | None = None,
         filter_path: str = "",
         arg_str: str = '--oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" --abbrev=20 --date=unix',
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> str:
         path = path or self.path
 
@@ -405,10 +418,10 @@ class LocalGit:
             cwd=path,
         )
 
-        return "" if resp is None else resp.strip()
+        return "" if resp is None else cast(str, resp).strip()
 
     @staticmethod
-    def _find_dot_git_dir(cwd: str) -> Optional[str]:
+    def _find_dot_git_dir(cwd: str) -> str | None:
         cur = Path(cwd).resolve()
         while True:
             git = cur / ".git"
@@ -423,7 +436,7 @@ class LocalGit:
 
     def _load_status_cache_signature(
         self, cwd: str
-    ) -> Optional[tuple[int, int, int, int, bool]]:
+    ) -> tuple[int, int, int, int, bool] | None:
         git_dir = self._find_dot_git_dir(cwd)
         if not git_dir:
             return None
@@ -445,7 +458,7 @@ class LocalGit:
 
     def load_status(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         use_cache: bool = True,
     ) -> list[File]:
         """Get the file tree status of GIT for processing and encapsulation.
@@ -485,9 +498,9 @@ class LocalGit:
         _, err, files = self.executor.exec(
             "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=workdir
         )
-        if err:
+        if err or files is None:
             return file_items
-        for file in files.rstrip().split("\n"):
+        for file in cast(str, files).rstrip().splitlines():
             if not file.strip():
                 # skip blank line.
                 continue
@@ -499,7 +512,7 @@ class LocalGit:
             if name.endswith('"'):
                 # may is chinese char code.
                 name = byte_str2str(name[1:-1])
-            untracked = change in ["??", "A ", "AM"]
+            untracked = change == "??"
             has_no_staged_change = staged_change in [" ", "U", "?"]
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
             has_inline_merged_conflicts = change in ["UU", "AA"]
@@ -534,7 +547,7 @@ class LocalGit:
         tracked: bool = True,
         cached: bool = False,
         plain: bool = False,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> str:
         """Gets the modification of the file.
 
@@ -562,7 +575,9 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return "Can't get diff." if err else res.rstrip()
+        if err or res is None:
+            return "Can't get diff."
+        return cast(str, res).rstrip()
 
     def iter_commits(
         self,
@@ -570,7 +585,7 @@ class LocalGit:
         limit: bool = True,
         max_commits: int = 300,
         filter_path: str = "",
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> Iterator[Commit]:
         """Yield commits for ``branch_name`` while reading ``git log`` as a stream.
 
@@ -636,7 +651,7 @@ class LocalGit:
         branch_name: str,
         limit: bool = True,
         filter_path: str = "",
-        path: Optional[str] = None,
+        path: str | None = None,
         max_commits: int = 300,
     ) -> list[Commit]:
         """Get commits for a branch (materializes :meth:`iter_commits`)."""
@@ -654,7 +669,7 @@ class LocalGit:
         self,
         branch_name: str,
         max_commits: int = 300,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> dict[str, str]:
         """Return a ``{sha: full body}`` map for ``branch_name``.
 
@@ -670,7 +685,10 @@ class LocalGit:
         _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
 
         bodies: dict[str, str] = {}
-        for record in (resp or "").split("\x1e"):
+        if resp is None:
+            return bodies
+        resp_str = cast(str, resp)
+        for record in resp_str.split("\x1e"):
             record = record.strip("\n")
             if not record or "\x1f" not in record:
                 continue
@@ -683,7 +701,7 @@ class LocalGit:
         commit_sha: str = "",
         file_name: str = "",
         plain: bool = False,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> str:
         """Gets the change of a file or all in a given commit.
         Args:
@@ -704,12 +722,14 @@ class LocalGit:
             flags=REPLY | DECODE,
             cwd=path,
         )
-        return resp.rstrip()
+        if resp is None:
+            return ""
+        return cast(str, resp).rstrip()
 
     # ===============
     # Options of git
     # ===============
-    def switch_file_status(self, file: File, path: Optional[str] = None):
+    def switch_file_status(self, file: File, path: str | None = None):
         """Change the file stage status.
 
         Args:
@@ -743,9 +763,9 @@ class LocalGit:
 
     def discard_file(
         self,
-        file: Union[File, str],
-        path: Optional[str] = None,
-        tracked: Optional[bool] = None,
+        file: File | str,
+        path: str | None = None,
+        tracked: bool | None = None,
     ):
         lookup = path if path is not None else self.path
         if lookup is None or lookup == "":
@@ -796,7 +816,7 @@ class LocalGit:
                 self.log.info("discard_file: skip missing untracked path %r", abs_file)
                 return
 
-    def ignore_file(self, file: Union[File, str], path: Optional[str] = None):
+    def ignore_file(self, file: File | str, path: str | None = None):
         """Append file to `.gitignore` file."""
 
         path = path or self.path
@@ -806,7 +826,7 @@ class LocalGit:
         with open(Path(repo_path) / ".gitignore", "a+") as f:
             f.write(f"\n{file_name}")
 
-    def checkout_branch(self, branch_name: str, path: Optional[str] = None) -> None:
+    def checkout_branch(self, branch_name: str, path: str | None = None) -> None:
         path = path or self.path
         code, err, out = self.executor.exec(
             f"git checkout {shlex.quote(branch_name)}",
@@ -820,7 +840,7 @@ class LocalGit:
         self,
         old_name: str,
         new_name: str,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> None:
         path = path or self.path
         code, err, out = self.executor.exec(
@@ -834,7 +854,7 @@ class LocalGit:
     def create_branch(
         self,
         branch_name: str,
-        path: Optional[str] = None,
+        path: str | None = None,
     ) -> None:
         """Create a new branch from HEAD and switch to it."""
         path = path or self.path
@@ -847,7 +867,7 @@ class LocalGit:
             raise GitError(err or f"create branch failed: {branch_name}")
 
     def get_file_info(
-        self, file: Union[File, str], path: Optional[str] = None
+        self, file: File | str, path: str | None = None
     ) -> tuple[str, str]:
         """Get file size and last modification time as formatted strings.
 
@@ -855,6 +875,8 @@ class LocalGit:
             (size_str, mtime_str) like ("12.5K", "2026-04-24 10:30").
         """
         path = path or self.path
+        if path is None:
+            return "", ""
         file_name = _file_path_for_cmd(file)
         file_path = Path(path) / file_name
         try:
@@ -874,7 +896,7 @@ class LocalGit:
         return f"{size / (1024 * 1024):.1f}M"
 
     def get_branch_recent_commit(
-        self, branch_name: str, path: Optional[str] = None
+        self, branch_name: str, path: str | None = None
     ) -> tuple[str, str]:
         """Get the most recent commit message and author for a branch."""
         path = path or self.path
@@ -885,11 +907,12 @@ class LocalGit:
         )
         if not resp:
             return "?", "?"
-        parts = resp.split("|")
+        resp_str = cast(str, resp)
+        parts = resp_str.split("|")
         return parts[0], parts[1] if len(parts) > 1 else "?"
 
     def get_branch_creation_time(
-        self, branch_name: str, path: Optional[str] = None
+        self, branch_name: str, path: str | None = None
     ) -> str:
         """Return branch creation date as YYYY-MM-DD (best-effort via reflog)."""
         path = path or self.path
@@ -908,7 +931,7 @@ class LocalGit:
             return "?"
 
     def get_commit_stats(
-        self, commit_sha: str, path: Optional[str] = None
+        self, commit_sha: str, path: str | None = None
     ) -> tuple[list[tuple[str, int, int]], int, int]:
         """Get changed files and insertion/deletion counts for a commit.
 
@@ -929,7 +952,8 @@ class LocalGit:
         total_add = 0
         total_del = 0
 
-        for line in resp.strip().split("\n"):
+        resp_str = cast(str, resp)
+        for line in resp_str.strip().splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -944,7 +968,7 @@ class LocalGit:
 
         return files, total_add, total_del
 
-    def has_staged_changes(self, path: Optional[str] = None) -> bool:
+    def has_staged_changes(self, path: str | None = None) -> bool:
         """Return True if index has staged changes."""
         path = path or self.path
         code, _, _ = self.executor.exec(
@@ -959,7 +983,7 @@ class LocalGit:
 
     def open_repo_in_browser(
         self,
-        path: Optional[str] = None,
+        path: str | None = None,
         branch: str = "",
         issue: str = "",
         commit: str = "",
@@ -990,7 +1014,7 @@ class LocalGit:
         else:
             return True, "Successfully opened repo."
 
-    def get_git_dir(self, path: Optional[str] = None) -> str:
+    def get_git_dir(self, path: str | None = None) -> str:
         """Return the git directory path via ``git rev-parse --git-dir``."""
         path = path or self.path
         code, err, out = self.executor.exec(
@@ -1000,13 +1024,13 @@ class LocalGit:
         )
         if code != 0 or not out:
             raise GitError(err or "Failed to get git directory")
-        git_dir_raw = out.strip()
+        git_dir_raw = cast(str, out).strip()
         if Path(git_dir_raw).is_absolute():
             return str(Path(git_dir_raw).resolve())
         repo_root, _ = self.confirm_repo(path)
         return str((Path(repo_root) / git_dir_raw).resolve())
 
-    def pull(self, path: Optional[str] = None) -> None:
+    def pull(self, path: str | None = None) -> None:
         """Pull from the upstream remote. Raises GitError on failure."""
         path = path or self.path
         code, err, _out = self.executor.exec(
@@ -1017,7 +1041,7 @@ class LocalGit:
         if code != 0:
             raise GitError(err or "Pull failed")
 
-    def merge(self, source: str, path: Optional[str] = None) -> None:
+    def merge(self, source: str, path: str | None = None) -> None:
         """Merge ``source`` into the current branch. Raises GitError on failure.
 
         If the merge results in conflicts, the error message will contain
@@ -1030,12 +1054,12 @@ class LocalGit:
             flags=WAITING | REPLY | DECODE,
         )
         if code != 0:
-            msg = err or f"Merge failed: {source}"
-            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in err):
+            msg = cast(str, err) if err else f"Merge failed: {source}"
+            if code == 1 and ("conflict" in msg.lower() or "CONFLICT" in msg):
                 raise GitError(f"Merge conflict: {msg}")
             raise GitError(msg)
 
-    def is_merge_in_progress(self, path: Optional[str] = None) -> bool:
+    def is_merge_in_progress(self, path: str | None = None) -> bool:
         """Return True if MERGE_HEAD exists in the git directory."""
         try:
             git_dir = self.get_git_dir(path)
@@ -1043,7 +1067,7 @@ class LocalGit:
             return False
         return (Path(git_dir) / "MERGE_HEAD").exists()
 
-    def checkout_ours(self, file: Union[File, str], path: Optional[str] = None) -> None:
+    def checkout_ours(self, file: File | str, path: str | None = None) -> None:
         """Checkout ``--ours`` version of a conflicted file."""
         path = path or self.path
         file_name = _file_path_for_cmd(file)
@@ -1055,9 +1079,7 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"checkout --ours failed: {file_name}")
 
-    def checkout_theirs(
-        self, file: Union[File, str], path: Optional[str] = None
-    ) -> None:
+    def checkout_theirs(self, file: File | str, path: str | None = None) -> None:
         """Checkout ``--theirs`` version of a conflicted file."""
         path = path or self.path
         file_name = _file_path_for_cmd(file)
@@ -1069,7 +1091,7 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"checkout --theirs failed: {file_name}")
 
-    def add_file(self, file: Union[File, str], path: Optional[str] = None) -> None:
+    def add_file(self, file: File | str, path: str | None = None) -> None:
         """Stage a file."""
         path = path or self.path
         file_name = _file_path_for_cmd(file)
@@ -1081,7 +1103,7 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"add failed: {file_name}")
 
-    def commit_no_edit(self, path: Optional[str] = None) -> None:
+    def commit_no_edit(self, path: str | None = None) -> None:
         """Complete a merge with the default message (``git commit --no-edit``)."""
         path = path or self.path
         code, err, _ = self.executor.exec(

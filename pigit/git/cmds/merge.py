@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/merge.py
 Description: Merge commands for cmd_new (m.* namespace).
 Author: Zev
 Date: 2026-04-10
 """
+
+from __future__ import annotations
 
 from ._completion_types import CompletionType
 from ._decorators import command, alias

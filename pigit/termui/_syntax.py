@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_syntax.py
 Description: Lightweight syntax tokenizer for diff code highlighting.
@@ -10,7 +9,6 @@ from __future__ import annotations
 
 import functools
 import re
-from typing import Optional
 
 from . import palette
 from ._syntax_configs import _LANGUAGE_CONFIGS
@@ -283,7 +281,7 @@ class SyntaxTokenizer:
     # ── multi-line string / comment mask ──
 
     @staticmethod
-    def compute_multiline_mask(lines: list[str], lang: str) -> list[Optional[str]]:
+    def compute_multiline_mask(lines: list[str], lang: str) -> list[str | None]:
         """Return a mask indicating which lines are inside a multi-line context.
 
         Each entry is either a token type (e.g. ``"docstring"``, ``"comment"``)
@@ -301,7 +299,7 @@ class SyntaxTokenizer:
             seen.add(base_lang)
             base_lang = _LANGUAGE_CONFIGS[base_lang]["_alias"]
 
-        mask: list[Optional[str]] = [None] * len(lines)
+        mask: list[str | None] = [None] * len(lines)
 
         if base_lang == "py":
             in_docstring = False

@@ -9,8 +9,16 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
+from pigit.termui._component import Component
 from pigit.termui._layer import Layer, LayerKind, LayerStack
 from pigit.termui.types import OverlayDispatchResult
+
+
+class _DummyBody(Component):
+    """Minimal component for use as ComponentRoot body in tests."""
+
+    def _render_surface(self, surface):
+        pass
 
 
 class TestLayer:
@@ -206,8 +214,7 @@ class TestComponentRootPopLayer:
     def test_component_root_pop_layer_calls_hide(self):
         from pigit.termui._root import ComponentRoot
 
-        body = MagicMock()
-        body._render_surface = MagicMock()
+        body = _DummyBody()
         root = ComponentRoot(body)
         overlay = MagicMock()
         root._layer_stack.push(LayerKind.TOAST, overlay)
@@ -217,7 +224,7 @@ class TestComponentRootPopLayer:
     def test_component_root_force_close_after_error_calls_hide(self):
         from pigit.termui._root import ComponentRoot
 
-        body = MagicMock()
+        body = _DummyBody()
         root = ComponentRoot(body)
         overlay = MagicMock()
         overlay.reset_state = MagicMock()

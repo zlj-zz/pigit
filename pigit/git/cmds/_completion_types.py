@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_completion_types.py
 Description: Completion types for git argument completion.
 Author: Zev
 Date: 2026-04-15
 """
+
+from __future__ import annotations
 
 from enum import Enum
 

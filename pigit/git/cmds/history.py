@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/history.py
 Description: History, log, stash, and tag commands for cmd_new (l.*, s.*, t.* namespace).
 Author: Zev
 Date: 2026-04-10
 """
+
+from __future__ import annotations
 
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
@@ -119,7 +120,7 @@ def log_contributors(args: list[str]) -> str:
 )
 def stash(args: list[str]) -> str:
     """Stash changes."""
-    base = "git stash"
+    base = "git stash --include-untracked"
     if args:
         return f"{base} {' '.join(args)}"
     return base

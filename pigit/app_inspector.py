@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_inspector.py
 Description: Right-side inspector panel for file/branch/commit details.
@@ -9,7 +8,7 @@ Date: 2026-04-23
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
 from pigit.termui import Component, palette
@@ -23,14 +22,14 @@ if TYPE_CHECKING:
 
 @dataclass
 class FileInfo:
-    file: "File"
+    file: File
     size: str
     mtime: str
 
 
 @dataclass
 class BranchInfo:
-    branch: "Branch"
+    branch: Branch
     recent_msg: str
     recent_author: str
     created: str
@@ -38,13 +37,13 @@ class BranchInfo:
 
 @dataclass
 class CommitInfo:
-    commit: "Commit"
+    commit: Commit
     changed_files: list[tuple[str, int, int]]
     total_add: int
     total_del: int
 
 
-InspectorData = Union[FileInfo, BranchInfo, CommitInfo, None]
+InspectorData = FileInfo | BranchInfo | CommitInfo | None
 
 
 class InspectorPanel(Component):
@@ -54,9 +53,10 @@ class InspectorPanel(Component):
         self,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self._content: list[str] = []
         self._title = "Inspector"
 
@@ -68,14 +68,13 @@ class InspectorPanel(Component):
     def show(self, data: InspectorData) -> None:
         """Display inspector content from a data object."""
         self.clear()
-        if data is None:
-            return
-        if isinstance(data, FileInfo):
-            self._show_file_impl(data)
-        elif isinstance(data, BranchInfo):
-            self._show_branch_impl(data)
-        elif isinstance(data, CommitInfo):
-            self._show_commit_impl(data)
+        match data:
+            case FileInfo():
+                self._show_file_impl(data)
+            case BranchInfo():
+                self._show_branch_impl(data)
+            case CommitInfo():
+                self._show_commit_impl(data)
 
     def update_from(self, source) -> None:
         """Refresh content from *source* if it provides inspector data.

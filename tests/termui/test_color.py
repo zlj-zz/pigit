@@ -71,21 +71,17 @@ class TestColorAdapter:
 
 
 class TestNearest256:
-    def test_exact_black(self):
-        assert _nearest_256((0, 0, 0)) == 0
-
-    def test_exact_white(self):
-        # White is in the 16-color palette (code 15)
-        assert _nearest_256((255, 255, 255)) == 15
-
-    def test_exact_red(self):
-        # Pure red is in the 16-color palette (code 9)
-        assert _nearest_256((255, 0, 0)) == 9
-
-    def test_gray(self):
-        # Mid-gray (128,128,128) is bright black in 16-color palette (code 8)
-        code = _nearest_256((128, 128, 128))
-        assert code == 8
+    @pytest.mark.parametrize(
+        "rgb, expected",
+        [
+            ((0, 0, 0), 0),
+            ((255, 255, 255), 15),
+            ((255, 0, 0), 9),
+            ((128, 128, 128), 8),
+        ],
+    )
+    def test_lookup(self, rgb, expected):
+        assert _nearest_256(rgb) == expected
 
     def test_caching(self):
         # Second call should use cache
@@ -95,14 +91,16 @@ class TestNearest256:
 
 
 class TestNearest16:
-    def test_exact_black(self):
-        assert _nearest_16((0, 0, 0)) == 0
-
-    def test_exact_red(self):
-        assert _nearest_16((255, 0, 0)) == 9
-
-    def test_exact_white(self):
-        assert _nearest_16((255, 255, 255)) == 15
+    @pytest.mark.parametrize(
+        "rgb, expected",
+        [
+            ((0, 0, 0), 0),
+            ((255, 0, 0), 9),
+            ((255, 255, 255), 15),
+        ],
+    )
+    def test_lookup(self, rgb, expected):
+        assert _nearest_16(rgb) == expected
 
 
 class TestDetectColorMode:

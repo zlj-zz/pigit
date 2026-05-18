@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/termui/_surface.py
 Description: 2-D character buffer for declarative terminal drawing.
@@ -8,7 +7,8 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from . import palette
 from .wcwidth_table import (
@@ -34,36 +34,24 @@ class FlatCell:
 
     ``fg`` and ``bg`` are RGB tuples. ``style_flags`` controls weight
     and other terminal styles via bitmask.
-    When ``ansi_style`` is set, it takes precedence (legacy mode).
-
-    The ``style`` parameter is a backward-compatibility alias for
-    ``ansi_style`` so existing ``Cell(char, style="...")`` calls
-    continue to work.
     """
 
-    __slots__ = ("char", "fg", "bg", "style_flags", "ansi_style", "_hash")
+    __slots__ = ("char", "fg", "bg", "style_flags", "_hash")
 
     def __init__(
         self,
         char: str = " ",
-        style: str = "",
         fg: tuple[int, int, int] = palette.DEFAULT_FG,
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        ansi_style: Optional[str] = None,
         *,
         bold: bool = False,
     ) -> None:
         self.char = char
         self.fg = fg
         self.bg = bg
-        # Backward compat: bold=True maps to style_flags with BOLD bit set
         self.style_flags = style_flags | palette.STYLE_BOLD if bold else style_flags
-        # Backward compat: 'style' kwarg maps to ansi_style
-        self.ansi_style = ansi_style if ansi_style is not None else (style or None)
-        self._hash = hash(
-            (self.char, self.fg, self.bg, self.style_flags, self.ansi_style)
-        )
+        self._hash: int | None = None
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FlatCell):
@@ -73,21 +61,17 @@ class FlatCell:
             and self.fg == other.fg
             and self.bg == other.bg
             and self.style_flags == other.style_flags
-            and self.ansi_style == other.ansi_style
         )
 
     def __hash__(self) -> int:
+        if self._hash is None:
+            self._hash = hash((self.char, self.fg, self.bg, self.style_flags))
         return self._hash
-
-    @property
-    def style(self) -> str:
-        """Backward compatibility alias for ``ansi_style``."""
-        return self.ansi_style or ""
 
     def __repr__(self) -> str:
         return (
             f"FlatCell(char={self.char!r}, fg={self.fg}, bg={self.bg}, "
-            f"style_flags={self.style_flags}, ansi_style={self.ansi_style!r})"
+            f"style_flags={self.style_flags})"
         )
 
 
@@ -102,7 +86,7 @@ class _Subsurface:
     """Proxy that translates local coordinates to a parent Surface."""
 
     def __init__(
-        self, parent: "Surface", row: int, col: int, width: int, height: int
+        self, parent: Surface, row: int, col: int, width: int, height: int
     ) -> None:
         self._parent = parent
         self._row = row
@@ -126,7 +110,7 @@ class _Subsurface:
             return None
         return r, c, w, h
 
-    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+    def subsurface(self, row: int, col: int, width: int, height: int) -> _Subsurface:
         """Return a nested subsurface relative to this one."""
         return _Subsurface(
             self._parent, self._row + row, self._col + col, width, height
@@ -139,8 +123,8 @@ class _Subsurface:
         row: int,
         col: int,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
     ) -> None:
         """Write text with RGB colors at local (row, col), clipped to bounds."""
@@ -153,7 +137,7 @@ class _Subsurface:
         self,
         row: int,
         col: int,
-        segments: Sequence["Segment"],
+        segments: Sequence[Segment],
     ) -> int:
         """Draw a list of styled segments and return the column after the last one."""
         for seg in segments:
@@ -186,7 +170,7 @@ class _Subsurface:
         fg: tuple[int, int, int],
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> None:
         """Draw an RGB box-drawing border at local (row, col), clipped to bounds."""
         clipped = self._clip(row, col, width, height)
@@ -265,7 +249,7 @@ class Surface:
             for i in range(self.width):
                 row[i] = _BLANK_CELL
 
-    def subsurface(self, row: int, col: int, width: int, height: int) -> "_Subsurface":
+    def subsurface(self, row: int, col: int, width: int, height: int) -> _Subsurface:
         """Return a proxy that translates local coordinates to this surface."""
         return _Subsurface(self, row, col, width, height)
 
@@ -279,7 +263,7 @@ class Surface:
         margin_bottom: int = 0,
         margin_left: int = 0,
         margin_right: int = 0,
-    ) -> "_Subsurface":
+    ) -> _Subsurface:
         """Return a subsurface inset by margins.
 
         Args:
@@ -304,8 +288,8 @@ class Surface:
         row: int,
         col: int,
         text: str,
-        fg: Optional[tuple[int, int, int]] = None,
-        bg: Optional[tuple[int, int, int]] = None,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
     ) -> None:
         """Write text with explicit RGB foreground and background colors.
@@ -370,7 +354,7 @@ class Surface:
         self,
         row: int,
         col: int,
-        segments: Sequence["Segment"],
+        segments: Sequence[Segment],
     ) -> int:
         """Draw a list of styled segments and return the column after the last one."""
         for seg in segments:
@@ -407,7 +391,7 @@ class Surface:
         fg: tuple[int, int, int],
         bg: tuple[int, int, int] = palette.DEFAULT_BG,
         style_flags: int = 0,
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> None:
         """Draw a box-drawing border with explicit RGB colors."""
         if width < 2 or height < 2:

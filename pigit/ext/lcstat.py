@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 import json
@@ -6,7 +8,8 @@ import re
 import stat
 import threading
 from concurrent.futures import ProcessPoolExecutor
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from .log import logger
 from .utils import adjudgment_type, confirm
@@ -74,7 +77,7 @@ def default_walk_err_callback(e):
         e (_type_): _description_
     """
 
-    print("Walk error: {0}".format(e))
+    print(f"Walk error: {e}")
 
 
 class CounterLockManageError(Exception):
@@ -105,8 +108,8 @@ class CounterLockManage:
 class Counter:
     def __init__(
         self,
-        walk_err_cb: Optional[Callable] = None,
-        saved_dir: Optional[str] = None,
+        walk_err_cb: Callable | None = None,
+        saved_dir: str | None = None,
         show_invalid: bool = False,
     ) -> None:
         """
@@ -358,7 +361,7 @@ class Counter:
         file_path = self._saved_path(root_path)
 
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 res: dict = json.load(f)
                 return res
         except Exception:
@@ -412,4 +415,4 @@ class Counter:
         else:
             i = 3
 
-        return "{0:.2f}{1}".format(total_size, size_unit[i]), diff_result, invalids
+        return f"{total_size:.2f}{size_unit[i]}", diff_result, invalids

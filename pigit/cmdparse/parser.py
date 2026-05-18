@@ -1,4 +1,4 @@
-# -*- coding:utf-8 -*-
+from __future__ import annotations
 
 from argparse import (
     ArgumentParser,
@@ -6,21 +6,15 @@ from argparse import (
     Namespace,
     _SubParsersAction,
 )
-from functools import wraps
 from shutil import get_terminal_size
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterable,
     Literal,
-    Optional,
-    Sequence,
-    Type,
     TypedDict,
-    Union,
     overload,
 )
+from collections.abc import Callable, Iterable, Sequence
 
 from plenty.style import Style
 
@@ -29,15 +23,15 @@ if TYPE_CHECKING:
 
 
 class ParserOptions(TypedDict, total=False):
-    title: Optional[str]
-    description: Optional[str]
-    parser_class: Optional["Parser"]
-    action: Optional["Action"]
-    option_string: Optional[str]
-    dest: Optional[str]
+    title: str | None
+    description: str | None
+    parser_class: Parser | None
+    action: Action | None
+    option_string: str | None
+    dest: str | None
     required: bool
-    help: Optional[str]
-    metavar: Optional[str]
+    help: str | None
+    metavar: str | None
 
 
 class ColorHelpFormatter(HelpFormatter):
@@ -56,7 +50,7 @@ class ColorHelpFormatter(HelpFormatter):
         prog: str,
         indent_increment: int = 2,
         max_help_position: int = 24,
-        width: Optional[int] = None,
+        width: int | None = None,
     ):
         max_width, _ = get_terminal_size()
         if width is None:
@@ -68,10 +62,10 @@ class ColorHelpFormatter(HelpFormatter):
 
     def _format_usage(
         self,
-        usage: str,
-        actions: Iterable["Action"],
+        usage: str | None,
+        actions: Iterable[Action],
         groups: Iterable,
-        prefix: Optional[str],
+        prefix: str | None,
     ) -> str:
         return Style.parse(self.usage_style).render(
             super()._format_usage(usage, actions, groups, prefix)
@@ -80,7 +74,7 @@ class ColorHelpFormatter(HelpFormatter):
     def _format_text(self, text: str) -> str:
         return Style.parse(self.text_style).render(super()._format_text(text))
 
-    def _format_action(self, action: "Action") -> str:
+    def _format_action(self, action: Action) -> str:
         # determine the required width and the entry label
         help_position = min(self._action_max_length + 2, self._max_help_position)
         help_width = max(self._width - help_position, 11)
@@ -141,45 +135,46 @@ class ParserError(Exception):
 class Parser(ArgumentParser):
     def __init__(
         self,
-        prog: Optional[str] = None,
-        usage: Optional[str] = None,
-        description: Optional[str] = None,
-        epilog: Optional[str] = None,
-        parents: Optional[Sequence[ArgumentParser]] = None,
-        formatter_class: Type[HelpFormatter] = ColorHelpFormatter,
+        prog: str | None = None,
+        usage: str | None = None,
+        description: str | None = None,
+        epilog: str | None = None,
+        parents: Sequence[ArgumentParser] | None = None,
+        formatter_class: type[HelpFormatter] = ColorHelpFormatter,
         prefix_chars: str = "-",
-        fromfile_prefix_chars: Optional[str] = None,
+        fromfile_prefix_chars: str | None = None,
         argument_default: Any = None,
         conflict_handler: str = "error",
         add_help: bool = True,
         allow_abbrev: bool = True,
-        # exit_on_error: bool = True,  # python3.9 feature
-        callback: Optional[Callable] = None,
+        callback: Callable | None = None,
+        **kwargs,
     ) -> None:
         if parents is None:
             parents = []
         super().__init__(
-            prog,
-            usage,
-            description,
-            epilog,
-            parents,
-            formatter_class,
-            prefix_chars,
-            fromfile_prefix_chars,
-            argument_default,
-            conflict_handler,
-            add_help,
-            allow_abbrev,
+            prog=prog,
+            usage=usage,
+            description=description,
+            epilog=epilog,
+            parents=parents,
+            formatter_class=formatter_class,
+            prefix_chars=prefix_chars,
+            fromfile_prefix_chars=fromfile_prefix_chars,
+            argument_default=argument_default,
+            conflict_handler=conflict_handler,
+            add_help=add_help,
+            allow_abbrev=allow_abbrev,
+            **kwargs,
         )
 
-        self.subparsers_action: Optional["_SubParsersAction"] = None
+        self.subparsers_action: _SubParsersAction | None = None
         self.default_callback = callback
 
     # ================================
     # overload ~ArgumentParser method
     # ================================
-    def add_subparsers(self, **kwargs) -> "_SubParsersAction":
+    def add_subparsers(self, **kwargs) -> _SubParsersAction:
         # cannot have multiple subparser arguments
         if self.subparsers_action is None:
             self.subparsers_action = super().add_subparsers(**kwargs)
@@ -188,7 +183,7 @@ class Parser(ArgumentParser):
     # ============
     # call method
     # ============
-    def main(self, args: Optional[list[str]] = None, **kwargs):
+    def main(self, args: list[str] | None = None, **kwargs):
         known_args: Namespace
         unknown: list
 
@@ -200,14 +195,14 @@ class Parser(ArgumentParser):
         elif self.default_callback is not None:
             self.default_callback(known_args, unknown)
 
-    def __call__(self, args: Optional[list[str]] = None, **kwds: Any) -> Any:
+    def __call__(self, args: list[str] | None = None, **kwds: Any) -> Any:
         self.main(args, **kwds)
 
     # ===============================
     # tools methods of serialization
     # ===============================
     @classmethod
-    def from_dict(cls, parser_dict: dict) -> "Parser":
+    def from_dict(cls, parser_dict: dict) -> Parser:
         """Parse a `dict` to generate a ~Parser."""
         from copy import deepcopy
 
@@ -215,7 +210,7 @@ class Parser(ArgumentParser):
         parser_dict = deepcopy(parser_dict)
 
         def add_command(
-            handle: Union["Parser", "_ArgumentGroup"],
+            handle: Parser | _ArgumentGroup,
             name: str,
             args: dict[str, Any],
         ) -> None:
@@ -224,8 +219,8 @@ class Parser(ArgumentParser):
             names: list[str] = name.split(" ")
             handle.add_argument(*names, **args)
 
-        def parse_args(handle: "Parser", args: dict) -> None:
-            sub_parsers: Optional["_SubParsersAction"] = None
+        def parse_args(handle: Parser, args: dict) -> None:
+            sub_parsers: _SubParsersAction | None = None
 
             for name, prop in args.items():
                 # Get command type.
@@ -235,7 +230,7 @@ class Parser(ArgumentParser):
                 # group. The command of the group in 'args', so we should iterative
                 # the 'args' to add each command.
                 if prop_type == "groups":
-                    g_handle: "_ArgumentGroup" = handle.add_argument_group(
+                    g_handle: _ArgumentGroup = handle.add_argument_group(
                         title=prop.get("title", ""),
                         description=prop.get("description", ""),
                     )
@@ -254,7 +249,7 @@ class Parser(ArgumentParser):
 
                     sub_args: dict = prop.pop("args", None)
 
-                    sub_handle: "Parser" = sub_parsers.add_parser(name, **prop)
+                    sub_handle: Parser = sub_parsers.add_parser(name, **prop)
 
                     # If `set_defaults` in args, special treatment is required.
                     set_defaults = sub_args.get("set_defaults")
@@ -297,7 +292,7 @@ class Parser(ArgumentParser):
             "help",
         ]
 
-        def _process(parser: "Parser", target_dict: dict) -> dict:
+        def _process(parser: Parser, target_dict: dict) -> dict:
             # Set parser parameters.
             for name in cmd_names:
                 target_dict[name] = getattr(parser, name, None)
@@ -342,21 +337,21 @@ class Parser(ArgumentParser):
         self,
         prog: str,
         *,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        parser_class: Optional["Parser"] = None,
-        action: Optional["Action"] = None,
-        option_string: Optional[str] = None,
-        dest: Optional[str] = None,
+        title: str | None = None,
+        description: str | None = None,
+        parser_class: Parser | None = None,
+        action: Action | None = None,
+        option_string: str | None = None,
+        dest: str | None = None,
         required: bool = False,
-        help: Optional[str] = None,
-        metavar: Optional[str] = None,
-    ) -> Callable[..., "Parser"]: ...
+        help: str | None = None,
+        metavar: str | None = None,
+    ) -> Callable[..., Parser]: ...
 
     @overload
-    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]: ...
+    def sub_parser(self, prog: str, **kwargs) -> Callable[..., Parser]: ...
 
-    def sub_parser(self, prog: str, **kwargs) -> Callable[..., "Parser"]:
+    def sub_parser(self, prog: str, **kwargs) -> Callable[..., Parser]:
         """Create a new ~Parser of subparser and use the decorator use callback.
         This will also automatically attach all decorated :func:`argument` as
         parameters to the parser.
@@ -376,17 +371,14 @@ class Parser(ArgumentParser):
                 f"The name of sub_parser must be str, but given a {type(prog).__name__}."
             ) from None
 
-        def decorator(fn: Callable[..., Any]) -> "Parser":
+        def decorator(fn: Callable[..., Any]) -> Parser:
             nonlocal kwargs
             attr_params = kwargs.pop("params", None)
             params = attr_params if attr_params is not None else []
 
-            try:
-                decorator_params = fn.__parser_params__
-            except AttributeError:
-                pass
-            else:
-                del fn.__parser_params__
+            decorator_params = getattr(fn, "__parser_params__", None)
+            if decorator_params is not None:
+                delattr(fn, "__parser_params__")
                 params.extend(decorator_params)
 
             if "description" not in kwargs:
@@ -409,36 +401,36 @@ class Parser(ArgumentParser):
 # ====================================
 @overload
 def command(
-    prog: Optional[str] = None,
-    cls: Optional[Type[Parser]] = None,
+    prog: str | None = None,
+    cls: type[Parser] | None = None,
     *,
-    usage: Optional[str] = None,
-    description: Optional[str] = None,
-    epilog: Optional[str] = None,
-    parents: Optional[Sequence[Parser]] = None,
-    formatter_class: Type[HelpFormatter] = HelpFormatter,
+    usage: str | None = None,
+    description: str | None = None,
+    epilog: str | None = None,
+    parents: Sequence[Parser] | None = None,
+    formatter_class: type[HelpFormatter] = HelpFormatter,
     prefix_chars: str = "-",
-    fromfile_prefix_chars: Optional[str] = None,
+    fromfile_prefix_chars: str | None = None,
     argument_default: Any = None,
     conflict_handler: str = "error",
     add_help: bool = True,
     allow_abbrev: bool = True,
     exit_on_error: bool = True,
-    callback: Optional[Callable] = None,
+    callback: Callable | None = None,
 ) -> Callable[..., Parser]: ...
 
 
 @overload
 def command(
-    prog: Optional[str] = None,
-    cls: Optional[Type[Parser]] = None,
+    prog: str | None = None,
+    cls: type[Parser] | None = None,
     **attrs,
 ) -> Callable[..., Parser]: ...
 
 
 def command(
-    prog: Optional[str] = None,
-    cls: Optional[Type[Parser]] = None,
+    prog: str | None = None,
+    cls: type[Parser] | None = None,
     **attrs,
 ) -> Callable[..., Parser]:
     """Creates a new ~Parser and uses the decorated function as callback.
@@ -453,7 +445,7 @@ def command(
     if cls is None:
         cls = Parser
 
-    fn: Optional[Callable] = None
+    fn: Callable | None = None
     if callable(prog):
         fn = prog
         prog = None
@@ -463,12 +455,9 @@ def command(
         attr_params = kwargs.pop("params", None)
         params = attr_params if attr_params is not None else []
 
-        try:
-            decorator_params = fn.__parser_params__
-        except AttributeError:
-            pass
-        else:
-            del fn.__parser_params__
+        decorator_params = getattr(fn, "__parser_params__", None)
+        if decorator_params is not None:
+            delattr(fn, "__parser_params__")
             params.extend(decorator_params)
 
         if "description" not in kwargs:
@@ -490,16 +479,16 @@ def command(
 
 def _param_memo(fn: Callable[..., Any], params) -> None:
     if not hasattr(fn, "__parser_params__"):
-        fn.__parser_params__ = []
+        setattr(fn, "__parser_params__", [])
 
-    fn.__parser_params__.append(params)
+    getattr(fn, "__parser_params__").append(params)
 
 
 @overload
 def argument(
     name: str,
     *,
-    action: Union[
+    action: (
         Literal[
             "store",
             "store_const",
@@ -511,22 +500,20 @@ def argument(
             "help",
             "version",
             "extend",
-        ],
-        Sequence["Action"],
-        None,
-    ] = None,
-    nargs: Union[
-        int, Literal["?", "*", "+", "...", "A...", "==SUPPRESS=="], None
-    ] = None,
-    const: Optional[Any] = None,
-    default: Optional[Any] = None,
-    type: Union[Callable, "FileType", None] = None,
-    choices: Optional[Iterable] = None,
-    required: Optional[bool] = None,
-    help: Optional[str] = None,
-    metavar: Union[str, tuple[str, ...], None] = None,
-    dest: Optional[str] = None,
-    version: Optional[str] = None,
+        ]
+        | Sequence[Action]
+        | None
+    ) = None,
+    nargs: int | Literal["?", "*", "+", "...", "A...", "==SUPPRESS=="] | None = None,
+    const: Any | None = None,
+    default: Any | None = None,
+    type: Callable | FileType | None = None,
+    choices: Iterable | None = None,
+    required: bool | None = None,
+    help: str | None = None,
+    metavar: str | tuple[str, ...] | None = None,
+    dest: str | None = None,
+    version: str | None = None,
     **kwargs: Any,
 ) -> Callable: ...
 

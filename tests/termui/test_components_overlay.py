@@ -9,18 +9,28 @@ Date: 2026-04-18
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component_base import Component
-from pigit.termui._overlay_components import (
+from pigit.termui._component import Component
+from pigit.termui import ToastPosition
+from pigit.termui.widgets import (
     AlertDialogBody,
     HelpEntry,
     HelpPanel,
     Popup,
     Sheet,
     Toast,
-    ToastPosition,
 )
 from pigit.termui.types import OverlayDispatchResult
 from pigit.termui._surface import Surface
+from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+
+
+@pytest.fixture(autouse=True)
+def _runtime_context():
+    """Provide a fresh RuntimeContext for overlay tests."""
+    runtime = RuntimeContext()
+    token = _runtime_ctx.set(runtime)
+    yield
+    _runtime_ctx.reset(token)
 
 
 class _Leaf(Component):
@@ -43,13 +53,25 @@ class DummyBody(Component):
         pass
 
 
+def _make_root(body):
+    """Create a ComponentRoot and wire it into the current RuntimeContext."""
+    from pigit.termui._root import ComponentRoot
+
+    root = ComponentRoot(body)
+    runtime = RuntimeContext.current()
+    if runtime is not None:
+        runtime.overlay_host = root
+        runtime.focus_manager = root._focus_manager
+    return root
+
+
 class TestOverlayContext:
     def test_show_toast_with_host(self):
         """验证 show_toast 在 overlay host context 下能工作"""
-        from pigit.termui._overlay_context import show_toast
+        from pigit.termui._runtime_context import show_toast
         from pigit.termui._root import ComponentRoot
 
-        root = ComponentRoot(DummyBody())
+        root = _make_root(DummyBody())
         root.resize((80, 24))
 
         result = show_toast("test message", duration=2.0)
@@ -60,34 +82,24 @@ class TestOverlayContext:
 
     def test_show_toast_no_host_returns_none(self):
         """验证无 overlay host context 时返回 None"""
-        from pigit.termui._overlay_context import (
+        from pigit.termui._runtime_context import (
             get_overlay_host,
             reset_overlay_host,
-            set_overlay_host,
             show_toast,
         )
 
-        # 清除可能由其他测试遗留的 overlay host
-        prev_host = get_overlay_host()
-        if prev_host is not None:
-            token = set_overlay_host(None)
-        else:
-            token = None
-
-        try:
-            assert get_overlay_host() is None
-            result = show_toast("test message")
-            assert result is None
-        finally:
-            if token is not None:
-                reset_overlay_host(token)
+        # 清除 overlay host
+        reset_overlay_host()
+        assert get_overlay_host() is None
+        result = show_toast("test message")
+        assert result is None
 
     def test_show_sheet_with_host(self):
         """验证 show_sheet 在 overlay host context 下能工作"""
-        from pigit.termui._overlay_context import show_sheet
+        from pigit.termui._runtime_context import show_sheet
         from pigit.termui._root import ComponentRoot
 
-        root = ComponentRoot(DummyBody())
+        root = _make_root(DummyBody())
         root.resize((80, 24))
 
         inner = _Leaf()
@@ -97,10 +109,10 @@ class TestOverlayContext:
 
     def test_show_toast_position_parameter(self):
         """验证 show_toast 支持传递 position 参数"""
-        from pigit.termui._overlay_context import show_toast
+        from pigit.termui._runtime_context import show_toast
         from pigit.termui._root import ComponentRoot
 
-        root = ComponentRoot(DummyBody())
+        root = _make_root(DummyBody())
         root.resize((80, 24))
 
         result = show_toast("test", duration=2.0, position=ToastPosition.BOTTOM_LEFT)
@@ -176,49 +188,31 @@ class TestToast:
         # BoxFrame 使用的边框字符
         assert "┌" in all_text or "─" in all_text or "│" in all_text
 
-    def test_toast_position_top_right(self):
-        """验证默认位置 TOP_RIGHT 在右上角区域"""
-        toast = Toast("Test", duration=5.0, position=ToastPosition.TOP_RIGHT)
+    @pytest.mark.parametrize(
+        "position, top, left",
+        [
+            (ToastPosition.TOP_RIGHT, True, False),
+            (ToastPosition.BOTTOM_LEFT, False, True),
+            (ToastPosition.TOP_LEFT, True, True),
+            (ToastPosition.BOTTOM_RIGHT, False, False),
+        ],
+    )
+    def test_toast_position(self, position, top, left):
+        """Verify each ToastPosition computes the correct base area."""
+        toast = Toast("Test", duration=5.0, position=position)
         surface = Surface(40, 10)
         toast.resize((40, 10))
         toast._rebuild_frame()
 
         base_row, base_col = toast._compute_base_position(surface)
-        assert base_row == 1  # 第1行（顶部）
-        assert base_col > surface.width // 2  # 在右侧区域
-
-    def test_toast_position_bottom_left(self):
-        """验证 BOTTOM_LEFT 位置在左下角区域"""
-        toast = Toast("Test", duration=5.0, position=ToastPosition.BOTTOM_LEFT)
-        surface = Surface(40, 10)
-        toast.resize((40, 10))
-        toast._rebuild_frame()
-
-        base_row, base_col = toast._compute_base_position(surface)
-        assert base_row > surface.height // 2  # 在底部区域
-        assert base_col == 1  # 第1列（左侧）
-
-    def test_toast_position_top_left(self):
-        """验证 TOP_LEFT 位置在左上角区域"""
-        toast = Toast("Test", duration=5.0, position=ToastPosition.TOP_LEFT)
-        surface = Surface(40, 10)
-        toast.resize((40, 10))
-        toast._rebuild_frame()
-
-        base_row, base_col = toast._compute_base_position(surface)
-        assert base_row == 1
-        assert base_col == 1
-
-    def test_toast_position_bottom_right(self):
-        """验证 BOTTOM_RIGHT 位置在右下角区域"""
-        toast = Toast("Test", duration=5.0, position=ToastPosition.BOTTOM_RIGHT)
-        surface = Surface(40, 10)
-        toast.resize((40, 10))
-        toast._rebuild_frame()
-
-        base_row, base_col = toast._compute_base_position(surface)
-        assert base_row > surface.height // 2
-        assert base_col > surface.width // 2
+        if top:
+            assert base_row == 1
+        else:
+            assert base_row > surface.height // 2
+        if left:
+            assert base_col == 1
+        else:
+            assert base_col > surface.width // 2
 
     def test_toast_slide_in_animation_left(self):
         """验证左侧位置的滑入动画偏移方向正确（水平方向）"""
@@ -498,36 +492,35 @@ class TestHelpPanel:
 
 class TestPopup:
     def _with_host(self, host):
-        from pigit.termui._overlay_context import set_overlay_host, reset_overlay_host
+        from pigit.termui._runtime_context import set_overlay_host
 
-        token = set_overlay_host(host)
-        return token
+        set_overlay_host(host)
 
     def test_popup_toggle_opens_when_no_modal(self):
-        from pigit.termui._overlay_context import reset_overlay_host
+        from pigit.termui._runtime_context import reset_overlay_host
 
         host = MagicMock()
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = None
         child = _Leaf()
         popup = Popup(child)
-        token = self._with_host(host)
+        self._with_host(host)
         try:
             popup.toggle()
             assert popup.open is True
             host._layer_stack.push.assert_called_once()
         finally:
-            reset_overlay_host(token)
+            reset_overlay_host()
 
     def test_popup_toggle_close_when_self_is_active(self):
-        from pigit.termui._overlay_context import reset_overlay_host
+        from pigit.termui._runtime_context import reset_overlay_host
 
         host = MagicMock()
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = None
         child = _Leaf()
         popup = Popup(child)
-        token = self._with_host(host)
+        self._with_host(host)
         try:
             popup.toggle()
             host._layer_stack.top.return_value = popup
@@ -535,22 +528,22 @@ class TestPopup:
             assert popup.open is False
             host._layer_stack.pop.assert_called_once()
         finally:
-            reset_overlay_host(token)
+            reset_overlay_host()
 
     def test_popup_toggle_blocked_when_other_modal_active(self):
-        from pigit.termui._overlay_context import reset_overlay_host
+        from pigit.termui._runtime_context import reset_overlay_host
 
         host = MagicMock()
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = MagicMock()
         child = _Leaf()
         popup = Popup(child)
-        token = self._with_host(host)
+        self._with_host(host)
         try:
             popup.toggle()
             assert popup.open is False
         finally:
-            reset_overlay_host(token)
+            reset_overlay_host()
 
     def test_popup_dispatch_overlay_key_explicit(self):
         class _KeyChild(Component):
@@ -571,30 +564,37 @@ class TestPopup:
         result = popup.dispatch_overlay_key("x")
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def test_popup_fallback_overlay_key_help_toggle(self):
-        from pigit.termui._overlay_context import reset_overlay_host
+    def test_help_panel_toggle_binding(self):
+        """HelpPanel binds '?' to toggle and delegates to on_toggle callback."""
+        toggled = []
+        panel = HelpPanel(on_toggle=lambda: toggled.append(True))
+        panel.toggle()
+        assert toggled == [True]
 
-        class _HelpChild(Component):
-            NAME = "help_child"
-            TOGGLE_HELP_SEMANTIC_KEYS = ("?",)
+    def test_help_panel_toggle_noop_without_callback(self):
+        """HelpPanel.toggle() is safe when on_toggle is None."""
+        panel = HelpPanel()
+        panel.toggle()  # should not raise
 
-            def _render_surface(self, surface):
-                pass
-
-            def refresh(self):
-                pass
+    def test_popup_auto_binds_child_toggle(self):
+        """Popup auto-wires its toggle() to child.set_on_toggle if available."""
+        from pigit.termui._runtime_context import reset_overlay_host
 
         host = MagicMock()
         host._layer_stack = MagicMock()
         host._layer_stack.top.return_value = None
-        child = _HelpChild()
-        popup = Popup(child)
-        token = self._with_host(host)
+        panel = HelpPanel()
+        popup = Popup(panel)
+        self._with_host(host)
         try:
-            result = popup.dispatch_overlay_key("?")
-            assert result is OverlayDispatchResult.HANDLED_IMPLICIT
+            # Popup should have auto-bound its toggle to the panel
+            panel.toggle()
+            assert popup.open is True
+            host._layer_stack.top.return_value = popup
+            panel.toggle()
+            assert popup.open is False
         finally:
-            reset_overlay_host(token)
+            reset_overlay_host()
 
     def test_popup_fallback_swallows_unbound(self):
         child = _Leaf()

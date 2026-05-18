@@ -12,7 +12,7 @@ from pigit.termui._bindings import (
     resolve_key_handlers,
     resolve_key_handlers_merged,
 )
-from pigit.termui._component_base import Component
+from pigit.termui._component import Component
 
 
 class _Owner:
@@ -85,6 +85,11 @@ class _Base(Component):
 
     def on_x(self) -> None:
         self.seen.append("class")
+
+    def get_help_entries(self):
+        from pigit.termui._component import _default_help_entries
+
+        return _default_help_entries(self)
 
 
 class _WithDeco(_Base):
@@ -159,3 +164,55 @@ def test_get_help_entries_keys_align_with_list_bindings():
     bind_keys = [k for k, _ in lb(owner, type(owner))]
     help_keys = [k for k, _ in help_rows]
     assert help_keys == bind_keys
+
+
+class _ParentWithDeco(Component):
+    NAME = "parent"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.seen: list = []
+
+    def refresh(self) -> None:
+        pass
+
+    def _render_surface(self, surface):
+        pass
+
+    @bind_keys("p")
+    def parent_method(self) -> None:
+        self.seen.append("parent")
+
+
+class _ChildInherits(_ParentWithDeco):
+    NAME = "child"
+
+    @bind_keys("c")
+    def child_method(self) -> None:
+        self.seen.append("child")
+
+
+def test_inherited_bind_keys_collected_from_mro():
+    """Subclass should inherit parent's @bind_keys via MRO traversal."""
+    owner = _ChildInherits()
+    h = resolve_key_handlers_merged(owner, type(owner), owner.BINDINGS)
+    assert "p" in h
+    assert "c" in h
+    h["p"]()
+    h["c"]()
+    assert owner.seen == ["parent", "child"]
+
+
+def test_child_override_bind_keys_replaces_parent():
+    """Child overriding a parent's bound method resolves to child's version."""
+
+    class _OverridingChild(_ParentWithDeco):
+        @bind_keys("p")
+        def parent_method(self) -> None:
+            self.seen.append("overridden")
+
+    owner = _OverridingChild()
+    h = resolve_key_handlers_merged(owner, type(owner), owner.BINDINGS)
+    assert "p" in h
+    h["p"]()
+    assert owner.seen == ["overridden"]

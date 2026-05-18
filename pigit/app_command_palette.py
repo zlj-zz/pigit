@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/app_palette.py
 Description: Command palette with InputLine and candidate list.
@@ -8,13 +7,13 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
-from pigit.termui import Component, InputLine, keys, OverlayDispatchResult
+from pigit.termui import Component, keys, OverlayDispatchResult
+from pigit.termui.widgets import InputLine
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
-
 
 # Default command palette commands
 DEFAULT_COMMANDS: list[str] = [
@@ -45,14 +44,15 @@ class CommandPalette(Component):
 
     def __init__(
         self,
-        on_execute: Optional[Callable[[str], None]] = None,
-        on_dismiss: Optional[Callable[[], None]] = None,
-        commands: Optional[list[str]] = None,
+        on_execute: Callable[[str], None] | None = None,
+        on_dismiss: Callable[[], None] | None = None,
+        commands: list[str] | None = None,
         x: int = 1,
         y: int = 1,
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
+        id: str | None = None,
     ) -> None:
-        super().__init__(x, y, size)
+        super().__init__(x, y, size, id=id)
         self._on_execute = on_execute
         self._on_dismiss = on_dismiss
         self._commands = commands or list(DEFAULT_COMMANDS)
@@ -91,28 +91,26 @@ class CommandPalette(Component):
 
     def on_key(self, key: str) -> None:
         """Process keyboard input."""
-        if key == keys.KEY_ESC:
-            self.close()
-            return
-        if key == keys.KEY_ENTER:
-            if self._candidates and self._selected < len(self._candidates):
-                cmd = self._candidates[self._selected]
-            else:
-                cmd = self._input_line.value.strip()
-            if cmd and self._on_execute:
-                self._on_execute(cmd)
-            self.close()
-            return
-        if key == keys.KEY_UP:
-            if self._candidates:
-                self._selected = max(0, self._selected - 1)
-            return
-        if key == keys.KEY_DOWN:
-            if self._candidates:
-                self._selected = min(len(self._candidates) - 1, self._selected + 1)
-            return
-        # Delegate all editing keys to InputLine.
-        self._input_line.on_key(key)
+        match key:
+            case keys.KEY_ESC:
+                self.close()
+            case keys.KEY_ENTER:
+                if self._candidates and self._selected < len(self._candidates):
+                    cmd = self._candidates[self._selected]
+                else:
+                    cmd = self._input_line.value.strip()
+                if cmd and self._on_execute:
+                    self._on_execute(cmd)
+                self.close()
+            case keys.KEY_UP:
+                if self._candidates:
+                    self._selected = max(0, self._selected - 1)
+            case keys.KEY_DOWN:
+                if self._candidates:
+                    self._selected = min(len(self._candidates) - 1, self._selected + 1)
+            case _:
+                # Delegate all editing keys to InputLine.
+                self._input_line.on_key(key)
 
     def _on_input_changed(self, value: str) -> None:
         """Callback fired by InputLine when value changes."""

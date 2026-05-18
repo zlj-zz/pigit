@@ -1,5 +1,87 @@
 # Changelog of pigit
 
+## 1.8.9 (2026-05-18)
+
+### Repo
+
+- **`repo ll` author column**: commit author (name + email) added to `repo ll` full output; format string extended to `%s (%cd)||%C(auto)%d||%an <%ae>`.
+- **`repo ll` empty-commit crash fix**: repos with no commits no longer crash on `||` split failure; guard checks for separator presence before parsing.
+- **`repo ll --filter` fuzzy name search**: `--filter <query>` performs case-insensitive fuzzy match on managed repo names.
+- **`repo mkbranch` batch branch creation**: create a new branch across multiple managed repos in parallel; supports `--checkout`, `--base`, `--force`, and `--dry-run`; pre-flight checks validate repo validity, branch existence, and workspace cleanliness.
+
+### Picker
+
+- **Git status in cmd picker**: picker rows show repo status symbols (unstaged `*`, staged `+`, untracked `?`) and category grouping with collapsible headers.
+- **Background hover highlight**: cursor row uses `BG_HOVER` for clearer visual focus.
+- **Filter key routing fix**: when filter input (`/`) is active, all keys route to `InputLine` instead of being intercepted by app-level bindings; Enter correctly confirms and hides the filter.
+- **Repo picker default filter state**: picker no longer starts with filter input visible; `j`/`k` navigation works on first launch.
+
+### TermUI
+
+- **Reactive module public**: `pigit.termui.reactive` (`Signal`, `Computed`, `ValueRef`, `bind_signals`) is now a public subpackage; removed from `__init__.__all__` to avoid import-time side effects.
+- **Widgets/layouts subpackages**: `pigit.termui.widgets` and `pigit.termui.containers` are now proper subpackages; imports reorganized.
+- **Pylance type errors resolved**: tightened return types, fixed self-reference annotations, and resolved pyright diagnostics across `termui/`, `cmdparse/`, and `ext/`.
+- **`exec_external` renderer cache fix**: renderer cache is cleared after resuming from an external process (e.g. `$EDITOR`) to prevent stale frame content.
+
+### Git
+
+- **`stash` includes untracked by default**: `git stash` now passes `--include-untracked` so new files are preserved.
+- **A/AM status treated as tracked**: files added to the index (`A`, `AM`) are correctly shown in diff view instead of being skipped.
+
+### App
+
+- **Terminal too small friendly message**: when the terminal has fewer than 5 rows, a descriptive error message is shown instead of a generic crash; runtime output is dimmed for less visual noise.
+- **Merge `emit()` parameter collision fix**: resolved keyword argument shadowing in merge action event bubbling.
+
+### Ext
+
+- **ANSI dim escape codes guarded**: `isatty` check prevents emitting `\033[2m` sequences to non-TTY sinks (e.g. pipes, files).
+
+### Tests
+
+- **Async loading flaky test fix**: `test_async_result_processed_during_loop` now polls with a 2-second timeout instead of a fixed `time.sleep(0.1)`, eliminating CI race conditions.
+
+## 1.8.8 (2026-05-08)
+
+### Python 3.10 Migration
+
+- **Union syntax `|`**: replace `Union[X, Y]` with `X | Y` and `Optional[X]` with `X | None` across 115 files; add `from __future__ import annotations` where needed for runtime compatibility.
+- **`TypeAlias` annotations**: `ValueRef` and other generic aliases explicitly declared with `typing.TypeAlias` for Pylance/pyright compatibility.
+- **`slots=True` for dataclasses**: `File`, `Commit`, `Branch` in `pigit/git/model.py` now use `__slots__` to reduce memory footprint and speed up attribute access.
+- **`zip(strict=True)`**: layout resizers (`Column`, `Row`), frame renderer, and managed-repos pairing now use `strict=True` to fail fast on length mismatches.
+- **`match/case` pattern matching**: replaced `isinstance` chains and key-dispatch `if/elif` ladders in `app_inspector`, `app_command_palette`, `_component_widgets`, and `app_diff`.
+- **CI matrix updated**: GitHub Actions now tests Python 3.10–3.13 (dropped 3.9).
+
+### TermUI — Reactive State System
+
+- **`Signal` / `Computed` primitives**: reactive values with subscriber notification; `Computed` supports lazy mode (recompute on read) and reactive mode (subscribe to `deps` Signals and auto-update).
+- **`ValueRef` type alias**: `T | Signal[T] | Computed[T]` for component props that accept either static or reactive data.
+- **`bind_signals()` helper**: declarative subscription linking — components auto-subscribe to reactive props and refresh on changes without manual wiring.
+- **`Header` reactive slots**: `left` / `center` / `right` accept `ValueRef[list[Segment]]`; auto-subscribe and re-render when underlying Signal or Computed changes.
+- **`HeaderState` rewrite**: pure semantic state class backed by Signal properties and Computed segment groups; moved from `termui/` to `app_` layer.
+
+### TermUI — Framework Architecture
+
+- **ContextVar-based `ComponentRegistry`**: O(1) component lookup by `id`; all `Component` subclasses auto-register on `__init__` and unregister on destruction.
+- **`by_id(id, expect_type)`**: type-safe component retrieval with runtime type assertion.
+- **Event bubbling**: `emit()` no longer calls `parent.accept()` directly; instead it walks the parent chain via `on_event()` bubbling, with `ComponentRoot` bridging to `Application.on_event` as the central router.
+- **`ActionEventType` expansion**: `goto`, `mode_changed`, `action_requested`, `selection_changed` for cross-panel communication without callback passing.
+- **Relative imports**: all `pigit.termui` internal modules use `from . import palette` / `from . import keys` instead of absolute paths.
+
+### Git Layer
+
+- **`Repo` split into `LocalGit` + `ManagedRepos`**: removed the `Repo(LocalGit, ManagedRepos)` multi-inheritance class; `Context` now holds them separately. `LocalGit` gains `bind_path()` and default logger fallback; `ManagedRepos` uses lazy-init `_git` for internal operations.
+
+### App
+
+- **Diff prefix column**: dedicated column for `+`/`-`/space prefixes in DiffViewer, separated from syntax-highlighted content.
+- **Branch-ref display**: improved alignment and spacing of branch reference badges in commit panel.
+- **Popup focus restoration**: overlay close correctly restores focus to the previously focused panel instead of leaving focus dangling.
+
+### Bug Fixes
+
+- **`g ws` command not found**: `pigit/git/cmds/__init__.py` now imports all command modules (`working_tree`, `branch`, `commit`, etc.) to trigger `@command` and `alias()` registration at import time.
+
 ## 1.8.7 (2026-05-04)
 
 ### App — Commit Panel

@@ -23,9 +23,7 @@ def test_empty():
 
 
 def test_linear_history():
-    rows = compute_graph_rows(
-        [_mk("c", ["b"]), _mk("b", ["a"]), _mk("a", [])]
-    )
+    rows = compute_graph_rows([_mk("c", ["b"]), _mk("b", ["a"]), _mk("a", [])])
     assert len(rows) == 3
 
     assert rows[0].lanes_before == []
@@ -45,9 +43,7 @@ def test_linear_history():
 
 def test_single_merge():
     # M is a merge of X (mainline) and Y (side branch tip pointing at X).
-    rows = compute_graph_rows(
-        [_mk("M", ["X", "Y"]), _mk("Y", ["X"]), _mk("X", [])]
-    )
+    rows = compute_graph_rows([_mk("M", ["X", "Y"]), _mk("Y", ["X"]), _mk("X", [])])
 
     assert rows[0].commit_lane == 0
     assert rows[0].closed_lanes == []

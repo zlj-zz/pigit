@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: pigit/git/cmds/_utils.py
 Description: Utility functions for cmd_new.
@@ -6,14 +5,16 @@ Author: Zev
 Date: 2026-04-10
 """
 
-from typing import Union, TypeVar
+from __future__ import annotations
+
+from typing import TypeVar
 
 from pigit.ext.utils import strtobool
 
 T = TypeVar("T")
 
 
-def is_truthy(value: Union[str, bool, None]) -> bool:
+def is_truthy(value: str | bool | None) -> bool:
     """Check if value is truthy.
 
     Args:

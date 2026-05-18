@@ -1,16 +1,23 @@
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_layouts import TabView
-from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
+from pigit.termui._component import Component, ComponentError
+from pigit.termui.containers import TabView
+from pigit.termui.widgets import ItemList, LineTextBrowser
 from pigit.termui.types import ActionEventType, OverlayDispatchResult
-
 
 # --- Helpers ---
 
 
 class _Leaf(Component):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_help_entries(self):
+        from pigit.termui._component import _default_help_entries
+
+        return _default_help_entries(self)
+
     def refresh(self):
         pass
 
@@ -19,9 +26,9 @@ class _Leaf(Component):
 
 
 class MockComponent(Component):
-    def __init__(self, name):
+    def __init__(self, name, id=None):
         self._name = name
-        super().__init__()
+        super().__init__(id=id)
 
     def _render_surface(self, surface):
         pass
@@ -42,18 +49,18 @@ class MockTabView(TabView):
 
 
 class TestComponentBase:
-    def test_emit_to_parent(self):
+    def test_emit_bubbles_to_on_event(self):
         parent = _Leaf()
         child = _Leaf()
         child.parent = parent
-        parent.accept = MagicMock()
+        parent.on_event = MagicMock(return_value=True)
         child.emit(ActionEventType.goto, target="x")
-        parent.accept.assert_called_once_with(ActionEventType.goto, target="x")
+        parent.on_event.assert_called_once_with(ActionEventType.goto, target="x")
 
-    def test_emit_without_parent_raises(self):
+    def test_emit_without_parent_logs_warning(self):
         child = _Leaf()
-        with pytest.raises(ComponentError, match="Has no parent"):
-            child.emit(ActionEventType.goto, target="x")
+        # No parent: emit logs a warning instead of raising
+        child.emit(ActionEventType.goto, target="x")
 
     def test_notify_children(self):
         a, b = _Leaf(), _Leaf()
@@ -115,6 +122,7 @@ class TestComponentBase:
         entries = _Bound().get_help_entries()
         assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
+
 class TestTabView:
     def test_duplicate_component_name_allowed(self):
         a = MockComponent("dup")
@@ -122,13 +130,13 @@ class TestTabView:
         assert a._name == "dup"
         assert b._name == "dup"
 
-    def test_container_key_routing_via_shortcuts(self):
+    def test_container_key_routing(self):
         received: list = []
 
         class RecordingChild(Component):
             def __init__(self, label: str) -> None:
                 self._label = label
-                super().__init__()
+                super().__init__(id=label)
 
             def _handle_event(self, key: str) -> None:
                 received.append((self._label, key))
@@ -146,16 +154,11 @@ class TestTabView:
         main = RecordingChild("main")
         secondary = RecordingChild("secondary")
 
-        # shortcut "2" switches to secondary; after switch, key is NOT re-dispatched
-        tv = RoutingTabView(
-            children=[main, secondary],
-            shortcuts={"2": secondary},
-            start=main,
-        )
-        received.clear()
-        tv._handle_event("2")
+        tv = RoutingTabView(children=[main, secondary], start="main")
+
+        # route_to switches to secondary
+        tv.route_to("secondary")
         assert secondary.is_activated() is True
-        assert received == []
 
         # key "k" delegates to active child
         received.clear()
@@ -175,19 +178,15 @@ class TestTabView:
         self, start_idx, switch_target_idx, expected_active_idx
     ):
         # Arrange
-        main = MockComponent("main")
-        secondary = MockComponent("secondary")
+        main = MockComponent("main", id="main")
+        secondary = MockComponent("secondary", id="secondary")
         children = [main, secondary]
-        shortcuts = {}
-        if switch_target_idx is not None:
-            shortcuts["x"] = children[switch_target_idx]
+        start_id = children[start_idx].id
 
         # Act
-        tab_view = MockTabView(
-            children=children, shortcuts=shortcuts or None, start=children[start_idx]
-        )
+        tab_view = MockTabView(children=children, start=start_id)
         if switch_target_idx is not None:
-            tab_view._handle_event("x")
+            tab_view.route_to(children[switch_target_idx].id)
 
         # Assert
         assert children[
@@ -318,21 +317,21 @@ class TestLineTextBrowser:
         assert browser._i == expected_index
 
 
-class MockItemSelector(ItemSelector):
+class MockItemList(ItemList):
     def refresh(self):
         pass
 
 
-class TestItemSelector:
-    def test_ItemSelector_init_error(self):
+class TestItemList:
+    def test_ItemList_init_error(self):
         # CURSOR length != 1 raises ComponentError
-        class BadSelector(ItemSelector):
+        class BadSelector(ItemList):
             CURSOR = "**"
 
         with pytest.raises(ComponentError):
             BadSelector()
 
-    # Test initialization of ItemSelector
+    # Test initialization of ItemList
     @pytest.mark.parametrize(
         "x, y, size, content",
         [
@@ -340,12 +339,12 @@ class TestItemSelector:
             (0, 0, (5, 5), []),
         ],
     )
-    def test_ItemSelector_init(self, x, y, size, content):
+    def test_ItemList_init(self, x, y, size, content):
         # Arrange
-        MockItemSelector.CURSOR = "*"
+        MockItemList.CURSOR = "*"
 
         # Act
-        selector = MockItemSelector(x=x, y=y, size=size, content=content)
+        selector = MockItemList(x=x, y=y, size=size, content=content)
 
         # Assert
         assert selector.x == x
@@ -365,8 +364,8 @@ class TestItemSelector:
         ],
         ids=["resize_larger", "resize_smaller"],
     )
-    def test_ItemSelector_resize(self, initial_size, new_size):
-        selector = MockItemSelector(size=initial_size)
+    def test_ItemList_resize(self, initial_size, new_size):
+        selector = MockItemList(size=initial_size)
 
         selector.resize(new_size)
         assert selector._size == new_size
@@ -381,8 +380,8 @@ class TestItemSelector:
         ],
         ids=["next_single_step", "next_multiple_steps", "next_beyond_end"],
     )
-    def test_ItemSelector_next(self, content, initial_pos, step, expected_pos):
-        selector = MockItemSelector(content=content)
+    def test_ItemList_next(self, content, initial_pos, step, expected_pos):
+        selector = MockItemList(content=content)
         selector.curr_no = initial_pos
 
         selector.next(step=step)
@@ -398,18 +397,18 @@ class TestItemSelector:
         ],
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
-    def test_ItemSelector_previous(self, content, initial_pos, step, expected_pos):
-        selector = MockItemSelector(content=content)
+    def test_ItemList_previous(self, content, initial_pos, step, expected_pos):
+        selector = MockItemList(content=content)
         selector.curr_no = initial_pos
 
         selector.previous(step=step)
         assert selector.curr_no == expected_pos
 
 
-class TestItemSelectorLazyLoad:
+class TestItemListLazyLoad:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
-        class DemoPanel(ItemSelector):
+        class DemoPanel(ItemList):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -430,7 +429,7 @@ class TestItemSelectorLazyLoad:
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 
-        class DemoPanel2(ItemSelector):
+        class DemoPanel2(ItemList):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -446,5 +445,3 @@ class TestItemSelectorLazyLoad:
         p.resize((20, 10))
         assert DemoPanel2.fresh_calls == 1
         assert p.content == ["a", "b"]
-
-
