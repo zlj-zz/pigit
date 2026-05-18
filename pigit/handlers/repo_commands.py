@@ -50,7 +50,7 @@ class RepoCommandHandler:
                 if reverse:
                     self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
                 else:
-                    self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
+                    self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[6][1]}")
             else:
                 if reverse:
                     summary_string = textwrap.dedent(f"""\
@@ -64,7 +64,8 @@ class RepoCommandHandler:
                             {info[2][0]}: {info[2][1]}
                             {info[3][0]}: `{info[3][1]}`<khaki>
                             {info[4][0]}: `{info[4][1]}`<ok>
-                            {info[5][0]}: `{info[5][1]}`<sky_blue>
+                            {info[5][0]}: `{info[5][1]}`<yellow>
+                            {info[6][0]}: `{info[6][1]}`<sky_blue>
                         """)
                 self.console.echo(summary_string)
 

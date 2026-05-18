@@ -25,6 +25,7 @@ def mock_ctx():
                 ("Status", "s"),
                 ("Commit Hash", "h"),
                 ("Commit Msg", "m"),
+                ("Author", "a"),
                 ("Local Path", "/lp"),
             ]
         ]

@@ -202,11 +202,17 @@ class ManagedRepos:
                 )
                 commit = self._git.load_log(
                     limit=1,
-                    arg_str="--format='%s (%cd)||%C(auto)%d%n' --date=relative --color",
+                    arg_str="--format='%s (%cd)||%C(auto)%d||%an <%ae>%n' --date=relative --color",
                     path=repo_path,
                 )
 
-                commit_msg, branch_status = commit.strip().split("||")
+                if "||" in commit:
+                    parts = commit.strip().split("||")
+                    commit_msg = parts[0]
+                    branch_status = parts[1] if len(parts) > 1 else ""
+                    author = parts[2] if len(parts) > 2 else ""
+                else:
+                    commit_msg, branch_status, author = commit.strip() or "", "", ""
                 unstaged_symbol = "*" if unstaged else " "
                 staged_symbol = "+" if staged else " "
                 untracked_symbol = "?" if untracked else " "
@@ -220,6 +226,7 @@ class ManagedRepos:
                     ("Status", branch_status),
                     ("Commit Hash", commit_hash),
                     ("Commit Msg", commit_msg),
+                    ("Author", author),
                     ("Local Path", repo_path),
                 ]
 
