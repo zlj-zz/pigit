@@ -510,7 +510,9 @@ def run_cmd_new_picker(
             if self._mode == PickerMode.PARAM_INPUT:
                 assert self._pending_entry is not None
                 self._finish_execute(self._pending_entry, value)
-            if not self._input._visible:
+            else:
+                # Filter mode — hide input line so focus returns to the list.
+                self._input._visible = False
                 self._layout.set_heights([2, "flex", 1, 0])
 
         def _on_input_cancel(self) -> None:

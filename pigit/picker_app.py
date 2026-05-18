@@ -123,10 +123,11 @@ class BasePickerApp(Application):
     # --- Overridable hooks ---
 
     def build_input(self) -> InputLine:
-        """Build the input line component. Subclasses may override to customize (e.g. cmd picker's visible=False)."""
+        """Build the input line component. Subclasses may override to customize."""
         return InputLine(
             prompt="/",
             overlay_mode=True,
+            visible=False,
             on_value_changed=self._on_filter,
             on_submit=self._on_filter_done,
             on_cancel=self._on_filter_done,
@@ -162,6 +163,14 @@ class BasePickerApp(Application):
             self.quit(exit_code=1, result_message=self.get_terminal_too_small_msg())
 
     def on_key(self, key: str) -> None:
+        if self._input.is_visible:
+            # InputLine is active (filter mode) — route keys to it.
+            # ESC hides the input; everything else edits the filter text.
+            if key in (keys.KEY_ESC,):
+                self._input.on_key(keys.KEY_ESC)
+            else:
+                self._input.on_key(key)
+            return
         if key in ("j", keys.KEY_DOWN):
             self._list.next()
         elif key in ("k", keys.KEY_UP):
@@ -187,6 +196,7 @@ class BasePickerApp(Application):
         self._update_status()
 
     def _on_filter_done(self, _value: str = "") -> None:
+        self._input._visible = False
         self._layout.set_heights([2, "flex", 1, 0])
 
     def toggle_help(self) -> None:
