@@ -5,7 +5,7 @@ import os
 import platform
 
 __project__ = "pigit"
-__version__ = "1.8.8"
+__version__ = "1.8.9"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 

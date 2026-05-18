@@ -1,5 +1,46 @@
 # Changelog of pigit
 
+## 1.8.9 (2026-05-18)
+
+### Repo
+
+- **`repo ll` author column**: commit author (name + email) added to `repo ll` full output; format string extended to `%s (%cd)||%C(auto)%d||%an <%ae>`.
+- **`repo ll` empty-commit crash fix**: repos with no commits no longer crash on `||` split failure; guard checks for separator presence before parsing.
+- **`repo ll --filter` fuzzy name search**: `--filter <query>` performs case-insensitive fuzzy match on managed repo names.
+- **`repo mkbranch` batch branch creation**: create a new branch across multiple managed repos in parallel; supports `--checkout`, `--base`, `--force`, and `--dry-run`; pre-flight checks validate repo validity, branch existence, and workspace cleanliness.
+
+### Picker
+
+- **Git status in cmd picker**: picker rows show repo status symbols (unstaged `*`, staged `+`, untracked `?`) and category grouping with collapsible headers.
+- **Background hover highlight**: cursor row uses `BG_HOVER` for clearer visual focus.
+- **Filter key routing fix**: when filter input (`/`) is active, all keys route to `InputLine` instead of being intercepted by app-level bindings; Enter correctly confirms and hides the filter.
+- **Repo picker default filter state**: picker no longer starts with filter input visible; `j`/`k` navigation works on first launch.
+
+### TermUI
+
+- **Reactive module public**: `pigit.termui.reactive` (`Signal`, `Computed`, `ValueRef`, `bind_signals`) is now a public subpackage; removed from `__init__.__all__` to avoid import-time side effects.
+- **Widgets/layouts subpackages**: `pigit.termui.widgets` and `pigit.termui.containers` are now proper subpackages; imports reorganized.
+- **Pylance type errors resolved**: tightened return types, fixed self-reference annotations, and resolved pyright diagnostics across `termui/`, `cmdparse/`, and `ext/`.
+- **`exec_external` renderer cache fix**: renderer cache is cleared after resuming from an external process (e.g. `$EDITOR`) to prevent stale frame content.
+
+### Git
+
+- **`stash` includes untracked by default**: `git stash` now passes `--include-untracked` so new files are preserved.
+- **A/AM status treated as tracked**: files added to the index (`A`, `AM`) are correctly shown in diff view instead of being skipped.
+
+### App
+
+- **Terminal too small friendly message**: when the terminal has fewer than 5 rows, a descriptive error message is shown instead of a generic crash; runtime output is dimmed for less visual noise.
+- **Merge `emit()` parameter collision fix**: resolved keyword argument shadowing in merge action event bubbling.
+
+### Ext
+
+- **ANSI dim escape codes guarded**: `isatty` check prevents emitting `\033[2m` sequences to non-TTY sinks (e.g. pipes, files).
+
+### Tests
+
+- **Async loading flaky test fix**: `test_async_result_processed_during_loop` now polls with a 2-second timeout instead of a fixed `time.sleep(0.1)`, eliminating CI race conditions.
+
 ## 1.8.8 (2026-05-08)
 
 ### Python 3.10 Migration
