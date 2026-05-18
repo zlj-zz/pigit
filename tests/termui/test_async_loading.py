@@ -122,14 +122,18 @@ def test_async_result_processed_during_loop():
     loop._render_requested = True
 
     # Run loop for a short time then break
-    start = time.monotonic()
     loop._loop = lambda: None  # We'll manually poll
 
-    # Wait for background thread
-    time.sleep(0.1)
+    # ThreadPoolExecutor scheduling + work() duration varies across machines.
+    # A fixed sleep is flaky on slow CI runners; poll with a generous timeout
+    # so the test adapts to the actual execution speed.
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if panel.loaded:
+            break
+        time.sleep(0.01)
 
-    # Poll should deliver result
-    AsyncTask.poll_all()
     assert panel.loaded
     assert panel.data == ["a", "b", "c"]
 
