@@ -8,8 +8,8 @@ Date: 2026-04-20
 
 import pytest
 
-from pigit.termui._component_base import Component
-from pigit.termui._component_layouts import Column
+from pigit.termui._component import Component
+from pigit.termui.containers import Column
 
 
 def _make_component(name: str = "mock") -> Component:

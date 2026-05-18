@@ -51,18 +51,22 @@ def bind_keys(*semantic_keys: str) -> Callable[[Any], Any]:
 
 
 def collect_decorator_bindings(cls: type) -> BindingsList:
-    """Collect ``(key, method_name)`` from ``@bind_keys`` in class definition order."""
+    """Collect ``(key, method_name)`` from ``@bind_keys`` across the MRO.
+
+    Parent class bindings are collected before subclass bindings, so
+    overrides in subclasses are discovered naturally.
+    """
 
     out: BindingsList = []
-    for name in cls.__dict__:
-        obj = cls.__dict__[name]
-        keys = getattr(obj, _PIGIT_BINDING_ATTR, None)
-        if not keys:
-            continue
-        if not isinstance(keys, tuple):
-            continue
-        for semantic_key in keys:
-            out.append((semantic_key, name))
+    for klass in reversed(cls.__mro__[:-1]):  # exclude object
+        for name, obj in klass.__dict__.items():
+            keys = getattr(obj, _PIGIT_BINDING_ATTR, None)
+            if not keys:
+                continue
+            if not isinstance(keys, tuple):
+                continue
+            for semantic_key in keys:
+                out.append((semantic_key, name))
     return out
 
 

@@ -16,22 +16,21 @@ from pigit.termui import (
     AlertDialog,
     Application,
     by_id,
-    Column,
     Component,
     ComponentRoot,
     exec_external,
     ExitEventLoop,
-    Header,
     HelpPanel,
     hide_spinner,
     keys,
     Popup,
-    Row,
     show_spinner,
     show_toast,
-    TabView,
     ToastPosition,
 )
+from pigit.termui.containers import Column, Row, TabView
+from pigit.termui.tty_io import terminal_size
+from pigit.termui.widgets import Header
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
 from .git.local_git import GitError
@@ -90,47 +89,42 @@ class PigitApplication(Application):
     }
 
     def build_root(self) -> Component:
-        DiffViewer(id="diff")
-        StatusPanel(display=by_id("diff"), git=self._git, id="status")
-        BranchPanel(
-            git=self._git,
-            branch_signal=self._branch_signal,
-            id="branch",
-        )
-        CommitPanel(display=by_id("diff"), git=self._git, id="commit")
+        footer = AppFooter(theme=THEME, id="footer")
+        footer.set_global_help([("Q", "Quit"), ("I", "Inspector"), (";", "Palette")])
+
+        inspector_panel = InspectorPanel(id="inspector")
 
         def _on_tab_switch(panel: Component) -> None:
-            footer = by_id("footer", AppFooter)
             provider = getattr(panel, "get_help_entries", None)
             footer.set_help_provider(provider)
             self._header_state.tab, self._header_state.tab_key = self._TAB_CONFIG.get(
                 type(panel), ("", "")
             )
-            by_id("inspector", InspectorPanel).update_from(panel)
+            inspector_panel.update_from(panel)
 
-        TabView(
-            children=[by_id("status"), by_id("branch"), by_id("commit"), by_id("diff")],
+        panel_tab = TabView(
+            children=[
+                StatusPanel(git=self._git, id="status"),
+                BranchPanel(
+                    git=self._git,
+                    branch_signal=self._branch_signal,
+                    id="branch",
+                ),
+                CommitPanel(git=self._git, id="commit"),
+                DiffViewer(id="diff"),
+            ],
             start="status",
             on_switch=_on_tab_switch,
             id="tab_view",
         )
-
-        Header(
-            left=self._header_state.left,
-            center=self._header_state.center,
-            right=self._header_state.right,
-            separator=True,
-            sep_fg=THEME.fg_dim,
-            id="header",
-        )
-        footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("Q", "Quit"), ("I", "Inspector"), (";", "Palette")])
-        provider = getattr(by_id("tab_view", TabView).active, "get_help_entries", None)
+        provider = getattr(panel_tab.active, "get_help_entries", None)
         footer.set_help_provider(provider)
 
-        InspectorPanel(id="inspector")
-        Row(
-            children=[by_id("tab_view", TabView), by_id("inspector", InspectorPanel)],
+        body = Row(
+            children=[
+                panel_tab,
+                inspector_panel,
+            ],
             widths=["flex", 0],
             id="body_row",
         )
@@ -143,9 +137,16 @@ class PigitApplication(Application):
 
         return Column(
             children=[
-                by_id("header"),
-                by_id("body_row", Row),
-                by_id("footer", AppFooter),
+                Header(
+                    left=self._header_state.left,
+                    center=self._header_state.center,
+                    right=self._header_state.right,
+                    separator=True,
+                    sep_fg=THEME.fg_dim,
+                    id="header",
+                ),
+                body,
+                footer,
             ],
             heights=[2, "flex", 2],
         )
@@ -159,13 +160,13 @@ class PigitApplication(Application):
             self._help_panel,
             exit_key=keys.KEY_ESC,
         )
-        self._loop.set_input_timeouts(0.125)
 
     def after_start(self):
-        size = self._loop.get_term_size()
-        if size.columns < 65 or size.lines < 10:
+        cols, rows = terminal_size()
+        if cols < 65 or rows < 10:
+            assert self._loop is not None
             self._loop.quit(
-                f"Terminal too small ({size.columns}x{size.lines}, need at least 65x10).",
+                f"Terminal too small ({cols}x{rows}, need at least 65x10).",
                 exit_code=1,
             )
 
@@ -222,16 +223,15 @@ class PigitApplication(Application):
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
         self._inspector_visible = not self._inspector_visible
-        size = self._loop.get_term_size()
+        cols, _ = terminal_size()
         body_row = by_id("body_row", Row)
         inspector = by_id("inspector", InspectorPanel)
         tab_view = by_id("tab_view", TabView)
         if self._inspector_visible:
-            body_row.set_widths(["flex", self._inspector_width(size.columns)])
+            body_row.set_widths(["flex", self._inspector_width(cols)])
             inspector.update_from(tab_view.active)
         else:
             body_row.set_widths(["flex", 0])
-        self._root.resize(size)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute inspector width on terminal resize."""
@@ -446,8 +446,8 @@ class PigitApplication(Application):
 
         self._confirm_push_and_finish(target, source)
 
-    def quit(self):
-        raise ExitEventLoop("Quit")
+    def quit(self, *, exit_code: int = 0, result_message: str | None = None):
+        raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
     def run(self):
         try:

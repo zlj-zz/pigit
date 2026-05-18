@@ -1,16 +1,23 @@
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component_base import Component, ComponentError
-from pigit.termui._component_layouts import TabView
-from pigit.termui._component_widgets import ItemSelector, LineTextBrowser
+from pigit.termui._component import Component, ComponentError
+from pigit.termui.containers import TabView
+from pigit.termui.widgets import ItemList, LineTextBrowser
 from pigit.termui.types import ActionEventType, OverlayDispatchResult
-
 
 # --- Helpers ---
 
 
 class _Leaf(Component):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_help_entries(self):
+        from pigit.termui._component import _default_help_entries
+
+        return _default_help_entries(self)
+
     def refresh(self):
         pass
 
@@ -115,6 +122,7 @@ class TestComponentBase:
         entries = _Bound().get_help_entries()
         assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
+
 class TestTabView:
     def test_duplicate_component_name_allowed(self):
         a = MockComponent("dup")
@@ -176,9 +184,7 @@ class TestTabView:
         start_id = children[start_idx].id
 
         # Act
-        tab_view = MockTabView(
-            children=children, start=start_id
-        )
+        tab_view = MockTabView(children=children, start=start_id)
         if switch_target_idx is not None:
             tab_view.route_to(children[switch_target_idx].id)
 
@@ -311,21 +317,21 @@ class TestLineTextBrowser:
         assert browser._i == expected_index
 
 
-class MockItemSelector(ItemSelector):
+class MockItemList(ItemList):
     def refresh(self):
         pass
 
 
-class TestItemSelector:
-    def test_ItemSelector_init_error(self):
+class TestItemList:
+    def test_ItemList_init_error(self):
         # CURSOR length != 1 raises ComponentError
-        class BadSelector(ItemSelector):
+        class BadSelector(ItemList):
             CURSOR = "**"
 
         with pytest.raises(ComponentError):
             BadSelector()
 
-    # Test initialization of ItemSelector
+    # Test initialization of ItemList
     @pytest.mark.parametrize(
         "x, y, size, content",
         [
@@ -333,12 +339,12 @@ class TestItemSelector:
             (0, 0, (5, 5), []),
         ],
     )
-    def test_ItemSelector_init(self, x, y, size, content):
+    def test_ItemList_init(self, x, y, size, content):
         # Arrange
-        MockItemSelector.CURSOR = "*"
+        MockItemList.CURSOR = "*"
 
         # Act
-        selector = MockItemSelector(x=x, y=y, size=size, content=content)
+        selector = MockItemList(x=x, y=y, size=size, content=content)
 
         # Assert
         assert selector.x == x
@@ -358,8 +364,8 @@ class TestItemSelector:
         ],
         ids=["resize_larger", "resize_smaller"],
     )
-    def test_ItemSelector_resize(self, initial_size, new_size):
-        selector = MockItemSelector(size=initial_size)
+    def test_ItemList_resize(self, initial_size, new_size):
+        selector = MockItemList(size=initial_size)
 
         selector.resize(new_size)
         assert selector._size == new_size
@@ -374,8 +380,8 @@ class TestItemSelector:
         ],
         ids=["next_single_step", "next_multiple_steps", "next_beyond_end"],
     )
-    def test_ItemSelector_next(self, content, initial_pos, step, expected_pos):
-        selector = MockItemSelector(content=content)
+    def test_ItemList_next(self, content, initial_pos, step, expected_pos):
+        selector = MockItemList(content=content)
         selector.curr_no = initial_pos
 
         selector.next(step=step)
@@ -391,18 +397,18 @@ class TestItemSelector:
         ],
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
-    def test_ItemSelector_previous(self, content, initial_pos, step, expected_pos):
-        selector = MockItemSelector(content=content)
+    def test_ItemList_previous(self, content, initial_pos, step, expected_pos):
+        selector = MockItemList(content=content)
         selector.curr_no = initial_pos
 
         selector.previous(step=step)
         assert selector.curr_no == expected_pos
 
 
-class TestItemSelectorLazyLoad:
+class TestItemListLazyLoad:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
-        class DemoPanel(ItemSelector):
+        class DemoPanel(ItemList):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -423,7 +429,7 @@ class TestItemSelectorLazyLoad:
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 
-        class DemoPanel2(ItemSelector):
+        class DemoPanel2(ItemList):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -439,5 +445,3 @@ class TestItemSelectorLazyLoad:
         p.resize((20, 10))
         assert DemoPanel2.fresh_calls == 1
         assert p.content == ["a", "b"]
-
-

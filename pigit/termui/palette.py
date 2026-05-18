@@ -24,6 +24,11 @@ DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK
 
+# ── Row state backgrounds (widgets) ──
+BG_HOVER: tuple[int, int, int] = (42, 45, 46)
+BG_ACTIVE: tuple[int, int, int] = (40, 45, 55)
+BG_DANGER_ROW: tuple[int, int, int] = (55, 35, 35)
+
 # ── Style flags (bitmask) ──
 STYLE_BOLD = 1 << 0
 STYLE_DIM = 1 << 1

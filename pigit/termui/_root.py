@@ -7,23 +7,23 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-import logging
 import time
 from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from ._component_base import Component, _set_focus_chain
+from ._component import Component
 from ._layer import LayerKind, LayerStack
 from .types import OverlayDispatchResult, ToastPosition
-from . import _overlay_context
+from ._runtime_context import (
+    FocusManager,
+    get_badge_signal,
+)
 
 if TYPE_CHECKING:
-    from ._component_registry import ComponentRegistry
-    from ._overlay_components import Sheet, Toast
+    from ._runtime_context import ComponentRegistry
     from ._segment import Segment
     from ._surface import Surface, _Subsurface
-
-_logger = logging.getLogger(__name__)
+    from .widgets import Sheet, Toast
 
 
 class ComponentRoot(Component):
@@ -42,7 +42,8 @@ class ComponentRoot(Component):
         self._body.parent = self
         self._registry = registry
         self._layer_stack = LayerStack()
-        self._overlay_host_token = _overlay_context.set_overlay_host(self)
+        self._focus_manager = FocusManager(self)
+        self._focus_manager.sync_focus_to_overlay_or_leaf()
         self._badge_text: str | None = None
         self._badge_bg: tuple[int, int, int] | None = None
         self._badge_fg: tuple[int, int, int] | None = None
@@ -50,14 +51,15 @@ class ComponentRoot(Component):
         self._app_on_event: Callable | None = None
 
     def destroy(self) -> None:
-        """Clean up overlay host token and destroy all children."""
-        try:
-            _overlay_context.reset_overlay_host(self._overlay_host_token)
-        except (RuntimeError, ValueError):
-            _logger.error("Failed to reset overlay host token", exc_info=True)
-        if callable(getattr(self._body, "destroy", None)):
-            self._body.destroy()
+        """Destroy children. Runtime context is reset by the caller."""
+        self._body.destroy()
         super().destroy()
+
+    def sync_focus_after_app_binding(self, overlay_was_open: bool) -> None:
+        """Restore focus to body leaf when an app binding closes an overlay."""
+        self._focus_manager.sync_focus_if_overlay_closed(
+            overlay_was_open, self.has_overlay_open()
+        )
 
     @property
     def body(self) -> Component:
@@ -104,7 +106,7 @@ class ComponentRoot(Component):
         self._badge_bg = None
         self._badge_fg = None
         self._badge_until = 0
-        sig = _overlay_context.get_badge_signal()
+        sig = get_badge_signal()
         if sig.value is not None:
             sig.set(None)
 
@@ -149,7 +151,9 @@ class ComponentRoot(Component):
 
     def accept(self, action, **data):
         """Forward an action to the body component."""
-        self._body.accept(action, **data)
+        accept_fn = getattr(self._body, "accept", None)
+        if callable(accept_fn):
+            accept_fn(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the body and all active overlays to the new terminal size."""
@@ -163,33 +167,6 @@ class ComponentRoot(Component):
         self._body._render_surface(surface)
         self._layer_stack.render(surface)
 
-    def _find_focus_leaf(self, start: Component | None = None) -> Component:
-        """Walk down the component tree to find the deepest focusable leaf.
-
-        Follows ``active`` when available (TabView) and drills into ``children``
-        for layout containers (Column, Row) that do not define ``active``.
-        """
-        leaf = start if start is not None else self._body
-        while True:
-            active = getattr(leaf, "active", None)
-            if active is not None:
-                leaf = active
-                continue
-            children = getattr(leaf, "children", None)
-            if children:
-                for child in children:
-                    if getattr(child, "active", None) is not None:
-                        leaf = child
-                        break
-                    if getattr(child, "children", None):
-                        leaf = child
-                        break
-                else:
-                    break
-            else:
-                break
-        return leaf
-
     def _top_open_overlay(self) -> Component | None:
         for kind in (LayerKind.MODAL, LayerKind.SHEET):
             top = self._layer_stack.top(kind)
@@ -200,16 +177,12 @@ class ComponentRoot(Component):
     def _handle_event(self, key: str) -> None:
         result = self.try_dispatch_overlay(key)
         if result != OverlayDispatchResult.DROPPED_UNBOUND:
-            top = self._top_open_overlay()
-            if top is not None:
-                _set_focus_chain(top)
-            else:
-                _set_focus_chain(self._find_focus_leaf())
+            self._focus_manager.sync_focus_to_overlay_or_leaf()
             return
-        self._body._handle_event(key)
-        top = self._top_open_overlay()
-        if top is not None:
-            _set_focus_chain(top)
+        leaf = self._focus_manager.get_event_target()
+        if leaf is not None:
+            leaf._handle_event(key)
+        self._focus_manager.sync_focus_to_overlay()
 
     def _expire_badge(self) -> None:
         if getattr(self, "_badge_until", 0) and time.monotonic() > self._badge_until:
@@ -239,7 +212,7 @@ class ComponentRoot(Component):
         Returns:
             Toast instance.
         """
-        from ._overlay_components import Toast
+        from .widgets import Toast
 
         existing = self._layer_stack.top(LayerKind.TOAST)
         if existing is not None:
@@ -255,7 +228,7 @@ class ComponentRoot(Component):
 
     def show_sheet(self, child: Component, height: int = 8) -> Sheet:
         """Display a bottom sheet on the SHEET layer."""
-        from ._overlay_components import Sheet
+        from .widgets import Sheet
 
         sheet = Sheet(child, height)
         sheet.resize(self._size)

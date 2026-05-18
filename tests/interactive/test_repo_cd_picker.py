@@ -14,7 +14,7 @@ from pigit.git.repo_cd_picker import (
     REPO_CD_NO_TTY_MSG,
     run_repo_cd_picker,
 )
-from pigit.termui._picker import PickerRow
+from pigit.picker_app import PickerRow
 
 
 class MockExecutor:
@@ -87,9 +87,11 @@ def _ensure_pigit_context():
 
 
 def test_entry_repo_cd_passes_pick_flag():
-    with patch.object(entry_mod.ctx.managed_repos, "cd_repo", return_value=(0, None)) as m:
+    with patch.object(
+        entry_mod.ctx.managed_repos, "cd_repo", return_value=(0, None)
+    ) as m:
         entry_mod.pigit("repo cd --pick".split())
-    m.assert_called_once_with(None, pick=True, pick_alt_screen=False)
+    m.assert_called_once_with(None, pick=True)
 
 
 @pytest.mark.parametrize("stdin_tty,stdout_tty", [(True, False), (False, True)])

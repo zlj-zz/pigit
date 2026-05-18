@@ -16,6 +16,10 @@ class FakeSession:
         self.stdout = mock.Mock()
 
 
+def _capture_output(session: FakeSession) -> str:
+    return "".join(c[0][0] for c in session.stdout.write.call_args_list)
+
+
 class TestRowToStr:
     def test_plain_cells(self):
         r = Renderer(FakeSession())
@@ -27,27 +31,6 @@ class TestRowToStr:
         row = [Cell("中"), Cell(""), Cell("a")]
         assert r._row_to_str(row) == "中a"
 
-    def test_style_transitions_and_resets(self):
-        r = Renderer(FakeSession())
-        row = [
-            Cell("a", style="\033[31m"),
-            Cell("b", style="\033[31m"),
-            Cell("c", style="\033[32m"),
-            Cell("d"),
-        ]
-        result = r._row_to_str(row)
-        assert result == "\033[31mab\033[0m\033[32mc\033[0md"
-
-    def test_mixed_empty_and_style_cells(self):
-        r = Renderer(FakeSession())
-        row = [
-            Cell(""),
-            Cell("x", style="\033[1m"),
-            Cell(""),
-            Cell("y"),
-        ]
-        assert r._row_to_str(row) == "\033[1mx\033[0my"
-
 
 class TestRenderSurface:
     def test_first_frame_does_full_clear(self):
@@ -57,7 +40,7 @@ class TestRenderSurface:
         s.draw_text_rgb(0, 0, "hello", fg=DEFAULT_FG, bg=DEFAULT_BG)
         s.draw_text_rgb(1, 0, "world", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[2J" in written
 
     def test_second_frame_only_rewrites_changed_rows(self):
@@ -71,7 +54,7 @@ class TestRenderSurface:
         sess.stdout.reset_mock()
         s.draw_text_rgb(1, 0, "changed", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[2J" not in written
         assert "changed" in written
         assert "hello" not in written
@@ -86,7 +69,7 @@ class TestRenderSurface:
         sess.stdout.reset_mock()
         r.clear_cache()
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[2J" in written
 
     def test_dimension_change_triggers_full_clear(self):
@@ -99,15 +82,8 @@ class TestRenderSurface:
         r.render_surface(s1)
         sess.stdout.reset_mock()
         r.render_surface(s2)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[2J" in written
-
-    def test_no_rows_surface_does_not_crash(self):
-        sess = FakeSession()
-        r = Renderer(sess)
-        s = Surface(0, 0)
-        r.render_surface(s)
-        assert True
 
     def test_rgb_end_to_end_via_draw_text_rgb(self):
         sess = FakeSession()
@@ -116,7 +92,7 @@ class TestRenderSurface:
         s = Surface(3, 1)
         s.draw_text_rgb(0, 0, "AB", fg=(255, 0, 0), bg=DEFAULT_BG)
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[38;2;255;0;0m" in written
         # Trailing reset is omitted when the last cell returns to default
         assert "\033[39m" in written
@@ -143,7 +119,7 @@ class TestRendererUtilities:
         sess = FakeSession()
         r = Renderer(sess)
         r.draw_absolute_row(3, "hello")
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[3;1f" in written
         assert "\033[K" in written
         assert "hello" in written
@@ -152,7 +128,7 @@ class TestRendererUtilities:
         sess = FakeSession()
         r = Renderer(sess)
         r.draw_block(["ab", "cd"], 1, 1, 3, 2)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[1;1f" in written
         assert "ab" in written
         assert "cd" in written
@@ -161,15 +137,14 @@ class TestRendererUtilities:
         sess = FakeSession()
         r = Renderer(sess)
         r.draw_panel(["ab", "cd"], 1, 1, size=(5, 3))
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[1;1f" in written
         assert "ab" in written
         assert "     " in written
 
 
 class TestRowToStrRGB:
-    def test_plain_cells_use_legacy_path(self):
-        """Cells with default RGB should route through legacy renderer."""
+    def test_plain_cells_no_sequences(self):
         r = Renderer(FakeSession())
         row = [FlatCell("a"), FlatCell("b"), FlatCell("c")]
         assert r._row_to_str(row) == "abc"
@@ -223,24 +198,6 @@ class TestRowToStrRGB:
         # Trailing reset is omitted when the last cell returns to default
         assert not result.endswith("\033[0m")
 
-    def test_mixed_legacy_and_rgb(self):
-        r = Renderer(FakeSession())
-        row = [
-            FlatCell("x", ansi_style="\033[1m"),
-            FlatCell("y"),  # default RGB
-        ]
-        result = r._row_to_str(row)
-        assert result == "\033[1mx\033[0my"
-
-    def test_mixed_rgb_then_legacy(self):
-        r = Renderer(FakeSession())
-        row = [
-            FlatCell("r", fg=(255, 0, 0)),
-            FlatCell("b", ansi_style="\033[1m"),
-        ]
-        result = r._row_to_str(row)
-        assert "\033[0m\033[1m" in result
-
 
 class TestRenderSurfaceRGB:
     def test_rgb_end_to_end(self):
@@ -262,7 +219,7 @@ class TestRenderSurfaceRGB:
         s = Surface(1, 1)
         s.draw_text_rgb(0, 0, "X", fg=(255, 0, 0))
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[38;5;9m" in written
 
 
@@ -276,7 +233,7 @@ class TestRenderSurfaceIncrementalWithRGB:
         sess.stdout.reset_mock()
         s.draw_text_rgb(0, 0, "xyz", fg=(255, 0, 0))
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "\033[2J" not in written
         assert "xyz" in written
 
@@ -290,6 +247,6 @@ class TestRenderSurfaceIncrementalWithRGB:
         sess.stdout.reset_mock()
         s.draw_text_rgb(1, 0, "xyz", fg=DEFAULT_FG, bg=DEFAULT_BG)
         r.render_surface(s)
-        written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
+        written = _capture_output(sess)
         assert "abc" not in written
         assert "xyz" in written

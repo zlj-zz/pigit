@@ -12,7 +12,6 @@ from types import TracebackType
 from typing import TextIO
 
 from ._renderer import Renderer
-from ._session_context import set_session, reset_session
 
 
 class Session:
@@ -50,7 +49,6 @@ class Session:
         else:
             self.stdout.write("\033[?25l")
         self.stdout.flush()
-        self._ctx_token = set_session(self)
         return self
 
     def suspend(self) -> None:
@@ -101,12 +99,7 @@ class Session:
             self.stdout.write("\033[?25h")
             self.stdout.flush()
         finally:
-            try:
-                if sys.platform != "win32" and self._old_termios is not None:
-                    import termios
+            if sys.platform != "win32" and self._old_termios is not None:
+                import termios
 
-                    termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)
-            finally:
-                token = getattr(self, "_ctx_token", None)
-                if token is not None:
-                    reset_session(token)
+                termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)

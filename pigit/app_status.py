@@ -15,16 +15,15 @@ from pigit.termui import (
     ActionEventType,
     AlertDialog,
     bind_keys,
-    Component,
     exec_external,
-    ItemSelector,
     keys,
     palette,
     Segment,
     show_badge,
     show_toast,
 )
-from pigit.termui.wcwidth_table import wcswidth
+from pigit.termui._async_task import AsyncTask
+from pigit.termui.widgets import ItemList
 
 from .app_inspector import FileInfo
 from .app_theme import THEME
@@ -32,7 +31,7 @@ from .git.model import File
 
 if TYPE_CHECKING:
     from .git.local_git import LocalGit
-    from .git.model import GitFileT, GitFuncT
+    from .git.model import GitFuncT
 
 
 def _staged_fg(ch: str) -> tuple[int, int, int]:
@@ -68,7 +67,7 @@ def _status_label(file: File) -> str:
     return ""
 
 
-class StatusPanel(ItemSelector):
+class StatusPanel(ItemList):
     """Status panel with visual mode."""
 
     CURSOR = "\u25cf"  # filled circle
@@ -77,18 +76,24 @@ class StatusPanel(ItemSelector):
         self,
         *,
         alert_inner_width: int | None = None,
-        display: Component | None = None,
         on_selection_changed: Callable | None = None,
         git: LocalGit,
         id: str | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
+            empty_state=[
+                Segment("    (\\__/)", fg=THEME.accent_green),
+                Segment("    ( •_• )", fg=THEME.accent_green),
+                Segment("    / > ✓", fg=THEME.accent_green),
+                Segment("  Pigit Clean", fg=THEME.fg_dim),
+                Segment("Working tree clean", fg=THEME.fg_dim),
+            ],
             lazy_load=True,
             id=id,
         )
         self.git = git
-        self._display = display
+        self._loader = AsyncTask()
 
         self.files: list[File] = []
         self._all_files: list[File] = []  # For filter reset
@@ -170,70 +175,46 @@ class StatusPanel(ItemSelector):
             self._selected.add(idx)
 
     def refresh(self) -> None:
-        self.files = self.git.load_status()
-        self._all_files = list(self.files)
-        if not self.files:
-            self.set_content(["No status changed."])
+        self._loader.start(self.git.load_status, self._on_status_loaded)
+
+    def _on_status_loaded(self, files: list[File]) -> None:
+        if not self.is_activated():
             return
-        # content is only used for row-count bookkeeping; rendering uses
-        # describe_row which reads directly from self.files.
-        self.set_content([f.name for f in self.files])
+        self.files = files
+        self._all_files = list(files)
+        if not files:
+            self.set_content([])
+        else:
+            # content is only used for row-count bookkeeping; rendering uses
+            # describe_row which reads directly from self.files.
+            self.set_content([f.name for f in files])
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._loader.cancel()
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._alert_dialog.resize(size)
+        if not self.files:
+            self.set_content([])
 
-    def _render_surface(self, surface) -> None:
-        if self.files:
-            super()._render_surface(surface)
-            return
-
-        w = surface.width
-        h = surface.height
-        if w <= 0 or h <= 0:
-            return
-
-        art_lines = [
-            "    (\\__/)",
-            "    ( \u2022_\u2022 )",
-            "    / > \u2713",
-            "  Pigit Clean",
-            "Working tree clean",
-        ]
-
-        total_height = len(art_lines)
-        start_row = (h - total_height) // 2
-
-        for i, line in enumerate(art_lines):
-            row = start_row + i
-            line_w = wcswidth(line)
-            col = max(0, (w - line_w) // 2)
-            fg = THEME.accent_green if i < 3 else THEME.fg_dim
-            surface.draw_text_rgb(row, col, line, fg=fg)
-
-    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[
         list[Segment],
         list[Segment] | None,
         list[Segment],
     ]:
         """Return row description: [cursor][staged][unstaged][filename.......][label]"""
         focused = self.is_focus_leaf
-        if idx >= len(self.files):
-            text = self.content[idx] if idx < len(self.content) else ""
-            prefix = self.CURSOR if is_cursor else " "
-            fg = THEME.fg_primary if focused else THEME.fg_dim
-            return (
-                [
-                    Segment(
-                        f"{prefix} {text}",
-                        fg=fg,
-                        style_flags=palette.STYLE_BOLD if is_cursor else 0,
-                    )
-                ],
-                None,
-                [],
-            )
-
+        if not self.files or idx >= len(self.files):
+            return ([], None, [])
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
@@ -274,7 +255,7 @@ class StatusPanel(ItemSelector):
             )
             self.emit(
                 ActionEventType.goto,
-                target=self._display,
+                target="diff",
                 source=self,
                 key=f.name,
                 content=c,
@@ -457,7 +438,7 @@ class StatusPanel(ItemSelector):
     def _check_via_alert(
         self,
         callee: GitFuncT,
-        file: GitFileT,
+        file: File,
         msg: str = "",
     ) -> bool:
         text = f"{msg} '{file}' ?"

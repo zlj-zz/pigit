@@ -72,9 +72,7 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         )
     mock_ctx.managed_repos.clear_repos.assert_called_once()
     mock_ctx.managed_repos.report_repos.assert_called_once()
-    mock_ctx.managed_repos.cd_repo.assert_called_once_with(
-        "r", pick=False, pick_alt_screen=False
-    )
+    mock_ctx.managed_repos.cd_repo.assert_called_once_with("r", pick=False)
     mock_ctx.managed_repos.process_repos_option.assert_called_once()
     mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
@@ -84,11 +82,17 @@ def test_repo_handler_ll_filter(mock_ctx):
     with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
         h = RepoCommandHandler(mock_ctx)
         h.ll(SimpleNamespace(simple=True, reverse=False, filter="web"))
-    mock_ctx.managed_repos.ll_repos.assert_called_once_with(reverse=False, filter_query="web")
+    mock_ctx.managed_repos.ll_repos.assert_called_once_with(
+        reverse=False, filter_query="web"
+    )
 
 
 def test_mkbranch_explicit_repos(mock_ctx):
-    mock_ctx.managed_repos.branch_new_repos.return_value = (True, [], [("repo-a", 0, None)])
+    mock_ctx.managed_repos.branch_new_repos.return_value = (
+        True,
+        [],
+        [("repo-a", 0, None)],
+    )
     echo = MagicMock()
     with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
         h = RepoCommandHandler(mock_ctx)
@@ -110,7 +114,11 @@ def test_mkbranch_explicit_repos(mock_ctx):
 
 def test_mkbranch_interactive(mock_ctx):
     mock_ctx.managed_repos.load_repos.return_value = {"repo-a": {"path": "/p1"}}
-    mock_ctx.managed_repos.branch_new_repos.return_value = (True, [], [("repo-a", 0, None)])
+    mock_ctx.managed_repos.branch_new_repos.return_value = (
+        True,
+        [],
+        [("repo-a", 0, None)],
+    )
     echo = MagicMock()
     with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
         with patch(

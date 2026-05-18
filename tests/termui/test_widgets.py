@@ -1,28 +1,67 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/termui/test_widgets.py
-Description: Unit tests for StatusBar, InputLine, and ItemSelector widgets.
+Description: Unit tests for StatusBar, InputLine, and ItemList widgets.
 Author: Zev
 Date: 2026-04-20
 """
 
-from pigit.termui._component_widgets import (
+from pigit.termui.widgets import (
     CheckList,
     InputLine,
-    ItemSelector,
+    ItemList,
     StatusBar,
 )
 from pigit.termui.reactive import Signal
 
 
-class TestItemSelector:
+from pigit.termui._segment import Segment
+from pigit.termui._surface import Surface
+
+
+class TestItemList:
     def test_viewport_start(self):
-        sel = ItemSelector(content=["a", "b", "c"])
+        sel = ItemList(content=["a", "b", "c"])
         assert sel.viewport_start == 0
 
     def test_visible_row_count(self):
-        sel = ItemSelector(content=["a", "b", "c"], size=(10, 5))
+        sel = ItemList(content=["a", "b", "c"], size=(10, 5))
         assert sel.visible_row_count == 5
+
+    def test_empty_state_renders_when_content_empty(self):
+        sel = ItemList(size=(40, 10), empty_state=[Segment("hello")])
+        sel.set_content([])
+        surface = Surface(40, 10)
+        sel._render_surface(surface)
+        # "hello" should be centered on the surface
+        found = False
+        for row in surface._rows:
+            text = "".join(c.char for c in row).strip()
+            if "hello" in text:
+                found = True
+                break
+        assert found
+
+    def test_empty_state_not_rendered_when_content_present(self):
+        sel = ItemList(size=(40, 10), empty_state=[Segment("empty")])
+        sel.set_content(["real"])
+        surface = Surface(40, 10)
+        sel._render_surface(surface)
+        # "real" should be rendered, "empty" should not
+        all_text = ""
+        for row in surface._rows:
+            all_text += "".join(c.char for c in row)
+        assert "real" in all_text
+        assert "empty" not in all_text
+
+    def test_no_empty_state_renders_nothing(self):
+        sel = ItemList(size=(40, 10))
+        sel.set_content([])
+        surface = Surface(40, 10)
+        sel._render_surface(surface)
+        # All rows should be empty
+        for row in surface._rows:
+            assert all(c.char == " " for c in row)
 
 
 class TestStatusBar:
@@ -55,7 +94,7 @@ class TestInputLine:
         inp = InputLine()
         inp.insert("a")
         assert inp.value == "a"
-        assert inp._cursor == 1
+        assert inp.cursor == 1
 
     def test_backspace(self):
         inp = InputLine()
@@ -63,7 +102,7 @@ class TestInputLine:
         inp.insert("b")
         inp.backspace()
         assert inp.value == "a"
-        assert inp._cursor == 1
+        assert inp.cursor == 1
 
     def test_delete(self):
         inp = InputLine()
@@ -91,7 +130,7 @@ class TestInputLine:
         inp.set_value("abc")
         inp.clear()
         assert inp.value == ""
-        assert inp._cursor == 0
+        assert inp.cursor == 0
 
     def test_on_submit(self):
         called = []
@@ -259,14 +298,25 @@ class TestInputLine:
         # Candidate mode draws prefix + dim suffix, then block cursor at end.
         calls = mock_surface.draw_text_rgb.call_args_list
         # Last call should be the block cursor at position 3 ("o" + "pt").
-        assert calls[-1] == (
-            (0, 3, " ",),
-            {"fg": DEFAULT_BG, "bg": DEFAULT_FG},
-        ) or calls[-1] == ((0, 3, " ", "DEFAULT_BG", "DEFAULT_FG"),) or calls[-1].args == (
-            0,
-            3,
-            " ",
-        ) and calls[-1].kwargs == {"fg": DEFAULT_BG, "bg": DEFAULT_FG}
+        assert (
+            calls[-1]
+            == (
+                (
+                    0,
+                    3,
+                    " ",
+                ),
+                {"fg": DEFAULT_BG, "bg": DEFAULT_FG},
+            )
+            or calls[-1] == ((0, 3, " ", "DEFAULT_BG", "DEFAULT_FG"),)
+            or calls[-1].args
+            == (
+                0,
+                3,
+                " ",
+            )
+            and calls[-1].kwargs == {"fg": DEFAULT_BG, "bg": DEFAULT_FG}
+        )
 
     def test_on_key_plain_text_editing(self):
         inp = InputLine()
@@ -276,7 +326,7 @@ class TestInputLine:
         inp.on_key("backspace")
         assert inp.value == "h"
         inp.on_key("left")
-        assert inp._cursor == 0
+        assert inp.cursor == 0
         inp.on_key("delete")
         assert inp.value == ""
 

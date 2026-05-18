@@ -11,7 +11,6 @@ from pigit.git import git_version
 from pigit.git.model import File
 from pigit.git.local_git import LocalGit
 
-
 exec_patch = "pigit.ext.executor.Executor.exec"
 
 

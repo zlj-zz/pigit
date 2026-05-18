@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NamedTuple
 from collections.abc import Sequence
 
-from pigit.termui._picker import PickerRow
+from pigit.picker_app import PickerRow
 
 
 class RepoStatus(NamedTuple):
@@ -36,7 +36,9 @@ class RepoStatus(NamedTuple):
 def _git_output(args: list[str]) -> str | None:
     """Run a git command and return stdout, or None on failure."""
     try:
-        return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL).strip()
+        return subprocess.check_output(
+            args, text=True, stderr=subprocess.DEVNULL
+        ).strip()
     except (subprocess.CalledProcessError, OSError):
         return None
 
@@ -71,7 +73,9 @@ def query_repos_status(rows: Sequence[PickerRow]) -> dict[str, RepoStatus]:
     results: dict[str, RepoStatus] = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {
-            pool.submit(get_repo_status, row.ref if isinstance(row.ref, str) else ""): row.title
+            pool.submit(
+                get_repo_status, row.ref if isinstance(row.ref, str) else ""
+            ): row.title
             for row in rows
         }
         for future in as_completed(futures):

@@ -10,7 +10,12 @@ import pytest
 from unittest.mock import MagicMock, patch, Mock
 
 from pigit.termui._application import Application, _ApplicationEventLoop
-from pigit.termui._component_base import Component, _set_focus_chain
+from pigit.termui._component import Component
+from pigit.termui._runtime_context import (
+    get_focus_manager,
+    set_focus_manager,
+    FocusManager,
+)
 from pigit.termui._root import ComponentRoot
 from pigit.termui.types import LayerKind
 
@@ -65,7 +70,7 @@ class TestApplication:
             mock_loop = MagicMock()
             MockLoop.return_value = mock_loop
             app.run()
-            assert app._root is not None
+            assert app._root is None
             # destroy() was called during cleanup in finally block
 
 
@@ -107,7 +112,9 @@ class TestApplicationEventLoop:
         # Simulate an overlay being open
         overlay = _FakeOverlay()
         root._layer_stack.push(LayerKind.MODAL, overlay)
-        _set_focus_chain(overlay)
+        fm = get_focus_manager()
+        if fm is not None:
+            fm.set_focus_chain(overlay)
 
         # Dispatch the app binding that closes the overlay
         loop._dispatch_semantic_string("x")

@@ -10,7 +10,7 @@ from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
-from pigit.termui._picker import PickerRow
+from pigit.picker_app import PickerRow
 
 
 def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
@@ -306,7 +306,6 @@ class ManagedRepos:
         repo: str | None = None,
         *,
         pick: bool = False,
-        pick_alt_screen: bool = False,
     ) -> tuple[int, str | None]:
         """Quick jump to repo dir.
 
@@ -342,7 +341,6 @@ class ManagedRepos:
                 rows,
                 self.executor,
                 initial_filter=initial_filter,
-                pick_alt_screen=pick_alt_screen,
             )
 
         if repo is not None and repo in exist_repos:
@@ -456,7 +454,9 @@ class ManagedRepos:
         )
 
         valid_repos: dict[str, dict] = {}
-        for (name, prop), (code, _err, _out) in zip(repo_items, validity_results, strict=True):
+        for (name, prop), (code, _err, _out) in zip(
+            repo_items, validity_results, strict=True
+        ):
             if code != 0:
                 blockers.append((name, "invalid repo"))
             else:
@@ -476,7 +476,9 @@ class ManagedRepos:
         )
 
         clean_repos: dict[str, dict] = {}
-        for (name, prop), (code, _err, out) in zip(valid_repos.items(), branch_results, strict=True):
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), branch_results, strict=True
+        ):
             if out and out.strip():
                 if not force:
                     blockers.append((name, f"branch '{branch_name}' already exists"))
@@ -497,7 +499,9 @@ class ManagedRepos:
                 max_concurrent=self._repo_parallel_workers(),
             )
 
-            for (name, prop), (code, _err, out) in zip(clean_repos.items(), status_results, strict=True):
+            for (name, prop), (code, _err, out) in zip(
+                clean_repos.items(), status_results, strict=True
+            ):
                 if out and out.strip():
                     blockers.append((name, "uncommitted changes"))
 
@@ -535,5 +539,7 @@ class ManagedRepos:
 
         return [
             (name, code, stderr if code != 0 else None)
-            for (name, _), (code, stderr, _stdout) in zip(repo_items, results, strict=True)
+            for (name, _), (code, stderr, _stdout) in zip(
+                repo_items, results, strict=True
+            )
         ]

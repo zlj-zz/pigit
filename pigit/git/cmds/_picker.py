@@ -13,37 +13,29 @@ import sys
 from typing import TYPE_CHECKING, cast
 
 from pigit.termui import (
-    Application,
-    Column,
     Component,
     ComponentRoot,
     ExitEventLoop,
-    HelpPanel,
-    InputLine,
-    ItemSelector,
-    StatusBar,
-    Popup,
     keys,
     get_renderer_strict,
     palette,
 )
-from pigit.termui._component_widgets import BG_HOVER
-from pigit.termui._picker import (
-    PICK_EXIT_CTRL_C,
-    PickerHeader,
-    PickerMode,
-    PickerRow,
-    PickerState,
-    apply_picker_filter,
-    picker_terminal_ok,
-)
 from pigit.termui._segment import Segment
+from pigit.termui.containers import Column
+from pigit.termui.wcwidth_table import wcswidth
+from pigit.termui.widgets import InputLine, ItemList, StatusBar
 from pigit.termui.tty_io import (
     terminal_size,
     truncate_line,
     tty_ok,
 )
-from pigit.termui.wcwidth_table import wcswidth
+from pigit.picker_app import (
+    BasePickerApp,
+    PickerHeader,
+    PickerMode,
+    PickerRow,
+    PickerState,
+)
 
 from ._completion import make_candidate_provider
 from ._mru import load_mru
@@ -68,15 +60,6 @@ _TERMINAL_TOO_SMALL_MSG = (
 
 # Tests can patch this
 _tty_ok = tty_ok
-
-# Semantic colors reused across row rendering
-_CYAN = palette.CYAN
-_YELLOW = palette.YELLOW
-_FG_PRIMARY = palette.DEFAULT_FG
-_FG_MUTED = palette.DEFAULT_FG_DIM
-_FG_DIM = palette.DIM
-_BOLD = palette.STYLE_BOLD
-_UNDERLINE = palette.STYLE_UNDERLINE
 
 
 def _highlight_match(
@@ -105,9 +88,9 @@ def _highlight_match(
         segments.append(
             Segment(
                 text[pos],
-                fg=_CYAN,
+                fg=palette.CYAN,
                 bg=bg,
-                style_flags=_BOLD | _UNDERLINE,
+                style_flags=palette.STYLE_BOLD | palette.STYLE_UNDERLINE,
             )
         )
         t_idx = pos + 1
@@ -166,13 +149,6 @@ def run_cmd_new_picker(
         for e in entries
     ]
 
-    def render_line(r: PickerRow) -> str:
-        ent = r.ref
-        assert isinstance(ent, CmdNewEntry)
-        mru_mark = "⟲" if ent.name in mru_set else " "
-        danger_mark = "▲" if ent.is_dangerous else " "
-        return f"{mru_mark}{danger_mark} {ent.name:<15} {ent.help_text}"
-
     pick_suffix = f" {category}" if category else ""
     mode_hint = "print" if print_only else "run"
     title = (
@@ -181,7 +157,7 @@ def run_cmd_new_picker(
     )
 
     # 2. Custom selector with category-aware rendering
-    class _CmdItemSelector(ItemSelector):
+    class _CmdItemList(ItemList):
         def __init__(
             self,
             app,
@@ -206,51 +182,70 @@ def run_cmd_new_picker(
                 sep_w = wcswidth(sep_text)
                 if sep_w < cols:
                     sep_text = sep_text + "─" * (cols - sep_w)
-                return ([], [Segment(sep_text, fg=_FG_DIM)], [])
+                return ([], [Segment(sep_text, fg=palette.DIM)], [])
 
             row = app._row_data[idx]
             assert row is not None
             ent = cast(CmdNewEntry, row.ref)
 
-            bg = BG_HOVER if is_cursor else None
-            row_style = _BOLD if is_cursor else 0
+            bg = palette.BG_HOVER if is_cursor else None
+            row_style = palette.STYLE_BOLD if is_cursor else 0
             in_mru = ent.name in app._mru_set
 
             if in_mru:
-                left = [Segment("◆ ", fg=_CYAN, bg=bg, style_flags=_BOLD | row_style)]
+                left = [
+                    Segment(
+                        "◆ ",
+                        fg=palette.CYAN,
+                        bg=bg,
+                        style_flags=palette.STYLE_BOLD | row_style,
+                    )
+                ]
             elif ent.is_dangerous:
-                left = [Segment("⚠ ", fg=_YELLOW, bg=bg, style_flags=row_style)]
+                left = [Segment("⚠ ", fg=palette.YELLOW, bg=bg, style_flags=row_style)]
             else:
-                left = [Segment("  ", fg=_FG_PRIMARY, bg=bg, style_flags=row_style)]
+                left = [
+                    Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)
+                ]
 
-            name_fg = _CYAN if in_mru else _FG_PRIMARY
-            name_style = _BOLD if in_mru else 0
+            name_fg = palette.CYAN if in_mru else palette.DEFAULT_FG
+            name_style = palette.STYLE_BOLD if in_mru else 0
 
-            name_segs = _highlight_match(ent.name, app._filter_needle, fg=name_fg, bg=bg)
+            name_segs = _highlight_match(
+                ent.name, app._filter_needle, fg=name_fg, bg=bg
+            )
             for seg in name_segs:
                 seg.style_flags |= name_style | row_style
 
             name_w = sum(wcswidth(s.text) for s in name_segs)
             name_pad = 15 - name_w
             if name_pad > 0:
-                name_segs.append(Segment(" " * name_pad, fg=_FG_PRIMARY, bg=bg, style_flags=row_style))
+                name_segs.append(
+                    Segment(
+                        " " * name_pad,
+                        fg=palette.DEFAULT_FG,
+                        bg=bg,
+                        style_flags=row_style,
+                    )
+                )
 
-            help_segs = _highlight_match(ent.help_text, app._filter_needle, fg=_FG_MUTED, bg=bg)
+            help_segs = _highlight_match(
+                ent.help_text, app._filter_needle, fg=palette.DEFAULT_FG_DIM, bg=bg
+            )
             for seg in help_segs:
                 seg.style_flags |= row_style
-            main = name_segs + [Segment("  ", fg=_FG_PRIMARY, bg=bg, style_flags=row_style)] + help_segs
+            main = (
+                name_segs
+                + [Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)]
+                + help_segs
+            )
 
             return (left, main, [])
 
     # 3. Local Application (used only inside this function)
-    class _CmdPickerApp(Application):
-        BINDINGS = [
-            ("Q", "quit"),
-            ("?", "toggle_help"),
-        ]
-
+    class _CmdPickerApp(BasePickerApp):
         def __init__(self) -> None:
-            super().__init__(input_takeover=True, alt=True)
+            super().__init__()
             self._state = PickerState()
             self._mode = PickerMode.BROWSE
             self._number_buf: str | None = None
@@ -258,7 +253,6 @@ def run_cmd_new_picker(
             self._processor = processor
             self._rows = rows
             self._filtered_rows = list(rows)
-            self._render_line = render_line
             self._pending_entry: CmdNewEntry | None = None
             self._last_needle: str = ""
             self._mru_set = mru_set
@@ -268,8 +262,11 @@ def run_cmd_new_picker(
             self._collapsed_groups: set[str] = set()
             self._sep_category_map: dict[int, str] = {}
 
+        def get_title(self) -> str:
+            return title
+
         def build_root(self) -> Component:
-            self._header = PickerHeader(title)
+            self._header = PickerHeader(self.get_title())
             content, row_data, sep_indices, sep_cats = self._build_grouped_content(
                 self._filtered_rows,
                 collapsed_groups=self._collapsed_groups,
@@ -277,26 +274,30 @@ def run_cmd_new_picker(
             self._row_data = row_data
             self._separator_indices = sep_indices
             self._sep_category_map = sep_cats
-            self._list = _CmdItemSelector(
+            self._list = _CmdItemList(
                 self,
                 content=content,
                 on_selection_changed=lambda idx: self._state.selected_idx.set(idx),
             )
             self._list.set_skip_indices(sep_indices)
             self._status = StatusBar(self._state.status_text)
-            self._input = InputLine(
-                prompt="/",
-                visible=False,
-                on_value_changed=self._on_filter_value_changed,
-                on_submit=self._on_input_submit,
-                on_cancel=self._on_input_cancel,
-            )
+            self._input = self.build_input()
 
             self._layout = Column(
                 [self._header, self._list, self._status, self._input],
                 heights=[2, "flex", 1, 0],
             )
             return self._layout
+
+        def build_input(self) -> InputLine:
+            return InputLine(
+                prompt="/",
+                overlay_mode=True,
+                visible=False,
+                on_value_changed=self._on_filter_value_changed,
+                on_submit=self._on_input_submit,
+                on_cancel=self._on_input_cancel,
+            )
 
         def _build_grouped_content(
             self,
@@ -323,46 +324,34 @@ def run_cmd_new_picker(
                     last_cat = cat
                 if cat in collapsed:
                     continue
-                content.append(self._render_line(r))
+                content.append(
+                    f"{'⟲' if ent.name in self._mru_set else ' '}"
+                    f"{'▲' if ent.is_dangerous else ' '}"
+                    f" {ent.name:<15} {ent.help_text}"
+                )
                 row_data.append(r)
             return content, row_data, separators, sep_categories
 
         def setup_root(self, root: ComponentRoot) -> None:
-            self._loop.set_input_timeouts(0.125)
-            root.show_toast(
-                "j/k scroll, Enter run, / filter, ? help",
-                duration=3.0,
-            )
-            self._help_panel = HelpPanel()
-            self._help_popup = Popup(
-                self._help_panel,
-                exit_key=keys.KEY_ESC,
-            )
-            self._state.selected_idx.subscribe(self._update_status)
-            self._update_status(0)
+            self._update_status()
 
-        def after_start(self) -> None:
-            _, term_rows = terminal_size()
-            if not picker_terminal_ok(term_rows):
-                self.quit(
-                    exit_code=1,
-                    result_message=_TERMINAL_TOO_SMALL_MSG,
-                )
-
-        # --- Event handling ---
+        def get_terminal_too_small_msg(self) -> str:
+            return _TERMINAL_TOO_SMALL_MSG
 
         def on_key(self, key: str) -> None:
             if self._number_buf is not None:
                 self._on_number_prefix(key)
                 return
-            if self._mode in (PickerMode.FILTER, PickerMode.PARAM_INPUT):
-                if key == "ctrl c":
-                    raise ExitEventLoop(
-                        "quit", exit_code=PICK_EXIT_CTRL_C, result_message=None
-                    )
+            if self._mode == PickerMode.PARAM_INPUT:
+                self._input.on_key(key)
+                return
+            if self._input.is_visible:
                 self._input.on_key(key)
                 return
             self._on_browse(key)
+
+        def on_confirm(self) -> None:
+            self._enter_param_input()
 
         def _on_browse(self, key: str) -> None:
             if key in ("j", keys.KEY_DOWN):
@@ -378,7 +367,8 @@ def run_cmd_new_picker(
             elif key == "enter":
                 self._enter_param_input()
             elif key == "/":
-                self._enter_filter()
+                self._input._enter_overlay_mode()
+                self._layout.set_heights([2, "flex", 1, 1])
             elif key in ("q", keys.KEY_ESC):
                 self.quit()
             elif key == "?":
@@ -429,21 +419,25 @@ def run_cmd_new_picker(
             self._state.filter_text.set(text)
             self._apply_filter()
 
-        def _enter_filter(self) -> None:
-            self._mode = PickerMode.FILTER
-            self._input.set_prompt("/")
-            self._input.set_candidate_provider(None)
-            self._input.set_visible(True)
-            self._layout.set_heights([2, "flex", 1, 1])
-            self.resize(self._loop.get_term_size())
+        def _apply_filter(self) -> None:
+            needle = self._input.value
+            if needle == self._last_needle:
+                return
+            needle_lower = needle.lower()
+            self._last_needle = needle
+            self._filter_needle = needle_lower
+            filtered = [
+                r
+                for r in self._rows
+                if needle_lower in r.title.lower()
+                or needle_lower in (r.detail or "").lower()
+            ]
+            self._filtered_rows = filtered
+            self._sync_content(filtered, reset_cursor=True)
 
-        def _exit_filter(self) -> None:
-            self._mode = PickerMode.BROWSE
-            self._input.set_visible(False)
-            self._layout.set_heights([2, "flex", 1, 0])
-            self.resize(self._loop.get_term_size())
-
-        def _sync_content(self, rows: list[PickerRow], *, reset_cursor: bool = False) -> None:
+        def _sync_content(
+            self, rows: list[PickerRow], *, reset_cursor: bool = False
+        ) -> None:
             content, row_data, sep_indices, sep_cats = self._build_grouped_content(
                 rows,
                 collapsed_groups=self._collapsed_groups if reset_cursor else None,
@@ -461,19 +455,7 @@ def run_cmd_new_picker(
                 if self._list.curr_no >= n:
                     self._list.curr_no = max(0, n - 1)
                 self._state.selected_idx.set(self._list.curr_no)
-            self._update_status(self._list.curr_no)
-
-        def _apply_filter(self) -> None:
-            if self._mode != PickerMode.FILTER:
-                return
-            needle = self._input.value
-            if needle == self._last_needle:
-                return
-            self._last_needle = needle
-            self._filter_needle = needle.lower()
-            filtered = apply_picker_filter(self._rows, needle)
-            self._filtered_rows = filtered
-            self._sync_content(filtered, reset_cursor=True)
+            self._update_status()
 
         def _rebuild_content(self) -> None:
             self._sync_content(self._filtered_rows, reset_cursor=False)
@@ -514,7 +496,6 @@ def run_cmd_new_picker(
             )
             self._input.set_visible(True)
             self._layout.set_heights([2, "flex", 1, 1])
-            self.resize(self._loop.get_term_size())
 
         def _exit_param_input(self) -> None:
             self._mode = PickerMode.BROWSE
@@ -524,21 +505,20 @@ def run_cmd_new_picker(
             self._input.set_prompt("/")
             self._input.set_visible(False)
             self._layout.set_heights([2, "flex", 1, 0])
-            self.resize(self._loop.get_term_size())
 
         def _on_input_submit(self, value: str) -> None:
-            if self._mode == PickerMode.FILTER:
-                self._exit_filter()
-            elif self._mode == PickerMode.PARAM_INPUT:
+            if self._mode == PickerMode.PARAM_INPUT:
                 assert self._pending_entry is not None
                 self._finish_execute(self._pending_entry, value)
+            if not self._input._visible:
+                self._layout.set_heights([2, "flex", 1, 0])
 
         def _on_input_cancel(self) -> None:
-            if self._mode == PickerMode.FILTER:
-                self._exit_filter()
-                self._input.clear()
-            elif self._mode == PickerMode.PARAM_INPUT:
+            if self._mode == PickerMode.PARAM_INPUT:
                 self._exit_param_input()
+            self._input.clear()
+            if not self._input._visible:
+                self._layout.set_heights([2, "flex", 1, 0])
 
         # --- Business logic ---
 
@@ -551,10 +531,7 @@ def run_cmd_new_picker(
             exit_code, output = self._processor.execute(ent.name, extra_args)
             raise ExitEventLoop("done", exit_code=exit_code, result_message=output)
 
-        def _format_row(self, row: PickerRow) -> str:
-            return self._render_line(row)
-
-        def _update_status(self, idx: int) -> None:
+        def _update_status(self) -> None:
             n = len(self._list.content)
             cat_count = len({cast(CmdNewEntry, e.ref).category for e in self._rows})
             text = f"{n} commands · {cat_count} categories"
@@ -583,14 +560,6 @@ def run_cmd_new_picker(
             renderer = get_renderer_strict()
             cols, _ = terminal_size()
             renderer.draw_absolute_row(1, " " * cols)
-
-        def quit(self, exit_code: int = 0, result_message: str | None = None) -> None:
-            raise ExitEventLoop(
-                "quit", exit_code=exit_code, result_message=result_message
-            )
-
-        def toggle_help(self) -> None:
-            self._help_popup.toggle()
 
     # 3. Launch
     exit_code, message = _CmdPickerApp().run_with_result()

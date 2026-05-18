@@ -13,25 +13,14 @@ from .types import (
     ActionEventType,
     LayerKind,
     OverlayDispatchResult,
-    OverlaySurface,
-    SurfaceProtocol,
     ToastPosition,
 )
 
 # Core components
-from ._component_base import Component, ComponentError, bind_signals
-from ._component_layouts import Column, Row, TabView
-from ._component_graph import HeatmapGrid, StepLineChart
-from ._component_widgets import (
-    Header,
-    InputLine,
-    ItemSelector,
-    LineTextBrowser,
-    StatusBar,
-)
+from ._component import Component, ComponentError, bind_signals
 
 # Overlay components
-from ._overlay_components import (
+from .widgets import (
     AlertDialog,
     AlertDialogBody,
     HelpEntry,
@@ -48,62 +37,42 @@ from .event_loop import ExitEventLoop
 from ._root import ComponentRoot
 from ._application import Application
 
-# Overlay context (module-level functions)
-from ._overlay_context import (
+# Runtime context — single source of truth for all context state
+from ._runtime_context import (
+    by_id,
     dismiss_sheet,
+    exec_external,
     get_badge,
     get_badge_signal,
+    get_registry,
+    get_renderer_strict,
     hide_spinner,
     show_badge,
+    show_sheet,
     show_spinner,
     show_toast,
-    show_sheet,
 )
-from ._session_context import exec_external
 
 # Other utilities
 from ._bindings import bind_keys, BindingError, list_bindings
 from . import keys
-from ._geometry import TerminalSize
-from ._color import ColorAdapter, ColorMode
 from ._renderer import Renderer
-from ._renderer_context import get_renderer_strict
-from ._surface import Cell, FlatCell, Surface
+from ._surface import Surface
 from ._segment import Segment
 from . import palette
 
-# Registry
-from ._component_registry import by_id, get_registry
-
-# Picker
-from ._picker import PickerRow
 from ._syntax import SyntaxTokenizer
-from ._text import plain
 
 __all__ = [
     # Types
     "ActionEventType",
     "LayerKind",
     "OverlayDispatchResult",
-    "OverlaySurface",
-    "SurfaceProtocol",
     "ToastPosition",
     # Core
     "Component",
     "ComponentError",
     "bind_signals",
-    # Containers
-    "TabView",
-    "Column",
-    "Row",
-    # Widgets
-    "Header",
-    "HeatmapGrid",
-    "InputLine",
-    "StepLineChart",
-    "ItemSelector",
-    "LineTextBrowser",
-    "StatusBar",
     # Overlays
     "AlertDialog",
     "AlertDialogBody",
@@ -125,15 +94,10 @@ __all__ = [
     "list_bindings",
     "keys",
     "Surface",
-    "FlatCell",
-    "Cell",
     "Segment",
     "palette",
-    "ColorAdapter",
-    "ColorMode",
     "Renderer",
     "get_renderer_strict",
-    "TerminalSize",
     # Overlay context
     "show_toast",
     "show_sheet",
@@ -147,7 +111,4 @@ __all__ = [
     "exec_external",
     # Syntax highlighting
     "SyntaxTokenizer",
-    "plain",
-    # Picker
-    "PickerRow",
 ]

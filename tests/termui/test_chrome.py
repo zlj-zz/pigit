@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from pigit.app_chrome import AppFooter
 from pigit.app_theme import THEME
-from pigit.termui import Header, Segment
+from pigit.termui import Segment
+from pigit.termui.widgets import Header
 from pigit.termui.palette import STYLE_BOLD
 from pigit.termui._surface import Surface
 

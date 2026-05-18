@@ -54,8 +54,9 @@ _Users_*
 .worktrees/
 
 .cursor/
-.specify/
 .claude/
+.specify/
+specs/
 
 ANNOCHANGELOG.md
 

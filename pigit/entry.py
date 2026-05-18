@@ -350,12 +350,6 @@ def repo_report(args, _):
     dest="repo_cd_pick",
     help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
 )
-@argument(
-    "--pick-alt-screen",
-    action="store_true",
-    dest="repo_cd_pick_alt_screen",
-    help="Use alternate screen for the repo picker (with --pick).",
-)
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)
@@ -364,11 +358,17 @@ def _(args, _):
 @repo.sub_parser("mkbranch", help="batch create new branch across managed repos.")
 @argument("branch_name", help="name of the new branch.")
 @argument("repos", nargs="*", help="target repo names (interactive picker if omitted).")
-@argument("-c --checkout", action="store_true", help="checkout the new branch after creation.")
-@argument("-b --base", type=str, default=None, help="create from specified base branch.")
+@argument(
+    "-c --checkout", action="store_true", help="checkout the new branch after creation."
+)
+@argument(
+    "-b --base", type=str, default=None, help="create from specified base branch."
+)
 @argument("-f --force", action="store_true", help="reset branch if already exists.")
 @argument("--dry-run", action="store_true", help="preview only, do not execute.")
-@argument("--filter-regex", type=str, default="", help="pre-filter repos in interactive mode.")
+@argument(
+    "--filter-regex", type=str, default="", help="pre-filter repos in interactive mode."
+)
 def repo_mkbranch(args, _):
     RepoCommandHandler(ctx.current()).mkbranch(args)
 

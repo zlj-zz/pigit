@@ -14,14 +14,14 @@ from pigit.termui import (
     ActionEventType,
     bind_keys,
     dismiss_sheet,
-    InputLine,
-    ItemSelector,
     keys,
     palette,
     Segment,
     show_sheet,
     show_toast,
 )
+from pigit.termui._async_task import AsyncTask
+from pigit.termui.widgets import InputLine, ItemList
 from pigit.termui.reactive import Signal
 
 from .app_inspector import BranchInfo
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(ItemSelector):
+class BranchPanel(ItemList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
@@ -54,6 +54,8 @@ class BranchPanel(ItemSelector):
         )
         self.git = git
         self._branch_signal = branch_signal
+        self._loader = AsyncTask()
+
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -70,8 +72,17 @@ class BranchPanel(ItemSelector):
 
     def refresh(self) -> None:
         scope = self._SCOPES[self._scope_idx]
-        self.branches = branches = self.git.load_branches(scope=scope)
+        self._loader.start(
+            lambda: self.git.load_branches(scope=scope),
+            self._on_branches_loaded,
+        )
+
+    def _on_branches_loaded(self, branches: list[Branch]) -> None:
+        if not self.is_activated():
+            return
+        self.branches = branches
         if not branches:
+            scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
             return
         lines = []
@@ -79,6 +90,10 @@ class BranchPanel(ItemSelector):
             line = self._format_branch(branch)
             lines.append(line)
         self.set_content(lines)
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._loader.cancel()
 
     def get_help_title(self) -> str:
         return "Branch"
@@ -127,7 +142,14 @@ class BranchPanel(ItemSelector):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    def describe_row(self, idx: int, is_cursor: bool) -> tuple[
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[
         list[Segment],
         list[Segment] | None,
         list[Segment],

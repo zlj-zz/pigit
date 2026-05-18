@@ -16,13 +16,13 @@ from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
     ActionEventType,
     bind_keys,
-    Component,
-    ItemSelector,
     keys,
     palette,
     Segment,
     show_toast,
 )
+from pigit.termui._async_task import AsyncTask
+from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_commit_graph import GraphRow, compute_graph_rows
@@ -94,7 +94,7 @@ class _SubRow(Enum):
     TAIL = auto()  # blank trailer between commits
 
 
-class CommitPanel(ItemSelector):
+class CommitPanel(ItemList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
     CURSOR = "●"
@@ -113,7 +113,6 @@ class CommitPanel(ItemSelector):
     def __init__(
         self,
         *,
-        display: Component | None = None,
         on_selection_changed: Callable | None = None,
         git: LocalGit,
         id: str | None = None,
@@ -124,10 +123,11 @@ class CommitPanel(ItemSelector):
             id=id,
         )
         self.git = git
+        self._loader = AsyncTask()
+
         self.commits: list[Commit] = []
         self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
-        self._display = display
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
@@ -217,9 +217,30 @@ class CommitPanel(ItemSelector):
 
     def refresh(self) -> None:
         branch_name = self.git.get_head() or ""
-        self.commits = commits = self.git.load_commits(branch_name)
+        self._loader.start(
+            lambda: self._load_commit_data(branch_name),
+            self._on_commits_loaded,
+        )
+
+    def _load_commit_data(
+        self, branch_name: str
+    ) -> tuple[list[Commit], list[GraphRow], tuple[str, ...]]:
+        """Synchronous data load executed on a background thread."""
+        commits = self.git.load_commits(branch_name)
+        remotes = tuple(self.git.get_remotes())
+        graph_rows = compute_graph_rows(commits) if commits else []
+        return commits, graph_rows, remotes
+
+    def _on_commits_loaded(
+        self,
+        payload: tuple[list[Commit], list[GraphRow], tuple[str, ...]],
+    ) -> None:
+        if not self.is_activated():
+            return
+        commits, graph_rows, remotes = payload
+        self.commits = commits
         self._contrib_graph.set_commits(commits)
-        self._remotes = tuple(self.git.get_remotes())
+        self._remotes = remotes
         self._refs_cache.clear()
         self._bodies = None
         self._body_lines_cache.clear()
@@ -228,7 +249,7 @@ class CommitPanel(ItemSelector):
             self._max_meta_w = 0
             self._graph_rows = []
             return
-        self._graph_rows = compute_graph_rows(commits)
+        self._graph_rows = graph_rows
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
         for commit in commits:
@@ -239,6 +260,10 @@ class CommitPanel(ItemSelector):
         if self._expanded:
             self._ensure_bodies()
         self._rebuild_rows()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._loader.cancel()
 
     def _ensure_bodies(self) -> None:
         if self._bodies is not None or not self.commits:
@@ -595,6 +620,7 @@ class CommitPanel(ItemSelector):
 
         total_lanes = max(len(row.lanes_before), len(row.lanes_after))
         segments = []
+        assert commit is not None
         for i in range(total_lanes):
             ch, fg = self._lane_glyph(row, i, commit, focused=focused)
             segments.append(Segment(ch + " ", fg=fg, style_flags=cursor_flags))
@@ -652,7 +678,7 @@ class CommitPanel(ItemSelector):
             content = self.git.load_commit_info(commit.sha, plain=True).split("\n")
             self.emit(
                 ActionEventType.goto,
-                target=self._display,
+                target="diff",
                 source=self,
                 content=content,
             )

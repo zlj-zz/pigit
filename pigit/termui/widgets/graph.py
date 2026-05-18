@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_component_graph.py
+Module: pigit/termui/widgets/graph.py
 Description: Generic heatmap grid and stepped line chart components.
 Author: Zev
 Date: 2026-04-30
@@ -10,9 +10,9 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
-from . import palette
-from ._component_base import Component
-from .wcwidth_table import wcswidth
+from .. import palette
+from .._component import Component
+from ..wcwidth_table import wcswidth
 
 # Box-drawing characters
 _BOX_H = "─"

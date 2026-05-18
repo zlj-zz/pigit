@@ -53,23 +53,19 @@ class RepoCommandHandler:
                     self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[5][1]}")
             else:
                 if reverse:
-                    summary_string = textwrap.dedent(
-                        f"""\
+                    summary_string = textwrap.dedent(f"""\
                         b`{info[0][0]}`
                             {info[1][0]}: `{info[1][1]}`<sky_blue>
-                        """
-                    )
+                        """)
                 else:
-                    summary_string = textwrap.dedent(
-                        f"""\
+                    summary_string = textwrap.dedent(f"""\
                         b`{info[0][0]}`
                             {info[1][0]}: {info[1][1]}
                             {info[2][0]}: {info[2][1]}
                             {info[3][0]}: `{info[3][1]}`<khaki>
                             {info[4][0]}: `{info[4][1]}`<ok>
                             {info[5][0]}: `{info[5][1]}`<sky_blue>
-                        """
-                    )
+                        """)
                 self.console.echo(summary_string)
 
     def clear(self) -> None:
@@ -85,10 +81,7 @@ class RepoCommandHandler:
 
     def cd(self, args: "Namespace") -> None:
         pick = getattr(args, "repo_cd_pick", False)
-        pick_alt = getattr(args, "repo_cd_pick_alt_screen", False)
-        code, msg = self.managed_repos.cd_repo(
-            args.repo, pick=pick, pick_alt_screen=pick_alt
-        )
+        code, msg = self.managed_repos.cd_repo(args.repo, pick=pick)
         if code != 0:
             if msg:
                 self.console.echo(msg)
@@ -111,7 +104,7 @@ class RepoCommandHandler:
             EMPTY_MANAGED_REPOS_MSG,
             run_multi_select_picker,
         )
-        from pigit.termui._picker import PickerRow
+        from pigit.picker_app import PickerRow
 
         branch_name = args.branch_name
         checkout = getattr(args, "checkout", False)
@@ -129,7 +122,9 @@ class RepoCommandHandler:
                 self.console.echo(EMPTY_MANAGED_REPOS_MSG)
                 return
             rows = [
-                PickerRow(title=name, detail=prop.get("path", ""), ref=prop.get("path", ""))
+                PickerRow(
+                    title=name, detail=prop.get("path", ""), ref=prop.get("path", "")
+                )
                 for name, prop in sorted(exist_repos.items())
             ]
             exit_code, selected = run_multi_select_picker(

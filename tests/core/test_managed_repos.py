@@ -289,7 +289,13 @@ def test_fuzzy_match():
 
 def test_ll_repos_filter(tmp_repos_json):
     tmp_repos_json.write_text(
-        json.dumps({"alpha": {"path": "/p1"}, "beta": {"path": "/p2"}, "gamma": {"path": "/p3"}})
+        json.dumps(
+            {
+                "alpha": {"path": "/p1"},
+                "beta": {"path": "/p2"},
+                "gamma": {"path": "/p3"},
+            }
+        )
     )
     ex = MockExecutor()
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))

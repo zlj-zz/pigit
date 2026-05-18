@@ -115,5 +115,4 @@ class Branch:
     is_remote: bool = False
 
 
-GitFileT = File | str
-GitFuncT = Callable[[GitFileT], None]
+GitFuncT = Callable[[File], None]

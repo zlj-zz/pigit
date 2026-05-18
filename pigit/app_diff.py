@@ -15,13 +15,13 @@ import re
 from pigit.termui import (
     ActionEventType,
     Component,
-    LineTextBrowser,
     SyntaxTokenizer,
     keys,
     palette,
     bind_keys,
-    plain,
 )
+from pigit.termui._text import plain
+from pigit.termui.widgets import LineTextBrowser
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -68,7 +68,7 @@ class DiffViewer(LineTextBrowser):
         size: tuple[int, int] | None = None,
         id: str | None = None,
     ) -> None:
-        super().__init__(x, y, size, "", id=id)
+        super().__init__(x, y, size, [], id=id)
         # LineTextBrowser sets _max_line to full height; adjust for border rows
         if self._size[1] >= 3:
             self._max_line = self._size[1] - 2

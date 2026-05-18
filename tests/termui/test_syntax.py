@@ -193,14 +193,22 @@ class TestTokenizeMarkdown:
 
 class TestResolveColor:
     def test_global_keyword_control(self):
-        assert SyntaxTokenizer.resolve_color("keyword_control", "py") == SYNTAX_COLORS["keyword_control"]
+        assert (
+            SyntaxTokenizer.resolve_color("keyword_control", "py")
+            == SYNTAX_COLORS["keyword_control"]
+        )
 
     def test_rust_override(self):
         # Rust overrides keyword_storage to accent_red
-        assert SyntaxTokenizer.resolve_color("keyword_storage", "rs") == THEME.accent_red
+        assert (
+            SyntaxTokenizer.resolve_color("keyword_storage", "rs") == THEME.accent_red
+        )
 
     def test_fallback(self):
-        assert SyntaxTokenizer.resolve_color("unknown_type", "py") == SYNTAX_COLORS["variable"]
+        assert (
+            SyntaxTokenizer.resolve_color("unknown_type", "py")
+            == SYNTAX_COLORS["variable"]
+        )
 
 
 class TestCache:
@@ -218,11 +226,11 @@ class TestMultilineMask:
 
     def test_python_docstring_double_quote(self, tok):
         lines = [
-            '+def foo():',
+            "+def foo():",
             '+    """This is a docstring',
-            '+    that spans multiple',
+            "+    that spans multiple",
             '+    lines."""',
-            '+    pass',
+            "+    pass",
         ]
         mask = tok.compute_multiline_mask(lines, "py")
         assert mask == [None, "docstring", "docstring", "docstring", None]

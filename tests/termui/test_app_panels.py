@@ -6,14 +6,14 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_diff import DiffViewer
-from pigit.termui._component_base import ComponentError
+from pigit.termui._component import ComponentError
 from pigit.termui._surface import Surface
 
 
 class TestDiffViewer:
     def test_init(self):
         d = DiffViewer()
-        assert d._content == ""
+        assert d._content == []
         assert d._heatmap == []
         assert d._heatmap_colors == []
         assert d._line_numbers == []
@@ -75,7 +75,7 @@ class TestDiffViewer:
         assert d._i == 0  # jumped back to first hunk
 
     def test_scroll_position_cache(self):
-        from pigit.termui._component_base import Component
+        from pigit.termui._component import Component
 
         class FakeSource(Component):
             def _render_surface(self, surface):
@@ -91,7 +91,7 @@ class TestDiffViewer:
         assert d.come_from is source
 
     def test_leave_display_no_parent(self):
-        from pigit.termui._component_base import Component
+        from pigit.termui._component import Component
 
         class FakeSource(Component):
             def _render_surface(self, surface):
@@ -103,7 +103,7 @@ class TestDiffViewer:
         d._leave_display()
 
     def test_leave_display_with_parent(self):
-        from pigit.termui._component_base import Component
+        from pigit.termui._component import Component
 
         class FakeParent(Component):
             def __init__(self):
@@ -233,7 +233,7 @@ class TestDiffViewer:
 
     def test_update_expands_tabs(self):
         """update() with list content must also expand tabs via set_content."""
-        from pigit.termui._component_base import Component
+        from pigit.termui._component import Component
         from pigit.termui.types import ActionEventType
 
         class FakeSource(Component):

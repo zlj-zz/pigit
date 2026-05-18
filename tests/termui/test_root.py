@@ -9,8 +9,9 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component_base import Component
-from pigit.termui._overlay_components import ToastPosition
+from pigit.termui._component import Component
+from pigit.termui import ToastPosition
+from pigit.termui.widgets import Toast
 from pigit.termui._layer import LayerKind
 from pigit.termui._root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult
@@ -122,7 +123,7 @@ class TestComponentRoot:
         assert toast1.open is False  # 旧 Toast 被关闭
 
     def test_show_sheet(self):
-        from pigit.termui._component_base import Component
+        from pigit.termui._component import Component
 
         class _Inner(Component):
             NAME = "inner"
@@ -153,7 +154,7 @@ class TestComponentRoot:
         assert toast.open is False
 
     def test_toast_clock_injection(self):
-        from pigit.termui._overlay_components import Toast
+        from pigit.termui.widgets import Toast
 
         clock_calls = [0.0, 2.0, 10.0]
         idx = 0

@@ -13,7 +13,8 @@ from __future__ import annotations
 import datetime
 from collections import defaultdict
 
-from pigit.termui import Component, HeatmapGrid, StepLineChart
+from pigit.termui import Component
+from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME

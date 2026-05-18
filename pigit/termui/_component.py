@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_component_base.py
+Module: pigit/termui/_component.py
 Description: Base Component class and related utilities for the TUI framework.
 Author: Zev
 Date: 2026-04-19
@@ -17,7 +17,8 @@ from ._bindings import (
     list_bindings,
     resolve_key_handlers_merged,
 )
-from ._renderer_context import (
+from ._runtime_context import (
+    get_focus_manager,
     get_renderer,
     get_renderer_strict,
 )
@@ -31,27 +32,6 @@ if TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 
 NONE_SIZE = (0, 0)
-
-# Module-level tracking of the last focused component for focus-chain updates.
-_last_focused: Component | None = None
-
-
-def _set_focus_chain(leaf: Component) -> None:
-    """Set _focus_level along the parent chain from leaf to root."""
-    global _last_focused
-    if _last_focused is leaf:
-        return
-    old = _last_focused
-    while old is not None:
-        old._focus_level = -1
-        old = old.parent
-    level = 0
-    node: Component | None = leaf
-    while node is not None:
-        node._focus_level = level
-        level += 1
-        node = node.parent
-    _last_focused = leaf
 
 
 class ComponentError(Exception):
@@ -79,8 +59,8 @@ def _render_child_to_surface(
 class Component(ABC):
     """Base class for all TUI components.
 
-    Provides the component tree (parent/children), size/position,
-    key-handler resolution, action dispatch, and lifecycle hooks.
+    Skeleton class containing tree structure, geometry, rendering,
+    key handling, event bubbling, and lifecycle hooks.
     Subclasses must implement :meth:`_render_surface`.
     """
 
@@ -104,12 +84,12 @@ class Component(ABC):
         self.parent = parent
         self.children = list(children) if children else []
 
-        self._key_handlers = resolve_key_handlers_merged(
-            self, type(self), self.BINDINGS
-        )
-
         self.id = id
-        self._try_register()
+        self._try_register_id()
+
+        self._key_handlers = resolve_key_handlers_merged(
+            self, type(self), getattr(self, "BINDINGS", None)
+        )
 
     def activate(self):
         """Mark the component as active. Called when it enters the visible tree."""
@@ -123,27 +103,32 @@ class Component(ABC):
         """Get current activate status."""
         return self._activated
 
-    def _try_register(self) -> None:
-        """Auto-register to current registry context if id is set."""
+    def _try_register_id(self) -> None:
+        """Register with the global component registry if an id is set."""
         if not self.id:
             return
-        from ._component_registry import get_registry
+        from ._runtime_context import get_registry
 
         reg = get_registry()
         if reg is not None:
             reg.register(self)
 
-    def destroy(self) -> None:
-        """Auto-unregister from registry and destroy children."""
-        if self.id:
-            from ._component_registry import get_registry
+    def _try_unregister_id(self) -> None:
+        """Unregister from the global component registry if an id is set."""
+        if not self.id:
+            return
+        from ._runtime_context import get_registry
 
-            reg = get_registry()
-            if reg is not None:
-                reg.unregister(self)
+        reg = get_registry()
+        if reg is not None:
+            reg.unregister(self)
+
+    def destroy(self) -> None:
+        """Destroy children and unregister from component registry."""
+        self.deactivate()
         for child in self.children:
-            if callable(getattr(child, "destroy", None)):
-                child.destroy()
+            child.destroy()
+        self._try_unregister_id()
 
     def refresh(self):
         """Fresh content data.
@@ -151,42 +136,6 @@ class Component(ABC):
         Default is no-op; override if the component needs to rebuild internal
         state when resized or notified.
         """
-
-    def accept(self, action: ActionEventType, **data):
-        """Process emit action of child."""
-        _logger.warning(
-            "%s.accept: unsupported action %r",
-            type(self).__name__,
-            action,
-        )
-
-    def emit(self, action: ActionEventType, **data):
-        """Bubble action up through parent chain to Application.
-
-        Stops at the first ancestor whose ``on_event`` returns True.
-        If no handler consumes it, logs a warning.
-        """
-        node = self.parent
-        while node is not None:
-            handler = getattr(node, "on_event", None)
-            if callable(handler):
-                if handler(action, **data):
-                    return  # handled, stop bubbling
-            node = node.parent
-        _logger.warning("Unhandled event %r from %s", action, type(self).__name__)
-
-    def update(self, action: ActionEventType, **data):
-        """Process notify action of parent."""
-        _logger.warning(
-            "%s.update: unsupported action %r",
-            type(self).__name__,
-            action,
-        )
-
-    def notify(self, action: ActionEventType, **data):
-        """Notify all children."""
-        for child in self.children:
-            child.update(action, **data)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Response to the resize event.
@@ -197,76 +146,133 @@ class Component(ABC):
         self._size = size
         self.refresh()
 
+    def _handle_event(self, key: str) -> None:
+        """Process a key event using resolved bindings and ``on_key`` hook."""
+        handler = self._key_handlers.get(key)
+        if handler is not None:
+            handler()
+
+        on_key = getattr(self, "on_key", None)
+        has_on_key = False
+        if on_key is not None and callable(on_key):
+            on_key(key)
+            has_on_key = True
+
+        fm = get_focus_manager()
+        if fm is None:
+            return
+        current_leaf = fm.get_focus_leaf()
+        has_active_child = self.active_child is not None
+        parent = self.parent
+        parent_active = parent.active_child if parent is not None else None
+        parent_switched = parent_active is not None and parent_active is not self
+        if (
+            not has_active_child
+            and not parent_switched
+            and (handler is not None or has_on_key)
+            and current_leaf is self
+        ):
+            fm.set_focus_chain(self)
+
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         """Render this component into the given Surface.
 
         New components should implement this instead of `_render`.
         """
 
+    def has_overlay_open(self) -> bool:
+        """Return True if an overlay is open. Base components never have overlays."""
+        return False
+
+    def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
+        """Dispatch a key to an overlay. Base components have no overlays."""
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
+    def emit(self, action: ActionEventType, **data) -> None:
+        """Bubble action up through parent chain to Application.
+
+        Stops at the first ancestor whose ``on_event`` returns True.
+        If no handler consumes it, logs a warning.
+        """
+        node = self.parent
+        while node is not None:
+            handler = getattr(node, "on_event", None)
+            if callable(handler):
+                if handler(action, **data):
+                    return
+            node = node.parent
+        _logger.warning("Unhandled event %r from %s", action, type(self).__name__)
+
+    def notify(self, action: ActionEventType, **data) -> None:
+        """Notify all children by calling their ``update`` method."""
+        for child in self.children:
+            update_fn = getattr(child, "update", None)
+            if callable(update_fn):
+                update_fn(action, **data)
+
+    def accept(self, action: ActionEventType, **data) -> None:
+        """Handle an action event broadcast from a parent container.
+
+        Default is no-op; container components override this to route or
+        broadcast to children.
+        """
+
+    def update(self, action: ActionEventType, **data) -> None:
+        """Receive an action update from a parent or sibling component.
+
+        Default is no-op; interactive components override this to react to
+        state changes (e.g. a panel refreshing when another panel changes).
+        """
+
+    @property
+    def active_child(self) -> Component | None:
+        """Return the currently active child component, or ``None``.
+
+        Reads the ``active`` attribute if it exists and is a Component.
+        This provides a safe, type-checked alternative to
+        ``getattr(obj, "active", None)`` probes.
+        """
+        active = getattr(self, "active", None)
+        return active if isinstance(active, Component) else None
+
     @property
     def is_focus_leaf(self) -> bool:
         return self._focus_level == 0
 
-    def _handle_event(self, key: str):
-        """Event process handle function.
+    def find_focus_leaf(self) -> Component:
+        """Walk down the tree to find the deepest focusable leaf.
 
-        If want to custom handle, instance function `on_key(str)` in sub-class.
-        Or instance attribute `BINDINGS` in sub-class. Support effectiveness both.
+        Follows :meth:`active_child` when available and drills into
+        :attr:`children` for layout containers that do not manage an active child.
+
+        .. warning::
+            This method walks via :meth:`active_child` and :attr:`children`.
+            Passing a ``MagicMock`` (or any object that returns a new object
+            for every attribute access) will cause an infinite loop because
+            ``active_child`` and ``children`` never resolve to ``None`` / empty.
+            Tests that create a ``ComponentRoot`` must use a real ``Component``
+            instance as the ``body`` argument.
         """
-        handler = self._key_handlers.get(key)
-        if handler is not None:
-            handler()
-
-        on_key = getattr(self, "on_key", None)
-        if on_key is not None and callable(on_key):
-            on_key(key)
-
-        # Only leaf components should claim focus; containers (e.g. TabView)
-        # manage focus via explicit _set_focus_chain calls in their actions.
-        # If a parent (e.g. TabView) has already switched active child during
-        # handler execution, do not reclaim focus.
-        has_active_child = getattr(self, "active", None) is not None
-        parent_active = getattr(self.parent, "active", None)
-        parent_switched = parent_active is not None and parent_active is not self
-        if (
-            not has_active_child
-            and not parent_switched
-            and (handler is not None or (on_key is not None and callable(on_key)))
-        ):
-            _set_focus_chain(self)
-
-    def has_overlay_open(self) -> bool:
-        """True when this component is the loop root and an overlay is active."""
-
-        return False
-
-    def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
-        """
-        Handle ``key`` for the active overlay only; must not be used when
-        :meth:`has_overlay_open` is false (defensive default).
-        """
-
-        return OverlayDispatchResult.DROPPED_UNBOUND
-
-    def get_help_title(self) -> str:
-        """Return the title for this component's help section.
-
-        Default is the class name without "Component" suffix, if present.
-        """
-        name = type(self).__name__
-        if name.endswith("Component"):
-            return name[: -len("Component")]
-        return name
-
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        """
-        Return ``(key display, description)`` rows for the help panel.
-
-        Default: derived from :func:`~pigit.termui.bindings.list_bindings` (same
-        keys as runtime handlers), with short English placeholders when no docstring.
-        """
-
-        return _default_help_entries(self)
+        leaf = self
+        while True:
+            active = leaf.active_child
+            if active is not None:
+                leaf = active
+                continue
+            children = leaf.children
+            if children:
+                for child in children:
+                    if child.active_child is not None:
+                        leaf = child
+                        break
+                    if child.children:
+                        leaf = child
+                        break
+                else:
+                    break
+            else:
+                break
+        return leaf
 
     @property
     def renderer(self) -> Renderer | None:
@@ -293,7 +299,7 @@ class Component(ABC):
 def _truncate_help_line(text: str, max_len: int = 120) -> str:
     if len(text) <= max_len:
         return text
-    return text[: max_len - 1] + "\u2026"
+    return text[: max_len - 1] + "…"
 
 
 def _default_help_entries(component: Component) -> list[tuple[str, str]]:

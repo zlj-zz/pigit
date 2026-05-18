@@ -2,7 +2,7 @@
 
 Lightweight, keyboard-first terminal UI primitives for full-screen TUIs and modal overlays. The package separates **input semantics**, **rendering**, **component trees**, **bindings**, and **overlay modality** so application code (for example `pigit.app`) can compose apps via `Application` without duplicating low-level terminal logic.
 
-**Requires Python 3.9+.**
+**Requires Python 3.10+.**
 
 ## Goals
 
@@ -19,7 +19,7 @@ Lightweight, keyboard-first terminal UI primitives for full-screen TUIs and moda
 ```mermaid
 flowchart TB
     subgraph tty["TTY"]
-        KB[KeyboardInput / TermuiInputBridge]
+        KB[KeyboardInput / Input]
     end
     subgraph session["Session"]
         R[Renderer]
@@ -110,40 +110,32 @@ flowchart LR
 
 | Module | Role |
 |--------|------|
-| `_component_base.py` | `Component` ABC, `ComponentError`, `bind_signals`, `nearest_overlay_host()` |
-| `_component_layouts.py` | `TabView` (tabbed stack), `Column`, `Row` (layout containers) |
-| `_component_widgets.py` | `ItemSelector` (cursor list), `Header`, `InputLine`, `LineTextBrowser`, `StatusBar` |
-| `_component_graph.py` | `HeatmapGrid`, `StepLineChart` |
-| `_component_registry.py` | `by_id`, `get_registry` |
-| `_overlay_components.py` | `Popup` (modal shell), `AlertDialog`, `HelpPanel`, `Toast`, `Sheet` |
+| `_component.py` | `Component` ABC, `ComponentError`, `bind_signals` |
+| `containers/` | `TabView` (tabbed stack), `Column`, `Row` (layout containers) |
+| `widgets/` | `ItemList`, `InputLine`, `CheckList`, `Header`, `HelpPanel`, `Popup`, `Toast`, `Sheet`, `LineTextBrowser`, `Graph`, `StatusBar` |
 | `_layer.py` | `LayerStack`, `Layer`, `LayerKind` (`NONE` / `MODAL` / `TOAST` / `SHEET`) |
 | `_segment.py` | `Segment` dataclass for styled text (fg/bg, style flags) |
 | `_color.py` | `ColorAdapter`, `ColorMode` — color mode detection and ANSI adapter |
 | `palette.py` | Color constants (`DEFAULT_FG`, `DEFAULT_BG`, `DEFAULT_FG_DIM`) and style flags (`STYLE_BOLD`, `STYLE_DIM`, etc.) |
 | `reactive.py` | `Signal`, `Computed` reactive primitives (not exported from `__init__`) |
 | `_root.py` | `ComponentRoot`: internal framework root, wraps body + LayerStack |
-| `_overlay_context.py` | Overlay host context — `show_toast`, `show_sheet`, `show_badge`, `get_badge`, `exec_external` |
+| `_runtime_context.py` | Consolidated context — renderer, session, overlay, registry, focus manager |
 | `_application.py` | `Application` facade: high-level entry point for app wiring |
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize -> overlay -> main dispatch |
 | `_session.py` | `Session`: TTY setup, creates `Renderer` |
-| `_session_context.py` | Session ContextVar — `exec_external` and session getter/setter |
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
-| `_renderer_context.py` | `get_renderer()`, `get_renderer_strict()`, `set_renderer()` via `ContextVar` |
 | `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
 | `_bindings.py` | `bind_keys`, `list_bindings`, `BindingError`, merged handler resolution |
 | `keys.py` | Semantic key constants and helpers (e.g. `KEY_ESC`, `is_mouse_event`) |
 | `_text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
-| `input_keyboard.py` | Low-level byte reader -> semantic strings |
-| `input_terminal.py` | `InputTerminal` protocol |
-| `input_bridge.py` | Bridge implementing `InputTerminal` over `KeyboardInput` |
-| `_geometry.py` | `TerminalSize` and related helpers |
+| `input.py` | Low-level byte reader -> semantic strings, terminal input handling |
+| `_async_task.py` | `AsyncTask` for non-blocking data loading in components |
 | `_frame.py` | `BoxFrame`: reusable bordered frame layout helpers |
 | `_layout.py` | `SizeModifier` protocol and layout utilities |
 | `_syntax.py` | `SyntaxTokenizer` |
 | `_syntax_configs.py` | Language syntax keyword configurations |
-| `_picker.py` | Picker building blocks — `PickerRow` |
-| `tty_io.py`, `wcwidth_table.py`, `input_trie.py` | Internal utilities for I/O and width |
 | `types.py` | `ActionEventType`, `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, protocols |
+| `tty_io.py`, `wcwidth_table.py` | Internal utilities for I/O and width |
 
 ## Public API
 
@@ -153,15 +145,14 @@ Stable names are listed in `__all__` inside `__init__.py`.
 |----------|-------|
 | **Core** | `Component`, `ComponentError`, `ActionEventType`, `bind_signals` |
 | **Containers** | `TabView`, `Column`, `Row` |
-| **Widgets** | `ItemSelector`, `LineTextBrowser`, `Header`, `InputLine`, `StatusBar`, `HeatmapGrid`, `StepLineChart` |
+| **Widgets** | `ItemList`, `LineTextBrowser`, `Header`, `InputLine`, `StatusBar`, `CheckList`, `Graph` |
 | **Overlays** | `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast` |
 | **Overlay types** | `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, `OverlaySurface` |
 | **Application** | `Application`, `ComponentRoot`, `ExitEventLoop` |
-| **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `TerminalSize`, `SurfaceProtocol` |
+| **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
 | **Bindings** | `bind_keys`, `list_bindings`, `BindingError` |
 | **Registry** | `by_id`, `get_registry` |
 | **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `get_badge_signal`, `show_spinner`, `hide_spinner`, `exec_external` |
-| **Picker** | `PickerRow` |
 | **Text** | `plain`, `SyntaxTokenizer` |
 | **Keys** | `keys` (submodule) |
 
@@ -170,7 +161,8 @@ Stable names are listed in `__all__` inside `__init__.py`.
 Import the package once for app-level wiring:
 
 ```python
-from pigit.termui import Application, Component, TabView, bind_keys, keys
+from pigit.termui import Application, Component, bind_keys, keys
+from pigit.termui.containers import TabView
 ```
 
 `keys` and `palette` are exported as submodules (not flat constants). Always access them qualified:
@@ -192,12 +184,12 @@ Inside `pigit.termui` itself, **all** cross-module imports must use relative pat
 # Correct
 from . import keys
 from . import palette
-from ._component_base import Component, bind_signals
+from ._component import Component, bind_signals
 from .reactive import Signal, Computed
 
 # Wrong — absolute paths are forbidden inside the package
 from pigit.termui import keys
-from pigit.termui._component_base import Component
+from pigit.termui._component import Component
 ```
 
 ## Architecture (detail)
@@ -229,7 +221,7 @@ MyApp().run()
 
 `AppEventLoop` holds a single root `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack` and a body component. `ComponentRoot` implements `has_overlay_open()` and `try_dispatch_overlay(key)` by delegating to its `LayerStack`.
 
-Application code constructs `Popup(help_panel)` (`_help_panel` / `_help_popup`); the shell uses `_overlay_context` to push/pop modal layers onto the host's `LayerStack`. Call `HelpPanel.refresh_entries_from_source()` from the app when opening help if you want rows synced from `host.children` (not from `Popup`). Bind `?` to a handler that refreshes help then `_help_popup.toggle()`. `AlertDialog` subclasses `Popup` and overrides ESC via `_on_exit_key`; it uses `_overlay_context` for session management.
+Application code constructs `Popup(help_panel)` (`_help_panel` / `_help_popup`); `_runtime_context` provides overlay helpers to push/pop modal layers onto the host's `LayerStack`. Call `HelpPanel.refresh_entries_from_source()` from the app when opening help if you want rows synced from `host.children` (not from `Popup`). Bind `?` to a handler that refreshes help then `_help_popup.toggle()`. `AlertDialog` subclasses `Popup` and overrides ESC via `_on_exit_key`; it uses `_runtime_context` for session management.
 
 Panels that open alert sessions typically expose `_alert_dialog` and `_alert_popup` (often the same `AlertDialog` instance).
 
@@ -237,7 +229,7 @@ Panels that open alert sessions typically expose `_alert_dialog` and `_alert_pop
 
 1. **State**: `LayerStack` manages layers by `LayerKind`: `NONE`, `MODAL`, `TOAST`, `SHEET`. `ComponentRoot` is the overlay host; `Popup` / `AlertDialog` push/pop `MODAL` layers.
 2. **Shell**: Any component can gain modal behavior when wrapped by `Popup`; `ComponentRoot` delegates overlay management to `LayerStack`.
-3. **Help**: `HelpPanel` is content only; `Popup` runs `toggle()` / ESC via `_overlay_context`. The app may sync rows via `refresh_entries_from_source()` before toggling open.
+3. **Help**: `HelpPanel` is content only; `Popup` runs `toggle()` / ESC via `_runtime_context`. The app may sync rows via `refresh_entries_from_source()` before toggling open.
 4. **Alert**: A panel owns `_alert_dialog` / `_alert_popup` (same `AlertDialog` instance); opening pushes a `LayerKind.MODAL` layer onto `LayerStack`.
 5. **Dispatch**: `LayerStack.dispatch` forwards keys to the top-most MODAL layer's `OverlaySurface` via `dispatch_overlay_key` (shell bindings, then child, then `Popup._fallback_overlay_key` for help `?` or swallow). TOAST and SHEET layers do not intercept input dispatch. Handler failures yield `OverlayDispatchResult.CLOSED_AFTER_ERROR` and cleanup the modal slot.
 6. **Toast**: `ComponentRoot.show_toast()` creates a `Toast` on the `TOAST` layer with slide-in/out animation and auto-expiration. Only one toast is shown at a time.
@@ -363,8 +355,8 @@ When adding new components or extending existing ones, follow these rules so the
 
 ## Tests
 
-Project tests under `tests/tui/` and `tests/termui/` cover bindings, the event loop, and input contracts. Run them with:
+Project tests under `tests/termui/` cover bindings, the event loop, rendering, widgets, containers, and input contracts. Run them with:
 
 ```bash
-python3 -m pytest tests/tui tests/termui -q
+python3 -m pytest tests/termui -q
 ```

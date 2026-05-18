@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import Component, InputLine, keys, OverlayDispatchResult
+from pigit.termui import Component, keys, OverlayDispatchResult
+from pigit.termui.widgets import InputLine
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
