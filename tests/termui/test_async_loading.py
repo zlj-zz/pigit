@@ -7,6 +7,7 @@ Date: 2026-05-17
 
 from __future__ import annotations
 
+import threading
 import time
 
 from pigit.termui._async_task import AsyncTask
@@ -196,14 +197,17 @@ def test_inactive_panel_drops_arriving_data():
 def test_async_task_race_new_start_drops_old_result():
     """Rapid start() calls cancel previous tasks; only latest result arrives."""
     received = []
+    old_started = threading.Event()
 
     def slow_work(label):
-        time.sleep(0.03)
+        if label == "old":
+            old_started.set()
+        time.sleep(0.05)
         return label
 
     task = AsyncTask()
     task.start(lambda: slow_work("old"), lambda x: received.append(x))
-    time.sleep(0.01)  # let old task start
+    old_started.wait(timeout=1.0)
     task.start(lambda: slow_work("new"), lambda x: received.append(x))
 
     time.sleep(0.1)
