@@ -244,12 +244,12 @@ class LocalGit:
     def get_summary(self, path: str | None = None, plain: bool = True) -> str:
         path = path or self.path
         color = "never" if plain else "always"
-        _, _, summary = self.executor.exec(
+        code, _err, summary = self.executor.exec(
             f"git shortlog --summary --numbered --color={color}",
             flags=REPLY | DECODE,
             cwd=path,
         )
-        if summary is None:
+        if code != 0 or summary is None:
             return ""
         return cast(str, summary)
 
@@ -316,11 +316,13 @@ class LocalGit:
             git_log = "\t" + error_str if err else textwrap.indent(cast(str, res), "\t")
             gen.append("Latest log:\n%s\n" % git_log)
 
-        # FIXME: will broken in a init repo.
         # Get git summary.
-        # if not include_part or "summary" in include_part:
-        #     summary = self.get_summary(path, not color)
-        #     gen.append("Summary:\n%s\n" % summary or error_str)
+        if not include_part or "summary" in include_part:
+            summary = self.get_summary(path, not color)
+            summary_str = "\t" + error_str if not summary else textwrap.indent(
+                summary, "\t"
+            )
+            gen.append("Summary:\n%s\n" % summary_str)
 
         return "\n".join(gen)
 
