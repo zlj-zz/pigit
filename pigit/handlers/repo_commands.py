@@ -12,7 +12,7 @@ class RepoCommandHandler:
     """``pigit repo`` / ``pigit open`` — multi-repo registry and bulk git."""
 
     def __init__(self, ctx: "Context") -> None:
-        from plenty import get_console
+        from ..termui.cli_output import get_console
 
         self.ctx = ctx
         self.console = get_console()
@@ -25,9 +25,9 @@ class RepoCommandHandler:
         if added := self.managed_repos.add_repos(args.paths, args.dry_run):
             self.console.echo(f"Found {len(added)} new repo(s).")
             for path in added:
-                self.console.echo(f"\t`{path}`<sky_blue>")
+                self.console.echo(f"\t@sky_blue({path})")
         else:
-            self.console.echo("`No new repos found!`<tomato>")
+            self.console.echo("@tomato(No new repos found!)")
 
     def rm(self, args: "Namespace") -> None:
         res = self.managed_repos.rm_repos(args.repos, args.path)
@@ -54,18 +54,18 @@ class RepoCommandHandler:
             else:
                 if reverse:
                     summary_string = textwrap.dedent(f"""\
-                        b`{info[0][0]}`
-                            {info[1][0]}: `{info[1][1]}`<sky_blue>
+                        @bold({info[0][0]})
+                            {info[1][0]}: @sky_blue({info[1][1]})
                         """)
                 else:
                     summary_string = textwrap.dedent(f"""\
-                        b`{info[0][0]}`
+                        @bold({info[0][0]})
                             {info[1][0]}: {info[1][1]}
                             {info[2][0]}: {info[2][1]}
-                            {info[3][0]}: `{info[3][1]}`<khaki>
-                            {info[4][0]}: `{info[4][1]}`<ok>
-                            {info[5][0]}: `{info[5][1]}`<yellow>
-                            {info[6][0]}: `{info[6][1]}`<sky_blue>
+                            {info[3][0]}: @khaki({info[3][1]})
+                            {info[4][0]}: @green({info[4][1]})
+                            {info[5][0]}: @yellow({info[5][1]})
+                            {info[6][0]}: @sky_blue({info[6][1]})
                         """)
                 self.console.echo(summary_string)
 

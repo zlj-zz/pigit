@@ -19,6 +19,14 @@ RED: tuple[int, int, int] = (244, 135, 113)
 MUTED: tuple[int, int, int] = (150, 150, 150)
 DIM: tuple[int, int, int] = (100, 100, 100)
 
+# Legacy plenty colors (moved here for centralised palette management)
+SKY_BLUE: tuple[int, int, int] = (135, 206, 250)
+TOMATO: tuple[int, int, int] = (255, 99, 71)
+KHAKI: tuple[int, int, int] = (240, 230, 140)
+PINK: tuple[int, int, int] = (255, 192, 203)
+VIOLET_RED: tuple[int, int, int] = (199, 21, 133)
+PALE_GREEN: tuple[int, int, int] = (152, 251, 152)
+
 # ── Role assignments ──
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE

@@ -9,9 +9,25 @@ import textwrap
 from pathlib import Path
 from collections.abc import Iterator
 
-from plenty.str_utils import byte_str2str
+import ast
 
 from typing import cast
+
+
+def byte_str2str(text: str) -> str:
+    """Decode a byte literal string (e.g. b'foo') to str.
+
+    Args:
+        text: A string that looks like a Python bytes literal.
+
+    Returns:
+        The decoded string, or the original text on failure.
+    """
+    try:
+        return ast.literal_eval(text).decode("utf-8")
+    except (ValueError, SyntaxError, UnicodeDecodeError):
+        return text
+
 
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
 from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
@@ -270,14 +286,16 @@ class LocalGit:
                 str: desc info.
         """
         path = path or self.path
-        error_str = "`Error getting.`<error>"
-        gen = ["[b`Repository Information`]" if color else "[Repository Information]"]
+        error_str = "@red(Error getting.)"
+        gen = [
+            "[@bold(Repository Information)]" if color else "[Repository Information]"
+        ]
         repo_path, _ = self.confirm_repo(path)
 
         # Get content.
         if not include_part or "path" in include_part:
             gen.append(
-                f"Repository: \n\t`{repo_path}`<sky_blue>\n"
+                f"Repository: \n\t@sky_blue({repo_path})\n"
                 if color
                 else f"Repository: \n\t{repo_path}\n"
             )
@@ -292,7 +310,7 @@ class LocalGit:
             else:
                 res = re.findall(self._RE_CONFIG_URL, config)
                 remote = "\n".join(
-                    [f"\ti`{x}`<sky_blue>" if color else f"\t{x}" for x in res]
+                    [f"\t@italic(@sky_blue({x}))" if color else f"\t{x}" for x in res]
                 )
             gen.append("Remote: \n%s\n" % remote)
 
@@ -319,8 +337,8 @@ class LocalGit:
         # Get git summary.
         if not include_part or "summary" in include_part:
             summary = self.get_summary(path, not color)
-            summary_str = "\t" + error_str if not summary else textwrap.indent(
-                summary, "\t"
+            summary_str = (
+                "\t" + error_str if not summary else textwrap.indent(summary, "\t")
             )
             gen.append("Summary:\n%s\n" % summary_str)
 
@@ -1007,7 +1025,7 @@ class LocalGit:
             remote_url += commit
 
         if print:
-            return True, f"Remote URL: `{remote_url}`<sky_blue>"
+            return True, f"Remote URL: @sky_blue({remote_url})"
 
         try:
             import webbrowser

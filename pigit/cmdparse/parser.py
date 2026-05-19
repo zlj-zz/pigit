@@ -16,7 +16,7 @@ from typing import (
 )
 from collections.abc import Callable, Iterable, Sequence
 
-from plenty.style import Style
+from ..termui.cli_output import styled
 
 if TYPE_CHECKING:
     from argparse import Action, FileType, _ArgumentGroup
@@ -40,11 +40,6 @@ class ColorHelpFormatter(HelpFormatter):
     to complete customization.
     """
 
-    usage_style: str = "bold"
-    text_style: str = "i sky_blue"
-    command_style: str = "ok"
-    help_style: str = "i yellow"
-
     def __init__(
         self,
         prog: str,
@@ -67,12 +62,10 @@ class ColorHelpFormatter(HelpFormatter):
         groups: Iterable,
         prefix: str | None,
     ) -> str:
-        return Style.parse(self.usage_style).render(
-            super()._format_usage(usage, actions, groups, prefix)
-        )
+        return styled(super()._format_usage(usage, actions, groups, prefix), bold=True)
 
     def _format_text(self, text: str) -> str:
-        return Style.parse(self.text_style).render(super()._format_text(text))
+        return styled(super()._format_text(text), fg="sky_blue", italic=True)
 
     def _format_action(self, action: Action) -> str:
         # determine the required width and the entry label
@@ -101,7 +94,7 @@ class ColorHelpFormatter(HelpFormatter):
 
         # collect the pieces of the action help
         # @Overwrite
-        parts = [Style.parse(self.command_style).render(action_header)]
+        parts = [styled(action_header, fg="green")]
 
         # if there was help for the action, add lines of help text
         if action.help:
@@ -111,9 +104,7 @@ class ColorHelpFormatter(HelpFormatter):
             help_parts.extend(
                 "%*s%s\n" % (help_position, "", line) for line in help_lines[1:]
             )
-            parts.append(
-                Style.parse(self.help_style).render(self._join_parts(help_parts))
-            )
+            parts.append(styled(self._join_parts(help_parts), fg="yellow", italic=True))
 
         elif not action_header.endswith("\n"):
             parts.append("\n")

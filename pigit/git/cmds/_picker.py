@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from . import GitCommandNew
 
 NO_TTY_MSG = (
-    "`pigit cmd --pick`<error> needs an interactive terminal.\n"
+    "@red(pigit cmd --pick) needs an interactive terminal.\n"
     "Use `pigit cmd -l` for the full list or "
     "`pigit cmd -s <query>` to search.\n"
     "See `pigit cmd -h` for more options."

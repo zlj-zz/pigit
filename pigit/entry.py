@@ -5,8 +5,7 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from plenty import get_console
-from plenty.table import Table
+from .termui.cli_output import get_console
 
 from .config import Config
 from .context import Context
@@ -128,9 +127,7 @@ def _pigit_main(args: Namespace, _) -> None:
 
         elif config.counter.format == "table":
 
-            def color_index(
-                count: int,
-            ) -> str:
+            def color_index(count: int) -> str:
                 # Colors displayed for different code quantities.
                 level_color = (
                     "green",
@@ -146,20 +143,20 @@ def _pigit_main(args: Namespace, _) -> None:
                     else level_color[index - 1]
                 )
 
-            tb = Table(title="[Code Counter Result]", title_style="bold")
-            tb.add_column("Language")
-            tb.add_column("Files")
-            tb.add_column("Code lines")
+            console.echo("@bold(Code Counter Result)")
+            console.echo("-" * 50)
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"`{get_file_icon(k)} {k}`<cyan>"
+                    f"@cyan({get_file_icon(k)} {k})"
                     if config.counter.show_icon
                     else k
                 )
 
-                f_num_str = f"`{v[FILES_NUM]}`<{color_index(v[FILES_NUM])}>"
-                l_num_str = f"`{v[LINES_NUM]}`<{color_index(v[LINES_NUM])}>"
+                f_color = color_index(v[FILES_NUM])
+                l_color = color_index(v[LINES_NUM])
+                f_num_str = f"@{f_color}({v[FILES_NUM]})"
+                l_num_str = f"@{l_color}({v[LINES_NUM]})"
 
                 f_change_str = (
                     f"{v[FILES_CHANGE]:+}" if v.get(FILES_CHANGE, 0) != 0 else ""
@@ -168,13 +165,18 @@ def _pigit_main(args: Namespace, _) -> None:
                     f"{v[LINES_CHANGE]:+}" if v.get(LINES_CHANGE, 0) != 0 else ""
                 )
 
-                tb.add_row(
-                    f_type_str,
-                    f"{f_num_str} `{f_change_str}`<{'#98fb98' if f_change_str.startswith('+') else '#ff6347'}>",
-                    f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
+                f_change_color = "#98fb98" if f_change_str.startswith("+") else "#ff6347"
+                l_change_color = "#98fb98" if l_change_str.startswith("+") else "#ff6347"
+                f_change_part = f" @{f_change_color}({f_change_str})" if f_change_str else ""
+                l_change_part = f" @{l_change_color}({l_change_str})" if l_change_str else ""
+
+                console.echo(
+                    f"{f_type_str:<20}  {f_num_str:>8}{f_change_part}  "
+                    f"{l_num_str:>10}{l_change_part}"
                 )
-            tb.caption = f" Total: {total_size}"
-            console.echo(tb)
+
+            console.echo(f"-" * 50)
+            console.echo(f"Total: {total_size}")
         else:
             print("Invalid display format!")
 

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from pigit.ext.executor import Executor
 
 REPO_CD_NO_TTY_MSG = (
-    "`pigit repo cd --pick`<error> needs an interactive terminal.\n"
+    "@red(pigit repo cd --pick) needs an interactive terminal.\n"
     "Use an explicit managed repo name in scripts and CI, or run "
     "`pigit repo cd --pick` only in a real terminal.\n"
     "See `pigit repo cd -h`."

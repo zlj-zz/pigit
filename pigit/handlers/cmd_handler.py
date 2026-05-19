@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from plenty import get_console
+from ..termui.cli_output import get_console
 
 from ..git.cmds import GitCommandNew, CommandCategory
 
@@ -52,7 +52,7 @@ class CmdHandler:
             try:
                 CommandCategory(category)
             except ValueError:
-                self._console.echo(f"`Unknown category: {category}`<tomato>")
+                self._console.echo(f"@tomato(Unknown category: {category})")
                 self._console.echo(
                     f"Valid categories: {', '.join(c.value for c in CommandCategory)}"
                 )
@@ -93,7 +93,7 @@ class CmdHandler:
                     category = CommandCategory(args.type)
                     help_text = self._processor.get_help(category=category)
                 except ValueError:
-                    self._console.echo(f"`Unknown category: {args.type}`<tomato>")
+                    self._console.echo(f"@tomato(Unknown category: {args.type})")
                     self._console.echo(
                         f"Valid categories: {', '.join(c.value for c in CommandCategory)}"
                     )
