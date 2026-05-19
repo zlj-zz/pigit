@@ -34,20 +34,53 @@ if TYPE_CHECKING:
     from .git.model import GitFuncT
 
 
-def _staged_fg(ch: str) -> tuple[int, int, int]:
+def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
+    if not focused:
+        return THEME.fg_dim
     if ch in "MA":
         return THEME.accent_green
+    if ch in "RC":
+        return THEME.accent_yellow
     if ch == "?":
         return THEME.accent_blue
-    return THEME.fg_dim
+    if ch == "U":
+        return THEME.accent_red
+    return THEME.fg_muted
 
 
-def _unstaged_fg(ch: str) -> tuple[int, int, int]:
+def _unstaged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
+    if not focused:
+        return THEME.fg_dim
     if ch in "MD":
         return THEME.accent_red
+    if ch in "RC":
+        return THEME.accent_yellow
     if ch == "?":
         return THEME.accent_blue
-    return THEME.fg_dim
+    if ch == "U":
+        return THEME.accent_red
+    return THEME.fg_muted
+
+
+def _label_fg(label: str, focused: bool) -> tuple[int, int, int]:
+    """Return a semantic color for the status label."""
+    if not focused:
+        return THEME.fg_dim
+    match label:
+        case "Staged":
+            return THEME.accent_green
+        case "Modified":
+            return THEME.accent_red
+        case "Mixed":
+            return THEME.accent_yellow
+        case "Conflict":
+            return THEME.accent_red
+        case "Deleted":
+            return THEME.accent_red
+        case "Untracked":
+            return THEME.accent_blue
+        case _:
+            return THEME.fg_muted
 
 
 def _status_label(file: File) -> str:
@@ -225,8 +258,10 @@ class StatusPanel(ItemList):
         left = [
             Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
-            Segment(staged, fg=_staged_fg(staged), style_flags=cursor_flags),
-            Segment(unstaged, fg=_unstaged_fg(unstaged), style_flags=cursor_flags),
+            Segment(staged, fg=_staged_fg(staged, focused), style_flags=cursor_flags),
+            Segment(
+                unstaged, fg=_unstaged_fg(unstaged, focused), style_flags=cursor_flags
+            ),
             Segment(" ", fg=fg_primary),
         ]
 
@@ -240,7 +275,7 @@ class StatusPanel(ItemList):
         right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append(Segment(label, fg=THEME.fg_muted if focused else THEME.fg_dim))
+            right.append(Segment(label, fg=_label_fg(label, focused)))
 
         return left, main, right
 
