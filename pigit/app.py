@@ -90,7 +90,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("Q", "Quit"), ("I", "Inspector"), (";", "Palette")])
+        footer.set_global_help([("I", "Inspector"), (";", "Palette"), ("Q", "Quit")])
 
         inspector_panel = InspectorPanel(id="inspector")
 

@@ -171,7 +171,7 @@ class CommitPanel(ItemList):
     def get_help_title(self) -> str:
         return "Commit"
 
-    @bind_keys("y")
+    @bind_keys("Y")
     def copy_sha(self) -> None:
         """Copy the selected commit SHA to the clipboard."""
         commit = self._current_commit()
@@ -189,7 +189,7 @@ class CommitPanel(ItemList):
             ("Enter", "View"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),
-            ("y", "Copy SHA"),
+            ("Y", "Copy SHA"),
         ]
 
     def _current_commit(self) -> Commit | None:
