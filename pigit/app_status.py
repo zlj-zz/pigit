@@ -297,12 +297,17 @@ class StatusPanel(ItemList):
             )
             return
         if key == "a":
-            action = "Unstaged" if f.has_staged_change else "Staged"
-            self._run_action(
-                self.git.switch_file_status,
-                single_msg=f"{action} {f.name}",
-                batch_msg="Updated {} file(s)",
-            )
+            if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+                self._check_via_alert(
+                    self.git.switch_file_status, f, msg="Stage conflicted file"
+                )
+            else:
+                action = "Unstaged" if f.has_staged_change else "Staged"
+                self._run_action(
+                    self.git.switch_file_status,
+                    single_msg=f"{action} {f.name}",
+                    batch_msg="Updated {} file(s)",
+                )
             return
         if key == "i":
             self._run_action(
@@ -338,23 +343,29 @@ class StatusPanel(ItemList):
         if key == "E":
             self._open_external_editor(f)
             return
-        if key == "o" and f.has_merged_conflicts:
-            try:
-                self.git.checkout_ours(f)
-                self.git.add_file(f)
-                show_badge("Ours", duration=1.0)
-            except Exception as e:
-                show_toast(f"Ours failed: {e}", duration=2.0)
-            self.refresh()
+        if key == "o":
+            if f.has_merged_conflicts:
+                try:
+                    self.git.checkout_ours(f)
+                    self.git.add_file(f)
+                    show_badge("Ours", duration=1.0)
+                except Exception as e:
+                    show_toast(f"Ours failed: {e}", duration=2.0)
+                self.refresh()
+            else:
+                show_toast("No conflicts in current file", duration=1.5)
             return
-        if key == "t" and f.has_merged_conflicts:
-            try:
-                self.git.checkout_theirs(f)
-                self.git.add_file(f)
-                show_badge("Theirs", duration=1.0)
-            except Exception as e:
-                show_toast(f"Theirs failed: {e}", duration=2.0)
-            self.refresh()
+        if key == "t":
+            if f.has_merged_conflicts:
+                try:
+                    self.git.checkout_theirs(f)
+                    self.git.add_file(f)
+                    show_badge("Theirs", duration=1.0)
+                except Exception as e:
+                    show_toast(f"Theirs failed: {e}", duration=2.0)
+                self.refresh()
+            else:
+                show_toast("No conflicts in current file", duration=1.5)
             return
 
     # --- Helpers ---
@@ -399,7 +410,7 @@ class StatusPanel(ItemList):
                 ("v", "Exit visual"),
                 ("s", "Toggle scroll mode"),
             ]
-        return [
+        entries = [
             ("jk/↑↓", "Navigate"),
             ("Enter", "Open"),
             ("a", "Stage"),
@@ -408,9 +419,14 @@ class StatusPanel(ItemList):
             ("C", "Commit"),
             ("v", "Visual"),
             ("E", "Edit file"),
-            ("o", "Ours"),
-            ("t", "Theirs"),
         ]
+        if (
+            self.files
+            and 0 <= self.curr_no < len(self.files)
+            and self.files[self.curr_no].has_merged_conflicts
+        ):
+            entries.extend([("o", "Ours"), ("t", "Theirs")])
+        return entries
 
     def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""

@@ -739,9 +739,11 @@ class LocalGit:
         path = path or self.path
         file_name = file.get_file_str()
 
-        if file.has_merged_conflicts or file.has_inline_merged_conflicts:
-            pass
-        elif file.has_unstaged_change:
+        if (
+            file.has_merged_conflicts
+            or file.has_inline_merged_conflicts
+            or file.has_unstaged_change
+        ):
             self.executor.exec(
                 f"git add -- {shlex.quote(file_name)}",
                 flags=WAITING | SILENT,
