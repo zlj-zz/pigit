@@ -205,8 +205,8 @@ def test_cd_repo_known_name(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"r": {"path": "/tmp"}}))
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    mr.cd_repo("r")
-    assert ex.exec_calls
+    code, path = mr.cd_repo("r")
+    assert code == 0 and path == "/tmp"
 
 
 def test_cd_repo_interactive_index(tmp_repos_json, monkeypatch):
@@ -214,8 +214,8 @@ def test_cd_repo_interactive_index(tmp_repos_json, monkeypatch):
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
     monkeypatch.setattr("builtins.input", lambda _: "0")
-    mr.cd_repo(None)
-    assert ex.exec_calls
+    code, path = mr.cd_repo(None)
+    assert code == 0 and path == "/p1"
 
 
 def test_cd_repo_interactive_bad_index(tmp_repos_json, monkeypatch, capsys):

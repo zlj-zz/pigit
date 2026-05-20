@@ -352,6 +352,12 @@ def repo_report(args, _):
     dest="repo_cd_pick",
     help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
 )
+@argument(
+    "--output-file",
+    dest="repo_cd_output_file",
+    default=None,
+    help="Write the selected repo path to FILE instead of spawning a shell.",
+)
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)
