@@ -1,136 +1,18 @@
 # PIGIT
 
-![Python 3](https://img.shields.io/badge/Python-v3.9%5E-green?logo=python)
+![Python 3](https://img.shields.io/badge/Python-v3.10%5E-green?logo=python)
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A terminal tool for git. Read as [Pi Git], meaning to use git like pig it. When we use git, do you feel very uncomfortable with too long commands. For example: `git status --short`, this project can help you improve it. This project is written in Python. Now most UNIX like systems come with Python. So you can easily install and use it.
-
-## Usage
-
-If you want to use it, you must first know what it can do.
-
-The command of `pigit -h` or `pigit --help` to get the help message with usage. Like this:
-
-```bash
-usage: pigit [-h] [-i] [-f] [-r] [-v] [-c [PATH]] [--create-ignore TYPE]
-             [--complete [SHELL]] [--create-config]
-             {cmd,repo,open} ...
-
-Pigit TUI is called automatically if no parameters are followed.
-
-
-positional arguments:
-  {cmd,repo,open}
-    cmd                 git short command.
-    repo                repos options.
-    open                open remote repository in web browser.
-
-
-options:
-  -h, --help            show this help message and exit
-  -i, --information     Show some information about the current git repository.
-  -f, --config          Display the config of current git repository and exit.
-  -r, --report          Report the pigit desc and exit.
-  -v, --version         Show version and exit.
-
-
-tools arguments:
-  Auxiliary type commands.
-
-  -c [PATH], --count [PATH]
-                        Count the number of codes and output them in tabular form.
-                        A given path can be accepted, and the default is the
-                        current directory.
-  --create-ignore TYPE  Create a demo .gitignore file. Need one argument, the type
-                        of gitignore.
-  --complete [SHELL]    Add shell prompt script and exit. (Supported bash, zsh,
-                        fish)
-  --create-config       Create a pre-configured file of PIGIT.(If a profile
-                        exists, the values available in it are used)
-```
-
-### Interaction
-
-Even if you can use short commands instead of long commands of git, there are still some cases where simple commands can be very bad. For example: `git add a/b/1.txt b/c/1.txt c/d/1.txt`.
-
-Therefore, we need a TUI to help us, so Pigit provides a simple command-line interactive TUI. When you use `pigit` without following any parameters, you will enter it.
+A terminal UI for Git, plus short command aliases and multi-repo management. Run `pigit` with no arguments to launch the TUI, or use sub-commands for quick one-off tasks.
 
 ![interaction demo](./docs/resources/demo_interaction.gif)
 
-And in the interaction mode, you can use `?` or `h` to see the help message.
+## Quick Start
 
-### `cmd`
-
-The command of `cmd` support some short sub-command to replace the long git original command.
-
-![demo display](./docs/resources/demo.gif)
-
-**Discovery**
-
-- `pigit cmd -l` — full table of short commands, help text, and underlying `git` lines (same idea as the old list flag).
-- `pigit cmd -s <query>` / `--search <query>` — case-insensitive substring filter over names, help, and command text.
-- `pigit cmd -t` — print supported types; `pigit cmd -t Branch` (etc.) — commands in that type.
-- `pigit cmd -p` / `--pick` — built-in interactive picker (TTY only): `j` / `k` move, `Enter` run, `/` then a line to filter, `q` quit, or type a number and `Enter`. If a command accepts arguments, you get a `pigit cmd <short> ` line and an empty-line prompt for extra args (then one run).
-
-Use `pigit cmd -l` to check what short command it supported, it will display the corresponding help information and the git original command, like this:
-
-```
-These are short commands that can replace git operations:
-    b        lists, creates, renames, and deletes branches.
-             git branch
-    bc       creates a new branch.
-             git checkout -b
-    bl       lists branches and their commits.
-             git branch -vv
-    bL       lists local and remote branches and their commits.
-             git branch --all -vv
-    bs       lists branches and their commits with ancestry graphs.
-             git show-branch
-    bS       lists local and remote branches and their commits with ancestry graphs.
-             git show-branch --all
-    bm       renames a branch.
-             git branch --move
-    bM       renames a branch even if the new branch name already exists.
-             git branch --move --force
-    bd       delete a local branch by name.
-             git branch -d
-......
-```
-
-### `repo`
-
-The command of `repo` support operate multiple repos at the same time.
-
-![demo display](./docs/resources/demo_repo_1.png)
-![demo display](./docs/resources/demo_repo_2.png)
-![demo display](./docs/resources/demo_repo_3.png)
-
-Use `pigit repo -h` to get more help.
-
-**`repo cd` / `repo cd --pick`**: With a managed repo name that exists in `repos.json`, `pigit repo cd <name>` jumps into that working tree (same as before). Use **`pigit repo cd --pick`** (`-p`) in a real terminal to open the built-in list picker (j/k, `/` filter, Enter to confirm, q/Esc to quit). If you pass a name that is not an exact key, the picker opens with the filter pre-filled so you can narrow the list. Scripts and CI should pass an explicit name or avoid `--pick`; the picker requires stdin and stdout to be TTYs. Details: `docs/technical_repo_cd_interactive.md`.
-
-```
-usage: pigit
-
- repo [-h] {add,rm,rename,ll,clear,cd,fetch,pull,push} ...
-
-
-positional arguments:
-  {add,rm,rename,ll,clear,cd,fetch,pull,push}
-    add                 add repo(s).
-    rm                  remove repo(s).
-    rename              rename a repo.
-    ll                  display summary of all repos.
-    clear               clear the all repos.
-    cd                  jump to a repo dir.
-    fetch               fetch remote update for repo(s).
-    pull                pull remote updates for repo(s).
-    push                push the local updates for repo(s).
-
-
-options:
-  -h, --help            show this help message and exit
+```bash
+pip install -U pigit
+pigit          # Launch TUI
 ```
 
 ## Installation
@@ -147,43 +29,130 @@ pip install -U pigit
 git clone https://github.com/zlj-zz/pigit.git --depth=1
 cd pigit
 make install
-# or
-python setup.py install  # On windows
+# or on Windows
+python setup.py install
 ```
 
 ### Development (editable install)
-
-Runtime and dev dependencies are declared in `pyproject.toml`. After cloning:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-This replaces the old flat `requirements.txt` list; `requirements.txt` now points at the same extra for compatibility with `pip install -r requirements.txt`.
+## TUI Mode
 
-## Completion
+Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments to enter it.
 
-Provides a friendly command-line completion capability, injecting completion through the following methods.
+The TUI provides interactive panels for status, branch list, commit log, diff viewer, and more. Use `j`/`k` or arrow keys to navigate, `Enter` to select, and `q` or `Esc` to go back. Press `?` or `h` at any time to see available key bindings.
 
-Write it to your shell configuration file：
+For operations that are cumbersome on the command line—such as staging individual hunks, browsing commit history with inline graphs, or resolving merge conflicts—the TUI is the recommended workflow.
 
-```sh
-# ~/.zshrc
+> [!NOTE]
+> The TUI requires an interactive terminal (both stdin and stdout must be TTYs). It will not launch in CI pipelines, scripts, or when piped.
 
-eval "$(pigit --complete zsh)"
+## CLI Usage
+
+For scripting, CI, or quick tasks, Pigit exposes sub-commands and flags.
+
+```bash
+usage: pigit [-h] [-i] [-f] [-r] [-v] [-c [PATH]] [--create-ignore TYPE]
+             [--init [SHELL]] [--create-config]
+             {cmd,repo,open} ...
+
+Pigit TUI is called automatically if no parameters are followed.
 ```
 
-Currently supports `bash`, `zsh` and `fish`.
+### `cmd`
 
-If no shell is specified, it will try to automatically detect what shell you are using.
+Short aliases for common git operations.
+
+![demo display](./docs/resources/demo.gif)
+
+**Discovery**
+
+- `pigit cmd -l` — list all short commands with help text and underlying `git` lines.
+- `pigit cmd -s <query>` / `--search <query>` — filter by keyword.
+- `pigit cmd -t <category>` — filter by category (branch, commit, index, etc.).
+- `pigit cmd -p` / `--pick` — interactive picker (TTY only): `j`/`k` to move, `Enter` to run, `/` to filter, `q` to quit.
+
+Example output from `pigit cmd -l`:
+
+```
+These are short commands that can replace git operations:
+    b        lists, creates, renames, and deletes branches.
+             git branch
+    bc       creates a new branch.
+             git checkout -b
+    bl       lists branches and their commits.
+             git branch -vv
+    bd       delete a local branch by name.
+             git branch -d
+......
+```
+
+### `repo`
+
+Manage multiple repositories at once.
+
+![demo display](./docs/resources/demo_repo_1.png)
+![demo display](./docs/resources/demo_repo_2.png)
+![demo display](./docs/resources/demo_repo_3.png)
+
+- `pigit repo add <path>` — add repo(s) to the managed list.
+- `pigit repo rm <name>` — remove repo(s).
+- `pigit repo ll` — display summary of all repos.
+- `pigit repo cd <name>` — print the path of a managed repo.
+- `pigit repo cd -p` — open the interactive picker to choose a repo.
+- `pigit repo fetch|pull|push [<name>...]` — run git operations across repos in parallel.
+
+### `open`
+
+Open the current repository's remote URL in a web browser.
+
+```bash
+pigit open              # open current branch
+pigit open <branch>     # open specific branch
+pigit open -c           # open at current commit
+pigit open -i <number>  # open a specific issue
+pigit open -p           # print URL instead of opening
+```
+
+### Other flags
+
+| flag | description |
+|------|-------------|
+| `-i`, `--information` | show repository info |
+| `-f`, `--config` | display local git config |
+| `-r`, `--report` | show pigit description |
+| `-c [PATH]`, `--count [PATH]` | code statistics (table or simple format) |
+| `--create-ignore TYPE` | generate a `.gitignore` template |
+| `--create-config` | create a config file at `~/.config/pigit/pigit.toml` |
+
+## Shell Integration
+
+`pigit --init` generates shell completion scripts **and** a `pigit` wrapper function.
+
+> [!TIP]
+> Run `--init` once: it sets up both tab-completion and the `repo cd` auto-`cd` wrapper. You do not need a separate completion-only step.
+
+Add it to your shell configuration:
 
 ```sh
-eval "$(pigit --complete)"
+# ~/.bashrc or ~/.zshrc
+eval "$(pigit --init)"
 ```
+
+Supports `bash`, `zsh`, and `fish`. If no shell is specified, it auto-detects from `$SHELL`.
+
+### Auto `cd` with `repo cd`
+
+After sourcing the init script, `pigit repo cd -p` automatically changes your shell's working directory when you pick a repo. The wrapper intercepts `pigit repo cd`, runs the picker, and `cd`s into the selected path.
+
+For scripts and CI, use `--output-file <path>` to write the selected directory to a file instead.
 
 ## Alias
 
-Alias is good way to help you use _pigit_ faster . Open your shell profile and append:
+Add to your shell profile for faster access:
 
 ```bash
 if type pigit >/dev/null 2>&1; then
@@ -192,52 +161,38 @@ if type pigit >/dev/null 2>&1; then
 fi
 ```
 
-Then, you can use `pg` to call `pigit`.
-
-**Windows**
-
-Check your *PowerShell* config, like this: `echo $profile`. Create it if the path not exist. Then open it, and input:
+**Windows (PowerShell)**
 
 ```ps
 set-alias pg pigit
 ```
 
-After completing the above preparations, restart your terminal. If it prompts that you cannot run the configuration, you can refer to the [official website address](https://learn.microsoft.com/zh-cn/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-7.4).
-
 ## Configuration
 
-You can use `pigit --create-config` to create a template configuration at **pigit** home path.
+Create a template config with `pigit --create-config`. The config lives at:
 
-On Linux or MacOS: `~/.config/pigit`
+- Linux/macOS: `~/.config/pigit/pigit.toml`
+- Windows: `%USERPROFILE%\pigit\pigit.toml`
 
-On windows should be: `C:\\User\\<your username>`
+See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 
-[here](./examples/pigit.toml) is a configuration template.
-
-| section      | key               | type  | default                     | desc                                                                                                                        |
-| ------------ | ----------------- | ----- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [cmd]        | display           | bool  | True                        | Show original git command.                                                                                                  |
-| [cmd]        | recommend         | bool  | True                        | Is it recommended to correct when entering wrong commands.                                                                  |
-| [counter]    | use_gitignore     | bool  | True                        | Whether to use the ignore configuration of the `.gitignore` file.                                                           |
-| [counter]    | show_invalid      | bool  | False                       | Whether show files that cannot be counted.                                                                                  |
-| [counter]    | show_icon         | bool  | True                        | Whether show files icons. Font support required, like: 'Nerd Font'.                                                         |
-| [counter]    | format            | str   | table                       | Output format of statistical results. Supported: [table, simple]                                                            |
-| [info]       | git_config_format | str   | table                       | Git local config print format. Supported: [table, normal]                                                                   |
-| [info]       | repo_include      | list  | ["remote", "branch", "log"] | Control which parts need to be displayed when viewing git repository information. Support: (path,remote,branch,log,summary) |
-| [repo]       | auto_append       | bool  | True                        | Whether auto append path to repos.                                                                                          |
-| [log]        | debug             | bool  | False                       | Whether run PIGIT in debug mode.                                                                                            |
-| [log]        | output            | bool  | False                       | Whether output log in terminal.                                                                                             |
+| section | key | type | default | description |
+|---------|-----|------|---------|-------------|
+| `[cmd]` | `display` | bool | `True` | show original git command |
+| `[cmd]` | `recommend` | bool | `True` | suggest corrections for wrong commands |
+| `[counter]` | `use_gitignore` | bool | `True` | respect `.gitignore` when counting |
+| `[counter]` | `show_invalid` | bool | `False` | show files that cannot be counted |
+| `[counter]` | `show_icon` | bool | `True` | show file icons (requires Nerd Font) |
+| `[counter]` | `format` | str | `table` | output format: `table` or `simple` |
+| `[info]` | `git_config_format` | str | `table` | git config display: `table` or `normal` |
+| `[info]` | `repo_include` | list | `["remote", "branch", "log"]` | sections to show in repo info |
+| `[repo]` | `auto_append` | bool | `True` | auto-add current repo to managed list |
+| `[log]` | `debug` | bool | `False` | debug mode |
+| `[log]` | `output` | bool | `False` | print logs to terminal |
 
 ## Custom Commands
 
-You can define custom aliases and scripts via a TOML configuration file at the **pigit** home directory.
-
-### Configuration file
-
-Create `pigit.cmds.toml` in your pigit home directory:
-
-- Linux/macOS: `~/.config/pigit/pigit.cmds.toml`
-- Windows: `%USERPROFILE%\pigit\pigit.cmds.toml`
+Define aliases and scripts in `pigit.cmds.toml` inside the pigit home directory.
 
 ### Aliases
 
@@ -249,35 +204,31 @@ mylog = "log --oneline --graph"
 
 ### Scripts
 
-Multi-step command scripts:
-
 ```toml
 [cmd_new.scripts.myscript]
 steps = ["status", "log --oneline"]
 help = "Show status then log"
 category = "script"
-```
 
-Concise form (for simple step lists):
-
-```toml
+# concise form for simple step lists
 [cmd_new.scripts]
 quick-check = ["status", "diff --cached"]
 ```
 
-In `pigit cmd -l`, search, and `--pick`, user-defined entries are prefixed with `[alias]` or `[script]` so you can tell them apart from built-ins.
+User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias]` or `[script]` prefixes.
 
-## Feature
+## Features
 
-- Short command for quick use Git, and custom your short command.
-- Provides command correction, when the command is wrong.
-- Have a simple tui interaction, complete very troublesome operations.
-- Code statistics and can be beautifully displayed.
-- Support generate and use shell completion script.
-- Support create `.gitignore` template from internet.
-- Support quick open remote url on website.
-- Support manage multi repos.
-- Have log output and help message tips.
+- **TUI-first workflow** — interactive panels for status, branch, commit log, diff, and more.
+- **Short commands** — aliases like `pigit cmd st` for `git status --short`.
+- **Command correction** — suggests the right command when you typo.
+- **Multi-repo management** — `repo` sub-commands for bulk operations across projects.
+- **Shell completion** — bash/zsh/fish with `pigit --init`.
+- **Auto `cd`** — shell wrapper enables `pigit repo cd -p` to change directory after picking.
+- **Code statistics** — count lines/files by type with table or simple output.
+- **`.gitignore` templates** — generate from common types.
+- **Quick open remote** — open repo/commit/issue in browser.
+- **Custom aliases & scripts** — extend via TOML config.
 
 ---
 
