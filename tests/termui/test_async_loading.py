@@ -210,7 +210,12 @@ def test_async_task_race_new_start_drops_old_result():
     old_started.wait(timeout=1.0)
     task.start(lambda: slow_work("new"), lambda x: received.append(x))
 
-    time.sleep(0.1)
-    AsyncTask.poll_all()
+    # Poll with timeout instead of fixed sleep for slow CI runners.
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if received:
+            break
+        time.sleep(0.01)
 
     assert received == ["new"]
