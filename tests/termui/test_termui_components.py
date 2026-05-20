@@ -59,7 +59,6 @@ class TestComponentBase:
 
     def test_emit_without_parent_logs_warning(self):
         child = _Leaf()
-        # No parent: emit logs a warning instead of raising
         child.emit(ActionEventType.goto, target="x")
 
     def test_notify_children(self):
@@ -76,7 +75,6 @@ class TestComponentBase:
     def test_notify_without_children_noop(self):
         leaf = _Leaf()
         leaf.children = []
-        # Empty children is a no-op, not an error
         leaf.notify(ActionEventType.goto, target="x")
 
     def test_resize_propagates_to_children(self):
@@ -177,18 +175,15 @@ class TestTabView:
     def test_tab_view_init_and_switch(
         self, start_idx, switch_target_idx, expected_active_idx
     ):
-        # Arrange
         main = MockComponent("main", id="main")
         secondary = MockComponent("secondary", id="secondary")
         children = [main, secondary]
         start_id = children[start_idx].id
 
-        # Act
         tab_view = MockTabView(children=children, start=start_id)
         if switch_target_idx is not None:
             tab_view.route_to(children[switch_target_idx].id)
 
-        # Assert
         assert children[
             expected_active_idx
         ].is_activated(), f"child[{expected_active_idx}] should be activated"
@@ -201,10 +196,7 @@ class TestTabView:
         ids=["unsupported-action"],
     )
     def test_tab_view_accept_logs_warning(self, action, data, caplog):
-        # Arrange
         tab_view = MockTabView(children=[MockComponent("main")])
-
-        # Act / Assert
         with caplog.at_level("WARNING"):
             tab_view.accept(action, **data)
         assert "unsupported" in caplog.text or "not found" in caplog.text
@@ -316,6 +308,209 @@ class TestLineTextBrowser:
         # Assert
         assert browser._i == expected_index
 
+    def test_render_no_content(self):
+        from pigit.termui._surface import Surface
+
+        browser = MockLineTextBrowser(size=(10, 2))
+        s = Surface(10, 2)
+        browser._render_surface(s)
+
+    def test_scroll_down_no_content(self):
+        browser = MockLineTextBrowser(size=(10, 2))
+        browser.scroll_down(1)
+        assert browser._i == 0
+
+
+class TestItemListFilter:
+    def test_set_source_content(self):
+        sel = MockItemList()
+        sel.set_source_content(["x", "y"])
+        assert sel.content == ["x", "y"]
+        assert sel._source_content == ["x", "y"]
+
+    def test_set_filter_basic(self):
+        sel = MockItemList()
+        sel.set_source_content(["apple", "banana", "apricot"])
+        sel.set_filter("ap")
+        assert sel.content == ["apple", "apricot"]
+        assert sel._visible_to_source == [0, 2]
+
+    def test_set_filter_empty_needle_clears(self):
+        sel = MockItemList()
+        sel.set_source_content(["apple", "banana"])
+        sel.set_filter("ap")
+        assert sel.content == ["apple"]
+        sel.set_filter("")
+        assert sel.content == ["apple", "banana"]
+
+    def test_set_filter_custom_fn(self):
+        sel = MockItemList()
+        sel.set_source_content(["A", "B", "C"])
+        sel.set_filter("a", fn=lambda row, n: row.lower() == n.lower())
+        assert sel.content == ["A"]
+
+    def test_set_filter_no_match(self):
+        sel = MockItemList()
+        sel.set_source_content(["apple", "banana"])
+        sel.set_filter("zzz")
+        assert sel.content == []
+        assert sel.curr_no == 0
+
+    def test_set_filter_idempotent(self):
+        sel = MockItemList()
+        sel.set_source_content(["apple", "banana"])
+        sel.set_filter("ap")
+        sel.set_filter("ap")
+        assert sel.content == ["apple"]
+
+    def test_source_index(self):
+        sel = MockItemList()
+        sel.set_source_content(["apple", "banana", "apricot"])
+        sel.set_filter("ap")
+        sel.curr_no = 1
+        assert sel.source_index == 2
+
+    def test_source_index_empty_visible(self):
+        sel = MockItemList()
+        sel.set_source_content([])
+        assert sel.source_index == 0
+
+    def test_visible_to_source(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_filter("b")
+        assert sel.visible_to_source(0) == 1
+
+    def test_visible_to_source_out_of_bounds(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        assert sel.visible_to_source(-1) == -1
+        assert sel.visible_to_source(10) == 10
+
+    def test_visible_to_source_no_mapping(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b"])
+        assert sel.visible_to_source(0) == 0
+
+
+class TestItemListMultiRow:
+    def test_set_item_starts(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_item_starts([0, 2, 4])
+        assert sel._item_starts == [0, 2, 4]
+
+    def test_set_item_starts_clamps_cursor(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b"])
+        sel.curr_no = 5
+        sel.set_item_starts([0, 1])
+        assert sel.curr_no == 1
+
+    def test_set_item_starts_none_reverts(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b"])
+        sel.set_item_starts([0, 1])
+        sel.set_item_starts(None)
+        assert sel._item_starts is None
+
+    def test_cursor_row_single_mode(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.curr_no = 2
+        assert sel.cursor_row() == 2
+
+    def test_cursor_row_multi_mode(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_item_starts([0, 3, 5])
+        sel.curr_no = 1
+        assert sel.cursor_row() == 3
+
+    def test_row_to_item_single_mode(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b"])
+        assert sel.row_to_item(1) == (1, 0)
+
+    def test_row_to_item_multi_mode(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_item_starts([0, 3, 5])
+        assert sel.row_to_item(4) == (1, 1)
+        assert sel.row_to_item(5) == (2, 0)
+
+
+class TestItemListSkipIndices:
+    def test_next_skips_separator(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "---", "b"])
+        sel.set_skip_indices({1})
+        sel.curr_no = 0
+        sel.next()
+        assert sel.curr_no == 2
+
+    def test_previous_skips_separator(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "---", "b"])
+        sel.set_skip_indices({1})
+        sel.curr_no = 2
+        sel.previous()
+        assert sel.curr_no == 0
+
+    def test_next_with_multi_row(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_item_starts([0, 1, 2])
+        sel.set_skip_indices({1})
+        sel.curr_no = 0
+        sel.next()
+        assert sel.curr_no == 2
+
+    def test_previous_with_multi_row(self):
+        sel = MockItemList()
+        sel.set_source_content(["a", "b", "c"])
+        sel.set_item_starts([0, 1, 2])
+        sel.set_skip_indices({1})
+        sel.curr_no = 2
+        sel.previous()
+        assert sel.curr_no == 0
+
+
+class TestItemListDrawHelpers:
+    def test_draw_right_aligned_draws_when_fits(self):
+        from pigit.termui._surface import Surface
+
+        sel = MockItemList(size=(20, 1))
+        surface = Surface(20, 1)
+        result = sel._draw_right_aligned(surface, 0, "ok", fg=(255, 255, 255))
+        assert result is True
+        # "ok" should appear near the right edge
+        row_text = "".join(c.char for c in surface._rows[0])
+        assert "ok" in row_text
+
+    def test_draw_right_aligned_skips_when_too_wide(self):
+        from pigit.termui._surface import Surface
+
+        sel = MockItemList(size=(5, 1))
+        surface = Surface(5, 1)
+        result = sel._draw_right_aligned(
+            surface, 0, "very_long_text", fg=(255, 255, 255)
+        )
+        assert result is False
+
+    def test_draw_row_layout_with_row_bg(self):
+        from pigit.termui._surface import Surface
+        from pigit.termui._segment import Segment
+
+        sel = MockItemList(size=(10, 1))
+        surface = Surface(10, 1)
+        left = [Segment("L", bg=(1, 2, 3))]
+        main = [Segment("main")]
+        right = []
+        sel._draw_row_layout(surface, 0, left, main, right)
+        # Row should have been pre-filled with spaces due to row_bg
+        assert any(c.bg == (1, 2, 3) for c in surface._rows[0])
+
 
 class MockItemList(ItemList):
     def refresh(self):
@@ -324,7 +519,6 @@ class MockItemList(ItemList):
 
 class TestItemList:
     def test_ItemList_init_error(self):
-        # CURSOR length != 1 raises ComponentError
         class BadSelector(ItemList):
             CURSOR = "**"
 

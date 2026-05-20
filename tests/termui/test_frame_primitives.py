@@ -55,3 +55,13 @@ class TestBoxFrame:
         # Should truncate to 3 display columns + ellipsis or pad to exactly inner_width
         assert "中" in lines[1]
         assert len(lines[1]) == 6  # │ + 4 inner + │
+
+    def test_draw_content_pads_short_lines(self):
+        s = Surface(6, 5)
+        frame = BoxFrame(inner_width=4, inner_height=2)
+        frame.draw_onto(s, 0, 0)
+        frame.draw_content(s, 0, 0, ["ab"])
+        lines = s.lines()
+        assert "ab" in lines[1]
+        # Second inner row should be blank (padded)
+        assert lines[2].startswith("│")

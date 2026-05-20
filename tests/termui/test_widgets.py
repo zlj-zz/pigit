@@ -371,3 +371,9 @@ class TestCheckList:
         left, main, _right = cl.describe_row(0, is_cursor=True)
         assert left[0].text == "✓"
         assert main[0].text == "item"
+
+    def test_describe_row_cursor_only(self):
+        cl = CheckList(content=["item"])
+        left, main, _right = cl.describe_row(0, is_cursor=True)
+        assert left[0].text == "·"
+        assert main[0].text == "item"
