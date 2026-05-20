@@ -57,59 +57,24 @@ console = get_console()
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
 def _pigit_main(args: Namespace, _) -> None:
-    if args.report:
-        console.echo(introduce())
+    if args.init:
+        from .init import run_shell_init
+
+        run_shell_init(args.init, _pigit_main)
+        return None
 
     elif args.create_config:
         ctx.config.create_config_template()
         return
+
+    elif args.report:
+        console.echo(introduce())
 
     elif args.config:
         console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
         console.echo(ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include))
-
-    elif args.complete:
-        # Generate completion vars dict.
-        complete_vars = _pigit_main.to_dict()
-
-        # Add cmd commands to completion with arg_completion metadata
-        from .git.cmds import get_registry, register_user_commands
-        register_user_commands()
-        registry = get_registry()
-
-        for cmd_def in registry.get_all():
-            meta = cmd_def.meta
-            # Handle Union[CompletionType, list[CompletionType]]
-            if meta.arg_completion is None:
-                arg_comp_value = ""
-            elif isinstance(meta.arg_completion, list):
-                # Take first completion type as primary (for multi-param scenarios)
-                arg_comp_value = meta.arg_completion[0].value if meta.arg_completion else ""
-            else:
-                arg_comp_value = meta.arg_completion.value
-
-            cmd_entry = {
-                "help": meta.help,
-                "args": {},
-                "arg_completion": arg_comp_value,
-            }
-            complete_vars["args"]["cmd"]["args"][meta.short] = cmd_entry
-
-        # Add user-defined aliases to completion
-        for alias_name, target in registry.get_aliases().items():
-            cmd_entry = {
-                "help": f"Alias for {target}",
-                "args": {},
-                "arg_completion": "",
-            }
-            complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
-
-        from .cmdparse.completion import shell_complete
-
-        shell_complete(complete_vars, args.complete)
-        return None
 
     elif args.ignore_type:
         _, msg = create_gitignore(args.ignore_type, writing=True)
@@ -221,7 +186,7 @@ tools_group.add_argument(
     help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""",
 )
 tools_group.add_argument(
-    "--complete",
+    "--init",
     nargs="?",
     const="nil",
     type=str,
