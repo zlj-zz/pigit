@@ -27,21 +27,17 @@ class MockExecutor:
 
 
 def test_run_repo_cd_picker_empty_rows():
-    ex = MockExecutor()
-    code, msg = run_repo_cd_picker([], ex)
+    code, msg = run_repo_cd_picker([])
     assert code == 1
     assert msg == EMPTY_MANAGED_REPOS_MSG
-    assert not ex.exec_calls
 
 
 def test_run_repo_cd_picker_no_tty():
-    ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
     with patch("pigit.git.repo_cd_picker.tty_ok", return_value=False):
-        code, msg = run_repo_cd_picker(rows, ex)
+        code, msg = run_repo_cd_picker(rows)
     assert code == 1
     assert msg == REPO_CD_NO_TTY_MSG
-    assert not ex.exec_calls
 
 
 def test_cd_repo_pick_empty_repos(tmp_path):
@@ -60,10 +56,9 @@ def test_cd_repo_pick_exact_name_skips_tui(tmp_path):
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(j))
     with patch("pigit.git.managed_repos.run_repo_cd_picker") as m_pick:
-        code, msg = mr.cd_repo("foo", pick=True)
-    assert (code, msg) == (0, None)
+        code, path = mr.cd_repo("foo", pick=True)
+    assert code == 0 and path == "/tmp/x"
     m_pick.assert_not_called()
-    assert ex.exec_calls
 
 
 def test_cd_repo_pick_prefills_filter(tmp_path):
@@ -91,15 +86,14 @@ def test_entry_repo_cd_passes_pick_flag():
         entry_mod.ctx.managed_repos, "cd_repo", return_value=(0, None)
     ) as m:
         entry_mod.pigit("repo cd --pick".split())
-    m.assert_called_once_with(None, pick=True)
+    m.assert_called_once_with(None, pick=True, output_file=None)
 
 
 @pytest.mark.parametrize("stdin_tty,stdout_tty", [(True, False), (False, True)])
 def test_run_repo_cd_picker_half_tty(stdin_tty, stdout_tty):
-    ex = MockExecutor()
     rows = [PickerRow(title="a", detail="/p", ref="/p")]
     with patch("sys.stdin.isatty", return_value=stdin_tty):
         with patch("sys.stdout.isatty", return_value=stdout_tty):
-            code, msg = run_repo_cd_picker(rows, ex)
+            code, msg = run_repo_cd_picker(rows)
     assert code == 1
     assert msg == REPO_CD_NO_TTY_MSG

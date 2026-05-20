@@ -34,20 +34,53 @@ if TYPE_CHECKING:
     from .git.model import GitFuncT
 
 
-def _staged_fg(ch: str) -> tuple[int, int, int]:
+def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
+    if not focused:
+        return THEME.fg_dim
     if ch in "MA":
         return THEME.accent_green
+    if ch in "RC":
+        return THEME.accent_yellow
     if ch == "?":
         return THEME.accent_blue
-    return THEME.fg_dim
+    if ch == "U":
+        return THEME.accent_red
+    return THEME.fg_muted
 
 
-def _unstaged_fg(ch: str) -> tuple[int, int, int]:
+def _unstaged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
+    if not focused:
+        return THEME.fg_dim
     if ch in "MD":
         return THEME.accent_red
+    if ch in "RC":
+        return THEME.accent_yellow
     if ch == "?":
         return THEME.accent_blue
-    return THEME.fg_dim
+    if ch == "U":
+        return THEME.accent_red
+    return THEME.fg_muted
+
+
+def _label_fg(label: str, focused: bool) -> tuple[int, int, int]:
+    """Return a semantic color for the status label."""
+    if not focused:
+        return THEME.fg_dim
+    match label:
+        case "Staged":
+            return THEME.accent_green
+        case "Modified":
+            return THEME.accent_red
+        case "Mixed":
+            return THEME.accent_yellow
+        case "Conflict":
+            return THEME.accent_red
+        case "Deleted":
+            return THEME.accent_red
+        case "Untracked":
+            return THEME.accent_blue
+        case _:
+            return THEME.fg_muted
 
 
 def _status_label(file: File) -> str:
@@ -225,8 +258,10 @@ class StatusPanel(ItemList):
         left = [
             Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
-            Segment(staged, fg=_staged_fg(staged), style_flags=cursor_flags),
-            Segment(unstaged, fg=_unstaged_fg(unstaged), style_flags=cursor_flags),
+            Segment(staged, fg=_staged_fg(staged, focused), style_flags=cursor_flags),
+            Segment(
+                unstaged, fg=_unstaged_fg(unstaged, focused), style_flags=cursor_flags
+            ),
             Segment(" ", fg=fg_primary),
         ]
 
@@ -240,7 +275,7 @@ class StatusPanel(ItemList):
         right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append(Segment(label, fg=THEME.fg_muted if focused else THEME.fg_dim))
+            right.append(Segment(label, fg=_label_fg(label, focused)))
 
         return left, main, right
 
@@ -262,12 +297,17 @@ class StatusPanel(ItemList):
             )
             return
         if key == "a":
-            action = "Unstaged" if f.has_staged_change else "Staged"
-            self._run_action(
-                self.git.switch_file_status,
-                single_msg=f"{action} {f.name}",
-                batch_msg="Updated {} file(s)",
-            )
+            if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+                self._check_via_alert(
+                    self.git.switch_file_status, f, msg="Stage conflicted file"
+                )
+            else:
+                action = "Unstaged" if f.has_staged_change else "Staged"
+                self._run_action(
+                    self.git.switch_file_status,
+                    single_msg=f"{action} {f.name}",
+                    batch_msg="Updated {} file(s)",
+                )
             return
         if key == "i":
             self._run_action(
@@ -303,23 +343,29 @@ class StatusPanel(ItemList):
         if key == "E":
             self._open_external_editor(f)
             return
-        if key == "o" and f.has_merged_conflicts:
-            try:
-                self.git.checkout_ours(f)
-                self.git.add_file(f)
-                show_badge("Ours", duration=1.0)
-            except Exception as e:
-                show_toast(f"Ours failed: {e}", duration=2.0)
-            self.refresh()
+        if key == "o":
+            if f.has_merged_conflicts:
+                try:
+                    self.git.checkout_ours(f)
+                    self.git.add_file(f)
+                    show_badge("Ours", duration=1.0)
+                except Exception as e:
+                    show_toast(f"Ours failed: {e}", duration=2.0)
+                self.refresh()
+            else:
+                show_toast("No conflicts in current file", duration=1.5)
             return
-        if key == "t" and f.has_merged_conflicts:
-            try:
-                self.git.checkout_theirs(f)
-                self.git.add_file(f)
-                show_badge("Theirs", duration=1.0)
-            except Exception as e:
-                show_toast(f"Theirs failed: {e}", duration=2.0)
-            self.refresh()
+        if key == "t":
+            if f.has_merged_conflicts:
+                try:
+                    self.git.checkout_theirs(f)
+                    self.git.add_file(f)
+                    show_badge("Theirs", duration=1.0)
+                except Exception as e:
+                    show_toast(f"Theirs failed: {e}", duration=2.0)
+                self.refresh()
+            else:
+                show_toast("No conflicts in current file", duration=1.5)
             return
 
     # --- Helpers ---
@@ -364,7 +410,7 @@ class StatusPanel(ItemList):
                 ("v", "Exit visual"),
                 ("s", "Toggle scroll mode"),
             ]
-        return [
+        entries = [
             ("jk/↑↓", "Navigate"),
             ("Enter", "Open"),
             ("a", "Stage"),
@@ -373,9 +419,14 @@ class StatusPanel(ItemList):
             ("C", "Commit"),
             ("v", "Visual"),
             ("E", "Edit file"),
-            ("o", "Ours"),
-            ("t", "Theirs"),
         ]
+        if (
+            self.files
+            and 0 <= self.curr_no < len(self.files)
+            and self.files[self.curr_no].has_merged_conflicts
+        ):
+            entries.extend([("o", "Ours"), ("t", "Theirs")])
+        return entries
 
     def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""

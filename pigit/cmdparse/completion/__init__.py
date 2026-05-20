@@ -1,5 +1,12 @@
-from __future__ import annotations
+# -*- coding: utf-8 -*-
+"""
+Module: pigit/cmdparse/completion/__init__.py
+Description: Shell completion script generation dispatcher.
+Author: Zev
+Date: 2026-05-20
+"""
 
+from __future__ import annotations
 
 from .base import ShellCompletion
 from .bash import BashCompletion
@@ -12,7 +19,6 @@ __all__ = [
     "ZshCompletion",
     "FishCompletion",
     "shell_complete",
-    "get_shell",
 ]
 
 _Supported_Shell: dict[str, type[ShellCompletion]] = {
@@ -28,8 +34,8 @@ def shell_complete(
     prog: str | None = None,
     script_dir: str | None = None,
     script_name: str | None = None,
-) -> None:
-    """Generate completion script source and print.
+) -> str:
+    """Generate completion script source and return it.
 
     Args:
         complete_vars (Dict): a dict of ~Parser serialization.
@@ -37,44 +43,18 @@ def shell_complete(
         prog (Optional[str], optional): cmd prog. Defaults to None.
         script_dir (Optional[str], optional): where the script saved. Defaults to None.
         script_name (Optional[str], optional): completion script name. Defaults to None.
+
+    Returns:
+        Completion script source string, or empty string on unsupported shell.
     """
-
-    # check shell effectiveness
-    shell = (
-        get_shell()
-        if shell is None or shell not in _Supported_Shell
-        else shell.lower().strip()
-    )
-
     if not shell:
-        # No shell be found!
-        print("")
-        return
+        return ""
 
+    shell = shell.lower().strip()
     if shell not in _Supported_Shell:
-        # not support shell
-        print("")
-        return
+        return ""
 
     complete_handle = _Supported_Shell[shell](
         prog, complete_vars, script_dir, script_name
     )
-
-    # try create completion file.
-    completion_src = complete_handle.generate_resource()
-    print(completion_src)
-
-
-def get_shell() -> str:
-    """Gets the currently used shell.
-
-    Returns:
-        (str): Current shell string.
-    """
-    import os
-
-    try:
-        shell_string = os.environ["SHELL"]
-        return shell_string.split("/")[-1].strip()
-    except KeyError:
-        return ""
+    return complete_handle.generate_resource()

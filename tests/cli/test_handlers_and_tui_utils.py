@@ -37,7 +37,9 @@ def mock_ctx():
 
 def test_repo_handler_add_found(mock_ctx):
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(paths=["/x"], dry_run=False)
         h.add(args)
@@ -48,7 +50,9 @@ def test_repo_handler_add_found(mock_ctx):
 def test_repo_handler_add_none(mock_ctx):
     mock_ctx.managed_repos.add_repos.return_value = []
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         h.add(SimpleNamespace(paths=[], dry_run=False))
     echo.assert_called()
@@ -56,7 +60,9 @@ def test_repo_handler_add_none(mock_ctx):
 
 def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         h.rm(SimpleNamespace(repos=["n"], path=False))
         h.rename(SimpleNamespace(repo="a", new_name="b"))
@@ -73,14 +79,18 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         )
     mock_ctx.managed_repos.clear_repos.assert_called_once()
     mock_ctx.managed_repos.report_repos.assert_called_once()
-    mock_ctx.managed_repos.cd_repo.assert_called_once_with("r", pick=False)
+    mock_ctx.managed_repos.cd_repo.assert_called_once_with(
+        "r", pick=False, output_file=None
+    )
     mock_ctx.managed_repos.process_repos_option.assert_called_once()
     mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
 
 def test_repo_handler_ll_filter(mock_ctx):
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         h.ll(SimpleNamespace(simple=True, reverse=False, filter="web"))
     mock_ctx.managed_repos.ll_repos.assert_called_once_with(
@@ -95,7 +105,9 @@ def test_mkbranch_explicit_repos(mock_ctx):
         [("repo-a", 0, None)],
     )
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(
             branch_name="feat/x",
@@ -121,7 +133,9 @@ def test_mkbranch_interactive(mock_ctx):
         [("repo-a", 0, None)],
     )
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         with patch(
             "pigit.git.repo_multi_select_picker.run_multi_select_picker",
             return_value=(0, ["repo-a"]),
@@ -150,7 +164,9 @@ def test_mkbranch_blockers_exit_1(mock_ctx):
         [],
     )
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(
             branch_name="feat/x",
@@ -169,7 +185,9 @@ def test_mkbranch_blockers_exit_1(mock_ctx):
 def test_mkbranch_dry_run(mock_ctx):
     mock_ctx.managed_repos.branch_new_repos.return_value = (True, [], [])
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(
             branch_name="feat/x",
@@ -190,7 +208,9 @@ def test_mkbranch_dry_run(mock_ctx):
 def test_mkbranch_empty_interactive(mock_ctx):
     mock_ctx.managed_repos.load_repos.return_value = {}
     echo = MagicMock()
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         h = RepoCommandHandler(mock_ctx)
         args = SimpleNamespace(
             branch_name="feat/x",
@@ -236,7 +256,9 @@ def test_repo_handler_cd_pick_no_tty(mock_ctx):
     echo = MagicMock()
     mock_ctx.managed_repos.cd_repo.return_value = (1, "needs tty")
     args = SimpleNamespace(repo=None, repo_cd_pick=True)
-    with patch("plenty.get_console", return_value=MagicMock(echo=echo)):
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
         with pytest.raises(SystemExit) as exc:
             RepoCommandHandler(mock_ctx).cd(args)
     assert exc.value.code == 1

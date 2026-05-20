@@ -3,7 +3,7 @@ import pytest
 from utils import analyze_it
 
 from pigit.info import introduce, show_gitconfig
-from plenty import get_console
+from pigit.termui.cli_output import get_console
 
 console = get_console()
 

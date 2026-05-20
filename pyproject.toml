@@ -26,9 +26,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dynamic = ["version"]
-dependencies = [
-    "plenty==1.0.2",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -62,6 +60,11 @@ where = ["."]
 
 # Coverage: omit thin entrypoints and full-screen TUI wiring / raw terminal input
 # (tested manually or via focused component tests; measuring them dominates line count).
+[tool.basedpyright]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+reportUnusedVariable = false
+
 [tool.coverage.run]
 source = ["pigit"]
 branch = true

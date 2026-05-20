@@ -13,8 +13,8 @@ from pigit.cmdparse.completion import (
     BashCompletion,
     FishCompletion,
     shell_complete,
-    get_shell,
 )
+from pigit.init import get_shell
 
 argparse_dict = {
     "prog": "pigit",

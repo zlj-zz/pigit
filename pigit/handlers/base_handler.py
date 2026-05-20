@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from plenty import get_console
+from ..termui.cli_output import get_console
 
 if TYPE_CHECKING:
     from ..config import Config

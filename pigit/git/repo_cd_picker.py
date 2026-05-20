@@ -7,10 +7,7 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from collections.abc import Sequence
-
-from pigit.ext.executor import WAITING
 
 from pigit.termui import ExitEventLoop, palette
 from pigit.picker_app import BasePickerApp, PickerRow
@@ -20,11 +17,8 @@ from pigit.termui.tty_io import tty_ok
 
 from ._repo_status import query_repos_status
 
-if TYPE_CHECKING:
-    from pigit.ext.executor import Executor
-
 REPO_CD_NO_TTY_MSG = (
-    "`pigit repo cd --pick`<error> needs an interactive terminal.\n"
+    "@red(pigit repo cd --pick) needs an interactive terminal.\n"
     "Use an explicit managed repo name in scripts and CI, or run "
     "`pigit repo cd --pick` only in a real terminal.\n"
     "See `pigit repo cd -h`."
@@ -103,17 +97,15 @@ class _RepoCdItemList(ItemList):
 
 def run_repo_cd_picker(
     rows: Sequence[PickerRow],
-    executor: Executor,
     *,
     initial_filter: str = "",
 ) -> tuple[int, str | None]:
-    """
-    Interactive repo directory picker; on confirm runs shell ``cd`` + ``exec $SHELL``.
+    """Interactive repo directory picker; on confirm returns the selected path.
 
     Requires a real TTY (same gate as :func:`tty_ok`).
 
     Returns:
-        ``(exit_code, message)``. ``0`` with ``None`` after successful ``cd`` or user quit.
+        ``(exit_code, path | None)``. ``0`` with the selected path, or ``None`` on quit.
     """
     if not rows:
         return 1, EMPTY_MANAGED_REPOS_MSG
@@ -158,8 +150,4 @@ def run_repo_cd_picker(
             self._status.set_text(f"{n} repos")
 
     exit_code, result = _RepoCdPickerApp().run_with_result()
-
-    if exit_code == 0 and result is not None:
-        shell_cd = "$SHELL -c 'cd {0} && exec $SHELL'"
-        executor.exec(shell_cd.format(result), flags=WAITING)
-    return exit_code, None
+    return exit_code, result

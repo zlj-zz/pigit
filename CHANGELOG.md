@@ -1,5 +1,22 @@
 # Changelog of pigit
 
+## 1.8.10 (2026-05-20)
+
+### Shell Integration
+
+- **`pigit --init` replaces `--complete`**: `run_shell_init()` in the new `pigit/init.py` generates both shell completion scripts and a `pigit` wrapper function. The wrapper enables automatic `cd` after `pigit repo cd -p` by intercepting the sub-command, writing the selected path to a temp file, and changing directory in the parent shell.
+- **Supported shells**: bash, zsh, and fish. Auto-detects from `$SHELL` when no shell is specified.
+- **`shell_complete()` is now pure**: returns the completion script as a string instead of printing to stdout. Callers control output.
+
+### Repo
+
+- **`repo cd` no longer spawns a shell**: resolves the target repo path and returns it (or writes to `--output-file` for shell IPC). This enables the new `pigit --init` wrapper to perform the actual `cd` in the parent shell.
+- **`repo cd --pick`**: the interactive picker returns the selected path directly; the executor-based shell-spawn path has been removed.
+
+### Documentation
+
+- **README restructured**: TUI Mode promoted to the primary section; Quick Start and Installation moved earlier; added `pigit open` documentation; reorganized Feature list.
+
 ## 1.8.9 (2026-05-18)
 
 ### Repo

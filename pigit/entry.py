@@ -5,8 +5,7 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from plenty import get_console
-from plenty.table import Table
+from .termui.cli_output import get_console
 
 from .config import Config
 from .context import Context
@@ -58,59 +57,24 @@ console = get_console()
 @argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
 @argument("-i --information", action="store_true", help="Show some information about the current git repository.")
 def _pigit_main(args: Namespace, _) -> None:
-    if args.report:
-        console.echo(introduce())
+    if args.init:
+        from .init import run_shell_init
+
+        run_shell_init(args.init, _pigit_main)
+        return None
 
     elif args.create_config:
         ctx.config.create_config_template()
         return
+
+    elif args.report:
+        console.echo(introduce())
 
     elif args.config:
         console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
 
     elif args.information:
         console.echo(ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include))
-
-    elif args.complete:
-        # Generate completion vars dict.
-        complete_vars = _pigit_main.to_dict()
-
-        # Add cmd commands to completion with arg_completion metadata
-        from .git.cmds import get_registry, register_user_commands
-        register_user_commands()
-        registry = get_registry()
-
-        for cmd_def in registry.get_all():
-            meta = cmd_def.meta
-            # Handle Union[CompletionType, list[CompletionType]]
-            if meta.arg_completion is None:
-                arg_comp_value = ""
-            elif isinstance(meta.arg_completion, list):
-                # Take first completion type as primary (for multi-param scenarios)
-                arg_comp_value = meta.arg_completion[0].value if meta.arg_completion else ""
-            else:
-                arg_comp_value = meta.arg_completion.value
-
-            cmd_entry = {
-                "help": meta.help,
-                "args": {},
-                "arg_completion": arg_comp_value,
-            }
-            complete_vars["args"]["cmd"]["args"][meta.short] = cmd_entry
-
-        # Add user-defined aliases to completion
-        for alias_name, target in registry.get_aliases().items():
-            cmd_entry = {
-                "help": f"Alias for {target}",
-                "args": {},
-                "arg_completion": "",
-            }
-            complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
-
-        from .cmdparse.completion import shell_complete
-
-        shell_complete(complete_vars, args.complete)
-        return None
 
     elif args.ignore_type:
         _, msg = create_gitignore(args.ignore_type, writing=True)
@@ -128,9 +92,7 @@ def _pigit_main(args: Namespace, _) -> None:
 
         elif config.counter.format == "table":
 
-            def color_index(
-                count: int,
-            ) -> str:
+            def color_index(count: int) -> str:
                 # Colors displayed for different code quantities.
                 level_color = (
                     "green",
@@ -146,20 +108,20 @@ def _pigit_main(args: Namespace, _) -> None:
                     else level_color[index - 1]
                 )
 
-            tb = Table(title="[Code Counter Result]", title_style="bold")
-            tb.add_column("Language")
-            tb.add_column("Files")
-            tb.add_column("Code lines")
+            console.echo("@bold(Code Counter Result)")
+            console.echo("-" * 50)
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"`{get_file_icon(k)} {k}`<cyan>"
+                    f"@cyan({get_file_icon(k)} {k})"
                     if config.counter.show_icon
                     else k
                 )
 
-                f_num_str = f"`{v[FILES_NUM]}`<{color_index(v[FILES_NUM])}>"
-                l_num_str = f"`{v[LINES_NUM]}`<{color_index(v[LINES_NUM])}>"
+                f_color = color_index(v[FILES_NUM])
+                l_color = color_index(v[LINES_NUM])
+                f_num_str = f"@{f_color}({v[FILES_NUM]})"
+                l_num_str = f"@{l_color}({v[LINES_NUM]})"
 
                 f_change_str = (
                     f"{v[FILES_CHANGE]:+}" if v.get(FILES_CHANGE, 0) != 0 else ""
@@ -168,13 +130,18 @@ def _pigit_main(args: Namespace, _) -> None:
                     f"{v[LINES_CHANGE]:+}" if v.get(LINES_CHANGE, 0) != 0 else ""
                 )
 
-                tb.add_row(
-                    f_type_str,
-                    f"{f_num_str} `{f_change_str}`<{'#98fb98' if f_change_str.startswith('+') else '#ff6347'}>",
-                    f"{l_num_str} `{l_change_str}`<{'#98fb98' if l_change_str.startswith('+') else '#ff6347'}>",
+                f_change_color = "#98fb98" if f_change_str.startswith("+") else "#ff6347"
+                l_change_color = "#98fb98" if l_change_str.startswith("+") else "#ff6347"
+                f_change_part = f" @{f_change_color}({f_change_str})" if f_change_str else ""
+                l_change_part = f" @{l_change_color}({l_change_str})" if l_change_str else ""
+
+                console.echo(
+                    f"{f_type_str:<20}  {f_num_str:>8}{f_change_part}  "
+                    f"{l_num_str:>10}{l_change_part}"
                 )
-            tb.caption = f" Total: {total_size}"
-            console.echo(tb)
+
+            console.echo(f"-" * 50)
+            console.echo(f"Total: {total_size}")
         else:
             print("Invalid display format!")
 
@@ -219,7 +186,7 @@ tools_group.add_argument(
     help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""",
 )
 tools_group.add_argument(
-    "--complete",
+    "--init",
     nargs="?",
     const="nil",
     type=str,
@@ -349,6 +316,12 @@ def repo_report(args, _):
     action="store_true",
     dest="repo_cd_pick",
     help="Interactive picker (TTY only). Exact repo name still cds without TUI.",
+)
+@argument(
+    "--output-file",
+    dest="repo_cd_output_file",
+    default=None,
+    help="Write the selected repo path to FILE instead of spawning a shell.",
 )
 @argument("repo", nargs="?", help="the name of repo.")
 def _(args, _):
