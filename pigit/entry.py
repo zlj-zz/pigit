@@ -4,8 +4,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from .termui.cli_output import get_console
-
 from .config import Config
 from .context import Context
 from .const import (
@@ -20,41 +18,111 @@ from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
 from .git import create_gitignore
 from .handlers import RepoCommandHandler, TuiHandler
+from .hook import before_hook
 from .info import introduce, show_gitconfig
+from .termui.cli_output import get_console
 
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
 
-# ===============
-# Configuration.
-# ===============
-conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_warnings()
 
-# ==============
-# Global handle
-# ==============
-ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
-Context.install(ctx)
+_TOOLS_GROUP = "tools"
 
-from .hook import before_hook
 
-before_hook(ctx)
+def _bootstrap() -> Context:
+    conf = Config(
+        path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
+    ).output_warnings()
+    ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
+    Context.install(ctx)
+    before_hook(ctx)
+    return ctx
 
+
+ctx = _bootstrap()
 console = get_console()
 
-# =====================
-# main command `pigit`
-# yapf: disable
-# =====================
-@command("pigit", description="Pigit TUI is called automatically if no parameters are followed.")
+
+def _color_index(count: int) -> str:
+    """Return a color name based on code quantity (thousands)."""
+    level_color = (
+        "green",
+        "#EBCB8C",  # yellow
+        "#FF6347",  # tomato
+        "#C71585",  # middle violet red
+        "#87CEFA",  # skyblue
+    )
+    index = len(str(count // 1000))
+    return level_color[-1] if index > len(level_color) else level_color[index - 1]
+
+
+@command(
+    "pigit",
+    description="Pigit TUI is called automatically if no parameters are followed.",
+    groups={
+        _TOOLS_GROUP: {
+            "title": "tools arguments",
+            "description": "Auxiliary type commands.",
+        }
+    },
+)
+@argument(
+    "-v --version",
+    action="version",
+    version=f"Version:{VERSION}",
+    help="Show version and exit.",
+)
 @argument("-r --report", action="store_true", help="Report the pigit desc and exit.")
-@argument("-f --config", action="store_true", help="Display the config of current git repository and exit.")
-@argument("-i --information", action="store_true", help="Show some information about the current git repository.")
-def _pigit_main(args: Namespace, _) -> None:
+@argument(
+    "-f --config",
+    action="store_true",
+    help="Display the config of current git repository and exit.",
+)
+@argument(
+    "-i --information",
+    action="store_true",
+    help="Show some information about the current git repository.",
+)
+@argument(
+    "-c --count",
+    nargs="?",
+    const=".",
+    type=str,
+    metavar="PATH",
+    group=_TOOLS_GROUP,
+    help="""Count the number of codes and output them in tabular form.
+    A given path can be accepted, and the default is the current directory.
+    """,
+)
+@argument(
+    "--create-ignore",
+    type=str,
+    metavar="TYPE",
+    dest="ignore_type",
+    group=_TOOLS_GROUP,
+    help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""",
+)
+@argument(
+    "--init",
+    nargs="?",
+    const="nil",
+    type=str,
+    metavar="SHELL",
+    group=_TOOLS_GROUP,
+    help="Add shell prompt script and exit. (Supported bash, zsh, fish)",
+)
+@argument(
+    "--create-config",
+    action="store_true",
+    group=_TOOLS_GROUP,
+    help="Create a pre-configured file of PIGIT."
+    "(If a profile exists, the values available in it are used)",
+)
+def pigit(args: Namespace, _) -> None:
     if args.init:
         from .init import run_shell_init
 
-        run_shell_init(args.init, _pigit_main)
+        run_shell_init(args.init, pigit)
         return None
 
     elif args.create_config:
@@ -65,10 +133,14 @@ def _pigit_main(args: Namespace, _) -> None:
         console.echo(introduce())
 
     elif args.config:
-        console.echo(show_gitconfig(format_type=ctx.config.get().info.git_config_format))
+        console.echo(
+            show_gitconfig(format_type=ctx.config.get().info.git_config_format)
+        )
 
     elif args.information:
-        console.echo(ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include))
+        console.echo(
+            ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include)
+        )
 
     elif args.ignore_type:
         _, msg = create_gitignore(args.ignore_type, writing=True)
@@ -85,35 +157,16 @@ def _pigit_main(args: Namespace, _) -> None:
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
         elif config.counter.format == "table":
-
-            def color_index(count: int) -> str:
-                # Colors displayed for different code quantities.
-                level_color = (
-                    "green",
-                    "#EBCB8C",  # yellow
-                    "#FF6347",  # tomato
-                    "#C71585",  # middle violet red
-                    "#87CEFA",  # skyblue
-                )
-                index = len(str(count // 1000))
-                return (
-                    level_color[-1]
-                    if index > len(level_color)
-                    else level_color[index - 1]
-                )
-
             console.echo("@bold(Code Counter Result)")
             console.echo("-" * 50)
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"@cyan({get_file_icon(k)} {k})"
-                    if config.counter.show_icon
-                    else k
+                    f"@cyan({get_file_icon(k)} {k})" if config.counter.show_icon else k
                 )
 
-                f_color = color_index(v[FILES_NUM])
-                l_color = color_index(v[LINES_NUM])
+                f_color = _color_index(v[FILES_NUM])
+                l_color = _color_index(v[LINES_NUM])
                 f_num_str = f"@{f_color}({v[FILES_NUM]})"
                 l_num_str = f"@{l_color}({v[LINES_NUM]})"
 
@@ -124,75 +177,35 @@ def _pigit_main(args: Namespace, _) -> None:
                     f"{v[LINES_CHANGE]:+}" if v.get(LINES_CHANGE, 0) != 0 else ""
                 )
 
-                f_change_color = "#98fb98" if f_change_str.startswith("+") else "#ff6347"
-                l_change_color = "#98fb98" if l_change_str.startswith("+") else "#ff6347"
-                f_change_part = f" @{f_change_color}({f_change_str})" if f_change_str else ""
-                l_change_part = f" @{l_change_color}({l_change_str})" if l_change_str else ""
+                f_change_color = (
+                    "#98fb98" if f_change_str.startswith("+") else "#ff6347"
+                )
+                l_change_color = (
+                    "#98fb98" if l_change_str.startswith("+") else "#ff6347"
+                )
+                f_change_part = (
+                    f" @{f_change_color}({f_change_str})" if f_change_str else ""
+                )
+                l_change_part = (
+                    f" @{l_change_color}({l_change_str})" if l_change_str else ""
+                )
 
                 console.echo(
                     f"{f_type_str:<20}  {f_num_str:>8}{f_change_part}  "
                     f"{l_num_str:>10}{l_change_part}"
                 )
 
-            console.echo(f"-" * 50)
+            console.echo("-" * 50)
             console.echo(f"Total: {total_size}")
         else:
             print("Invalid display format!")
 
         return None
 
-    # Don't have invalid command list.
-    # if not list(filter(lambda x: x, vars(known_args).values())):
     else:
         handler = TuiHandler(ctx)
         if handler.preprocess():
             handler.execute()
-
-# yapf: enable
-pigit = _pigit_main
-pigit.add_argument(
-    "-v",
-    "--version",
-    action="version",
-    help="Show version and exit.",
-    version=f"Version:{VERSION}",
-)
-
-tools_group = pigit.add_argument_group(
-    title="tools arguments", description="Auxiliary type commands."
-)
-tools_group.add_argument(
-    "-c",
-    "--count",
-    nargs="?",
-    const=".",
-    type=str,
-    metavar="PATH",
-    help="""Count the number of codes and output them in tabular form.
-    A given path can be accepted, and the default is the current directory.
-    """,
-)
-tools_group.add_argument(
-    "--create-ignore",
-    type=str,
-    metavar="TYPE",
-    dest="ignore_type",
-    help="""Create a demo .gitignore file. Need one argument, the type of gitignore.""",
-)
-tools_group.add_argument(
-    "--init",
-    nargs="?",
-    const="nil",
-    type=str,
-    metavar="SHELL",
-    help="Add shell prompt script and exit. (Supported bash, zsh, fish)",
-)
-tools_group.add_argument(
-    "--create-config",
-    action="store_true",
-    help="Create a pre-configured file of PIGIT."
-    "(If a profile exists, the values available in it are used)",
-)
 
 
 # =============================================
@@ -299,9 +312,9 @@ def repo_ll(args, _):
     RepoCommandHandler(ctx.current()).ll(args)
 
 
-repo.sub_parser("clear", help="clear the all repos.")(
-    lambda _, __: RepoCommandHandler(ctx.current()).clear()
-)
+@repo.sub_parser("clear", help="clear the all repos.")
+def repo_clear(_, __):
+    RepoCommandHandler(ctx.current()).clear()
 
 
 @repo.sub_parser("report", help="genereate report of all repos.")

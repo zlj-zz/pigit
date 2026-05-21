@@ -377,8 +377,7 @@ class Parser(ArgumentParser):
 
             parser = self.add_subparsers().add_parser(prog, **kwargs)
 
-            for args, kwargs in params:
-                parser.add_argument(*args, **kwargs)
+            _apply_params(parser, params)
 
             parser.set_defaults(sub_callback=fn)
 
@@ -443,6 +442,7 @@ def command(
 
     def decorator(fn: Callable[..., Any]) -> Parser:
         kwargs = attrs
+        group_configs = kwargs.pop("groups", None)
         attr_params = kwargs.pop("params", None)
         params = attr_params if attr_params is not None else []
 
@@ -460,8 +460,7 @@ def command(
             **kwargs,
         )
 
-        for args, kwargs in params:
-            cmd.add_argument(*args, **kwargs)
+        _apply_params(cmd, params, group_configs=group_configs)
 
         return cmd
 
@@ -473,6 +472,34 @@ def _param_memo(fn: Callable[..., Any], params) -> None:
         setattr(fn, "__parser_params__", [])
 
     getattr(fn, "__parser_params__").append(params)
+
+
+def _apply_params(
+    parser, params: list, *, group_configs: dict[str, dict] | None = None
+) -> None:
+    """Register arguments on a parser, creating argument groups as needed.
+
+    Supports a ``group`` keyword in argument kwargs: arguments with the same
+    ``group`` value are placed in a shared ``add_argument_group``.
+    The ``group`` key is consumed and never passed to argparse.
+
+    ``group_configs`` maps a group name to keyword arguments for
+    ``add_argument_group`` (e.g. ``title`` and ``description``).
+    """
+    groups: dict[str, Any] = {}
+    group_configs = group_configs or {}
+    for arg_names, arg_kwargs in params:
+        group_name = arg_kwargs.pop("group", None)
+        target = parser
+        if group_name is not None:
+            if group_name not in groups:
+                config = group_configs.get(group_name, {})
+                groups[group_name] = parser.add_argument_group(
+                    title=config.get("title", group_name),
+                    description=config.get("description"),
+                )
+            target = groups[group_name]
+        target.add_argument(*arg_names, **arg_kwargs)
 
 
 @overload

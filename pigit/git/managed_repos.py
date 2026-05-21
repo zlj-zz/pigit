@@ -176,30 +176,19 @@ class ManagedRepos:
         return ""
 
     @staticmethod
-    def _format_repo_row(
-        repo_name: str,
-        repo_path: str,
-        branch: str,
-        status: str,
-        commit_hash: str,
-        commit_msg: str,
-        author: str,
-        dirty: bool,
-        staged: bool,
-        untracked: bool,
-    ) -> list[tuple]:
+    def _format_repo_row(repo_name: str, repo_path: str, meta: dict) -> list[tuple]:
         symbols = (
-            f"{'*' if dirty else ' '}"
-            f"{'+' if staged else ' '}"
-            f"{'?' if untracked else ' '}"
+            f"{'*' if meta.get('dirty') else ' '}"
+            f"{'+' if meta.get('staged') else ' '}"
+            f"{'?' if meta.get('untracked') else ' '}"
         )
         return [
             (repo_name, ""),
-            ("Branch", f"{branch} {symbols}"),
-            ("Status", status),
-            ("Commit Hash", commit_hash),
-            ("Commit Msg", commit_msg),
-            ("Author", author),
+            ("Branch", f"{meta.get('branch', '')} {symbols}"),
+            ("Status", meta.get("status", "")),
+            ("Commit Hash", meta.get("commit_hash", "")),
+            ("Commit Msg", meta.get("commit_msg", "")),
+            ("Author", meta.get("commit_author", "")),
             ("Local Path", repo_path),
         ]
 
@@ -216,18 +205,7 @@ class ManagedRepos:
             meta = prop.get("meta")
 
             if meta and self._is_meta_fresh(repo_path, meta):
-                yield self._format_repo_row(
-                    repo_name,
-                    repo_path,
-                    meta.get("branch", ""),
-                    meta.get("status", ""),
-                    meta.get("commit_hash", ""),
-                    meta.get("commit_msg", ""),
-                    meta.get("commit_author", ""),
-                    meta.get("dirty", False),
-                    meta.get("staged", False),
-                    meta.get("untracked", False),
-                )
+                yield self._format_repo_row(repo_name, repo_path, meta)
                 continue
 
             head = self._git.get_head(repo_path)
@@ -244,18 +222,7 @@ class ManagedRepos:
             if not reverse:
                 meta = self._fetch_repo_meta(repo_path)
                 if meta:
-                    yield self._format_repo_row(
-                        repo_name,
-                        repo_path,
-                        meta["branch"],
-                        meta.get("status", ""),
-                        meta.get("commit_hash", ""),
-                        meta["commit_msg"],
-                        meta.get("commit_author", ""),
-                        meta["dirty"],
-                        meta["staged"],
-                        meta["untracked"],
-                    )
+                    yield self._format_repo_row(repo_name, repo_path, meta)
 
     def add_repos(self, paths: list[str], dry_run: bool = False) -> list:
         """Traverse the incoming paths. If it is not saved and is a git
@@ -270,46 +237,29 @@ class ManagedRepos:
         exist_repos = self.load_repos()
         exist_paths_set = {r["path"] for r in exist_repos.values()}
 
-        # Build a map of input path -> confirmed repo path (valid only).
-        path_to_repo: dict[str, str] = {}
         new_git_paths = []
         for path in paths:
             repo_path, _ = self._git.confirm_repo(path)
-            if repo_path:
-                path_to_repo[path] = repo_path
-                if repo_path not in exist_paths_set:
-                    new_git_paths.append(repo_path)
+            if repo_path and repo_path not in exist_paths_set:
+                new_git_paths.append(repo_path)
 
         if dry_run:
             return new_git_paths
 
-        modified = bool(new_git_paths)
-        if new_git_paths:
-            name_counts = Counter(
-                os.path.basename(os.path.normpath(p)) for p in new_git_paths
-            )
-            for path in new_git_paths:
-                name = self._make_repo_name(path, exist_repos, name_counts)
-                exist_repos[name] = {"path": path}
+        if not new_git_paths:
+            return []
 
-        # Build reverse lookup after adding new repos.
-        path_to_name = {info["path"]: name for name, info in exist_repos.items()}
+        name_counts = Counter(
+            os.path.basename(os.path.normpath(p)) for p in new_git_paths
+        )
+        for path in new_git_paths:
+            name = self._make_repo_name(path, exist_repos, name_counts)
+            exist_repos[name] = {"path": path}
+            new_meta = self._fetch_repo_meta(path)
+            if new_meta:
+                exist_repos[name]["meta"] = new_meta
 
-        # Refresh metadata for new repos and stale existing repos.
-        for repo_path in path_to_repo.values():
-            name = path_to_name.get(repo_path)
-            if not name:
-                continue
-            meta = exist_repos[name].get("meta")
-            if not meta or not self._is_meta_fresh(repo_path, meta):
-                new_meta = self._fetch_repo_meta(repo_path)
-                if new_meta:
-                    exist_repos[name]["meta"] = new_meta
-                    modified = True
-
-        if modified:
-            self.dump_repos(exist_repos)
-
+        self.dump_repos(exist_repos)
         return new_git_paths
 
     def refresh_meta(
@@ -647,17 +597,18 @@ class ManagedRepos:
 
     # --- Metadata caching helpers ---
 
-    def _is_meta_fresh(self, repo_path: str, meta: dict | None) -> bool:
+    def _resolve_git_dir(self, repo_path: str) -> str:
+        try:
+            return self._git.get_git_dir(repo_path)
+        except Exception:
+            return os.path.join(repo_path, ".git")
+
+    def _is_meta_fresh(self, repo_path: str, meta: dict) -> bool:
         """Check whether cached metadata is still valid by comparing .git/index mtime."""
-        if not meta:
-            return False
         cached_mtime = meta.get("index_mtime")
         if not isinstance(cached_mtime, int):
             return False
-        try:
-            git_dir = self._git.get_git_dir(repo_path)
-        except Exception:
-            git_dir = os.path.join(repo_path, ".git")
+        git_dir = self._resolve_git_dir(repo_path)
         index_path = os.path.join(git_dir, "index")
         try:
             return int(os.path.getmtime(index_path)) == cached_mtime
@@ -708,10 +659,7 @@ class ManagedRepos:
         else:
             commit_msg = commit.strip()
 
-        try:
-            git_dir = self._git.get_git_dir(repo_path)
-        except Exception:
-            git_dir = os.path.join(repo_path, ".git")
+        git_dir = self._resolve_git_dir(repo_path)
         try:
             index_mtime = int(os.path.getmtime(os.path.join(git_dir, "index")))
         except OSError:

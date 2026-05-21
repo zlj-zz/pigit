@@ -10,11 +10,7 @@ from __future__ import annotations
 
 
 def before_hook(ctx) -> None:
-    """Called after Context.bootstrap() on every command invocation.
-
-    Handles auto_append: if the current working directory is a git repo
-    and auto_append is enabled, adds/updates it in managed repos.
-    """
+    """Auto-append current repo to managed repos if enabled."""
     repo_path = ctx.local_git.confirm_repo()[0]
     if repo_path and ctx.config.get().repo.auto_append:
         try:
