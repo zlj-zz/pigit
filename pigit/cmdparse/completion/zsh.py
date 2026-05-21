@@ -264,6 +264,7 @@ class ZshCompletion(ShellCompletion):
             _arguments.append("'*::arg:->args'\\")
             _opt_case_str += "  args)\n"
             _opt_case_str += textwrap.indent("\n".join(_sub_relationship), " " * 4)
+            _opt_case_str += "    ;;\n"
 
         if _opt_case_str:
             _opt_case_str += "esac"
