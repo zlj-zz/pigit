@@ -11,6 +11,7 @@ import textwrap
 
 from .base import ShellCompletion
 from .widgets import WIDGETS
+from ...const import REPOS_PATH
 
 # Git helper functions for bash completion
 BASH_HELPERS = {
@@ -23,98 +24,126 @@ BASH_HELPERS = {
     "ref": '_git_refs() { git for-each-ref --format="%(refname:short)" 2>/dev/null | sort -u; }',
 }
 
+_BASH_TEMPLATE: str = textwrap.dedent("""\
+    #!/usr/bin/env bash
+    # PIGIT shell completion script
+    # Generated for bash
+
+    # Git helper functions for completion
+    %(helper_functions)s
+
+    # Main completion function
+    %(func_name)s() {
+        local cur prev words cword
+
+        # Initialize completion variables (compatible with/without bash-completion)
+        if type _init_completion &>/dev/null; then
+            _init_completion || return
+        else
+            cur="${COMP_WORDS[COMP_CWORD]}"
+            prev="${COMP_WORDS[COMP_CWORD-1]}"
+            words=("${COMP_WORDS[@]}")
+            cword=$COMP_CWORD
+        fi
+
+        # Find cmd / repo position
+        local cmd_depth=0
+        local repo_depth=0
+        for ((i=1; i < cword; i++)); do
+            if [[ "${words[i]}" == "cmd" ]]; then
+                cmd_depth=$i
+                break
+            fi
+            if [[ "${words[i]}" == "repo" ]]; then
+                repo_depth=$i
+                break
+            fi
+        done
+
+        # Handle cmd subcommand completion with git-aware arguments
+        if [[ $cmd_depth -gt 0 ]]; then
+            local subcmd=""
+            # Find subcommand after cmd
+            for ((i=cmd_depth+1; i < cword; i++)); do
+                if [[ "${words[i]}" != -* ]]; then
+                    subcmd="${words[i]}"
+                    break
+                fi
+            done
+
+            # Complete subcommand name or its arguments
+            if [[ -z "$subcmd" || "$subcmd" == "$cur" && "$cur" != -* ]]; then
+                COMPREPLY=($(compgen -W "%(cmd_commands)s" -- "$cur"))
+                return 0
+            fi
+
+            case "$subcmd" in
+%(cmd_arg_cases)s
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            return 0
+        fi
+
+        # Handle repo subcommand completion with repos-aware arguments
+        if [[ $repo_depth -gt 0 ]]; then
+            local subcmd=""
+            for ((i=repo_depth+1; i < cword; i++)); do
+                if [[ "${words[i]}" != -* ]]; then
+                    subcmd="${words[i]}"
+                    break
+                fi
+            done
+
+            if [[ -z "$subcmd" || "$subcmd" == "$cur" && "$cur" != -* ]]; then
+                COMPREPLY=($(compgen -W "%(repo_commands)s" -- "$cur"))
+                return 0
+            fi
+
+            case "$subcmd" in
+%(repo_arg_cases)s
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            return 0
+        fi
+
+        # Handle top-level completion
+        local first_word=""
+        for ((i=1; i < cword; i++)); do
+            if [[ "${words[i]}" != -* ]]; then
+                first_word="${words[i]}"
+                break
+            fi
+        done
+
+        case "$first_word" in
+            *)
+                case "$cur" in
+                    -*)
+                        COMPREPLY=($(compgen -W "%(top_options)s" -- "$cur"))
+                        ;;
+                    *)
+                        COMPREPLY=($(compgen -W "%(top_commands)s" -- "$cur"))
+                        ;;
+                esac
+                ;;
+        esac
+    }
+
+    complete -F %(func_name)s %(prop)s
+
+%(widget)s
+    """)
+
 
 class BashCompletion(ShellCompletion):
     """Bash shell completion generator with enhanced git-aware completion."""
 
     SHELL: str = "bash"
-
-    # Enhanced template with git-aware completion
-    TEMPLATE_SRC: str = textwrap.dedent("""\
-        #!/usr/bin/env bash
-        # PIGIT shell completion script
-        # Generated for bash
-
-        # Git helper functions for completion
-        %(helper_functions)s
-
-        # Main completion function
-        %(func_name)s() {
-            local cur prev words cword
-
-            # Initialize completion variables (compatible with/without bash-completion)
-            if type _init_completion &>/dev/null; then
-                _init_completion || return
-            else
-                cur="${COMP_WORDS[COMP_CWORD]}"
-                prev="${COMP_WORDS[COMP_CWORD-1]}"
-                words=("${COMP_WORDS[@]}")
-                cword=$COMP_CWORD
-            fi
-
-            # Find cmd position
-            local cmd_depth=0
-            local i
-            for ((i=1; i < cword; i++)); do
-                if [[ "${words[i]}" == "cmd" ]]; then
-                    cmd_depth=$i
-                    break
-                fi
-            done
-
-            # Handle cmd subcommand completion with git-aware arguments
-            if [[ $cmd_depth -gt 0 ]]; then
-                local subcmd=""
-                # Find subcommand after cmd
-                for ((i=cmd_depth+1; i < cword; i++)); do
-                    if [[ "${words[i]}" != -* ]]; then
-                        subcmd="${words[i]}"
-                        break
-                    fi
-                done
-
-                # Complete subcommand name or its arguments
-                if [[ -z "$subcmd" || "$subcmd" == "$cur" && "$cur" != -* ]]; then
-                    COMPREPLY=($(compgen -W "%(cmd_commands)s" -- "$cur"))
-                    return 0
-                fi
-
-                case "$subcmd" in
-%(cmd_arg_cases)s
-                    *)
-                        COMPREPLY=()
-                        ;;
-                esac
-                return 0
-            fi
-
-            # Handle top-level completion
-            local first_word=""
-            for ((i=1; i < cword; i++)); do
-                if [[ "${words[i]}" != -* ]]; then
-                    first_word="${words[i]}"
-                    break
-                fi
-            done
-
-            case "$first_word" in
-                *)
-                    case "$cur" in
-                        -*)
-                            COMPREPLY=($(compgen -W "%(top_options)s" -- "$cur"))
-                            ;;
-                        *)
-                            COMPREPLY=($(compgen -W "%(top_commands)s" -- "$cur"))
-                            ;;
-                    esac
-                    ;;
-            esac
-        }
-
-        complete -F %(func_name)s %(prop)s
-
-%(widget)s
-        """)
+    TEMPLATE_SRC: str = _BASH_TEMPLATE
 
     def _escape_case_pattern(self, pattern: str) -> str:
         """Escape case statement patterns to prevent wildcard matching.
@@ -144,10 +173,38 @@ class BashCompletion(ShellCompletion):
         """
         if not used_completions:
             return ""
-        helpers = [
-            BASH_HELPERS[comp] for comp in used_completions if comp in BASH_HELPERS
-        ]
+        helpers = []
+        for comp in used_completions:
+            if comp == "repos":
+                helpers.append(
+                    '_pigit_repos() { python3 -c \'import json,os; p=os.path.expanduser("%s");'
+                    ' d=json.load(open(p)) if os.path.isfile(p) else {}; [print(k) for k in d]\''
+                    ' 2>/dev/null; }' % REPOS_PATH
+                )
+            elif comp in BASH_HELPERS:
+                helpers.append(BASH_HELPERS[comp])
         return "\n\n".join(helpers) + "\n"
+
+    def _build_arg_cases(
+        self, sub_args: dict, used_completions: set
+    ) -> tuple[list[str], list[str]]:
+        """Build command list and case arms for a sub-parser's arg_completion."""
+        commands = []
+        cases = []
+        for cmd_name, cmd_info in sub_args.items():
+            if not cmd_name.startswith("-") and cmd_name != "args":
+                commands.append(cmd_name)
+                arg_comp = ShellCompletion._promote_arg_completion(cmd_info)
+                if arg_comp and arg_comp in self.GIT_COMPLETION_FUNCS:
+                    used_completions.add(arg_comp)
+                    helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
+                    escaped_pattern = self._escape_case_pattern(cmd_name)
+                    cases.append(
+                        f"""                    {escaped_pattern})
+                        COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
+                        ;;"""
+                    )
+        return commands, cases
 
     def generate_content(self) -> dict[str, str]:
         """Generate template variables for bash completion.
@@ -157,31 +214,15 @@ class BashCompletion(ShellCompletion):
         """
         comp_vars = self.complete_vars
         args = comp_vars.get("args", {})
+        used_completions: set[str] = set()
 
-        # Extract cmd subcommands with git-aware argument completion
-        cmd_args = args.get("cmd", {}).get("args", {})
+        cmd_commands, cmd_arg_cases = self._build_arg_cases(
+            args.get("cmd", {}).get("args", {}), used_completions
+        )
+        repo_commands, repo_arg_cases = self._build_arg_cases(
+            args.get("repo", {}).get("args", {}), used_completions
+        )
 
-        cmd_commands = []
-        cmd_arg_cases = []
-        used_completions = set()
-
-        for cmd_name, cmd_info in cmd_args.items():
-            if not cmd_name.startswith("-") and cmd_name != "args":
-                cmd_commands.append(cmd_name)
-
-                # Check if command has argument completion
-                arg_comp = cmd_info.get("arg_completion", "")
-                # Check if this completion type has a helper
-                if arg_comp and arg_comp in self.GIT_COMPLETION_FUNCS:
-                    used_completions.add(arg_comp)
-                    helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
-                    # Escape case pattern to handle wildcards like '.' in 'b.o'
-                    escaped_pattern = self._escape_case_pattern(cmd_name)
-                    cmd_arg_cases.append(f"""        {escaped_pattern})
-                        COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
-                        ;;""")
-
-        # Extract top-level options and commands
         top_options = []
         top_commands = []
         for name, prop in args.items():
@@ -196,6 +237,8 @@ class BashCompletion(ShellCompletion):
             "prop": self.prog_name,
             "cmd_commands": " ".join(sorted(cmd_commands)),
             "cmd_arg_cases": "\n".join(cmd_arg_cases),
+            "repo_commands": " ".join(sorted(repo_commands)),
+            "repo_arg_cases": "\n".join(repo_arg_cases),
             "top_options": " ".join(sorted(top_options)),
             "top_commands": " ".join(sorted(top_commands)),
             "widget": WIDGETS["bash"],

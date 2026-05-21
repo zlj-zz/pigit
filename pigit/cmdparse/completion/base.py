@@ -31,6 +31,7 @@ class ShellCompletion:
         "commit": "_git_commits",
         "stash": "_git_stashes",
         "ref": "_git_refs",
+        "repos": "_pigit_repos",
     }
 
     def __init__(
@@ -78,6 +79,23 @@ class ShellCompletion:
         safe_name = re.sub(r"\W*", "", self.prog_name.replace("-", "_"), re.ASCII)
         return f"_{safe_name}_completion"
 
+    @staticmethod
+    def _promote_arg_completion(prop: dict) -> str:
+        """Return arg_completion from prop or its first positional arg."""
+        arg_completion = prop.get("arg_completion", "")
+        if arg_completion:
+            return arg_completion
+        for arg_name, arg_prop in prop.get("args", {}).items():
+            if (
+                isinstance(arg_prop, dict)
+                and not arg_name.startswith("-")
+                and arg_name != "args"
+            ):
+                arg_completion = arg_prop.get("arg_completion", "")
+                if arg_completion:
+                    return arg_completion
+        return ""
+
     def _parse(self, args: dict) -> tuple:
         """Parse args dict and extract completion metadata.
 
@@ -98,7 +116,6 @@ class ShellCompletion:
                 _arguments.extend(a)
                 _positions.extend(p)
             elif name == "set_defaults":
-                # Special need be ignore.
                 pass
             elif "args" in prop:
                 a, p, s = self._parse(prop["args"])
@@ -107,9 +124,7 @@ class ShellCompletion:
                     "_positions": p,
                     "_sub_opts": s,
                     "help": prop.get("help", "_").replace("\n", ""),
-                    "arg_completion": prop.get(
-                        "arg_completion", ""
-                    ),  # NEW: extract arg_completion
+                    "arg_completion": self._promote_arg_completion(prop),
                 }
             elif name.startswith("-"):
                 _arguments.append((name, prop.get("help", "_").replace("\n", "")))

@@ -11,6 +11,7 @@ import textwrap
 
 from .base import ShellCompletion
 from .widgets import WIDGETS
+from ...const import REPOS_PATH
 
 # Git helper functions for zsh
 ZSH_HELPERS = {
@@ -127,6 +128,7 @@ class ZshCompletion(ShellCompletion):
             "commit": "_git_commits",
             "stash": "_git_stashes",
             "ref": "_git_refs",
+            "repos": "_pigit_repos",
         }
         return completion_map.get(comp_type, "")
 
@@ -202,9 +204,21 @@ class ZshCompletion(ShellCompletion):
         """Generate git helper function definitions."""
         if not self._used_git_helpers:
             return ""
-        helpers = [
-            ZSH_HELPERS[comp] for comp in self._used_git_helpers if comp in ZSH_HELPERS
-        ]
+        helpers = []
+        for comp in self._used_git_helpers:
+            if comp == "repos":
+                helpers.append(
+                    '_pigit_repos() {\n'
+                    '    local -a repos\n'
+                    '    repos=(${(f)"$(python3 -c '
+                    '\'import json,os; p=os.path.expanduser("%s"); '
+                    'd=json.load(open(p)) if os.path.isfile(p) else {}; '
+                    '[print(k) for k in d]\' 2>/dev/null)"})\n'
+                    '    (( $#repos )) && compadd -a repos\n'
+                    '}' % REPOS_PATH
+                )
+            elif comp in ZSH_HELPERS:
+                helpers.append(ZSH_HELPERS[comp])
         return "\n\n".join(helpers) + "\n"
 
     def args2complete(self, args_dict: dict) -> str:

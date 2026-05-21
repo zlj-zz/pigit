@@ -315,6 +315,9 @@ class Parser(ArgumentParser):
 
                         for name in argument_names:
                             args[option_string][name] = getattr(action, name, None)
+                        arg_completion = getattr(action, "arg_completion", None)
+                        if arg_completion is not None:
+                            args[option_string]["arg_completion"] = arg_completion
 
             return target_dict
 
@@ -490,6 +493,7 @@ def _apply_params(
     group_configs = group_configs or {}
     for arg_names, arg_kwargs in params:
         group_name = arg_kwargs.pop("group", None)
+        arg_completion = arg_kwargs.pop("arg_completion", None)
         target = parser
         if group_name is not None:
             if group_name not in groups:
@@ -499,7 +503,9 @@ def _apply_params(
                     description=config.get("description"),
                 )
             target = groups[group_name]
-        target.add_argument(*arg_names, **arg_kwargs)
+        action = target.add_argument(*arg_names, **arg_kwargs)
+        if arg_completion is not None:
+            action.arg_completion = arg_completion
 
 
 @overload

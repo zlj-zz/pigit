@@ -284,14 +284,17 @@ def repo_add(args, _):
 
 @repo.sub_parser("rm", help="remove repo(s).")
 @argument("--path", action="store_true", help="remove follow path, default is name.")
-@argument("repos", nargs="+", help="name or path of repo(s).")
+@argument("repos", nargs="+", arg_completion="repos", help="name or path of repo(s).")
 def repo_rm(args, _):
     RepoCommandHandler(ctx.current()).rm(args)
 
 
 @repo.sub_parser("update", help="refresh cached metadata for repo(s).")
 @argument(
-    "repos", nargs="*", help="name(s) of repo(s) to refresh. refreshes all if omitted."
+    "repos",
+    nargs="*",
+    arg_completion="repos",
+    help="name(s) of repo(s) to refresh. refreshes all if omitted.",
 )
 def repo_update(args, _):
     RepoCommandHandler(ctx.current()).update(args)
@@ -299,7 +302,7 @@ def repo_update(args, _):
 
 @repo.sub_parser("rename", help="rename a repo.")
 @argument("new_name", help="the new name of repo.")
-@argument("repo", help="the name of repo.")
+@argument("repo", arg_completion="repos", help="the name of repo.")
 def repo_rename(args, _):
     RepoCommandHandler(ctx.current()).rename(args)
 
@@ -338,14 +341,19 @@ def repo_report(args, _):
     default=None,
     help="Write the selected repo path to FILE instead of spawning a shell.",
 )
-@argument("repo", nargs="?", help="the name of repo.")
+@argument("repo", nargs="?", arg_completion="repos", help="the name of repo.")
 def _(args, _):
     RepoCommandHandler(ctx.current()).cd(args)
 
 
 @repo.sub_parser("mkbranch", help="batch create new branch across managed repos.")
 @argument("branch_name", help="name of the new branch.")
-@argument("repos", nargs="*", help="target repo names (interactive picker if omitted).")
+@argument(
+    "repos",
+    nargs="*",
+    arg_completion="repos",
+    help="target repo names (interactive picker if omitted).",
+)
 @argument(
     "-c --checkout", action="store_true", help="checkout the new branch after creation."
 )
@@ -369,7 +377,7 @@ repo_options = {
 for sub_cmd, prop in repo_options.items():
     help_string = f"{h.strip()} for repo(s)." if (h := prop.get("help")) else "NULL"
     repo.sub_parser(sub_cmd, help=help_string)(
-        argument("repos", nargs="*", help="name of repo(s).")(
+        argument("repos", nargs="*", arg_completion="repos", help="name of repo(s).")(
             dynamic_default_attrs(
                 lambda args, _, cmd: RepoCommandHandler(
                     ctx.current()
