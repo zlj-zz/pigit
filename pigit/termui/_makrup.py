@@ -146,6 +146,13 @@ def parse_markup(text: str) -> list[Segment]:
         at = text.find("@", pos)
         if at == -1:
             break
+        # Escaped literal @: "@@" → "@"
+        if at + 1 < len(text) and text[at + 1] == "@":
+            if at > pos:
+                segments.append(Segment(text[pos:at]))
+            segments.append(Segment("@"))
+            pos = at + 2
+            continue
         # Distinguish markup @ from literal @ (e.g. email addresses)
         if at + 1 >= len(text) or text[at + 1] not in _TAG_START_CHARS:
             pos = at + 1

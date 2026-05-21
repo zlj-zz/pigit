@@ -63,6 +63,12 @@ class Console:
                 out.append(_segments_to_ansi(segs))
         print(*out, sep=sep, end=end, flush=flush)
 
+    def render(self, text: str) -> str:
+        """Parse markup and return the ANSI string without printing."""
+        if "@" not in text:
+            return text
+        return _segments_to_ansi(parse_markup(text))
+
     def echo_plain(
         self,
         *values: str,

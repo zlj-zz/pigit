@@ -133,9 +133,9 @@ def pigit(args: Namespace, _) -> None:
         console.echo(introduce())
 
     elif args.config:
-        console.echo(
-            show_gitconfig(format_type=ctx.config.get().info.git_config_format)
-        )
+        from .ext.utils import page_output
+
+        page_output(console.render(show_gitconfig()))
 
     elif args.information:
         console.echo(

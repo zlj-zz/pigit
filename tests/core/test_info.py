@@ -25,5 +25,5 @@ def test():
     introduce()
 
     print()
-    c = show_gitconfig(format_type="normal")
+    c = show_gitconfig()
     console.echo(c)
