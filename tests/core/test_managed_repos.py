@@ -9,7 +9,7 @@ import pytest
 
 from pigit.ext.executor_factory import MockExecutor
 from pigit.git.local_git import LocalGit
-from pigit.git.managed_repos import ManagedRepos, _fuzzy_match
+from pigit.git.managed_repos import ManagedRepos, _fuzzy_match, _logger
 
 
 @pytest.fixture
@@ -94,11 +94,13 @@ def test_dump_repos_success(tmp_repos_json):
 
 def test_dump_repos_failure_logs(tmp_repos_json):
     ex = MockExecutor()
-    log = MagicMock()
-    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json), log=log)
-    with patch("pathlib.Path.open", side_effect=OSError("nope")):
+    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    with (
+        patch("pathlib.Path.open", side_effect=OSError("nope")),
+        patch.object(_logger, "error") as mock_error,
+    ):
         assert mr.dump_repos({}) is False
-    log.error.assert_called()
+    mock_error.assert_called()
 
 
 def test_clear_repos(tmp_repos_json):
@@ -265,9 +267,7 @@ def test_ll_repos_normal_summary(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"g": {"path": "/rp"}}))
     ex = MockExecutor(
         responses={
-            "git diff --stat": (0, "", "1\n"),
-            "git diff --stat --cached": (0, "", ""),
-            "git ls-files -zo --exclude-standard": (0, "", ""),
+            "git status --porcelain": (0, "", " M file.txt\n"),
         }
     )
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))

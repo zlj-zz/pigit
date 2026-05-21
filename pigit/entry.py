@@ -1,7 +1,6 @@
 # The PIGIT terminal tool entry file.
 from __future__ import annotations
 
-import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -37,14 +36,9 @@ conf = Config(path=CONFIG_FILE_PATH, version=VERSION, auto_load=True).output_war
 ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
 Context.install(ctx)
 
-# auto_append: add current repo to managed repos on any command invocation.
-_confirm_result = ctx.local_git.confirm_repo()
-_repo_path = _confirm_result[0]
-if _repo_path and ctx.config.get().repo.auto_append:
-    try:
-        ctx.managed_repos.add_repos([_repo_path])
-    except Exception:
-        logging.debug("auto_append failed", exc_info=True)
+from .hook import before_hook
+
+before_hook(ctx)
 
 console = get_console()
 
@@ -280,6 +274,14 @@ def repo_add(args, _):
 @argument("repos", nargs="+", help="name or path of repo(s).")
 def repo_rm(args, _):
     RepoCommandHandler(ctx.current()).rm(args)
+
+
+@repo.sub_parser("update", help="refresh cached metadata for repo(s).")
+@argument(
+    "repos", nargs="*", help="name(s) of repo(s) to refresh. refreshes all if omitted."
+)
+def repo_update(args, _):
+    RepoCommandHandler(ctx.current()).update(args)
 
 
 @repo.sub_parser("rename", help="rename a repo.")

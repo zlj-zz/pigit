@@ -34,6 +34,16 @@ class RepoCommandHandler:
         for one in res:
             self.console.echo(f"Deleted repo. name: '{one[0]}', path: {one[1]}")
 
+    def update(self, args: "Namespace") -> None:
+        names = getattr(args, "repos", None) or None
+        refreshed = self.managed_repos.refresh_meta(names, force=True)
+        if not refreshed:
+            self.console.echo("No repos found to refresh.")
+            return
+        self.console.echo(f"Refreshed {len(refreshed)} repo(s):")
+        for name in refreshed:
+            self.console.echo(f"  ✓ {name}")
+
     def rename(self, args: "Namespace") -> None:
         _ok, msg = self.managed_repos.rename_repo(args.repo, args.new_name)
         self.console.echo(msg)

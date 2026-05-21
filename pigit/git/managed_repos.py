@@ -12,6 +12,8 @@ from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
 from pigit.picker_app import PickerRow
 
+_logger = logging.getLogger(__name__)
+
 
 def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     """Return managed repo names sorted by Unicode code points (stable across platforms)."""
@@ -62,10 +64,8 @@ class ManagedRepos:
         self,
         executor: Executor,
         repo_json_path: str | None = None,
-        log: logging.Logger | None = None,
     ) -> None:
         self.executor = executor
-        self.log = log
         self.repo_json_path = (
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
@@ -77,11 +77,11 @@ class ManagedRepos:
         if self._local_git is None:
             from .local_git import LocalGit
 
-            self._local_git = LocalGit(executor=self.executor, log=self.log)
+            self._local_git = LocalGit(executor=self.executor)
         return self._local_git
 
     @staticmethod
-    def _make_repo_name(path: str, repos: dict[str, str], name_counts: Counter) -> str:
+    def _make_repo_name(path: str, repos: dict[str, dict], name_counts: Counter) -> str:
         """
         Given a new repo `path`, create a repo name. By default, basename is used.
         If name collision exists, further include parent path name.
@@ -102,7 +102,7 @@ class ManagedRepos:
             return os.path.join(par_name, name)
         return name
 
-    def load_repos(self) -> dict:
+    def load_repos(self) -> dict[str, dict]:
         """Load repos info from cache file."""
 
         try:
@@ -118,8 +118,8 @@ class ManagedRepos:
             with self.repo_json_path.open(mode="w") as fp:
                 json.dump(repos, fp, indent=2)
                 return True
-        except Exception as e:
-            self.log.error(f"Failed to dump repos: {e}")
+        except (OSError, TypeError) as e:
+            _logger.error("Failed to dump repos: %s", e)
             return False
 
     def clear_repos(self) -> None:
@@ -173,6 +173,35 @@ class ManagedRepos:
 
             report_dict[repo_name] = commits
         pprint.pprint(report_dict)
+        return ""
+
+    @staticmethod
+    def _format_repo_row(
+        repo_name: str,
+        repo_path: str,
+        branch: str,
+        status: str,
+        commit_hash: str,
+        commit_msg: str,
+        author: str,
+        dirty: bool,
+        staged: bool,
+        untracked: bool,
+    ) -> list[tuple]:
+        symbols = (
+            f"{'*' if dirty else ' '}"
+            f"{'+' if staged else ' '}"
+            f"{'?' if untracked else ' '}"
+        )
+        return [
+            (repo_name, ""),
+            ("Branch", f"{branch} {symbols}"),
+            ("Status", status),
+            ("Commit Hash", commit_hash),
+            ("Commit Msg", commit_msg),
+            ("Author", author),
+            ("Local Path", repo_path),
+        ]
 
     def ll_repos(
         self, reverse: bool = False, filter_query: str = ""
@@ -184,6 +213,23 @@ class ManagedRepos:
                 continue
             prop = exist_repos[repo_name]
             repo_path = prop["path"]
+            meta = prop.get("meta")
+
+            if meta and self._is_meta_fresh(repo_path, meta):
+                yield self._format_repo_row(
+                    repo_name,
+                    repo_path,
+                    meta.get("branch", ""),
+                    meta.get("status", ""),
+                    meta.get("commit_hash", ""),
+                    meta.get("commit_msg", ""),
+                    meta.get("commit_author", ""),
+                    meta.get("dirty", False),
+                    meta.get("staged", False),
+                    meta.get("untracked", False),
+                )
+                continue
+
             head = self._git.get_head(repo_path)
 
             # jump invalid repo.
@@ -193,51 +239,23 @@ class ManagedRepos:
                         (repo_name, ""),
                         ("Local Path", repo_path),
                     ]
+                continue
 
-            elif not reverse:
-                _, _, unstaged = self.executor.exec(
-                    "git diff --stat", flags=REPLY | DECODE, cwd=repo_path
-                )
-                _, _, staged = self.executor.exec(
-                    "git diff --stat --cached", flags=REPLY | DECODE, cwd=repo_path
-                )
-                _, _, untracked = self.executor.exec(
-                    "git ls-files -zo --exclude-standard",
-                    flags=REPLY | DECODE,
-                    cwd=repo_path,
-                )
-                commit_hash = self._git.get_first_pushed_commit(
-                    path=repo_path, branch_name=head
-                )
-                commit = self._git.load_log(
-                    limit=1,
-                    arg_str="--format='%s (%cd)||%C(auto)%d||%an <%ae>%n' --date=relative --color",
-                    path=repo_path,
-                )
-
-                if "||" in commit:
-                    parts = commit.strip().split("||")
-                    commit_msg = parts[0]
-                    branch_status = parts[1] if len(parts) > 1 else ""
-                    author = parts[2] if len(parts) > 2 else ""
-                else:
-                    commit_msg, branch_status, author = commit.strip() or "", "", ""
-                unstaged_symbol = "*" if unstaged else " "
-                staged_symbol = "+" if staged else " "
-                untracked_symbol = "?" if untracked else " "
-
-                yield [
-                    (repo_name, ""),
-                    (
-                        "Branch",
-                        f"{head} {unstaged_symbol}{staged_symbol}{untracked_symbol}",
-                    ),
-                    ("Status", branch_status),
-                    ("Commit Hash", commit_hash),
-                    ("Commit Msg", commit_msg),
-                    ("Author", author),
-                    ("Local Path", repo_path),
-                ]
+            if not reverse:
+                meta = self._fetch_repo_meta(repo_path)
+                if meta:
+                    yield self._format_repo_row(
+                        repo_name,
+                        repo_path,
+                        meta["branch"],
+                        meta.get("status", ""),
+                        meta.get("commit_hash", ""),
+                        meta["commit_msg"],
+                        meta.get("commit_author", ""),
+                        meta["dirty"],
+                        meta["staged"],
+                        meta["untracked"],
+                    )
 
     def add_repos(self, paths: list[str], dry_run: bool = False) -> list:
         """Traverse the incoming paths. If it is not saved and is a git
@@ -252,24 +270,90 @@ class ManagedRepos:
         exist_repos = self.load_repos()
         exist_paths_set = {r["path"] for r in exist_repos.values()}
 
+        # Build a map of input path -> confirmed repo path (valid only).
+        path_to_repo: dict[str, str] = {}
         new_git_paths = []
         for path in paths:
             repo_path, _ = self._git.confirm_repo(path)
-            if repo_path and repo_path not in exist_paths_set:
-                new_git_paths.append(repo_path)
+            if repo_path:
+                path_to_repo[path] = repo_path
+                if repo_path not in exist_paths_set:
+                    new_git_paths.append(repo_path)
 
-        if new_git_paths and not dry_run:
+        if dry_run:
+            return new_git_paths
+
+        modified = bool(new_git_paths)
+        if new_git_paths:
             name_counts = Counter(
                 os.path.basename(os.path.normpath(p)) for p in new_git_paths
             )
-            new_repos = {
-                self._make_repo_name(path, exist_repos, name_counts): {"path": path}
-                for path in new_git_paths
-            }
+            for path in new_git_paths:
+                name = self._make_repo_name(path, exist_repos, name_counts)
+                exist_repos[name] = {"path": path}
 
-            self.dump_repos({**exist_repos, **new_repos})
+        # Build reverse lookup after adding new repos.
+        path_to_name = {info["path"]: name for name, info in exist_repos.items()}
+
+        # Refresh metadata for new repos and stale existing repos.
+        for repo_path in path_to_repo.values():
+            name = path_to_name.get(repo_path)
+            if not name:
+                continue
+            meta = exist_repos[name].get("meta")
+            if not meta or not self._is_meta_fresh(repo_path, meta):
+                new_meta = self._fetch_repo_meta(repo_path)
+                if new_meta:
+                    exist_repos[name]["meta"] = new_meta
+                    modified = True
+
+        if modified:
+            self.dump_repos(exist_repos)
 
         return new_git_paths
+
+    def refresh_meta(
+        self, names: list[str] | None = None, *, force: bool = False
+    ) -> list[str]:
+        """Refresh cached metadata for managed repos.
+
+        Args:
+            names: Repo names to refresh. If None, refresh all managed repos.
+            force: When True, always re-fetch metadata regardless of cache freshness.
+
+        Returns:
+            List of repo names whose metadata was actually refreshed.
+        """
+        exist_repos = self.load_repos()
+        if not exist_repos:
+            return []
+
+        targets = {
+            name: info
+            for name, info in exist_repos.items()
+            if names is None or name in names
+        }
+        if not targets:
+            return []
+
+        refreshed: list[str] = []
+        for name, info in targets.items():
+            repo_path = info.get("path")
+            if not repo_path:
+                continue
+            if not force:
+                meta = info.get("meta")
+                if meta and self._is_meta_fresh(repo_path, meta):
+                    continue
+            new_meta = self._fetch_repo_meta(repo_path)
+            if new_meta:
+                exist_repos[name]["meta"] = new_meta
+                refreshed.append(name)
+
+        if refreshed:
+            self.dump_repos(exist_repos)
+
+        return refreshed
 
     def rm_repos(self, repos: list[str], use_path: bool = False) -> list[tuple]:
         exist_repos = self.load_repos()
@@ -560,3 +644,88 @@ class ManagedRepos:
                 repo_items, results, strict=True
             )
         ]
+
+    # --- Metadata caching helpers ---
+
+    def _is_meta_fresh(self, repo_path: str, meta: dict | None) -> bool:
+        """Check whether cached metadata is still valid by comparing .git/index mtime."""
+        if not meta:
+            return False
+        cached_mtime = meta.get("index_mtime")
+        if not isinstance(cached_mtime, int):
+            return False
+        try:
+            git_dir = self._git.get_git_dir(repo_path)
+        except Exception:
+            git_dir = os.path.join(repo_path, ".git")
+        index_path = os.path.join(git_dir, "index")
+        try:
+            return int(os.path.getmtime(index_path)) == cached_mtime
+        except OSError:
+            return False
+
+    def _fetch_repo_meta(self, repo_path: str) -> dict | None:
+        """Fetch git metadata for a single repo and return a cacheable dict."""
+        head = self._git.get_head(repo_path)
+        if not head:
+            return None
+
+        _, _, status_out = self.executor.exec(
+            "git status --porcelain", flags=REPLY | DECODE, cwd=repo_path
+        )
+        has_unstaged = False
+        has_staged = False
+        has_untracked = False
+        status_text = status_out if isinstance(status_out, str) else ""
+        for line in status_text.splitlines():
+            if not line:
+                continue
+            xy = line[:2]
+            if "?" in xy:
+                has_untracked = True
+                continue
+            if xy[0] != " ":
+                has_staged = True
+            if xy[1] != " ":
+                has_unstaged = True
+
+        commit_hash = self._git.get_first_pushed_commit(
+            path=repo_path, branch_name=head
+        )
+        commit = self._git.load_log(
+            limit=1,
+            arg_str="--format='%s (%cd)||%d||%an||%ae%n' --date=relative --color",
+            path=repo_path,
+        )
+
+        commit_msg, branch_status, author_name, author_email = "", "", "", ""
+        if "||" in commit:
+            parts = commit.strip().split("||", 3)
+            commit_msg = parts[0]
+            branch_status = parts[1] if len(parts) > 1 else ""
+            author_name = parts[2] if len(parts) > 2 else ""
+            author_email = parts[3] if len(parts) > 3 else ""
+        else:
+            commit_msg = commit.strip()
+
+        try:
+            git_dir = self._git.get_git_dir(repo_path)
+        except Exception:
+            git_dir = os.path.join(repo_path, ".git")
+        try:
+            index_mtime = int(os.path.getmtime(os.path.join(git_dir, "index")))
+        except OSError:
+            index_mtime = 0
+
+        return {
+            "branch": head,
+            "status": branch_status,
+            "commit_hash": commit_hash,
+            "commit_msg": commit_msg,
+            "commit_author": author_name,
+            "commit_author_email": author_email,
+            "dirty": bool(has_unstaged or has_staged or has_untracked),
+            "staged": bool(has_staged),
+            "untracked": bool(has_untracked),
+            "index_mtime": index_mtime,
+        }
