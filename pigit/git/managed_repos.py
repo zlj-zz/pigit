@@ -5,6 +5,7 @@ import logging
 import os
 import pprint
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from collections.abc import Generator
 
@@ -263,20 +264,23 @@ class ManagedRepos:
         return new_git_paths
 
     def refresh_meta(
-        self, names: list[str] | None = None, *, force: bool = False
-    ) -> list[str]:
-        """Refresh cached metadata for managed repos.
+        self,
+        names: list[str] | None = None,
+        *,
+        force: bool = False,
+    ) -> Generator[str, None, None]:
+        """Refresh cached metadata for managed repos, yielding each refreshed name.
 
         Args:
             names: Repo names to refresh. If None, refresh all managed repos.
             force: When True, always re-fetch metadata regardless of cache freshness.
 
-        Returns:
-            List of repo names whose metadata was actually refreshed.
+        Yields:
+            Repo name whose metadata was successfully refreshed.
         """
         exist_repos = self.load_repos()
         if not exist_repos:
-            return []
+            return
 
         targets = {
             name: info
@@ -284,9 +288,10 @@ class ManagedRepos:
             if names is None or name in names
         }
         if not targets:
-            return []
+            return
 
-        refreshed: list[str] = []
+        # Pre-filter skipped repos (cache fresh and not forced).
+        to_refresh: dict[str, str] = {}
         for name, info in targets.items():
             repo_path = info.get("path")
             if not repo_path:
@@ -295,15 +300,31 @@ class ManagedRepos:
                 meta = info.get("meta")
                 if meta and self._is_meta_fresh(repo_path, meta):
                     continue
-            new_meta = self._fetch_repo_meta(repo_path)
-            if new_meta:
-                exist_repos[name]["meta"] = new_meta
-                refreshed.append(name)
+            to_refresh[name] = repo_path
 
-        if refreshed:
-            self.dump_repos(exist_repos)
+        if not to_refresh:
+            return
 
-        return refreshed
+        def _fetch_one(item: tuple[str, str]) -> tuple[str, dict | None]:
+            name, repo_path = item
+            return name, self._fetch_repo_meta(repo_path)
+
+        refreshed: list[str] = []
+        try:
+            with ThreadPoolExecutor(max_workers=self._repo_parallel_workers()) as pool:
+                futures = {
+                    pool.submit(_fetch_one, item): item[0]
+                    for item in to_refresh.items()
+                }
+                for future in as_completed(futures):
+                    name, new_meta = future.result()
+                    if new_meta:
+                        exist_repos[name]["meta"] = new_meta
+                        refreshed.append(name)
+                        yield name
+        finally:
+            if refreshed:
+                self.dump_repos(exist_repos)
 
     def rm_repos(self, repos: list[str], use_path: bool = False) -> list[tuple]:
         exist_repos = self.load_repos()
@@ -645,19 +666,28 @@ class ManagedRepos:
         )
         commit = self._git.load_log(
             limit=1,
-            arg_str="--format='%s (%cd)||%d||%an||%ae%n' --date=relative --color",
+            arg_str="--format='%s (%cd)||%at||%d||%an||%ae%n' --date=relative --color",
             path=repo_path,
         )
 
-        commit_msg, branch_status, author_name, author_email = "", "", "", ""
+        commit_msg, commit_time, branch_status = "", 0, ""
+        author_name, author_email = "", ""
         if "||" in commit:
-            parts = commit.strip().split("||", 3)
+            parts = commit.strip().split("||", 4)
             commit_msg = parts[0]
-            branch_status = parts[1] if len(parts) > 1 else ""
-            author_name = parts[2] if len(parts) > 2 else ""
-            author_email = parts[3] if len(parts) > 3 else ""
+            commit_time = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            branch_status = parts[2] if len(parts) > 2 else ""
+            author_name = parts[3] if len(parts) > 3 else ""
+            author_email = parts[4] if len(parts) > 4 else ""
         else:
             commit_msg = commit.strip()
+
+        ahead, behind = "?", "?"
+        for branch in self._git.load_branches(path=repo_path, scope="local"):
+            if branch.is_head:
+                ahead = branch.ahead
+                behind = branch.behind
+                break
 
         git_dir = self._resolve_git_dir(repo_path)
         try:
@@ -670,8 +700,11 @@ class ManagedRepos:
             "status": branch_status,
             "commit_hash": commit_hash,
             "commit_msg": commit_msg,
+            "commit_time": commit_time,
             "commit_author": author_name,
             "commit_author_email": author_email,
+            "ahead": ahead,
+            "behind": behind,
             "dirty": bool(has_unstaged or has_staged or has_untracked),
             "staged": bool(has_staged),
             "untracked": bool(has_untracked),

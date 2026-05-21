@@ -208,14 +208,14 @@ class ZshCompletion(ShellCompletion):
         for comp in self._used_git_helpers:
             if comp == "repos":
                 helpers.append(
-                    '_pigit_repos() {\n'
-                    '    local -a repos\n'
+                    "_pigit_repos() {\n"
+                    "    local -a repos\n"
                     '    repos=(${(f)"$(python3 -c '
                     '\'import json,os; p=os.path.expanduser("%s"); '
-                    'd=json.load(open(p)) if os.path.isfile(p) else {}; '
-                    '[print(k) for k in d]\' 2>/dev/null)"})\n'
-                    '    (( $#repos )) && compadd -a repos\n'
-                    '}' % REPOS_PATH
+                    "d=json.load(open(p)) if os.path.isfile(p) else {}; "
+                    "[print(k) for k in d]' 2>/dev/null)\"})\n"
+                    "    (( $#repos )) && compadd -a repos\n"
+                    "}" % REPOS_PATH
                 )
             elif comp in ZSH_HELPERS:
                 helpers.append(ZSH_HELPERS[comp])

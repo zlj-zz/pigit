@@ -178,8 +178,8 @@ class BashCompletion(ShellCompletion):
             if comp == "repos":
                 helpers.append(
                     '_pigit_repos() { python3 -c \'import json,os; p=os.path.expanduser("%s");'
-                    ' d=json.load(open(p)) if os.path.isfile(p) else {}; [print(k) for k in d]\''
-                    ' 2>/dev/null; }' % REPOS_PATH
+                    " d=json.load(open(p)) if os.path.isfile(p) else {}; [print(k) for k in d]'"
+                    " 2>/dev/null; }" % REPOS_PATH
                 )
             elif comp in BASH_HELPERS:
                 helpers.append(BASH_HELPERS[comp])
@@ -199,11 +199,9 @@ class BashCompletion(ShellCompletion):
                     used_completions.add(arg_comp)
                     helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
                     escaped_pattern = self._escape_case_pattern(cmd_name)
-                    cases.append(
-                        f"""                    {escaped_pattern})
+                    cases.append(f"""                    {escaped_pattern})
                         COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
-                        ;;"""
-                    )
+                        ;;""")
         return commands, cases
 
     def generate_content(self) -> dict[str, str]:

@@ -36,13 +36,18 @@ class RepoCommandHandler:
 
     def update(self, args: "Namespace") -> None:
         names = getattr(args, "repos", None) or None
-        refreshed = self.managed_repos.refresh_meta(names, force=True)
-        if not refreshed:
+        repos = self.managed_repos.load_repos()
+        targets = [n for n in repos if names is None or n in names] if repos else []
+        if not targets:
             self.console.echo("No repos found to refresh.")
             return
-        self.console.echo(f"Refreshed {len(refreshed)} repo(s):")
-        for name in refreshed:
+        self.console.echo(f"Refreshing {len(targets)} repo(s)...")
+        count = 0
+        for name in self.managed_repos.refresh_meta(names, force=True):
             self.console.echo(f"  ✓ {name}")
+            count += 1
+        if count == 0:
+            self.console.echo("All repos are up to date.")
 
     def rename(self, args: "Namespace") -> None:
         _ok, msg = self.managed_repos.rename_repo(args.repo, args.new_name)
