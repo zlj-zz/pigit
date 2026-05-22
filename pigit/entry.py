@@ -157,46 +157,87 @@ def pigit(args: Namespace, _) -> None:
                 print(f"::{k}  (files:{v[FILES_NUM]:,} | lines:{v[LINES_NUM]:,})")
 
         elif config.counter.format == "table":
-            console.echo("@bold(Code Counter Result)")
-            console.echo("-" * 50)
+            console.echo(" @bold(Code Counter Result)")
+            console.echo(" " + "-" * 50)
+
+            # Pre-compute column widths for alignment.
+            max_f_num = max(len(str(v[FILES_NUM])) for v in diff_result.values())
+            max_l_num = max(len(str(v[LINES_NUM])) for v in diff_result.values())
+            max_f_chg = max(
+                (
+                    len(f"{v[FILES_CHANGE]:+}")
+                    if v.get(FILES_CHANGE, 0) != 0
+                    else 0
+                )
+                for v in diff_result.values()
+            )
+            max_l_chg = max(
+                (
+                    len(f"{v[LINES_CHANGE]:+}")
+                    if v.get(LINES_CHANGE, 0) != 0
+                    else 0
+                )
+                for v in diff_result.values()
+            )
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"@cyan({get_file_icon(k)} {k})" if config.counter.show_icon else k
+                    f"@cyan({get_file_icon(k)} {k})"
+                    if config.counter.show_icon
+                    else k
                 )
 
                 f_color = _color_index(v[FILES_NUM])
                 l_color = _color_index(v[LINES_NUM])
-                f_num_str = f"@{f_color}({v[FILES_NUM]})"
-                l_num_str = f"@{l_color}({v[LINES_NUM]})"
 
-                f_change_str = (
-                    f"{v[FILES_CHANGE]:+}" if v.get(FILES_CHANGE, 0) != 0 else ""
+                # Align numbers as plain text, then wrap with color markup.
+                f_num_raw = str(v[FILES_NUM]).rjust(max_f_num)
+                l_num_raw = str(v[LINES_NUM]).rjust(max_l_num)
+                f_num_str = f"@{f_color}({f_num_raw})"
+                l_num_str = f"@{l_color}({l_num_raw})"
+
+                f_change_raw = (
+                    f"{v[FILES_CHANGE]:+}"
+                    if v.get(FILES_CHANGE, 0) != 0
+                    else ""
                 )
-                l_change_str = (
-                    f"{v[LINES_CHANGE]:+}" if v.get(LINES_CHANGE, 0) != 0 else ""
+                l_change_raw = (
+                    f"{v[LINES_CHANGE]:+}"
+                    if v.get(LINES_CHANGE, 0) != 0
+                    else ""
                 )
 
                 f_change_color = (
-                    "#98fb98" if f_change_str.startswith("+") else "#ff6347"
+                    "#98fb98" if f_change_raw.startswith("+") else "#ff6347"
                 )
                 l_change_color = (
-                    "#98fb98" if l_change_str.startswith("+") else "#ff6347"
+                    "#98fb98" if l_change_raw.startswith("+") else "#ff6347"
                 )
-                f_change_part = (
-                    f" @{f_change_color}({f_change_str})" if f_change_str else ""
-                )
-                l_change_part = (
-                    f" @{l_change_color}({l_change_str})" if l_change_str else ""
-                )
+
+                # Fixed-width change columns so later columns stay aligned.
+                if f_change_raw:
+                    f_chg_pad = " " * (max_f_chg - len(f_change_raw))
+                    f_change_part = (
+                        f" @{f_change_color}({f_change_raw}){f_chg_pad}"
+                    )
+                else:
+                    f_change_part = " " * (max_f_chg + 1) if max_f_chg else ""
+
+                if l_change_raw:
+                    l_chg_pad = " " * (max_l_chg - len(l_change_raw))
+                    l_change_part = (
+                        f" @{l_change_color}({l_change_raw}){l_chg_pad}"
+                    )
+                else:
+                    l_change_part = " " * (max_l_chg + 1) if max_l_chg else ""
 
                 console.echo(
-                    f"{f_type_str:<20}  {f_num_str:>8}{f_change_part}  "
-                    f"{l_num_str:>10}{l_change_part}"
+                    f" {f_type_str:<20}  {f_num_str}{f_change_part}  "
+                    f"{l_num_str}{l_change_part}"
                 )
 
-            console.echo("-" * 50)
-            console.echo(f"Total: {total_size}")
+            console.echo(" " + "-" * 50)
+            console.echo(f" Total: {total_size}")
         else:
             print("Invalid display format!")
 

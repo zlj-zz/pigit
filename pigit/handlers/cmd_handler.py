@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..termui.cli_output import get_console
+from ..ext.utils import page_output
 
 from ..git.cmds import GitCommandNew, CommandCategory
 
@@ -100,7 +101,7 @@ class CmdHandler:
                     return 1
             else:
                 help_text = self._processor.get_help()
-            self._console.echo(help_text)
+            page_output(self._console.render(help_text))
             return 0
 
         if args.search:
