@@ -42,14 +42,12 @@ def introduce() -> str:
 
 def show_gitconfig(
     path: str | None = None,
-    format_type: str = "normal",
     color: bool = True,
 ) -> str:
-    """Return git config info with format.
+    """Return git config info.
 
     Args:
         path: Path to git repository. Defaults to None.
-        format_type: Output format style. Defaults to "normal".
         color: Whether to apply color. Defaults to True.
 
     Returns:
@@ -74,13 +72,41 @@ def show_gitconfig(
             else "Error reading configuration file."
         )
 
-    gen = []
+    # Separate branch sections for potential folding.
+    branch_sections: dict[str, dict[str, str]] = {}
+    other_sections: dict[str, dict[str, str]] = {}
+    for name, kv in config.items():
+        if name.startswith('branch "'):
+            branch_sections[name] = kv
+        else:
+            other_sections[name] = kv
 
-    for tit, kv in config.items():
-        gen.append(f"@tomato([{tit}])" if color else f"[{tit}]")
-        gen.extend(
-            f"\t@sky_blue({k})=@violet_red({v})" if color else f"\t{k}={v}"
-            for k, v in kv.items()
-        )
+    def _render_section(name: str, kv: dict[str, str]) -> list[str]:
+        """Render one config section as aligned key=value lines."""
+        lines: list[str] = []
+        header = f"@bold(@red([{name}]))" if color else f"[{name}]"
+        lines.append(header)
+        if kv:
+            max_key_len = max(len(k) for k in kv)
+            for k, v in kv.items():
+                padded = k.ljust(max_key_len)
+                key_part = f"@green({padded})" if color else padded
+                safe_v = v.replace("@", "@@")
+                lines.append(f"  {key_part} = {safe_v}")
+        return lines
+
+    gen: list[str] = []
+
+    # Render non-branch sections.
+    for name, kv in other_sections.items():
+        if gen:
+            gen.append("")
+        gen.extend(_render_section(name, kv))
+
+    # Render branch sections.
+    for name, kv in branch_sections.items():
+        if gen:
+            gen.append("")
+        gen.extend(_render_section(name, kv))
 
     return "\n".join(gen)

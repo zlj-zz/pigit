@@ -100,3 +100,52 @@ class TestComputed:
         base.set(2)
         _ = c.value
         assert called == []
+
+
+class TestComputedReactiveMode:
+    def test_initial_value_with_deps(self):
+        base = Signal(10)
+        c = Computed(lambda: base.value * 2, deps=[base])
+        assert c.value == 20
+
+    def test_recomputes_when_dep_changes(self):
+        base = Signal(1)
+        c = Computed(lambda: base.value + 1, deps=[base])
+        base.set(5)
+        assert c.value == 6
+
+    def test_subscriber_notified_when_dep_changes(self):
+        base = Signal(1)
+        c = Computed(lambda: base.value * 3, deps=[base])
+        called = []
+        c.subscribe(lambda v: called.append(v))
+        base.set(2)
+        assert called == [6]
+
+    def test_no_notification_when_unchanged(self):
+        base = Signal(1)
+        c = Computed(lambda: base.value % 2, deps=[base])
+        called = []
+        c.subscribe(lambda v: called.append(v))
+        base.set(3)
+        assert called == []
+
+    def test_unsubscribe_removes_listener(self):
+        base = Signal(1)
+        c = Computed(lambda: base.value, deps=[base])
+        called = []
+        unsub = c.subscribe(lambda v: called.append(v))
+        unsub()
+        base.set(2)
+        assert called == []
+
+    def test_multiple_deps(self):
+        a = Signal(1)
+        b = Signal(2)
+        c = Computed(lambda: a.value + b.value, deps=[a, b])
+        called = []
+        c.subscribe(lambda v: called.append(v))
+        a.set(10)
+        assert called == [12]
+        b.set(20)
+        assert called == [12, 30]

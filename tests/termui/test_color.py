@@ -63,11 +63,31 @@ class TestColorAdapter:
         seq = adapter.fg_sequence((255, 0, 0))
         assert seq == "\033[38;5;9m"
 
+    def test_256_mode_bg_sequence(self):
+        adapter = ColorAdapter(ColorMode.COLOR_256)
+        seq = adapter.bg_sequence((255, 0, 0))
+        assert seq == "\033[48;5;9m"
+
     def test_16_mode_returns_bright_red_code(self):
         adapter = ColorAdapter(ColorMode.COLOR_16)
         seq = adapter.fg_sequence((255, 0, 0))
-        # Code 9 (bright red) maps to 91
         assert seq == "\033[91m"
+
+    def test_16_mode_bg_sequence(self):
+        adapter = ColorAdapter(ColorMode.COLOR_16)
+        seq = adapter.bg_sequence((0, 0, 255))
+        assert seq == "\033[104m"
+
+    def test_16_mode_bg_bright(self):
+        adapter = ColorAdapter(ColorMode.COLOR_16)
+        seq = adapter.bg_sequence((128, 128, 128))
+        assert seq == "\033[100m"
+
+    def test_style_sequence_reverse(self):
+        from pigit.termui.palette import STYLE_REVERSE
+
+        adapter = ColorAdapter(ColorMode.TRUECOLOR)
+        assert adapter.style_sequence(STYLE_REVERSE) == "\033[7m"
 
 
 class TestNearest256:
@@ -84,7 +104,6 @@ class TestNearest256:
         assert _nearest_256(rgb) == expected
 
     def test_caching(self):
-        # Second call should use cache
         result1 = _nearest_256((100, 150, 200))
         result2 = _nearest_256((100, 150, 200))
         assert result1 == result2
@@ -121,6 +140,36 @@ class TestDetectColorMode:
         with mock.patch.dict(
             os.environ,
             {"TERM": "xterm-256color", "COLORTERM": "", "PIGIT_COLOR_MODE": ""},
+        ):
+            adapter = ColorAdapter()
+            assert adapter.mode == ColorMode.COLOR_256
+
+    def test_invalid_env_falls_back(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "PIGIT_COLOR_MODE": "invalid",
+                "TERM": "xterm-256color",
+                "COLORTERM": "",
+            },
+            clear=True,
+        ):
+            adapter = ColorAdapter()
+            assert adapter.mode == ColorMode.COLOR_256
+
+    @pytest.mark.parametrize("term", ["xterm", "screen", "vt100"])
+    def test_16_from_simple_term(self, term):
+        with mock.patch.dict(
+            os.environ,
+            {"TERM": term, "COLORTERM": "", "PIGIT_COLOR_MODE": ""},
+        ):
+            adapter = ColorAdapter()
+            assert adapter.mode == ColorMode.COLOR_16
+
+    def test_default_fallback_to_256(self):
+        with mock.patch.dict(
+            os.environ,
+            {"TERM": "unknown", "COLORTERM": "", "PIGIT_COLOR_MODE": ""},
         ):
             adapter = ColorAdapter()
             assert adapter.mode == ColorMode.COLOR_256

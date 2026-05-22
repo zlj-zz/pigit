@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shlex
 import subprocess
 import sys
 import time
@@ -340,6 +342,28 @@ def get_file_icon(file_type: str) -> str:
     """
     #     
     return FILE_ICONS.get(file_type, "")
+
+
+def page_output(text: str) -> None:
+    """Send *text* to a pager if stdout is a TTY, otherwise print directly.
+
+    Respects the ``PAGER`` environment variable; defaults to ``less -R``
+    so ANSI colors are preserved.
+    """
+    if not sys.stdout.isatty():
+        print(text, end="")
+        return
+
+    pager = os.environ.get("PAGER", "less -FRX")
+    try:
+        with subprocess.Popen(
+            shlex.split(pager),
+            stdin=subprocess.PIPE,
+            stdout=sys.stdout,
+        ) as proc:
+            proc.communicate(text.encode("utf-8", "replace"))
+    except (OSError, subprocess.SubprocessError):
+        print(text, end="")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import pytest
+import termios
 from unittest.mock import patch
 
 from pigit.termui.keys import is_mouse_event
@@ -67,3 +68,107 @@ def test_termui_input_bridge_accepts_zero_timeout():
     bridge.set_input_timeouts(0.0)
     assert bridge._timeout == 0.0
     assert math.isfinite(bridge._timeout)
+
+
+def test_termui_input_bridge_start_stop_noop():
+    bridge = TermuiInputBridge()
+    bridge.start()
+    bridge.stop()
+
+
+class TestInputTerminal:
+    # NOTE: termios control-character indices (VINTR, VQUIT, etc.) vary by
+    # platform (e.g. VINTR is 8 on Darwin but 0 on Linux). Always use the
+    # ``termios`` module constants instead of hard-coded numbers.
+
+    def test_get_input_raises_not_implemented(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        with pytest.raises(NotImplementedError, match="Subclasses must implement"):
+            term.get_input()
+
+    def test_set_input_timeouts_noop(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        term.set_input_timeouts(1.0)  # should not raise
+
+    def test_tty_signal_keys_returns_early_on_non_tty(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        with patch("os.isatty", return_value=False):
+            result = term.tty_signal_keys(fileno=0)
+        assert result is None
+
+    def test_tty_signal_keys_reads_current_settings(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        cc = [0] * 32
+        cc[termios.VINTR] = 3
+        cc[termios.VQUIT] = 28
+        cc[termios.VSTART] = 17
+        cc[termios.VSTOP] = 19
+        cc[termios.VSUSP] = 26
+        fake_tattr = [[], [], [], [], [], [], cc]
+        with (
+            patch("os.isatty", return_value=True),
+            patch(
+                "pigit.termui.input.termios.tcgetattr", return_value=fake_tattr
+            ) as mock_getattr,
+        ):
+            result = term.tty_signal_keys(fileno=0)
+        mock_getattr.assert_called_once()
+        assert result == (3, 28, 17, 19, 26)
+
+    def test_tty_signal_keys_sets_undefined_to_zero(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        cc = [0] * 32
+        cc[termios.VINTR] = 3
+        fake_tattr = [[], [], [], [], [], [], cc]
+        with (
+            patch("os.isatty", return_value=True),
+            patch("pigit.termui.input.termios.tcgetattr", return_value=fake_tattr),
+            patch("pigit.termui.input.termios.tcsetattr") as mock_setattr,
+        ):
+            term.tty_signal_keys(intr="undefined", fileno=0)
+        assert mock_setattr.called
+        call_tattr = mock_setattr.call_args[0][2]
+        assert call_tattr[6][termios.VINTR] == 0
+
+    def test_tty_signal_keys_sets_explicit_values(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        cc = [0] * 32
+        cc[termios.VINTR] = 3
+        cc[termios.VQUIT] = 28
+        fake_tattr = [[], [], [], [], [], [], cc]
+        with (
+            patch("os.isatty", return_value=True),
+            patch("pigit.termui.input.termios.tcgetattr", return_value=fake_tattr),
+            patch("pigit.termui.input.termios.tcsetattr") as mock_setattr,
+        ):
+            term.tty_signal_keys(intr=5, quit=6, fileno=0)
+        call_tattr = mock_setattr.call_args[0][2]
+        assert call_tattr[6][termios.VINTR] == 5
+        assert call_tattr[6][termios.VQUIT] == 6
+
+    def test_tty_signal_keys_no_change_returns_without_setting(self):
+        from pigit.termui.input import InputTerminal
+
+        term = InputTerminal()
+        cc = [0] * 32
+        cc[termios.VINTR] = 3
+        fake_tattr = [[], [], [], [], [], [], cc]
+        with (
+            patch("os.isatty", return_value=True),
+            patch("pigit.termui.input.termios.tcgetattr", return_value=fake_tattr),
+            patch("pigit.termui.input.termios.tcsetattr") as mock_setattr,
+        ):
+            term.tty_signal_keys(fileno=0)
+        mock_setattr.assert_not_called()

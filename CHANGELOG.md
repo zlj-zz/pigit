@@ -1,5 +1,39 @@
 # Changelog of pigit
 
+## 1.8.11 (2026-05-21)
+
+### Repo
+
+- **Metadata caching**: `repo ll` caches branch, status, commit hash, message, author, and timestamps per repo in `repos.json`, keyed by `.git/index` mtime for freshness.
+- **`repo update`**: refresh cached metadata for all or selected managed repos; runs in parallel via `ThreadPoolExecutor` with real-time progress output.
+- **Extended meta fields**: `_fetch_repo_meta` now captures `commit_time` (Unix timestamp), `ahead`, and `behind` counts for each repo.
+- **Parallel `refresh_meta` refactor**: switched from serial loop to concurrent worker pool; method now yields results as a generator so callers receive progress incrementally.
+
+### Shell Completion
+
+- **Repo name completion**: bash and zsh completion scripts read managed repo names from `repos.json` and offer them as candidates for `repo rm`, `repo update`, `repo rename`, `repo cd`, `repo mkbranch`, and `repo fetch|pull|push`.
+- **Zsh case-statement fix**: added missing `;;` to close the `args)` branch in the generated `case $state` block, resolving the zsh parse error on script load.
+
+### Parser
+
+- **Decorator-level argument groups**: `@argument(..., group="name")` groups arguments under named sections in help output; `group_configs` on `@command` controls group titles and descriptions.
+
+### Config
+
+- **Styled warning output**: `output_warnings()` now prints a bold red header bar with `@bold(@red())` markup, and auto-wraps long messages to terminal width (max 72 chars) with indent-aligned continuation lines.
+- **Version-mismatch message fix**: added missing spaces between sentences in the outdated-config warning.
+- **Warnings go to stderr**: `output_warnings()` now prints to `sys.stderr` so warning text no longer contaminates stdout-oriented output such as shell completion scripts.
+
+### Info
+
+- **`pigit -f` rewrite**: git config display now shows section headers in `@bold(@red())`, keys aligned and colored `@green()`, and values with `@@` escaping to prevent markup mis-parsing (e.g. email addresses).
+- **Pager support**: `pigit -f` automatically pipes output through `less -FRX` when stdout is a TTY, matching `git log` behavior; non-TTY output remains direct print.
+
+### Tests
+
+- **Coverage expansion**: new tests for termui components, CLI parsing, and core modules.
+- **Flaky test fix**: `test_async_task_race` stabilized with deterministic `threading.Event` synchronization.
+
 ## 1.8.10 (2026-05-20)
 
 ### Shell Integration

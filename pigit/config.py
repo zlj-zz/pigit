@@ -114,17 +114,39 @@ class Config(metaclass=Singleton):
     def output_warnings(self) -> "Config":
         """Output config warning info and return self object.
 
+        Warnings are written to ``stderr`` so they do not contaminate
+        ``stdout``-oriented output (e.g. shell completion scripts).
+
         Returns:
             self (Config): single `Config` object.
         """
+        if not self._warnings:
+            return self
 
-        if self._warnings:
-            print("#", "::Config Warning Info::")
-            print("#", "=" * 30)
-            for warning in self._warnings:
-                print("#", warning)
-            print("#", "=" * 30)
-            self._warnings = []
+        import sys
+        from shutil import get_terminal_size
+
+        from .termui.cli_output import get_console
+
+        console = get_console()
+        term_width, _ = get_terminal_size()
+        width = min(72, term_width - 4)
+        bar = "━" * width
+
+        print(console.render(f"@bold(@red(Config Warning))"), file=sys.stderr)
+        print(console.render(f"@bold(@red({bar}))"), file=sys.stderr)
+        for i, warning in enumerate(self._warnings, 1):
+            prefix = f"{i}. "
+            indent = " " * (len(prefix) + 2)
+            wrapped = textwrap.fill(
+                warning,
+                width=width - 2,
+                initial_indent=f"  {prefix}",
+                subsequent_indent=indent,
+            )
+            print(wrapped, file=sys.stderr)
+        print(console.render(f"@bold(@red({bar}))"), file=sys.stderr)
+        self._warnings = []
 
         return self
 
@@ -209,8 +231,8 @@ class Config(metaclass=Singleton):
             or "dev" in self.current_version
         ):
             self._warnings.append(
-                "The current configuration file is not up-to-date."
-                "You'd better recreate it."
+                "The current configuration file is not up-to-date. "
+                "You'd better recreate it. "
                 f"Config version is '{version}', current version is '{self.current_version}'."
             )
 

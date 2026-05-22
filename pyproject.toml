@@ -64,6 +64,8 @@ where = ["."]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"
 reportUnusedVariable = false
+reportUnusedParameter = false
+reportUnreachable = false
 
 [tool.coverage.run]
 source = ["pigit"]

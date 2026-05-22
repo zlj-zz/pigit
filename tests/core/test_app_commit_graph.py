@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for the inline merge-graph layout algorithm."""
 
-from pigit.app_commit_graph import compute_graph_rows
+from pigit.app_commit_graph import compute_graph_rows, _alloc_lane
 from pigit.git.model import Commit
 
 
@@ -154,3 +154,33 @@ def test_orphan_branch_allocates_new_lane():
     assert rows[0].lanes_after == []
     # 'b' has no incoming, so it allocates lane 0 again.
     assert rows[1].commit_lane == 0
+
+
+class TestAllocLane:
+    def test_reuses_none_slot(self):
+        lanes = ["a", None, "b"]
+        idx = _alloc_lane(lanes, prefer_after=0)
+        assert idx == 1
+        assert lanes == ["a", None, "b"]
+
+    def test_appends_when_no_none_slot(self):
+        lanes = ["a", "b"]
+        idx = _alloc_lane(lanes, prefer_after=0)
+        assert idx == 2
+        assert lanes == ["a", "b", None]
+
+    def test_respects_prefer_after(self):
+        lanes = [None, "a", None]
+        idx = _alloc_lane(lanes, prefer_after=1)
+        assert idx == 2
+
+    def test_respects_exclude(self):
+        lanes = [None, None, "a"]
+        idx = _alloc_lane(lanes, prefer_after=0, exclude={0})
+        assert idx == 1
+
+    def test_exclude_forces_append(self):
+        lanes = [None]
+        idx = _alloc_lane(lanes, prefer_after=0, exclude={0})
+        assert idx == 1
+        assert lanes == [None, None]

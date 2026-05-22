@@ -187,3 +187,11 @@ class TestCompletion:
 
     def test_action(self):
         shell_complete(self.complete_vars, "bash", "xxx", ".", "./test.txt")
+
+    def test_shell_complete_empty_shell_returns_empty(self):
+        assert shell_complete(self.complete_vars, "") == ""
+        assert shell_complete(self.complete_vars, None) == ""
+
+    def test_shell_complete_unsupported_shell_returns_empty(self):
+        assert shell_complete(self.complete_vars, "powershell") == ""
+        assert shell_complete(self.complete_vars, "unknown") == ""
