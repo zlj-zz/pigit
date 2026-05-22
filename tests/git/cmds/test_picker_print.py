@@ -10,14 +10,14 @@ import sys
 
 import pytest
 
-from pigit.git.cmds._picker import run_cmd_new_picker
+from pigit.handlers.cmd_picker import run_cmd_new_picker
 from pigit.handlers.cmd_handler import handle_widget
 
 
 class TestPickerPrintOnly:
     def test_run_picker_print_only_no_tty(self, monkeypatch):
         """No tty returns error message for print_only too."""
-        monkeypatch.setattr("pigit.git.cmds._picker._tty_ok", lambda: False)
+        monkeypatch.setattr("pigit.handlers.cmd_picker._tty_ok", lambda: False)
         exit_code, message = run_cmd_new_picker(print_only=True)
         assert exit_code == 1
         assert "interactive terminal" in message.lower()

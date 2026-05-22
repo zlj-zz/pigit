@@ -1,5 +1,5 @@
 """
-Module: pigit/git/cmds/_picker.py
+Module: pigit/handlers/cmd_picker.py
 Description: Interactive picker for cmd commands (--pick functionality).
 Author: Zev
 Date: 2026-04-10
@@ -37,13 +37,17 @@ from pigit.picker_app import (
     PickerState,
 )
 
-from ._completion import make_candidate_provider
-from ._mru import load_mru
-from ._picker_adapter import iter_cmd_new_entries, CmdNewEntry
-from ._picker_sorter import build_context_signals, sort_picker_entries
+from pigit.git.cmds._completion import make_candidate_provider
+from pigit.git.cmds._mru import load_mru
+from .cmd_picker_data import (
+    iter_cmd_new_entries,
+    CmdNewEntry,
+    build_context_signals,
+    sort_picker_entries,
+)
 
 if TYPE_CHECKING:
-    from . import GitCommandNew
+    from pigit.git.cmds import GitCommandNew
 
 NO_TTY_MSG = (
     "@red(pigit cmd --pick) needs an interactive terminal.\n"
@@ -128,7 +132,7 @@ def run_cmd_new_picker(
         return 1, NO_TTY_MSG
 
     # Import here to avoid circular imports at module level
-    from . import GitCommandNew
+    from pigit.git.cmds import GitCommandNew
 
     processor = processor or GitCommandNew()
 

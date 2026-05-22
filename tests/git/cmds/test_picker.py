@@ -14,12 +14,12 @@ import pytest
 from pigit.config import Config
 from pigit.context import Context
 from pigit.ext.executor_factory import ExecutorFactory, MockExecutor
-from pigit.git.cmds._picker_sorter import (
+from pigit.handlers.cmd_picker_data import (
     build_context_signals,
     context_score,
     sort_picker_entries,
+    CmdNewEntry,
 )
-from pigit.git.cmds._picker_adapter import CmdNewEntry
 from pigit.git.model import File
 from pigit.git.local_git import LocalGit
 from pigit.git.managed_repos import ManagedRepos
