@@ -164,27 +164,17 @@ def pigit(args: Namespace, _) -> None:
             max_f_num = max(len(str(v[FILES_NUM])) for v in diff_result.values())
             max_l_num = max(len(str(v[LINES_NUM])) for v in diff_result.values())
             max_f_chg = max(
-                (
-                    len(f"{v[FILES_CHANGE]:+}")
-                    if v.get(FILES_CHANGE, 0) != 0
-                    else 0
-                )
+                (len(f"{v[FILES_CHANGE]:+}") if v.get(FILES_CHANGE, 0) != 0 else 0)
                 for v in diff_result.values()
             )
             max_l_chg = max(
-                (
-                    len(f"{v[LINES_CHANGE]:+}")
-                    if v.get(LINES_CHANGE, 0) != 0
-                    else 0
-                )
+                (len(f"{v[LINES_CHANGE]:+}") if v.get(LINES_CHANGE, 0) != 0 else 0)
                 for v in diff_result.values()
             )
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"@cyan({get_file_icon(k)} {k})"
-                    if config.counter.show_icon
-                    else k
+                    f"@cyan({get_file_icon(k)} {k})" if config.counter.show_icon else k
                 )
 
                 f_color = _color_index(v[FILES_NUM])
@@ -197,14 +187,10 @@ def pigit(args: Namespace, _) -> None:
                 l_num_str = f"@{l_color}({l_num_raw})"
 
                 f_change_raw = (
-                    f"{v[FILES_CHANGE]:+}"
-                    if v.get(FILES_CHANGE, 0) != 0
-                    else ""
+                    f"{v[FILES_CHANGE]:+}" if v.get(FILES_CHANGE, 0) != 0 else ""
                 )
                 l_change_raw = (
-                    f"{v[LINES_CHANGE]:+}"
-                    if v.get(LINES_CHANGE, 0) != 0
-                    else ""
+                    f"{v[LINES_CHANGE]:+}" if v.get(LINES_CHANGE, 0) != 0 else ""
                 )
 
                 f_change_color = (
@@ -217,17 +203,13 @@ def pigit(args: Namespace, _) -> None:
                 # Fixed-width change columns so later columns stay aligned.
                 if f_change_raw:
                     f_chg_pad = " " * (max_f_chg - len(f_change_raw))
-                    f_change_part = (
-                        f" @{f_change_color}({f_change_raw}){f_chg_pad}"
-                    )
+                    f_change_part = f" @{f_change_color}({f_change_raw}){f_chg_pad}"
                 else:
                     f_change_part = " " * (max_f_chg + 1) if max_f_chg else ""
 
                 if l_change_raw:
                     l_chg_pad = " " * (max_l_chg - len(l_change_raw))
-                    l_change_part = (
-                        f" @{l_change_color}({l_change_raw}){l_chg_pad}"
-                    )
+                    l_change_part = f" @{l_change_color}({l_change_raw}){l_chg_pad}"
                 else:
                     l_change_part = " " * (max_l_chg + 1) if max_l_chg else ""
 

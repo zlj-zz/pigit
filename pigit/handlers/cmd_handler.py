@@ -47,7 +47,7 @@ class CmdHandler:
 
     def _run_picker(self, category=None, print_only=False) -> int:
         """Run interactive picker."""
-        from ..git.cmds._picker import run_cmd_new_picker
+        from .cmd_picker import run_cmd_new_picker
 
         if category:
             try:
