@@ -54,35 +54,46 @@ class RepoCommandHandler:
         self.console.echo(msg)
 
     def ll(self, args: "Namespace") -> None:
+        from collections.abc import Iterator
+        from ..ext.utils import page_output
+
         simple = args.simple
         reverse = args.reverse
         filter_query = getattr(args, "filter", "")
 
-        for info in self.managed_repos.ll_repos(
-            reverse=reverse, filter_query=filter_query
-        ):
-            if simple:
-                if reverse:
-                    self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15}")
+        def _lines() -> Iterator[str]:
+            first = True
+            for info in self.managed_repos.ll_repos(
+                reverse=reverse, filter_query=filter_query
+            ):
+                if not first:
+                    yield "\n"
+                first = False
+
+                if simple:
+                    if reverse:
+                        line = f"{info[0][0]:<20} {info[1][1]:<15}"
+                    else:
+                        line = f"{info[0][0]:<20} {info[1][1]:<15} {info[6][1]}"
                 else:
-                    self.console.echo(f"{info[0][0]:<20} {info[1][1]:<15} {info[6][1]}")
-            else:
-                if reverse:
-                    summary_string = textwrap.dedent(f"""\
-                        @bold({info[0][0]})
-                            {info[1][0]}: @sky_blue({info[1][1]})
-                        """)
-                else:
-                    summary_string = textwrap.dedent(f"""\
-                        @bold({info[0][0]})
-                            {info[1][0]}: {info[1][1]}
-                            {info[2][0]}: {info[2][1]}
-                            {info[3][0]}: @khaki({info[3][1]})
-                            {info[4][0]}: @green({info[4][1]})
-                            {info[5][0]}: @yellow({info[5][1]})
-                            {info[6][0]}: @sky_blue({info[6][1]})
-                        """)
-                self.console.echo(summary_string)
+                    if reverse:
+                        line = textwrap.dedent(f"""\
+                            @bold({info[0][0]})
+                                {info[1][0]}: @sky_blue({info[1][1]})
+                            """)
+                    else:
+                        line = textwrap.dedent(f"""\
+                            @bold({info[0][0]})
+                                    {info[1][0]}: {info[1][1]}
+                                    {info[2][0]}: {info[2][1]}
+                                    {info[3][0]}: @khaki({info[3][1]})
+                                    {info[4][0]}: @green({info[4][1]})
+                                    {info[5][0]}: @yellow({info[5][1]})
+                                    {info[6][0]}: @sky_blue({info[6][1]})
+                            """)
+                yield self.console.render(line)
+
+        page_output(_lines())
 
     def clear(self) -> None:
         self.managed_repos.clear_repos()
