@@ -180,15 +180,6 @@ class RepoCommandHandler:
     def process_repos_option(self, repos, cmd: str) -> None:
         self.managed_repos.process_repos_option(repos, cmd)
 
-    def open_browser(self, args: "Namespace") -> None:
-        _code, msg = self.managed_repos.open_repo_in_browser(
-            branch=args.branch,
-            issue=args.issue,
-            commit=args.commit,
-            print=args.print,
-        )
-        self.console.echo(msg)
-
     def mkbranch(self, args: "Namespace") -> None:
         from .repo_picker import EMPTY_MANAGED_REPOS_MSG, run_multi_select_picker
         from pigit.git.managed_repos import iter_managed_repo_names

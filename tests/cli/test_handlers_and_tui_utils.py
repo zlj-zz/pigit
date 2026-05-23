@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from pigit.handlers.open_handler import OpenHandler
 from pigit.handlers.repo_handler import RepoCommandHandler
 from pigit.handlers.tui_handler import TuiHandler
 
@@ -31,8 +32,11 @@ def mock_ctx():
         ]
     )
     managed_repos.report_repos.return_value = "report-text"
-    managed_repos.open_repo_in_browser.return_value = (0, "opened")
-    return SimpleNamespace(managed_repos=managed_repos, config=MagicMock())
+    local_git = MagicMock()
+    local_git.get_remote_url.return_value = "https://github.com/user/repo"
+    return SimpleNamespace(
+        managed_repos=managed_repos, local_git=local_git, config=MagicMock()
+    )
 
 
 def test_repo_handler_add_found(mock_ctx):
@@ -74,13 +78,9 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         h.report(SimpleNamespace(author="x", since="", until=""))
         h.cd(SimpleNamespace(repo="r"))
         h.process_repos_option(["a"], "git pull")
-        h.open_browser(
-            SimpleNamespace(branch=None, issue=None, commit=None, print=False)
-        )
     mock_ctx.managed_repos.clear_repos.assert_called_once()
     mock_ctx.managed_repos.report_repos.assert_called_once()
     mock_ctx.managed_repos.process_repos_option.assert_called_once()
-    mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
 
 def test_repo_handler_ll_filter(mock_ctx):
@@ -260,6 +260,42 @@ def test_repo_handler_cd_pick_no_tty(mock_ctx):
             with pytest.raises(SystemExit) as exc:
                 RepoCommandHandler(mock_ctx).cd(args)
     assert exc.value.code == 1
+
+
+def test_open_handler_print(mock_ctx):
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = OpenHandler(mock_ctx)
+        h.open_browser(SimpleNamespace(branch="dev", issue="", commit="", print=True))
+    mock_ctx.local_git.get_remote_url.assert_called_once()
+    texts = [c.args[0] for c in echo.call_args_list if c.args]
+    assert any("https://github.com/user/repo/tree/dev" in t for t in texts)
+
+
+def test_open_handler_open(mock_ctx):
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        with patch("webbrowser.open") as mock_wb:
+            h = OpenHandler(mock_ctx)
+            h.open_browser(SimpleNamespace(branch="", issue="", commit="", print=False))
+    mock_ctx.local_git.get_remote_url.assert_called_once()
+    mock_wb.assert_called_once_with("https://github.com/user/repo")
+
+
+def test_open_handler_no_remote(mock_ctx):
+    mock_ctx.local_git.get_remote_url.return_value = ""
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = OpenHandler(mock_ctx)
+        h.open_browser(SimpleNamespace(branch="", issue="", commit="", print=False))
+    echo.assert_called_once()
+    assert "No remote URL" in echo.call_args[0][0]
 
 
 def test_tui_utils_get_width_and_plain():

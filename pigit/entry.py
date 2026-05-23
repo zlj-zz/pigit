@@ -17,7 +17,7 @@ from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counte
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
 from .git import create_gitignore
-from .handlers import RepoCommandHandler, TuiHandler
+from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
 from .hook import before_hook
 from .info import introduce, show_gitconfig
 from .termui.cli_output import get_console
@@ -420,6 +420,6 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: Namespace, _):
-    RepoCommandHandler(ctx.current()).open_browser(args)
+    OpenHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

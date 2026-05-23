@@ -1003,39 +1003,6 @@ class LocalGit:
             return True
         raise RepoError(f"git diff --cached failed with exit code {code}")
 
-    def open_repo_in_browser(
-        self,
-        path: str | None = None,
-        branch: str = "",
-        issue: str = "",
-        commit: str = "",
-        print: bool = False,
-    ) -> tuple[bool, str]:
-        path = path or self.path
-        remote_url = self.get_remote_url(path=path)
-
-        if branch:
-            branch = f"/tree/{branch}"
-            remote_url += branch
-        elif issue:
-            issue = f"/issues/{issue}"
-            remote_url += issue
-        elif commit:
-            commit = f"/commit/{commit}"
-            remote_url += commit
-
-        if print:
-            return True, f"Remote URL: @sky_blue({remote_url})"
-
-        try:
-            import webbrowser
-
-            webbrowser.open(remote_url)
-        except Exception as e:
-            return False, f"Failed to open the repo; {e}"
-        else:
-            return True, "Successfully opened repo."
-
     def get_git_dir(self, path: str | None = None) -> str:
         """Return the git directory path via ``git rev-parse --git-dir``."""
         path = path or self.path
