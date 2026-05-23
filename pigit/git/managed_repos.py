@@ -381,29 +381,36 @@ class ManagedRepos:
         """
         return iter_managed_repo_names(self.load_repos())
 
-    def process_repos_option(self, repos: list[str] | None, cmd: str):
+    def process_repos_option(
+        self, repos: list[str] | None, cmd: str
+    ) -> list[tuple[str, int, str, str]]:
+        """Run ``cmd`` across selected managed repos in parallel.
+
+        Returns:
+            One entry per repo: ``(repo_name, exit_code, stderr, stdout)``.
+        """
         exist_repos = self.load_repos()
-        print(f":: {cmd}\n")
 
         if repos:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
-        if len(exist_repos) >= 1:
-            cmds = []
-            orders = []
-            for _, prop in exist_repos.items():
-                cmds.append(cmd)
-                orders.append({"cwd": prop["path"]})
+        if not exist_repos:
+            return []
 
-            return self.executor.exec_parallel(
-                *cmds,
-                orders=orders,
-                flags=WAITING,
-                max_concurrent=self._repo_parallel_workers(),
-            )
+        repo_items = list(exist_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE | WAITING,
+            max_concurrent=self._repo_parallel_workers(),
+        )
 
-        for _, prop in exist_repos.items():
-            self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
+        return [
+            (name, code, err, out)
+            for (name, _), (code, err, out) in zip(repo_items, results, strict=True)
+        ]
 
     def branch_new_repos(
         self,
@@ -543,6 +550,151 @@ class ManagedRepos:
             flag = " -f" if force else ""
             parts.append(f"git branch{flag} {branch_name}")
         cmd = " && ".join(parts)
+
+        repo_items = list(target_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        return [
+            (name, code, stderr if code != 0 else None)
+            for (name, _), (code, stderr, _stdout) in zip(
+                repo_items, results, strict=True
+            )
+        ]
+
+    def switch_repos(
+        self,
+        branch: str,
+        repos: list[str],
+        *,
+        create: bool = False,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+        """Batch switch branch across managed repos.
+
+        Returns:
+            (all_ok, blockers, results)
+            - all_ok: bool, whether pre-flight passed and execution succeeded.
+            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - results: list of (repo_name, exit_code, stderr_or_none) from execution.
+              Empty if pre-flight failed or dry_run.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos:
+            return True, [], []
+
+        blockers = self._switch_preflight(
+            target_repos, branch, create=create, force=force
+        )
+        if blockers:
+            return False, blockers, []
+
+        if dry_run:
+            return True, [], []
+
+        results = self._switch_execute(target_repos, branch, create=create, force=force)
+        return True, [], results
+
+    def _switch_preflight(
+        self,
+        target_repos: dict[str, dict],
+        branch: str,
+        *,
+        create: bool,
+        force: bool,
+    ) -> list[tuple[str, str]]:
+        """Run pre-flight checks for batch branch switch."""
+        blockers: list[tuple[str, str]] = []
+        repo_items = list(target_repos.items())
+
+        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
+        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        validity_results = self.executor.exec_parallel(
+            *validity_cmds,
+            orders=validity_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        valid_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, _out) in zip(
+            repo_items, validity_results, strict=True
+        ):
+            if code != 0:
+                blockers.append((name, "invalid repo"))
+            else:
+                valid_repos[name] = prop
+
+        if not valid_repos:
+            return blockers
+
+        branch_cmds = [f"git branch --list {branch}"] * len(valid_repos)
+        branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        branch_results = self.executor.exec_parallel(
+            *branch_cmds,
+            orders=branch_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        repos_with_branch: dict[str, dict] = {}
+        repos_without_branch: dict[str, dict] = {}
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), branch_results, strict=True
+        ):
+            if out and out.strip():
+                repos_with_branch[name] = prop
+            else:
+                repos_without_branch[name] = prop
+
+        if repos_without_branch and not create:
+            for name in repos_without_branch:
+                blockers.append((name, f"branch '{branch}' does not exist"))
+
+        if force:
+            return blockers
+
+        status_cmds = ["git status --porcelain"] * len(valid_repos)
+        status_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        status_results = self.executor.exec_parallel(
+            *status_cmds,
+            orders=status_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), status_results, strict=True
+        ):
+            if out and out.strip():
+                blockers.append((name, "uncommitted changes"))
+
+        return blockers
+
+    def _switch_execute(
+        self,
+        target_repos: dict[str, dict],
+        branch: str,
+        *,
+        create: bool,
+        force: bool,
+    ) -> list[tuple[str, int, str | None]]:
+        """Execute branch switch across repos in parallel."""
+        flag = " -f" if force else ""
+        create_flag = " -c" if create else ""
+        cmd = f"git switch{create_flag}{flag} {branch}"
 
         repo_items = list(target_repos.items())
         cmds = [cmd] * len(repo_items)

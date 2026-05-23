@@ -435,3 +435,96 @@ class TestBranchNewRepos:
         assert ok is True
         assert blockers == []
         assert results[0] == ("repo-a", 0, None)
+
+
+class TestSwitchRepos:
+    def test_switch_existing_branch(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", "  dev\n"),
+                "git status --porcelain": (0, "", ""),
+                "git switch dev": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"])
+        assert ok is True
+        assert blockers == []
+        assert results[0] == ("repo-a", 0, None)
+
+    def test_switch_branch_not_exists_no_create(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"])
+        assert ok is False
+        assert any("does not exist" in r for _, r in blockers)
+        assert results == []
+
+    def test_switch_create_missing_branch(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", ""),
+                "git status --porcelain": (0, "", ""),
+                "git switch -c dev": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"], create=True)
+        assert ok is True
+        assert blockers == []
+        assert results[0] == ("repo-a", 0, None)
+
+    def test_switch_dirty_without_force(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", "  dev\n"),
+                "git status --porcelain": (0, "", "M file.txt\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"])
+        assert ok is False
+        assert any("uncommitted changes" in r for _, r in blockers)
+        assert results == []
+
+    def test_switch_force_dirty(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", "  dev\n"),
+                "git switch -f dev": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"], force=True)
+        assert ok is True
+        assert blockers == []
+        assert results[0] == ("repo-a", 0, None)
+
+    def test_switch_dry_run(self, tmp_repos_json):
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-dir": (0, "", ".git\n"),
+                "git branch --list dev": (0, "", "  dev\n"),
+                "git status --porcelain": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        ok, blockers, results = mr.switch_repos("dev", ["repo-a"], dry_run=True)
+        assert ok is True
+        assert blockers == []
+        assert results == []

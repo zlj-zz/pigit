@@ -50,7 +50,7 @@ class RepoCommandHandler:
             self.console.echo("All repos are up to date.")
 
     def rename(self, args: "Namespace") -> None:
-        _ok, msg = self.managed_repos.rename_repo(args.repo, args.new_name)
+        _, msg = self.managed_repos.rename_repo(args.repo, args.new_name)
         self.console.echo(msg)
 
     def ll(self, args: "Namespace") -> None:
@@ -177,47 +177,88 @@ class RepoCommandHandler:
 
         self._cd_interactive(output_file, exist)
 
-    def process_repos_option(self, repos, cmd: str) -> None:
-        self.managed_repos.process_repos_option(repos, cmd)
+    def _pick_repos(
+        self,
+        explicit: list[str],
+        title: str,
+        filter_regex: str = "",
+    ) -> list[str] | None:
+        """Return explicit repo names, or let the user pick via TUI."""
+        from pigit.picker_app import PickerRow
+        from pigit.git.managed_repos import iter_managed_repo_names
+        from .repo_picker import EMPTY_MANAGED_REPOS_MSG, run_multi_select_picker
+
+        if explicit:
+            return list(explicit)
+
+        exist_repos = self.managed_repos.load_repos()
+        if not exist_repos:
+            self.console.echo(EMPTY_MANAGED_REPOS_MSG)
+            return None
+
+        rows = [
+            PickerRow(
+                title=name,
+                detail=exist_repos[name].get("path", ""),
+                ref=exist_repos[name].get("path", ""),
+            )
+            for name in iter_managed_repo_names(exist_repos)
+        ]
+        exit_code, selected = run_multi_select_picker(
+            rows,
+            title=title,
+            initial_filter=filter_regex,
+        )
+        if exit_code != 0 or not selected:
+            return None
+        return selected
+
+    def bulk_cmd(self, args: "Namespace", cmd: str) -> None:
+        repo_names = self._pick_repos(
+            getattr(args, "repos", []),
+            title=f"pigit repo {cmd}",
+        )
+        if repo_names is None:
+            return
+
+        results = self.managed_repos.process_repos_option(repo_names, cmd)
+        if not results:
+            self.console.echo("No repos to process.")
+            return
+
+        for name, code, err, out in results:
+            if out:
+                self.console.echo(out)
+            if err:
+                self.console.echo(f"@tomato({err})")
+            if code != 0:
+                self.console.echo(f"@tomato(✗) {name} — exited {code}")
+
+        success = sum(1 for _, code, _, _ in results if code == 0)
+        total = len(results)
+        if success == total:
+            self.console.echo(f"@green(✓) {success}/{total} succeeded")
+        else:
+            self.console.echo(
+                f"@green(✓) @yellow({success})/{total} succeeded, @tomato({total - success}) failed"
+            )
 
     def mkbranch(self, args: "Namespace") -> None:
-        from .repo_picker import EMPTY_MANAGED_REPOS_MSG, run_multi_select_picker
-        from pigit.git.managed_repos import iter_managed_repo_names
-        from pigit.picker_app import PickerRow
-
         branch_name = args.branch_name
         checkout = getattr(args, "checkout", False)
         base = getattr(args, "base", None)
         force = getattr(args, "force", False)
         dry_run = getattr(args, "dry_run", False)
-        filter_regex = getattr(args, "filter_regex", "")
 
-        repo_names: list[str] = []
-        if args.repos:
-            repo_names = list(args.repos)
-        else:
-            exist_repos = self.managed_repos.load_repos()
-            if not exist_repos:
-                self.console.echo(EMPTY_MANAGED_REPOS_MSG)
-                return
-            rows = [
-                PickerRow(
-                    title=name,
-                    detail=exist_repos[name].get("path", ""),
-                    ref=exist_repos[name].get("path", ""),
-                )
-                for name in iter_managed_repo_names(exist_repos)
-            ]
-            exit_code, selected = run_multi_select_picker(
-                rows,
-                title=f"pigit repo mkbranch {branch_name}",
-                initial_filter=filter_regex,
-            )
-            if exit_code != 0 or not selected:
-                return
-            repo_names = selected
+        repo_names = self._pick_repos(
+            getattr(args, "repos", []),
+            title=f"pigit repo mkbranch {branch_name}",
+            filter_regex=getattr(args, "filter_regex", ""),
+        )
+        if repo_names is None:
+            return
 
-        all_ok, blockers, results = self.managed_repos.branch_new_repos(
+        _, blockers, results = self.managed_repos.branch_new_repos(
             branch_name,
             repo_names,
             checkout=checkout,
@@ -235,6 +276,47 @@ class RepoCommandHandler:
 
         if dry_run:
             self.console.echo(f'Would create branch "{branch_name}" in:')
+            for name in repo_names:
+                self.console.echo(f"  - {name}")
+            return
+
+        for name, code, stderr in results:
+            if code == 0:
+                self.console.echo(f"✓ {name}")
+            else:
+                self.console.echo(f"✗ {name} — {stderr or 'unknown error'}")
+
+    def switch(self, args: "Namespace") -> None:
+        branch = args.branch_name
+        create = getattr(args, "create", False)
+        force = getattr(args, "force", False)
+        dry_run = getattr(args, "dry_run", False)
+
+        repo_names = self._pick_repos(
+            getattr(args, "repos", []),
+            title=f"pigit repo switch {branch}",
+            filter_regex=getattr(args, "filter_regex", ""),
+        )
+        if repo_names is None:
+            return
+
+        _, blockers, results = self.managed_repos.switch_repos(
+            branch,
+            repo_names,
+            create=create,
+            force=force,
+            dry_run=dry_run,
+        )
+
+        if blockers:
+            self.console.echo("Pre-flight blocked:")
+            for name, reason in blockers:
+                self.console.echo(f"  ✗ {name} — {reason}")
+            self.console.echo("\nFix the issues and retry.")
+            raise SystemExit(1)
+
+        if dry_run:
+            self.console.echo(f'Would switch to branch "{branch}" in:')
             for name in repo_names:
                 self.console.echo(f"  - {name}")
             return

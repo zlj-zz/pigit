@@ -185,7 +185,7 @@ def run_repo_cd_picker(
 # ---------------------------------------------------------------------------
 
 
-class _MkbranchCheckList(CheckList):
+class _RepoCheckList(CheckList):
     def __init__(self, app, **kwargs) -> None:
         super().__init__(**kwargs)
         self._app = app
@@ -262,7 +262,7 @@ def run_multi_select_picker(
             return header_title
 
         def build_list(self) -> CheckList:
-            lst = _MkbranchCheckList(
+            lst = _RepoCheckList(
                 self,
                 on_selection_changed=lambda _: self._update_status(),
             )
