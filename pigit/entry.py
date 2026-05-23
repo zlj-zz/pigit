@@ -295,7 +295,7 @@ def _(args: Namespace, _):
 # =============================================
 # sub command `repo`
 # =============================================
-repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h help"))
+repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: repo.print_help())
 
 
 @repo.sub_parser("add", help="add repo(s).")
