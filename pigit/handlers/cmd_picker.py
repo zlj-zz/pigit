@@ -202,7 +202,7 @@ def run_cmd_new_picker(
                         "◆ ",
                         fg=palette.CYAN,
                         bg=bg,
-                        style_flags=palette.STYLE_BOLD | row_style,
+                        style_flags=row_style,
                     )
                 ]
             elif ent.is_dangerous:
@@ -213,13 +213,12 @@ def run_cmd_new_picker(
                 ]
 
             name_fg = palette.CYAN if in_mru else palette.DEFAULT_FG
-            name_style = palette.STYLE_BOLD if in_mru else 0
 
             name_segs = _highlight_match(
                 ent.name, app._filter_needle, fg=name_fg, bg=bg
             )
             for seg in name_segs:
-                seg.style_flags |= name_style | row_style
+                seg.style_flags |= row_style
 
             name_w = sum(wcswidth(s.text) for s in name_segs)
             name_pad = 15 - name_w
