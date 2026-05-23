@@ -338,6 +338,23 @@ def run_cmd_new_picker(
 
         def setup_root(self, root: ComponentRoot) -> None:
             self._update_status()
+            if self._help_popup is not None:
+                panel = self._help_popup._child
+                panel._entries_source = None
+                panel.set_entries(self._help_entries())
+
+        def _help_entries(self) -> list[tuple[str, str]]:
+            return [
+                ("j / k", "Scroll up / down"),
+                ("g / G", "Jump to first / last"),
+                ("Tab", "Toggle group fold"),
+                ("Enter", "Confirm / enter params"),
+                ("/", "Filter list"),
+                ("?", "Show preview"),
+                ("q / Esc", "Quit"),
+                ("Ctrl+C", "Abort"),
+                ("0-9", "Goto number"),
+            ]
 
         def get_terminal_too_small_msg(self) -> str:
             return _TERMINAL_TOO_SMALL_MSG

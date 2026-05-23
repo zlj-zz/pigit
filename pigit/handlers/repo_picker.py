@@ -269,6 +269,13 @@ def run_multi_select_picker(
             lst.set_source_content([r.title for r in self._rows])
             return lst
 
+        def _extra_help_entries(self) -> list[tuple[str, str]]:
+            return [
+                ("Space", "Toggle selection"),
+                ("a", "Select all"),
+                ("n", "Select none"),
+            ]
+
         def on_key_extra(self, key: str) -> None:
             if key == " ":
                 self._list.toggle()
