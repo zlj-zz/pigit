@@ -10,8 +10,6 @@ from pathlib import Path
 from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
-from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
-from pigit.picker_app import PickerRow
 
 _logger = logging.getLogger(__name__)
 
@@ -20,15 +18,6 @@ def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     """Return managed repo names sorted by Unicode code points (stable across platforms)."""
 
     return sorted(repos.keys())
-
-
-def _write_path_or_return(path: str, output_file: str | None) -> tuple[int, str | None]:
-    """Write ``path`` to ``output_file`` when given, otherwise return it."""
-    if output_file is not None:
-        with open(output_file, "w") as f:
-            f.write(path)
-        return 0, None
-    return 0, path
 
 
 def _fuzzy_match(text: str, query: str) -> bool:
@@ -372,69 +361,25 @@ class ManagedRepos:
             self.dump_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def cd_repo(
-        self,
-        repo: str | None = None,
-        *,
-        pick: bool = False,
-        output_file: str | None = None,
-    ) -> tuple[int, str | None]:
-        """Resolve managed repo path, optionally via interactive picker.
+    def resolve_repo_path(self, repo_name: str) -> str | None:
+        """Return the filesystem path for a managed repo by name.
 
         Args:
-            repo: Managed repo name, or ``None`` to choose interactively.
-            pick: If ``True``, use the TTY picker when the name is missing or not
-                an exact key (requires a terminal for the picker path).
-            output_file: When provided, write the resolved path to this file
-                instead of returning it.
+            repo_name: Managed repo name.
 
         Returns:
-            ``(exit_code, path | None)``. ``0`` with the resolved path,
-            or ``None`` when written to ``output_file``.
+            Path string if found, otherwise ``None``.
         """
+        exist = self.load_repos()
+        return exist.get(repo_name, {}).get("path")
 
-        exist_repos = self.load_repos()
+    def get_repo_names(self) -> list[str]:
+        """Return sorted list of managed repo names.
 
-        if pick:
-            if not exist_repos:
-                return 1, EMPTY_MANAGED_REPOS_MSG
-            if repo is not None and repo in exist_repos:
-                return _write_path_or_return(exist_repos[repo]["path"], output_file)
-            rows = [
-                PickerRow(
-                    title=name,
-                    ref=exist_repos[name]["path"],
-                )
-                for name in iter_managed_repo_names(exist_repos)
-            ]
-            initial_filter = "" if repo is None else repo
-            exit_code, result = run_repo_cd_picker(
-                rows,
-                initial_filter=initial_filter,
-            )
-            if exit_code == 0 and result is not None:
-                return _write_path_or_return(result, output_file)
-            return exit_code, result
-
-        if repo is not None and repo in exist_repos:
-            return _write_path_or_return(exist_repos[repo]["path"], output_file)
-
-        cur_cache = iter_managed_repo_names(exist_repos)
-        print("Managed repos include the following:")
-        for i, r in enumerate(cur_cache):
-            print(".  ", i, r)
-
-        try:
-            input_num = int(input("Please input the index:"))
-            if 0 <= input_num < len(cur_cache):
-                return _write_path_or_return(
-                    exist_repos[cur_cache[input_num]]["path"], output_file
-                )
-            else:
-                print("Error: index out of range.")
-        except Exception:
-            print("Error: index need input a number.")
-        return 0, None
+        Returns:
+            Names sorted by Unicode code points.
+        """
+        return iter_managed_repo_names(self.load_repos())
 
     def process_repos_option(self, repos: list[str] | None, cmd: str):
         exist_repos = self.load_repos()

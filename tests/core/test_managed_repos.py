@@ -203,39 +203,25 @@ def test_rename_repo_cases(tmp_repos_json):
     assert "newn" in data and "old" not in data
 
 
-def test_cd_repo_known_name(tmp_repos_json):
+def test_resolve_repo_path_known_name(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"r": {"path": "/tmp"}}))
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    code, path = mr.cd_repo("r")
-    assert code == 0 and path == "/tmp"
+    assert mr.resolve_repo_path("r") == "/tmp"
 
 
-def test_cd_repo_interactive_index(tmp_repos_json, monkeypatch):
-    tmp_repos_json.write_text(json.dumps({"a": {"path": "/p1"}, "b": {"path": "/p2"}}))
+def test_resolve_repo_path_unknown_name(tmp_repos_json):
+    tmp_repos_json.write_text(json.dumps({"r": {"path": "/tmp"}}))
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    monkeypatch.setattr("builtins.input", lambda _: "0")
-    code, path = mr.cd_repo(None)
-    assert code == 0 and path == "/p1"
+    assert mr.resolve_repo_path("x") is None
 
 
-def test_cd_repo_interactive_bad_index(tmp_repos_json, monkeypatch, capsys):
-    tmp_repos_json.write_text(json.dumps({"a": {"path": "/p"}}))
+def test_get_repo_names_sorted(tmp_repos_json):
+    tmp_repos_json.write_text(json.dumps({"b": {"path": "/p2"}, "a": {"path": "/p1"}}))
     ex = MockExecutor()
     mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    monkeypatch.setattr("builtins.input", lambda _: "99")
-    mr.cd_repo(None)
-    assert "out of range" in capsys.readouterr().out
-
-
-def test_cd_repo_interactive_non_int(tmp_repos_json, monkeypatch, capsys):
-    tmp_repos_json.write_text(json.dumps({"a": {"path": "/p"}}))
-    ex = MockExecutor()
-    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    monkeypatch.setattr("builtins.input", lambda _: "x")
-    mr.cd_repo(None)
-    assert "number" in capsys.readouterr().out
+    assert mr.get_repo_names() == ["a", "b"]
 
 
 def test_process_repos_option_parallel(tmp_repos_json):

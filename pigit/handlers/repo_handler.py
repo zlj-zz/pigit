@@ -95,18 +95,87 @@ class RepoCommandHandler:
         )
         self.console.echo(report)
 
+    @staticmethod
+    def _write_path_or_echo(path: str, output_file: str | None, console) -> None:
+        """Write path to file when given, otherwise echo to console."""
+        if output_file is not None:
+            with open(output_file, "w") as f:
+                f.write(path)
+        else:
+            console.echo(path)
+
+    def _cd_with_picker(
+        self, repo_name: str | None, output_file: str | None, exist: dict
+    ) -> None:
+        from .repo_picker import run_repo_cd_picker
+        from pigit.picker_app import PickerRow
+        from pigit.git.managed_repos import iter_managed_repo_names
+        from .repo_picker import EMPTY_MANAGED_REPOS_MSG
+
+        if not exist:
+            self.console.echo(EMPTY_MANAGED_REPOS_MSG)
+            raise SystemExit(1)
+        if repo_name and repo_name in exist:
+            self._write_path_or_echo(
+                exist[repo_name]["path"], output_file, self.console
+            )
+            return
+
+        rows = [
+            PickerRow(title=name, detail=exist[name]["path"], ref=exist[name]["path"])
+            for name in iter_managed_repo_names(exist)
+        ]
+        exit_code, result = run_repo_cd_picker(rows, initial_filter=repo_name or "")
+        if exit_code == 0 and result is not None:
+            self._write_path_or_echo(result, output_file, self.console)
+        elif exit_code != 0:
+            if result:
+                self.console.echo(result)
+            raise SystemExit(exit_code)
+
+    def _cd_by_name(self, repo_name: str, output_file: str | None, exist: dict) -> None:
+        path = exist.get(repo_name, {}).get("path")
+        if path:
+            self._write_path_or_echo(path, output_file, self.console)
+            return
+        self.console.echo(f"@tomato(Unknown repo: {repo_name})")
+        raise SystemExit(1)
+
+    def _cd_interactive(self, output_file: str | None, exist: dict) -> None:
+        from pigit.git.managed_repos import iter_managed_repo_names
+        from .repo_picker import EMPTY_MANAGED_REPOS_MSG
+
+        names = iter_managed_repo_names(exist)
+        if not names:
+            self.console.echo(EMPTY_MANAGED_REPOS_MSG)
+            raise SystemExit(1)
+
+        self.console.echo("Managed repos include the following:")
+        for i, name in enumerate(names):
+            self.console.echo(f"  {i}. {name}")
+        try:
+            idx = int(input("Please input the index:"))
+            path = exist[names[idx]]["path"]
+            self._write_path_or_echo(path, output_file, self.console)
+        except (ValueError, IndexError):
+            self.console.echo("@tomato(Error: invalid index.)")
+            raise SystemExit(1)
+
     def cd(self, args: "Namespace") -> None:
         pick = getattr(args, "repo_cd_pick", False)
         output_file = getattr(args, "repo_cd_output_file", None)
-        code, result = self.managed_repos.cd_repo(
-            args.repo, pick=pick, output_file=output_file
-        )
-        if code != 0:
-            if result:
-                self.console.echo(result)
-            raise SystemExit(code)
-        if output_file is None and result:
-            self.console.echo(result)
+        repo_name = args.repo
+        exist = self.managed_repos.load_repos()
+
+        if pick:
+            self._cd_with_picker(repo_name, output_file, exist)
+            return
+
+        if repo_name:
+            self._cd_by_name(repo_name, output_file, exist)
+            return
+
+        self._cd_interactive(output_file, exist)
 
     def process_repos_option(self, repos, cmd: str) -> None:
         self.managed_repos.process_repos_option(repos, cmd)
@@ -121,10 +190,8 @@ class RepoCommandHandler:
         self.console.echo(msg)
 
     def mkbranch(self, args: "Namespace") -> None:
-        from pigit.git.repo_multi_select_picker import (
-            EMPTY_MANAGED_REPOS_MSG,
-            run_multi_select_picker,
-        )
+        from .repo_picker import EMPTY_MANAGED_REPOS_MSG, run_multi_select_picker
+        from pigit.git.managed_repos import iter_managed_repo_names
         from pigit.picker_app import PickerRow
 
         branch_name = args.branch_name
@@ -144,9 +211,11 @@ class RepoCommandHandler:
                 return
             rows = [
                 PickerRow(
-                    title=name, detail=prop.get("path", ""), ref=prop.get("path", "")
+                    title=name,
+                    detail=exist_repos[name].get("path", ""),
+                    ref=exist_repos[name].get("path", ""),
                 )
-                for name, prop in sorted(exist_repos.items())
+                for name in iter_managed_repo_names(exist_repos)
             ]
             exit_code, selected = run_multi_select_picker(
                 rows,

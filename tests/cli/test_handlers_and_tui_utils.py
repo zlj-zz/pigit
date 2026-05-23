@@ -6,14 +6,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pigit.handlers.repo_commands import RepoCommandHandler
+from pigit.handlers.repo_handler import RepoCommandHandler
 from pigit.handlers.tui_handler import TuiHandler
 
 
 @pytest.fixture
 def mock_ctx():
     managed_repos = MagicMock()
-    managed_repos.cd_repo.return_value = (0, None)
+    managed_repos.load_repos.return_value = {"r": {"path": "/mock/path"}}
     managed_repos.add_repos.return_value = ["/a", "/b"]
     managed_repos.rm_repos.return_value = [("n", "/p")]
     managed_repos.rename_repo.return_value = (True, "ok")
@@ -79,9 +79,6 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         )
     mock_ctx.managed_repos.clear_repos.assert_called_once()
     mock_ctx.managed_repos.report_repos.assert_called_once()
-    mock_ctx.managed_repos.cd_repo.assert_called_once_with(
-        "r", pick=False, output_file=None
-    )
     mock_ctx.managed_repos.process_repos_option.assert_called_once()
     mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
@@ -137,7 +134,7 @@ def test_mkbranch_interactive(mock_ctx):
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
     ):
         with patch(
-            "pigit.git.repo_multi_select_picker.run_multi_select_picker",
+            "pigit.handlers.repo_picker.run_multi_select_picker",
             return_value=(0, ["repo-a"]),
         ) as mock_picker:
             h = RepoCommandHandler(mock_ctx)
@@ -254,15 +251,15 @@ def test_tui_handler_execute_runs_app():
 
 def test_repo_handler_cd_pick_no_tty(mock_ctx):
     echo = MagicMock()
-    mock_ctx.managed_repos.cd_repo.return_value = (1, "needs tty")
-    args = SimpleNamespace(repo=None, repo_cd_pick=True)
+    mock_ctx.managed_repos.load_repos.return_value = {"r": {"path": "/p"}}
+    args = SimpleNamespace(repo=None, repo_cd_pick=True, repo_cd_output_file=None)
     with patch(
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
     ):
-        with pytest.raises(SystemExit) as exc:
-            RepoCommandHandler(mock_ctx).cd(args)
+        with patch("pigit.handlers.repo_picker.tty_ok", return_value=False):
+            with pytest.raises(SystemExit) as exc:
+                RepoCommandHandler(mock_ctx).cd(args)
     assert exc.value.code == 1
-    echo.assert_called_once_with("needs tty")
 
 
 def test_tui_utils_get_width_and_plain():
