@@ -61,6 +61,24 @@ class RepoCommandHandler:
         reverse = args.reverse
         filter_query = getattr(args, "filter", "")
 
+        def _colorize_symbols(branch_text: str) -> str:
+            """Colorize git status symbols (* dirty, + staged, ? untracked)."""
+            if len(branch_text) < 3:
+                return branch_text
+            prefix = branch_text[:-3]
+            symbols = branch_text[-3:]
+            colored = []
+            for ch in symbols:
+                if ch == "*":
+                    colored.append("@tomato(*)")
+                elif ch == "+":
+                    colored.append("@green(+)")
+                elif ch == "?":
+                    colored.append("@yellow(?)")
+                else:
+                    colored.append(ch)
+            return prefix + "".join(colored)
+
         def _lines() -> Iterator[str]:
             first = True
             for info in self.managed_repos.ll_repos(
@@ -70,21 +88,23 @@ class RepoCommandHandler:
                     yield "\n"
                 first = False
 
+                branch_colored = _colorize_symbols(info[1][1])
+
                 if simple:
                     if reverse:
-                        line = f"{info[0][0]:<20} {info[1][1]:<15}"
+                        line = f"{info[0][0]:<20} {branch_colored:<15}"
                     else:
-                        line = f"{info[0][0]:<20} {info[1][1]:<15} {info[6][1]}"
+                        line = f"{info[0][0]:<20} {branch_colored:<15} {info[6][1]}"
                 else:
                     if reverse:
                         line = textwrap.dedent(f"""\
                             @bold({info[0][0]})
-                                {info[1][0]}: @sky_blue({info[1][1]})
+                                {info[1][0]}: @sky_blue({branch_colored})
                             """)
                     else:
                         line = textwrap.dedent(f"""\
                             @bold({info[0][0]})
-                                    {info[1][0]}: {info[1][1]}
+                                    {info[1][0]}: {branch_colored}
                                     {info[2][0]}: {info[2][1]}
                                     {info[3][0]}: @khaki({info[3][1]})
                                     {info[4][0]}: @green({info[4][1]})
