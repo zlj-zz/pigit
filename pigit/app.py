@@ -44,6 +44,9 @@ from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.local_git import LocalGit
 from .git.managed_repos import ManagedRepos
+from .viewmodels.status import StatusViewModel
+from .viewmodels.branch import BranchViewModel
+from .viewmodels.commit import CommitViewModel
 
 
 class PigitApplication(Application):
@@ -102,15 +105,18 @@ class PigitApplication(Application):
             )
             inspector_panel.update_from(panel)
 
+        status_vm = StatusViewModel(self._git)
+        branch_vm = BranchViewModel(self._git)
+        commit_vm = CommitViewModel(self._git)
         panel_tab = TabView(
             children=[
-                StatusPanel(git=self._git, id="status"),
+                StatusPanel(vm=status_vm, id="status"),
                 BranchPanel(
-                    git=self._git,
+                    vm=branch_vm,
                     branch_signal=self._branch_signal,
                     id="branch",
                 ),
-                CommitPanel(git=self._git, id="commit"),
+                CommitPanel(vm=commit_vm, id="commit"),
                 DiffViewer(id="diff"),
             ],
             start="status",

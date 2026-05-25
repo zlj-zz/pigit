@@ -13,22 +13,24 @@ from collections.abc import Callable
 from pigit.termui import (
     ActionEventType,
     bind_keys,
+    bind_signals,
     dismiss_sheet,
     keys,
     palette,
     Segment,
+    show_badge,
     show_sheet,
     show_toast,
 )
-from pigit.termui._async_task import AsyncTask
 from pigit.termui.widgets import InputLine, ItemList
 from pigit.termui.reactive import Signal
 
 from .app_inspector import BranchInfo
 from .app_theme import THEME
+from .viewmodels.branch import IBranchViewModel
+from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
-    from .git.local_git import LocalGit
     from .git.model import Branch
 
 
@@ -44,7 +46,7 @@ class BranchPanel(ItemList):
         *,
         on_selection_changed: Callable | None = None,
         branch_signal: Signal[str] | None = None,
-        git: LocalGit,
+        vm: IBranchViewModel,
         id: str | None = None,
     ) -> None:
         super().__init__(
@@ -52,10 +54,8 @@ class BranchPanel(ItemList):
             lazy_load=True,
             id=id,
         )
-        self.git = git
+        self._vm = vm
         self._branch_signal = branch_signal
-        self._loader = AsyncTask()
-
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -69,15 +69,17 @@ class BranchPanel(ItemList):
             on_submit=self._on_new_branch_submit,
             on_cancel=dismiss_sheet,
         )
-
-    def refresh(self) -> None:
-        scope = self._SCOPES[self._scope_idx]
-        self._loader.start(
-            lambda: self.git.load_branches(scope=scope),
-            self._on_branches_loaded,
+        self._vm_unsubs: list[Callable[[], None]] = []
+        self._vm_unsubs.append(
+            bind_signals(self, vm.items, callback=self._on_items_changed)
         )
 
-    def _on_branches_loaded(self, branches: list[Branch]) -> None:
+    def activate(self) -> None:
+        super().activate()
+        self._vm.refresh()
+
+    def _on_items_changed(self) -> None:
+        branches = self._vm.items.value
         if not self.is_activated():
             return
         self.branches = branches
@@ -85,15 +87,23 @@ class BranchPanel(ItemList):
             scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
             return
-        lines = []
-        for branch in branches:
-            line = self._format_branch(branch)
-            lines.append(line)
+        lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
 
     def deactivate(self) -> None:
         super().deactivate()
-        self._loader.cancel()
+        for unsub in self._vm_unsubs:
+            unsub()
+        self._vm_unsubs.clear()
+        self._vm.dispose()
+
+    def _handle_result(self, result: ActionResult) -> None:
+        if result.success:
+            show_badge(result.message, duration=1.0)
+        else:
+            show_toast(result.message, duration=2.0)
+        if result.should_refresh:
+            self._vm.refresh()
 
     def get_help_title(self) -> str:
         return "Branch"
@@ -112,20 +122,7 @@ class BranchPanel(ItemList):
 
     def get_inspector_data(self) -> BranchInfo | None:
         """Return inspector data for the currently selected branch."""
-        idx = self.curr_no
-        if not self.branches or not (0 <= idx < len(self.branches)):
-            return None
-        b = self.branches[idx]
-        recent_msg, recent_author, created = "?", "?", "?"
-        if self.git is not None:
-            recent_msg, recent_author = self.git.get_branch_recent_commit(b.name)
-            created = self.git.get_branch_creation_time(b.name)
-        return BranchInfo(
-            branch=b,
-            recent_msg=recent_msg,
-            recent_author=recent_author,
-            created=created,
-        )
+        return self._vm.get_inspector_data(self.curr_no)
 
     def _format_branch(self, branch: Branch) -> str:
         """Format a branch for display."""
@@ -194,7 +191,8 @@ class BranchPanel(ItemList):
         show_toast(f"Branch scope: {label}", duration=2.0)
         self.curr_no = 0
         self._r_start = 0
-        self.refresh()
+        self._vm.set_scope(scope)
+        self._vm.refresh()
 
     def on_key(self, key: str) -> None:
         if key == "c":
@@ -207,15 +205,10 @@ class BranchPanel(ItemList):
             if local_branch.is_remote:
                 show_toast("Cannot checkout remote branch directly.", duration=1.5)
                 return
-            try:
-                self.git.checkout_branch(local_branch.name)
-            except Exception as e:
-                show_toast(f"Checkout failed: {e}", duration=3.0)
-                return
-            show_toast(f"Switched to {local_branch.name}", duration=1.5)
-            if self._branch_signal is not None:
+            result = self._vm.checkout(self.curr_no)
+            self._handle_result(result)
+            if result.success and self._branch_signal is not None:
                 self._branch_signal.set(local_branch.name)
-            self.refresh()
         elif key == "n":
             self._show_new_branch_sheet()
         elif key == "r":
@@ -240,13 +233,11 @@ class BranchPanel(ItemList):
         if branch.is_head:
             show_toast("Already on this branch", duration=1.5)
             return
-        try:
-            if self.git.has_staged_changes():
-                show_toast("Uncommitted changes, stash or commit first", duration=2.0)
-                return
-        except Exception:
-            pass
-        source = self.git.get_head() or ""
+        ok, msg = self._vm.can_merge()
+        if not ok:
+            show_toast(msg, duration=2.0)
+            return
+        source = self._vm.current_branch()
         target = branch.name
         self.emit(
             ActionEventType.action_requested,
@@ -254,24 +245,6 @@ class BranchPanel(ItemList):
             source=source,
             target=target,
         )
-
-    def _do_sheet_action(
-        self,
-        action: Callable[[], None],
-        success_msg: str,
-        error_prefix: str,
-    ) -> bool:
-        """Run a git action, toast the result, refresh and dismiss the sheet."""
-        try:
-            action()
-        except Exception as e:
-            show_toast(f"{error_prefix} failed: {e}", duration=3.0)
-            dismiss_sheet()
-            return False
-        show_toast(success_msg, duration=1.5)
-        self.refresh()
-        dismiss_sheet()
-        return True
 
     def _show_new_branch_sheet(self) -> None:
         self._new_branch_input.clear()
@@ -282,15 +255,12 @@ class BranchPanel(ItemList):
         if not name:
             dismiss_sheet()
             return
-        if (
-            self._do_sheet_action(
-                lambda: self.git.create_branch(name),
-                f"Created and switched to {name}",
-                "Create branch",
-            )
-            and self._branch_signal is not None
-        ):
-            self._branch_signal.set(name)
+        result = self._vm.create_branch(name)
+        self._handle_result(result)
+        if result.success:
+            dismiss_sheet()
+            if self._branch_signal is not None:
+                self._branch_signal.set(name)
 
     def _show_rename_sheet(self, branch_name: str) -> None:
         self._rename_branch_name = branch_name
@@ -302,13 +272,11 @@ class BranchPanel(ItemList):
         if not new_name or new_name == self._rename_branch_name:
             dismiss_sheet()
             return
-        if (
-            self._do_sheet_action(
-                lambda: self.git.rename_branch(self._rename_branch_name, new_name),
-                f"Renamed to {new_name}",
-                "Rename",
-            )
-            and self._branch_signal is not None
-        ):
-            if self._branch_signal.value == self._rename_branch_name:
-                self._branch_signal.set(new_name)
+        idx = self.curr_no
+        result = self._vm.rename_branch(idx, new_name)
+        self._handle_result(result)
+        if result.success:
+            dismiss_sheet()
+            if self._branch_signal is not None:
+                if self._branch_signal.value == self._rename_branch_name:
+                    self._branch_signal.set(new_name)
