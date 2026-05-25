@@ -22,7 +22,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import InputLine, ItemList
+from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
 from .app_inspector import BranchInfo
@@ -68,6 +68,10 @@ class BranchPanel(ItemList):
             prompt="New branch: ",
             on_submit=self._on_new_branch_submit,
             on_cancel=dismiss_sheet,
+        )
+        self._alert_dialog = AlertDialog(
+            inner_width=40,
+            on_result=lambda _: None,
         )
         self._vm_unsubs: list[Callable[[], None]] = []
         self._vm_unsubs.append(
@@ -116,6 +120,7 @@ class BranchPanel(ItemList):
             ("c", "Checkout"),
             ("n", "New branch"),
             ("r", "Rename"),
+            ("d", "Delete"),
             ("R", f"Scope ({scope_label})"),
             ("m", "Merge into selected"),
         ]
@@ -219,8 +224,31 @@ class BranchPanel(ItemList):
                 show_toast("Cannot rename remote branch.", duration=1.5)
                 return
             self._show_rename_sheet(branch.name)
+        elif key == "d":
+            self._trigger_delete()
         elif key == "m":
             self._trigger_merge()
+
+    def _trigger_delete(self) -> None:
+        """Validate constraints and show confirmation before deleting a branch."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_remote:
+            show_toast("Cannot delete remote branch", duration=2.0)
+            return
+        if branch.is_head:
+            show_toast("Cannot delete current branch", duration=1.5)
+            return
+        text = f"Delete branch '{branch.name}' ?"
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.delete_branch(self.curr_no)
+            self._handle_result(result)
+
+        self._alert_dialog.alert(text, on_result)
 
     def _trigger_merge(self) -> None:
         """Validate constraints and emit merge request via callback."""

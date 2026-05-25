@@ -26,6 +26,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def checkout(self, idx: int) -> ActionResult: ...
     def create_branch(self, name: str) -> ActionResult: ...
     def rename_branch(self, idx: int, new_name: str) -> ActionResult: ...
+    def delete_branch(self, idx: int, force: bool = False) -> ActionResult: ...
     def get_inspector_data(self, idx: int) -> BranchInfo | None: ...
     def current_branch(self) -> str: ...
     def can_merge(self) -> tuple[bool, str]: ...
@@ -88,6 +89,18 @@ class BranchViewModel(ViewModelBase["Branch"]):
             self._git.rename_branch(b.name, new_name)
             return ActionResult(
                 success=True, message=f"Renamed to {new_name}", should_refresh=True
+            )
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+
+    def delete_branch(self, idx: int, force: bool = False) -> ActionResult:
+        b = self._branch_at(idx)
+        if b is None:
+            return ActionResult(success=False, message="Invalid index")
+        try:
+            self._git.delete_branch(b.name, force=force)
+            return ActionResult(
+                success=True, message=f"Deleted {b.name}", should_refresh=True
             )
         except Exception as e:
             return ActionResult(success=False, message=str(e))

@@ -87,6 +87,33 @@ def test_rename_branch_invalid_index(branch_vm):
     assert "Invalid index" in result.message
 
 
+def test_delete_branch_success(branch_vm):
+    result = branch_vm.delete_branch(1)
+    assert result.success is True
+    assert "Deleted feat" in result.message
+    assert result.should_refresh is True
+    branch_vm._git.delete_branch.assert_called_once_with("feat", force=False)
+
+
+def test_delete_branch_force(branch_vm):
+    result = branch_vm.delete_branch(1, force=True)
+    assert result.success is True
+    branch_vm._git.delete_branch.assert_called_once_with("feat", force=True)
+
+
+def test_delete_branch_invalid_index(branch_vm):
+    result = branch_vm.delete_branch(99)
+    assert result.success is False
+    assert "Invalid index" in result.message
+
+
+def test_delete_branch_failure(branch_vm):
+    branch_vm._git.delete_branch.side_effect = RuntimeError("not fully merged")
+    result = branch_vm.delete_branch(1)
+    assert result.success is False
+    assert "not fully merged" in result.message
+
+
 def test_get_inspector_data(branch_vm):
     branch_vm._git.get_branch_recent_commit.return_value = ("msg", "Zev")
     branch_vm._git.get_branch_creation_time.return_value = "2 days ago"

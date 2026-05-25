@@ -888,6 +888,23 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"create branch failed: {branch_name}")
 
+    def delete_branch(
+        self,
+        branch_name: str,
+        force: bool = False,
+        path: str | None = None,
+    ) -> None:
+        """Delete a local branch."""
+        path = path or self.path
+        flag = "-D" if force else "-d"
+        code, err, out = self.executor.exec(
+            f"git branch {flag} {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"delete branch failed: {branch_name}")
+
     def get_file_info(
         self, file: File | str, path: str | None = None
     ) -> tuple[str, str]:

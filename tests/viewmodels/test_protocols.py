@@ -24,6 +24,7 @@ BRANCH_REQUIRED = [
     "checkout",
     "create_branch",
     "rename_branch",
+    "delete_branch",
     "get_inspector_data",
     "current_branch",
     "can_merge",
