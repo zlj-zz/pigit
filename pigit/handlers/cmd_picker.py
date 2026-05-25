@@ -329,7 +329,7 @@ def run_cmd_new_picker(
                     continue
                 content.append(
                     f"{'⟲' if ent.name in self._mru_set else ' '}"
-                    f"{'▲' if ent.is_dangerous else ' '}"
+                    f"{'⚠' if ent.is_dangerous else ' '}"
                     f" {ent.name:<15} {ent.help_text}"
                 )
                 row_data.append(r)
