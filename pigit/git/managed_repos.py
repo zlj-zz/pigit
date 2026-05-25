@@ -172,13 +172,20 @@ class ManagedRepos:
             f"{'+' if meta.get('staged') else ' '}"
             f"{'?' if meta.get('untracked') else ' '}"
         )
+        author_name = meta.get("commit_author", "")
+        author_email = meta.get("commit_author_email", "")
+        if author_name and author_email:
+            author_display = f"{author_name} <{author_email}>"
+        else:
+            author_display = author_name or author_email
+
         return [
             (repo_name, ""),
             ("Branch", f"{meta.get('branch', '')} {symbols}"),
             ("Status", meta.get("status", "")),
             ("Commit Hash", meta.get("commit_hash", "")),
             ("Commit Msg", meta.get("commit_msg", "")),
-            ("Author", meta.get("commit_author", "")),
+            ("Author", author_display),
             ("Local Path", repo_path),
         ]
 

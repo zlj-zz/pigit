@@ -108,7 +108,7 @@ class RepoCommandHandler:
                                     {info[2][0]}: {info[2][1]}
                                     {info[3][0]}: @khaki({info[3][1]})
                                     {info[4][0]}: @green({info[4][1]})
-                                    {info[5][0]}: @yellow({info[5][1]})
+                                    {info[5][0]}: @purple({info[5][1]})
                                     {info[6][0]}: @sky_blue({info[6][1]})
                             """)
                 yield self.console.render(line)

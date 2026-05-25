@@ -24,6 +24,10 @@ _NAME_TO_RGB: dict[str, RGB] = {
     "yellow": palette.YELLOW,
     "green": palette.GREEN,
     "red": palette.RED,
+    "purple": palette.PURPLE,
+    "blue": palette.BLUE,
+    "muted": palette.MUTED,
+    "dim": palette.DIM,
     # Legacy plenty colors
     "sky_blue": palette.SKY_BLUE,
     "tomato": palette.TOMATO,
@@ -155,11 +159,17 @@ def parse_markup(text: str) -> list[Segment]:
             continue
         # Distinguish markup @ from literal @ (e.g. email addresses)
         if at + 1 >= len(text) or text[at + 1] not in _TAG_START_CHARS:
+            if at > pos:
+                segments.append(Segment(text[pos:at]))
+            segments.append(Segment("@"))
             pos = at + 1
             continue
         # Verify there is a matching '('
         paren = text.find("(", at)
         if paren == -1:
+            if at > pos:
+                segments.append(Segment(text[pos:at]))
+            segments.append(Segment("@"))
             pos = at + 1
             continue
         # Extract preceding plain text
