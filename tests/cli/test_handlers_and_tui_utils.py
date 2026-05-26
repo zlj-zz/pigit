@@ -6,14 +6,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pigit.handlers.repo_commands import RepoCommandHandler
+from pigit.handlers.open_handler import OpenHandler
+from pigit.handlers.repo_handler import RepoCommandHandler
 from pigit.handlers.tui_handler import TuiHandler
 
 
 @pytest.fixture
 def mock_ctx():
     managed_repos = MagicMock()
-    managed_repos.cd_repo.return_value = (0, None)
+    managed_repos.load_repos.return_value = {"r": {"path": "/mock/path"}}
     managed_repos.add_repos.return_value = ["/a", "/b"]
     managed_repos.rm_repos.return_value = [("n", "/p")]
     managed_repos.rename_repo.return_value = (True, "ok")
@@ -31,8 +32,11 @@ def mock_ctx():
         ]
     )
     managed_repos.report_repos.return_value = "report-text"
-    managed_repos.open_repo_in_browser.return_value = (0, "opened")
-    return SimpleNamespace(managed_repos=managed_repos, config=MagicMock())
+    local_git = MagicMock()
+    local_git.get_remote_url.return_value = "https://github.com/user/repo"
+    return SimpleNamespace(
+        managed_repos=managed_repos, local_git=local_git, config=MagicMock()
+    )
 
 
 def test_repo_handler_add_found(mock_ctx):
@@ -58,7 +62,7 @@ def test_repo_handler_add_none(mock_ctx):
     echo.assert_called()
 
 
-def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
+def test_repo_handler_rm_rename_report_cd_open(mock_ctx):
     echo = MagicMock()
     with patch(
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
@@ -73,17 +77,8 @@ def test_repo_handler_rm_rename_report_cd_process_open(mock_ctx):
         h.clear()
         h.report(SimpleNamespace(author="x", since="", until=""))
         h.cd(SimpleNamespace(repo="r"))
-        h.process_repos_option(["a"], "git pull")
-        h.open_browser(
-            SimpleNamespace(branch=None, issue=None, commit=None, print=False)
-        )
     mock_ctx.managed_repos.clear_repos.assert_called_once()
     mock_ctx.managed_repos.report_repos.assert_called_once()
-    mock_ctx.managed_repos.cd_repo.assert_called_once_with(
-        "r", pick=False, output_file=None
-    )
-    mock_ctx.managed_repos.process_repos_option.assert_called_once()
-    mock_ctx.managed_repos.open_repo_in_browser.assert_called_once()
 
 
 def test_repo_handler_ll_filter(mock_ctx):
@@ -137,7 +132,7 @@ def test_mkbranch_interactive(mock_ctx):
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
     ):
         with patch(
-            "pigit.git.repo_multi_select_picker.run_multi_select_picker",
+            "pigit.handlers.repo_picker.run_multi_select_picker",
             return_value=(0, ["repo-a"]),
         ) as mock_picker:
             h = RepoCommandHandler(mock_ctx)
@@ -226,6 +221,76 @@ def test_mkbranch_empty_interactive(mock_ctx):
     mock_ctx.managed_repos.branch_new_repos.assert_not_called()
 
 
+def test_switch_explicit_repos(mock_ctx):
+    mock_ctx.managed_repos.switch_repos.return_value = (
+        True,
+        [],
+        [("repo-a", 0, None)],
+    )
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = RepoCommandHandler(mock_ctx)
+        args = SimpleNamespace(
+            branch_name="dev",
+            repos=["repo-a"],
+            create=False,
+            force=False,
+            dry_run=False,
+            filter_regex="",
+        )
+        h.switch(args)
+    mock_ctx.managed_repos.switch_repos.assert_called_once_with(
+        "dev", ["repo-a"], create=False, force=False, dry_run=False
+    )
+
+
+def test_switch_blockers_exit_1(mock_ctx):
+    mock_ctx.managed_repos.switch_repos.return_value = (
+        False,
+        [("repo-a", "branch 'dev' does not exist")],
+        [],
+    )
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = RepoCommandHandler(mock_ctx)
+        args = SimpleNamespace(
+            branch_name="dev",
+            repos=["repo-a"],
+            create=False,
+            force=False,
+            dry_run=False,
+            filter_regex="",
+        )
+        with pytest.raises(SystemExit) as exc:
+            h.switch(args)
+    assert exc.value.code == 1
+
+
+def test_switch_dry_run(mock_ctx):
+    mock_ctx.managed_repos.switch_repos.return_value = (True, [], [])
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = RepoCommandHandler(mock_ctx)
+        args = SimpleNamespace(
+            branch_name="dev",
+            repos=["repo-a"],
+            create=False,
+            force=False,
+            dry_run=True,
+            filter_regex="",
+        )
+        h.switch(args)
+    mock_ctx.managed_repos.switch_repos.assert_called_once()
+    texts = [c.args[0] for c in echo.call_args_list if c.args]
+    assert any("Would switch" in t for t in texts)
+
+
 def test_tui_handler_preprocess_windows():
     with patch("pigit.handlers.tui_handler.IS_WIN", True):
         h = TuiHandler(MagicMock())
@@ -254,15 +319,51 @@ def test_tui_handler_execute_runs_app():
 
 def test_repo_handler_cd_pick_no_tty(mock_ctx):
     echo = MagicMock()
-    mock_ctx.managed_repos.cd_repo.return_value = (1, "needs tty")
-    args = SimpleNamespace(repo=None, repo_cd_pick=True)
+    mock_ctx.managed_repos.load_repos.return_value = {"r": {"path": "/p"}}
+    args = SimpleNamespace(repo=None, repo_cd_pick=True, repo_cd_output_file=None)
     with patch(
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
     ):
-        with pytest.raises(SystemExit) as exc:
-            RepoCommandHandler(mock_ctx).cd(args)
+        with patch("pigit.handlers.repo_picker.tty_ok", return_value=False):
+            with pytest.raises(SystemExit) as exc:
+                RepoCommandHandler(mock_ctx).cd(args)
     assert exc.value.code == 1
-    echo.assert_called_once_with("needs tty")
+
+
+def test_open_handler_print(mock_ctx):
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = OpenHandler(mock_ctx)
+        h.open_browser(SimpleNamespace(branch="dev", issue="", commit="", print=True))
+    mock_ctx.local_git.get_remote_url.assert_called_once()
+    texts = [c.args[0] for c in echo.call_args_list if c.args]
+    assert any("https://github.com/user/repo/tree/dev" in t for t in texts)
+
+
+def test_open_handler_open(mock_ctx):
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        with patch("webbrowser.open") as mock_wb:
+            h = OpenHandler(mock_ctx)
+            h.open_browser(SimpleNamespace(branch="", issue="", commit="", print=False))
+    mock_ctx.local_git.get_remote_url.assert_called_once()
+    mock_wb.assert_called_once_with("https://github.com/user/repo")
+
+
+def test_open_handler_no_remote(mock_ctx):
+    mock_ctx.local_git.get_remote_url.return_value = ""
+    echo = MagicMock()
+    with patch(
+        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
+    ):
+        h = OpenHandler(mock_ctx)
+        h.open_browser(SimpleNamespace(branch="", issue="", commit="", print=False))
+    echo.assert_called_once()
+    assert "No remote URL" in echo.call_args[0][0]
 
 
 def test_tui_utils_get_width_and_plain():

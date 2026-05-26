@@ -7,14 +7,19 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+import logging
 import os
+from enum import Enum, auto
 from typing import TYPE_CHECKING
 from collections.abc import Callable
+
+_logger = logging.getLogger(__name__)
 
 from pigit.termui import (
     ActionEventType,
     AlertDialog,
     bind_keys,
+    bind_signals,
     exec_external,
     keys,
     palette,
@@ -22,16 +27,24 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui._async_task import AsyncTask
 from pigit.termui.widgets import ItemList
 
 from .app_inspector import FileInfo
+from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .git.model import File
+from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
-    from .git.local_git import LocalGit
-    from .git.model import GitFuncT
+    from pigit.viewmodels.status import IStatusViewModel
+
+
+class StatusAction(Enum):
+    """Action types for status panel batch operations."""
+
+    STAGE = auto()
+    DISCARD = auto()
+    IGNORE = auto()
 
 
 def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
@@ -103,14 +116,14 @@ def _status_label(file: File) -> str:
 class StatusPanel(ItemList):
     """Status panel with visual mode."""
 
-    CURSOR = "\u25cf"  # filled circle
+    CURSOR = "●"  # filled circle
 
     def __init__(
         self,
         *,
         alert_inner_width: int | None = None,
         on_selection_changed: Callable | None = None,
-        git: LocalGit,
+        vm: IStatusViewModel,
         id: str | None = None,
     ) -> None:
         super().__init__(
@@ -125,21 +138,72 @@ class StatusPanel(ItemList):
             lazy_load=True,
             id=id,
         )
-        self.git = git
-        self._loader = AsyncTask()
-
+        self._vm = vm
         self.files: list[File] = []
-        self._all_files: list[File] = []  # For filter reset
+        self._all_files: list[File] = []
+        self._filter = SearchFilter(self._apply_filter)
         self._alert_dialog = AlertDialog(
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )
+        self._vm_unsubs: list[Callable[[], None]] = []
 
         # Visual mode state
         self._visual_mode = False
         self._visual_anchor: int | None = None
         self._selected: set[int] = set()
         self._visual_scroll = False  # auto-select while navigating
+
+    def activate(self) -> None:
+        super().activate()
+        self._bind_vm_signals()
+        self._vm.refresh()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        for unsub in self._vm_unsubs:
+            unsub()
+        self._vm_unsubs.clear()
+        self._vm.dispose()
+
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
+
+    def _on_items_changed(self) -> None:
+        files = self._vm.items.value
+        _logger.debug(
+            "[STATUS] _on_items_changed: activated=%s files=%d",
+            self.is_activated(),
+            len(files),
+        )
+        if not self.is_activated():
+            return
+        self._all_files = list(files)
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        """Filter files by query and rebuild display state."""
+        query = self._filter.query.lower()
+        if not query:
+            self.files = list(self._all_files)
+            self._filter.map = list(range(len(self._all_files)))
+        else:
+            filtered: list[File] = []
+            mapping: list[int] = []
+            for i, f in enumerate(self._all_files):
+                if query in f.name.lower():
+                    filtered.append(f)
+                    mapping.append(i)
+            self.files = filtered
+            self._filter.map = mapping
+        if not self.files:
+            self.set_content([])
+            return
+        self.set_content([f.name for f in self.files])
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -207,30 +271,15 @@ class StatusPanel(ItemList):
         else:
             self._selected.add(idx)
 
-    def refresh(self) -> None:
-        self._loader.start(self.git.load_status, self._on_status_loaded)
-
-    def _on_status_loaded(self, files: list[File]) -> None:
-        if not self.is_activated():
-            return
-        self.files = files
-        self._all_files = list(files)
-        if not files:
-            self.set_content([])
-        else:
-            # content is only used for row-count bookkeeping; rendering uses
-            # describe_row which reads directly from self.files.
-            self.set_content([f.name for f in files])
-
-    def deactivate(self) -> None:
-        super().deactivate()
-        self._loader.cancel()
-
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         self._alert_dialog.resize(size)
         if not self.files:
             self.set_content([])
+
+    def _render_surface(self, surface) -> None:
+        super()._render_surface(surface)
+        self._filter.render_bar(surface)
 
     def describe_row(
         self,
@@ -280,47 +329,53 @@ class StatusPanel(ItemList):
         return left, main, right
 
     def on_key(self, key: str) -> None:
+        if self._filter.handle_key(key):
+            return
+
         if not self.files:
             return
-        f = self.files[self.curr_no]
         if key == keys.KEY_ENTER:
-            cached = f.has_staged_change and not f.has_unstaged_change
-            c = self.git.load_file_diff(f.name, f.tracked, cached, plain=True).split(
-                "\n"
-            )
+            source_idx = self._filter.source_index(self.curr_no)
+            diff = self._vm.load_diff(source_idx)
             self.emit(
                 ActionEventType.goto,
                 target="diff",
                 source=self,
-                key=f.name,
-                content=c,
+                key=self.files[self.curr_no].name,
+                content=diff,
             )
             return
         if key == "a":
+            _logger.debug("[STATUS] on_key: stage")
+            f = self.files[self.curr_no]
             if f.has_merged_conflicts or f.has_inline_merged_conflicts:
                 self._check_via_alert(
-                    self.git.switch_file_status, f, msg="Stage conflicted file"
+                    self._vm.stage, self.curr_no, msg="Stage conflicted file"
                 )
             else:
                 action = "Unstaged" if f.has_staged_change else "Staged"
                 self._run_action(
-                    self.git.switch_file_status,
+                    self._vm.stage,
                     single_msg=f"{action} {f.name}",
                     batch_msg="Updated {} file(s)",
+                    action_type=StatusAction.STAGE,
                 )
             return
         if key == "i":
             self._run_action(
-                self.git.ignore_file,
+                self._vm.ignore,
                 single_msg="Ignored",
                 batch_msg="Ignored {} file(s)",
+                action_type=StatusAction.IGNORE,
             )
             return
         if key == "d":
+            _logger.debug("[STATUS] on_key: discard")
             self._run_action(
-                self.git.discard_file,
+                self._vm.discard,
                 single_msg="Discard file",
                 batch_msg="Discard {} file(s)",
+                action_type=StatusAction.DISCARD,
                 needs_confirm=True,
             )
             return
@@ -329,7 +384,7 @@ class StatusPanel(ItemList):
                 show_toast("No staged changes to commit", duration=2.0)
                 return
             try:
-                result = exec_external(["git", "commit"], cwd=self.git.path)
+                result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
                 if result.returncode == 0:
                     show_toast("Commit created", duration=1.5)
                 else:
@@ -338,47 +393,48 @@ class StatusPanel(ItemList):
                 show_toast("Failed to open editor", duration=2.0)
                 raise
             finally:
-                self.refresh()
+                self._vm.refresh()
             return
         if key == "E":
-            self._open_external_editor(f)
+            self._open_external_editor(self.files[self.curr_no])
             return
         if key == "o":
-            if f.has_merged_conflicts:
-                try:
-                    self.git.checkout_ours(f)
-                    self.git.add_file(f)
-                    show_badge("Ours", duration=1.0)
-                except Exception as e:
-                    show_toast(f"Ours failed: {e}", duration=2.0)
-                self.refresh()
-            else:
-                show_toast("No conflicts in current file", duration=1.5)
+            source_idx = self._filter.source_index(self.curr_no)
+            result = self._vm.checkout_ours(source_idx)
+            self._handle_result(result)
             return
         if key == "t":
-            if f.has_merged_conflicts:
-                try:
-                    self.git.checkout_theirs(f)
-                    self.git.add_file(f)
-                    show_badge("Theirs", duration=1.0)
-                except Exception as e:
-                    show_toast(f"Theirs failed: {e}", duration=2.0)
-                self.refresh()
-            else:
-                show_toast("No conflicts in current file", duration=1.5)
+            source_idx = self._filter.source_index(self.curr_no)
+            result = self._vm.checkout_theirs(source_idx)
+            self._handle_result(result)
             return
 
     # --- Helpers ---
+
+    def _handle_result(self, result: ActionResult) -> None:
+        """Handle a ViewModel action result: badge/toast and optional refresh."""
+        _logger.debug(
+            "[STATUS] _handle_result: success=%s should_refresh=%s msg=%r",
+            result.success,
+            result.should_refresh,
+            result.message,
+        )
+        if result.success:
+            show_badge(result.message, duration=1.0)
+        else:
+            show_toast(result.message, duration=2.0)
+        if result.should_refresh:
+            self._vm.refresh()
 
     def _open_external_editor(self, file: File) -> None:
         """Open file in external editor, suspending TUI."""
         editor = os.environ.get("EDITOR", "vim")
         try:
-            exec_external([editor, file.name], cwd=self.git.path)
+            exec_external([editor, file.name], cwd=self._vm.repo_path)
         except Exception:
             show_toast("Failed to open editor", duration=2.0)
         finally:
-            self.refresh()
+            self._vm.refresh()
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
@@ -413,6 +469,7 @@ class StatusPanel(ItemList):
         entries = [
             ("jk/↑↓", "Navigate"),
             ("Enter", "Open"),
+            ("/", "Filter"),
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
@@ -430,14 +487,8 @@ class StatusPanel(ItemList):
 
     def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""
-        idx = self.curr_no
-        if not self.files or not (0 <= idx < len(self.files)):
-            return None
-        file = self.files[idx]
-        size, mtime = ("?", "?")
-        if self.git is not None:
-            size, mtime = self.git.get_file_info(file)
-        return FileInfo(file=file, size=size, mtime=mtime)
+        source_idx = self._filter.source_index(self.curr_no)
+        return self._vm.get_inspector_data(source_idx)
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
@@ -453,10 +504,11 @@ class StatusPanel(ItemList):
 
     def _run_action(
         self,
-        callee: GitFuncT,
+        callee: Callable[[int], ActionResult],
         *,
         single_msg: str = "",
         batch_msg: str = "",
+        action_type: StatusAction,
         needs_confirm: bool = False,
     ) -> None:
         """Unified handler for single / visual mode actions."""
@@ -468,45 +520,56 @@ class StatusPanel(ItemList):
                 self._toast_no_selection()
                 return
             if needs_confirm:
-                self._confirm_batch(batch_msg, callee)
-            else:
-                count = len(self._selected)
-                for idx in sorted(self._selected):
-                    if idx < len(self.files):
-                        callee(self.files[idx])
-                self._clear_visual_mode()
-                show_badge(batch_msg.format(count), duration=1.5)
+                self._confirm_batch(batch_msg, action_type)
+                return
+            result = self._dispatch_batch(action_type, self._selected)
+            self._handle_result(result)
+            self._clear_visual_mode()
+            return
+        # Single mode
+        source_idx = self._filter.source_index(self.curr_no)
+        if needs_confirm:
+            if self._check_via_alert(callee, self.curr_no, msg=single_msg):
+                return
         else:
-            f = self.files[self.curr_no]
-            if needs_confirm:
-                if self._check_via_alert(callee, f, msg=single_msg):
-                    return
-            else:
-                callee(f)
-                show_badge(single_msg, duration=1.5)
-        self.refresh()
+            result = callee(source_idx)
+            self._handle_result(result)
+
+    def _dispatch_batch(
+        self, action_type: StatusAction, indices: set[int]
+    ) -> ActionResult:
+        source_indices = {self._filter.source_index(i) for i in indices}
+        match action_type:
+            case StatusAction.STAGE:
+                return self._vm.stage_indices(source_indices)
+            case StatusAction.DISCARD:
+                return self._vm.discard_indices(source_indices)
+            case StatusAction.IGNORE:
+                return self._vm.ignore_indices(source_indices)
+        return ActionResult(success=False, message="Unknown action")
 
     def _check_via_alert(
         self,
-        callee: GitFuncT,
-        file: File,
+        callee: Callable[[int], ActionResult],
+        idx: int,
         msg: str = "",
     ) -> bool:
+        file = self.files[idx]
         text = f"{msg} '{file}' ?"
+        source_idx = self._filter.source_index(idx)
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:
-                self.refresh()
+                self._vm.refresh()
                 return
-            callee(file)
-            self.refresh()
+            result = callee(source_idx)
+            self._handle_result(result)
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)
-            show_badge(msg, duration=1.5)
 
         return self._alert_dialog.alert(text, on_result)
 
-    def _confirm_batch(self, action: str, callee: GitFuncT) -> None:
+    def _confirm_batch(self, action: str, action_type: StatusAction) -> None:
         """Confirm a batch operation on selected files."""
         count = len(self._selected)
         text = f"{action} {count} files?"
@@ -514,13 +577,10 @@ class StatusPanel(ItemList):
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 return
-            for idx in sorted(self._selected):
-                if idx < len(self.files):
-                    callee(self.files[idx])
+            result = self._dispatch_batch(action_type, self._selected)
+            self._handle_result(result)
             self._selected.clear()
             self._visual_mode = False
             self._visual_anchor = None
-            self.refresh()
-            show_badge(f"{action} {count} file(s)", duration=1.5)
 
         self._alert_dialog.alert(text, on_result)

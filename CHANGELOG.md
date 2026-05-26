@@ -1,5 +1,45 @@
 # Changelog of pigit
 
+## 1.8.12 (2026-05-26)
+
+### Diff
+
+- **Per-file language detection**: `DiffViewer` now scans `diff --git` and `+++ b/...` headers to determine the language of each file segment in a commit diff, instead of using a single language for the entire diff.
+- **Plain meta-info rendering**: commit hash, Author, Date, and commit message lines (before the first `diff --git`) are rendered as plain text without syntax tokenization. Diff file headers (`---` / `+++`) are also plain.
+- **`compute_multiline_mask` per-line languages**: signature changed from `(lines, lang: str)` to `(lines, line_langs: list[str])`; docstring and block-comment state resets at file boundaries.
+
+### TUI — ViewModel Layer
+
+- **Introduced ViewModel layer**: `StatusViewModel`, `BranchViewModel`, and `CommitViewModel` decouple data loading from UI panels via Protocol interfaces and reactive `Signal` objects.
+- **SearchFilter composition**: replaced `SearchMixin` with a standalone `SearchFilter` class used by `StatusPanel` and `CommitPanel`; eliminates multiple-inheritance complexity.
+- **Signal binding lifecycle fix**: bindings are now established in `activate()` and torn down in `deactivate()`, fixing stale subscriptions when returning from diff view to status/commit panel.
+
+### Branch
+
+- **Delete branch with `d`**: `BranchPanel` supports deleting the selected branch with confirmation.
+
+### Repo
+
+- **`repo ll` author email**: author column now shows name + email; email `@` symbols no longer break markup parsing.
+- **`repo ll` branch status colorization**: branch status symbols are color-coded.
+- **`repo ll` pager output**: streams through `page_output` / `less -FRX` on TTY.
+- **Batch branch switch**: `repo switch` supports switching branch across multiple managed repos with picker selection and summary output. `fetch`, `pull`, and `push` aligned with the same picker + summary pattern.
+
+### Command
+
+- **Colorized command list**: `pigit cmd -l` output groups commands by category with color-coded headers and a unified danger marker (`*`).
+- **Pager for command list**: `pigit cmd -l` pipes through pager when stdout is a TTY.
+- **Repo subcommand help**: missing repo subcommand now shows full help instead of an error.
+
+### Picker
+
+- **Help entries for all picker types**: all built-in pickers expose `get_help_entries()` for the `?` overlay.
+- **Cursor-only bold**: removed MRU-item bolding; bold is applied only to the cursor row.
+
+### Refactor
+
+- **Handler extraction**: `OpenHandler` extracted from `RepoCommandHandler`; repo pickers and cmd picker moved from `git/` module to `handlers/`.
+
 ## 1.8.11 (2026-05-21)
 
 ### Repo

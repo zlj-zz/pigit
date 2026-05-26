@@ -272,3 +272,98 @@ class TestDiffViewer:
             assert rows[r][-1].char == "\u2502", f"row {r} missing right border"
         # Row 7: bottom border
         assert rows[7][0].char == "\u2514"
+
+
+class TestBranchPanelLifecycle:
+    """BranchPanel + ViewModel integration tests."""
+
+    def test_activate_triggers_vm_refresh(self):
+        from unittest.mock import Mock
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=IBranchViewModel)
+        vm.items = Signal([])
+        from pigit.app_branch import BranchPanel
+
+        panel = BranchPanel(vm=vm)
+        panel.activate()
+        vm.refresh.assert_called_once()
+
+    def test_deactivate_disposes_vm(self):
+        from unittest.mock import Mock
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=IBranchViewModel)
+        vm.items = Signal([])
+        from pigit.app_branch import BranchPanel
+
+        panel = BranchPanel(vm=vm)
+        panel.activate()
+        panel.deactivate()
+        vm.dispose.assert_called_once()
+
+    def test_items_changed_updates_content(self):
+        from unittest.mock import Mock
+        from pigit.git.model import Branch
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=IBranchViewModel)
+        vm.items = Signal([])
+        from pigit.app_branch import BranchPanel
+
+        panel = BranchPanel(vm=vm)
+        panel.activate()
+        vm.items.set([Branch("main", "0", "0", True)])
+        assert len(panel.content) == 1
+        assert panel.branches[0].name == "main"
+
+
+class TestCommitPanelLifecycle:
+    """CommitPanel + ViewModel integration tests."""
+
+    def test_activate_triggers_vm_refresh(self):
+        from unittest.mock import Mock
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        from pigit.app_commit import CommitPanel
+
+        panel = CommitPanel(vm=vm)
+        panel.activate()
+        vm.refresh.assert_called_once()
+
+    def test_deactivate_disposes_vm(self):
+        from unittest.mock import Mock
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        from pigit.app_commit import CommitPanel
+
+        panel = CommitPanel(vm=vm)
+        panel.activate()
+        panel.deactivate()
+        vm.dispose.assert_called_once()
+
+    def test_items_changed_rebuilds_content(self):
+        from unittest.mock import Mock
+        from pigit.git.model import Commit
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        vm.graph_rows = []
+        from pigit.app_commit import CommitPanel
+
+        panel = CommitPanel(vm=vm)
+        panel.activate()
+        vm.items.set([Commit("abc1234", "msg", "Zev", 0, "pushed", "", [])])
+        assert len(panel.commits) == 1
+        assert panel.commits[0].sha == "abc1234"

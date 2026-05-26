@@ -8,7 +8,7 @@ import time
 from collections import Counter
 from functools import lru_cache
 from math import sqrt
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -344,26 +344,52 @@ def get_file_icon(file_type: str) -> str:
     return FILE_ICONS.get(file_type, "")
 
 
-def page_output(text: str) -> None:
-    """Send *text* to a pager if stdout is a TTY, otherwise print directly.
+def page_output(text: str | Iterator[str]) -> None:
+    """Send *text* or a generator of chunks to a pager if stdout is a TTY.
 
     Respects the ``PAGER`` environment variable; defaults to ``less -R``
     so ANSI colors are preserved.
     """
+    is_str = isinstance(text, str)
+
     if not sys.stdout.isatty():
-        print(text, end="")
+        if is_str:
+            print(text, end="")
+        else:
+            for chunk in text:
+                print(chunk, end="")
         return
 
     pager = os.environ.get("PAGER", "less -FRX")
     try:
-        with subprocess.Popen(
+        proc = subprocess.Popen(
             shlex.split(pager),
             stdin=subprocess.PIPE,
             stdout=sys.stdout,
-        ) as proc:
+        )
+        if is_str:
             proc.communicate(text.encode("utf-8", "replace"))
+        else:
+            stdin = proc.stdin
+            assert stdin is not None
+            try:
+                for chunk in text:
+                    stdin.write(chunk.encode("utf-8", "replace"))
+                    stdin.flush()
+            except BrokenPipeError:
+                pass
+            finally:
+                try:
+                    stdin.close()
+                except BrokenPipeError:
+                    pass
+                proc.wait()
     except (OSError, subprocess.SubprocessError):
-        print(text, end="")
+        if is_str:
+            print(text, end="")
+        else:
+            for chunk in text:
+                print(chunk, end="")
 
 
 if __name__ == "__main__":

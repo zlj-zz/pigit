@@ -157,6 +157,26 @@ class BasePickerApp(Application):
         else:
             self._update_status()
 
+        if self._help_popup is not None:
+            panel = self._help_popup._child
+            panel._entries_source = None
+            panel.set_entries(self._help_entries())
+
+    def _help_entries(self) -> list[tuple[str, str]]:
+        entries = [
+            ("j / k", "Scroll up / down"),
+            ("Enter", "Confirm selection"),
+            ("/", "Filter list"),
+            ("q / Esc", "Quit"),
+            ("?", "Toggle help"),
+            ("Ctrl+C", "Abort"),
+        ]
+        entries.extend(self._extra_help_entries())
+        return entries
+
+    def _extra_help_entries(self) -> list[tuple[str, str]]:
+        return []
+
     def after_start(self) -> None:
         _, term_rows = terminal_size()
         if term_rows < 5:  # need header (2) + at least 2 list row + footer

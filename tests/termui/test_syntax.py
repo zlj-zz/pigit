@@ -232,7 +232,7 @@ class TestMultilineMask:
             '+    lines."""',
             "+    pass",
         ]
-        mask = tok.compute_multiline_mask(lines, "py")
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == [None, "docstring", "docstring", "docstring", None]
 
     def test_python_docstring_single_quote(self, tok):
@@ -241,13 +241,13 @@ class TestMultilineMask:
             "+    middle",
             "+    end'''",
         ]
-        mask = tok.compute_multiline_mask(lines, "py")
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == ["docstring", "docstring", "docstring"]
 
     def test_python_single_line_docstring_ignored(self, tok):
         """Single-line docstrings are handled by the regex; mask should be None."""
         lines = ['+    """A single line docstring."""']
-        mask = tok.compute_multiline_mask(lines, "py")
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == [None]
 
     def test_c_block_comment(self, tok):
@@ -257,7 +257,7 @@ class TestMultilineMask:
             "+       multi-line comment */",
             "+    return 0;",
         ]
-        mask = tok.compute_multiline_mask(lines, "c")
+        mask = tok.compute_multiline_mask(lines, ["c"] * len(lines))
         assert mask == [None, "comment", "comment", None]
 
     def test_hunk_header_resets_state(self, tok):
@@ -266,7 +266,7 @@ class TestMultilineMask:
             "@@ -10,5 +12,7 @@",
             '+    part 2"""',
         ]
-        mask = tok.compute_multiline_mask(lines, "py")
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == ["docstring", None, None]
 
     def test_alias_language_uses_base_config(self, tok):
@@ -275,7 +275,7 @@ class TestMultilineMask:
             "+    /* block",
             "+       comment */",
         ]
-        mask = tok.compute_multiline_mask(lines, "ts")
+        mask = tok.compute_multiline_mask(lines, ["ts"] * len(lines))
         assert mask == ["comment", "comment"]
 
     def test_no_newline_line_skipped(self, tok):
@@ -284,5 +284,5 @@ class TestMultilineMask:
             "\\ No newline at end of file",
             '+    end."""',
         ]
-        mask = tok.compute_multiline_mask(lines, "py")
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == ["docstring", None, "docstring"]

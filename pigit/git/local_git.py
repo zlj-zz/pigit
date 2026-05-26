@@ -888,6 +888,23 @@ class LocalGit:
         if code != 0:
             raise GitError(err or f"create branch failed: {branch_name}")
 
+    def delete_branch(
+        self,
+        branch_name: str,
+        force: bool = False,
+        path: str | None = None,
+    ) -> None:
+        """Delete a local branch."""
+        path = path or self.path
+        flag = "-D" if force else "-d"
+        code, err, out = self.executor.exec(
+            f"git branch {flag} {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"delete branch failed: {branch_name}")
+
     def get_file_info(
         self, file: File | str, path: str | None = None
     ) -> tuple[str, str]:
@@ -1002,39 +1019,6 @@ class LocalGit:
         if code == 1:
             return True
         raise RepoError(f"git diff --cached failed with exit code {code}")
-
-    def open_repo_in_browser(
-        self,
-        path: str | None = None,
-        branch: str = "",
-        issue: str = "",
-        commit: str = "",
-        print: bool = False,
-    ) -> tuple[bool, str]:
-        path = path or self.path
-        remote_url = self.get_remote_url(path=path)
-
-        if branch:
-            branch = f"/tree/{branch}"
-            remote_url += branch
-        elif issue:
-            issue = f"/issues/{issue}"
-            remote_url += issue
-        elif commit:
-            commit = f"/commit/{commit}"
-            remote_url += commit
-
-        if print:
-            return True, f"Remote URL: @sky_blue({remote_url})"
-
-        try:
-            import webbrowser
-
-            webbrowser.open(remote_url)
-        except Exception as e:
-            return False, f"Failed to open the repo; {e}"
-        else:
-            return True, "Successfully opened repo."
 
     def get_git_dir(self, path: str | None = None) -> str:
         """Return the git directory path via ``git rev-parse --git-dir``."""

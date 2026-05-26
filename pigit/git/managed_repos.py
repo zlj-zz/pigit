@@ -10,8 +10,6 @@ from pathlib import Path
 from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
-from pigit.git.repo_cd_picker import EMPTY_MANAGED_REPOS_MSG, run_repo_cd_picker
-from pigit.picker_app import PickerRow
 
 _logger = logging.getLogger(__name__)
 
@@ -20,15 +18,6 @@ def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
     """Return managed repo names sorted by Unicode code points (stable across platforms)."""
 
     return sorted(repos.keys())
-
-
-def _write_path_or_return(path: str, output_file: str | None) -> tuple[int, str | None]:
-    """Write ``path`` to ``output_file`` when given, otherwise return it."""
-    if output_file is not None:
-        with open(output_file, "w") as f:
-            f.write(path)
-        return 0, None
-    return 0, path
 
 
 def _fuzzy_match(text: str, query: str) -> bool:
@@ -183,13 +172,20 @@ class ManagedRepos:
             f"{'+' if meta.get('staged') else ' '}"
             f"{'?' if meta.get('untracked') else ' '}"
         )
+        author_name = meta.get("commit_author", "")
+        author_email = meta.get("commit_author_email", "")
+        if author_name and author_email:
+            author_display = f"{author_name} <{author_email}>"
+        else:
+            author_display = author_name or author_email
+
         return [
             (repo_name, ""),
             ("Branch", f"{meta.get('branch', '')} {symbols}"),
             ("Status", meta.get("status", "")),
             ("Commit Hash", meta.get("commit_hash", "")),
             ("Commit Msg", meta.get("commit_msg", "")),
-            ("Author", meta.get("commit_author", "")),
+            ("Author", author_display),
             ("Local Path", repo_path),
         ]
 
@@ -372,93 +368,56 @@ class ManagedRepos:
             self.dump_repos(exist_repos)
             return True, f"rename successful, `{repo}`->`{name}`."
 
-    def cd_repo(
-        self,
-        repo: str | None = None,
-        *,
-        pick: bool = False,
-        output_file: str | None = None,
-    ) -> tuple[int, str | None]:
-        """Resolve managed repo path, optionally via interactive picker.
+    def resolve_repo_path(self, repo_name: str) -> str | None:
+        """Return the filesystem path for a managed repo by name.
 
         Args:
-            repo: Managed repo name, or ``None`` to choose interactively.
-            pick: If ``True``, use the TTY picker when the name is missing or not
-                an exact key (requires a terminal for the picker path).
-            output_file: When provided, write the resolved path to this file
-                instead of returning it.
+            repo_name: Managed repo name.
 
         Returns:
-            ``(exit_code, path | None)``. ``0`` with the resolved path,
-            or ``None`` when written to ``output_file``.
+            Path string if found, otherwise ``None``.
         """
+        exist = self.load_repos()
+        return exist.get(repo_name, {}).get("path")
 
+    def get_repo_names(self) -> list[str]:
+        """Return sorted list of managed repo names.
+
+        Returns:
+            Names sorted by Unicode code points.
+        """
+        return iter_managed_repo_names(self.load_repos())
+
+    def process_repos_option(
+        self, repos: list[str] | None, cmd: str
+    ) -> list[tuple[str, int, str, str]]:
+        """Run ``cmd`` across selected managed repos in parallel.
+
+        Returns:
+            One entry per repo: ``(repo_name, exit_code, stderr, stdout)``.
+        """
         exist_repos = self.load_repos()
-
-        if pick:
-            if not exist_repos:
-                return 1, EMPTY_MANAGED_REPOS_MSG
-            if repo is not None and repo in exist_repos:
-                return _write_path_or_return(exist_repos[repo]["path"], output_file)
-            rows = [
-                PickerRow(
-                    title=name,
-                    ref=exist_repos[name]["path"],
-                )
-                for name in iter_managed_repo_names(exist_repos)
-            ]
-            initial_filter = "" if repo is None else repo
-            exit_code, result = run_repo_cd_picker(
-                rows,
-                initial_filter=initial_filter,
-            )
-            if exit_code == 0 and result is not None:
-                return _write_path_or_return(result, output_file)
-            return exit_code, result
-
-        if repo is not None and repo in exist_repos:
-            return _write_path_or_return(exist_repos[repo]["path"], output_file)
-
-        cur_cache = iter_managed_repo_names(exist_repos)
-        print("Managed repos include the following:")
-        for i, r in enumerate(cur_cache):
-            print(".  ", i, r)
-
-        try:
-            input_num = int(input("Please input the index:"))
-            if 0 <= input_num < len(cur_cache):
-                return _write_path_or_return(
-                    exist_repos[cur_cache[input_num]]["path"], output_file
-                )
-            else:
-                print("Error: index out of range.")
-        except Exception:
-            print("Error: index need input a number.")
-        return 0, None
-
-    def process_repos_option(self, repos: list[str] | None, cmd: str):
-        exist_repos = self.load_repos()
-        print(f":: {cmd}\n")
 
         if repos:
             exist_repos = {k: v for k, v in exist_repos.items() if k in repos}
 
-        if len(exist_repos) >= 1:
-            cmds = []
-            orders = []
-            for _, prop in exist_repos.items():
-                cmds.append(cmd)
-                orders.append({"cwd": prop["path"]})
+        if not exist_repos:
+            return []
 
-            return self.executor.exec_parallel(
-                *cmds,
-                orders=orders,
-                flags=WAITING,
-                max_concurrent=self._repo_parallel_workers(),
-            )
+        repo_items = list(exist_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE | WAITING,
+            max_concurrent=self._repo_parallel_workers(),
+        )
 
-        for _, prop in exist_repos.items():
-            self.executor.exec(cmd, flags=WAITING, cwd=prop["path"])
+        return [
+            (name, code, err, out)
+            for (name, _), (code, err, out) in zip(repo_items, results, strict=True)
+        ]
 
     def branch_new_repos(
         self,
@@ -598,6 +557,151 @@ class ManagedRepos:
             flag = " -f" if force else ""
             parts.append(f"git branch{flag} {branch_name}")
         cmd = " && ".join(parts)
+
+        repo_items = list(target_repos.items())
+        cmds = [cmd] * len(repo_items)
+        orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        results = self.executor.exec_parallel(
+            *cmds,
+            orders=orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        return [
+            (name, code, stderr if code != 0 else None)
+            for (name, _), (code, stderr, _stdout) in zip(
+                repo_items, results, strict=True
+            )
+        ]
+
+    def switch_repos(
+        self,
+        branch: str,
+        repos: list[str],
+        *,
+        create: bool = False,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+        """Batch switch branch across managed repos.
+
+        Returns:
+            (all_ok, blockers, results)
+            - all_ok: bool, whether pre-flight passed and execution succeeded.
+            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - results: list of (repo_name, exit_code, stderr_or_none) from execution.
+              Empty if pre-flight failed or dry_run.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos:
+            return True, [], []
+
+        blockers = self._switch_preflight(
+            target_repos, branch, create=create, force=force
+        )
+        if blockers:
+            return False, blockers, []
+
+        if dry_run:
+            return True, [], []
+
+        results = self._switch_execute(target_repos, branch, create=create, force=force)
+        return True, [], results
+
+    def _switch_preflight(
+        self,
+        target_repos: dict[str, dict],
+        branch: str,
+        *,
+        create: bool,
+        force: bool,
+    ) -> list[tuple[str, str]]:
+        """Run pre-flight checks for batch branch switch."""
+        blockers: list[tuple[str, str]] = []
+        repo_items = list(target_repos.items())
+
+        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
+        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        validity_results = self.executor.exec_parallel(
+            *validity_cmds,
+            orders=validity_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        valid_repos: dict[str, dict] = {}
+        for (name, prop), (code, _err, _out) in zip(
+            repo_items, validity_results, strict=True
+        ):
+            if code != 0:
+                blockers.append((name, "invalid repo"))
+            else:
+                valid_repos[name] = prop
+
+        if not valid_repos:
+            return blockers
+
+        branch_cmds = [f"git branch --list {branch}"] * len(valid_repos)
+        branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        branch_results = self.executor.exec_parallel(
+            *branch_cmds,
+            orders=branch_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        repos_with_branch: dict[str, dict] = {}
+        repos_without_branch: dict[str, dict] = {}
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), branch_results, strict=True
+        ):
+            if out and out.strip():
+                repos_with_branch[name] = prop
+            else:
+                repos_without_branch[name] = prop
+
+        if repos_without_branch and not create:
+            for name in repos_without_branch:
+                blockers.append((name, f"branch '{branch}' does not exist"))
+
+        if force:
+            return blockers
+
+        status_cmds = ["git status --porcelain"] * len(valid_repos)
+        status_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
+        status_results = self.executor.exec_parallel(
+            *status_cmds,
+            orders=status_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        for (name, prop), (code, _err, out) in zip(
+            valid_repos.items(), status_results, strict=True
+        ):
+            if out and out.strip():
+                blockers.append((name, "uncommitted changes"))
+
+        return blockers
+
+    def _switch_execute(
+        self,
+        target_repos: dict[str, dict],
+        branch: str,
+        *,
+        create: bool,
+        force: bool,
+    ) -> list[tuple[str, int, str | None]]:
+        """Execute branch switch across repos in parallel."""
+        flag = " -f" if force else ""
+        create_flag = " -c" if create else ""
+        cmd = f"git switch{create_flag}{flag} {branch}"
 
         repo_items = list(target_repos.items())
         cmds = [cmd] * len(repo_items)

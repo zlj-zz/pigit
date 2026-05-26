@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
+import logging
+
 from .. import palette
 from .._component import Component, ComponentError
 from .._runtime_context import request_render
@@ -17,6 +19,8 @@ from .._surface import Surface, _Subsurface
 from ..reactive import Signal, ValueRef
 from ..types import ActionEventType
 from ..wcwidth_table import truncate_by_width, wcswidth
+
+_logger = logging.getLogger(__name__)
 
 
 class ItemList(Component):
@@ -109,9 +113,11 @@ class ItemList(Component):
         if not content:
             self._r_start = 0
             self.curr_no = 0
+            self._request_render()
             return
         self.curr_no = min(self.curr_no, len(content) - 1)
         self._scroll_into_view()
+        self._request_render()
 
     def set_source_content(self, content: list[str]) -> None:
         """Set the original unfiltered content.
@@ -251,7 +257,11 @@ class ItemList(Component):
 
     def _request_render(self) -> None:
         """Request a render if this component is currently activated."""
-        if self.is_activated():
+        activated = self.is_activated()
+        _logger.debug(
+            "[RENDER] %s._request_render activated=%s", type(self).__name__, activated
+        )
+        if activated:
             request_render()
 
     @property

@@ -88,12 +88,20 @@ class AsyncTask(Generic[T]):
 
         Must be called from the main thread (typically by AppEventLoop).
         """
+        count = 0
         while True:
             try:
                 callback, result = _GLOBAL_QUEUE.get_nowait()
             except queue.Empty:
                 break
+            count += 1
+            _logger.debug(
+                "[ASYNC] poll_all: invoking callback=%s",
+                getattr(callback, "__name__", callback),
+            )
             try:
                 callback(result)
             except Exception:
                 _logger.exception("AsyncTask callback failed")
+        if count:
+            _logger.debug("[ASYNC] poll_all: processed %d callbacks", count)

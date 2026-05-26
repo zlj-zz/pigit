@@ -17,7 +17,7 @@ from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counte
 from .ext.func import dynamic_default_attrs
 from .ext.utils import get_file_icon
 from .git import create_gitignore
-from .handlers import RepoCommandHandler, TuiHandler
+from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
 from .hook import before_hook
 from .info import introduce, show_gitconfig
 from .termui.cli_output import get_console
@@ -295,7 +295,7 @@ def _(args: Namespace, _):
 # =============================================
 # sub command `repo`
 # =============================================
-repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: print("-h help"))
+repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: repo.print_help())
 
 
 @repo.sub_parser("add", help="add repo(s).")
@@ -392,6 +392,28 @@ def repo_mkbranch(args, _):
     RepoCommandHandler(ctx.current()).mkbranch(args)
 
 
+@repo.sub_parser("switch", help="batch switch branch across managed repos.")
+@argument("branch_name", help="name of the branch to switch to.")
+@argument(
+    "repos",
+    nargs="*",
+    arg_completion="repos",
+    help="target repo names (interactive picker if omitted).",
+)
+@argument(
+    "-c --create", action="store_true", help="create branch if it does not exist."
+)
+@argument(
+    "-f --force", action="store_true", help="discard local changes when switching."
+)
+@argument("--dry-run", action="store_true", help="preview only, do not execute.")
+@argument(
+    "--filter-regex", type=str, default="", help="pre-filter repos in interactive mode."
+)
+def repo_switch(args, _):
+    RepoCommandHandler(ctx.current()).switch(args)
+
+
 repo_options = {
     "fetch": {"cmd": "git fetch", "allow_all": True, "help": "fetch remote update"},
     "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
@@ -402,9 +424,9 @@ for sub_cmd, prop in repo_options.items():
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", arg_completion="repos", help="name of repo(s).")(
             dynamic_default_attrs(
-                lambda args, _, cmd: RepoCommandHandler(
-                    ctx.current()
-                ).process_repos_option(args.repos, cmd),
+                lambda args, _, cmd: RepoCommandHandler(ctx.current()).bulk_cmd(
+                    args, cmd
+                ),
                 cmd=prop["cmd"],
             )
         )
@@ -420,6 +442,6 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: Namespace, _):
-    RepoCommandHandler(ctx.current()).open_browser(args)
+    OpenHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

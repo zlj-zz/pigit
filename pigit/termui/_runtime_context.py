@@ -620,5 +620,6 @@ def request_render() -> None:
     Safe to call from Signal subscribers or any component callback.
     """
     cb = get_render_request()
+    _logger.debug("[RENDER] request_render cb=%s", cb is not None)
     if cb is not None:
         cb()

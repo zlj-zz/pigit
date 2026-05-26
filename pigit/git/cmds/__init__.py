@@ -239,21 +239,39 @@ class GitCommandNew:
         """
         if dangerous_only:
             commands = self._registry.get_dangerous()
-            title = "Dangerous Commands"
+            title = "@bold(@tomato(Dangerous Commands))"
         elif category:
             commands = self._registry.get_all(category)
-            title = f"{category.value.title()} Commands"
+            title = f"@bold(@sky_blue({category.value.title()} Commands))"
         else:
             commands = self._registry.get_all()
-            title = "All Commands"
+            title = "@bold(@sky_blue(All Commands))"
 
         if not commands:
             return f"No commands found for: {title}"
 
-        # Sort commands by category then name
-        commands.sort(key=lambda c: (c.meta.category.value, c.meta.short))
+        # Sort by category declaration order, then security level, then name.
+        category_order = {cat: i for i, cat in enumerate(CommandCategory)}
+        security_order = {level: i for i, level in enumerate(SecurityLevel)}
+        commands.sort(
+            key=lambda c: (
+                category_order.get(c.meta.category, 999),
+                security_order.get(c.meta.security_level, 999),
+                c.meta.short,
+            )
+        )
 
-        lines = [f"\n{title}", "=" * len(title), ""]
+        # Use plain title length for separator (markup not counted)
+        plain_title = (
+            "Dangerous Commands"
+            if dangerous_only
+            else f"{category.value.title()} Commands" if category else "All Commands"
+        )
+        lines = [
+            f"\n{title}",
+            f"@sky_blue({'─' * len(plain_title)})",
+            "",
+        ]
 
         current_category = None
         for cmd_def in commands:
@@ -262,18 +280,19 @@ class GitCommandNew:
             # Category header
             if meta.category != current_category and not category:
                 current_category = meta.category
-                lines.append(f"\n[{current_category.value.upper()}]")
+                lines.append(f"\n@bold(@cyan([{current_category.value.upper()}]))")
 
             # Command line
             prefix = ""
             if meta.is_user_defined:
-                prefix = "  *"
+                prefix = "  @green(*)"
             elif meta.dangerous:
-                prefix = "  ▲"
+                prefix = "  @yellow(⚠)"
             else:
                 prefix = "   "
 
-            lines.append(f"{prefix} {meta.short:<12} {meta.help}")
+            short_padded = f"{meta.short:<12}"
+            lines.append(f"{prefix} @bold({short_padded}) {meta.help}")
 
         lines.append("")
         return "\n".join(lines)

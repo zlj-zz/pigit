@@ -202,7 +202,7 @@ def run_cmd_new_picker(
                         "◆ ",
                         fg=palette.CYAN,
                         bg=bg,
-                        style_flags=palette.STYLE_BOLD | row_style,
+                        style_flags=row_style,
                     )
                 ]
             elif ent.is_dangerous:
@@ -213,13 +213,12 @@ def run_cmd_new_picker(
                 ]
 
             name_fg = palette.CYAN if in_mru else palette.DEFAULT_FG
-            name_style = palette.STYLE_BOLD if in_mru else 0
 
             name_segs = _highlight_match(
                 ent.name, app._filter_needle, fg=name_fg, bg=bg
             )
             for seg in name_segs:
-                seg.style_flags |= name_style | row_style
+                seg.style_flags |= row_style
 
             name_w = sum(wcswidth(s.text) for s in name_segs)
             name_pad = 15 - name_w
@@ -330,7 +329,7 @@ def run_cmd_new_picker(
                     continue
                 content.append(
                     f"{'⟲' if ent.name in self._mru_set else ' '}"
-                    f"{'▲' if ent.is_dangerous else ' '}"
+                    f"{'⚠' if ent.is_dangerous else ' '}"
                     f" {ent.name:<15} {ent.help_text}"
                 )
                 row_data.append(r)
@@ -338,6 +337,23 @@ def run_cmd_new_picker(
 
         def setup_root(self, root: ComponentRoot) -> None:
             self._update_status()
+            if self._help_popup is not None:
+                panel = self._help_popup._child
+                panel._entries_source = None
+                panel.set_entries(self._help_entries())
+
+        def _help_entries(self) -> list[tuple[str, str]]:
+            return [
+                ("j / k", "Scroll up / down"),
+                ("g / G", "Jump to first / last"),
+                ("Tab", "Toggle group fold"),
+                ("Enter", "Confirm / enter params"),
+                ("/", "Filter list"),
+                ("?", "Show preview"),
+                ("q / Esc", "Quit"),
+                ("Ctrl+C", "Abort"),
+                ("0-9", "Goto number"),
+            ]
 
         def get_terminal_too_small_msg(self) -> str:
             return _TERMINAL_TOO_SMALL_MSG

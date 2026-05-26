@@ -16,22 +16,25 @@ from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
     ActionEventType,
     bind_keys,
+    bind_signals,
     keys,
     palette,
     Segment,
+    show_badge,
     show_toast,
 )
-from pigit.termui._async_task import AsyncTask
 from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
-from .app_commit_graph import GraphRow, compute_graph_rows
+from .app_commit_graph import GraphRow
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
+from .app_search_filter import SearchFilter
+from .viewmodels.base import ActionResult
+from .viewmodels.commit import ICommitViewModel
 
 if TYPE_CHECKING:
-    from .git.local_git import LocalGit
     from .git.model import Commit
 
 
@@ -114,7 +117,7 @@ class CommitPanel(ItemList):
         self,
         *,
         on_selection_changed: Callable | None = None,
-        git: LocalGit,
+        vm: ICommitViewModel,
         id: str | None = None,
     ) -> None:
         super().__init__(
@@ -122,21 +125,20 @@ class CommitPanel(ItemList):
             lazy_load=True,
             id=id,
         )
-        self.git = git
-        self._loader = AsyncTask()
-
+        self._vm = vm
         self.commits: list[Commit] = []
+        self._all_commits: list[Commit] = []
+        self._filter = SearchFilter(self._apply_filter)
         self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
-        self._graph_rows: list[GraphRow] = []
-        self._remotes: tuple[str, ...] = ()
         self._refs_cache: dict[str, tuple[str, list[str], list[str]]] = {}
         self._expanded = False
         self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
+        self._vm_unsubs: list[Callable[[], None]] = []
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -187,6 +189,7 @@ class CommitPanel(ItemList):
         return [
             ("jk/↑↓", "Navigate"),
             ("Enter", "View"),
+            ("/", "Search"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),
             ("Y", "Copy SHA"),
@@ -202,57 +205,58 @@ class CommitPanel(ItemList):
 
     def get_inspector_data(self) -> CommitInfo | None:
         """Return inspector data for the currently selected commit."""
-        c = self._current_commit()
-        if c is None:
-            return None
-        changed_files, total_add, total_del = [], 0, 0
-        if self.git is not None:
-            changed_files, total_add, total_del = self.git.get_commit_stats(c.sha)
-        return CommitInfo(
-            commit=c,
-            changed_files=changed_files,
-            total_add=total_add,
-            total_del=total_del,
-        )
+        source_idx = self._filter.source_index(self.curr_no)
+        return self._vm.get_inspector_data(source_idx)
 
-    def refresh(self) -> None:
-        branch_name = self.git.get_head() or ""
-        self._loader.start(
-            lambda: self._load_commit_data(branch_name),
-            self._on_commits_loaded,
-        )
+    def activate(self) -> None:
+        super().activate()
+        self._bind_vm_signals()
+        self._vm.refresh()
 
-    def _load_commit_data(
-        self, branch_name: str
-    ) -> tuple[list[Commit], list[GraphRow], tuple[str, ...]]:
-        """Synchronous data load executed on a background thread."""
-        commits = self.git.load_commits(branch_name)
-        remotes = tuple(self.git.get_remotes())
-        graph_rows = compute_graph_rows(commits) if commits else []
-        return commits, graph_rows, remotes
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
 
-    def _on_commits_loaded(
-        self,
-        payload: tuple[list[Commit], list[GraphRow], tuple[str, ...]],
-    ) -> None:
+    def _on_items_changed(self) -> None:
         if not self.is_activated():
             return
-        commits, graph_rows, remotes = payload
-        self.commits = commits
+        commits = self._vm.items.value
+        self._all_commits = list(commits)
+        self._apply_filter()
         self._contrib_graph.set_commits(commits)
-        self._remotes = remotes
         self._refs_cache.clear()
         self._bodies = None
         self._body_lines_cache.clear()
-        if not commits:
-            self.set_content(["No commits found."])
+
+    def _apply_filter(self) -> None:
+        """Filter commits by query and rebuild display state."""
+        query = self._filter.query.lower()
+        if not query:
+            self.commits = list(self._all_commits)
+            self._filter.map = list(range(len(self._all_commits)))
+        else:
+            filtered: list[Commit] = []
+            mapping: list[int] = []
+            for i, c in enumerate(self._all_commits):
+                if (
+                    query in c.msg.lower()
+                    or query in c.author.lower()
+                    or query in c.sha.lower()
+                ):
+                    filtered.append(c)
+                    mapping.append(i)
+            self.commits = filtered
+            self._filter.map = mapping
+        if not self.commits:
+            self.set_content(["No matching commits."])
             self._max_meta_w = 0
-            self._graph_rows = []
             return
-        self._graph_rows = graph_rows
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
-        for commit in commits:
+        for commit in self.commits:
             self._rel_time_cache[commit.sha] = relative_time(commit.unix_timestamp)
             self._abs_time_cache[commit.sha] = self._format_abs_time(
                 commit.unix_timestamp
@@ -263,13 +267,23 @@ class CommitPanel(ItemList):
 
     def deactivate(self) -> None:
         super().deactivate()
-        self._loader.cancel()
+        for unsub in self._vm_unsubs:
+            unsub()
+        self._vm_unsubs.clear()
+        self._vm.dispose()
+
+    def _handle_result(self, result: ActionResult) -> None:
+        if result.success:
+            show_badge(result.message, duration=1.0)
+        else:
+            show_toast(result.message, duration=2.0)
+        if result.should_refresh:
+            self._vm.refresh()
 
     def _ensure_bodies(self) -> None:
         if self._bodies is not None or not self.commits:
             return
-        branch_name = self.git.get_head() or ""
-        self._bodies = self.git.get_commit_bodies(branch_name)
+        self._bodies = self._vm.get_bodies()
         self._body_lines_cache.clear()
 
     def _body_lines(self, commit: Commit) -> list[str]:
@@ -370,6 +384,7 @@ class CommitPanel(ItemList):
         super()._render_surface(surface)
         if self._view_mode is CommitViewMode.HEATMAP:
             self._render_heatmap_overlay(surface)
+        self._filter.render_bar(surface)
 
     def describe_row(
         self,
@@ -456,10 +471,11 @@ class CommitPanel(ItemList):
         else:
             left = [Segment("  ", fg=THEME.fg_primary)]
 
-        if item_idx < len(self._graph_rows):
+        source_idx = self._filter.source_index(item_idx)
+        if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
-                    self._graph_rows[item_idx],
+                    self._vm.graph_rows[source_idx],
                     commit,
                     cursor_flags=cursor_flags,
                     focused=focused,
@@ -490,10 +506,11 @@ class CommitPanel(ItemList):
         styled bold and we omit ``cursor_flags`` entirely.
         """
         left: list[Segment] = [Segment("  ", fg=THEME.fg_primary)]
-        if item_idx < len(self._graph_rows):
+        source_idx = self._filter.source_index(item_idx)
+        if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
-                    self._graph_rows[item_idx],
+                    self._vm.graph_rows[source_idx],
                     None,
                     sub=True,
                     cursor_flags=0,
@@ -546,7 +563,7 @@ class CommitPanel(ItemList):
         """Render branch-ref badges wrapped in orange parens, comma-separated."""
         cached = self._refs_cache.get(commit.sha)
         if cached is None:
-            cached = _parse_decoration(commit.extra_info, self._remotes)
+            cached = _parse_decoration(commit.extra_info, self._vm.remotes)
             self._refs_cache[commit.sha] = cached
         head_ref, local_refs, remote_refs = cached
         if not (head_ref or local_refs or remote_refs or commit.tag):
@@ -671,14 +688,18 @@ class CommitPanel(ItemList):
             # Contribution graph is view-only; g toggles back to list.
             return
 
+        if self._filter.handle_key(key):
+            return
+
         if key == keys.KEY_ENTER:
             if not self.commits:
                 return
-            commit = self.commits[self.curr_no]
-            content = self.git.load_commit_info(commit.sha, plain=True).split("\n")
+            source_idx = self._filter.source_index(self.curr_no)
+            content = self._vm.load_diff(source_idx)
             self.emit(
                 ActionEventType.goto,
                 target="diff",
                 source=self,
+                key=self.commits[self.curr_no].sha,
                 content=content,
             )
