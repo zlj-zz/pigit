@@ -35,7 +35,7 @@ class IStatusViewModel(IListViewModel["File"]):
     def ignore_indices(self, indices: set[int]) -> ActionResult: ...
 
 
-class StatusViewModel(ViewModelBase["File"]):
+class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     """Concrete ViewModel for working tree status."""
 
     def __init__(self, git: LocalGit) -> None:

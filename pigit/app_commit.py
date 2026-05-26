@@ -254,6 +254,7 @@ class CommitPanel(ItemList):
         if not self.commits:
             self.set_content(["No matching commits."])
             self._max_meta_w = 0
+            self._notify_change()
             return
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
@@ -265,6 +266,7 @@ class CommitPanel(ItemList):
         if self._expanded:
             self._ensure_bodies()
         self._rebuild_rows()
+        self._notify_change()
 
     def deactivate(self) -> None:
         super().deactivate()

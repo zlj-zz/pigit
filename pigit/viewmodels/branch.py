@@ -32,7 +32,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def can_merge(self) -> tuple[bool, str]: ...
 
 
-class BranchViewModel(ViewModelBase["Branch"]):
+class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
     """Concrete ViewModel for branch list."""
 
     _SCOPES = ["local", "remote", "all"]

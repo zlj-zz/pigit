@@ -34,7 +34,7 @@ class ICommitViewModel(IListViewModel["Commit"]):
     def get_bodies(self) -> dict[str, str] | None: ...
 
 
-class CommitViewModel(ViewModelBase["Commit"]):
+class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     """Concrete ViewModel for commit log."""
 
     def __init__(self, git: LocalGit) -> None:

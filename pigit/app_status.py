@@ -20,6 +20,7 @@ from pigit.termui import (
     AlertDialog,
     bind_keys,
     bind_signals,
+    by_id,
     exec_external,
     keys,
     palette,
@@ -29,8 +30,9 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import ItemList
 
-from .app_diff import DiffType
+from .app_diff import DiffType, DiffViewer
 from .app_inspector import FileInfo
+from .app_preview import PreviewPanel
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .git.model import File
@@ -203,8 +205,10 @@ class StatusPanel(ItemList):
             self._filter.map = mapping
         if not self.files:
             self.set_content([])
+            self._notify_change()
             return
         self.set_content([f.name for f in self.files])
+        self._notify_change()
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -233,6 +237,18 @@ class StatusPanel(ItemList):
         start = min(self._visual_anchor, self.curr_no)
         end = max(self._visual_anchor, self.curr_no)
         self._selected.update(range(start, end + 1))
+
+    @bind_keys("J")
+    def _scroll_preview_down(self) -> None:
+        preview = by_id("preview", PreviewPanel)
+        if preview is not None:
+            preview.scroll_down(DiffViewer.SCROLL_PAGE_SIZE)
+
+    @bind_keys("K")
+    def _scroll_preview_up(self) -> None:
+        preview = by_id("preview", PreviewPanel)
+        if preview is not None:
+            preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_keys("v")
     def toggle_visual_mode(self) -> None:

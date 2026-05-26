@@ -37,10 +37,11 @@ from .git.local_git import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
-from .app_diff import DiffViewer
+from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
-from .app_status import StatusPanel
+from .app_preview import PreviewPanel
+from .app_status import StatusPanel, _status_label
 from .app_theme import THEME
 from .git.local_git import LocalGit
 from .git.managed_repos import ManagedRepos
@@ -83,6 +84,15 @@ class PigitApplication(Application):
             inner_width=50,
             on_result=lambda _: None,
         )
+        # ViewModels (stored for preview updates)
+        self._status_vm: StatusViewModel | None = None
+        self._commit_vm: CommitViewModel | None = None
+        self._branch_vm: BranchViewModel | None = None
+        # Adaptive split state
+        self._preview_panel: PreviewPanel | None = None
+        self._is_large_screen = False
+
+    LARGE_SCREEN_COLS = 120
 
     _TAB_CONFIG: dict[type, tuple[str, str]] = {
         StatusPanel: ("Status", "1"),
@@ -96,6 +106,9 @@ class PigitApplication(Application):
         footer.set_global_help([("I", "Inspector"), (";", "Palette"), ("Q", "Quit")])
 
         inspector_panel = InspectorPanel(id="inspector")
+        # Preview is created at app level but only inserted into layout when
+        # Status tab is active on large screens.
+        self._preview_panel = PreviewPanel(id="preview")
 
         def _on_tab_switch(panel: Component) -> None:
             provider = getattr(panel, "get_help_entries", None)
@@ -104,19 +117,23 @@ class PigitApplication(Application):
                 type(panel), ("", "")
             )
             inspector_panel.update_from(panel)
+            if self._is_large_screen:
+                cols, _ = terminal_size()
+                self._apply_body_widths(cols)
+                self._update_preview()
 
-        status_vm = StatusViewModel(self._git)
-        branch_vm = BranchViewModel(self._git)
-        commit_vm = CommitViewModel(self._git)
+        self._status_vm = StatusViewModel(self._git)
+        self._branch_vm = BranchViewModel(self._git)
+        self._commit_vm = CommitViewModel(self._git)
         panel_tab = TabView(
             children=[
-                StatusPanel(vm=status_vm, id="status"),
+                StatusPanel(vm=self._status_vm, id="status"),
                 BranchPanel(
-                    vm=branch_vm,
+                    vm=self._branch_vm,
                     branch_signal=self._branch_signal,
                     id="branch",
                 ),
-                CommitPanel(vm=commit_vm, id="commit"),
+                CommitPanel(vm=self._commit_vm, id="commit"),
                 DiffViewer(id="diff"),
             ],
             start="status",
@@ -125,6 +142,9 @@ class PigitApplication(Application):
         )
         provider = getattr(panel_tab.active, "get_help_entries", None)
         footer.set_help_provider(provider)
+
+        cols, _ = terminal_size()
+        self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
         body = Row(
             children=[
@@ -176,6 +196,11 @@ class PigitApplication(Application):
                 exit_code=1,
             )
 
+        # Initialize layout for large screen (inserts preview only if Status is active)
+        if self._is_large_screen:
+            self._apply_body_widths(cols)
+            self._update_preview()
+
         # Initialize header with repo info
         try:
             head = self._git.get_head() or ""
@@ -198,6 +223,84 @@ class PigitApplication(Application):
             position=ToastPosition.BOTTOM_LEFT,
         )
         self._try_restore_merge_state()
+
+    def _apply_body_widths(self, cols: int) -> None:
+        """Recompute body_row widths based on screen size, active tab, and inspector state.
+
+        PreviewPanel is only inserted into the layout when Status is active on
+        large screens; otherwise it is removed so it does not appear global.
+        """
+        body_row = by_id("body_row", Row)
+        if body_row is None:
+            return
+        tab_view = by_id("tab_view", TabView)
+        inspector = by_id("inspector", InspectorPanel)
+        on_status = tab_view is not None and isinstance(tab_view.active, StatusPanel)
+
+        if self._is_large_screen and on_status:
+            tab_w = max(50, int(cols * 0.35))
+            preview_w = max(1, cols - tab_w)
+            inspector_w = self._inspector_width(cols)
+            desired_children = [tab_view, inspector, self._preview_panel]
+            if self._inspector_visible:
+                desired_widths = [tab_w, inspector_w, max(1, preview_w - inspector_w)]
+            else:
+                desired_widths = [tab_w, 0, preview_w]
+        else:
+            desired_children = [tab_view, inspector]
+            if self._inspector_visible:
+                desired_widths = ["flex", self._inspector_width(cols)]
+            else:
+                desired_widths = ["flex", 0]
+
+        # Sync children list: preview is only present when Status is active.
+        if list(body_row.children) != desired_children:
+            # Detach preview if being removed
+            for child in list(body_row.children):
+                if child is self._preview_panel and child not in desired_children:
+                    body_row.children.remove(child)
+                    if child.parent is body_row:
+                        child.parent = None
+            # Attach preview if being added
+            preview = self._preview_panel
+            if (
+                preview is not None
+                and preview in desired_children
+                and preview not in body_row.children
+            ):
+                body_row.children.append(preview)
+                preview.parent = body_row
+            body_row.set_widths(desired_widths)
+
+    def _update_preview(self) -> None:
+        """Update the preview panel for the current Status selection."""
+        if not self._is_large_screen or self._preview_panel is None:
+            return
+        tab_view = by_id("tab_view", TabView)
+        if tab_view is None:
+            return
+        active = tab_view.active
+        if not isinstance(active, StatusPanel):
+            return
+        if (
+            not active.files
+            or active.curr_no < 0
+            or active.curr_no >= len(active.files)
+        ):
+            self._preview_panel.clear()
+            return
+        f = active.files[active.curr_no]
+        source_idx = active._filter.source_index(active.curr_no)
+        diff_lines = self._status_vm.load_diff(source_idx) if self._status_vm else []
+        diff_type = (
+            DiffType.STAGED
+            if (f.has_staged_change and not f.has_unstaged_change)
+            else DiffType.UNSTAGED
+        )
+        self._preview_panel.set_diff_type(diff_type)
+        self._preview_panel.set_preview(
+            diff_lines, title=f.name, subtitle=_status_label(f)
+        )
 
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
@@ -230,22 +333,27 @@ class PigitApplication(Application):
         """Toggle inspector panel visibility."""
         self._inspector_visible = not self._inspector_visible
         cols, _ = terminal_size()
-        body_row = by_id("body_row", Row)
         inspector = by_id("inspector", InspectorPanel)
         tab_view = by_id("tab_view", TabView)
-        if self._inspector_visible:
-            body_row.set_widths(["flex", self._inspector_width(cols)])
+        self._apply_body_widths(cols)
+        if self._inspector_visible and inspector is not None and tab_view is not None:
             inspector.update_from(tab_view.active)
-        else:
-            body_row.set_widths(["flex", 0])
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Recompute inspector width on terminal resize."""
-        if self._inspector_visible:
-            body_row = by_id("body_row", Row)
-            if body_row is not None:
-                body_row.set_widths(["flex", self._inspector_width(size[0])])
-        super().resize(size)
+        """Recompute layout widths on terminal resize.
+
+        Note: super().resize() is NOT called here because
+        _ApplicationEventLoop.resize() already propagates resize to the
+        component tree after this method returns.
+        """
+        cols = size[0]
+        was_large = self._is_large_screen
+        self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
+        self._apply_body_widths(cols)
+        if was_large and not self._is_large_screen and self._preview_panel is not None:
+            self._preview_panel.clear()
+        if not was_large and self._is_large_screen:
+            self._update_preview()
 
     def goto_status(self):
         by_id("tab_view", TabView).route_to("status")
@@ -270,6 +378,8 @@ class PigitApplication(Application):
             tab_view = by_id("tab_view", TabView)
             if inspector is not None and tab_view is not None:
                 inspector.update_from(tab_view.active)
+            if tab_view is not None and isinstance(tab_view.active, StatusPanel):
+                self._update_preview()
             return True
         return False
 

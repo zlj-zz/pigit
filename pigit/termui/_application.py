@@ -55,6 +55,11 @@ class _ApplicationEventLoop(AppEventLoop):
         self._app.after_start()
         self._app._auto_after_start()
 
+    def resize(self) -> None:
+        """Propagate resize to the Application before the component tree."""
+        self._app.resize(self.get_term_size())
+        super().resize()
+
     def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
         self.before_dispatch_key(key)
         if key == "window resize":

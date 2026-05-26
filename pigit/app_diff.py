@@ -152,6 +152,11 @@ class DiffViewer(LineTextBrowser):
         self._render_tokens = self._pre_tokenize()
         self._hunks = self._parse_hunks()
         self._hunk_starts = [h.start for h in self._hunks]
+        self._i = 0
+
+    def set_diff_type(self, diff_type: DiffType) -> None:
+        """Set the diff type (unstaged, staged, or commit)."""
+        self._diff_type = diff_type
 
     def _parse_hunks(self) -> list[_Hunk]:
         """Parse hunk boundaries from diff content in a single pass."""

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from .._component import Component, _render_child_to_surface
 from .._runtime_context import get_focus_manager
@@ -26,7 +26,7 @@ class TabView(Component):
 
     def __init__(
         self,
-        children: list[Component],
+        children: Sequence[Component],
         start: str | None = None,
         on_switch: Callable[[Component], None] | None = None,
         x: int = 1,
