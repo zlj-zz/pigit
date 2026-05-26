@@ -30,6 +30,7 @@ from .app_commit_graph import GraphRow
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
+from .app_search_filter import SearchFilter
 from .viewmodels.base import ActionResult
 from .viewmodels.commit import ICommitViewModel
 
@@ -126,6 +127,8 @@ class CommitPanel(ItemList):
         )
         self._vm = vm
         self.commits: list[Commit] = []
+        self._all_commits: list[Commit] = []
+        self._filter = SearchFilter(self._apply_filter)
         self._view_mode = CommitViewMode.LIST
         self._contrib_graph = ContributionGraph()
         self._rel_time_cache: dict[str, str] = {}
@@ -136,9 +139,6 @@ class CommitPanel(ItemList):
         self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
         self._vm_unsubs: list[Callable[[], None]] = []
-        self._vm_unsubs.append(
-            bind_signals(self, vm.items, callback=self._on_items_changed)
-        )
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -189,6 +189,7 @@ class CommitPanel(ItemList):
         return [
             ("jk/↑↓", "Navigate"),
             ("Enter", "View"),
+            ("/", "Search"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),
             ("Y", "Copy SHA"),
@@ -204,28 +205,58 @@ class CommitPanel(ItemList):
 
     def get_inspector_data(self) -> CommitInfo | None:
         """Return inspector data for the currently selected commit."""
-        return self._vm.get_inspector_data(self.curr_no)
+        source_idx = self._filter.source_index(self.curr_no)
+        return self._vm.get_inspector_data(source_idx)
 
     def activate(self) -> None:
         super().activate()
+        self._bind_vm_signals()
         self._vm.refresh()
+
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
 
     def _on_items_changed(self) -> None:
         if not self.is_activated():
             return
         commits = self._vm.items.value
-        self.commits = commits
+        self._all_commits = list(commits)
+        self._apply_filter()
         self._contrib_graph.set_commits(commits)
         self._refs_cache.clear()
         self._bodies = None
         self._body_lines_cache.clear()
-        if not commits:
-            self.set_content(["No commits found."])
+
+    def _apply_filter(self) -> None:
+        """Filter commits by query and rebuild display state."""
+        query = self._filter.query.lower()
+        if not query:
+            self.commits = list(self._all_commits)
+            self._filter.map = list(range(len(self._all_commits)))
+        else:
+            filtered: list[Commit] = []
+            mapping: list[int] = []
+            for i, c in enumerate(self._all_commits):
+                if (
+                    query in c.msg.lower()
+                    or query in c.author.lower()
+                    or query in c.sha.lower()
+                ):
+                    filtered.append(c)
+                    mapping.append(i)
+            self.commits = filtered
+            self._filter.map = mapping
+        if not self.commits:
+            self.set_content(["No matching commits."])
             self._max_meta_w = 0
             return
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
-        for commit in commits:
+        for commit in self.commits:
             self._rel_time_cache[commit.sha] = relative_time(commit.unix_timestamp)
             self._abs_time_cache[commit.sha] = self._format_abs_time(
                 commit.unix_timestamp
@@ -353,6 +384,7 @@ class CommitPanel(ItemList):
         super()._render_surface(surface)
         if self._view_mode is CommitViewMode.HEATMAP:
             self._render_heatmap_overlay(surface)
+        self._filter.render_bar(surface)
 
     def describe_row(
         self,
@@ -439,10 +471,11 @@ class CommitPanel(ItemList):
         else:
             left = [Segment("  ", fg=THEME.fg_primary)]
 
-        if item_idx < len(self._vm.graph_rows):
+        source_idx = self._filter.source_index(item_idx)
+        if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
-                    self._vm.graph_rows[item_idx],
+                    self._vm.graph_rows[source_idx],
                     commit,
                     cursor_flags=cursor_flags,
                     focused=focused,
@@ -473,10 +506,11 @@ class CommitPanel(ItemList):
         styled bold and we omit ``cursor_flags`` entirely.
         """
         left: list[Segment] = [Segment("  ", fg=THEME.fg_primary)]
-        if item_idx < len(self._vm.graph_rows):
+        source_idx = self._filter.source_index(item_idx)
+        if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
-                    self._vm.graph_rows[item_idx],
+                    self._vm.graph_rows[source_idx],
                     None,
                     sub=True,
                     cursor_flags=0,
@@ -654,10 +688,14 @@ class CommitPanel(ItemList):
             # Contribution graph is view-only; g toggles back to list.
             return
 
+        if self._filter.handle_key(key):
+            return
+
         if key == keys.KEY_ENTER:
             if not self.commits:
                 return
-            content = self._vm.load_diff(self.curr_no)
+            source_idx = self._filter.source_index(self.curr_no)
+            content = self._vm.load_diff(source_idx)
             self.emit(
                 ActionEventType.goto,
                 target="diff",

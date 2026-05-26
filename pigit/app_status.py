@@ -7,10 +7,13 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
+import logging
 import os
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 from collections.abc import Callable
+
+_logger = logging.getLogger(__name__)
 
 from pigit.termui import (
     ActionEventType,
@@ -27,6 +30,7 @@ from pigit.termui import (
 from pigit.termui.widgets import ItemList
 
 from .app_inspector import FileInfo
+from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .git.model import File
 from .viewmodels.base import ActionResult
@@ -136,15 +140,13 @@ class StatusPanel(ItemList):
         )
         self._vm = vm
         self.files: list[File] = []
-        self._all_files: list[File] = []  # For filter reset
+        self._all_files: list[File] = []
+        self._filter = SearchFilter(self._apply_filter)
         self._alert_dialog = AlertDialog(
             inner_width=alert_inner_width,
             on_result=lambda _: None,
         )
         self._vm_unsubs: list[Callable[[], None]] = []
-        self._vm_unsubs.append(
-            bind_signals(self, vm.items, callback=self._on_items_changed)
-        )
 
         # Visual mode state
         self._visual_mode = False
@@ -154,6 +156,7 @@ class StatusPanel(ItemList):
 
     def activate(self) -> None:
         super().activate()
+        self._bind_vm_signals()
         self._vm.refresh()
 
     def deactivate(self) -> None:
@@ -163,18 +166,44 @@ class StatusPanel(ItemList):
         self._vm_unsubs.clear()
         self._vm.dispose()
 
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
+
     def _on_items_changed(self) -> None:
         files = self._vm.items.value
+        _logger.debug(
+            "[STATUS] _on_items_changed: activated=%s files=%d",
+            self.is_activated(),
+            len(files),
+        )
         if not self.is_activated():
             return
-        self.files = files
         self._all_files = list(files)
-        if not files:
-            self.set_content([])
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        """Filter files by query and rebuild display state."""
+        query = self._filter.query.lower()
+        if not query:
+            self.files = list(self._all_files)
+            self._filter.map = list(range(len(self._all_files)))
         else:
-            # content is only used for row-count bookkeeping; rendering uses
-            # describe_row which reads directly from self.files.
-            self.set_content([f.name for f in files])
+            filtered: list[File] = []
+            mapping: list[int] = []
+            for i, f in enumerate(self._all_files):
+                if query in f.name.lower():
+                    filtered.append(f)
+                    mapping.append(i)
+            self.files = filtered
+            self._filter.map = mapping
+        if not self.files:
+            self.set_content([])
+            return
+        self.set_content([f.name for f in self.files])
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -248,6 +277,10 @@ class StatusPanel(ItemList):
         if not self.files:
             self.set_content([])
 
+    def _render_surface(self, surface) -> None:
+        super()._render_surface(surface)
+        self._filter.render_bar(surface)
+
     def describe_row(
         self,
         idx: int,
@@ -296,10 +329,14 @@ class StatusPanel(ItemList):
         return left, main, right
 
     def on_key(self, key: str) -> None:
+        if self._filter.handle_key(key):
+            return
+
         if not self.files:
             return
         if key == keys.KEY_ENTER:
-            diff = self._vm.load_diff(self.curr_no)
+            source_idx = self._filter.source_index(self.curr_no)
+            diff = self._vm.load_diff(source_idx)
             self.emit(
                 ActionEventType.goto,
                 target="diff",
@@ -309,6 +346,7 @@ class StatusPanel(ItemList):
             )
             return
         if key == "a":
+            _logger.debug("[STATUS] on_key: stage")
             f = self.files[self.curr_no]
             if f.has_merged_conflicts or f.has_inline_merged_conflicts:
                 self._check_via_alert(
@@ -332,6 +370,7 @@ class StatusPanel(ItemList):
             )
             return
         if key == "d":
+            _logger.debug("[STATUS] on_key: discard")
             self._run_action(
                 self._vm.discard,
                 single_msg="Discard file",
@@ -360,11 +399,13 @@ class StatusPanel(ItemList):
             self._open_external_editor(self.files[self.curr_no])
             return
         if key == "o":
-            result = self._vm.checkout_ours(self.curr_no)
+            source_idx = self._filter.source_index(self.curr_no)
+            result = self._vm.checkout_ours(source_idx)
             self._handle_result(result)
             return
         if key == "t":
-            result = self._vm.checkout_theirs(self.curr_no)
+            source_idx = self._filter.source_index(self.curr_no)
+            result = self._vm.checkout_theirs(source_idx)
             self._handle_result(result)
             return
 
@@ -372,6 +413,12 @@ class StatusPanel(ItemList):
 
     def _handle_result(self, result: ActionResult) -> None:
         """Handle a ViewModel action result: badge/toast and optional refresh."""
+        _logger.debug(
+            "[STATUS] _handle_result: success=%s should_refresh=%s msg=%r",
+            result.success,
+            result.should_refresh,
+            result.message,
+        )
         if result.success:
             show_badge(result.message, duration=1.0)
         else:
@@ -422,6 +469,7 @@ class StatusPanel(ItemList):
         entries = [
             ("jk/↑↓", "Navigate"),
             ("Enter", "Open"),
+            ("/", "Filter"),
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
@@ -439,7 +487,8 @@ class StatusPanel(ItemList):
 
     def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""
-        return self._vm.get_inspector_data(self.curr_no)
+        source_idx = self._filter.source_index(self.curr_no)
+        return self._vm.get_inspector_data(source_idx)
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
@@ -478,23 +527,25 @@ class StatusPanel(ItemList):
             self._clear_visual_mode()
             return
         # Single mode
+        source_idx = self._filter.source_index(self.curr_no)
         if needs_confirm:
             if self._check_via_alert(callee, self.curr_no, msg=single_msg):
                 return
         else:
-            result = callee(self.curr_no)
+            result = callee(source_idx)
             self._handle_result(result)
 
     def _dispatch_batch(
         self, action_type: StatusAction, indices: set[int]
     ) -> ActionResult:
+        source_indices = {self._filter.source_index(i) for i in indices}
         match action_type:
             case StatusAction.STAGE:
-                return self._vm.stage_indices(indices)
+                return self._vm.stage_indices(source_indices)
             case StatusAction.DISCARD:
-                return self._vm.discard_indices(indices)
+                return self._vm.discard_indices(source_indices)
             case StatusAction.IGNORE:
-                return self._vm.ignore_indices(indices)
+                return self._vm.ignore_indices(source_indices)
         return ActionResult(success=False, message="Unknown action")
 
     def _check_via_alert(
@@ -505,12 +556,13 @@ class StatusPanel(ItemList):
     ) -> bool:
         file = self.files[idx]
         text = f"{msg} '{file}' ?"
+        source_idx = self._filter.source_index(idx)
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 self._vm.refresh()
                 return
-            result = callee(idx)
+            result = callee(source_idx)
             self._handle_result(result)
             if self.files:
                 self.curr_no = min(max(self.curr_no, 0), len(self.files) - 1)

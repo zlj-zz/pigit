@@ -177,6 +177,10 @@ class AppEventLoop:
     def _loop(self) -> None:
         while True:
             AsyncTask.poll_all()
+            if self._render_requested:
+                _logger.debug("[RENDER] _loop: render (poll)")
+                self._render_requested = False
+                self.render()
             input_key = self._input_handle.get_input()
             if not input_key or not input_key[0]:
                 if self._render_requested or self._real_time:
@@ -185,9 +189,11 @@ class AppEventLoop:
                 continue
             first = input_key[0][0]
             if isinstance(first, str):
+                _logger.debug("[RENDER] _loop: dispatch key=%r", first)
                 outcome = self._dispatch_semantic_string(first)
                 self.after_dispatch_key(first, outcome)
                 if self._render_requested:
+                    _logger.debug("[RENDER] _loop: render (after dispatch)")
                     self._render_requested = False
                     self.render()
                 continue
