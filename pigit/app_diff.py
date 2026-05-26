@@ -79,7 +79,7 @@ class DiffViewer(LineTextBrowser):
         self.i_cache_key = ""
         self.i_cache: dict[str, int] = {}
         self._tokenizer = SyntaxTokenizer()
-        self._lang = "generic"
+        self._line_langs: list[str] = []
         self._multiline_mask: list[str | None] = []
         # _render_tokens holds (text, fg_color, display_width) per token
         self._render_tokens: list[list[tuple[str, tuple[int, int, int], int]]] = []
@@ -105,20 +105,51 @@ class DiffViewer(LineTextBrowser):
             self._content.append(cleaned)
         self._compute_heatmap()
         self._compute_line_numbers()
-        if self.i_cache_key:
-            self._lang = self._tokenizer.detect_language(self.i_cache_key)
+        self._line_langs = self._detect_line_languages()
         self._multiline_mask = self._tokenizer.compute_multiline_mask(
-            self._content, self._lang
+            self._content, self._line_langs
         )
         self._render_tokens = self._pre_tokenize()
         self._hunk_indices = [
             i for i, line in enumerate(self._content) if line.startswith("@@")
         ]
 
+    def _detect_line_languages(self) -> list[str]:
+        """Scan file headers to determine per-line language.
+
+        Lines before the first ``diff --git`` (commit meta-info) and diff
+        file headers (``---`` / ``+++``) are marked as ``"plain"`` to skip
+        syntax highlighting. Only actual code lines use language-specific
+        tokenization.
+        """
+        result: list[str] = []
+        current_lang = "generic"
+        saw_diff = False
+        for line in self._content:
+            if line.startswith("diff --git"):
+                saw_diff = True
+                parts = line.split()
+                if len(parts) >= 4 and parts[3].startswith("b/"):
+                    current_lang = self._tokenizer.detect_language(parts[3][2:])
+                result.append("plain")
+            elif not saw_diff:
+                result.append("plain")
+            elif line.startswith("--- ") or line.startswith("+++ "):
+                if line.startswith("+++ "):
+                    filename = line[4:]
+                    if filename.startswith("b/"):
+                        filename = filename[2:]
+                    current_lang = self._tokenizer.detect_language(filename)
+                result.append("plain")
+            else:
+                result.append(current_lang)
+        return result
+
     def _pre_tokenize(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
         """Pre-tokenize all lines, resolve colors, and compute display widths."""
         result: list[list[tuple[str, tuple[int, int, int], int]]] = []
         for i, line in enumerate(self._content):
+            lang = self._line_langs[i] if i < len(self._line_langs) else "generic"
             if line.startswith("@@"):
                 tokens = self._tokenizer.tokenize_diff_hunk(line)
             elif line.startswith("\\"):
@@ -134,17 +165,23 @@ class DiffViewer(LineTextBrowser):
                 ml_type = (
                     self._multiline_mask[i] if i < len(self._multiline_mask) else None
                 )
-                if ml_type is not None:
+                if lang == "plain":
+                    tokens = [(code, "plain")]
+                elif ml_type is not None:
                     tokens = [(code, ml_type)]
-                elif self._lang == "md":
+                elif lang == "md":
                     tokens = self._tokenizer.tokenize_markdown(code)
                 else:
-                    tokens = self._tokenizer.tokenize(code, self._lang)
+                    tokens = self._tokenizer.tokenize(code, lang)
             result.append(
                 [
                     (
                         text,
-                        self._tokenizer.resolve_color(ttype, self._lang),
+                        (
+                            THEME.fg_primary
+                            if ttype == "plain"
+                            else self._tokenizer.resolve_color(ttype, lang)
+                        ),
                         wcswidth(text),
                     )
                     for text, ttype in tokens

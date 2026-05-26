@@ -281,39 +281,56 @@ class SyntaxTokenizer:
     # ── multi-line string / comment mask ──
 
     @staticmethod
-    def compute_multiline_mask(lines: list[str], lang: str) -> list[str | None]:
+    def compute_multiline_mask(
+        lines: list[str], line_langs: list[str]
+    ) -> list[str | None]:
         """Return a mask indicating which lines are inside a multi-line context.
 
         Each entry is either a token type (e.g. ``"docstring"``, ``"comment"``)
         or ``None``.  Hunk headers (``@@``) reset state because each hunk is a
-        non-contiguous region of the source file.
+        non-contiguous region of the source file. File headers also reset state
+        because each file may use a different language.
         """
-        # Resolve language alias chain to the base language.
-        base_lang = lang
-        seen = set()
-        while (
-            base_lang in _LANGUAGE_CONFIGS and "_alias" in _LANGUAGE_CONFIGS[base_lang]
-        ):
-            if base_lang in seen:
-                break
-            seen.add(base_lang)
-            base_lang = _LANGUAGE_CONFIGS[base_lang]["_alias"]
+
+        def _resolve_base(lang: str) -> str:
+            seen = set()
+            while lang in _LANGUAGE_CONFIGS and "_alias" in _LANGUAGE_CONFIGS[lang]:
+                if lang in seen:
+                    break
+                seen.add(lang)
+                lang = _LANGUAGE_CONFIGS[lang]["_alias"]
+            return lang
 
         mask: list[str | None] = [None] * len(lines)
 
-        if base_lang == "py":
-            in_docstring = False
-            quote = ""
-            for i, line in enumerate(lines):
-                if line.startswith("@@"):
-                    in_docstring = False
-                    quote = ""
-                    continue
-                if line.startswith("\\"):
-                    continue
+        in_docstring = False
+        in_block = False
+        quote = ""
 
-                content = line[1:] if line and line[0] in "+- " else line
-                stripped = content.lstrip()
+        for i, line in enumerate(lines):
+            # File boundary resets all multi-line state.
+            if line.startswith("diff --git") or line.startswith("+++ "):
+                in_docstring = False
+                in_block = False
+                quote = ""
+                continue
+
+            if line.startswith("@@"):
+                in_docstring = False
+                in_block = False
+                quote = ""
+                continue
+
+            if line.startswith("\\"):
+                continue
+
+            lang = line_langs[i] if i < len(line_langs) else "generic"
+            base_lang = _resolve_base(lang)
+
+            content = line[1:] if line and line[0] in "+- " else line
+            stripped = content.lstrip()
+
+            if base_lang == "py":
                 if not in_docstring:
                     if stripped.startswith('"""') or stripped.startswith("'''"):
                         quote = '"""' if stripped.startswith('"""') else "'''"
@@ -326,16 +343,10 @@ class SyntaxTokenizer:
                         in_docstring = False
                         quote = ""
 
-        elif _LANGUAGE_CONFIGS.get(base_lang, {}).get("block_comment") == ("/*", "*/"):
-            in_block = False
-            for i, line in enumerate(lines):
-                if line.startswith("@@"):
-                    in_block = False
-                    continue
-                if line.startswith("\\"):
-                    continue
-
-                content = line[1:] if line and line[0] in "+- " else line
+            elif _LANGUAGE_CONFIGS.get(base_lang, {}).get("block_comment") == (
+                "/*",
+                "*/",
+            ):
                 if not in_block:
                     start = content.find("/*")
                     if start != -1:
