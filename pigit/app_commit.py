@@ -27,6 +27,7 @@ from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_commit_graph import GraphRow
+from .app_diff import DiffType
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -702,4 +703,6 @@ class CommitPanel(ItemList):
                 source=self,
                 key=self.commits[self.curr_no].sha,
                 content=content,
+                repo_path=self._vm.repo_path,
+                diff_type=DiffType.COMMIT,
             )

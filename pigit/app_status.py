@@ -29,6 +29,7 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import ItemList
 
+from .app_diff import DiffType
 from .app_inspector import FileInfo
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
@@ -337,12 +338,20 @@ class StatusPanel(ItemList):
         if key == keys.KEY_ENTER:
             source_idx = self._filter.source_index(self.curr_no)
             diff = self._vm.load_diff(source_idx)
+            f = self.files[self.curr_no]
+            diff_type = (
+                DiffType.STAGED
+                if (f.has_staged_change and not f.has_unstaged_change)
+                else DiffType.UNSTAGED
+            )
             self.emit(
                 ActionEventType.goto,
                 target="diff",
                 source=self,
-                key=self.files[self.curr_no].name,
+                key=f.name,
                 content=diff,
+                repo_path=self._vm.repo_path,
+                diff_type=diff_type,
             )
             return
         if key == "a":
