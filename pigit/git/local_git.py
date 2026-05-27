@@ -31,7 +31,7 @@ def byte_str2str(text: str) -> str:
 
 from pigit.ext.executor import SILENT, WAITING, REPLY, DECODE, Executor
 from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
-from .model import File, Commit, Branch
+from .model import File, Commit, Branch, Stash
 
 
 class RepoError(Exception):
@@ -560,6 +560,86 @@ class LocalGit:
                 "files": file_items,
             }
         return file_items
+
+    def load_stashes(
+        self,
+        path: str | None = None,
+    ) -> list[Stash]:
+        """Load stash entries.
+
+        Args:
+            path: Repository path. Uses ``self.path`` if None.
+
+        Returns:
+            List of Stash objects ordered newest first.
+        """
+        path = path or self.path
+        _, err, resp = self.executor.exec(
+            'git stash list --format="%gd|%h|%s"',
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if err or resp is None:
+            return []
+        assert isinstance(resp, str)
+        text = resp
+        stashes: list[Stash] = []
+        for line in text.strip().splitlines():
+            parts = line.split("|", 2)
+            if len(parts) >= 3:
+                stashes.append(
+                    Stash(ref=parts[0], sha=parts[1], msg=parts[2])
+                )
+        return stashes
+
+    def stash_push(
+        self,
+        path: str | None = None,
+        message: str = "",
+    ) -> None:
+        """Stash current changes.
+
+        Args:
+            path: Repository path.
+            message: Optional stash message.
+
+        Raises:
+            GitError: If the stash command fails.
+        """
+        path = path or self.path
+        cmd = "git stash push"
+        if message:
+            cmd += f" -m {shlex.quote(message)}"
+        code, err, _ = self.executor.exec(
+            cmd,
+            flags=WAITING | REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0:
+            raise GitError(err or "Stash failed")
+
+    def stash_pop(
+        self,
+        ref: str,
+        path: str | None = None,
+    ) -> None:
+        """Pop a stash entry.
+
+        Args:
+            ref: Stash reference (e.g. ``stash@{0}``).
+            path: Repository path.
+
+        Raises:
+            GitError: If the pop command fails.
+        """
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            f"git stash pop {shlex.quote(ref)}",
+            flags=WAITING | REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0:
+            raise GitError(err or f"Pop failed: {ref}")
 
     def load_file_diff(
         self,

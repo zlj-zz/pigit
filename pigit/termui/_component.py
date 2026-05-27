@@ -7,6 +7,7 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
+import contextvars
 import logging
 from abc import ABC
 from typing import TYPE_CHECKING
@@ -32,6 +33,11 @@ if TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 
 NONE_SIZE = (0, 0)
+
+# Context variable for event-dispatch cycle detection during a single key event.
+_event_dispatch_state: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "_event_dispatch_state", default=None
+)
 
 
 class ComponentError(Exception):
@@ -146,18 +152,60 @@ class Component(ABC):
         self._size = size
         self.refresh()
 
-    def _handle_event(self, key: str) -> None:
-        """Process a key event using resolved bindings and ``on_key`` hook."""
+    def _handle_event(self, key: str) -> bool:
+        """Process a key event. Return True if consumed."""
+        state = _event_dispatch_state.get()
+        if state is None:
+            state = {"visited": set()}
+            token = _event_dispatch_state.set(state)
+            try:
+                return self._dispatch_event_impl(key, state)
+            finally:
+                _event_dispatch_state.reset(token)
+        return self._dispatch_event_impl(key, state)
+
+    def _dispatch_event_impl(self, key: str, state: dict) -> bool:
+        """Internal event dispatch with cycle detection."""
+        cid = id(self)
+        if cid in state["visited"]:
+            return False
+        state["visited"].add(cid)
+
+        # 1. Bindings (always consumed)
         handler = self._key_handlers.get(key)
         if handler is not None:
             handler()
+            self._maybe_reestablish_focus()
+            return True
 
+        # 2. New bubbling-aware hook: handle_key -> bool
+        handle_key = getattr(self, "handle_key", None)
+        if handle_key is not None:
+            if handle_key(key):
+                self._maybe_reestablish_focus()
+                return True
+
+        # 3. Legacy hook: on_key (always consumed, no bubbling)
         on_key = getattr(self, "on_key", None)
-        has_on_key = False
         if on_key is not None and callable(on_key):
             on_key(key)
-            has_on_key = True
+            self._maybe_reestablish_focus()
+            return True
 
+        # 4. Forward to event_target
+        target = self.event_target
+        if target is not None and id(target) not in state["visited"]:
+            if target._handle_event(key):
+                return True
+
+        # 5. Bubble to parent
+        if self.parent is not None:
+            return self.parent._handle_event(key)
+
+        return False
+
+    def _maybe_reestablish_focus(self) -> None:
+        """Re-establish focus chain if this component is the current leaf."""
         fm = get_focus_manager()
         if fm is None:
             return
@@ -169,7 +217,6 @@ class Component(ABC):
         if (
             not has_active_child
             and not parent_switched
-            and (handler is not None or has_on_key)
             and current_leaf is self
         ):
             fm.set_focus_chain(self)
@@ -236,33 +283,77 @@ class Component(ABC):
         return active if isinstance(active, Component) else None
 
     @property
+    def presented_child(self) -> Component | None:
+        """Child that represents this container for external UI (help, inspector).
+
+        None means this container presents itself.
+        Containers with an active sub-panel override this.
+        """
+        return None
+
+    @property
+    def event_target(self) -> Component | None:
+        """Child to which unhandled events are forwarded.
+
+        None means events bubble to parent instead.
+        """
+        return None
+
+    @property
     def is_focus_leaf(self) -> bool:
-        return self._focus_level == 0
+        """Return True if this component should render as focused."""
+        if self._focus_level == 0:
+            return True
+        # Container transparency: if an ancestor presents this component as its
+        # delegate child, treat this component as focused.
+        node = self.parent
+        while node is not None:
+            if node.presented_child is self and node._focus_level >= 0:
+                return True
+            node = node.parent
+        return False
 
     def find_focus_leaf(self) -> Component:
         """Walk down the tree to find the deepest focusable leaf.
 
-        Follows :meth:`active_child` when available and drills into
-        :attr:`children` for layout containers that do not manage an active child.
+        Follows :meth:`active_child` and :attr:`presented_child` when available
+        and drills into :attr:`children` for layout containers that do not
+        manage an active child.
 
         .. warning::
-            This method walks via :meth:`active_child` and :attr:`children`.
-            Passing a ``MagicMock`` (or any object that returns a new object
-            for every attribute access) will cause an infinite loop because
-            ``active_child`` and ``children`` never resolve to ``None`` / empty.
-            Tests that create a ``ComponentRoot`` must use a real ``Component``
-            instance as the ``body`` argument.
+            This method walks via :meth:`active_child`, :attr:`presented_child`,
+            and :attr:`children`. Passing a ``MagicMock`` (or any object that
+            returns a new object for every attribute access) will cause an
+            infinite loop because ``active_child`` and ``children`` never
+            resolve to ``None`` / empty. Tests that create a ``ComponentRoot``
+            must use a real ``Component`` instance as the ``body`` argument.
         """
         leaf = self
+        visited: set[int] = set()
         while True:
+            cid = id(leaf)
+            if cid in visited:
+                _logger.warning(
+                    "Cycle detected in presented_child/active_child chain at %s",
+                    type(leaf).__name__,
+                )
+                break
+            visited.add(cid)
+
+            presented = leaf.presented_child
+            if presented is not None:
+                leaf = presented
+                continue
+
             active = leaf.active_child
             if active is not None:
                 leaf = active
                 continue
+
             children = leaf.children
             if children:
                 for child in children:
-                    if child.active_child is not None:
+                    if child.presented_child is not None or child.active_child is not None:
                         leaf = child
                         break
                     if child.children:
@@ -354,3 +445,33 @@ def bind_signals(
             unsub()
 
     return unsubscribe
+
+
+def resolve_presented(component: Component | None) -> Component | None:
+    """Walk the presented_child chain to find the outermost presented component.
+
+    Used for help text, inspector data, and other external queries that should
+    penetrate container wrappers.
+    """
+    seen: set[int] = set()
+    while component is not None:
+        cid = id(component)
+        if cid in seen:
+            _logger.warning("Cycle in presented_child chain")
+            break
+        seen.add(cid)
+        presented = component.presented_child
+        if presented is None:
+            break
+        component = presented
+    return component
+
+
+def _proxy_to_presented(component: Component, method_name: str, *, default=None):
+    """Call method on component's presented_child if available."""
+    child = resolve_presented(component)
+    if child is not None and child is not component:
+        method = getattr(child, method_name, None)
+        if callable(method):
+            return method()
+    return default

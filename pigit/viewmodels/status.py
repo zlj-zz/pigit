@@ -14,7 +14,7 @@ from .base import ActionResult, IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
     from pigit.git.local_git import LocalGit
-    from pigit.git.model import File
+    from pigit.git.model import File, Stash
     from pigit.app_inspector import FileInfo
 
 
@@ -33,6 +33,9 @@ class IStatusViewModel(IListViewModel["File"]):
     def stage_indices(self, indices: set[int]) -> ActionResult: ...
     def discard_indices(self, indices: set[int]) -> ActionResult: ...
     def ignore_indices(self, indices: set[int]) -> ActionResult: ...
+    def load_stashes(self) -> list[Stash]: ...
+    def stash_push(self) -> ActionResult: ...
+    def stash_pop(self) -> ActionResult: ...
 
 
 class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
@@ -168,3 +171,20 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
 
     def ignore_indices(self, indices: set[int]) -> ActionResult:
         return self._run_batch(indices, self._git.ignore_file, "Ignored {} file(s)")
+
+    def load_stashes(self) -> list[Stash]:
+        return self._git.load_stashes()
+
+    def stash_push(self) -> ActionResult:
+        try:
+            self._git.stash_push()
+            return ActionResult(success=True, message="Stashed", should_refresh=True)
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+
+    def stash_pop(self) -> ActionResult:
+        try:
+            self._git.stash_pop("stash@{0}")
+            return ActionResult(success=True, message="Popped stash", should_refresh=True)
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))

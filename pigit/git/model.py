@@ -115,4 +115,13 @@ class Branch:
     is_remote: bool = False
 
 
+@dataclass(slots=True)
+class Stash:
+    """Model class of a git stash entry."""
+
+    ref: str
+    sha: str
+    msg: str
+
+
 GitFuncT = Callable[[File], None]

@@ -146,6 +146,7 @@ class TabView(Component):
         if self._active is not None:
             _render_child_to_surface(self._active, surface, "TabView")
 
-    def _handle_event(self, key: str):
+    def _handle_event(self, key: str) -> bool:
         if self._active is not None:
-            self._active._handle_event(key)
+            return self._active._handle_event(key)
+        return False
