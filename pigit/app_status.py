@@ -157,6 +157,11 @@ class StatusPanel(ItemList):
         self._selected: set[int] = set()
         self._visual_scroll = False  # auto-select while navigating
 
+    def filter_source_index(self, visible_idx: int | None = None) -> int:
+        """Map a visible (filtered) index back to the source data index."""
+        idx = self.curr_no if visible_idx is None else visible_idx
+        return self._filter.source_index(idx)
+
     def activate(self) -> None:
         super().activate()
         self._bind_vm_signals()

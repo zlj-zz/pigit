@@ -463,10 +463,7 @@ class DiffViewer(LineTextBrowser):
 
         header_lines: list[str] = []
         for i in range(hunk.file_header_start, hunk.start):
-            line = self._content[i]
-            if line.startswith("@@"):
-                break
-            header_lines.append(line)
+            header_lines.append(self._content[i])
 
         hunk_lines = [self._content[i] for i in range(hunk.start, hunk.end)]
         return "\n".join(header_lines + hunk_lines) + "\n"

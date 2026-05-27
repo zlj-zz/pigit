@@ -47,6 +47,7 @@ from ._runtime_context import (
     get_registry,
     get_renderer_strict,
     hide_spinner,
+    request_render,
     show_badge,
     show_sheet,
     show_spinner,
@@ -107,6 +108,7 @@ __all__ = [
     "get_badge_signal",
     "show_spinner",
     "hide_spinner",
+    "request_render",
     # Session context
     "exec_external",
     # Syntax highlighting

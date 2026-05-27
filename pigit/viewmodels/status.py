@@ -180,30 +180,21 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     def load_stashes(self) -> list[Stash]:
         return self._git.load_stashes()
 
-    def stash_push(self) -> ActionResult:
+    def _stash_op(self, fn: Callable[[], None], success_msg: str) -> ActionResult:
         try:
-            self._git.stash_push()
-            return ActionResult(success=True, message="Stashed", should_refresh=True)
+            fn()
+            return ActionResult(success=True, message=success_msg, should_refresh=True)
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+
+    def stash_push(self) -> ActionResult:
+        return self._stash_op(self._git.stash_push, "Stashed")
 
     def stash_pop(self, ref: str = "stash@{0}") -> ActionResult:
-        try:
-            self._git.stash_pop(ref)
-            return ActionResult(
-                success=True, message="Popped stash", should_refresh=True
-            )
-        except Exception as e:
-            return ActionResult(success=False, message=str(e))
+        return self._stash_op(lambda: self._git.stash_pop(ref), "Popped stash")
 
     def stash_drop(self, ref: str) -> ActionResult:
-        try:
-            self._git.stash_drop(ref)
-            return ActionResult(
-                success=True, message="Dropped stash", should_refresh=True
-            )
-        except Exception as e:
-            return ActionResult(success=False, message=str(e))
+        return self._stash_op(lambda: self._git.stash_drop(ref), "Dropped stash")
 
     def load_stash_diff(self, ref: str) -> list[str]:
         try:

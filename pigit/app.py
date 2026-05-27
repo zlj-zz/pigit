@@ -24,6 +24,7 @@ from pigit.termui import (
     hide_spinner,
     keys,
     Popup,
+    request_render,
     resolve_presented,
     show_spinner,
     show_toast,
@@ -98,6 +99,7 @@ class PigitApplication(Application):
 
     _TAB_CONFIG: dict[type, tuple[str, str]] = {
         StatusPanel: ("Status", "1"),
+        StashPanel: ("Stash", "1"),
         BranchPanel: ("Branch", "2"),
         CommitPanel: ("Commit", "3"),
         DiffViewer: ("Display", ""),
@@ -190,6 +192,10 @@ class PigitApplication(Application):
             id="palette",
         )
 
+        # Initialize header/footer for the starting tab
+        if panel_tab.active is not None:
+            _on_tab_switch(panel_tab.active)
+
         return Column(
             children=[
                 Header(
@@ -264,8 +270,10 @@ class PigitApplication(Application):
             return
         tab_view = by_id("tab_view", TabView)
         inspector = by_id("inspector", InspectorPanel)
-        active_id = getattr(getattr(tab_view, "active", None), "id", None)
-        on_status = active_id == "status"
+        active_presented = (
+            resolve_presented(tab_view.active) if tab_view is not None else None
+        )
+        on_status = isinstance(active_presented, (StatusPanel, StashPanel))
 
         if self._is_large_screen and on_status:
             tab_w = max(50, int(cols * 0.35))
@@ -300,7 +308,7 @@ class PigitApplication(Application):
             ):
                 body_row.children.append(preview)
                 preview.parent = body_row
-            body_row.set_widths(desired_widths)
+        body_row.set_widths(desired_widths)
 
     def _update_preview(self) -> None:
         """Update the preview panel for the current Status or Stash selection."""
@@ -319,7 +327,7 @@ class PigitApplication(Application):
                 self._preview_panel.clear()
                 return
             f = active.files[active.curr_no]
-            source_idx = active._filter.source_index(active.curr_no)
+            source_idx = active.filter_source_index()
             diff_lines = (
                 self._status_vm.load_diff(source_idx) if self._status_vm else []
             )
@@ -378,6 +386,7 @@ class PigitApplication(Application):
 
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
+        was_visible = self._inspector_visible
         self._inspector_visible = not self._inspector_visible
         cols, _ = terminal_size()
         inspector = by_id("inspector", InspectorPanel)
@@ -385,7 +394,10 @@ class PigitApplication(Application):
         self._apply_body_widths(cols)
         if self._inspector_visible and inspector is not None and tab_view is not None:
             active = resolve_presented(tab_view.active)
+            if not was_visible and hasattr(inspector, "_last_key"):
+                delattr(inspector, "_last_key")
             inspector.update_from(active or tab_view.active)
+        request_render()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute layout widths on terminal resize.
@@ -416,6 +428,12 @@ class PigitApplication(Application):
         """Central event router: all panel events bubble up to here."""
         if action is ActionEventType.mode_changed:
             self._header_state.mode = data.get("mode", "")
+            footer = by_id("footer", AppFooter)
+            tab_view = by_id("tab_view", TabView)
+            if footer is not None and tab_view is not None:
+                active = resolve_presented(tab_view.active)
+                provider = getattr(active, "get_help_entries", None) if active else None
+                footer.set_help_provider(provider)
             return True
         if action is ActionEventType.action_requested:
             if data.get("cmd") == "merge":
@@ -431,6 +449,23 @@ class PigitApplication(Application):
                 inspector.update_from(active)
             if isinstance(active, (StatusPanel, StashPanel)):
                 self._update_preview()
+            # Refresh footer help and header tab when focus moves inside a container
+            footer = by_id("footer", AppFooter)
+            if footer is not None and active is not None:
+                provider = getattr(active, "get_help_entries", None)
+                footer.set_help_provider(provider)
+            if active is not None:
+                tab_name = getattr(active, "tab_name", None)
+                tab_key = getattr(active, "tab_key", None)
+                if tab_name is not None:
+                    self._header_state.tab, self._header_state.tab_key = (
+                        tab_name,
+                        tab_key or "",
+                    )
+                else:
+                    self._header_state.tab, self._header_state.tab_key = (
+                        self._TAB_CONFIG.get(type(active), ("", ""))
+                    )
             return True
         return False
 
