@@ -107,7 +107,7 @@ class CommitPanel(ItemList):
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
     LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
-        THEME.accent_cyan,
+        THEME.accent_sky_blue,
         THEME.accent_green,
         THEME.accent_purple,
         THEME.accent_blue,
@@ -576,7 +576,7 @@ class CommitPanel(ItemList):
         head_fg = THEME.accent_blue if focused else THEME.fg_dim
         local_fg = THEME.accent_green if focused else THEME.fg_dim
         remote_fg = THEME.accent_magenta if focused else THEME.fg_dim
-        tag_fg = THEME.accent_cyan if focused else THEME.fg_dim
+        tag_fg = THEME.accent_sky_blue if focused else THEME.fg_dim
         arrow_fg = THEME.fg_primary
 
         entries: list[list[Segment]] = []

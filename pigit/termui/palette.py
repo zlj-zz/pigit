@@ -7,6 +7,8 @@ Date: 2026-04-27
 
 from __future__ import annotations
 
+# ── Pure color names ──
+
 PEARL: tuple[int, int, int] = (220, 220, 230)
 SLATE: tuple[int, int, int] = (120, 120, 130)
 INK: tuple[int, int, int] = (18, 18, 22)
@@ -19,7 +21,7 @@ RED: tuple[int, int, int] = (244, 135, 113)
 MUTED: tuple[int, int, int] = (150, 150, 150)
 DIM: tuple[int, int, int] = (100, 100, 100)
 
-# Legacy plenty colors (moved here for centralised palette management)
+# Extended palette
 SKY_BLUE: tuple[int, int, int] = (135, 206, 250)
 TOMATO: tuple[int, int, int] = (255, 99, 71)
 KHAKI: tuple[int, int, int] = (240, 230, 140)
@@ -27,15 +29,34 @@ PINK: tuple[int, int, int] = (255, 192, 203)
 VIOLET_RED: tuple[int, int, int] = (199, 21, 133)
 PALE_GREEN: tuple[int, int, int] = (152, 251, 152)
 
-# ── Role assignments ──
+# Dark theme specific
+CHARCOAL: tuple[int, int, int] = (24, 24, 24)
+GRAPHITE: tuple[int, int, int] = (30, 30, 30)
+GUNMETAL: tuple[int, int, int] = (42, 45, 46)
+STEEL: tuple[int, int, int] = (55, 55, 61)
+NAVY_GRAY: tuple[int, int, int] = (40, 45, 55)
+SLATE_DARK: tuple[int, int, int] = (45, 45, 50)
+
+# Semantic dark colors
+FOREST: tuple[int, int, int] = (35, 65, 45)
+OLIVE: tuple[int, int, int] = (75, 65, 20)
+MAROON: tuple[int, int, int] = (80, 40, 40)
+DARK_CRIMSON: tuple[int, int, int] = (55, 35, 35)
+MIDNIGHT: tuple[int, int, int] = (30, 50, 75)
+
+# Light / bright
+ALMOST_WHITE: tuple[int, int, int] = (220, 220, 220)
+MAGENTA: tuple[int, int, int] = (240, 130, 200)
+AMBER: tuple[int, int, int] = (255, 175, 80)
+
+# ── Legacy role assignments (kept for backward compat) ──
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK
 
-# ── Row state backgrounds (widgets) ──
-BG_HOVER: tuple[int, int, int] = (42, 45, 46)
-BG_ACTIVE: tuple[int, int, int] = (40, 45, 55)
-BG_DANGER_ROW: tuple[int, int, int] = (55, 35, 35)
+BG_HOVER = GUNMETAL
+BG_ACTIVE = NAVY_GRAY
+BG_DANGER_ROW = DARK_CRIMSON
 
 # ── Style flags (bitmask) ──
 STYLE_BOLD = 1 << 0

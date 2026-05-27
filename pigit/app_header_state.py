@@ -98,7 +98,7 @@ class HeaderState:
             [
                 Segment(self.repo, fg=self._theme.fg_primary),
                 Segment("  ", fg=self._theme.fg_dim),
-                Segment(self.branch, fg=self._theme.accent_cyan),
+                Segment(self.branch, fg=self._theme.accent_pearl),
             ]
         )
         return segs

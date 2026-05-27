@@ -82,7 +82,7 @@ class PreviewPanel(Component):
                 0,
                 0,
                 title_text,
-                fg=THEME.accent_cyan,
+                fg=THEME.accent_pearl,
                 bg=palette.DEFAULT_BG,
                 style_flags=palette.STYLE_BOLD,
             )

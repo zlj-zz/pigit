@@ -713,7 +713,7 @@ class DiffViewer(LineTextBrowser):
                     h - 1,
                     badge_x,
                     badge,
-                    fg=THEME.accent_cyan,
+                    fg=THEME.accent_sky_blue,
                     bg=THEME.bg_base,
                     style_flags=palette.STYLE_BOLD,
                 )

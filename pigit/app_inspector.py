@@ -186,7 +186,7 @@ class InspectorPanel(Component):
                 0,
                 content_x,
                 title,
-                fg=THEME.accent_cyan,
+                fg=THEME.accent_pearl,
                 bg=palette.DEFAULT_BG,
                 style_flags=palette.STYLE_BOLD,
             )
