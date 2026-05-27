@@ -24,6 +24,7 @@ from pigit.termui import (
     hide_spinner,
     keys,
     Popup,
+    resolve_presented,
     show_spinner,
     show_toast,
     ToastPosition,
@@ -41,6 +42,7 @@ from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
+from .app_stash import StashPanel
 from .app_status import StatusPanel, _status_label
 from .app_theme import THEME
 from .git.local_git import LocalGit
@@ -111,12 +113,25 @@ class PigitApplication(Application):
         self._preview_panel = PreviewPanel(id="preview")
 
         def _on_tab_switch(panel: Component) -> None:
-            provider = getattr(panel, "get_help_entries", None)
-            footer.set_help_provider(provider)
-            self._header_state.tab, self._header_state.tab_key = self._TAB_CONFIG.get(
-                type(panel), ("", "")
+            presented = resolve_presented(panel)
+            provider = (
+                getattr(presented, "get_help_entries", None) if presented else None
             )
-            inspector_panel.update_from(panel)
+            footer.set_help_provider(provider)
+            target = presented if presented is not None else panel
+            tab_name = getattr(target, "tab_name", None)
+            tab_key = getattr(target, "tab_key", None)
+            if tab_name is not None:
+                self._header_state.tab, self._header_state.tab_key = (
+                    tab_name,
+                    tab_key or "",
+                )
+            else:
+                self._header_state.tab, self._header_state.tab_key = (
+                    self._TAB_CONFIG.get(type(target), ("", ""))
+                )
+            if presented is not None:
+                inspector_panel.update_from(presented)
             if self._is_large_screen:
                 cols, _ = terminal_size()
                 self._apply_body_widths(cols)
@@ -125,9 +140,21 @@ class PigitApplication(Application):
         self._status_vm = StatusViewModel(self._git)
         self._branch_vm = BranchViewModel(self._git)
         self._commit_vm = CommitViewModel(self._git)
+
+        status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
+        stash_panel = StashPanel(vm=self._status_vm, id="stash")
+        status_stack = Column(
+            children=[status_panel, stash_panel],
+            heights=["flex", 4],
+            focus_index=0,
+            id="status",
+        )
+        setattr(status_stack, "tab_name", "Status")
+        setattr(status_stack, "tab_key", "1")
+
         panel_tab = TabView(
             children=[
-                StatusPanel(vm=self._status_vm, id="status"),
+                status_stack,
                 BranchPanel(
                     vm=self._branch_vm,
                     branch_signal=self._branch_signal,
@@ -140,7 +167,9 @@ class PigitApplication(Application):
             on_switch=_on_tab_switch,
             id="tab_view",
         )
-        provider = getattr(panel_tab.active, "get_help_entries", None)
+        active = panel_tab.active
+        presented = resolve_presented(active)
+        provider = getattr(presented or active, "get_help_entries", None)
         footer.set_help_provider(provider)
 
         cols, _ = terminal_size()
@@ -235,7 +264,8 @@ class PigitApplication(Application):
             return
         tab_view = by_id("tab_view", TabView)
         inspector = by_id("inspector", InspectorPanel)
-        on_status = tab_view is not None and isinstance(tab_view.active, StatusPanel)
+        active_id = getattr(getattr(tab_view, "active", None), "id", None)
+        on_status = active_id == "status"
 
         if self._is_large_screen and on_status:
             tab_w = max(50, int(cols * 0.35))
@@ -273,34 +303,51 @@ class PigitApplication(Application):
             body_row.set_widths(desired_widths)
 
     def _update_preview(self) -> None:
-        """Update the preview panel for the current Status selection."""
+        """Update the preview panel for the current Status or Stash selection."""
         if not self._is_large_screen or self._preview_panel is None:
             return
         tab_view = by_id("tab_view", TabView)
         if tab_view is None:
             return
-        active = tab_view.active
-        if not isinstance(active, StatusPanel):
-            return
-        if (
-            not active.files
-            or active.curr_no < 0
-            or active.curr_no >= len(active.files)
-        ):
-            self._preview_panel.clear()
-            return
-        f = active.files[active.curr_no]
-        source_idx = active._filter.source_index(active.curr_no)
-        diff_lines = self._status_vm.load_diff(source_idx) if self._status_vm else []
-        diff_type = (
-            DiffType.STAGED
-            if (f.has_staged_change and not f.has_unstaged_change)
-            else DiffType.UNSTAGED
-        )
-        self._preview_panel.set_diff_type(diff_type)
-        self._preview_panel.set_preview(
-            diff_lines, title=f.name, subtitle=_status_label(f)
-        )
+        active = resolve_presented(tab_view.active)
+        if isinstance(active, StatusPanel):
+            if (
+                not active.files
+                or active.curr_no < 0
+                or active.curr_no >= len(active.files)
+            ):
+                self._preview_panel.clear()
+                return
+            f = active.files[active.curr_no]
+            source_idx = active._filter.source_index(active.curr_no)
+            diff_lines = (
+                self._status_vm.load_diff(source_idx) if self._status_vm else []
+            )
+            diff_type = (
+                DiffType.STAGED
+                if (f.has_staged_change and not f.has_unstaged_change)
+                else DiffType.UNSTAGED
+            )
+            self._preview_panel.set_diff_type(diff_type)
+            self._preview_panel.set_preview(
+                diff_lines, title=f.name, subtitle=_status_label(f)
+            )
+        elif active is not None and isinstance(active, StashPanel):  # type: ignore[reportAttributeAccessIssue]
+            if (
+                not active.stashes  # type: ignore[reportAttributeAccessIssue]
+                or active.curr_no < 0  # type: ignore[reportAttributeAccessIssue]
+                or active.curr_no >= len(active.stashes)  # type: ignore[reportAttributeAccessIssue]
+            ):
+                self._preview_panel.clear()
+                return
+            stash = active.stashes[active.curr_no]  # type: ignore[reportAttributeAccessIssue]
+            diff_lines = (
+                self._status_vm.load_stash_diff(stash.ref) if self._status_vm else []
+            )
+            self._preview_panel.set_diff_type(DiffType.STASH)
+            self._preview_panel.set_preview(
+                diff_lines, title=stash.msg, subtitle=stash.ref
+            )
 
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
@@ -337,7 +384,8 @@ class PigitApplication(Application):
         tab_view = by_id("tab_view", TabView)
         self._apply_body_widths(cols)
         if self._inspector_visible and inspector is not None and tab_view is not None:
-            inspector.update_from(tab_view.active)
+            active = resolve_presented(tab_view.active)
+            inspector.update_from(active or tab_view.active)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute layout widths on terminal resize.
@@ -376,9 +424,12 @@ class PigitApplication(Application):
         if action is ActionEventType.selection_changed:
             inspector = by_id("inspector", InspectorPanel)
             tab_view = by_id("tab_view", TabView)
-            if inspector is not None and tab_view is not None:
-                inspector.update_from(tab_view.active)
-            if tab_view is not None and isinstance(tab_view.active, StatusPanel):
+            active = (
+                resolve_presented(tab_view.active) if tab_view is not None else None
+            )
+            if inspector is not None and active is not None:
+                inspector.update_from(active)
+            if isinstance(active, (StatusPanel, StashPanel)):
                 self._update_preview()
             return True
         return False

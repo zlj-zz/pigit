@@ -7,10 +7,13 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from .base import ActionResult, IListViewModel, ViewModelBase
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pigit.git.local_git import LocalGit
@@ -35,7 +38,9 @@ class IStatusViewModel(IListViewModel["File"]):
     def ignore_indices(self, indices: set[int]) -> ActionResult: ...
     def load_stashes(self) -> list[Stash]: ...
     def stash_push(self) -> ActionResult: ...
-    def stash_pop(self) -> ActionResult: ...
+    def stash_pop(self, ref: str = "stash@{0}") -> ActionResult: ...
+    def stash_drop(self, ref: str) -> ActionResult: ...
+    def load_stash_diff(self, ref: str) -> list[str]: ...
 
 
 class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
@@ -182,9 +187,28 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         except Exception as e:
             return ActionResult(success=False, message=str(e))
 
-    def stash_pop(self) -> ActionResult:
+    def stash_pop(self, ref: str = "stash@{0}") -> ActionResult:
         try:
-            self._git.stash_pop("stash@{0}")
-            return ActionResult(success=True, message="Popped stash", should_refresh=True)
+            self._git.stash_pop(ref)
+            return ActionResult(
+                success=True, message="Popped stash", should_refresh=True
+            )
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+
+    def stash_drop(self, ref: str) -> ActionResult:
+        try:
+            self._git.stash_drop(ref)
+            return ActionResult(
+                success=True, message="Dropped stash", should_refresh=True
+            )
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+
+    def load_stash_diff(self, ref: str) -> list[str]:
+        try:
+            text = self._git.load_stash_diff(ref)
+            return text.splitlines() if text else []
+        except Exception:
+            _logger.exception("Failed to load stash diff for %s", ref)
+            return []

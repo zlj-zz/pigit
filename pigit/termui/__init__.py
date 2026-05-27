@@ -17,7 +17,7 @@ from .types import (
 )
 
 # Core components
-from ._component import Component, ComponentError, bind_signals
+from ._component import Component, ComponentError, bind_signals, resolve_presented
 
 # Overlay components
 from .widgets import (

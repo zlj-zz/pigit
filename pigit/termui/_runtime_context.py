@@ -163,7 +163,20 @@ class FocusManager:
 
     def get_event_target(self) -> Component | None:
         """Return the component that should receive the next key event."""
-        return self._leaf or self._root.body.find_focus_leaf()
+        leaf = self._leaf or self._root.body.find_focus_leaf()
+        if leaf is None:
+            return None
+        node: Component | None = leaf
+        while node is not None:
+            parent = node.parent
+            if (
+                parent is not None
+                and parent.presented_child is node
+                and parent.event_target is node
+            ):
+                return parent
+            node = parent
+        return leaf
 
     # --- Mechanics API (low-level focus chain manipulation) ---
 

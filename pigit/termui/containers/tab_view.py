@@ -113,17 +113,28 @@ class TabView(Component):
             return True
         return False
 
+    def _resolve_target_id(self, target) -> str | None:
+        """Resolve a goto target to a child id string."""
+        if isinstance(target, str):
+            return target
+        if isinstance(target, Component):
+            # Direct child
+            if target in self.children and target.id:
+                return target.id
+            # Descendant of a direct child — walk up from target to find
+            # the ancestor that is a direct child of this TabView.
+            node: Component | None = target.parent
+            while node is not None and node is not self:
+                if node in self.children and node.id:
+                    return node.id
+                node = node.parent
+        return None
+
     def accept(self, action: ActionEventType, **data):
         """Handle a goto action by routing to the target child."""
         if action is ActionEventType.goto:
             target = data.get("target")
-            target_id = None
-            if isinstance(target, str):
-                target_id = target
-            elif (
-                isinstance(target, Component) and target in self.children and target.id
-            ):
-                target_id = target.id
+            target_id = self._resolve_target_id(target)
             if target_id:
                 self.route_to(target_id)
                 if self._active is not None:

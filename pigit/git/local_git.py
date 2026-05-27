@@ -587,9 +587,7 @@ class LocalGit:
         for line in text.strip().splitlines():
             parts = line.split("|", 2)
             if len(parts) >= 3:
-                stashes.append(
-                    Stash(ref=parts[0], sha=parts[1], msg=parts[2])
-                )
+                stashes.append(Stash(ref=parts[0], sha=parts[1], msg=parts[2]))
         return stashes
 
     def stash_push(
@@ -640,6 +638,54 @@ class LocalGit:
         )
         if code != 0:
             raise GitError(err or f"Pop failed: {ref}")
+
+    def stash_drop(
+        self,
+        ref: str,
+        path: str | None = None,
+    ) -> None:
+        """Drop a stash entry.
+
+        Args:
+            ref: Stash reference (e.g. "stash@{0}").
+            path: Repository path.
+
+        Raises:
+            GitError: If the drop command fails.
+        """
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            f"git stash drop {shlex.quote(ref)}",
+            flags=WAITING | REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0:
+            raise GitError(err or f"Drop failed: {ref}")
+
+    def load_stash_diff(
+        self,
+        ref: str,
+        path: str | None = None,
+    ) -> str:
+        """Load the diff content of a stash entry.
+
+        Args:
+            ref: Stash reference (e.g. "stash@{0}").
+            path: Repository path.
+
+        Returns:
+            Diff text as a single string.
+        """
+        path = path or self.path
+        _, err, resp = self.executor.exec(
+            f"git stash show -p {shlex.quote(ref)}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if err or resp is None:
+            return ""
+        assert isinstance(resp, str)
+        return resp
 
     def load_file_diff(
         self,

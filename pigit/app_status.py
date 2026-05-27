@@ -433,6 +433,10 @@ class StatusPanel(ItemList):
             result = self._vm.checkout_theirs(source_idx)
             self._handle_result(result)
             return
+        if key == "z":
+            result = self._vm.stash_push()
+            self._handle_result(result)
+            return
 
     # --- Helpers ---
 

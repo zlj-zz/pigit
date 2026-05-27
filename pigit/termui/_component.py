@@ -214,11 +214,7 @@ class Component(ABC):
         parent = self.parent
         parent_active = parent.active_child if parent is not None else None
         parent_switched = parent_active is not None and parent_active is not self
-        if (
-            not has_active_child
-            and not parent_switched
-            and current_leaf is self
-        ):
+        if not has_active_child and not parent_switched and current_leaf is self:
             fm.set_focus_chain(self)
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
@@ -353,7 +349,10 @@ class Component(ABC):
             children = leaf.children
             if children:
                 for child in children:
-                    if child.presented_child is not None or child.active_child is not None:
+                    if (
+                        child.presented_child is not None
+                        or child.active_child is not None
+                    ):
                         leaf = child
                         break
                     if child.children:
@@ -363,6 +362,15 @@ class Component(ABC):
                     break
             else:
                 break
+        # If leaf is nested inside a focus-managed container, return the
+        # container so that the framework routes events to it (not the leaf).
+        parent = leaf.parent
+        if (
+            parent is not None
+            and parent.presented_child is leaf
+            and parent.event_target is leaf
+        ):
+            return parent
         return leaf
 
     @property

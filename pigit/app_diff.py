@@ -42,6 +42,7 @@ class DiffType(enum.Enum):
     UNSTAGED = "unstaged"
     STAGED = "staged"
     COMMIT = "commit"
+    STASH = "stash"
 
 
 @dataclasses.dataclass

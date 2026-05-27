@@ -13,6 +13,7 @@ from collections.abc import Sequence
 
 from .._component import Component
 from .._layout import layout_flex
+from .._runtime_context import request_render
 from ..types import ActionEventType
 
 _logger = logging.getLogger(__name__)
@@ -25,12 +26,17 @@ class Column(Component):
     """Vertical stack: fixed heights + flex share.
 
     Children receive geometry from this container; manual ``x, y`` is ignored.
+
+    When ``focus_index`` is set, Column manages ``presented_child`` and
+    ``event_target`` so the active child receives events and external queries
+    (help, inspector) penetrate transparently. Tab cycles focus between children.
     """
 
     def __init__(
         self,
         children: Sequence[Component],
         heights: Sequence[int | Literal["flex"]],
+        focus_index: int | None = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -41,6 +47,7 @@ class Column(Component):
         for child in self.children:
             child.parent = self
         self._heights = list(heights)
+        self._focus_index = focus_index
 
     def set_heights(self, heights: Sequence[int | Literal["flex"]]) -> None:
         """Update the height spec for each child and validate the length.
@@ -91,6 +98,65 @@ class Column(Component):
             child._render_surface(
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
+
+    def _focused_child(self) -> Component | None:
+        """Return the currently focused child, or ``None``."""
+        if self._focus_index is not None:
+            if 0 <= self._focus_index < len(self.children):
+                return self.children[self._focus_index]
+        return None
+
+    @property
+    def presented_child(self) -> Component | None:
+        """Return the focused child when ``focus_index`` is set."""
+        return self._focused_child()
+
+    @property
+    def event_target(self) -> Component | None:
+        """Forward events to the focused child when ``focus_index`` is set."""
+        return self._focused_child()
+
+    def handle_key(self, key: str) -> bool:
+        """Cycle focus on Tab when ``focus_index`` is set."""
+        if self._focus_index is not None and key == "tab":
+            self.focus_next()
+            return True
+        return False
+
+    def focus_next(self) -> None:
+        """Cycle focus to the next child panel."""
+        if self._focus_index is None or not self.children:
+            return
+        old_child = self._focused_child()
+        self._focus_index = (self._focus_index + 1) % len(self.children)
+        new_child = self._focused_child()
+        _logger.debug(
+            "[FOCUS] focus_next: old=%s new=%s focus_index=%s",
+            type(old_child).__name__ if old_child else None,
+            type(new_child).__name__ if new_child else None,
+            self._focus_index,
+        )
+        if old_child is not None and old_child is not new_child:
+            old_child.deactivate()
+        if new_child is not None and new_child is not old_child:
+            new_child.activate()
+        self.emit(ActionEventType.mode_changed, mode="")
+        self.emit(ActionEventType.selection_changed)
+        request_render()
+
+    def activate(self) -> None:
+        super().activate()
+        child = self._focused_child()
+        if child is not None:
+            child.activate()
+        else:
+            for child in self.children:
+                child.activate()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        for child in self.children:
+            child.deactivate()
 
     def accept(self, action: ActionEventType, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not
