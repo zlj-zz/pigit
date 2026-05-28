@@ -339,7 +339,6 @@ def run_cmd_new_picker(
             self._update_status()
             if self._help_popup is not None:
                 panel = self._help_popup._child
-                panel._entries_source = None
                 panel.set_entries(self._help_entries())
 
         def _help_entries(self) -> list[tuple[str, str]]:

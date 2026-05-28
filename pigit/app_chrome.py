@@ -82,7 +82,8 @@ class AppFooter(Component):
             )
             x += left_w + 2
 
-        # Pull panel help from provider and merge with global help
+        # Pull panel help from provider, then append global help
+        # (Inspector / Palette / Quit). Panels control which entries appear.
         panel_help = self._help_provider() if self._help_provider else []
         seen = {key for key, _ in panel_help}
         help_pairs = list(panel_help)

@@ -7,7 +7,6 @@ Date: 2026-05-18
 
 from __future__ import annotations
 
-from typing import Any, cast
 from collections.abc import Callable
 
 from .. import keys, palette
@@ -26,9 +25,8 @@ class HelpPanel(Component):
     Plain help content (bordered, scrollable key list). Not modal until wrapped.
 
     Wrap with :class:`~pigit.termui.widgets.popup.Popup` to make it modal.
-    Bind ``?`` to a handler that refreshes rows (e.g.
-    :meth:`refresh_entries_from_source`) when opening help, then calls
-    ``popup.toggle()``.
+    Content is set statically via :meth:`set_entries` or
+    :meth:`set_grouped_entries`.
     """
 
     BINDINGS = [
@@ -47,14 +45,12 @@ class HelpPanel(Component):
         y: int = 1,
         size: tuple[int, int] | None = None,
         *,
-        entries_source: Component | None = None,
         key_fg: tuple[int, int, int] | None = None,
         on_toggle: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(x=x, y=y, size=size)
         self._inner_w_cfg = inner_width
         self._inner_h_cfg = inner_height
-        self._entries_source = entries_source
         self._key_fg = key_fg
         self._on_toggle = on_toggle
         self._lines: list[str] = []
@@ -152,38 +148,6 @@ class HelpPanel(Component):
         self._lines = lines
         self._line_segments = segments
         self._offset = 0
-
-    def on_before_show(self) -> None:
-        """Refresh help entries from the configured source before opening."""
-        if self._entries_source is not None:
-            self.refresh_entries_from_source(self._entries_source)
-
-    def refresh_entries_from_source(
-        self, entries_source: Any, *, max_rows: int = 256
-    ) -> None:
-        """
-        Build grouped help rows from ``entries_source.children``.
-
-        Collect :meth:`~pigit.termui._component.Component.get_help_entries` from
-        each mapped child, group by
-        :meth:`~pigit.termui._component.Component.get_help_title`, then call
-        :meth:`set_grouped_entries` (truncated to ``max_rows``).
-        """
-        children = getattr(entries_source, "children", None)
-        if children is None:
-            raise TypeError("Source must expose a non-optional `children` sequence.")
-        groups: list[tuple[str, list[HelpEntry]]] = []
-        for panel in children:
-            entries = panel.get_help_entries()
-            if not entries:
-                continue
-            title_getter = getattr(panel, "get_help_title", None)
-            if callable(title_getter):
-                title = cast(str, title_getter())
-            else:
-                title = panel.__class__.__name__.replace("Panel", "")
-            groups.append((title, entries))
-        self.set_grouped_entries(groups)
 
     def scroll_down(self) -> None:
         """Scroll the help content down by one line."""

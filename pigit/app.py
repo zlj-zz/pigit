@@ -52,6 +52,69 @@ from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 
+# Static help groups for HelpPanel (all operations, grouped by panel).
+# Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
+_HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
+    (
+        "Status",
+        [
+            ("jk/↑↓", "Navigate"),
+            ("Enter", "Open"),
+            ("/", "Filter"),
+            ("a", "Stage"),
+            ("d", "Discard"),
+            ("i", "Ignore"),
+            ("C", "Commit"),
+            ("v", "Visual"),
+            ("E", "Edit file"),
+            ("o", "Ours"),
+            ("t", "Theirs"),
+        ],
+    ),
+    (
+        "Stash",
+        [
+            ("jk/↑↓", "Navigate"),
+            ("Enter", "View diff"),
+            ("p", "Pop stash"),
+            ("d", "Drop stash"),
+        ],
+    ),
+    (
+        "Branch",
+        [
+            ("jk/↑↓", "Navigate"),
+            ("c", "Checkout"),
+            ("n", "New branch"),
+            ("r", "Rename"),
+            ("d", "Delete"),
+            ("R", "Scope"),
+            ("m", "Merge into selected"),
+        ],
+    ),
+    (
+        "Commit",
+        [
+            ("jk/↑↓", "Navigate"),
+            ("Enter", "View"),
+            ("/", "Search"),
+            ("g", "Toggle view"),
+            ("z", "Toggle expanded"),
+            ("Y", "Copy SHA"),
+        ],
+    ),
+    (
+        "Diff",
+        [
+            ("jk", "Navigate"),
+            ("JK", "Quick Navigate"),
+            ("] [", "Next/Prev hunk"),
+            ("H", "Hunk mode"),
+            ("esc", "Back"),
+        ],
+    ),
+]
+
 
 class PigitApplication(Application):
     """Pigit TUI application entry."""
@@ -214,9 +277,9 @@ class PigitApplication(Application):
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            entries_source=by_id("tab_view", TabView),
             key_fg=THEME.accent_blue,
         )
+        self._help_panel.set_grouped_entries(_HELP_GROUPS)
         self._help_popup = Popup(
             self._help_panel,
             exit_key=keys.KEY_ESC,
@@ -232,6 +295,7 @@ class PigitApplication(Application):
             )
 
         # Initialize layout for large screen (inserts preview only if Status is active)
+        self._sync_stash_height(rows)
         if self._is_large_screen:
             self._apply_body_widths(cols)
             self._update_preview()
@@ -384,6 +448,12 @@ class PigitApplication(Application):
         """Compute inspector width: 30% of total, capped at 45."""
         return min(int(total_width * 0.3), 45)
 
+    def _sync_stash_height(self, rows: int) -> None:
+        """Set StashPanel height to 25% of rows, capped at 10, min 3."""
+        status_stack = by_id("status", Column)
+        if status_stack is not None:
+            status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
+
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
         was_visible = self._inspector_visible
@@ -400,15 +470,16 @@ class PigitApplication(Application):
         request_render()
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Recompute layout widths on terminal resize.
+        """Recompute layout widths and stash height on terminal resize.
 
         Note: super().resize() is NOT called here because
         _ApplicationEventLoop.resize() already propagates resize to the
         component tree after this method returns.
         """
-        cols = size[0]
+        cols, rows = size
         was_large = self._is_large_screen
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
+        self._sync_stash_height(rows)
         self._apply_body_widths(cols)
         if was_large and not self._is_large_screen and self._preview_panel is not None:
             self._preview_panel.clear()

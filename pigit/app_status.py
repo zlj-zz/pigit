@@ -502,14 +502,13 @@ class StatusPanel(ItemList):
             ]
         entries = [
             ("jk/↑↓", "Navigate"),
-            ("Enter", "Open"),
+            ("↵ ", "Open"),
             ("/", "Filter"),
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
             ("C", "Commit"),
             ("v", "Visual"),
-            ("E", "Edit file"),
         ]
         if (
             self.files

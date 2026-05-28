@@ -189,7 +189,7 @@ class CommitPanel(ItemList):
         """Return help pairs for commit panel."""
         return [
             ("jk/↑↓", "Navigate"),
-            ("Enter", "View"),
+            ("↵ ", "View"),
             ("/", "Search"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),

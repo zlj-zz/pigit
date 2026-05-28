@@ -136,7 +136,7 @@ class StashPanel(ItemList):
     def get_help_entries(self) -> list[tuple[str, str]]:
         entries = [
             ("jk/↑↓", "Navigate"),
-            ("Enter", "View diff"),
+            ("↵ ", "View diff"),
             ("p", "Pop stash"),
             ("d", "Drop stash"),
         ]

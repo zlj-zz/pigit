@@ -122,7 +122,6 @@ class BranchPanel(ItemList):
             ("r", "Rename"),
             ("d", "Delete"),
             ("R", f"Scope ({scope_label})"),
-            ("m", "Merge into selected"),
         ]
 
     def get_inspector_data(self) -> BranchInfo | None:
