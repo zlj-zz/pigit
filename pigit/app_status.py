@@ -21,13 +21,16 @@ from pigit.termui import (
     bind_keys,
     bind_signals,
     by_id,
+    dismiss_sheet,
     exec_external,
     keys,
     palette,
     Segment,
     show_badge,
+    show_sheet,
     show_toast,
 )
+from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
@@ -409,6 +412,36 @@ class StatusPanel(ItemList):
                 needs_confirm=True,
             )
             return
+        if key == "c":
+            if not self._vm.staged_files:
+                show_toast("No staged changes to commit", duration=1.5)
+                return
+            from .app_commit_editor import CommitEditor
+
+            def _do_commit(msg: str) -> None:
+                subject = msg.split("\n", 1)[0].strip()
+                result = self._vm.commit(msg)
+                if result.success:
+                    dismiss_sheet()
+                    self._vm.refresh()
+                    show_badge(f"Committed: {subject}", duration=1.5)
+                else:
+                    show_toast(result.message, duration=2.0)
+
+            editor = CommitEditor(
+                vm=self._vm,
+                staged_files=self._vm.staged_files,
+                on_submit=_do_commit,
+                on_cancel=dismiss_sheet,
+            )
+            rows = terminal_size()[1]
+            show_sheet(
+                editor,
+                height=min(rows - 2, max(10, int(rows * 0.35))),
+                show_border=True,
+            )
+            editor.activate()
+            return
         if key == "C":
             if not any(f.has_staged_change for f in self.files):
                 show_toast("No staged changes to commit", duration=2.0)
@@ -507,7 +540,7 @@ class StatusPanel(ItemList):
             ("a", "Stage"),
             ("d", "Discard"),
             ("i", "Ignore"),
-            ("C", "Commit"),
+            ("c", "Commit"),
             ("v", "Visual"),
         ]
         if (

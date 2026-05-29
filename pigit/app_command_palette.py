@@ -59,6 +59,7 @@ class CommandPalette(Component):
         self._input_line = InputLine(
             prompt="> ",
             on_value_changed=self._on_input_changed,
+            allow_newline=False,
         )
         self._candidates: list[str] = []
         self._selected = 0

@@ -229,11 +229,13 @@ class ComponentRoot(Component):
         self._layer_stack.push(LayerKind.TOAST, toast)
         return toast
 
-    def show_sheet(self, child: Component, height: int = 8) -> Sheet:
+    def show_sheet(
+        self, child: Component, height: int = 8, show_border: bool = False
+    ) -> Sheet:
         """Display a bottom sheet on the SHEET layer."""
         from .widgets import Sheet
 
-        sheet = Sheet(child, height)
+        sheet = Sheet(child, height, show_border=show_border)
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
         return sheet

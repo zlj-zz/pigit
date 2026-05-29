@@ -57,6 +57,7 @@ class TestComponentRoot:
         popup = MagicMock()
         popup.open = True
         popup.parent = None
+        popup.presented_child = None
         popup.dispatch_overlay_key.return_value = OverlayDispatchResult.HANDLED_EXPLICIT
         root._layer_stack.push(LayerKind.MODAL, popup)
         root._handle_event("k")

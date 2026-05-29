@@ -144,17 +144,26 @@ class FocusManager:
 
     # --- Policy API (high-level decisions about where focus should go) ---
 
+    def _resolve_overlay_target(self, overlay: Component) -> Component:
+        """Walk the presented_child chain to the deepest leaf."""
+        from ._component import resolve_presented
+
+        result = resolve_presented(overlay)
+        return result if result is not None else overlay
+
     def sync_focus_to_overlay_or_leaf(self) -> None:
         """Set focus to the top open overlay, or body leaf if none."""
         top = self._root._top_open_overlay()
-        target = top if top is not None else self._root.body.find_focus_leaf()
-        self.set_focus_chain(target)
+        if top is not None:
+            self.set_focus_chain(self._resolve_overlay_target(top))
+        else:
+            self.set_focus_chain(self._root.body.find_focus_leaf())
 
     def sync_focus_to_overlay(self) -> None:
-        """If an overlay is open, set focus to it; otherwise do nothing."""
+        """If an overlay is open, set focus to its deepest presented child."""
         top = self._root._top_open_overlay()
         if top is not None:
-            self.set_focus_chain(top)
+            self.set_focus_chain(self._resolve_overlay_target(top))
 
     def sync_focus_if_overlay_closed(self, was_open: bool, now_open: bool) -> None:
         """Restore focus to body leaf when an overlay closes."""
@@ -167,7 +176,9 @@ class FocusManager:
         if leaf is None:
             return None
         node: Component | None = leaf
-        while node is not None:
+        for _ in range(128):
+            if node is None:
+                break
             parent = node.parent
             if (
                 parent is not None
@@ -206,23 +217,20 @@ class FocusManager:
 
         The leaf receives level ``0``, its parent ``1``, and so on.
         All previously-focused nodes are reset to ``-1``.
-
-        .. warning::
-            This method walks the ``parent`` chain until it reaches ``None``.
-            Passing a ``MagicMock`` (or any object whose ``parent`` attribute
-            never returns ``None``) will cause an infinite loop.  Tests that
-            create a ``ComponentRoot`` must use a real ``Component`` instance
-            as the ``body`` argument.
         """
         if self._leaf is leaf:
             return
         old = self._leaf
-        while old is not None:
+        for _ in range(128):
+            if old is None:
+                break
             old._focus_level = -1
             old = old.parent
         level = 0
         node: Component | None = leaf
-        while node is not None:
+        for _ in range(128):
+            if node is None:
+                break
             node._focus_level = level
             level += 1
             node = node.parent
@@ -441,9 +449,11 @@ def show_toast(
     )
 
 
-def show_sheet(child: Component, height: int = 8) -> Sheet | None:
+def show_sheet(
+    child: Component, height: int = 8, show_border: bool = False
+) -> Sheet | None:
     """Display a bottom sheet via the current overlay host."""
-    return _with_host(lambda h: h.show_sheet(child, height))
+    return _with_host(lambda h: h.show_sheet(child, height, show_border=show_border))
 
 
 def dismiss_sheet() -> None:

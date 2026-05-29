@@ -300,6 +300,7 @@ def run_cmd_new_picker(
                 on_value_changed=self._on_filter_value_changed,
                 on_submit=self._on_input_submit,
                 on_cancel=self._on_input_cancel,
+                allow_newline=False,
             )
 
         def _build_grouped_content(

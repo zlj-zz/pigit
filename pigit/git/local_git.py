@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shlex
 import time
@@ -165,6 +166,21 @@ class LocalGit:
                     continue
 
             return conf_dict
+
+    def get_config_value(self, key: str, path: str | None = None) -> str | None:
+        """Get a single git config value by key (e.g. ``commit.template``).
+
+        Returns ``None`` if the key is not set.
+        """
+        path = path or self.path
+        code, _err, out = self.executor.exec(
+            f"git config {shlex.quote(key)}",
+            cwd=path,
+            flags=REPLY | DECODE,
+        )
+        if code != 0 or not out:
+            return None
+        return cast(str, out).strip()
 
     def get_head(self, path: str | None = None) -> str | None:
         """Get current repo head. Return a branch name or a commit sha string."""
@@ -1243,6 +1259,26 @@ class LocalGit:
             cwd=path,
             flags=WAITING | REPLY | DECODE,
         )
+        if code != 0:
+            msg = err or "Commit failed"
+            raise GitError(msg)
+
+    def commit(self, message: str, path: str | None = None) -> None:
+        """Create a commit with the given message."""
+        import tempfile
+
+        path = path or self.path
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(message)
+            tmp_path = f.name
+        try:
+            code, err, _ = self.executor.exec(
+                ["git", "commit", "-F", tmp_path],
+                cwd=path,
+                flags=WAITING | REPLY | DECODE,
+            )
+        finally:
+            os.unlink(tmp_path)
         if code != 0:
             msg = err or "Commit failed"
             raise GitError(msg)
