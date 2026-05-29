@@ -20,6 +20,41 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 HelpEntry = tuple[str, str]
 
 
+def _wrap_text(text: str, max_width: int) -> list[str]:
+    """Wrap *text* into lines no wider than *max_width*.
+
+    Breaks at word boundaries when possible; falls back to character
+    boundaries for very long words.
+    """
+    if max_width <= 0:
+        return [text]
+    words = text.split(" ")
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}" if current else word
+        if wcswidth(candidate) <= max_width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            # If a single word is too long, break it forcibly
+            if wcswidth(word) > max_width:
+                for ch in word:
+                    candidate2 = f"{current}{ch}" if current else ch
+                    if wcswidth(candidate2) <= max_width:
+                        current = candidate2
+                    else:
+                        if current:
+                            lines.append(current)
+                        current = ch
+            else:
+                current = word
+    if current:
+        lines.append(current)
+    return lines if lines else [""]
+
+
 class HelpPanel(Component):
     """
     Plain help content (bordered, scrollable key list). Not modal until wrapped.
@@ -27,6 +62,9 @@ class HelpPanel(Component):
     Wrap with :class:`~pigit.termui.widgets.popup.Popup` to make it modal.
     Content is set statically via :meth:`set_entries` or
     :meth:`set_grouped_entries`.
+
+    Long descriptions are automatically wrapped to fit the panel width;
+    continuation lines align with the first line's description column.
     """
 
     BINDINGS = [
@@ -64,6 +102,9 @@ class HelpPanel(Component):
         )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         self._line_segments: list[list[Segment]] = []
+        # Raw data for lazy rebuild on resize
+        self._entries: list[HelpEntry] | None = None
+        self._groups: list[tuple[str, list[HelpEntry]]] | None = None
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recalculate inner and outer dimensions for the given terminal size."""
@@ -83,44 +124,84 @@ class HelpPanel(Component):
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
         super().resize(size)
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Content setters
+    # ------------------------------------------------------------------
 
     def set_entries(self, entries: list[HelpEntry]) -> None:
         """Set flat help entries and rebuild rendered lines."""
-        if not entries:
-            self._lines = []
-            self._line_segments = []
-            self._offset = 0
-            return
-        max_key_w = max(wcswidth(key_disp) for key_disp, _ in entries)
-        lines: list[str] = []
-        segments: list[list[Segment]] = []
-        for key_disp, desc in entries:
-            pad = max_key_w - wcswidth(key_disp)
-            line = f"{key_disp}{' ' * pad}  {desc}"
-            lines.append(line)
-            seg: list[Segment] = []
-            if self._key_fg is not None:
-                seg.append(Segment(key_disp, fg=self._key_fg))
-                seg.append(Segment(" " * pad + "  "))
-            else:
-                seg.append(Segment(key_disp + " " * pad + "  "))
-            seg.append(Segment(desc))
-            segments.append(seg)
-        self._lines = lines
-        self._line_segments = segments
-        self._offset = 0
+        self._entries = list(entries)
+        self._groups = None
+        self._rebuild()
 
     def set_grouped_entries(self, groups: list[tuple[str, list[HelpEntry]]]) -> None:
         """Set grouped help entries with category headers and rebuild rendered lines."""
-        if not groups:
+        self._groups = list(groups)
+        self._entries = None
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Rebuild (wrap-aware)
+    # ------------------------------------------------------------------
+
+    def _rebuild(self) -> None:
+        """Rebuild _lines and _line_segments from raw data using current _inner_w."""
+        if self._entries is not None:
+            self._lines, self._line_segments = self._build_flat(self._entries)
+        elif self._groups is not None:
+            self._lines, self._line_segments = self._build_grouped(self._groups)
+        else:
             self._lines = []
             self._line_segments = []
-            self._offset = 0
-            return
+        self._offset = 0
+
+    def _build_flat(
+        self, entries: list[HelpEntry]
+    ) -> tuple[list[str], list[list[Segment]]]:
+        if not entries:
+            return [], []
+        max_key_w = max(wcswidth(key_disp) for key_disp, _ in entries)
+        gap = 2  # space between key column and description
+        desc_avail = max(1, self._inner_w - max_key_w - gap)
+
+        lines: list[str] = []
+        segments: list[list[Segment]] = []
+        for key_disp, desc in entries:
+            wrapped = _wrap_text(desc, desc_avail)
+            for i, desc_line in enumerate(wrapped):
+                if i == 0:
+                    pad = max_key_w - wcswidth(key_disp)
+                    line = f"{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                    seg: list[Segment] = []
+                    if self._key_fg is not None:
+                        seg.append(Segment(key_disp, fg=self._key_fg))
+                        seg.append(Segment(" " * pad + " " * gap))
+                    else:
+                        seg.append(Segment(key_disp + " " * pad + " " * gap))
+                    seg.append(Segment(desc_line))
+                else:
+                    indent = max_key_w + gap
+                    line = f"{' ' * indent}{desc_line}"
+                    seg = [Segment(" " * indent), Segment(desc_line)]
+                lines.append(line)
+                segments.append(seg)
+        return lines, segments
+
+    def _build_grouped(
+        self, groups: list[tuple[str, list[HelpEntry]]]
+    ) -> tuple[list[str], list[list[Segment]]]:
+        if not groups:
+            return [], []
         max_key_w = 0
         for _, entries in groups:
             for key_disp, _ in entries:
                 max_key_w = max(max_key_w, wcswidth(key_disp))
+
+        group_indent = 2
+        gap = 2
+        desc_avail = max(1, self._inner_w - group_indent - max_key_w - gap)
 
         lines: list[str] = []
         segments: list[list[Segment]] = []
@@ -130,24 +211,33 @@ class HelpPanel(Component):
             lines.append(title)
             segments.append([Segment(title, style_flags=palette.STYLE_BOLD)])
             for key_disp, desc in entries:
-                pad = max_key_w - wcswidth(key_disp)
-                line = f"  {key_disp}{' ' * pad}  {desc}"
-                lines.append(line)
-                seg: list[Segment] = []
-                seg.append(Segment("  "))
-                if self._key_fg is not None:
-                    seg.append(Segment(key_disp, fg=self._key_fg))
-                    seg.append(Segment(" " * pad + "  "))
-                else:
-                    seg.append(Segment(key_disp + " " * pad + "  "))
-                seg.append(Segment(desc))
-                segments.append(seg)
+                wrapped = _wrap_text(desc, desc_avail)
+                for i, desc_line in enumerate(wrapped):
+                    if i == 0:
+                        pad = max_key_w - wcswidth(key_disp)
+                        line = f"{' ' * group_indent}{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                        seg: list[Segment] = []
+                        seg.append(Segment(" " * group_indent))
+                        if self._key_fg is not None:
+                            seg.append(Segment(key_disp, fg=self._key_fg))
+                            seg.append(Segment(" " * pad + " " * gap))
+                        else:
+                            seg.append(Segment(key_disp + " " * pad + " " * gap))
+                        seg.append(Segment(desc_line))
+                    else:
+                        indent = group_indent + max_key_w + gap
+                        line = f"{' ' * indent}{desc_line}"
+                        seg = [Segment(" " * indent), Segment(desc_line)]
+                    lines.append(line)
+                    segments.append(seg)
             lines.append("")
             segments.append([])
 
-        self._lines = lines
-        self._line_segments = segments
-        self._offset = 0
+        return lines, segments
+
+    # ------------------------------------------------------------------
+    # Scrolling
+    # ------------------------------------------------------------------
 
     def scroll_down(self) -> None:
         """Scroll the help content down by one line."""
