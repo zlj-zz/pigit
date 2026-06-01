@@ -55,6 +55,7 @@ from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
+from .config import Config
 
 # Static help groups for HelpPanel (all operations, grouped by panel).
 # Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
@@ -189,6 +190,10 @@ class PigitApplication(Application):
         )
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
+        # Auto-refresh
+        cfg = Config().get()
+        self._auto_refresh_interval = cfg.tui.auto_refresh_interval
+        self._refresh_timer_id: int | None = None
         # ViewModels (stored for preview updates)
         self._status_vm: StatusViewModel | None = None
         self._commit_vm: CommitViewModel | None = None
@@ -361,6 +366,13 @@ class PigitApplication(Application):
             position=ToastPosition.BOTTOM_LEFT,
         )
         self._try_restore_merge_state()
+
+        # Register auto-refresh timer
+        if self._loop is not None and self._auto_refresh_interval > 0:
+            self._refresh_timer_id = self._loop.add_interval(
+                self._auto_refresh_interval,
+                self._refresh_active_panel,
+            )
 
     def _apply_body_widths(self, cols: int) -> None:
         """Recompute body_row widths based on screen size, active tab, and inspector state.
@@ -535,12 +547,27 @@ class PigitApplication(Application):
         by_id("tab_view", TabView).route_to("commit")
 
     def _refresh_active_panel(self) -> None:
-        """Refresh the currently active panel if it supports refresh."""
-        tab_view = by_id("tab_view", TabView)
-        if tab_view is not None:
-            active = resolve_presented(tab_view.active)
-            if active is not None and hasattr(active, "refresh"):
-                active.refresh()
+        """Auto-refresh callback: refresh the currently active panel's VM.
+
+        Skips when an overlay is open (user is in modal/sheet).
+        Does NOT call request_render(); vm.refresh() uses AsyncTask,
+        and Signal subscribers trigger rendering when data arrives.
+        """
+        try:
+            tab_view = by_id("tab_view", TabView)
+        except RuntimeError:
+            return
+        if tab_view is None:
+            return
+        active = resolve_presented(tab_view.active)
+        if active is None:
+            return
+        # Skip refresh when an overlay is open
+        if self._root is not None and self._root.has_overlay_open():
+            return
+        vm = getattr(active, "_vm", None)
+        if vm is not None and hasattr(vm, "refresh"):
+            vm.refresh()
 
     def reverse_last_action(self) -> None:
         """Reverse the most recent session action."""

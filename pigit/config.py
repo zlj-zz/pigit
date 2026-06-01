@@ -17,6 +17,7 @@ from .config_data import (
     InfoConfig,
     RepoConfig,
     LogConfig,
+    TuiConfig,
 )
 from .ext.singleton import Singleton
 from .ext.utils import confirm, traceback_info
@@ -86,6 +87,12 @@ class Config(metaclass=Singleton):
 
         # (bool) Whether output log in terminal.
         output = {log_output}
+
+        [tui]
+
+        # (float) Auto-refresh interval in seconds for the TUI.
+        # Set to 0 to disable auto-refresh.
+        auto_refresh_interval = {tui_auto_refresh_interval}
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
@@ -222,6 +229,12 @@ class Config(metaclass=Singleton):
             output=log_raw.get("output", False),
         )
 
+        # Parse [tui] section
+        tui_raw = raw.get("tui", {})
+        tui = TuiConfig(
+            auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
+        )
+
         # Version check
         if not (
             self.current_version == "unknown"
@@ -243,6 +256,7 @@ class Config(metaclass=Singleton):
             info=info,
             repo=repo,
             log=log,
+            tui=tui,
         )
 
     def load_config(self) -> None:
@@ -285,6 +299,7 @@ class Config(metaclass=Singleton):
                         repo_auto_append=str(data.repo.auto_append).lower(),
                         log_debug=str(data.log.debug).lower(),
                         log_output=str(data.log.output).lower(),
+                        tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                     )
                 )
         except Exception:

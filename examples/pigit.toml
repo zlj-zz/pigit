@@ -1,0 +1,62 @@
+#? Config file for pigit
+
+#  ____ ___ ____ ___ _____                            __ _
+# |  _ \_ _/ ___|_ _|_   _|           ___ ___  _ __  / _(_) __ _
+# | |_) | | |  _ | |  | |_____ _____ / __/ _ \| '_ \| |_| |/ _` |
+# |  __/| | |_| || |  | |_____|_____| (_| (_) | | | |  _| | (_| |
+# |_|  |___\____|___| |_|            \___\___/|_| |_|_| |_|\__, |
+#                                                          |___/
+# Git-tools -- pigit configuration.
+
+version = "unknown"
+
+[cmd]
+
+# (bool) Show original git command.
+display = true
+
+# (bool) Is it recommended to correct when entering wrong commands.
+recommend = true
+
+[counter]
+
+# (bool) Whether to use the ignore configuration of the `.gitignore` file.
+use_gitignore = true
+
+# (bool) Whether show files that cannot be counted.
+show_invalid = false
+
+# (bool) Whether show files icons. Font support required, like: 'Nerd Font'
+show_icon = false
+
+# Output format of statistical results. Supported: [table, simple]
+# When the command line width is not enough, the `simple` format is forced.
+format = "table"
+
+[info]
+
+# Git local config print format. Supported: [table, normal]
+git_config_format = "table"
+
+# Control which parts need to be displayed when viewing git repository information.
+# Support: (path, remote, branch, log, summary)
+repo_include = ["remote", "branch", "log"]
+
+[repo]
+
+# (bool) Whether auto append path to repos.
+auto_append = true
+
+[log]
+
+# (bool) Whether run PIGIT in debug mode.
+debug = false
+
+# (bool) Whether output log in terminal.
+output = false
+
+[tui]
+
+# (float) Auto-refresh interval in seconds for the TUI.
+# Set to 0 to disable auto-refresh.
+auto_refresh_interval = 10.0
