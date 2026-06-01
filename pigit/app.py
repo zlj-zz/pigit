@@ -83,6 +83,7 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("c", "Open inline commit editor"),
             ("C", "Open external $EDITOR for commit"),
             ("v", "Toggle visual multi-select mode"),
+            ("Y", "Copy file path"),
             ("E", "Open file in external $EDITOR"),
             ("o", "Checkout ours (conflict)"),
             ("t", "Checkout theirs (conflict)"),

@@ -38,6 +38,7 @@ from .app_inspector import FileInfo
 from .app_preview import PreviewPanel
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
+from .ext.utils import copy_to_clipboard
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -474,6 +475,14 @@ class StatusPanel(ItemList):
         if key == "z":
             result = self._vm.stash_push()
             self._handle_result(result)
+            return
+        if key == "Y":
+            if self.files and 0 <= self.curr_no < len(self.files):
+                path = self.files[self.curr_no].name
+                if copy_to_clipboard(path):
+                    show_toast(f"Copied: {path}", duration=1.0)
+                else:
+                    show_toast("Failed to copy to clipboard", duration=2.0)
             return
 
     # --- Helpers ---
