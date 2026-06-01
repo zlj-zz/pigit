@@ -24,6 +24,8 @@ class ICommitViewModel(IListViewModel["Commit"]):
     """Protocol for CommitPanel's ViewModel."""
 
     @property
+    def repo_path(self) -> str: ...
+    @property
     def graph_rows(self) -> list[GraphRow]: ...
     @property
     def remotes(self) -> tuple[str, ...]: ...
@@ -32,7 +34,7 @@ class ICommitViewModel(IListViewModel["Commit"]):
     def get_bodies(self) -> dict[str, str] | None: ...
 
 
-class CommitViewModel(ViewModelBase["Commit"]):
+class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     """Concrete ViewModel for commit log."""
 
     def __init__(self, git: LocalGit) -> None:
@@ -41,6 +43,10 @@ class CommitViewModel(ViewModelBase["Commit"]):
         self._graph_rows: Signal[list[GraphRow]] = Signal([])
         self._remotes: Signal[tuple[str, ...]] = Signal(())
         self._bodies: dict[str, str] | None = None
+
+    @property
+    def repo_path(self) -> str:
+        return self._git.path or ""
 
     @property
     def graph_rows(self) -> list[GraphRow]:

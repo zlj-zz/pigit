@@ -8,17 +8,24 @@ Date: 2026-04-23
 from __future__ import annotations
 
 import bisect
+import dataclasses
+import enum
 import logging
+import os
 import re
-
+import subprocess
+import tempfile
 
 from pigit.termui import (
     ActionEventType,
+    AlertDialog,
     Component,
     SyntaxTokenizer,
     keys,
     palette,
     bind_keys,
+    show_badge,
+    show_toast,
 )
 from pigit.termui._text import plain
 from pigit.termui.widgets import LineTextBrowser
@@ -29,6 +36,26 @@ from .app_theme import THEME
 _logger = logging.getLogger(__name__)
 
 _HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+class DiffType(enum.Enum):
+    UNSTAGED = "unstaged"
+    STAGED = "staged"
+    COMMIT = "commit"
+    STASH = "stash"
+
+
+@dataclasses.dataclass
+class _Hunk:
+    """A single diff hunk boundary."""
+
+    start: int  # index into _content (includes @@ line)
+    end: int  # index into _content (excludes next @@ or EOF)
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    file_header_start: int  # index of 'diff --git' line for this file
 
 
 class DiffViewer(LineTextBrowser):
@@ -83,7 +110,13 @@ class DiffViewer(LineTextBrowser):
         self._multiline_mask: list[str | None] = []
         # _render_tokens holds (text, fg_color, display_width) per token
         self._render_tokens: list[list[tuple[str, tuple[int, int, int], int]]] = []
-        self._hunk_indices: list[int] = []
+        self._hunk_starts: list[int] = []
+        self._hunk_mode = False
+        self._hunk_index = 0
+        self._hunks: list[_Hunk] = []
+        self._repo_path = ""
+        self._diff_type = DiffType.UNSTAGED
+        self._alert_dialog = AlertDialog(on_result=lambda _: None)
 
     def set_content(self, diff_lines: list[str]) -> None:
         """Set diff content and pre-compute heatmap and line numbers.
@@ -98,6 +131,14 @@ class DiffViewer(LineTextBrowser):
         the rendered output.
         """
         self._content = []
+        self._heatmap = []
+        self._heatmap_colors = []
+        self._line_numbers = []
+        self._line_langs = []
+        self._multiline_mask = []
+        self._render_tokens = []
+        self._hunks = []
+        self._hunk_starts = []
         for line in diff_lines:
             cleaned = plain(line).replace("\r", "")
             if "\t" in cleaned:
@@ -110,9 +151,89 @@ class DiffViewer(LineTextBrowser):
             self._content, self._line_langs
         )
         self._render_tokens = self._pre_tokenize()
-        self._hunk_indices = [
-            i for i, line in enumerate(self._content) if line.startswith("@@")
-        ]
+        self._hunks = self._parse_hunks()
+        self._hunk_starts = [h.start for h in self._hunks]
+        self._i = 0
+
+    def set_diff_type(self, diff_type: DiffType) -> None:
+        """Set the diff type (unstaged, staged, or commit)."""
+        self._diff_type = diff_type
+
+    def _parse_hunks(self) -> list[_Hunk]:
+        """Parse hunk boundaries from diff content in a single pass."""
+        hunks: list[_Hunk] = []
+        current_start: int | None = None
+        file_header_start = 0
+        old_start = new_start = old_count = new_count = 0
+
+        for i, line in enumerate(self._content):
+            if line.startswith("diff --git"):
+                if current_start is not None:
+                    hunks.append(
+                        _Hunk(
+                            start=current_start,
+                            end=i,
+                            old_start=old_start,
+                            old_count=old_count,
+                            new_start=new_start,
+                            new_count=new_count,
+                            file_header_start=file_header_start,
+                        )
+                    )
+                    current_start = None
+                file_header_start = i
+                continue
+
+            if line.startswith("@@"):
+                if current_start is not None:
+                    hunks.append(
+                        _Hunk(
+                            start=current_start,
+                            end=i,
+                            old_start=old_start,
+                            old_count=old_count,
+                            new_start=new_start,
+                            new_count=new_count,
+                            file_header_start=file_header_start,
+                        )
+                    )
+                current_start = i
+                m = _HUNK_HEADER_RE.match(line)
+                if m:
+                    old_start = int(m.group(1))
+                    new_start = int(m.group(2))
+                    old_count = self._parse_count(line, is_old=True)
+                    new_count = self._parse_count(line, is_old=False)
+                else:
+                    old_start = new_start = 0
+                    old_count = new_count = 1
+
+        if current_start is not None:
+            hunks.append(
+                _Hunk(
+                    start=current_start,
+                    end=len(self._content),
+                    old_start=old_start,
+                    old_count=old_count,
+                    new_start=new_start,
+                    new_count=new_count,
+                    file_header_start=file_header_start,
+                )
+            )
+        return hunks
+
+    @staticmethod
+    def _parse_count(header_line: str, *, is_old: bool) -> int:
+        """Parse hunk count from @@ header. Per git diff spec, omitted count defaults to 1."""
+        if is_old:
+            pattern = r"-(\d+)(?:,(\d+))?"
+        else:
+            pattern = r"\+(\d+)(?:,(\d+))?"
+        m = re.search(pattern, header_line)
+        if not m:
+            return 1
+        count_str = m.group(2)
+        return int(count_str) if count_str is not None else 1
 
     def _detect_line_languages(self) -> list[str]:
         """Scan file headers to determine per-line language.
@@ -194,11 +315,22 @@ class DiffViewer(LineTextBrowser):
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for diff viewer."""
-        return [
+        if self._hunk_mode:
+            return [
+                ("jk", "Prev/Next hunk"),
+                ("s", "Stage/Unstage hunk"),
+                ("d", "Discard hunk"),
+                ("H/Esc", "Exit hunk mode"),
+            ]
+        entries = [
             ("jk", "Navigate"),
             ("JK", "Quick Navigate"),
+            ("] [", "Next/Prev hunk"),
             ("esc", "Back"),
         ]
+        if self._diff_type is not DiffType.COMMIT:
+            entries.insert(2, ("H", "Hunk mode"))
+        return entries
 
     def update(self, action: ActionEventType, **data) -> None:
         if action is ActionEventType.goto:
@@ -208,6 +340,14 @@ class DiffViewer(LineTextBrowser):
             src = data.get("source")
             self.come_from = src if isinstance(src, Component) else None
             self.i_cache_key = data.get("key", "")
+            self._repo_path = data.get("repo_path", "")
+            raw_type = data.get("diff_type", "unstaged")
+            self._diff_type = (
+                DiffType(raw_type) if isinstance(raw_type, str) else DiffType.UNSTAGED
+            )
+            # Reset hunk mode on new diff
+            self._hunk_mode = False
+            self._hunk_index = 0
             content = data.get("content", "")
             match content:
                 case list():
@@ -218,16 +358,25 @@ class DiffViewer(LineTextBrowser):
 
     @bind_keys(keys.KEY_ESC)
     def _leave_display(self) -> None:
+        if self._hunk_mode:
+            self._hunk_mode = False
+            return
         if self.come_from is not None:
             self.emit(ActionEventType.goto, target=self.come_from)
 
     @bind_keys("j")
-    def _scroll_line_down(self) -> None:
-        self.scroll_down()
+    def _on_j(self) -> None:
+        if self._hunk_mode:
+            self._next_hunk_nav()
+        else:
+            self.scroll_down()
 
     @bind_keys("k")
-    def _scroll_line_up(self) -> None:
-        self.scroll_up()
+    def _on_k(self) -> None:
+        if self._hunk_mode:
+            self._prev_hunk_nav()
+        else:
+            self.scroll_up()
 
     @bind_keys("J")
     def _scroll_page_down(self) -> None:
@@ -240,20 +389,122 @@ class DiffViewer(LineTextBrowser):
     @bind_keys("]")
     def _next_hunk(self) -> None:
         """Jump to next hunk header (@@ line)."""
-        if not self._hunk_indices:
+        if not self._hunk_starts:
             return
-        pos = bisect.bisect_right(self._hunk_indices, self._i)
-        if pos < len(self._hunk_indices):
-            self._i = self._hunk_indices[pos]
+        pos = bisect.bisect_right(self._hunk_starts, self._i)
+        if pos < len(self._hunk_starts):
+            self._i = self._hunk_starts[pos]
 
     @bind_keys("[")
     def _prev_hunk(self) -> None:
         """Jump to previous hunk header (@@ line)."""
-        if not self._hunk_indices:
+        if not self._hunk_starts:
             return
-        pos = bisect.bisect_left(self._hunk_indices, self._i) - 1
+        pos = bisect.bisect_left(self._hunk_starts, self._i) - 1
         if pos >= 0:
-            self._i = self._hunk_indices[pos]
+            self._i = self._hunk_starts[pos]
+
+    @bind_keys("H")
+    def toggle_hunk_mode(self) -> None:
+        if self._diff_type is DiffType.COMMIT:
+            return
+        if not self._hunks:
+            show_toast("No hunks available", duration=1.5)
+            return
+        self._hunk_mode = not self._hunk_mode
+        if self._hunk_mode:
+            self._hunk_index = 0
+            self._scroll_to_hunk(self._hunk_index)
+
+    def _next_hunk_nav(self) -> None:
+        self._hunk_index = min(self._hunk_index + 1, len(self._hunks) - 1)
+        self._scroll_to_hunk(self._hunk_index)
+
+    def _prev_hunk_nav(self) -> None:
+        self._hunk_index = max(self._hunk_index - 1, 0)
+        self._scroll_to_hunk(self._hunk_index)
+
+    def _scroll_to_hunk(self, idx: int) -> None:
+        """Scroll so hunk header is at top of viewport."""
+        hunk = self._hunks[idx]
+        self._i = max(0, hunk.start)
+
+    def _run_hunk_action(self, action: str, *, needs_confirm: bool = False) -> None:
+        if not self._hunks or self._diff_type is DiffType.COMMIT:
+            show_toast("Not available for commit diffs", duration=1.5)
+            return
+        patch = self._extract_hunk_patch(self._hunk_index)
+        if needs_confirm:
+
+            def on_confirm(confirmed: bool) -> None:
+                if confirmed:
+                    self._apply_patch(patch, action=action)
+
+            self._alert_dialog.alert("Discard hunk?", on_confirm)
+        else:
+            self._apply_patch(patch, action=action)
+
+    @bind_keys("s")
+    def _stage_current_hunk(self) -> None:
+        self._run_hunk_action("stage")
+
+    @bind_keys("d")
+    def _discard_current_hunk(self) -> None:
+        self._run_hunk_action("discard", needs_confirm=True)
+
+    def _extract_hunk_patch(self, hunk_idx: int) -> str:
+        """Extract file header + single hunk as a valid git patch.
+
+        The file header includes everything from 'diff --git' up to (but not
+        including) the first @@ line. Previous hunks in the same file are
+        NOT included.
+        """
+        hunk = self._hunks[hunk_idx]
+
+        header_lines: list[str] = []
+        for i in range(hunk.file_header_start, hunk.start):
+            header_lines.append(self._content[i])
+
+        hunk_lines = [self._content[i] for i in range(hunk.start, hunk.end)]
+        return "\n".join(header_lines + hunk_lines) + "\n"
+
+    def _patch_cmd_and_msg(self, patch_path: str, action: str) -> tuple[list[str], str]:
+        if action == "stage":
+            if self._diff_type is DiffType.STAGED:
+                return ["git", "apply", "--cached", "-R", patch_path], "Hunk unstaged"
+            return ["git", "apply", "--cached", patch_path], "Hunk staged"
+        return ["git", "apply", "-R", patch_path], "Hunk discarded"
+
+    def _apply_patch(self, patch: str, action: str) -> None:
+        """Apply or reverse-apply a patch using subprocess (no TUI flicker)."""
+        if not self._repo_path:
+            show_toast("No repo path available", duration=2.0)
+            return
+
+        suffix = "_stage.patch" if action == "stage" else "_discard.patch"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+            f.write(patch)
+            patch_path = f.name
+
+        try:
+            cmd, msg = self._patch_cmd_and_msg(patch_path, action)
+            result = subprocess.run(cmd, cwd=self._repo_path, capture_output=True)
+            if result.returncode == 0:
+                show_badge(msg, duration=1.0)
+            else:
+                stderr = (
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else ""
+                )
+                show_toast(f"Failed: {stderr[:100]}", duration=2.0)
+        except Exception as e:
+            show_toast(f"Failed: {e}", duration=2.0)
+        finally:
+            try:
+                os.unlink(patch_path)
+            except OSError:
+                pass
 
     def _compute_heatmap(self) -> None:
         """Compute density symbol and color for each line."""
@@ -349,16 +600,18 @@ class DiffViewer(LineTextBrowser):
 
         if is_add:
             bg = THEME.bg_success
-            fg = THEME.fg_primary
         elif is_del:
             bg = THEME.bg_danger
-            fg = THEME.fg_primary
         elif line.startswith("@@"):
             bg = palette.DEFAULT_BG
-            fg = THEME.accent_blue
         else:
             bg = palette.DEFAULT_BG
-            fg = THEME.fg_primary
+
+        # Hunk mode highlight: override bg for active hunk
+        if self._hunk_mode and self._hunks:
+            hunk = self._hunks[self._hunk_index]
+            if hunk.start <= idx < hunk.end:
+                bg = THEME.bg_info
 
         if bg != palette.DEFAULT_BG:
             surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
@@ -449,6 +702,19 @@ class DiffViewer(LineTextBrowser):
                 blank_count,
                 palette.DEFAULT_BG,
             )
+
+        if self._hunk_mode:
+            badge = " HUNK "
+            badge_x = w - len(badge) - 2
+            if badge_x > 0:
+                surface.draw_text_rgb(
+                    h - 1,
+                    badge_x,
+                    badge,
+                    fg=THEME.accent_sky_blue,
+                    bg=THEME.bg_base,
+                    style_flags=palette.STYLE_BOLD,
+                )
 
     def _render_surface_borderless(self, surface) -> None:
         """Original rendering without box border, used when surface is too small."""

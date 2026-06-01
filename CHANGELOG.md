@@ -1,5 +1,53 @@
 # Changelog of pigit
 
+## 1.8.13 (2026-06-01)
+
+### Session History
+
+- **Undo stack**: one-key reversal with `u`; `U` opens a sheet overlay to browse and reverse past actions.
+- **RecentActionsPanel**: sheet overlay showing history records with relative timestamps and panel hints; `Enter` reverses to selected action, `Esc` closes.
+- **ReverseCommand**: serializable command-pattern objects for every reversible action (stage, discard, ignore, commit, stash, checkout, rename, delete branch).
+- **VM integration**: `StatusViewModel` and `BranchViewModel` push reverse commands to `SessionHistory` after successful operations.
+- **Blob capture for discard undo**: untracked files are base64-encoded; tracked files store `blob_sha` via `git hash-object -w` for byte-for-byte restoration.
+
+### Commit Editor
+
+- **Inline commit editor**: subject/body fields with real-time lint bar inside a sheet overlay; `Tab`/`Shift+Tab` cycles focus, `Ctrl+Enter` submits, `Esc` cancels.
+
+### Stash
+
+- **StashPanel in Status tab**: stash list rendered at the bottom of the Status panel with column focus cycling; `z` to push, `Z` to pop latest.
+
+### Diff
+
+- **Hunk Mode**: press `H` in diff view to toggle inline hunk staging/unstaging.
+
+### UI / Layout
+
+- **Adaptive split layout**: on large terminals (≥120 cols), Status/Branch panels show a `PreviewPanel` side-by-side with the file/branch list.
+- **Theme refresh**: cyan replaced with pearl/sky-blue/purple palette; consolidated into a single `THEME` object.
+
+### Help
+
+- **Dynamic panel width**: `HelpPanel` now uses content-adaptive width based on key-column width and average description length, clamped between min/max caps.
+- **Auto-wrap long descriptions**: descriptions are wrapped at word boundaries with aligned continuation lines.
+- **Global help group**: app-level bindings (`Q`, `?`, `;`, `I`, `1/2/3`, `u`, `U`) are now documented in the help panel.
+- **Static HelpPanel**: footer hints renamed to `footer_hints` and trimmed to top-4 entries.
+
+### TermUI
+
+- **Event bubbling**: `presented_child` and `handle_key` delegation for component-tree event routing.
+- **Overlay dispatch priority**: overlays now receive keys before app-level bindings, preventing global shortcuts from hijacking modal/sheet input.
+- **Sheet focus sync**: fixed focus restoration when closing sheet overlays via `Esc`.
+
+### Inspector
+
+- **Toggle layout fix**: inspector layout and empty-content handling on first show fixed.
+
+### Repo
+
+- **Branch switch hint**: suggests `-c/--create` when the target branch does not exist in `repo switch`.
+
 ## 1.8.12 (2026-05-26)
 
 ### Diff

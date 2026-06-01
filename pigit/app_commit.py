@@ -27,6 +27,7 @@ from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_commit_graph import GraphRow
+from .app_diff import DiffType
 from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -106,7 +107,7 @@ class CommitPanel(ItemList):
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
     LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
-        THEME.accent_cyan,
+        THEME.accent_sky_blue,
         THEME.accent_green,
         THEME.accent_purple,
         THEME.accent_blue,
@@ -188,7 +189,7 @@ class CommitPanel(ItemList):
         """Return help pairs for commit panel."""
         return [
             ("jk/↑↓", "Navigate"),
-            ("Enter", "View"),
+            ("↵ ", "View"),
             ("/", "Search"),
             ("g", "Toggle view"),
             ("z", "Toggle expanded"),
@@ -253,6 +254,7 @@ class CommitPanel(ItemList):
         if not self.commits:
             self.set_content(["No matching commits."])
             self._max_meta_w = 0
+            self._notify_change()
             return
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
@@ -264,6 +266,7 @@ class CommitPanel(ItemList):
         if self._expanded:
             self._ensure_bodies()
         self._rebuild_rows()
+        self._notify_change()
 
     def deactivate(self) -> None:
         super().deactivate()
@@ -573,7 +576,7 @@ class CommitPanel(ItemList):
         head_fg = THEME.accent_blue if focused else THEME.fg_dim
         local_fg = THEME.accent_green if focused else THEME.fg_dim
         remote_fg = THEME.accent_magenta if focused else THEME.fg_dim
-        tag_fg = THEME.accent_cyan if focused else THEME.fg_dim
+        tag_fg = THEME.accent_sky_blue if focused else THEME.fg_dim
         arrow_fg = THEME.fg_primary
 
         entries: list[list[Segment]] = []
@@ -702,4 +705,6 @@ class CommitPanel(ItemList):
                 source=self,
                 key=self.commits[self.curr_no].sha,
                 content=content,
+                repo_path=self._vm.repo_path,
+                diff_type=DiffType.COMMIT,
             )

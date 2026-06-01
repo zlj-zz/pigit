@@ -131,6 +131,7 @@ class BasePickerApp(Application):
             on_value_changed=self._on_filter,
             on_submit=self._on_filter_done,
             on_cancel=self._on_filter_done,
+            allow_newline=False,
         )
 
     def on_key_extra(self, key: str) -> None:
@@ -159,7 +160,6 @@ class BasePickerApp(Application):
 
         if self._help_popup is not None:
             panel = self._help_popup._child
-            panel._entries_source = None
             panel.set_entries(self._help_entries())
 
     def _help_entries(self) -> list[tuple[str, str]]:

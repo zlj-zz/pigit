@@ -34,7 +34,7 @@ _HEATMAP_COLORS: list[tuple[int, int, int]] = [
 
 # Author line chart colors (top 6 authors)
 _AUTHOR_COLORS: list[tuple[int, int, int]] = [
-    THEME.accent_cyan,
+    THEME.accent_sky_blue,
     THEME.accent_yellow,
     THEME.accent_purple,
     THEME.accent_red,

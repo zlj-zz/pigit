@@ -174,15 +174,18 @@ class ComponentRoot(Component):
                 return top
         return None
 
-    def _handle_event(self, key: str) -> None:
+    def _handle_event(self, key: str) -> bool:
         result = self.try_dispatch_overlay(key)
         if result != OverlayDispatchResult.DROPPED_UNBOUND:
             self._focus_manager.sync_focus_to_overlay_or_leaf()
-            return
+            return True
         leaf = self._focus_manager.get_event_target()
         if leaf is not None:
-            leaf._handle_event(key)
+            consumed = leaf._handle_event(key)
+            self._focus_manager.sync_focus_to_overlay()
+            return consumed
         self._focus_manager.sync_focus_to_overlay()
+        return False
 
     def _expire_badge(self) -> None:
         if getattr(self, "_badge_until", 0) and time.monotonic() > self._badge_until:
@@ -226,11 +229,13 @@ class ComponentRoot(Component):
         self._layer_stack.push(LayerKind.TOAST, toast)
         return toast
 
-    def show_sheet(self, child: Component, height: int = 8) -> Sheet:
+    def show_sheet(
+        self, child: Component, height: int = 8, show_border: bool = False
+    ) -> Sheet:
         """Display a bottom sheet on the SHEET layer."""
         from .widgets import Sheet
 
-        sheet = Sheet(child, height)
+        sheet = Sheet(child, height, show_border=show_border)
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
         return sheet

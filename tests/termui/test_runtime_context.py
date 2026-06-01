@@ -387,7 +387,7 @@ class TestOverlayHelpers:
         set_overlay_host(host)
         child = MagicMock()
         result = show_sheet(child, height=4)
-        host.show_sheet.assert_called_once_with(child, 4)
+        host.show_sheet.assert_called_once_with(child, 4, show_border=False)
         assert result is host.show_sheet.return_value
 
     def test_dismiss_sheet(self):

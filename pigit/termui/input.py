@@ -48,6 +48,33 @@ def _csi_or_ss3_byte_count(buf: bytes) -> int:
     return 0
 
 
+def _parse_csi_u(chunk: bytes) -> str | None:
+    """Parse CSI-u sequence \x1b[<code>;<mod>u -> semantic key string.
+
+    Modifier mask: 1=none 2=shift 3=alt 4=shift+alt 5=ctrl 6=ctrl+shift
+    7=ctrl+alt 8=ctrl+shift+alt
+    """
+    if not chunk.startswith(b"\x1b[") or chunk[-1:] != b"u":
+        return None
+    params = chunk[2:-1].decode("ascii", errors="ignore").split(";")
+    if not params:
+        return None
+    try:
+        key_code = int(params[0])
+    except ValueError:
+        return None
+    modifier = int(params[1]) if len(params) > 1 else 1
+    # Enter (code 13)
+    if key_code == 13:
+        if modifier == 2:
+            return keys.KEY_SHIFT_ENTER
+        if modifier == 5:
+            return keys.KEY_CTRL_ENTER
+        if modifier == 6:
+            return "ctrl shift enter"
+    return None
+
+
 def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
     """
     Match a leading escape sequence.
@@ -76,6 +103,9 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
         chunk = buf[:n]
         if chunk in keys.ESC_TO_SEMANTIC:
             return keys.ESC_TO_SEMANTIC[chunk], n, False
+        csi_u = _parse_csi_u(chunk)
+        if csi_u:
+            return csi_u, n, False
         return None, n, False
 
     # ESC + non-CSI: emit ESC; caller may re-parse following bytes.

@@ -17,7 +17,7 @@ from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component import Component
 from ._root import ComponentRoot
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
-from .types import ActionEventType
+from .types import ActionEventType, OverlayDispatchResult
 from . import keys
 
 if TYPE_CHECKING:
@@ -55,11 +55,28 @@ class _ApplicationEventLoop(AppEventLoop):
         self._app.after_start()
         self._app._auto_after_start()
 
+    def resize(self) -> None:
+        """Propagate resize to the Application before the component tree."""
+        self._app.resize(self.get_term_size())
+        super().resize()
+
     def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
         self.before_dispatch_key(key)
         if key == "window resize":
             self.resize()
             return "resize"
+
+        # When an overlay is open, give it first dibs.  If the overlay
+        # consumes the key (anything other than DROPPED_UNBOUND) we stop
+        # here so that Sheet/Modal interactions are not hijacked by global
+        # shortcuts (e.g. "2" switching tabs while typing in a commit).
+        if self._child.has_overlay_open():
+            result = self._child.try_dispatch_overlay(key)
+            if result != OverlayDispatchResult.DROPPED_UNBOUND:
+                self._child._focus_manager.sync_focus_to_overlay_or_leaf()
+                self.request_render()
+                return "child"
+            # Overlay explicitly dropped the key — fall through to app bindings.
 
         handler = self._app_key_handlers.get(key)
         if handler is not None:
@@ -83,7 +100,9 @@ class _ApplicationEventLoop(AppEventLoop):
             raise
         except Exception:
             _logger.exception(log_fmt, key)
-        self._child.sync_focus_after_app_binding(overlay_was_open)
+        overlay_now_open = self._child.has_overlay_open()
+        if overlay_was_open != overlay_now_open:
+            self._child._focus_manager.sync_focus_to_overlay_or_leaf()
         self.render()
 
 

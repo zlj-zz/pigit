@@ -87,6 +87,11 @@ class _FakeOverlay(Component):
     def refresh(self):
         pass
 
+    def dispatch_overlay_key(self, key: str):
+        from pigit.termui.types import OverlayDispatchResult
+
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
 
 class TestApplicationEventLoop:
     def test_app_binding_closes_overlay_restores_focus(self):

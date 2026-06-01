@@ -15,6 +15,7 @@ from .help_panel import HelpEntry, HelpPanel
 from .input_line import InputLine
 from .item_list import ItemList
 from .line_text_browser import LineTextBrowser
+from .lint_bar import LintBar
 from .popup import AlertDialog, AlertDialogBody, Popup
 from .sheet import Sheet
 from .status_bar import StatusBar
@@ -31,6 +32,7 @@ __all__ = [
     "InputLine",
     "ItemList",
     "LineTextBrowser",
+    "LintBar",
     "Popup",
     "Sheet",
     "StatusBar",

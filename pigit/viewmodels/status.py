@@ -7,15 +7,22 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+import base64
+import logging
+import time
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from .base import ActionResult, IListViewModel, ViewModelBase
 
+from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
+
 if TYPE_CHECKING:
     from pigit.git.local_git import LocalGit
-    from pigit.git.model import File
+    from pigit.git.model import File, Stash
     from pigit.app_inspector import FileInfo
+
+_logger = logging.getLogger(__name__)
 
 
 class IStatusViewModel(IListViewModel["File"]):
@@ -33,14 +40,23 @@ class IStatusViewModel(IListViewModel["File"]):
     def stage_indices(self, indices: set[int]) -> ActionResult: ...
     def discard_indices(self, indices: set[int]) -> ActionResult: ...
     def ignore_indices(self, indices: set[int]) -> ActionResult: ...
+    @property
+    def staged_files(self) -> list[File]: ...
+    def commit(self, message: str) -> ActionResult: ...
+    def load_stashes(self) -> list[Stash]: ...
+    def stash_push(self) -> ActionResult: ...
+    def stash_pop(self, ref: str = "stash@{0}") -> ActionResult: ...
+    def stash_drop(self, ref: str) -> ActionResult: ...
+    def load_stash_diff(self, ref: str) -> list[str]: ...
 
 
-class StatusViewModel(ViewModelBase["File"]):
+class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     """Concrete ViewModel for working tree status."""
 
-    def __init__(self, git: LocalGit) -> None:
+    def __init__(self, git: LocalGit, history: SessionHistory | None = None) -> None:
         super().__init__()
         self._git = git
+        self._history = history
 
     @property
     def repo_path(self) -> str:
@@ -97,25 +113,85 @@ class StatusViewModel(ViewModelBase["File"]):
         )
 
     def stage(self, idx: int) -> ActionResult:
-        return self._run_single(
+        f = self._file_at(idx)
+        if f is None:
+            return ActionResult(success=False, message="Invalid index")
+        was_staged = f.has_staged_change
+        result = self._run_single(
             idx,
             self._git.switch_file_status,
             lambda f: f"{'Unstaged' if f.has_staged_change else 'Staged'} {f.name}",
         )
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="unstage" if not was_staged else "stage",
+                payload={"path": f.name},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"{'Unstaged' if was_staged else 'Staged'} {f.name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result
 
     def discard(self, idx: int) -> ActionResult:
-        return self._run_single(
+        f = self._file_at(idx)
+        if f is None:
+            return ActionResult(success=False, message="Invalid index")
+
+        result = self._run_single(
             idx,
             self._git.discard_file,
             lambda f: f"Discarded {f.name}",
         )
+        if result.success and self._history is not None:
+            payload: dict = {"path": f.name, "tracked": f.tracked}
+            if f.tracked:
+                blob_sha = self._git.hash_object_file(f.name)
+                if blob_sha:
+                    payload["blob_sha"] = blob_sha
+            else:
+                content = self._git.read_file_bytes(f.name)
+                if content is not None:
+                    payload["content_b64"] = base64.b64encode(content).decode()
+
+            cmd = ReverseCommand(op_type="discard", payload=payload)
+            self._history.push(
+                HistoryRecord(
+                    description=f"Discarded {f.name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result
 
     def ignore(self, idx: int) -> ActionResult:
-        return self._run_single(
+        f = self._file_at(idx)
+        if f is None:
+            return ActionResult(success=False, message="Invalid index")
+        result = self._run_single(
             idx,
             self._git.ignore_file,
             lambda f: f"Ignored {f.name}",
         )
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="unignore",
+                payload={"path": f.name},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"Ignored {f.name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result
 
     def checkout_ours(self, idx: int) -> ActionResult:
         def _op(f: File) -> None:
@@ -159,12 +235,178 @@ class StatusViewModel(ViewModelBase["File"]):
         return FileInfo(file=f, size=size, mtime=mtime)
 
     def stage_indices(self, indices: set[int]) -> ActionResult:
-        return self._run_batch(
-            indices, self._git.switch_file_status, "Updated {} file(s)"
+        items = self._items.value
+        commands: list[ReverseCommand] = []
+        count = 0
+        try:
+            for idx in sorted(indices):
+                if idx < len(items):
+                    f = items[idx]
+                    was_staged = f.has_staged_change
+                    self._git.switch_file_status(f)
+                    commands.append(
+                        ReverseCommand(
+                            op_type="unstage" if not was_staged else "stage",
+                            payload={"path": f.name},
+                        )
+                    )
+                    count += 1
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+        if count > 0 and self._history is not None:
+            self._history.push(
+                HistoryRecord(
+                    description=f"{'Unstaged' if commands[0].op_type == 'stage' else 'Staged'} {count} file(s)",
+                    commands=commands,
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return ActionResult(
+            success=True, message=f"Updated {count} file(s)", should_refresh=count > 0
         )
 
     def discard_indices(self, indices: set[int]) -> ActionResult:
-        return self._run_batch(indices, self._git.discard_file, "Discarded {} file(s)")
+        items = self._items.value
+        commands: list[ReverseCommand] = []
+        count = 0
+        try:
+            for idx in sorted(indices):
+                if idx < len(items):
+                    self._git.discard_file(items[idx])
+                    count += 1
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+        if count > 0 and self._history is not None:
+            for idx in sorted(indices):
+                if idx < len(items):
+                    f = items[idx]
+                    payload: dict = {"path": f.name, "tracked": f.tracked}
+                    if f.tracked:
+                        blob_sha = self._git.hash_object_file(f.name)
+                        if blob_sha:
+                            payload["blob_sha"] = blob_sha
+                    else:
+                        content = self._git.read_file_bytes(f.name)
+                        if content is not None:
+                            payload["content_b64"] = base64.b64encode(content).decode()
+                    commands.append(ReverseCommand(op_type="discard", payload=payload))
+            self._history.push(
+                HistoryRecord(
+                    description=f"Discarded {count} file(s)",
+                    commands=commands,
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return ActionResult(
+            success=True, message=f"Discarded {count} file(s)", should_refresh=count > 0
+        )
 
     def ignore_indices(self, indices: set[int]) -> ActionResult:
-        return self._run_batch(indices, self._git.ignore_file, "Ignored {} file(s)")
+        items = self._items.value
+        commands: list[ReverseCommand] = []
+        count = 0
+        try:
+            for idx in sorted(indices):
+                if idx < len(items):
+                    f = items[idx]
+                    self._git.ignore_file(f)
+                    commands.append(
+                        ReverseCommand(op_type="unignore", payload={"path": f.name})
+                    )
+                    count += 1
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+        if count > 0 and self._history is not None:
+            self._history.push(
+                HistoryRecord(
+                    description=f"Ignored {count} file(s)",
+                    commands=commands,
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return ActionResult(
+            success=True, message=f"Ignored {count} file(s)", should_refresh=count > 0
+        )
+
+    def load_stashes(self) -> list[Stash]:
+        return self._git.load_stashes()
+
+    def _stash_op(self, fn: Callable[[], None], success_msg: str) -> ActionResult:
+        try:
+            fn()
+            return ActionResult(success=True, message=success_msg, should_refresh=True)
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+
+    def stash_push(self) -> ActionResult:
+        result = self._stash_op(self._git.stash_push, "Stashed")
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(op_type="stash_push", payload={})
+            self._history.push(
+                HistoryRecord(
+                    description="Stashed changes",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result
+
+    def stash_pop(self, ref: str = "stash@{0}") -> ActionResult:
+        result = self._stash_op(lambda: self._git.stash_pop(ref), "Popped stash")
+        if result.success and self._history is not None:
+            # TODO: capture stash SHA for restore
+            cmd = ReverseCommand(op_type="stash_pop", payload={})
+            self._history.push(
+                HistoryRecord(
+                    description=f"Popped {ref}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result
+
+    def stash_drop(self, ref: str) -> ActionResult:
+        return self._stash_op(lambda: self._git.stash_drop(ref), "Dropped stash")
+
+    def load_stash_diff(self, ref: str) -> list[str]:
+        try:
+            text = self._git.load_stash_diff(ref)
+            return text.splitlines() if text else []
+        except Exception:
+            _logger.exception("Failed to load stash diff for %s", ref)
+            return []
+
+    @property
+    def staged_files(self) -> list[File]:
+        return [f for f in self._items.value if f.has_staged_change]
+
+    def commit(self, message: str) -> ActionResult:
+        head_sha: str | None = None
+        try:
+            if self._history is not None:
+                head_sha = self._git.get_head()
+            self._git.commit(message)
+            result = ActionResult(
+                success=True, message="Committed", should_refresh=True
+            )
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="commit",
+                payload={"head_sha": head_sha or "", "message_preview": message[:50]},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"Committed: {message[:40]}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return result

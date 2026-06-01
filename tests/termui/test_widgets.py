@@ -272,8 +272,10 @@ class TestInputLine:
 
         mock_surface = mocker.Mock()
         mock_surface.width = 10
+        mock_surface.height = 1
         inp = InputLine(prompt="> ", size=(10, 1))
         inp.set_value("hi")
+        inp._focus_level = 0  # mark as focused so cursor is drawn
         inp._render_surface(mock_surface)
         # Text is drawn via draw_text_rgb, then block cursor is drawn via draw_text_rgb
         # at cursor position (prompt_len + cursor = 2 + 2 = 4) as reverse video.
@@ -288,12 +290,14 @@ class TestInputLine:
 
         mock_surface = mocker.Mock()
         mock_surface.width = 12
+        mock_surface.height = 1
         inp = InputLine(
             candidate_provider=lambda text: ["opt"],
             size=(12, 1),
         )
         inp.set_value("o")
         inp.on_key("tab")
+        inp._focus_level = 0  # mark as focused so cursor is drawn
         inp._render_surface(mock_surface)
         # Candidate mode draws prefix + dim suffix, then block cursor at end.
         calls = mock_surface.draw_text_rgb.call_args_list

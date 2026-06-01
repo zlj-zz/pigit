@@ -92,7 +92,7 @@ def _highlight_match(
         segments.append(
             Segment(
                 text[pos],
-                fg=palette.CYAN,
+                fg=palette.SKY_BLUE,
                 bg=bg,
                 style_flags=palette.STYLE_BOLD | palette.STYLE_UNDERLINE,
             )
@@ -200,7 +200,7 @@ def run_cmd_new_picker(
                 left = [
                     Segment(
                         "◆ ",
-                        fg=palette.CYAN,
+                        fg=palette.PURPLE,
                         bg=bg,
                         style_flags=row_style,
                     )
@@ -212,7 +212,7 @@ def run_cmd_new_picker(
                     Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)
                 ]
 
-            name_fg = palette.CYAN if in_mru else palette.DEFAULT_FG
+            name_fg = palette.PURPLE if in_mru else palette.DEFAULT_FG
 
             name_segs = _highlight_match(
                 ent.name, app._filter_needle, fg=name_fg, bg=bg
@@ -300,6 +300,7 @@ def run_cmd_new_picker(
                 on_value_changed=self._on_filter_value_changed,
                 on_submit=self._on_input_submit,
                 on_cancel=self._on_input_cancel,
+                allow_newline=False,
             )
 
         def _build_grouped_content(
@@ -339,7 +340,6 @@ def run_cmd_new_picker(
             self._update_status()
             if self._help_popup is not None:
                 panel = self._help_popup._child
-                panel._entries_source = None
                 panel.set_entries(self._help_entries())
 
         def _help_entries(self) -> list[tuple[str, str]]:

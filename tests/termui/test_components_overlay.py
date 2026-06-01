@@ -389,9 +389,25 @@ class TestSheet:
 
         child._render_surface.assert_called_once()
         sub = child._render_surface.call_args[0][0]
-        # Subsurface height matches sheet size; _to_parent translates to bottom area
+        # Default: no border, child gets full sheet height
         assert sub.height == 3
+        assert sub._to_parent(0, 0) == (7, 0)
         assert hasattr(sub, "_to_parent")
+
+    def test_sheet_render_surface_with_border(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, show_border=True)
+        sheet._size = (20, 3)
+
+        surface = Surface(20, 10)
+        sheet._render_surface(surface)
+
+        child._render_surface.assert_called_once()
+        sub = child._render_surface.call_args[0][0]
+        # With border: child height is sheet height minus 1
+        assert sub.height == 2
+        assert sub._to_parent(0, 0) == (8, 0)
 
     def test_sheet_render_surface_zero_height_skips(self):
         child = MagicMock()
@@ -412,12 +428,12 @@ class TestSheet:
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
         child.dispatch_overlay_key.assert_called_once_with("k")
 
-    def test_sheet_dispatch_no_child_handler_returns_dropped(self):
+    def test_sheet_dispatch_routes_to_child_handle_event(self):
         child = _Leaf()
         sheet = Sheet(child, height=3)
 
         result = sheet.dispatch_overlay_key("k")
-        assert result is OverlayDispatchResult.DROPPED_UNBOUND
+        assert result is OverlayDispatchResult.HANDLED_EXPLICIT
 
     def test_sheet_resize_sets_size_and_child_size(self):
         child = MagicMock()
@@ -425,6 +441,7 @@ class TestSheet:
         sheet.resize((40, 20))
 
         assert sheet._size == (40, 6)
+        # Default: no border, child gets full sheet height
         child.resize.assert_called_once_with((40, 6))
 
     def test_sheet_resize_clamps_to_half_height(self):
@@ -433,7 +450,17 @@ class TestSheet:
         sheet.resize((40, 20))
 
         assert sheet._size == (40, 10)
+        # Default: no border, child gets full sheet height
         child.resize.assert_called_once_with((40, 10))
+
+    def test_sheet_resize_with_border_reduces_child_height(self):
+        child = MagicMock()
+        sheet = Sheet(child, height=6, show_border=True)
+        sheet.resize((40, 20))
+
+        assert sheet._size == (40, 6)
+        # With border: child height is sheet height minus 1
+        child.resize.assert_called_once_with((40, 5))
 
     def test_sheet_hide_sets_open_false(self):
         child = _Leaf()

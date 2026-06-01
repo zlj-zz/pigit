@@ -63,11 +63,13 @@ class BranchPanel(ItemList):
             prompt="Rename branch: ",
             on_submit=self._on_rename_submit,
             on_cancel=dismiss_sheet,
+            allow_newline=False,
         )
         self._new_branch_input = InputLine(
             prompt="New branch: ",
             on_submit=self._on_new_branch_submit,
             on_cancel=dismiss_sheet,
+            allow_newline=False,
         )
         self._alert_dialog = AlertDialog(
             inner_width=40,
@@ -122,7 +124,6 @@ class BranchPanel(ItemList):
             ("r", "Rename"),
             ("d", "Delete"),
             ("R", f"Scope ({scope_label})"),
-            ("m", "Merge into selected"),
         ]
 
     def get_inspector_data(self) -> BranchInfo | None:
