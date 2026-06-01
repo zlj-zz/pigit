@@ -43,7 +43,17 @@ pip install -e ".[dev]"
 
 Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments to enter it.
 
-The TUI provides interactive panels for status, branch list, commit log, diff viewer, and more. Use `j`/`k` or arrow keys to navigate, `Enter` to select, and `q` or `Esc` to go back. Press `?` or `h` at any time to see available key bindings.
+The TUI provides interactive panels for status, branch list, commit log, diff viewer, and more. Use `j`/`k` or arrow keys to navigate, `Enter` to select, and `q` or `Esc` to go back. Press `?` at any time to see available key bindings.
+
+**Status panel** — stage/unstage files with `a`, discard with `d`, ignore with `i`, and view inline diffs with `Enter`. A stash list sits at the bottom (`z` to push, `Z` to pop). On wide terminals a file-preview splits the view.
+
+**Diff viewer** — press `H` to toggle hunk mode and stage/unstage individual hunks inline.
+
+**Commit editor** — press `c` in the status panel to open an inline subject/body editor with lint feedback; `Ctrl+Enter` submits.
+
+**Session history** — press `u` to undo the last action, or `U` to open a sheet and reverse multiple steps.
+
+**Branch panel** — checkout, create, rename, and delete branches; `R` scopes to a repo sub-directory.
 
 For operations that are cumbersome on the command line—such as staging individual hunks, browsing commit history with inline graphs, or resolving merge conflicts—the TUI is the recommended workflow.
 
@@ -220,6 +230,11 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 ## Features
 
 - **TUI-first workflow** — interactive panels for status, branch, commit log, diff, and more.
+- **Session history / undo** — one-key reversal (`u`) and a browsable undo stack (`U`).
+- **Inline commit editor** — subject/body fields with lint bar inside the TUI.
+- **Hunk staging** — stage or unstage individual hunks directly in the diff viewer (`H`).
+- **Stash management** — push, pop, and drop stashes from the status panel.
+- **Adaptive layout** — side-by-side preview panel on large terminals.
 - **Short commands** — aliases like `pigit cmd st` for `git status --short`.
 - **Command correction** — suggests the right command when you typo.
 - **Multi-repo management** — `repo` sub-commands for bulk operations across projects.
