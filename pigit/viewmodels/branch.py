@@ -7,9 +7,11 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from .base import ActionResult, IListViewModel, ViewModelBase
+from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
     from pigit.git.local_git import LocalGit
@@ -37,9 +39,10 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
 
     _SCOPES = ["local", "remote", "all"]
 
-    def __init__(self, git: LocalGit) -> None:
+    def __init__(self, git: LocalGit, history: SessionHistory | None = None) -> None:
         super().__init__()
         self._git = git
+        self._history = history
         self._scope: str = "local"
 
     @property
@@ -62,13 +65,30 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
         b = self._branch_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
+        current = self._git.get_head() or ""
         try:
+            if self._history is not None:
+                self._history.on_pre_checkout(current)
             self._git.checkout_branch(b.name)
-            return ActionResult(
+            result = ActionResult(
                 success=True, message=f"Switched to {b.name}", should_refresh=True
             )
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="checkout_branch",
+                payload={"branch": current},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"Checked out {b.name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="branch",
+                )
+            )
+        return result
 
     def create_branch(self, name: str) -> ActionResult:
         try:
@@ -85,25 +105,56 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
         b = self._branch_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
+        old_name = b.name
         try:
-            self._git.rename_branch(b.name, new_name)
-            return ActionResult(
+            self._git.rename_branch(old_name, new_name)
+            result = ActionResult(
                 success=True, message=f"Renamed to {new_name}", should_refresh=True
             )
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="rename_branch",
+                payload={"old_name": old_name, "new_name": new_name},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"Renamed {old_name} → {new_name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="branch",
+                )
+            )
+        return result
 
     def delete_branch(self, idx: int, force: bool = False) -> ActionResult:
         b = self._branch_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
+        # Capture branch SHA before deletion for potential restore
+        sha = self._git.get_head() if b.is_head else self._git._branch_sha(b.name)
         try:
             self._git.delete_branch(b.name, force=force)
-            return ActionResult(
+            result = ActionResult(
                 success=True, message=f"Deleted {b.name}", should_refresh=True
             )
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+        if result.success and self._history is not None:
+            cmd = ReverseCommand(
+                op_type="delete_branch",
+                payload={"name": b.name, "sha": sha or ""},
+            )
+            self._history.push(
+                HistoryRecord(
+                    description=f"Deleted {b.name}",
+                    commands=[cmd],
+                    timestamp=time.time(),
+                    panel_hint="branch",
+                )
+            )
+        return result
 
     def get_inspector_data(self, idx: int) -> BranchInfo | None:
         b = self._branch_at(idx)

@@ -43,7 +43,8 @@ class Sheet(Component):
         """Forward overlay keys to the child component if supported."""
         if self._child_dispatch is not None:
             return self._child_dispatch(key)
-        return OverlayDispatchResult.DROPPED_UNBOUND
+        self._child._handle_event(key)
+        return OverlayDispatchResult.HANDLED_EXPLICIT
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if self._size[1] <= 0:

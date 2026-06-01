@@ -1178,6 +1178,18 @@ class LocalGit:
         repo_root, _ = self.confirm_repo(path)
         return str((Path(repo_root) / git_dir_raw).resolve())
 
+    def _branch_sha(self, branch_name: str, path: str | None = None) -> str | None:
+        """Get the SHA of a branch. Returns None if the branch does not exist."""
+        path = path or self.path
+        code, _err, out = self.executor.exec(
+            f"git rev-parse --verify {shlex.quote(branch_name)}",
+            cwd=path,
+            flags=REPLY | DECODE,
+        )
+        if code != 0 or not out:
+            return None
+        return cast(str, out).strip()
+
     def pull(self, path: str | None = None) -> None:
         """Pull from the upstream remote. Raises GitError on failure."""
         path = path or self.path
@@ -1282,3 +1294,132 @@ class LocalGit:
         if code != 0:
             msg = err or "Commit failed"
             raise GitError(msg)
+
+    # ===============
+    # Session History helpers
+    # ===============
+
+    def hash_object_file(self, file: File | str, path: str | None = None) -> str | None:
+        """git hash-object -w <file>. Returns SHA or None. Writes blob to object DB."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, _err, out = self.executor.exec(
+            f"git hash-object -w -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=REPLY | DECODE,
+        )
+        if code != 0 or not out:
+            return None
+        return cast(str, out).strip()
+
+    def cat_file_to_path(
+        self, sha: str, dest: File | str, path: str | None = None
+    ) -> None:
+        """git cat-file -p <sha> > <dest>. Restores exact blob content."""
+        path = path or self.path
+        dest_name = _file_path_for_cmd(dest)
+        code, err, out = self.executor.exec(
+            f"git cat-file -p {shlex.quote(sha)}",
+            cwd=path,
+            flags=REPLY,
+        )
+        if code != 0:
+            raise GitError(err or f"cat-file failed: {sha}")
+        dest_path = Path(path or ".") / dest_name
+        dest_path.write_bytes(
+            out if isinstance(out, bytes) else cast(str, out).encode("utf-8")
+        )
+
+    def checkout_head_file(self, file: File | str, path: str | None = None) -> None:
+        """Restore file from HEAD (fallback when blob SHA is unavailable)."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git checkout HEAD -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"checkout HEAD failed: {file_name}")
+
+    def reset_head_file(self, file: File | str, path: str | None = None) -> None:
+        """git reset HEAD -- <file> (unstage)."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        code, err, _ = self.executor.exec(
+            f"git reset HEAD -- {shlex.quote(file_name)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"reset HEAD failed: {file_name}")
+
+    def soft_reset_head1(self, path: str | None = None) -> None:
+        """git reset --soft HEAD~1 (uncommit, keep staged)."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            "git reset --soft HEAD~1",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or "soft reset HEAD~1 failed")
+
+    def unignore_file(self, file: File | str, path: str | None = None) -> None:
+        """Remove file entry from .gitignore."""
+        path = path or self.path
+        repo_path, _ = self.confirm_repo(path)
+        file_name = _file_path_for_cmd(file)
+        gitignore_path = Path(repo_path) / ".gitignore"
+        if not gitignore_path.exists():
+            return
+        content = gitignore_path.read_text()
+        lines = content.splitlines()
+        filtered = [line for line in lines if line.strip() != file_name]
+        if len(filtered) != len(lines):
+            gitignore_path.write_text("\n".join(filtered) + ("\n" if filtered else ""))
+
+    def read_file_bytes(
+        self, file: File | str, path: str | None = None
+    ) -> bytes | None:
+        """Read raw file content."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        file_path = Path(path or ".") / file_name
+        try:
+            return file_path.read_bytes()
+        except OSError:
+            return None
+
+    def write_file_bytes(
+        self, file: File | str, data: bytes, path: str | None = None
+    ) -> None:
+        """Write raw bytes to file."""
+        path = path or self.path
+        file_name = _file_path_for_cmd(file)
+        file_path = Path(path or ".") / file_name
+        file_path.write_bytes(data)
+
+    def create_branch_at(
+        self, branch_name: str, sha: str, path: str | None = None
+    ) -> None:
+        """Create a branch at a specific commit."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            f"git branch {shlex.quote(branch_name)} {shlex.quote(sha)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"create branch at {sha} failed: {branch_name}")
+
+    def stash_store(self, sha: str, path: str | None = None) -> None:
+        """Store a commit as a stash entry."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            f"git stash store {shlex.quote(sha)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or f"stash store failed: {sha}")

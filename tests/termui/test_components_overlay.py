@@ -428,12 +428,12 @@ class TestSheet:
         assert result is OverlayDispatchResult.HANDLED_EXPLICIT
         child.dispatch_overlay_key.assert_called_once_with("k")
 
-    def test_sheet_dispatch_no_child_handler_returns_dropped(self):
+    def test_sheet_dispatch_routes_to_child_handle_event(self):
         child = _Leaf()
         sheet = Sheet(child, height=3)
 
         result = sheet.dispatch_overlay_key("k")
-        assert result is OverlayDispatchResult.DROPPED_UNBOUND
+        assert result is OverlayDispatchResult.HANDLED_EXPLICIT
 
     def test_sheet_resize_sets_size_and_child_size(self):
         child = MagicMock()

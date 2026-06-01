@@ -18,6 +18,7 @@ from pigit.termui import (
     by_id,
     Component,
     ComponentRoot,
+    dismiss_sheet,
     exec_external,
     ExitEventLoop,
     HelpPanel,
@@ -26,6 +27,8 @@ from pigit.termui import (
     Popup,
     request_render,
     resolve_presented,
+    show_badge,
+    show_sheet,
     show_spinner,
     show_toast,
     ToastPosition,
@@ -51,6 +54,7 @@ from .git.managed_repos import ManagedRepos
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
+from .session_history import SessionHistory
 
 # Static help groups for HelpPanel (all operations, grouped by panel).
 # Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
@@ -123,6 +127,13 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("esc", "Close diff and return to status"),
         ],
     ),
+    (
+        "Session History",
+        [
+            ("u", "Reverse last action"),
+            ("U", "Browse recent actions"),
+        ],
+    ),
 ]
 
 
@@ -137,6 +148,8 @@ class PigitApplication(Application):
         ("1", "goto_status"),
         ("2", "goto_branch"),
         ("3", "goto_commit"),
+        ("u", "reverse_last_action"),
+        ("U", "open_recent_actions"),
     ]
 
     def __init__(
@@ -160,6 +173,8 @@ class PigitApplication(Application):
             inner_width=50,
             on_result=lambda _: None,
         )
+        # Session history (undo stack)
+        self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         # ViewModels (stored for preview updates)
         self._status_vm: StatusViewModel | None = None
         self._commit_vm: CommitViewModel | None = None
@@ -212,8 +227,8 @@ class PigitApplication(Application):
                 self._apply_body_widths(cols)
                 self._update_preview()
 
-        self._status_vm = StatusViewModel(self._git)
-        self._branch_vm = BranchViewModel(self._git)
+        self._status_vm = StatusViewModel(self._git, history=self._session_history)
+        self._branch_vm = BranchViewModel(self._git, history=self._session_history)
         self._commit_vm = CommitViewModel(self._git)
 
         status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
@@ -504,6 +519,36 @@ class PigitApplication(Application):
 
     def goto_commit(self):
         by_id("tab_view", TabView).route_to("commit")
+
+    def _refresh_active_panel(self) -> None:
+        """Refresh the currently active panel if it supports refresh."""
+        tab_view = by_id("tab_view", TabView)
+        if tab_view is not None:
+            active = resolve_presented(tab_view.active)
+            if active is not None and hasattr(active, "refresh"):
+                active.refresh()
+
+    def reverse_last_action(self) -> None:
+        """Reverse the most recent session action."""
+        result = self._session_history.reverse(self._git)
+        if result.success:
+            show_badge(result.message, duration=1.5)
+            self._refresh_active_panel()
+        else:
+            show_toast(result.message, duration=2.0)
+
+    def open_recent_actions(self) -> None:
+        """Open the RecentActionsPanel sheet overlay."""
+        from .app_recent_actions import RecentActionsPanel
+
+        def _on_done() -> None:
+            dismiss_sheet()
+            self._refresh_active_panel()
+
+        panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
+        rows = terminal_size()[1]
+        show_sheet(panel, height=min(12, rows // 3), show_border=True)
+        panel.activate()
 
     def on_event(self, action: ActionEventType, **data) -> bool:
         """Central event router: all panel events bubble up to here."""

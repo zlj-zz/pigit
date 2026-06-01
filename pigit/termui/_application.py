@@ -100,7 +100,9 @@ class _ApplicationEventLoop(AppEventLoop):
             raise
         except Exception:
             _logger.exception(log_fmt, key)
-        self._child.sync_focus_after_app_binding(overlay_was_open)
+        overlay_now_open = self._child.has_overlay_open()
+        if overlay_was_open != overlay_now_open:
+            self._child._focus_manager.sync_focus_to_overlay_or_leaf()
         self.render()
 
 
