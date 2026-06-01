@@ -343,7 +343,15 @@ class RepoCommandHandler:
             self.console.echo("Pre-flight blocked:")
             for name, reason in blockers:
                 self.console.echo(f"  ✗ {name} — {reason}")
-            self.console.echo("\nFix the issues and retry.")
+            has_missing_branch = any(
+                "does not exist" in reason for _, reason in blockers
+            )
+            if has_missing_branch:
+                self.console.echo(
+                    "\nFix the issues and retry, or use -c/--create to create missing branches."
+                )
+            else:
+                self.console.echo("\nFix the issues and retry.")
             raise SystemExit(1)
 
         if dry_run:
