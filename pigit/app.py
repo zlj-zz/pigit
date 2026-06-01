@@ -60,6 +60,16 @@ from .session_history import SessionHistory
 # Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
 _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
+        "Global",
+        [
+            ("1 2 3", "Switch to Status / Branch / Commit tab"),
+            ("Q", "Quit Pigit"),
+            ("?", "Toggle this help panel"),
+            (";", "Open command palette"),
+            ("I", "Toggle file inspector"),
+        ],
+    ),
+    (
         "Status",
         [
             ("jk/↑↓", "Navigate file list"),
