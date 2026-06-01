@@ -67,6 +67,8 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("?", "Toggle this help panel"),
             (";", "Open command palette"),
             ("I", "Toggle file inspector"),
+            ("u", "Reverse last action"),
+            ("U", "Open recent actions sheet"),
         ],
     ),
     (
@@ -140,8 +142,9 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     (
         "Session History",
         [
-            ("u", "Reverse last action"),
-            ("U", "Browse recent actions"),
+            ("jk/↑↓", "Navigate history list"),
+            ("Enter", "Reverse to selected action"),
+            ("Esc", "Close panel"),
         ],
     ),
 ]

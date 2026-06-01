@@ -65,7 +65,13 @@ class HelpPanel(Component):
 
     Long descriptions are automatically wrapped to fit the panel width;
     continuation lines align with the first line's description column.
+
+    Width is content-adaptive with a min/max cap so the panel is neither
+    cramped in narrow terminals nor wastefully wide in large ones.
     """
+
+    MIN_INNER_W = 58
+    MAX_INNER_W = 108
 
     BINDINGS = [
         (keys.KEY_DOWN, "scroll_down"),
@@ -106,13 +112,50 @@ class HelpPanel(Component):
         self._entries: list[HelpEntry] | None = None
         self._groups: list[tuple[str, list[HelpEntry]]] | None = None
 
+    def _estimate_content_width(self) -> int:
+        """Estimate minimum inner width needed by current content."""
+        entries = self._entries
+        groups = self._groups
+        gap = 2
+        group_indent = 2
+
+        if groups:
+            max_key_w = 0
+            desc_lengths: list[int] = []
+            for _, ents in groups:
+                for key_disp, desc in ents:
+                    max_key_w = max(max_key_w, wcswidth(key_disp))
+                    desc_lengths.append(wcswidth(desc))
+            avg_desc = sum(desc_lengths) // len(desc_lengths) if desc_lengths else 0
+            desc_w = min(max(avg_desc, 16), 40)
+            return group_indent + max_key_w + gap + desc_w
+
+        if entries:
+            max_key_w = max((wcswidth(k) for k, _ in entries), default=0)
+            desc_lengths = [wcswidth(d) for _, d in entries]
+            avg_desc = sum(desc_lengths) // len(desc_lengths) if desc_lengths else 0
+            desc_w = min(max(avg_desc, 16), 40)
+            return max_key_w + gap + desc_w
+
+        return 0
+
     def resize(self, size: tuple[int, int]) -> None:
         """Recalculate inner and outer dimensions for the given terminal size."""
         tw, th = int(size[0]), int(size[1])
         avail_w, avail_h = self._padding.apply((tw, th))
-        inner_w = (
-            self._inner_w_cfg if self._inner_w_cfg is not None else max(24, tw // 2)
-        )
+
+        if self._inner_w_cfg is not None:
+            inner_w = self._inner_w_cfg
+        else:
+            content_w = self._estimate_content_width()
+            if content_w:
+                inner_w = max(
+                    self.MIN_INNER_W,
+                    min(content_w, self.MAX_INNER_W, avail_w),
+                )
+            else:
+                inner_w = max(self.MIN_INNER_W, min(self.MAX_INNER_W, avail_w))
+
         inner_h = (
             self._inner_h_cfg if self._inner_h_cfg is not None else max(8, th // 2)
         )
