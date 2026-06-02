@@ -542,6 +542,8 @@ class DiffViewer(LineTextBrowser):
             elif raw.startswith("\x00BINARY_OR_TOO_LARGE:"):
                 parts = raw.split(":")
                 size_str = parts[1].rstrip("\x00") if len(parts) > 1 else "?"
+                if size_str.startswith("-"):
+                    size_str = "unknown size"
                 content = [f"Binary file ({size_str} bytes)"]
             else:
                 content = raw.splitlines()

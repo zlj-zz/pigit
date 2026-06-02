@@ -72,11 +72,11 @@ class TestRefreshActivePanel:
         mock_panel._vm.refresh.assert_not_called()
 
     def test_refreshes_vm_when_no_overlay(self, app, mock_panel):
-        """_refresh_active_panel calls vm.refresh when no overlay is open."""
+        """_refresh_active_panel calls active.refresh when no overlay is open."""
         app._root = MagicMock()
         app._root.has_overlay_open.return_value = False
         app._refresh_active_panel()
-        mock_panel._vm.refresh.assert_called_once()
+        mock_panel.refresh.assert_called_once()
 
     def test_skips_when_no_vm(self, app):
         """_refresh_active_panel skips when active panel has no _vm."""

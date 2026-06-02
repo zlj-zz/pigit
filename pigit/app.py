@@ -370,6 +370,8 @@ class PigitApplication(Application):
 
         # Register auto-refresh timer
         if self._loop is not None and self._auto_refresh_interval > 0:
+            if self._refresh_timer_id is not None:
+                self._loop.remove_interval(self._refresh_timer_id)
             self._refresh_timer_id = self._loop.add_interval(
                 self._auto_refresh_interval,
                 self._refresh_active_panel,
@@ -566,9 +568,13 @@ class PigitApplication(Application):
         # Skip refresh when an overlay is open
         if self._root is not None and self._root.has_overlay_open():
             return
-        vm = getattr(active, "_vm", None)
-        if vm is not None and hasattr(vm, "refresh"):
-            vm.refresh()
+        # Prefer panel-level refresh (e.g. StashPanel.refresh reloads stashes)
+        if hasattr(active, "refresh") and callable(getattr(active, "refresh")):
+            active.refresh()
+        else:
+            vm = getattr(active, "_vm", None)
+            if vm is not None and hasattr(vm, "refresh"):
+                vm.refresh()
 
     def reverse_last_action(self) -> None:
         """Reverse the most recent session action."""

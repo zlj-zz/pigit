@@ -51,6 +51,8 @@ def _csi_or_ss3_byte_count(buf: bytes) -> int:
 def _parse_csi_u(chunk: bytes) -> str | None:
     """Parse CSI-u sequence \x1b[<code>;<mod>u -> semantic key string.
 
+    Also handles the kitty extended format \x1b[<code>;<mod>:<event>u.
+
     Modifier mask: 1=none 2=shift 3=alt 4=shift+alt 5=ctrl 6=ctrl+shift
     7=ctrl+alt 8=ctrl+shift+alt
     """
@@ -63,7 +65,11 @@ def _parse_csi_u(chunk: bytes) -> str | None:
         key_code = int(params[0])
     except ValueError:
         return None
-    modifier = int(params[1]) if len(params) > 1 else 1
+    modifier_str = params[1].split(":")[0] if len(params) > 1 else "1"
+    try:
+        modifier = int(modifier_str)
+    except ValueError:
+        modifier = 1
     # Enter (code 13)
     if key_code == 13:
         if modifier == 2:

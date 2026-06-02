@@ -943,7 +943,7 @@ class LocalGit:
         try:
             size = int(cast(str, size_out).strip())
         except ValueError:
-            size = 0
+            size = -1
         if size > max_size:
             return f"\x00BINARY_OR_TOO_LARGE:{size}\x00"
 
@@ -956,6 +956,8 @@ class LocalGit:
         if code != 0:
             self.log.warning("git show failed: %s", err)
             return None
+        if out is None:
+            return ""
 
         raw = cast(str, out).encode("utf-8") if isinstance(out, str) else out
         if b"\x00" in raw[:8192]:
