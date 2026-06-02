@@ -138,6 +138,7 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("JK", "Page up / down diff"),
             ("] [", "Jump to next / previous hunk"),
             ("H", "Toggle hunk staging mode"),
+            ("v", "View file at commit"),
             ("esc", "Close diff and return to status"),
         ],
     ),

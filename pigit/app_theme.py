@@ -57,6 +57,10 @@ class FlatTheme:
     # Overlay backgrounds
     bg_palette: tuple[int, int, int] = palette.SLATE_DARK
 
+    # File history header
+    bg_file_history_header: tuple[int, int, int] = palette.GREEN
+    fg_file_history_header: tuple[int, int, int] = palette.BLACK
+
 
 # Global singleton theme instance.
 THEME = FlatTheme()

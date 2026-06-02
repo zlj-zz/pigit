@@ -220,7 +220,7 @@ class AppEventLoop:
                 for t in list(self._timers.values()):
                     if now < t.next_fire:
                         continue
-                    t.next_fire = now + t.interval
+                    t.next_fire = t.next_fire + t.interval
                     try:
                         t.callback()
                     except Exception:
