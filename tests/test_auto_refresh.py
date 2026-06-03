@@ -41,11 +41,9 @@ class TestAutoRefreshConfig:
 def app():
     """Create a PigitApplication with mocked Config."""
     from pigit.app import PigitApplication
-    from pigit.config_data import ConfigData
+    from pigit.config_data import TuiConfig
 
-    with patch("pigit.app.Config") as mock_cfg_cls:
-        mock_cfg_cls.return_value.get.return_value = ConfigData()
-        yield PigitApplication()
+    yield PigitApplication(config=TuiConfig())
 
 
 @pytest.fixture

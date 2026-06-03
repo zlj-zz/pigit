@@ -55,7 +55,7 @@ from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
-from .config import Config
+from .config_data import TuiConfig
 
 # Static help groups for HelpPanel (all operations, grouped by panel).
 # Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
@@ -170,8 +170,10 @@ class PigitApplication(Application):
 
     def __init__(
         self,
+        *,
         local_git: LocalGit | None = None,
         managed_repos: ManagedRepos | None = None,
+        config: TuiConfig,
     ) -> None:
         super().__init__(input_takeover=True)
         self._local_git = local_git or LocalGit()
@@ -192,8 +194,7 @@ class PigitApplication(Application):
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         # Auto-refresh
-        cfg = Config().get()
-        self._auto_refresh_interval = cfg.tui.auto_refresh_interval
+        self._auto_refresh_interval = config.auto_refresh_interval
         self._refresh_timer_id: int | None = None
         # ViewModels (stored for preview updates)
         self._status_vm: StatusViewModel | None = None

@@ -7,6 +7,8 @@ Date: 2026-05-07
 
 from __future__ import annotations
 
+from typing import Any
+
 from pigit.termui import get_badge, get_badge_signal, palette, Segment
 from pigit.termui.reactive import Computed, Signal
 
@@ -17,7 +19,7 @@ class _SignalProp:
     def __set_name__(self, owner, name):
         self._attr = f"_{name}"
 
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj, objtype=None) -> Any:
         if obj is None:
             return self
         return getattr(obj, self._attr).value

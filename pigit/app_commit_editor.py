@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.app_theme import THEME
-from pigit.termui import keys, palette, show_toast
+from pigit.termui import keys, show_toast
 from pigit.termui._component import Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.widgets import InputLine, LintBar

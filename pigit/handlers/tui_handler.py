@@ -26,4 +26,5 @@ class TuiHandler(BaseHandler):
         PigitApplication(
             local_git=self.local_git,
             managed_repos=self.managed_repos,
+            config=self.config.get().tui,
         ).run()

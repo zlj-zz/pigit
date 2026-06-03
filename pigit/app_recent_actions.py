@@ -12,7 +12,7 @@ from collections.abc import Callable
 
 from pigit.app_theme import THEME
 from pigit.ext.utils import relative_time
-from pigit.termui import palette, Segment, keys
+from pigit.termui import Segment, keys
 from pigit.termui.widgets import ItemList
 
 if TYPE_CHECKING:
