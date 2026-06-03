@@ -10,7 +10,6 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 
-from .. import palette
 from .._component import Component
 from .._frame import BoxFrame
 from .._segment import Segment
@@ -115,9 +114,7 @@ class Toast(Component):
         inner_h = len(self._line_segments)
 
         if self._frame is None:
-            self._frame = BoxFrame(
-                inner_w, inner_h, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
-            )
+            self._frame = BoxFrame(inner_w, inner_h)
         else:
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
@@ -186,13 +183,6 @@ class Toast(Component):
         if render_col + self._outer_w <= 0 or render_col >= surface.width:
             return
 
-        surface.fill_rect_rgb(
-            base_row,
-            render_col,
-            self._outer_w,
-            self.outer_row_count,
-            palette.DEFAULT_BG,
-        )
         self._frame.draw_onto(surface, base_row, render_col)
         content_row = base_row + 1
         content_col = render_col + 1
@@ -206,7 +196,7 @@ class Toast(Component):
             pad_col = content_col + line_w
             pad_w = content_col + self._frame.inner_width - pad_col
             if pad_w > 0:
-                surface.fill_rect_rgb(row, pad_col, pad_w, 1, palette.DEFAULT_BG)
+                surface.fill_rect_rgb(row, pad_col, pad_w, 1)
 
     @property
     def message(self) -> str:

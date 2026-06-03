@@ -36,6 +36,17 @@ from .app_theme import THEME
 _logger = logging.getLogger(__name__)
 
 _HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+_DIFF_GIT_RE = re.compile(r"^diff --git a/(.+) b/(.+)$")
+
+
+@dataclasses.dataclass
+class _DiffStateSnapshot:
+    """Immutable snapshot of diff view state for later restoration."""
+
+    content: list[str]
+    diff_type: DiffType
+    scroll_i: int
+    come_from: Component | None
 
 
 class DiffType(enum.Enum):
@@ -118,6 +129,96 @@ class DiffViewer(LineTextBrowser):
         self._diff_type = DiffType.UNSTAGED
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
 
+        # File history state
+        self._file_history_mode = False
+        self._file_history_path: str = ""
+        self._file_history_commits: list[tuple[str, str]] = []
+        self._file_history_index: int = 0
+        self._file_history_cache: dict[str, list[str]] = {}
+        self._saved_diff_state: _DiffStateSnapshot | None = None
+
+    def _current_file_path(self) -> str | None:
+        """Return the file path at the current cursor position in diff mode."""
+        if not self._hunks or not self._content:
+            return None
+        target_hunk = None
+        for h in self._hunks:
+            if h.start <= self._i < h.end:
+                target_hunk = h
+                break
+        if target_hunk is None:
+            return None
+        header_idx = target_hunk.file_header_start
+        if header_idx >= len(self._content):
+            return None
+        line = self._content[header_idx]
+        m = _DIFF_GIT_RE.match(line)
+        if m:
+            return m.group(2).strip('"')
+        return None
+
+    def _set_plain_content(self, lines: list[str]) -> None:
+        """Set plain file content (no diff parsing) for File History mode."""
+        self._content = []
+        for line in lines:
+            cleaned = plain(line).replace("\r", "")
+            if "\t" in cleaned:
+                cleaned = cleaned.expandtabs(self.TAB_WIDTH)
+            self._content.append(cleaned)
+
+        # Plain 1-based sequential line numbers
+        self._line_numbers = [
+            str(i + 1).rjust(self.LINE_NO_STR_WIDTH) for i in range(len(self._content))
+        ]
+
+        # Detect language from file path
+        lang = "generic"
+        if self._file_history_path:
+            lang = self._tokenizer.detect_language(self._file_history_path)
+        self._line_langs = [lang] * len(self._content)
+
+        # No heatmap for plain files
+        self._heatmap = [" "] * len(self._content)
+        self._heatmap_colors = [THEME.fg_dim] * len(self._content)
+
+        self._multiline_mask = self._tokenizer.compute_multiline_mask(
+            self._content, self._line_langs, strip_diff_prefix=False
+        )
+        self._render_tokens = self._pre_tokenize_plain()
+        self._hunks = []
+        self._hunk_starts = []
+        self._i = 0
+
+    def _pre_tokenize_plain(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+        """Pre-tokenize plain file content (no diff prefixes)."""
+        result: list[list[tuple[str, tuple[int, int, int], int]]] = []
+        for i, line in enumerate(self._content):
+            lang = self._line_langs[i] if i < len(self._line_langs) else "generic"
+            ml_type = self._multiline_mask[i] if i < len(self._multiline_mask) else None
+            if lang == "plain":
+                tokens = [(line, "plain")]
+            elif ml_type is not None:
+                tokens = [(line, ml_type)]
+            elif lang == "md":
+                tokens = self._tokenizer.tokenize_markdown(line)
+            else:
+                tokens = self._tokenizer.tokenize(line, lang)
+            result.append(
+                [
+                    (
+                        text,
+                        (
+                            THEME.fg_primary
+                            if ttype == "plain"
+                            else self._tokenizer.resolve_color(ttype, lang)
+                        ),
+                        wcswidth(text),
+                    )
+                    for text, ttype in tokens
+                ]
+            )
+        return result
+
     def set_content(self, diff_lines: list[str]) -> None:
         """Set diff content and pre-compute heatmap and line numbers.
 
@@ -139,6 +240,8 @@ class DiffViewer(LineTextBrowser):
         self._render_tokens = []
         self._hunks = []
         self._hunk_starts = []
+        self._file_history_mode = False
+        self._file_history_cache.clear()
         for line in diff_lines:
             cleaned = plain(line).replace("\r", "")
             if "\t" in cleaned:
@@ -315,6 +418,13 @@ class DiffViewer(LineTextBrowser):
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for diff viewer."""
+        if self._file_history_mode:
+            return [
+                ("jk", "Scroll"),
+                ("p", "Older commit"),
+                ("n", "Newer commit"),
+                ("Esc", "Back"),
+            ]
         if self._hunk_mode:
             return [
                 ("jk", "Prev/Next hunk"),
@@ -330,6 +440,8 @@ class DiffViewer(LineTextBrowser):
         ]
         if self._diff_type is not DiffType.COMMIT:
             entries.insert(2, ("H", "Hunk mode"))
+        else:
+            entries.insert(2, ("v", "View file at commit"))
         return entries
 
     def update(self, action: ActionEventType, **data) -> None:
@@ -342,9 +454,12 @@ class DiffViewer(LineTextBrowser):
             self.i_cache_key = data.get("key", "")
             self._repo_path = data.get("repo_path", "")
             raw_type = data.get("diff_type", "unstaged")
-            self._diff_type = (
-                DiffType(raw_type) if isinstance(raw_type, str) else DiffType.UNSTAGED
-            )
+            if isinstance(raw_type, DiffType):
+                self._diff_type = raw_type
+            elif isinstance(raw_type, str):
+                self._diff_type = DiffType(raw_type)
+            else:
+                self._diff_type = DiffType.UNSTAGED
             # Reset hunk mode on new diff
             self._hunk_mode = False
             self._hunk_index = 0
@@ -358,11 +473,117 @@ class DiffViewer(LineTextBrowser):
 
     @bind_keys(keys.KEY_ESC)
     def _leave_display(self) -> None:
+        if self._file_history_mode:
+            self._exit_file_history()
+            return
         if self._hunk_mode:
             self._hunk_mode = False
             return
         if self.come_from is not None:
             self.emit(ActionEventType.goto, target=self.come_from)
+
+    @bind_keys("v")
+    def _toggle_file_history(self) -> None:
+        if self._file_history_mode:
+            self._exit_file_history()
+            return
+        if self._diff_type is not DiffType.COMMIT:
+            show_toast("File history only available for commit diffs", duration=1.5)
+            return
+        path = self._current_file_path()
+        if not path:
+            show_toast("No file at current position", duration=1.5)
+            return
+        self._enter_file_history(path)
+
+    def _enter_file_history(self, path: str) -> None:
+        """Save diff state and switch to File History view."""
+        # Save BEFORE set_content overwrites everything
+        self._saved_diff_state = _DiffStateSnapshot(
+            content=list(self._content),
+            diff_type=self._diff_type,
+            scroll_i=self._i,
+            come_from=self.come_from,
+        )
+        self._file_history_path = path
+        self._file_history_cache = {}
+
+        from .git.local_git import LocalGit
+
+        git = LocalGit(path=self._repo_path)
+        self._file_history_commits = git.get_file_history(path, self._repo_path)
+
+        current_sha = self.i_cache_key
+        self._file_history_index = 0
+        for i, (sha, _) in enumerate(self._file_history_commits):
+            if sha.startswith(current_sha) or current_sha.startswith(sha):
+                self._file_history_index = i
+                break
+
+        self._file_history_mode = True
+        self._load_file_history_at_current_index()
+
+    def _load_file_history_at_current_index(self) -> None:
+        if not self._file_history_commits:
+            self._set_plain_content(["No history for this file"])
+            return
+        sha, _ = self._file_history_commits[self._file_history_index]
+
+        if sha in self._file_history_cache:
+            content = self._file_history_cache[sha]
+        else:
+            from .git.local_git import LocalGit
+
+            git = LocalGit(path=self._repo_path)
+            raw = git.get_file_at_commit(sha, self._file_history_path, self._repo_path)
+            if raw is None:
+                content = ["File deleted in this commit"]
+            elif raw.startswith("\x00BINARY_OR_TOO_LARGE:"):
+                parts = raw.split(":")
+                size_str = parts[1].rstrip("\x00") if len(parts) > 1 else "?"
+                if size_str.startswith("-"):
+                    size_str = "unknown size"
+                content = [f"Binary file ({size_str} bytes)"]
+            else:
+                content = raw.splitlines()
+            self._file_history_cache[sha] = content
+            # Simple LRU: trim to 10 entries
+            if len(self._file_history_cache) > 10:
+                oldest = next(iter(self._file_history_cache))
+                del self._file_history_cache[oldest]
+
+        self._set_plain_content(content)
+
+    def _exit_file_history(self) -> None:
+        if not self._file_history_mode:
+            return
+        self._file_history_mode = False
+        self._file_history_cache.clear()
+        snap = self._saved_diff_state
+        if snap is not None:
+            self.set_content(snap.content)
+            self._diff_type = snap.diff_type
+            self._i = snap.scroll_i
+            self.come_from = snap.come_from
+        self._saved_diff_state = None
+
+    @bind_keys("p")
+    def _prev_file_commit(self) -> None:
+        """Go to older commit that touched this file."""
+        if not self._file_history_mode:
+            return
+        if self._file_history_index < len(self._file_history_commits) - 1:
+            self._file_history_index += 1
+            self._load_file_history_at_current_index()
+
+    @bind_keys("n")
+    def _next_file_commit(self) -> None:
+        """Go to newer commit that touched this file."""
+        if not self._file_history_mode:
+            return
+        if self._file_history_index > 0:
+            self._file_history_index -= 1
+            self._load_file_history_at_current_index()
 
     @bind_keys("j")
     def _on_j(self) -> None:
@@ -523,13 +744,13 @@ class DiffViewer(LineTextBrowser):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
-                THEME.accent_green,
+                THEME.fg_success,
             )
         if self._is_del_line(line):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
-                THEME.accent_red,
+                THEME.fg_danger,
             )
         return " ", THEME.fg_dim
 
@@ -602,10 +823,8 @@ class DiffViewer(LineTextBrowser):
             bg = THEME.bg_success
         elif is_del:
             bg = THEME.bg_danger
-        elif line.startswith("@@"):
-            bg = palette.DEFAULT_BG
         else:
-            bg = palette.DEFAULT_BG
+            bg = THEME.bg_diff_context
 
         # Hunk mode highlight: override bg for active hunk
         if self._hunk_mode and self._hunks:
@@ -613,7 +832,7 @@ class DiffViewer(LineTextBrowser):
             if hunk.start <= idx < hunk.end:
                 bg = THEME.bg_info
 
-        if bg != palette.DEFAULT_BG:
+        if bg != THEME.bg_diff_context:
             surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
 
         line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
@@ -622,9 +841,9 @@ class DiffViewer(LineTextBrowser):
 
         prefix_x = x_offset + self.LINE_NO_WIDTH
         if is_add:
-            surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.accent_green, bg=bg)
+            surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.fg_success, bg=bg)
         elif is_del:
-            surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.accent_red, bg=bg)
+            surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.fg_danger, bg=bg)
 
         # ── Syntax-highlighted text rendering ──
         text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
@@ -650,7 +869,7 @@ class DiffViewer(LineTextBrowser):
         col: int,
         max_col: int,
         tokens: list[tuple[str, tuple[int, int, int], int]],
-        bg: tuple[int, int, int],
+        bg: tuple[int, int, int] | None = None,
     ) -> None:
         """Draw syntax tokens with width-aware truncation."""
         for token_text, token_fg, token_width in tokens:
@@ -663,8 +882,106 @@ class DiffViewer(LineTextBrowser):
             surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
             col += token_width
 
+    def _file_history_header(self) -> str:
+        """Build the header line for File History view."""
+        if not self._file_history_commits:
+            return f" {self._file_history_path} — no history "
+        sha, subject = self._file_history_commits[self._file_history_index]
+        short_sha = sha[:8]
+        pos = f"({self._file_history_index + 1}/{len(self._file_history_commits)})"
+        # Truncate subject if too long
+        max_subj = 40
+        if len(subject) > max_subj:
+            subject = subject[: max_subj - 1] + "…"
+        return f' {self._file_history_path}  @  {short_sha}  "{subject}"  {pos} '
+
+    def _render_file_history(self, surface) -> None:
+        if not self._content:
+            return
+        w = surface.width
+        h = surface.height
+        if w <= self.LINE_NO_WIDTH + 3 or h < self.BORDER_ROWS + 1:
+            self._render_file_history_borderless(surface)
+            return
+
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
+
+        # Header row (overwrites top border)
+        header = self._file_history_header()
+        header_trim = (
+            truncate_by_width(header, w - 4) + " "
+            if wcswidth(header) > w - 4
+            else header
+        )
+        surface.draw_text_rgb(
+            0,
+            2,
+            header_trim,
+            fg=THEME.fg_file_history_header,
+            bg=THEME.bg_file_history_header,
+            style_flags=palette.STYLE_BOLD,
+        )
+
+        # Content area
+        content_h = h - self.BORDER_ROWS  # rows between top and bottom borders
+        content_w = w - self.BORDER_COLS
+        main_w = content_w - self.LINE_NO_WIDTH - 1
+        end = min(self._i + content_h, len(self._content))
+
+        for idx in range(self._i, end):
+            row = idx - self._i + 1  # +1 for top border
+
+            line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
+            if line_no:
+                surface.draw_text_rgb(row, 1, line_no, fg=THEME.fg_dim)
+
+            text_start = 1 + self.LINE_NO_WIDTH + 1
+            tokens = self._render_tokens[idx] if idx < len(self._render_tokens) else []
+            self._draw_tokens(
+                surface,
+                row,
+                text_start,
+                text_start + main_w,
+                tokens,
+            )
+
+        # Footer hint (overwrites bottom border)
+        hint = " jk:nav  p:older  n:newer  d:diff  Esc:back "
+        hint_trim = truncate_by_width(hint, w - 4) if wcswidth(hint) > w - 4 else hint
+        surface.draw_text_rgb(h - 1, 1, hint_trim, fg=THEME.fg_dim)
+
+    def _render_file_history_borderless(self, surface) -> None:
+        """File history rendering when surface is too small for borders."""
+        w = surface.width
+        h = surface.height
+        if w <= self.LINE_NO_WIDTH + 1:
+            return
+
+        main_w = self._main_width(w)
+        end = min(self._i + h, len(self._content))
+
+        for idx in range(self._i, end):
+            row = idx - self._i
+
+            line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
+            if line_no:
+                surface.draw_text_rgb(row, 0, line_no, fg=THEME.fg_dim)
+
+            text_start = self.LINE_NO_WIDTH + 1
+            tokens = self._render_tokens[idx] if idx < len(self._render_tokens) else []
+            self._draw_tokens(
+                surface,
+                row,
+                text_start,
+                text_start + main_w,
+                tokens,
+            )
+
     def _render_surface(self, surface) -> None:
         if not self._content:
+            return
+        if self._file_history_mode:
+            self._render_file_history(surface)
             return
         w = surface.width
         h = surface.height
@@ -672,7 +989,7 @@ class DiffViewer(LineTextBrowser):
             self._render_surface_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS
@@ -700,8 +1017,19 @@ class DiffViewer(LineTextBrowser):
                 1,
                 w - self.BORDER_COLS,
                 blank_count,
-                palette.DEFAULT_BG,
+                THEME.bg_diff_context,
             )
+
+        if self._diff_type is DiffType.COMMIT and not self._hunk_mode:
+            path = self._current_file_path()
+            if path:
+                path_badge = f" {path} "
+                path_trim = (
+                    truncate_by_width(path_badge, w - 4)
+                    if wcswidth(path_badge) > w - 4
+                    else path_badge
+                )
+                surface.draw_text_rgb(h - 1, 1, path_trim, fg=THEME.fg_muted)
 
         if self._hunk_mode:
             badge = " HUNK "
@@ -711,8 +1039,7 @@ class DiffViewer(LineTextBrowser):
                     h - 1,
                     badge_x,
                     badge,
-                    fg=THEME.accent_sky_blue,
-                    bg=THEME.bg_base,
+                    fg=THEME.fg_file_history_link,
                     style_flags=palette.STYLE_BOLD,
                 )
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # ── Pure color names ──
 
+BLACK: tuple[int, int, int] = (0, 0, 0)
 PEARL: tuple[int, int, int] = (220, 220, 230)
 SLATE: tuple[int, int, int] = (120, 120, 130)
 INK: tuple[int, int, int] = (18, 18, 22)

@@ -43,6 +43,11 @@ class LogConfig:
 
 
 @dataclass
+class TuiConfig:
+    auto_refresh_interval: float = 10.0
+
+
+@dataclass
 class ConfigData:
     version: str = "unknown"
     cmd: CmdConfig = field(default_factory=CmdConfig)
@@ -50,3 +55,4 @@ class ConfigData:
     info: InfoConfig = field(default_factory=InfoConfig)
     repo: RepoConfig = field(default_factory=RepoConfig)
     log: LogConfig = field(default_factory=LogConfig)
+    tui: TuiConfig = field(default_factory=TuiConfig)

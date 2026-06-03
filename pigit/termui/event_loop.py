@@ -8,7 +8,10 @@ Date: 2026-03-29
 from __future__ import annotations
 
 import logging
+import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
+from collections.abc import Callable
 
 from . import keys
 from ._async_task import AsyncTask
@@ -22,6 +25,14 @@ if TYPE_CHECKING:
     from .input import InputTerminal
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _Timer:
+    interval: float
+    callback: Callable[[], None]
+    next_fire: float
+
 
 KeyDispatchOutcome = Literal[
     "binding",
@@ -92,6 +103,9 @@ class AppEventLoop:
         self._surface: Any = None
         self._had_overlay = False
 
+        self._timers: dict[int, _Timer] = {}
+        self._timer_id_counter: int = 0
+
     def request_render(self) -> None:
         """Request a render on the next loop iteration.
 
@@ -128,6 +142,7 @@ class AppEventLoop:
 
     def stop(self):
         """Terminal restoration is performed by :class:`Session` when ``run()`` exits."""
+        self._timers.clear()
 
     def __enter__(self):
         self.start()
@@ -174,9 +189,43 @@ class AppEventLoop:
         """Set the input polling timeout on the underlying input handle."""
         self._input_handle.set_input_timeouts(timeout)
 
+    def add_interval(self, interval: float, callback: Callable[[], None]) -> int:
+        """Register a repeating timer. Returns a handle for removal.
+
+        Callback must be lightweight (no blocking I/O). Heavy work should be
+        offloaded via AsyncTask.
+        """
+        if interval <= 0:
+            raise ValueError("interval must be positive")
+        self._timer_id_counter += 1
+        tid = self._timer_id_counter
+        self._timers[tid] = _Timer(
+            interval=interval,
+            callback=callback,
+            next_fire=time.monotonic() + interval,
+        )
+        return tid
+
+    def remove_interval(self, tid: int) -> None:
+        """Cancel a timer by its handle."""
+        self._timers.pop(tid, None)
+
     def _loop(self) -> None:
         while True:
             AsyncTask.poll_all()
+
+            # Timer firing
+            if self._timers:
+                now = time.monotonic()
+                for t in list(self._timers.values()):
+                    if now < t.next_fire:
+                        continue
+                    t.next_fire = t.next_fire + t.interval
+                    try:
+                        t.callback()
+                    except Exception:
+                        _logger.exception("Timer callback failed")
+
             if self._render_requested:
                 _logger.debug("[RENDER] _loop: render (poll)")
                 self._render_requested = False

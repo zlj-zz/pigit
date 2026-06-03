@@ -20,6 +20,7 @@ from pigit.termui import (
     get_renderer_strict,
     palette,
 )
+from pigit.app_theme import THEME
 from pigit.termui._segment import Segment
 from pigit.termui.containers import Column
 from pigit.termui.wcwidth_table import wcswidth
@@ -92,7 +93,7 @@ def _highlight_match(
         segments.append(
             Segment(
                 text[pos],
-                fg=palette.SKY_BLUE,
+                fg=THEME.fg_search_match,
                 bg=bg,
                 style_flags=palette.STYLE_BOLD | palette.STYLE_UNDERLINE,
             )
@@ -186,13 +187,13 @@ def run_cmd_new_picker(
                 sep_w = wcswidth(sep_text)
                 if sep_w < cols:
                     sep_text = sep_text + "─" * (cols - sep_w)
-                return ([], [Segment(sep_text, fg=palette.DIM)], [])
+                return ([], [Segment(sep_text, fg=THEME.fg_dim)], [])
 
             row = app._row_data[idx]
             assert row is not None
             ent = cast(CmdNewEntry, row.ref)
 
-            bg = palette.BG_HOVER if is_cursor else None
+            bg = THEME.bg_hover if is_cursor else None
             row_style = palette.STYLE_BOLD if is_cursor else 0
             in_mru = ent.name in app._mru_set
 
@@ -200,19 +201,21 @@ def run_cmd_new_picker(
                 left = [
                     Segment(
                         "◆ ",
-                        fg=palette.PURPLE,
+                        fg=THEME.fg_info,
                         bg=bg,
                         style_flags=row_style,
                     )
                 ]
             elif ent.is_dangerous:
-                left = [Segment("⚠ ", fg=palette.YELLOW, bg=bg, style_flags=row_style)]
+                left = [
+                    Segment("⚠ ", fg=THEME.fg_warning, bg=bg, style_flags=row_style)
+                ]
             else:
                 left = [
-                    Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)
+                    Segment("  ", fg=THEME.fg_primary, bg=bg, style_flags=row_style)
                 ]
 
-            name_fg = palette.PURPLE if in_mru else palette.DEFAULT_FG
+            name_fg = THEME.fg_info if in_mru else THEME.fg_primary
 
             name_segs = _highlight_match(
                 ent.name, app._filter_needle, fg=name_fg, bg=bg
@@ -226,20 +229,20 @@ def run_cmd_new_picker(
                 name_segs.append(
                     Segment(
                         " " * name_pad,
-                        fg=palette.DEFAULT_FG,
+                        fg=THEME.fg_primary,
                         bg=bg,
                         style_flags=row_style,
                     )
                 )
 
             help_segs = _highlight_match(
-                ent.help_text, app._filter_needle, fg=palette.DEFAULT_FG_DIM, bg=bg
+                ent.help_text, app._filter_needle, fg=THEME.fg_dim, bg=bg
             )
             for seg in help_segs:
                 seg.style_flags |= row_style
             main = (
                 name_segs
-                + [Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)]
+                + [Segment("  ", fg=THEME.fg_primary, bg=bg, style_flags=row_style)]
                 + help_segs
             )
 

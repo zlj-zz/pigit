@@ -27,11 +27,9 @@ def get_shell() -> str:
 
 
 def _first_arg_completion(meta) -> str:
-    if meta.arg_completion is None:
-        return ""
-    if isinstance(meta.arg_completion, list):
-        return meta.arg_completion[0].value if meta.arg_completion else ""
-    return meta.arg_completion.value
+    if meta.arg_completion:
+        return meta.arg_completion[0].value
+    return ""
 
 
 def _resolve_shell(shell: str) -> str:

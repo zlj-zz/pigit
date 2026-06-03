@@ -282,7 +282,10 @@ class SyntaxTokenizer:
 
     @staticmethod
     def compute_multiline_mask(
-        lines: list[str], line_langs: list[str]
+        lines: list[str],
+        line_langs: list[str],
+        *,
+        strip_diff_prefix: bool = True,
     ) -> list[str | None]:
         """Return a mask indicating which lines are inside a multi-line context.
 
@@ -290,6 +293,9 @@ class SyntaxTokenizer:
         or ``None``.  Hunk headers (``@@``) reset state because each hunk is a
         non-contiguous region of the source file. File headers also reset state
         because each file may use a different language.
+
+        When *strip_diff_prefix* is ``False`` (plain file content), diff prefix
+        stripping is skipped so leading whitespace in source code is preserved.
         """
 
         def _resolve_base(lang: str) -> str:
@@ -327,7 +333,10 @@ class SyntaxTokenizer:
             lang = line_langs[i] if i < len(line_langs) else "generic"
             base_lang = _resolve_base(lang)
 
-            content = line[1:] if line and line[0] in "+- " else line
+            if strip_diff_prefix and line and line[0] in "+- ":
+                content = line[1:]
+            else:
+                content = line
             stripped = content.lstrip()
 
             if base_lang == "py":

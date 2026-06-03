@@ -519,3 +519,97 @@ def test_quit_raises_exit_event_loop():
     loop = AppEventLoop(ComponentMock(), alt=False)
     with pytest.raises(ExitEventLoop, match="bye"):
         loop.quit("bye", exit_code=42, result_message="msg")
+
+
+# ---- Timer tests ----
+
+
+def test_add_interval_fires_callback(mock_renderer):
+    """Timer callback fires after interval elapses."""
+    loop = AppEventLoop(_Leaf(), alt=False)
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [
+        [],  # first poll: timer fires
+        ExitEventLoop("stop"),
+    ]
+
+    calls = []
+    loop.add_interval(0.0001, lambda: calls.append("fired"))
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert "fired" in calls
+
+
+def test_remove_interval_stops_firing(mock_renderer):
+    """remove_interval prevents further timer firings."""
+    loop = AppEventLoop(_Leaf(), alt=False)
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [
+        [],  # first poll
+        [],  # second poll
+        ExitEventLoop("stop"),
+    ]
+
+    calls = []
+    tid = loop.add_interval(0.0001, lambda: calls.append("fired"))
+    loop.remove_interval(tid)
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert calls == []
+
+
+def test_timer_exception_isolated(mock_renderer):
+    """Timer callback exception does not break the loop or other timers."""
+    loop = AppEventLoop(_Leaf(), alt=False)
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [
+        [],  # both timers fire
+        ExitEventLoop("stop"),
+    ]
+
+    good_calls = []
+    loop.add_interval(0.0001, lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    loop.add_interval(0.0001, lambda: good_calls.append("ok"))
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert "ok" in good_calls
+
+
+def test_multiple_timers_fire_independently(mock_renderer):
+    """Multiple timers with different intervals fire independently."""
+    loop = AppEventLoop(_Leaf(), alt=False)
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop._input_handle = Mock()
+    loop._input_handle.get_input.side_effect = [
+        [],
+        ExitEventLoop("stop"),
+    ]
+
+    fast_calls = []
+    slow_calls = []
+    loop.add_interval(0.0001, lambda: fast_calls.append("fast"))
+    loop.add_interval(3600.0, lambda: slow_calls.append("slow"))
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert len(fast_calls) >= 1
+    assert slow_calls == []
+
+
+def test_stop_clears_timers(mock_renderer):
+    """stop() clears all registered timers."""
+    loop = AppEventLoop(_Leaf(), alt=False)
+    loop.add_interval(1.0, lambda: None)
+    assert len(loop._timers) == 1
+    loop.stop()
+    assert len(loop._timers) == 0

@@ -7,6 +7,8 @@ Date: 2026-05-07
 
 from __future__ import annotations
 
+from typing import Any
+
 from pigit.termui import get_badge, get_badge_signal, palette, Segment
 from pigit.termui.reactive import Computed, Signal
 
@@ -17,7 +19,7 @@ class _SignalProp:
     def __set_name__(self, owner, name):
         self._attr = f"_{name}"
 
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj, objtype=None) -> Any:
         if obj is None:
             return self
         return getattr(obj, self._attr).value
@@ -98,7 +100,7 @@ class HeaderState:
             [
                 Segment(self.repo, fg=self._theme.fg_primary),
                 Segment("  ", fg=self._theme.fg_dim),
-                Segment(self.branch, fg=self._theme.accent_pearl),
+                Segment(self.branch, fg=self._theme.fg_branch_name),
             ]
         )
         return segs
@@ -106,9 +108,9 @@ class HeaderState:
     def _make_center(self) -> list[Segment]:
         segs: list[Segment] = []
         if self.ahead > 0:
-            segs.append(Segment(f"↑{self.ahead} ", fg=self._theme.accent_green))
+            segs.append(Segment(f"↑{self.ahead} ", fg=self._theme.fg_success))
         if self.behind > 0:
-            segs.append(Segment(f"↓{self.behind}", fg=self._theme.accent_yellow))
+            segs.append(Segment(f"↓{self.behind}", fg=self._theme.fg_warning))
         return segs
 
     def _make_right(self) -> list[Segment]:
@@ -117,7 +119,7 @@ class HeaderState:
             segs.append(
                 Segment(
                     f"[MERGE] {self.merge_target}  ",
-                    fg=self._theme.accent_red,
+                    fg=self._theme.fg_danger,
                     style_flags=palette.STYLE_BOLD,
                 )
             )

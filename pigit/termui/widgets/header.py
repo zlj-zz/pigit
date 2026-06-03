@@ -12,7 +12,6 @@ from collections.abc import Callable, Sequence
 from .._component import Component, bind_signals
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
-from .. import palette
 from ..reactive import Computed, Signal, ValueRef
 from ..wcwidth_table import truncate_by_width, wcswidth
 
@@ -105,13 +104,13 @@ class Header(Component):
 
         if h >= 2 and self._separator:
             self._draw_content(surface, 0, w)
-            surface.fill_rect_rgb(1, 0, w, 1, palette.DEFAULT_BG)
-            surface.draw_text_rgb(1, 0, "─" * w, fg=self._sep_fg, bg=palette.DEFAULT_BG)
+            surface.fill_rect_rgb(1, 0, w, 1)
+            surface.draw_text_rgb(1, 0, "─" * w, fg=self._sep_fg)
         else:
             self._draw_content(surface, 0, w)
 
     def _draw_content(self, surface: Surface | _Subsurface, row: int, w: int) -> None:
-        surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
+        surface.fill_rect_rgb(row, 0, w, 1)
 
         left = self._get(self._left_src)
         center = self._get(self._center_src)

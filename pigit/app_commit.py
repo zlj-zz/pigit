@@ -107,11 +107,11 @@ class CommitPanel(ItemList):
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
     LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
-        THEME.accent_sky_blue,
-        THEME.accent_green,
-        THEME.accent_purple,
-        THEME.accent_blue,
-        THEME.accent_red,
+        palette.SKY_BLUE,
+        palette.GREEN,
+        palette.PURPLE,
+        palette.BLUE,
+        palette.RED,
     )
 
     def __init__(
@@ -572,11 +572,11 @@ class CommitPanel(ItemList):
         if not (head_ref or local_refs or remote_refs or commit.tag):
             return []
 
-        paren_fg = THEME.accent_orange if focused else THEME.fg_dim
-        head_fg = THEME.accent_blue if focused else THEME.fg_dim
-        local_fg = THEME.accent_green if focused else THEME.fg_dim
-        remote_fg = THEME.accent_magenta if focused else THEME.fg_dim
-        tag_fg = THEME.accent_sky_blue if focused else THEME.fg_dim
+        paren_fg = THEME.fg_tag_parent if focused else THEME.fg_dim
+        head_fg = THEME.fg_info if focused else THEME.fg_dim
+        local_fg = THEME.fg_success if focused else THEME.fg_dim
+        remote_fg = THEME.fg_remote_branch if focused else THEME.fg_dim
+        tag_fg = THEME.fg_tag if focused else THEME.fg_dim
         arrow_fg = THEME.fg_primary
 
         entries: list[list[Segment]] = []
@@ -659,7 +659,7 @@ class CommitPanel(ItemList):
         lane_fg = lane_color if focused else THEME.fg_dim
 
         if i == row.commit_lane:
-            commit_color = THEME.accent_yellow if not commit.is_pushed() else lane_color
+            commit_color = THEME.fg_warning if not commit.is_pushed() else lane_color
             return self.GRAPH_COMMIT, commit_color
 
         if i in row.closed_lanes:

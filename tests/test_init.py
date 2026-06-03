@@ -62,29 +62,17 @@ class TestResolveShell:
 
 
 class TestFirstArgCompletion:
-    class _Meta:
-        arg_completion = None
-
-    class _MetaList:
+    class _MetaEmpty:
         arg_completion = []
 
     class _MetaListValue:
         arg_completion = [mock.Mock(value="path")]
 
-    class _MetaStr:
-        arg_completion = mock.Mock(value="branch")
-
-    def test_none_returns_empty(self):
-        assert _first_arg_completion(self._Meta()) == ""
-
     def test_empty_list_returns_empty(self):
-        assert _first_arg_completion(self._MetaList()) == ""
+        assert _first_arg_completion(self._MetaEmpty()) == ""
 
     def test_list_with_value_returns_first(self):
         assert _first_arg_completion(self._MetaListValue()) == "path"
-
-    def test_non_list_returns_value(self):
-        assert _first_arg_completion(self._MetaStr()) == "branch"
 
 
 class TestRunShellInit:
@@ -92,7 +80,7 @@ class TestRunShellInit:
         class FakeMeta:
             short = "st"
             help = "status"
-            arg_completion = None
+            arg_completion = []
 
         class FakeCmdDef:
             meta = FakeMeta()

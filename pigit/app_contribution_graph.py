@@ -13,7 +13,7 @@ from __future__ import annotations
 import datetime
 from collections import defaultdict
 
-from pigit.termui import Component
+from pigit.termui import Component, palette
 from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
@@ -34,12 +34,12 @@ _HEATMAP_COLORS: list[tuple[int, int, int]] = [
 
 # Author line chart colors (top 6 authors)
 _AUTHOR_COLORS: list[tuple[int, int, int]] = [
-    THEME.accent_sky_blue,
-    THEME.accent_yellow,
-    THEME.accent_purple,
-    THEME.accent_red,
-    THEME.accent_green,
-    THEME.accent_blue,
+    palette.SKY_BLUE,
+    palette.YELLOW,
+    palette.PURPLE,
+    palette.RED,
+    palette.GREEN,
+    palette.BLUE,
 ]
 
 _CELL_CHAR = "■"

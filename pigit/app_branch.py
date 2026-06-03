@@ -162,7 +162,7 @@ class BranchPanel(ItemList):
         is_head = idx < len(self.branches) and self.branches[idx].is_head
         prefix = self.CURSOR if is_cursor else " "
         if is_head:
-            fg = THEME.accent_green if focused else THEME.fg_dim
+            fg = THEME.fg_success if focused else THEME.fg_dim
         else:
             fg = THEME.fg_primary if focused else THEME.fg_dim
         left = [
@@ -180,11 +180,11 @@ class BranchPanel(ItemList):
                 ahead = branch.ahead if branch.ahead != "?" else ""
                 behind = branch.behind if branch.behind != "?" else ""
                 if ahead:
-                    right.append(Segment(f"\u2191{ahead}", fg=THEME.accent_green))
+                    right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
                 if behind:
                     if right:
                         right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2193{behind}", fg=THEME.accent_yellow))
+                    right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
         return left, None, right
 

@@ -24,7 +24,7 @@ def command(
     category: CommandCategory,
     help: str,
     has_args: bool = False,
-    arg_completion: CompletionType | list[CompletionType] = None,
+    arg_completion: list[CompletionType] = [],
     dangerous: bool = False,
     confirm_msg: str = "",
     examples: list[str] | None = None,

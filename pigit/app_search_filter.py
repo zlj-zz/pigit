@@ -82,7 +82,7 @@ class SearchFilter:
             return
         if self.active:
             text = f"/{self.query}"
-            fg = THEME.accent_pearl
+            fg = THEME.fg_branch_name
             flags = palette.STYLE_BOLD
         else:
             text = f"filter: {self.query}"

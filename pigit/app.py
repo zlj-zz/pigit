@@ -55,6 +55,7 @@ from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
+from .config_data import TuiConfig
 
 # Static help groups for HelpPanel (all operations, grouped by panel).
 # Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
@@ -83,6 +84,7 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("c", "Open inline commit editor"),
             ("C", "Open external $EDITOR for commit"),
             ("v", "Toggle visual multi-select mode"),
+            ("Y", "Copy file path"),
             ("E", "Open file in external $EDITOR"),
             ("o", "Checkout ours (conflict)"),
             ("t", "Checkout theirs (conflict)"),
@@ -136,6 +138,7 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("JK", "Page up / down diff"),
             ("] [", "Jump to next / previous hunk"),
             ("H", "Toggle hunk staging mode"),
+            ("v", "View file at commit"),
             ("esc", "Close diff and return to status"),
         ],
     ),
@@ -167,8 +170,10 @@ class PigitApplication(Application):
 
     def __init__(
         self,
+        *,
         local_git: LocalGit | None = None,
         managed_repos: ManagedRepos | None = None,
+        config: TuiConfig,
     ) -> None:
         super().__init__(input_takeover=True)
         self._local_git = local_git or LocalGit()
@@ -188,6 +193,9 @@ class PigitApplication(Application):
         )
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
+        # Auto-refresh
+        self._auto_refresh_interval = config.auto_refresh_interval
+        self._refresh_timer_id: int | None = None
         # ViewModels (stored for preview updates)
         self._status_vm: StatusViewModel | None = None
         self._commit_vm: CommitViewModel | None = None
@@ -315,7 +323,7 @@ class PigitApplication(Application):
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            key_fg=THEME.accent_blue,
+            key_fg=THEME.fg_info,
         )
         self._help_panel.set_grouped_entries(_HELP_GROUPS)
         self._help_popup = Popup(
@@ -360,6 +368,15 @@ class PigitApplication(Application):
             position=ToastPosition.BOTTOM_LEFT,
         )
         self._try_restore_merge_state()
+
+        # Register auto-refresh timer
+        if self._loop is not None and self._auto_refresh_interval > 0:
+            if self._refresh_timer_id is not None:
+                self._loop.remove_interval(self._refresh_timer_id)
+            self._refresh_timer_id = self._loop.add_interval(
+                self._auto_refresh_interval,
+                self._refresh_active_panel,
+            )
 
     def _apply_body_widths(self, cols: int) -> None:
         """Recompute body_row widths based on screen size, active tab, and inspector state.
@@ -534,12 +551,31 @@ class PigitApplication(Application):
         by_id("tab_view", TabView).route_to("commit")
 
     def _refresh_active_panel(self) -> None:
-        """Refresh the currently active panel if it supports refresh."""
-        tab_view = by_id("tab_view", TabView)
-        if tab_view is not None:
-            active = resolve_presented(tab_view.active)
-            if active is not None and hasattr(active, "refresh"):
-                active.refresh()
+        """Auto-refresh callback: refresh the currently active panel's VM.
+
+        Skips when an overlay is open (user is in modal/sheet).
+        Does NOT call request_render(); vm.refresh() uses AsyncTask,
+        and Signal subscribers trigger rendering when data arrives.
+        """
+        try:
+            tab_view = by_id("tab_view", TabView)
+        except RuntimeError:
+            return
+        if tab_view is None:
+            return
+        active = resolve_presented(tab_view.active)
+        if active is None:
+            return
+        # Skip refresh when an overlay is open
+        if self._root is not None and self._root.has_overlay_open():
+            return
+        # Prefer panel-level refresh (e.g. StashPanel.refresh reloads stashes)
+        if hasattr(active, "refresh") and callable(getattr(active, "refresh")):
+            active.refresh()
+        else:
+            vm = getattr(active, "_vm", None)
+            if vm is not None and hasattr(vm, "refresh"):
+                vm.refresh()
 
     def reverse_last_action(self) -> None:
         """Reverse the most recent session action."""

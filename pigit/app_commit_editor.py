@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.termui import keys, palette, show_toast
+from pigit.app_theme import THEME
+from pigit.termui import keys, show_toast
 from pigit.termui._component import Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.widgets import InputLine, LintBar
@@ -33,9 +34,9 @@ class _StagedHeader(Component):
         self._count = count
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
-        surface.fill_rect_rgb(0, 0, surface.width, surface.height, palette.DEFAULT_BG)
+        surface.fill_rect_rgb(0, 0, surface.width, surface.height, THEME.bg_base)
         text = f"Staged ({self._count})"
-        surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG_DIM)
+        surface.draw_text_rgb(0, 0, text, fg=THEME.fg_dim)
 
 
 class _StagedList(Component):
@@ -51,14 +52,14 @@ class _StagedList(Component):
         self.files = files
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
-        surface.fill_rect_rgb(0, 0, surface.width, surface.height, palette.DEFAULT_BG)
+        surface.fill_rect_rgb(0, 0, surface.width, surface.height, THEME.bg_base)
 
         if not self.files:
             surface.draw_text_rgb(
                 0,
                 0,
                 "  No staged files",
-                fg=palette.DEFAULT_FG_DIM,
+                fg=THEME.fg_dim,
             )
             return
 
@@ -70,17 +71,13 @@ class _StagedList(Component):
             line = f"  {staged} {f.name}"
             if len(line) > surface.width:
                 line = line[: surface.width - 1] + "…"
-            fg = palette.DEFAULT_FG_DIM
-            if staged == "M":
-                fg = palette.GREEN
-            elif staged == "A":
-                fg = palette.GREEN
+            fg = THEME.fg_dim
+            if staged in "MA":
+                fg = THEME.fg_success
             elif staged == "D":
-                fg = palette.RED
-            elif staged == "R":
-                fg = palette.YELLOW
-            elif staged == "C":
-                fg = palette.YELLOW
+                fg = THEME.fg_danger
+            elif staged in "RC":
+                fg = THEME.fg_warning
             surface.draw_text_rgb(i, 0, line, fg=fg)
 
 

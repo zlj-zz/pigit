@@ -82,8 +82,7 @@ class PreviewPanel(Component):
                 0,
                 0,
                 title_text,
-                fg=THEME.accent_pearl,
-                bg=palette.DEFAULT_BG,
+                fg=THEME.fg_branch_name,
                 style_flags=palette.STYLE_BOLD,
             )
 
@@ -97,7 +96,6 @@ class PreviewPanel(Component):
                     sub_x,
                     self._subtitle,
                     fg=THEME.fg_dim,
-                    bg=palette.DEFAULT_BG,
                 )
 
         # Horizontal separator (row 1)
@@ -108,7 +106,6 @@ class PreviewPanel(Component):
                 0,
                 sep,
                 fg=THEME.fg_dim,
-                bg=palette.DEFAULT_BG,
             )
 
         # Diff content (rows 2+)

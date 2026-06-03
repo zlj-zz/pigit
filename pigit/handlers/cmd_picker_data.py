@@ -46,16 +46,14 @@ def iter_cmd_new_entries() -> Iterator[CmdNewEntry]:
     registry = get_registry()
     for cmd_def in sorted(registry.get_all(), key=lambda c: c.meta.short):
         meta = cmd_def.meta
-        comp = meta.arg_completion
-        if isinstance(comp, list) and comp:
-            comp = comp[0]
+        comp = meta.arg_completion[0] if meta.arg_completion else None
         yield CmdNewEntry(
             name=meta.short,
             help_text=meta.help,
             category=meta.category.value,
             is_dangerous=meta.dangerous,
             has_args=meta.has_args,
-            arg_completion=comp if isinstance(comp, CompletionType) else None,
+            arg_completion=comp,
         )
 
 

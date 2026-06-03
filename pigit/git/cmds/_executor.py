@@ -69,11 +69,9 @@ def _execute_override(
     Returns:
         Tuple of (exit_code, output)
     """
-    try:
-        override_def = registry.get(handler_name)
+    override_def = registry.get(handler_name)
+    if override_def is not None:
         return _execute_handler(override_def.handler, args, executor, execute_step)
-    except Exception:
-        pass
 
     full_cmd = f"{handler_name} {' '.join(args)}" if args else handler_name
     return executor.exec(full_cmd)

@@ -1,5 +1,41 @@
 # Changelog of pigit
 
+## 1.8.14 (2026-06-03)
+
+### Diff — Time-travel File History
+
+- **`v` in commit diff view**: opens a file-history browser showing the file content at the selected commit. Only available when the cursor is inside a hunk (file path shown in the bottom bar as a visual cue).
+- **`p` / `n`**: navigate to older / newer commits that touched the same file.
+- **`d` / `Esc`**: return to the diff view; previous scroll position is restored.
+- **Syntax-highlighted rendering**: file content is tokenized with language detection from the file path.
+
+### TUI — Auto Refresh
+
+- **Generic timer mechanism**: `AppEventLoop.add_interval()` / `remove_interval()` for periodic callbacks without threading.
+- **`tui.auto_refresh_interval` config**: default `10.0` seconds; set to `0` to disable. Auto-refreshes the active panel while the TUI is idle.
+- **Overlay-aware**: refresh is skipped when a modal, sheet, or popup is open to avoid disrupting user input.
+- **Panel-level refresh priority**: panels with their own `refresh()` method (e.g., `StashPanel`) are refreshed directly; otherwise the underlying ViewModel is refreshed.
+
+### Theme & Rendering
+
+- **`FlatCell` transparent defaults**: `fg` and `bg` now default to `None` (terminal default) instead of `palette.DEFAULT_FG` / `palette.DEFAULT_BG`. Renderer emits `\033[49m` / `\033[39m` for transparent cells.
+- **Theme normalization**: app layer uses semantic `THEME.*` colors exclusively; direct `palette` references removed from diff rendering.
+- **Fixed black blocks in diff viewer**: unfilled interior cells no longer render as black; context lines use terminal default background.
+- **`AppFooter` simplified**: removed explicit `bg` settings, relying on terminal default.
+
+### Status Panel
+
+- **`Y` copies file path**: selected file path is copied to the system clipboard.
+
+### Input
+
+- **xterm `modifyOtherKeys` support**: parses CSI 27 sequences (e.g., iTerm2 `Ctrl+Enter`) so key bindings work reliably across terminal emulators.
+
+### Refactors
+
+- **`arg_completion` unified**: all `@command` decorators now use `list[CompletionType]` with an empty-list default, eliminating `None` / single-value inconsistencies.
+- **`TuiConfig` dependency injection**: `PigitApplication` receives `TuiConfig` via `__init__` instead of constructing `Config()` internally.
+
 ## 1.8.13 (2026-06-01)
 
 ### Session History

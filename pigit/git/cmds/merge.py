@@ -17,7 +17,7 @@ from ._models import CommandCategory, SecurityLevel
     category=CommandCategory.MERGE,
     help="Merge changes from another branch.",
     has_args=True,
-    arg_completion=CompletionType.BRANCH,
+    arg_completion=[CompletionType.BRANCH],
     dangerous=True,
     confirm_msg="Merge branch? This may create merge conflicts.",
     security_level=SecurityLevel.NORMAL,
@@ -76,7 +76,7 @@ def merge_status(args: list[str]) -> str:
     category=CommandCategory.MERGE,
     help="Merge without fast-forward (create merge commit).",
     has_args=True,
-    arg_completion=CompletionType.BRANCH,
+    arg_completion=[CompletionType.BRANCH],
     examples=["pigit cmd_new m.no feature-branch"],
     related=["m", "m.ff"],
 )
@@ -93,7 +93,7 @@ def merge_no_ff(args: list[str]) -> str:
     category=CommandCategory.MERGE,
     help="Merge with fast-forward only (fail if not possible).",
     has_args=True,
-    arg_completion=CompletionType.BRANCH,
+    arg_completion=[CompletionType.BRANCH],
     examples=["pigit cmd_new m.ff feature-branch"],
     related=["m", "m.no"],
 )
@@ -110,7 +110,7 @@ def merge_ff_only(args: list[str]) -> str:
     category=CommandCategory.MERGE,
     help="Squash merge (combine all commits into one).",
     has_args=True,
-    arg_completion=CompletionType.BRANCH,
+    arg_completion=[CompletionType.BRANCH],
     examples=["pigit cmd_new m.squash feature-branch"],
     related=["m", "c.F"],
 )

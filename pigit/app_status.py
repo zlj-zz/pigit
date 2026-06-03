@@ -38,6 +38,7 @@ from .app_inspector import FileInfo
 from .app_preview import PreviewPanel
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
+from .ext.utils import copy_to_clipboard
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -57,13 +58,13 @@ def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
     if not focused:
         return THEME.fg_dim
     if ch in "MA":
-        return THEME.accent_green
+        return THEME.fg_success
     if ch in "RC":
-        return THEME.accent_yellow
+        return THEME.fg_warning
     if ch == "?":
-        return THEME.accent_blue
+        return THEME.fg_info
     if ch == "U":
-        return THEME.accent_red
+        return THEME.fg_danger
     return THEME.fg_muted
 
 
@@ -71,13 +72,13 @@ def _unstaged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
     if not focused:
         return THEME.fg_dim
     if ch in "MD":
-        return THEME.accent_red
+        return THEME.fg_danger
     if ch in "RC":
-        return THEME.accent_yellow
+        return THEME.fg_warning
     if ch == "?":
-        return THEME.accent_blue
+        return THEME.fg_info
     if ch == "U":
-        return THEME.accent_red
+        return THEME.fg_danger
     return THEME.fg_muted
 
 
@@ -87,17 +88,17 @@ def _label_fg(label: str, focused: bool) -> tuple[int, int, int]:
         return THEME.fg_dim
     match label:
         case "Staged":
-            return THEME.accent_green
+            return THEME.fg_success
         case "Modified":
-            return THEME.accent_red
+            return THEME.fg_danger
         case "Mixed":
-            return THEME.accent_yellow
+            return THEME.fg_warning
         case "Conflict":
-            return THEME.accent_red
+            return THEME.fg_danger
         case "Deleted":
-            return THEME.accent_red
+            return THEME.fg_danger
         case "Untracked":
-            return THEME.accent_blue
+            return THEME.fg_info
         case _:
             return THEME.fg_muted
 
@@ -135,9 +136,9 @@ class StatusPanel(ItemList):
         super().__init__(
             on_selection_changed=on_selection_changed,
             empty_state=[
-                Segment("    (\\__/)", fg=THEME.accent_green),
-                Segment("    ( •_• )", fg=THEME.accent_green),
-                Segment("    / > ✓", fg=THEME.accent_green),
+                Segment("    (\\__/)", fg=THEME.fg_success),
+                Segment("    ( •_• )", fg=THEME.fg_success),
+                Segment("    / > ✓", fg=THEME.fg_success),
                 Segment("  Pigit Clean", fg=THEME.fg_dim),
                 Segment("Working tree clean", fg=THEME.fg_dim),
             ],
@@ -341,7 +342,7 @@ class StatusPanel(ItemList):
 
         is_selected = idx in self._selected
         if is_selected:
-            filename_fg = THEME.accent_purple if focused else THEME.fg_dim
+            filename_fg = THEME.fg_staged_renamed if focused else THEME.fg_dim
         else:
             filename_fg = fg_primary
         main = [Segment(file.name, fg=filename_fg, style_flags=cursor_flags)]
@@ -474,6 +475,14 @@ class StatusPanel(ItemList):
         if key == "z":
             result = self._vm.stash_push()
             self._handle_result(result)
+            return
+        if key == "Y":
+            if self.files and 0 <= self.curr_no < len(self.files):
+                path = self.files[self.curr_no].name
+                if copy_to_clipboard(path):
+                    show_toast(f"Copied: {path}", duration=1.0)
+                else:
+                    show_toast("Failed to copy to clipboard", duration=2.0)
             return
 
     # --- Helpers ---

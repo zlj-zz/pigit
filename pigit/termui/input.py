@@ -48,8 +48,35 @@ def _csi_or_ss3_byte_count(buf: bytes) -> int:
     return 0
 
 
+def _parse_csi_27(chunk: bytes) -> str | None:
+    """Parse xterm modifyOtherKeys sequence \x1b[27;<mod>;<key>~."""
+    if not chunk.startswith(b"\x1b[") or chunk[-1:] != b"~":
+        return None
+    inner = chunk[2:-1].decode("ascii", errors="ignore")
+    if not inner.startswith("27;"):
+        return None
+    parts = inner.split(";")
+    if len(parts) != 3:
+        return None
+    try:
+        modifier = int(parts[1])
+        key_code = int(parts[2])
+    except ValueError:
+        return None
+    if key_code == 13:
+        if modifier == 2:
+            return keys.KEY_SHIFT_ENTER
+        if modifier == 5:
+            return keys.KEY_CTRL_ENTER
+        if modifier == 6:
+            return keys.KEY_CTRL_SHIFT_ENTER
+    return None
+
+
 def _parse_csi_u(chunk: bytes) -> str | None:
     """Parse CSI-u sequence \x1b[<code>;<mod>u -> semantic key string.
+
+    Also handles the kitty extended format \x1b[<code>;<mod>:<event>u.
 
     Modifier mask: 1=none 2=shift 3=alt 4=shift+alt 5=ctrl 6=ctrl+shift
     7=ctrl+alt 8=ctrl+shift+alt
@@ -63,7 +90,11 @@ def _parse_csi_u(chunk: bytes) -> str | None:
         key_code = int(params[0])
     except ValueError:
         return None
-    modifier = int(params[1]) if len(params) > 1 else 1
+    modifier_str = params[1].split(":")[0] if len(params) > 1 else "1"
+    try:
+        modifier = int(modifier_str)
+    except ValueError:
+        modifier = 1
     # Enter (code 13)
     if key_code == 13:
         if modifier == 2:
@@ -106,6 +137,9 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
         csi_u = _parse_csi_u(chunk)
         if csi_u:
             return csi_u, n, False
+        csi_27 = _parse_csi_27(chunk)
+        if csi_27:
+            return csi_27, n, False
         return None, n, False
 
     # ESC + non-CSI: emit ESC; caller may re-parse following bytes.
