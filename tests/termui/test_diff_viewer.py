@@ -243,7 +243,8 @@ class TestFileHistoryHelp:
         keys = [k for k, _ in entries]
         assert "p" in keys
         assert "n" in keys
-        assert "d" in keys
+        assert "d" not in keys
+        assert "Esc" in keys
         assert "v" not in keys
 
 
