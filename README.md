@@ -45,9 +45,9 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 
 The TUI provides interactive panels for status, branch list, commit log, diff viewer, and more. Use `j`/`k` or arrow keys to navigate, `Enter` to select, and `q` or `Esc` to go back. Press `?` at any time to see available key bindings.
 
-**Status panel** — stage/unstage files with `a`, discard with `d`, ignore with `i`, and view inline diffs with `Enter`. A stash list sits at the bottom (`z` to push, `Z` to pop). On wide terminals a file-preview splits the view.
+**Status panel** — stage/unstage files with `a`, discard with `d`, ignore with `i`, and view inline diffs with `Enter`. `Y` copies the selected file path to the clipboard. A stash list sits at the bottom (`z` to push, `Z` to pop). On wide terminals a file-preview splits the view.
 
-**Diff viewer** — press `H` to toggle hunk mode and stage/unstage individual hunks inline.
+**Diff viewer** — press `H` to toggle hunk mode and stage/unstage individual hunks inline. In commit diffs, press `v` to view the file at that commit and `p`/`n` to browse older/newer revisions.
 
 **Commit editor** — press `c` in the status panel to open an inline subject/body editor with lint feedback; `Ctrl+Enter` submits.
 
