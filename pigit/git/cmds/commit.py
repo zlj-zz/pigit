@@ -97,7 +97,7 @@ def commit_amend(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Create a fixup commit (for autosquash rebase).",
     has_args=True,
-    arg_completion=CompletionType.COMMIT,
+    arg_completion=[CompletionType.COMMIT],
     examples=["pigit cmd_new c.fix HEAD~1", "pigit cmd_new c.fix abc123"],
     related=["c", "c.s"],
 )
@@ -113,7 +113,7 @@ def commit_fixup_target(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Create a squash commit (for autosquash rebase).",
     has_args=True,
-    arg_completion=CompletionType.COMMIT,
+    arg_completion=[CompletionType.COMMIT],
     examples=["pigit cmd_new c.s HEAD~1", "pigit cmd_new c.s abc123"],
     related=["c", "c.fix"],
 )
@@ -129,7 +129,7 @@ def commit_squash(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Checkout a branch or paths.",
     has_args=True,
-    arg_completion=CompletionType.REF,
+    arg_completion=[CompletionType.REF],
     examples=["pigit cmd_new c.o main", "pigit cmd_new c.o -- file.txt"],
     related=["b.o", "c"],
 )

@@ -79,7 +79,7 @@ class CommandMeta:
     category: CommandCategory
     help: str
     has_args: bool = False
-    arg_completion: CompletionType | list[CompletionType] = None
+    arg_completion: list[CompletionType] = field(default_factory=list)
     dangerous: bool = False
     confirm_msg: str = ""
     examples: list[str] = field(default_factory=list)
