@@ -873,7 +873,7 @@ class DiffViewer(LineTextBrowser):
         col: int,
         max_col: int,
         tokens: list[tuple[str, tuple[int, int, int], int]],
-        bg: tuple[int, int, int],
+        bg: tuple[int, int, int] | None = None,
     ) -> None:
         """Draw syntax tokens with width-aware truncation."""
         for token_text, token_fg, token_width in tokens:
@@ -947,7 +947,6 @@ class DiffViewer(LineTextBrowser):
                 text_start,
                 text_start + main_w,
                 tokens,
-                THEME.bg_base,
             )
 
         # Footer hint (overwrites bottom border)
@@ -980,7 +979,6 @@ class DiffViewer(LineTextBrowser):
                 text_start,
                 text_start + main_w,
                 tokens,
-                THEME.bg_base,
             )
 
     def _render_surface(self, surface) -> None:
