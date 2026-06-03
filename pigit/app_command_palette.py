@@ -136,10 +136,10 @@ class CommandPalette(Component):
             return
 
         # Background
-        surface.fill_rect_rgb(0, 0, w, h, THEME.bg_palette)
+        surface.fill_rect_rgb(0, 0, w, h, THEME.bg_overlay)
 
         # Top border
-        surface.draw_text_rgb(0, 0, "─" * w, fg=THEME.fg_dim, bg=THEME.bg_palette)
+        surface.draw_text_rgb(0, 0, "─" * w, fg=THEME.fg_dim, bg=THEME.bg_overlay)
 
         # Input line at bottom
         input_row = h - 1
@@ -151,7 +151,7 @@ class CommandPalette(Component):
         if wcswidth(core) > w:
             core = truncate_by_width(core, w - 1) + "…"
         surface.draw_text_rgb(
-            input_row, 0, core, fg=THEME.fg_primary, bg=THEME.bg_palette
+            input_row, 0, core, fg=THEME.fg_primary, bg=THEME.bg_overlay
         )
 
         # Block cursor
@@ -162,7 +162,7 @@ class CommandPalette(Component):
                 else " "
             )
             surface.draw_text_rgb(
-                input_row, cursor_abs, ch, fg=THEME.bg_palette, bg=THEME.fg_primary
+                input_row, cursor_abs, ch, fg=THEME.bg_overlay, bg=THEME.fg_primary
             )
 
         # Candidate list above input
@@ -175,7 +175,7 @@ class CommandPalette(Component):
                     continue
                 is_selected = i == self._selected
                 fg = THEME.fg_primary if is_selected else THEME.fg_muted
-                bg = THEME.bg_active if is_selected else THEME.bg_palette
+                bg = THEME.bg_active if is_selected else THEME.bg_overlay
                 text = f"  {candidate}"
                 if wcswidth(text) > w:
                     text = truncate_by_width(text, w - 1) + "…"

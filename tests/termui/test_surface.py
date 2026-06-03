@@ -13,8 +13,8 @@ class TestCell:
     def test_default_cell_is_blank(self):
         c = Cell()
         assert c.char == " "
-        assert c.fg == DEFAULT_FG
-        assert c.bg == DEFAULT_BG
+        assert c.fg is None
+        assert c.bg is None
 
     def test_cell_with_values(self):
         c = Cell(char="X", fg=(255, 0, 0))
@@ -161,8 +161,8 @@ class TestFlatCell:
     def test_default_cell(self):
         c = FlatCell()
         assert c.char == " "
-        assert c.fg == (220, 220, 230)
-        assert c.bg == (18, 18, 22)
+        assert c.fg is None
+        assert c.bg is None
         assert c.style_flags == 0
 
     def test_rgb_values(self):
@@ -211,7 +211,7 @@ class TestSurfaceRGB:
     def test_fill_rect_rgb(self):
         s = Surface(4, 3)
         s.fill_rect_rgb(1, 1, 2, 2, bg=(0, 0, 255))
-        assert s.rows()[0][0].bg == (18, 18, 22)  # unchanged
+        assert s.rows()[0][0].bg is None  # unchanged
         assert s.rows()[1][1].bg == (0, 0, 255)
         assert s.rows()[1][2].bg == (0, 0, 255)
         assert s.rows()[2][1].bg == (0, 0, 255)
@@ -252,7 +252,7 @@ class TestSurfaceRGBEdgeCases:
         # Should be a no-op
         for row in s.rows():
             for cell in row:
-                assert cell.bg == (18, 18, 22)
+                assert cell.bg is None
 
 
 class TestSurfaceRGBWideChars:

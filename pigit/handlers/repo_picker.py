@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from pigit.termui import ExitEventLoop, palette
+from pigit.app_theme import THEME
 from pigit.picker_app import BasePickerApp, PickerRow
 from pigit.termui._segment import Segment
 from pigit.termui.widgets import CheckList, ItemList
@@ -44,12 +45,12 @@ def _render_status_symbol(
 ) -> Segment:
     """Map a status character to a colored Segment."""
     fg = (
-        palette.RED
+        THEME.fg_danger
         if ch == "*"
         else (
-            palette.GREEN
+            THEME.fg_success
             if ch == "+"
-            else palette.YELLOW if ch == "?" else palette.DEFAULT_FG
+            else THEME.fg_warning if ch == "?" else THEME.fg_primary
         )
     )
     return Segment(ch, fg=fg, bg=bg, style_flags=row_style)
@@ -63,19 +64,17 @@ def _build_repo_row_body(
 ) -> tuple[list[Segment], list[Segment]]:
     """Build the main and right segments for a repo row."""
     main: list[Segment] = [
-        Segment(row.title, fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style),
-        Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style),
+        Segment(row.title, fg=THEME.fg_primary, bg=bg, style_flags=row_style),
+        Segment("  ", fg=THEME.fg_primary, bg=bg, style_flags=row_style),
     ]
 
     if status is not None:
         branch_seg = Segment(
-            status.branch, fg=palette.BLUE, bg=bg, style_flags=row_style
+            status.branch, fg=THEME.fg_branch_name, bg=bg, style_flags=row_style
         )
         main.append(branch_seg)
         if status.symbols:
-            main.append(
-                Segment(" ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)
-            )
+            main.append(Segment(" ", fg=THEME.fg_primary, bg=bg, style_flags=row_style))
             main.extend(
                 _render_status_symbol(ch, bg, row_style) for ch in status.symbols
             )
@@ -83,7 +82,7 @@ def _build_repo_row_body(
     right = [
         Segment(
             row.ref if isinstance(row.ref, str) else "",
-            fg=palette.DEFAULT_FG_DIM,
+            fg=THEME.fg_dim,
             bg=bg,
             style_flags=row_style,
         )
@@ -112,10 +111,10 @@ class _RepoCdItemList(ItemList):
         app = self._app
         source_idx = self.visible_to_source(idx)
         row = app._rows[source_idx]
-        bg = palette.BG_HOVER if is_cursor else None
+        bg = THEME.bg_hover if is_cursor else None
         row_style = palette.STYLE_BOLD if is_cursor else 0
 
-        left = [Segment("  ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style)]
+        left = [Segment("  ", fg=THEME.fg_primary, bg=bg, style_flags=row_style)]
         main, right = _build_repo_row_body(
             row, app._repo_status.get(row.title), bg, row_style
         )
@@ -203,19 +202,17 @@ class _RepoCheckList(CheckList):
         row = app._rows[source_idx]
         is_checked = idx in self._checked
         if is_checked:
-            bg = palette.BG_ACTIVE
+            bg = THEME.bg_active
         elif is_cursor:
-            bg = palette.BG_HOVER
+            bg = THEME.bg_hover
         else:
             bg = None
         row_style = palette.STYLE_BOLD if is_cursor else 0
 
         marker = (
-            Segment(self.CHECKED, fg=palette.GREEN, bg=bg, style_flags=row_style)
+            Segment(self.CHECKED, fg=THEME.fg_success, bg=bg, style_flags=row_style)
             if is_checked
-            else Segment(
-                self.UNCHECKED, fg=palette.DEFAULT_FG_DIM, bg=bg, style_flags=row_style
-            )
+            else Segment(self.UNCHECKED, fg=THEME.fg_dim, bg=bg, style_flags=row_style)
         )
 
         main, right = _build_repo_row_body(
@@ -223,7 +220,7 @@ class _RepoCheckList(CheckList):
         )
         left = [
             marker,
-            Segment(" ", fg=palette.DEFAULT_FG, bg=bg, style_flags=row_style),
+            Segment(" ", fg=THEME.fg_primary, bg=bg, style_flags=row_style),
         ]
         return (left, main, right)
 

@@ -49,18 +49,12 @@ class AppFooter(Component):
         if h >= 2:
             # Two-row footer: dedicated separator line + content row
             # Row 0: separator
-            surface.fill_rect_rgb(0, 0, w, 1, palette.DEFAULT_BG)
-            surface.draw_text_rgb(
-                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=palette.DEFAULT_BG
-            )
+            surface.draw_text_rgb(0, 0, "\u2500" * w, fg=self._theme.fg_dim)
             # Row 1: content
             self._draw_footer_content(surface, 1, w)
         else:
             # Single-row fallback: border line overlaid with content
-            surface.fill_rect_rgb(0, 0, w, 1, palette.DEFAULT_BG)
-            surface.draw_text_rgb(
-                0, 0, "\u2500" * w, fg=self._theme.fg_dim, bg=palette.DEFAULT_BG
-            )
+            surface.draw_text_rgb(0, 0, "\u2500" * w, fg=self._theme.fg_dim)
             self._draw_footer_content(surface, 0, w)
 
     def _draw_footer_content(self, surface, row: int, w: int) -> None:
@@ -70,16 +64,12 @@ class AppFooter(Component):
         Panel help is pulled from the registered provider each render cycle;
         global help is appended and deduplicated by key.
         """
-        surface.fill_rect_rgb(row, 0, w, 1, palette.DEFAULT_BG)
-
         left_text = self._context_text
         left_w = wcswidth(left_text)
         x = 0
 
         if left_text:
-            surface.draw_text_rgb(
-                row, x, left_text, fg=self._theme.fg_primary, bg=palette.DEFAULT_BG
-            )
+            surface.draw_text_rgb(row, x, left_text, fg=self._theme.fg_primary)
             x += left_w + 2
 
         # Pull panel help from provider, then append global help
@@ -105,7 +95,6 @@ class AppFooter(Component):
                         x,
                         truncate_by_width(pair_text, avail) + "\u2026",
                         fg=self._theme.fg_muted,
-                        bg=palette.DEFAULT_BG,
                     )
                 break
 
@@ -116,14 +105,11 @@ class AppFooter(Component):
                 x,
                 key,
                 fg=self._theme.fg_primary,
-                bg=palette.DEFAULT_BG,
                 style_flags=palette.STYLE_BOLD,
             )
             x += key_w
 
             # Space + description dim
             rest = f" {desc}  "
-            surface.draw_text_rgb(
-                row, x, rest, fg=self._theme.fg_muted, bg=palette.DEFAULT_BG
-            )
+            surface.draw_text_rgb(row, x, rest, fg=self._theme.fg_muted)
             x += wcswidth(rest)

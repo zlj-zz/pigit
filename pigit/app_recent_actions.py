@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
+from pigit.app_theme import THEME
 from pigit.ext.utils import relative_time
 from pigit.termui import palette, Segment, keys
 from pigit.termui.widgets import ItemList
@@ -78,13 +79,13 @@ class RecentActionsPanel(ItemList):
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         record = self._records[idx]
-        cursor_seg = Segment(self.CURSOR if is_cursor else " ", fg=palette.DEFAULT_FG)
+        cursor_seg = Segment(self.CURSOR if is_cursor else " ", fg=THEME.fg_primary)
         left = [cursor_seg, Segment(" ")]
 
-        main = [Segment(record.description, fg=palette.DEFAULT_FG)]
+        main = [Segment(record.description, fg=THEME.fg_primary)]
 
         right_text = f"{relative_time(int(record.timestamp))}  {record.panel_hint}"
-        right = [Segment(right_text, fg=palette.DEFAULT_FG_DIM)]
+        right = [Segment(right_text, fg=THEME.fg_dim)]
 
         return left, main, right
 

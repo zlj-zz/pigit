@@ -322,7 +322,7 @@ class PigitApplication(Application):
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
-            key_fg=THEME.accent_blue,
+            key_fg=THEME.fg_info,
         )
         self._help_panel.set_grouped_entries(_HELP_GROUPS)
         self._help_popup = Popup(

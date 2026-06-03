@@ -17,7 +17,7 @@ class TestHeader:
         h.left = [
             Segment("my-repo", fg=THEME.fg_primary),
             Segment("  ", fg=THEME.fg_dim),
-            Segment("main", fg=THEME.accent_cyan),
+            Segment("main", fg=THEME.fg_branch_name),
         ]
         h.right = [
             Segment("Status", fg=THEME.fg_muted, style_flags=STYLE_BOLD),
@@ -37,11 +37,11 @@ class TestHeader:
         h.left = [
             Segment("r", fg=THEME.fg_primary),
             Segment("  ", fg=THEME.fg_dim),
-            Segment("b", fg=THEME.accent_cyan),
+            Segment("b", fg=THEME.fg_branch_name),
         ]
         h.center = [
-            Segment("↑2 ", fg=THEME.accent_green),
-            Segment("↓1", fg=THEME.accent_yellow),
+            Segment("↑2 ", fg=THEME.fg_success),
+            Segment("↓1", fg=THEME.fg_warning),
         ]
         s = Surface(30, 2)
         h.resize((30, 2))
@@ -56,7 +56,7 @@ class TestHeader:
         h.left = [
             Segment("very-long-repo-name", fg=THEME.fg_primary),
             Segment("  ", fg=THEME.fg_dim),
-            Segment("feature", fg=THEME.accent_cyan),
+            Segment("feature", fg=THEME.fg_branch_name),
         ]
         s = Surface(10, 2)
         h.resize((10, 2))

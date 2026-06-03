@@ -148,8 +148,8 @@ class Renderer:
     def _row_to_str(self, row: list[FlatCell]) -> str:
         """Convert a row of FlatCells to an ANSI string."""
         parts = []
-        last_fg = palette.DEFAULT_FG
-        last_bg = palette.DEFAULT_BG
+        last_fg = None
+        last_bg = None
         last_style = 0
 
         for cell in row:
@@ -157,13 +157,13 @@ class Renderer:
                 continue
             sgr_parts = []
             if cell.fg != last_fg:
-                if cell.fg == palette.DEFAULT_FG:
+                if cell.fg is None or cell.fg == palette.DEFAULT_FG:
                     sgr_parts.append("\033[39m")
                 else:
                     sgr_parts.append(self._color.fg_sequence(cell.fg))
                 last_fg = cell.fg
             if cell.bg != last_bg:
-                if cell.bg == palette.DEFAULT_BG:
+                if cell.bg is None or cell.bg == palette.DEFAULT_BG:
                     sgr_parts.append("\033[49m")
                 else:
                     sgr_parts.append(self._color.bg_sequence(cell.bg))
@@ -179,7 +179,7 @@ class Renderer:
                 parts.extend(sgr_parts)
             parts.append(cell.char)
 
-        if last_fg != palette.DEFAULT_FG or last_bg != palette.DEFAULT_BG or last_style:
+        if last_fg is not None or last_bg is not None or last_style:
             parts.append(self._color.reset_sequence())
         return "".join(parts)
 

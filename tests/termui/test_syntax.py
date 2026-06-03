@@ -201,7 +201,7 @@ class TestResolveColor:
     def test_rust_override(self):
         # Rust overrides keyword_storage to accent_red
         assert (
-            SyntaxTokenizer.resolve_color("keyword_storage", "rs") == THEME.accent_red
+            SyntaxTokenizer.resolve_color("keyword_storage", "rs") == THEME.fg_danger
         )
 
     def test_fallback(self):

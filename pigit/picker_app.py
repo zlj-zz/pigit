@@ -18,6 +18,7 @@ from pigit.termui import (
     keys,
     palette,
 )
+from pigit.app_theme import THEME
 from pigit.termui._component import Component
 from pigit.termui.containers import Column
 from pigit.termui.reactive import Signal
@@ -59,13 +60,11 @@ class PickerHeader(Component):
             0,
             0,
             truncate_line(self._title, cols),
-            fg=palette.DEFAULT_FG,
-            bg=palette.DEFAULT_BG,
+            fg=THEME.fg_primary,
+            bg=THEME.bg_base,
             style_flags=palette.STYLE_BOLD,
         )
-        surface.draw_text_rgb(
-            1, 0, "─" * cols, fg=palette.DEFAULT_FG_DIM, bg=palette.DEFAULT_BG
-        )
+        surface.draw_text_rgb(1, 0, "─" * cols, fg=THEME.fg_dim, bg=THEME.bg_base)
 
     def refresh(self) -> None:
         """No-op refresh for the static header (subclasses may override)."""

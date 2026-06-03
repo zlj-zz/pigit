@@ -172,10 +172,10 @@ class InspectorPanel(Component):
 
         # Left border and separator
         content_x = 2
-        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim, bg=THEME.bg_base)
         if h > 1:
             surface.draw_hline_rgb(
-                1, content_x, w - content_x, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
+                1, content_x, w - content_x, fg=THEME.fg_dim, bg=THEME.bg_base
             )
 
         # Title
@@ -186,8 +186,8 @@ class InspectorPanel(Component):
                 0,
                 content_x,
                 title,
-                fg=THEME.accent_pearl,
-                bg=palette.DEFAULT_BG,
+                fg=THEME.fg_branch_name,
+                bg=THEME.bg_base,
                 style_flags=palette.STYLE_BOLD,
             )
 
@@ -201,5 +201,5 @@ class InspectorPanel(Component):
             if wcswidth(text) > avail:
                 text = truncate_by_width(text, avail - 1) + "…"
             surface.draw_text_rgb(
-                row, content_x, text, fg=THEME.fg_primary, bg=palette.DEFAULT_BG
+                row, content_x, text, fg=THEME.fg_primary, bg=THEME.bg_base
             )

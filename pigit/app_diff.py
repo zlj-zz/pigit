@@ -748,13 +748,13 @@ class DiffViewer(LineTextBrowser):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
-                THEME.accent_green,
+                THEME.fg_success,
             )
         if self._is_del_line(line):
             density = self._line_density(line)
             return (
                 ["░", "▒", "▓", "█"][min(density, 3)],
-                THEME.accent_red,
+                THEME.fg_danger,
             )
         return " ", THEME.fg_dim
 
@@ -827,10 +827,8 @@ class DiffViewer(LineTextBrowser):
             bg = THEME.bg_success
         elif is_del:
             bg = THEME.bg_danger
-        elif line.startswith("@@"):
-            bg = palette.DEFAULT_BG
         else:
-            bg = palette.DEFAULT_BG
+            bg = THEME.bg_diff_context
 
         # Hunk mode highlight: override bg for active hunk
         if self._hunk_mode and self._hunks:
@@ -838,7 +836,7 @@ class DiffViewer(LineTextBrowser):
             if hunk.start <= idx < hunk.end:
                 bg = THEME.bg_info
 
-        if bg != palette.DEFAULT_BG:
+        if bg != THEME.bg_diff_context:
             surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
 
         line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
@@ -847,9 +845,9 @@ class DiffViewer(LineTextBrowser):
 
         prefix_x = x_offset + self.LINE_NO_WIDTH
         if is_add:
-            surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.accent_green, bg=bg)
+            surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.fg_success, bg=bg)
         elif is_del:
-            surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.accent_red, bg=bg)
+            surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.fg_danger, bg=bg)
 
         # ── Syntax-highlighted text rendering ──
         text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
@@ -910,7 +908,7 @@ class DiffViewer(LineTextBrowser):
             self._render_file_history_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
 
         # Header row (overwrites top border)
         header = self._file_history_header()
@@ -939,9 +937,7 @@ class DiffViewer(LineTextBrowser):
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
             if line_no:
-                surface.draw_text_rgb(
-                    row, 1, line_no, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-                )
+                surface.draw_text_rgb(row, 1, line_no, fg=THEME.fg_dim)
 
             text_start = 1 + self.LINE_NO_WIDTH + 1
             tokens = self._render_tokens[idx] if idx < len(self._render_tokens) else []
@@ -951,15 +947,13 @@ class DiffViewer(LineTextBrowser):
                 text_start,
                 text_start + main_w,
                 tokens,
-                palette.DEFAULT_BG,
+                THEME.bg_base,
             )
 
         # Footer hint (overwrites bottom border)
         hint = " jk:nav  p:older  n:newer  d:diff  Esc:back "
         hint_trim = truncate_by_width(hint, w - 4) if wcswidth(hint) > w - 4 else hint
-        surface.draw_text_rgb(
-            h - 1, 1, hint_trim, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-        )
+        surface.draw_text_rgb(h - 1, 1, hint_trim, fg=THEME.fg_dim)
 
     def _render_file_history_borderless(self, surface) -> None:
         """File history rendering when surface is too small for borders."""
@@ -976,9 +970,7 @@ class DiffViewer(LineTextBrowser):
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
             if line_no:
-                surface.draw_text_rgb(
-                    row, 0, line_no, fg=THEME.fg_dim, bg=palette.DEFAULT_BG
-                )
+                surface.draw_text_rgb(row, 0, line_no, fg=THEME.fg_dim)
 
             text_start = self.LINE_NO_WIDTH + 1
             tokens = self._render_tokens[idx] if idx < len(self._render_tokens) else []
@@ -988,7 +980,7 @@ class DiffViewer(LineTextBrowser):
                 text_start,
                 text_start + main_w,
                 tokens,
-                palette.DEFAULT_BG,
+                THEME.bg_base,
             )
 
     def _render_surface(self, surface) -> None:
@@ -1003,7 +995,7 @@ class DiffViewer(LineTextBrowser):
             self._render_surface_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, bg=palette.DEFAULT_BG)
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS
@@ -1031,7 +1023,7 @@ class DiffViewer(LineTextBrowser):
                 1,
                 w - self.BORDER_COLS,
                 blank_count,
-                palette.DEFAULT_BG,
+                THEME.bg_diff_context,
             )
 
         if self._hunk_mode:
@@ -1042,8 +1034,7 @@ class DiffViewer(LineTextBrowser):
                     h - 1,
                     badge_x,
                     badge,
-                    fg=THEME.accent_sky_blue,
-                    bg=THEME.bg_base,
+                    fg=THEME.fg_file_history_link,
                     style_flags=palette.STYLE_BOLD,
                 )
 

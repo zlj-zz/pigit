@@ -41,8 +41,8 @@ class FlatCell:
     def __init__(
         self,
         char: str = " ",
-        fg: tuple[int, int, int] = palette.DEFAULT_FG,
-        bg: tuple[int, int, int] = palette.DEFAULT_BG,
+        fg: tuple[int, int, int] | None = None,
+        bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
         *,
         bold: bool = False,
@@ -153,7 +153,12 @@ class _Subsurface:
         return col
 
     def fill_rect_rgb(
-        self, row: int, col: int, width: int, height: int, bg: tuple[int, int, int]
+        self,
+        row: int,
+        col: int,
+        width: int,
+        height: int,
+        bg: tuple[int, int, int] | None = None,
     ) -> None:
         """Fill a rectangle with an RGB background, clipped to subsurface bounds."""
         clipped = self._clip(row, col, width, height)
@@ -297,13 +302,10 @@ class Surface:
         Args:
             row, col: Starting position.
             text: String to write.
-            fg: Foreground RGB tuple, or None to use palette.DEFAULT_FG.
-            bg: Background RGB tuple, or None to use palette.DEFAULT_BG.
+            fg: Foreground RGB tuple, or None for no color.
+            bg: Background RGB tuple, or None for no color.
             style_flags: Bitmask of terminal style flags.
         """
-        actual_fg = fg if fg is not None else palette.DEFAULT_FG
-        actual_bg = bg if bg is not None else palette.DEFAULT_BG
-
         if row < 0 or row >= self.height or col >= self.width:
             return
 
@@ -316,7 +318,7 @@ class Surface:
                 w = _char_width(ord(ch))
                 if cur_col >= 0 and cur_col + w <= self.width:
                     self._rows[row][cur_col] = FlatCell(
-                        ch, fg=actual_fg, bg=actual_bg, style_flags=style_flags
+                        ch, fg=fg, bg=bg, style_flags=style_flags
                     )
                     if w == 2:
                         self._rows[row][cur_col + 1] = _SPACER_CELL
@@ -330,7 +332,7 @@ class Surface:
                 text = text[: self.width - col]
             for ch in text:
                 self._rows[row][col] = FlatCell(
-                    ch, fg=actual_fg, bg=actual_bg, style_flags=style_flags
+                    ch, fg=fg, bg=bg, style_flags=style_flags
                 )
                 col += 1
             return
@@ -343,9 +345,7 @@ class Surface:
             if col >= self.width:
                 break
             w = _char_width(ord(ch))
-            self._rows[row][col] = FlatCell(
-                ch, fg=actual_fg, bg=actual_bg, style_flags=style_flags
-            )
+            self._rows[row][col] = FlatCell(ch, fg=fg, bg=bg, style_flags=style_flags)
             if w == 2:
                 self._rows[row][col + 1] = _SPACER_CELL
             col += w
@@ -370,12 +370,20 @@ class Surface:
         return col
 
     def fill_rect_rgb(
-        self, row: int, col: int, width: int, height: int, bg: tuple[int, int, int]
+        self,
+        row: int,
+        col: int,
+        width: int,
+        height: int,
+        bg: tuple[int, int, int] | None = None,
     ) -> None:
         """Fill a rectangular area with a solid background color.
 
         Existing character content is replaced with spaces.
+        When ``bg`` is *None*, the fill is skipped (transparent).
         """
+        if bg is None:
+            return
         cell = FlatCell(" ", bg=bg)
         for r in range(row, min(row + height, self.height)):
             for c in range(col, min(col + width, self.width)):
