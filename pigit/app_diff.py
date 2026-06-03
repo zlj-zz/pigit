@@ -423,7 +423,6 @@ class DiffViewer(LineTextBrowser):
                 ("jk", "Scroll"),
                 ("p", "Older commit"),
                 ("n", "Newer commit"),
-                ("d", "Diff view"),
                 ("Esc", "Back"),
             ]
         if self._hunk_mode:
@@ -672,9 +671,6 @@ class DiffViewer(LineTextBrowser):
 
     @bind_keys("d")
     def _discard_current_hunk(self) -> None:
-        if self._file_history_mode:
-            self._exit_file_history()
-            return
         self._run_hunk_action("discard", needs_confirm=True)
 
     def _extract_hunk_patch(self, hunk_idx: int) -> str:
@@ -1023,6 +1019,17 @@ class DiffViewer(LineTextBrowser):
                 blank_count,
                 THEME.bg_diff_context,
             )
+
+        if self._diff_type is DiffType.COMMIT and not self._hunk_mode:
+            path = self._current_file_path()
+            if path:
+                path_badge = f" {path} "
+                path_trim = (
+                    truncate_by_width(path_badge, w - 4)
+                    if wcswidth(path_badge) > w - 4
+                    else path_badge
+                )
+                surface.draw_text_rgb(h - 1, 1, path_trim, fg=THEME.fg_muted)
 
         if self._hunk_mode:
             badge = " HUNK "
