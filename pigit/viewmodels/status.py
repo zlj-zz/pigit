@@ -65,12 +65,6 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     def _do_load(self) -> list[File]:
         return self._git.load_status()
 
-    def _file_at(self, idx: int) -> File | None:
-        items = self._items.value
-        if 0 <= idx < len(items):
-            return items[idx]
-        return None
-
     def _run_single(
         self,
         idx: int,
@@ -79,7 +73,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         guard: Callable[[File], bool] | None = None,
     ) -> ActionResult:
         """Execute a single-file git operation and return an ActionResult."""
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
         if guard is not None and not guard(f):
@@ -113,7 +107,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         )
 
     def stage(self, idx: int) -> ActionResult:
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
         was_staged = f.has_staged_change
@@ -138,7 +132,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def discard(self, idx: int) -> ActionResult:
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
 
@@ -170,7 +164,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def ignore(self, idx: int) -> ActionResult:
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
         result = self._run_single(
@@ -218,7 +212,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         )
 
     def load_diff(self, idx: int, plain: bool = True) -> list[str]:
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return []
         cached = f.has_staged_change and not f.has_unstaged_change
@@ -226,7 +220,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return text.splitlines()
 
     def get_inspector_data(self, idx: int) -> FileInfo | None:
-        f = self._file_at(idx)
+        f = self.item_at(idx)
         if f is None:
             return None
         size, mtime = self._git.get_file_info(f)

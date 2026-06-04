@@ -55,14 +55,8 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
     def _do_load(self) -> list[Branch]:
         return self._git.load_branches(scope=self._scope)
 
-    def _branch_at(self, idx: int) -> Branch | None:
-        items = self._items.value
-        if 0 <= idx < len(items):
-            return items[idx]
-        return None
-
     def checkout(self, idx: int) -> ActionResult:
-        b = self._branch_at(idx)
+        b = self.item_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
         current = self._git.get_head() or ""
@@ -102,7 +96,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             return ActionResult(success=False, message=str(e))
 
     def rename_branch(self, idx: int, new_name: str) -> ActionResult:
-        b = self._branch_at(idx)
+        b = self.item_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
         old_name = b.name
@@ -129,7 +123,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
         return result
 
     def delete_branch(self, idx: int, force: bool = False) -> ActionResult:
-        b = self._branch_at(idx)
+        b = self.item_at(idx)
         if b is None:
             return ActionResult(success=False, message="Invalid index")
         # Capture branch SHA before deletion for potential restore
@@ -157,7 +151,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
         return result
 
     def get_inspector_data(self, idx: int) -> BranchInfo | None:
-        b = self._branch_at(idx)
+        b = self.item_at(idx)
         if b is None:
             return None
         recent_msg, recent_author = self._git.get_branch_recent_commit(b.name)

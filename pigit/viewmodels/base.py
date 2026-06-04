@@ -70,6 +70,12 @@ class ViewModelBase(Generic[T]):
     def _on_loaded(self, data: list[T]) -> None:
         self._items.set(data)
 
+    def item_at(self, idx: int) -> T | None:
+        items = self._items.value
+        if 0 <= idx < len(items):
+            return items[idx]
+        return None
+
     def dispose(self) -> None:
         self._loader.cancel()
         for unsub in self._unsubs:
