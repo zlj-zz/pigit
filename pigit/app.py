@@ -194,7 +194,7 @@ class PigitApplication(Application):
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         # Auto-refresh
-        self._auto_refresh_interval = config.auto_refresh_interval
+        self._config = config
         self._refresh_timer_id: int | None = None
         # ViewModels (stored for preview updates)
         self._status_vm: StatusViewModel | None = None
@@ -370,11 +370,11 @@ class PigitApplication(Application):
         self._try_restore_merge_state()
 
         # Register auto-refresh timer
-        if self._loop is not None and self._auto_refresh_interval > 0:
+        if self._loop is not None and self._config.auto_refresh_interval > 0:
             if self._refresh_timer_id is not None:
                 self._loop.remove_interval(self._refresh_timer_id)
             self._refresh_timer_id = self._loop.add_interval(
-                self._auto_refresh_interval,
+                self._config.auto_refresh_interval,
                 self._refresh_active_panel,
             )
 
