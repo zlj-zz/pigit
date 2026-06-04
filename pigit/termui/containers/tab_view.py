@@ -73,6 +73,16 @@ class TabView(Component):
         """Return the currently active child panel."""
         return self._active
 
+    def activate(self) -> None:
+        super().activate()
+        if self._active is not None:
+            self._active.activate()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        for child in self.children:
+            child.deactivate()
+
     def route_to(self, id: str) -> Component | None:
         """Switch to the child component with the given id."""
         resolved = self._id_map().get(id)

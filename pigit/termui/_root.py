@@ -13,6 +13,7 @@ from collections.abc import Callable, Sequence
 
 from ._component import Component
 from ._layer import LayerKind, LayerStack
+from .event_bus import EventBus
 from .types import OverlayDispatchResult, ToastPosition
 from ._runtime_context import (
     FocusManager,
@@ -36,6 +37,7 @@ class ComponentRoot(Component):
         self,
         body: Component,
         registry: ComponentRegistry | None = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         super().__init__()
         self._body = body
@@ -48,7 +50,13 @@ class ComponentRoot(Component):
         self._badge_bg: tuple[int, int, int] | None = None
         self._badge_fg: tuple[int, int, int] | None = None
         self._badge_until = 0
+        self._event_bus = event_bus
         self._app_on_event: Callable | None = None
+
+    def activate(self) -> None:
+        """Activate the root and propagate to the body component tree."""
+        super().activate()
+        self._body.activate()
 
     def destroy(self) -> None:
         """Destroy children. Runtime context is reset by the caller."""
@@ -65,6 +73,15 @@ class ComponentRoot(Component):
     def body(self) -> Component:
         """The root's single child component (the application body)."""
         return self._body
+
+    @property
+    def event_bus(self) -> EventBus | None:
+        """The framework event bus used for cross-panel subscriptions."""
+        return self._event_bus
+
+    def __del__(self) -> None:
+        """Best-effort cleanup: nothing to do; bus is owned by Application."""
+        pass
 
     # --- Badge API (framework-managed, not an overlay) ---
 

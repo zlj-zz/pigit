@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component import Component
 from ._root import ComponentRoot
+from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
 from .types import ActionEventType, OverlayDispatchResult
 from . import keys
@@ -127,6 +128,7 @@ class Application:
             self, type(self), self.BINDINGS
         )
         self._help_popup: Any = None
+        self._event_bus = EventBus()
 
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""
@@ -187,7 +189,9 @@ class Application:
         token = _runtime_ctx.set(runtime)
         try:
             body = self.build_root()
-            self._root = root = ComponentRoot(body, runtime.registry)
+            self._root = root = ComponentRoot(
+                body, runtime.registry, event_bus=self._event_bus
+            )
             runtime.overlay_host = root
             runtime.focus_manager = root._focus_manager
             root._app_on_event = self.on_event
@@ -195,6 +199,7 @@ class Application:
             self._loop.set_input_timeouts(self.input_timeouts)
             self._auto_setup_root(root)
             self.setup_root(root)
+            root.activate()
             self._loop.run()
         finally:
             if self._root is not None:

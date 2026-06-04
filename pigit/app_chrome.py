@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import Component, palette
+from pigit.termui import ActionEventType, by_id, Component, palette, resolve_presented
+from pigit.termui.containers import TabView
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import FlatTheme
@@ -28,6 +29,21 @@ class AppFooter(Component):
         self._context_text = ""
         self._global_help: list[tuple[str, str]] = []
         self._help_provider: Callable[[], list[tuple[str, str]]] | None = None
+
+    def activate(self) -> None:
+        super().activate()
+        self.subscribe(ActionEventType.selection_changed, self._sync_help)
+        self.subscribe(ActionEventType.mode_changed, self._sync_help)
+
+    def _sync_help(self, *, active: Component | None = None, **_) -> bool:
+        if active is None:
+            tab_view = by_id("tab_view", TabView)
+            active = (
+                resolve_presented(tab_view.active) if tab_view is not None else None
+            )
+        provider = getattr(active, "get_help_entries", None) if active else None
+        self.set_help_provider(provider)
+        return True
 
     def set_context(self, item_name: str = "") -> None:
         self._context_text = f"\u2192 {item_name}" if item_name else ""

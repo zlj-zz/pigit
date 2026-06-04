@@ -600,35 +600,20 @@ class PigitApplication(Application):
         panel.activate()
 
     def on_event(self, action: ActionEventType, **data) -> bool:
-        """Central event router: all panel events bubble up to here."""
+        """Central event router: publishes to the framework bus and handles app-level logic."""
         if action is ActionEventType.mode_changed:
             self._header_state.mode = data.get("mode", "")
-            footer = by_id("footer", AppFooter)
-            tab_view = by_id("tab_view", TabView)
-            if footer is not None and tab_view is not None:
-                active = resolve_presented(tab_view.active)
-                provider = getattr(active, "get_help_entries", None) if active else None
-                footer.set_help_provider(provider)
-            return True
-        if action is ActionEventType.action_requested:
-            if data.get("cmd") == "merge":
-                self._on_merge_request(data["source"], data["target"])
-                return True
-        if action is ActionEventType.selection_changed:
-            inspector = by_id("inspector", InspectorPanel)
             tab_view = by_id("tab_view", TabView)
             active = (
                 resolve_presented(tab_view.active) if tab_view is not None else None
             )
-            if inspector is not None and active is not None:
-                inspector.update_from(active)
-            if isinstance(active, (StatusPanel, StashPanel)):
-                self._update_preview()
-            # Refresh footer help and header tab when focus moves inside a container
-            footer = by_id("footer", AppFooter)
-            if footer is not None and active is not None:
-                provider = getattr(active, "get_help_entries", None)
-                footer.set_help_provider(provider)
+            self._event_bus.publish(action, active=active, **data)
+            return True
+        if action is ActionEventType.selection_changed:
+            tab_view = by_id("tab_view", TabView)
+            active = (
+                resolve_presented(tab_view.active) if tab_view is not None else None
+            )
             if active is not None:
                 tab_name = getattr(active, "tab_name", None)
                 tab_key = getattr(active, "tab_key", None)
@@ -641,8 +626,14 @@ class PigitApplication(Application):
                     self._header_state.tab, self._header_state.tab_key = (
                         self._TAB_CONFIG.get(type(active), ("", ""))
                     )
+            if isinstance(active, (StatusPanel, StashPanel)):
+                self._update_preview()
+            self._event_bus.publish(action, active=active, **data)
             return True
-        return False
+        if action is ActionEventType.action_requested and data.get("cmd") == "merge":
+            self._on_merge_request(data["source"], data["target"])
+            return True
+        return self._event_bus.publish(action, **data)
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
