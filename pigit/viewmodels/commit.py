@@ -14,8 +14,7 @@ from pigit.termui.reactive import Signal
 from .base import ActionResult, IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
-    from pigit.app_commit_graph import GraphRow
-    from pigit.app_inspector import CommitInfo
+    from pigit.app_types import CommitInfo, GraphRow
     from pigit.git.local_git import LocalGit
     from pigit.git.model import Commit
 
@@ -79,7 +78,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         if c is None:
             return None
         changed_files, total_add, total_del = self._git.get_commit_stats(c.sha)
-        from pigit.app_inspector import CommitInfo
+        from pigit.app_types import CommitInfo
 
         return CommitInfo(
             commit=c,

@@ -26,9 +26,8 @@ from pigit.termui import (
 from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
-from .app_commit_graph import GraphRow
+from .app_types import CommitInfo, GraphRow
 from .app_diff import DiffType
-from .app_inspector import CommitInfo
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
 from .app_search_filter import SearchFilter

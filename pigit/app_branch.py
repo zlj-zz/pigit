@@ -25,7 +25,7 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
-from .app_inspector import BranchInfo
+from .app_types import BranchInfo
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult

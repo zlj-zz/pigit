@@ -34,7 +34,7 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
-from .app_inspector import FileInfo
+from .app_types import FileInfo
 from .app_preview import PreviewPanel
 from .app_search_filter import SearchFilter
 from .app_theme import THEME

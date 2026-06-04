@@ -18,9 +18,9 @@ from .base import ActionResult, IListViewModel, ViewModelBase
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
+    from pigit.app_types import FileInfo
     from pigit.git.local_git import LocalGit
     from pigit.git.model import File, Stash
-    from pigit.app_inspector import FileInfo
 
 _logger = logging.getLogger(__name__)
 
@@ -230,7 +230,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         if f is None:
             return None
         size, mtime = self._git.get_file_info(f)
-        from pigit.app_inspector import FileInfo
+        from pigit.app_types import FileInfo
 
         return FileInfo(file=f, size=size, mtime=mtime)
 

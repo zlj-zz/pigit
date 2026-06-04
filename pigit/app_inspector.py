@@ -7,7 +7,6 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
@@ -15,35 +14,7 @@ from pigit.termui import Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
-
-if TYPE_CHECKING:
-    from .git.model import Branch, Commit, File
-
-
-@dataclass
-class FileInfo:
-    file: File
-    size: str
-    mtime: str
-
-
-@dataclass
-class BranchInfo:
-    branch: Branch
-    recent_msg: str
-    recent_author: str
-    created: str
-
-
-@dataclass
-class CommitInfo:
-    commit: Commit
-    changed_files: list[tuple[str, int, int]]
-    total_add: int
-    total_del: int
-
-
-InspectorData = FileInfo | BranchInfo | CommitInfo | None
+from .app_types import BranchInfo, CommitInfo, FileInfo, InspectorData
 
 
 class InspectorPanel(Component):

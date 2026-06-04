@@ -14,9 +14,9 @@ from .base import ActionResult, IListViewModel, ViewModelBase
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
+    from pigit.app_types import BranchInfo
     from pigit.git.local_git import LocalGit
     from pigit.git.model import Branch
-    from pigit.app_inspector import BranchInfo
 
 
 class IBranchViewModel(IListViewModel["Branch"]):
@@ -162,7 +162,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             return None
         recent_msg, recent_author = self._git.get_branch_recent_commit(b.name)
         created = self._git.get_branch_creation_time(b.name)
-        from pigit.app_inspector import BranchInfo
+        from pigit.app_types import BranchInfo
 
         return BranchInfo(
             branch=b,
