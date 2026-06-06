@@ -70,7 +70,7 @@ class AsyncTask(Generic[T]):
             with self._lock:
                 if current_gen != self._gen:
                     return
-            _GLOBAL_QUEUE.put((callback, result))
+                _GLOBAL_QUEUE.put((callback, result))
 
         _executor.submit(_run)
 
@@ -105,3 +105,21 @@ class AsyncTask(Generic[T]):
                 _logger.exception("AsyncTask callback failed")
         if count:
             _logger.debug("[ASYNC] poll_all: processed %d callbacks", count)
+
+
+def run_async(
+    work: Callable[[], T],
+    callback: Callable[[T], Any],
+) -> AsyncTask[T]:
+    """Run blocking work in a background thread; deliver result to main thread.
+
+    Args:
+        work: Blocking function executed in ThreadPoolExecutor.
+        callback: Invoked on the main thread with the result.
+
+    Returns:
+        AsyncTask handle; caller can ``.cancel()`` to drop the result.
+    """
+    task = AsyncTask[T]()
+    task.start(work, callback)
+    return task

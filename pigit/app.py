@@ -415,6 +415,7 @@ class PigitApplication(Application):
             # Detach preview if being removed
             for child in list(body_row.children):
                 if child is self._preview_panel and child not in desired_children:
+                    child.deactivate()
                     body_row.children.remove(child)
                     if child.parent is body_row:
                         child.parent = None
@@ -427,6 +428,7 @@ class PigitApplication(Application):
             ):
                 body_row.children.append(preview)
                 preview.parent = body_row
+                preview.activate()
         body_row.set_widths(desired_widths)
 
     def _update_preview(self) -> None:

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.ext.utils import copy_to_clipboard, relative_time
+from pigit.termui._async_task import run_async
 from pigit.termui import (
     ActionEventType,
     bind_keys,
@@ -179,10 +180,14 @@ class CommitPanel(ItemList):
         commit = self._current_commit()
         if commit is None:
             return
-        if copy_to_clipboard(commit.sha):
-            show_toast(f"Copied {commit.sha[:7]}", duration=1.5)
-        else:
-            show_toast("Failed to copy to clipboard", duration=2.0)
+        run_async(
+            lambda: copy_to_clipboard(commit.sha),
+            lambda ok, sha=commit.sha: (
+                show_toast(f"Copied {sha[:7]}", duration=1.5)
+                if ok
+                else show_toast("Failed to copy to clipboard", duration=2.0)
+            ),
+        )
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Return help pairs for commit panel."""

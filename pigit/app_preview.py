@@ -36,6 +36,16 @@ class PreviewPanel(Component):
         self._subtitle = ""
         self._diff_viewer = DiffViewer(x=self.TITLE_ROWS + 1, y=1, id="preview_diff")
 
+    def activate(self) -> None:
+        """Activate the preview and its internal diff viewer."""
+        super().activate()
+        self._diff_viewer.activate()
+
+    def deactivate(self) -> None:
+        """Deactivate the preview and its internal diff viewer."""
+        super().deactivate()
+        self._diff_viewer.deactivate()
+
     def set_preview(
         self, diff_lines: list[str], title: str, subtitle: str = ""
     ) -> None:
