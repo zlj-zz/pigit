@@ -527,18 +527,31 @@ def bind_signals(
     Returns:
         Unsubscribe function. Caller must store and call on destroy.
     """
+    import types
+
     cb = callback or component.refresh
 
-    def _handler(_: object) -> None:
+    def _handler(self: Component, _: object) -> None:
         cb()
+
+    bound = types.MethodType(_handler, component)
+    # Keep bound alive as long as component is alive so WeakMethod
+    # continues to resolve while the component exists.
+    handlers: list[object] = getattr(component, "_bind_signal_handlers", [])
+    handlers.append(bound)
+    component._bind_signal_handlers = handlers
 
     unsubs: list[Callable[[], None]] = []
     for sig in signals:
-        unsubs.append(sig.subscribe(_handler))
+        unsubs.append(sig.subscribe(bound))
 
     def unsubscribe() -> None:
         for unsub in unsubs:
             unsub()
+        try:
+            handlers.remove(bound)
+        except ValueError:
+            pass
 
     return unsubscribe
 

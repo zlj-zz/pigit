@@ -68,7 +68,7 @@ class InputLine(Component):
         self._unsubs: list[Callable[[], None]] = []
         self._unsubs.append(self._value_sig.subscribe(self._update_cache_and_notify))
         self._unsubs.append(
-            self._cursor_sig.subscribe(lambda _: self._request_render())
+            self._cursor_sig.subscribe(self._on_cursor_change)
         )
         # Completion state
         self._candidate_provider = candidate_provider
@@ -77,6 +77,10 @@ class InputLine(Component):
         self._showing_candidates = False
         self._original_value = ""
         self._scroll_offset = 0
+
+    def _on_cursor_change(self, _: int) -> None:
+        """Handler for _cursor_sig changes."""
+        self._request_render()
 
     def _request_render(self) -> None:
         """Request a render if this component is currently activated."""

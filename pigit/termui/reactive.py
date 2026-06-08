@@ -7,6 +7,8 @@ Date: 2026-04-20
 
 from __future__ import annotations
 
+import inspect
+import weakref
 from typing import Generic, TypeAlias, TypeVar
 from collections.abc import Callable
 
@@ -14,11 +16,16 @@ T = TypeVar("T")
 
 
 class Signal(Generic[T]):
-    """Reactive value. Subscribers are notified on every write."""
+    """Reactive value. Subscribers are notified on every write.
+
+    ``subscribe()`` only accepts **bound methods**. This ensures that when the
+    owning instance is garbage-collected, the subscription is automatically
+    dropped without requiring an explicit unsubscribe call.
+    """
 
     def __init__(self, value: T) -> None:
         self._value = value
-        self._subs: list[Callable[[T], None]] = []
+        self._subs: list[weakref.ref] = []
 
     @property
     def value(self) -> T:
@@ -30,13 +37,45 @@ class Signal(Generic[T]):
         if value == self._value:
             return
         self._value = value
-        for cb in self._subs:
+        cbs: list[Callable[[T], None]] = []
+        alive: list[weakref.ref] = []
+        for ref in self._subs:
+            cb = ref()
+            if cb is not None:
+                cbs.append(cb)
+                alive.append(ref)
+        self._subs = alive
+        for cb in cbs:
             cb(value)
 
     def subscribe(self, callback: Callable[[T], None]) -> Callable[[], None]:
-        """Subscribe to value changes. Returns an unsubscribe function."""
-        self._subs.append(callback)
-        return lambda: self._subs.remove(callback)
+        """Subscribe to value changes. Returns an unsubscribe function.
+
+        Raises:
+            TypeError: If ``callback`` is not a bound method.
+        """
+        if not inspect.ismethod(callback):
+            raise TypeError(
+                "Signal.subscribe() requires a bound method. "
+                "Pass a method on your component (e.g. self._on_change), "
+                "not a lambda or plain function."
+            )
+        ref = weakref.WeakMethod(callback)
+        self._subs.append(ref)
+        self_ref = weakref.ref(self)
+
+        def _unsub() -> None:
+            s = self_ref()
+            if s is not None:
+                s._unsubscribe(ref)
+
+        return _unsub
+
+    def _unsubscribe(self, ref: weakref.ref) -> None:
+        try:
+            self._subs.remove(ref)
+        except ValueError:
+            pass
 
 
 class Computed(Generic[T]):
@@ -59,27 +98,35 @@ class Computed(Generic[T]):
         self._value: T = fn()
 
         if deps is not None:
-            # Reactive mode: subscribe to deps
-            self._subs: list[Callable[[T], None]] = []
-            self._unsubs: list[Callable[[], None]] = []
+            self._subs: list[weakref.ref] = []
             for dep in deps:
-                self._unsubs.append(dep.subscribe(lambda _: self._recompute()))
+                dep.subscribe(self._on_dep_change)
         else:
-            # Lazy mode: backwards-compatible, recompute on each .value read
             self._signal = Signal(self._value)
+
+    def _on_dep_change(self, _: T) -> None:
+        """Handler subscribed to each dependency Signal."""
+        self._recompute()
 
     def _recompute(self) -> None:
         new = self._fn()
         if new != self._value:
             self._value = new
-            for cb in self._subs:
+            cbs: list[Callable[[T], None]] = []
+            alive: list[weakref.ref] = []
+            for ref in self._subs:
+                cb = ref()
+                if cb is not None:
+                    cbs.append(cb)
+                    alive.append(ref)
+            self._subs = alive
+            for cb in cbs:
                 cb(new)
 
     @property
     def value(self) -> T:
         if self.deps is not None:
             return self._value
-        # Lazy mode: recompute and notify on each read
         new = self._fn()
         if new != self._value:
             self._value = new
@@ -88,9 +135,28 @@ class Computed(Generic[T]):
 
     def subscribe(self, callback: Callable[[T], None]) -> Callable[[], None]:
         if self.deps is not None:
-            self._subs.append(callback)
-            return lambda: self._subs.remove(callback)
+            if not inspect.ismethod(callback):
+                raise TypeError(
+                    "Computed.subscribe() requires a bound method. "
+                    "Pass a method on your component, not a lambda or plain function."
+                )
+            ref = weakref.WeakMethod(callback)
+            self._subs.append(ref)
+            self_ref = weakref.ref(self)
+
+            def _unsub() -> None:
+                c = self_ref()
+                if c is not None:
+                    c._unsubscribe(ref)
+
+            return _unsub
         return self._signal.subscribe(callback)
+
+    def _unsubscribe(self, ref: weakref.ref) -> None:
+        try:
+            self._subs.remove(ref)
+        except ValueError:
+            pass
 
 
 # Type alias for component props that accept both static and reactive data.
