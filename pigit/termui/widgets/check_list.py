@@ -23,9 +23,7 @@ class CheckList(ItemList):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._checked_sig: Signal[set[int]] = Signal(set())
-        self._checked_unsub = self._checked_sig.subscribe(
-            self._on_checked_change
-        )
+        self._checked_unsub = self._checked_sig.subscribe(self._on_checked_change)
 
     def _on_checked_change(self, _: set[int]) -> None:
         """Handler for _checked_sig changes."""

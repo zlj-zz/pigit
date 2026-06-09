@@ -49,12 +49,8 @@ class ItemList(Component):
         self._curr_no_sig = Signal(0)
         self._r_start_sig = Signal(0)
         self._unsubs: list[Callable[[], None]] = []
-        self._unsubs.append(
-            self._curr_no_sig.subscribe(self._on_curr_no_change)
-        )
-        self._unsubs.append(
-            self._r_start_sig.subscribe(self._on_r_start_change)
-        )
+        self._unsubs.append(self._curr_no_sig.subscribe(self._on_curr_no_change))
+        self._unsubs.append(self._r_start_sig.subscribe(self._on_r_start_change))
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False

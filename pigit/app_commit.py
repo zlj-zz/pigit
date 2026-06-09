@@ -140,6 +140,12 @@ class CommitPanel(ItemList):
         self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
         self._vm_unsubs: list[Callable[[], None]] = []
+        self._row_cache_focused: list[
+            tuple[tuple[Segment, ...], tuple[Segment, ...]]
+        ] = []
+        self._row_cache_unfocused: list[
+            tuple[tuple[Segment, ...], tuple[Segment, ...]]
+        ] = []
 
     @bind_keys("j", keys.KEY_DOWN)
     def next(self, step: int = 1) -> None:
@@ -258,6 +264,8 @@ class CommitPanel(ItemList):
         if not self.commits:
             self.set_content(["No matching commits."])
             self._max_meta_w = 0
+            self._row_cache_focused.clear()
+            self._row_cache_unfocused.clear()
             self._notify_change()
             return
         self._rel_time_cache.clear()
@@ -270,6 +278,7 @@ class CommitPanel(ItemList):
         if self._expanded:
             self._ensure_bodies()
         self._rebuild_rows()
+        self._build_row_cache()
         self._notify_change()
 
     def deactivate(self) -> None:
@@ -429,15 +438,30 @@ class CommitPanel(ItemList):
                 [],
             )
 
-        if item_idx is None:
-            return self._describe_compact(self.commits[idx], idx, is_cursor, focused)
+        if item_idx is not None:
+            commit = self.commits[item_idx]
+            kind, payload = self._schema_for(commit)[sub_row]
+            if kind is _SubRow.COMMIT:
+                left, main = self._commit_left_main(
+                    commit, item_idx, is_cursor, focused
+                )
+                return left, main, []
+            return self._describe_sub_row(commit, item_idx, kind, payload, focused)
 
-        commit = self.commits[item_idx]
-        kind, payload = self._schema_for(commit)[sub_row]
-        if kind is _SubRow.COMMIT:
-            left, main = self._commit_left_main(commit, item_idx, is_cursor, focused)
-            return left, main, []
-        return self._describe_sub_row(commit, item_idx, kind, payload, focused)
+        # Compact mode: cursor row built dynamically; non-cursor rows read cache.
+        commit = self.commits[idx]
+        if is_cursor:
+            return self._describe_compact(commit, idx, True, focused)
+
+        cache = self._row_cache_focused if focused else self._row_cache_unfocused
+        if idx < len(cache):
+            left_tpl, main_tpl = cache[idx]
+            left = list(left_tpl)
+            main = list(main_tpl)
+            right = self._meta_segments(commit, focused)
+            return left, main, right
+
+        return self._describe_compact(commit, idx, False, focused)
 
     def _describe_compact(
         self,
@@ -446,19 +470,24 @@ class CommitPanel(ItemList):
         is_cursor: bool,
         focused: bool,
     ) -> tuple[list[Segment], list[Segment], list[Segment]]:
-        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-        left, main = self._commit_left_main(commit, item_idx, is_cursor, focused)
-        author = commit.author
-        rel = self._rel_time_cache.get(commit.sha) or relative_time(
-            commit.unix_timestamp
-        )
-        meta = f"  {author}  {rel}"
-        meta_w = wcswidth(meta)
-        reserve = max(self._max_meta_w, meta_w)
-        if reserve > meta_w:
-            meta = " " * (reserve - meta_w) + meta
-        fg_meta = THEME.fg_muted if focused else THEME.fg_dim
-        right = [Segment(meta, fg=fg_meta, style_flags=cursor_flags)]
+        if is_cursor:
+            left, main = self._commit_left_main(commit, item_idx, is_cursor, focused)
+        else:
+            cache = self._row_cache_focused if focused else self._row_cache_unfocused
+            if item_idx < len(cache):
+                left_tpl, main_tpl = cache[item_idx]
+                left, main = list(left_tpl), list(main_tpl)
+            else:
+                left, main = self._commit_left_main(
+                    commit, item_idx, is_cursor, focused
+                )
+
+        right = self._meta_segments(commit, focused)
+        if is_cursor:
+            right = [
+                Segment(s.text, fg=s.fg, bg=s.bg, style_flags=palette.STYLE_BOLD)
+                for s in right
+            ]
         return left, main, right
 
     def _commit_left_main(
@@ -498,6 +527,32 @@ class CommitPanel(ItemList):
         )
         main.append(Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags))
         return left, main
+
+    def _build_row_cache(self) -> None:
+        """Pre-build per-commit (left, main) Segments for focused/unfocused.
+
+        Cursor styling is excluded; only the static portions are cached.
+        """
+        self._row_cache_focused = []
+        self._row_cache_unfocused = []
+        for idx, commit in enumerate(self.commits):
+            lf, mf = self._commit_left_main(commit, idx, is_cursor=False, focused=True)
+            self._row_cache_focused.append((tuple(lf), tuple(mf)))
+            lu, mu = self._commit_left_main(commit, idx, is_cursor=False, focused=False)
+            self._row_cache_unfocused.append((tuple(lu), tuple(mu)))
+
+    def _meta_segments(self, commit: Commit, focused: bool) -> list[Segment]:
+        author = commit.author
+        rel = self._rel_time_cache.get(commit.sha) or relative_time(
+            commit.unix_timestamp
+        )
+        meta = f"  {author}  {rel}"
+        meta_w = wcswidth(meta)
+        reserve = max(self._max_meta_w, meta_w)
+        if reserve > meta_w:
+            meta = " " * (reserve - meta_w) + meta
+        fg_meta = THEME.fg_muted if focused else THEME.fg_dim
+        return [Segment(meta, fg=fg_meta, style_flags=0)]
 
     def _describe_sub_row(
         self,

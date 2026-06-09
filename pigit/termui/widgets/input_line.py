@@ -67,9 +67,7 @@ class InputLine(Component):
         self._cached_line_offsets: list[int] = [0]
         self._unsubs: list[Callable[[], None]] = []
         self._unsubs.append(self._value_sig.subscribe(self._update_cache_and_notify))
-        self._unsubs.append(
-            self._cursor_sig.subscribe(self._on_cursor_change)
-        )
+        self._unsubs.append(self._cursor_sig.subscribe(self._on_cursor_change))
         # Completion state
         self._candidate_provider = candidate_provider
         self._candidates: list[str] = []
