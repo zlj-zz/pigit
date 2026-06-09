@@ -143,26 +143,40 @@ class DiffViewer(LineTextBrowser):
         self._file_history_index: int = 0
         self._file_history_cache: dict[str, list[str]] = {}
         self._saved_diff_state: _DiffStateSnapshot | None = None
+        self._cached_path_i = -1
+        self._cached_path_hunks_id = -1
+        self._cached_path: str | None = None
 
     def _current_file_path(self) -> str | None:
         """Return the file path at the current cursor position in diff mode."""
         if not self._hunks or not self._content:
             return None
+        hunks_id = id(self._hunks)
+        if self._cached_path_i == self._i and self._cached_path_hunks_id == hunks_id:
+            return self._cached_path
         target_hunk = None
         for h in self._hunks:
             if h.start <= self._i < h.end:
                 target_hunk = h
                 break
         if target_hunk is None:
+            self._cached_path_i = self._i
+            self._cached_path_hunks_id = hunks_id
+            self._cached_path = None
             return None
         header_idx = target_hunk.file_header_start
         if header_idx >= len(self._content):
+            self._cached_path_i = self._i
+            self._cached_path_hunks_id = hunks_id
+            self._cached_path = None
             return None
         line = self._content[header_idx]
         m = _DIFF_GIT_RE.match(line)
-        if m:
-            return m.group(2).strip('"')
-        return None
+        result = m.group(2).strip('"') if m else None
+        self._cached_path_i = self._i
+        self._cached_path_hunks_id = hunks_id
+        self._cached_path = result
+        return result
 
     def _set_plain_content(self, lines: list[str]) -> None:
         """Set plain file content (no diff parsing) for File History mode."""
