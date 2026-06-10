@@ -105,6 +105,9 @@ class AsyncTask(Generic[T]):
                 _logger.exception("AsyncTask callback failed")
         if count:
             _logger.debug("[ASYNC] poll_all: processed %d callbacks", count)
+            from ._runtime_context import request_render
+
+            request_render()
 
 
 def run_async(

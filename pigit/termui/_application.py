@@ -47,6 +47,7 @@ class _ApplicationEventLoop(AppEventLoop):
 
     def __init__(self, root: ComponentRoot, app: Application, **kwargs):
         super().__init__(root, **kwargs)
+        root._event_loop = self
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
         self._app_on_key = getattr(app, "on_key", None)

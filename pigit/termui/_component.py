@@ -224,6 +224,14 @@ class Component(ABC):
             child.destroy()
         self._try_unregister_id()
 
+    def hide(self) -> None:
+        """Close or hide this component. No-op by default; overlays override."""
+
+    @property
+    def size(self) -> tuple[int, int]:
+        """Current (width, height) assigned by the last resize()."""
+        return self._size
+
     def refresh(self):
         """Fresh content data.
 

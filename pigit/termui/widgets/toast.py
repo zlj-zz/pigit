@@ -8,6 +8,7 @@ Date: 2026-05-18
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
 from .._component import Component
@@ -16,6 +17,9 @@ from .._segment import Segment
 from .._surface import Surface, _Subsurface
 from ..types import ToastPosition, OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
+
+if TYPE_CHECKING:
+    from ..event_loop import AppEventLoop
 
 MAX_TOAST_LINES = 100
 
@@ -58,6 +62,9 @@ class Toast(Component):
         self._lines: list[str] = []
         self._outer_w = 0
         self.outer_row_count = 0
+
+        self._event_loop: AppEventLoop | None = None
+        self._timer_id: int | None = None
 
     def is_expired(self) -> bool:
         """Return True if the toast has exceeded its display duration."""
@@ -126,7 +133,7 @@ class Toast(Component):
         total = self.duration
         enter = self._enter_duration
         exit = self._exit_duration
-        dist = self._outer_w if self._outer_w > 0 else 1
+        dist = self._outer_w + 1 if self._outer_w > 0 else 2
 
         is_left = self._position in (ToastPosition.TOP_LEFT, ToastPosition.BOTTOM_LEFT)
         direction = -1 if is_left else 1
@@ -160,6 +167,26 @@ class Toast(Component):
         """Drop all keys; toasts are non-interactive."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
+    def _start_animation_timer(self) -> None:
+        """Register a short-interval timer to drive enter/exit animation."""
+        loop = self._event_loop
+        if loop is None or self._timer_id is not None:
+            return
+
+        def _tick() -> None:
+            if not self.open or self.is_expired():
+                self._stop_animation_timer()
+                return
+            loop.request_render()
+
+        self._timer_id = loop.add_interval(0.05, _tick)
+
+    def _stop_animation_timer(self) -> None:
+        """Cancel the animation timer, if active."""
+        if self._timer_id is not None and self._event_loop is not None:
+            self._event_loop.remove_interval(self._timer_id)
+            self._timer_id = None
+
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self.open:
             return
@@ -172,6 +199,10 @@ class Toast(Component):
 
         if self._frame is None:
             return
+
+        # Ensure animation timer is running on first render.
+        if self._timer_id is None:
+            self._start_animation_timer()
 
         elapsed = self._clock() - self._created_at
         offset_x = self._compute_slide_offset(elapsed)
@@ -206,6 +237,7 @@ class Toast(Component):
     def hide(self) -> None:
         """Close the toast."""
         self.open = False
+        self._stop_animation_timer()
 
     def refresh(self) -> None:
         """No-op refresh for compatibility."""

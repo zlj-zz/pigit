@@ -40,14 +40,19 @@ from ._application import Application
 # Runtime context — single source of truth for all context state
 from ._runtime_context import (
     by_id,
+    get_registry,
+    get_renderer_strict,
+    request_render,
+)
+
+# Overlay and convenience APIs
+from ._overlay_api import (
     dismiss_sheet,
+    dismiss_toast,
     exec_external,
     get_badge,
     get_badge_signal,
-    get_registry,
-    get_renderer_strict,
     hide_spinner,
-    request_render,
     show_badge,
     show_sheet,
     show_spinner,
@@ -103,6 +108,7 @@ __all__ = [
     "show_toast",
     "show_sheet",
     "dismiss_sheet",
+    "dismiss_toast",
     "show_badge",
     "get_badge",
     "get_badge_signal",

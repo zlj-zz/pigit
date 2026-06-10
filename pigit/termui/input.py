@@ -150,7 +150,7 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
 # Keyboard input (formerly input_keyboard.py)
 # ---------------------------------------------------------------------------
 
-_ReadHook = Callable[[float], bytes]
+_ReadHook = Callable[[float | None], bytes]
 
 
 def _utf8_byte_len(first: int) -> int:
@@ -188,14 +188,14 @@ class KeyboardInput:
         buf = sys.stdin.buffer
         return buf
 
-    def _read_chunk(self, timeout: float) -> bytes:
+    def _read_chunk(self, timeout: float | None) -> bytes:
         if self._read_hook is not None:
             return self._read_hook(timeout)
         if sys.platform == "win32":
             return self._read_chunk_windows(timeout)
         return self._read_chunk_posix(timeout)
 
-    def _read_chunk_posix(self, timeout: float) -> bytes:
+    def _read_chunk_posix(self, timeout: float | None) -> bytes:
         import select
 
         stdin = self._default_stdin()
@@ -213,10 +213,27 @@ class KeyboardInput:
         except BlockingIOError:
             return b""
 
-    def _read_chunk_windows(self, timeout: float) -> bytes:
+    def _read_chunk_windows(self, timeout: float | None) -> bytes:
         import msvcrt
 
         _msvcrt: Any = msvcrt
+        if timeout is None:
+            # Blocking indefinitely: msvcrt has no true blocking read with
+            # interrupt support, so we poll at 20 Hz (lower CPU than 1 kHz).
+            out = bytearray()
+            while True:
+                if _msvcrt.kbhit():
+                    ch = _msvcrt.getch()
+                    if ch in (b"\x00", b"\xe0"):
+                        ch += _msvcrt.getch()
+                    out.extend(ch)
+                    while _msvcrt.kbhit():
+                        ch2 = _msvcrt.getch()
+                        if ch2 in (b"\x00", b"\xe0"):
+                            ch2 += _msvcrt.getch()
+                        out.extend(ch2)
+                    return bytes(out)
+                time.sleep(0.05)
         deadline = time.monotonic() + timeout
         out = bytearray()
         while time.monotonic() < deadline:
@@ -312,7 +329,7 @@ class KeyboardInput:
             return [keys.KEY_WINDOW_RESIZE]
         return []
 
-    def read_keys(self, timeout: float = 0.1) -> list[str]:
+    def read_keys(self, timeout: float | None = 0.1) -> list[str]:
         """
         Block up to ``timeout`` seconds for input, then return semantic keys.
 
@@ -456,12 +473,13 @@ class TermuiInputBridge(InputTerminal):
         return
 
     def set_input_timeouts(self, timeout: float | None) -> None:
-        """Set the keyboard read timeout to a non-negative finite float."""
+        """Set the keyboard read timeout. None means block indefinitely."""
         if timeout is None:
+            self._timeout = None
             return
         t = float(timeout)
         if not math.isfinite(t) or t < 0:
-            raise ValueError("timeout must be a non-negative finite float")
+            raise ValueError("timeout must be a non-negative finite float or None")
         self._timeout = t
 
     def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:

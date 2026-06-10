@@ -15,6 +15,16 @@ from pigit.termui.widgets import Toast
 from pigit.termui._layer import LayerKind
 from pigit.termui._root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult
+from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+
+
+@pytest.fixture(autouse=True)
+def _runtime_context():
+    """Provide a fresh RuntimeContext for root tests."""
+    runtime = RuntimeContext()
+    token = _runtime_ctx.set(runtime)
+    yield
+    _runtime_ctx.reset(token)
 
 
 class DummyBody(Component):
@@ -94,9 +104,14 @@ class TestComponentRoot:
         root.refresh()
 
     def test_show_toast(self):
+        from pigit.termui._runtime_context import set_overlay_host
+        from pigit.termui._overlay_api import show_toast
+
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        toast = root.show_toast("hello", duration=1.5)
+        set_overlay_host(root)
+        toast = show_toast("hello", duration=1.5)
+        assert toast is not None
         assert root._layer_stack.top(LayerKind.TOAST) is toast
         assert len(toast._segments) == 1
         assert toast._segments[0].text == "hello"
@@ -104,21 +119,30 @@ class TestComponentRoot:
 
     def test_show_toast_with_position(self):
         """验证 show_toast 支持 position 参数"""
+        from pigit.termui._runtime_context import set_overlay_host
+        from pigit.termui._overlay_api import show_toast
+
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        toast = root.show_toast(
-            "hello", duration=1.5, position=ToastPosition.BOTTOM_LEFT
-        )
+        set_overlay_host(root)
+        toast = show_toast("hello", duration=1.5, position=ToastPosition.BOTTOM_LEFT)
+        assert toast is not None
         assert toast._position == ToastPosition.BOTTOM_LEFT
 
     def test_show_toast_singleton_replaces_existing(self):
         """验证新 Toast 替换旧 Toast（单例模式）"""
+        from pigit.termui._runtime_context import set_overlay_host
+        from pigit.termui._overlay_api import show_toast
+
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
-        toast1 = root.show_toast("first", duration=5.0)
+        set_overlay_host(root)
+        toast1 = show_toast("first", duration=5.0)
+        assert toast1 is not None
         assert root._layer_stack.top(LayerKind.TOAST) is toast1
 
-        toast2 = root.show_toast("second", duration=5.0)
+        toast2 = show_toast("second", duration=5.0)
+        assert toast2 is not None
         # 旧 Toast 应该被移除
         assert root._layer_stack.top(LayerKind.TOAST) is toast2
         assert toast1.open is False  # 旧 Toast 被关闭
@@ -144,15 +168,26 @@ class TestComponentRoot:
         assert inner.parent is sheet
 
     def test_toast_expires_on_render(self):
-        root = ComponentRoot(DummyBody())
-        toast = root.show_toast("expiring", duration=0.0)
-        assert root._layer_stack.top(LayerKind.TOAST) is toast
-        from pigit.termui._surface import Surface
+        from pigit.termui._runtime_context import (
+            set_overlay_host,
+            reset_overlay_host,
+        )
+        from pigit.termui._overlay_api import show_toast
 
-        surface = Surface(10, 5)
-        root._render_surface(surface)
-        assert root._layer_stack.top(LayerKind.TOAST) is None
-        assert toast.open is False
+        root = ComponentRoot(DummyBody())
+        set_overlay_host(root)
+        try:
+            toast = show_toast("expiring", duration=0.0)
+            assert toast is not None
+            assert root._layer_stack.top(LayerKind.TOAST) is toast
+            from pigit.termui._surface import Surface
+
+            surface = Surface(10, 5)
+            root._render_surface(surface)
+            assert root._layer_stack.top(LayerKind.TOAST) is None
+            assert toast.open is False
+        finally:
+            reset_overlay_host()
 
     def test_toast_clock_injection(self):
         from pigit.termui.widgets import Toast

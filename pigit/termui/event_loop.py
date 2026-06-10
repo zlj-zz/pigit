@@ -214,25 +214,40 @@ class AppEventLoop:
         while True:
             AsyncTask.poll_all()
 
-            # Timer firing
+            # Timer firing (catch up drift: callback may take time or system
+            # clock may jump, so a single interval increment is not enough).
             if self._timers:
                 now = time.monotonic()
                 for t in list(self._timers.values()):
                     if now < t.next_fire:
                         continue
-                    t.next_fire = t.next_fire + t.interval
+                    while now >= t.next_fire:
+                        t.next_fire += t.interval
                     try:
                         t.callback()
                     except Exception:
                         _logger.exception("Timer callback failed")
 
+            # Render before blocking on input (timer callback may request it).
             if self._render_requested:
                 _logger.debug("[RENDER] _loop: render (poll)")
                 self._render_requested = False
                 self.render()
+
+            # Dynamic timeout: nearest timer first, 1s idle ceiling otherwise.
+            if self._timers:
+                now = time.monotonic()
+                timer_timeout = max(
+                    0.0, min(t.next_fire for t in self._timers.values()) - now
+                )
+                timeout = timer_timeout
+            else:
+                timeout = 1.0
+            self._input_handle.set_input_timeouts(timeout)
+
             input_key = self._input_handle.get_input()
             if not input_key or not input_key[0]:
-                if self._render_requested or self._real_time:
+                if self._render_requested:
                     self._render_requested = False
                     self.render()
                 continue

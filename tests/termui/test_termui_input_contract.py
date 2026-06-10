@@ -56,11 +56,11 @@ def test_termui_input_bridge_rejects_invalid_timeout(bad):
         bridge.set_input_timeouts(bad)
 
 
-def test_termui_input_bridge_ignores_none_timeout():
+def test_termui_input_bridge_accepts_none_timeout():
     bridge = TermuiInputBridge()
     bridge.set_input_timeouts(0.5)
     bridge.set_input_timeouts(None)
-    assert bridge._timeout == 0.5
+    assert bridge._timeout is None
 
 
 def test_termui_input_bridge_accepts_zero_timeout():
