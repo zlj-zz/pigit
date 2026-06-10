@@ -214,9 +214,10 @@ class Toast(Component):
         if render_col + self._outer_w <= 0 or render_col >= surface.width:
             return
 
-        self._frame.draw_onto(surface, base_row, render_col)
-        content_row = base_row + 1
-        content_col = render_col + 1
+        self._frame.draw(surface, base_row, render_col)
+        content_row, content_col, cw, _ch = self._frame.content_rect(
+            base_row, render_col
+        )
         for i, segments in enumerate(self._line_segments):
             row = content_row + i
             if row >= surface.height:
@@ -225,7 +226,7 @@ class Toast(Component):
             line_text = "".join(s.text for s in segments)
             line_w = wcswidth(line_text)
             pad_col = content_col + line_w
-            pad_w = content_col + self._frame.inner_width - pad_col
+            pad_w = content_col + cw - pad_col
             if pad_w > 0:
                 surface.fill_rect_rgb(row, pad_col, pad_w, 1)
 

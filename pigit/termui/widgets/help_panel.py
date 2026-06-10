@@ -307,10 +307,9 @@ class HelpPanel(Component):
         surface.fill_rect_rgb(
             self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
-        self._frame.draw_onto(surface, self.x, self.y)
+        self._frame.draw(surface, self.x, self.y)
 
-        content_row = self.x + 1
-        content_col = self.y + 1
+        content_row, content_col, cw, _ch = self._frame.content_rect(self.x, self.y)
         chunk = self._line_segments[self._offset : self._offset + self._scroll_h]
         for i, segments in enumerate(chunk):
             row = content_row + i
@@ -318,7 +317,7 @@ class HelpPanel(Component):
             for seg in segments:
                 text = seg.text
                 text_w = wcswidth(text)
-                avail = content_col + self._inner_w - x
+                avail = content_col + cw - x
                 if text_w > avail:
                     text = truncate_by_width(text, avail)
                 surface.draw_text_rgb(
@@ -330,7 +329,7 @@ class HelpPanel(Component):
                     style_flags=seg.style_flags,
                 )
                 x += wcswidth(text)
-            if x < content_col + self._inner_w:
+            if x < content_col + cw:
                 surface.fill_rect_rgb(
-                    row, x, content_col + self._inner_w - x, 1, palette.DEFAULT_BG
+                    row, x, content_col + cw - x, 1, palette.DEFAULT_BG
                 )

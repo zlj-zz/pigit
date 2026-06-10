@@ -10,19 +10,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from . import palette
-from .wcwidth_table import pad_by_width, truncate_by_width
 
 if TYPE_CHECKING:
     from ._surface import Surface, _Subsurface
 
 
 class BoxFrame:
-    """Reusable bordered frame layout helper."""
+    """Reusable bordered frame — draws a box and reports the content area.
+
+    BoxFrame does **not** draw or manage content; callers own content rendering.
+    """
 
     def __init__(
         self,
-        inner_width: int,
-        inner_height: int,
+        inner_width: int = 0,
+        inner_height: int = 0,
         title: str | None = None,
         *,
         fg: tuple[int, int, int] = palette.DEFAULT_FG,
@@ -35,19 +37,21 @@ class BoxFrame:
         self.fg = fg
         self.bg = bg
         self.style_flags = style_flags
-        self._recalc_outer()
-
-    def _recalc_outer(self) -> None:
-        self.outer_width = self.inner_width + 2
-        self.outer_height = self.inner_height + 2
 
     def set_inner_size(self, inner_width: int, inner_height: int) -> None:
-        """Update inner dimensions and recompute outer size."""
+        """Update inner dimensions."""
         self.inner_width = inner_width
         self.inner_height = inner_height
-        self._recalc_outer()
 
-    def draw_onto(self, surface: Surface | _Subsurface, row: int, col: int) -> None:
+    @property
+    def outer_width(self) -> int:
+        return self.inner_width + 2
+
+    @property
+    def outer_height(self) -> int:
+        return self.inner_height + 2
+
+    def draw(self, surface: Surface | _Subsurface, row: int = 0, col: int = 0) -> None:
         """Draw border onto surface at (row, col)."""
         surface.draw_box_rgb(
             row,
@@ -60,29 +64,10 @@ class BoxFrame:
             title=self.title,
         )
 
-    def draw_content(
-        self, surface: Surface | _Subsurface, row: int, col: int, lines: list[str]
-    ) -> None:
-        """Draw content lines inside the box, clipped to inner dimensions.
+    def content_rect(self, row: int = 0, col: int = 0) -> tuple[int, int, int, int]:
+        """Return content area coordinates inside the frame.
 
-        Lines shorter than ``inner_width`` are padded with spaces, and missing
-        lines are filled with blank rows so that previous-frame residue does
-        not leak through.
+        Returns:
+            Tuple of (content_row, content_col, inner_width, inner_height).
         """
-        content_row = row + 1
-        content_col = col + 1
-        padded = list(lines[: self.inner_height])
-        while len(padded) < self.inner_height:
-            padded.append("")
-        for i, line in enumerate(padded):
-            text = pad_by_width(
-                truncate_by_width(line, self.inner_width), self.inner_width
-            )
-            surface.draw_text_rgb(
-                content_row + i,
-                content_col,
-                text,
-                fg=self.fg,
-                bg=self.bg,
-                style_flags=self.style_flags,
-            )
+        return row + 1, col + 1, self.inner_width, self.inner_height
