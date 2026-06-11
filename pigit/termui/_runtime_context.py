@@ -11,21 +11,16 @@ from __future__ import annotations
 
 import contextvars
 import logging
-import subprocess
 from typing import TYPE_CHECKING, TypeVar, cast
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from ._layer import LayerKind
-from .reactive import Signal
 
 if TYPE_CHECKING:
     from ._component import Component
     from ._renderer import Renderer
-    from .widgets import Sheet, Toast
     from ._root import ComponentRoot
-    from ._segment import Segment
     from ._session import Session
-    from .types import ToastPosition
 
 _logger = logging.getLogger(__name__)
 
@@ -39,7 +34,6 @@ __all__ = [
     "set_session",
     "reset_session",
     "get_session",
-    "exec_external",
     "set_renderer",
     "reset_renderer",
     "get_renderer",
@@ -51,14 +45,6 @@ __all__ = [
     "layer_pop",
     "layer_top",
     "is_modal_open",
-    "show_toast",
-    "show_sheet",
-    "dismiss_sheet",
-    "get_badge_signal",
-    "show_badge",
-    "get_badge",
-    "show_spinner",
-    "hide_spinner",
     "get_registry",
     "set_registry",
     "reset_registry",
@@ -76,9 +62,6 @@ __all__ = [
 _runtime_ctx: contextvars.ContextVar[RuntimeContext | None] = contextvars.ContextVar(
     "runtime", default=None
 )
-
-# Module-level badge signal (preserved from _overlay_context)
-_badge_signal: Signal[str | None] = Signal(None)
 
 
 # --- RendererNotBoundError ---
@@ -304,34 +287,6 @@ def get_session() -> Session | None:
     return runtime.session if runtime is not None else None
 
 
-def exec_external(
-    cmd: list[str],
-    cwd: str | None = None,
-) -> subprocess.CompletedProcess[bytes]:
-    """Suspend TUI, run an external command, then resume TUI and redraw.
-
-    Works from anywhere inside a Session context.
-    """
-    session = get_session()
-    if session is None:
-        raise RuntimeError("No active TUI session; call only inside Session context.")
-
-    session.suspend()
-    result: subprocess.CompletedProcess[bytes]
-    try:
-        result = subprocess.run(cmd, cwd=cwd, stdin=None, stdout=None, stderr=None)
-    finally:
-        try:
-            session.resume()
-        except Exception:
-            _logger.exception("Session.resume() failed; terminal may be in bad state")
-            raise
-        renderer = get_renderer()
-        if renderer is not None:
-            renderer.clear_cache()
-    return result
-
-
 # --- Renderer context helpers ---
 
 
@@ -370,18 +325,6 @@ def get_renderer_strict() -> Renderer:
 # --- Overlay host context helpers ---
 
 
-def _with_host(fn):
-    """Call ``fn(host)`` if an overlay host is active; return ``None`` otherwise.
-
-    Used internally to collapse the repeated ``host = get_overlay_host();
-    if host is not None: ...`` guard pattern.
-    """
-    host = get_overlay_host()
-    if host is None:
-        return None
-    return fn(host)
-
-
 def set_overlay_host(host: ComponentRoot) -> None:
     """Set the current overlay host in context."""
     runtime = _runtime_ctx.get()
@@ -404,6 +347,9 @@ def get_overlay_host() -> ComponentRoot | None:
     """Return the current overlay host, or ``None`` if not inside a TUI session."""
     runtime = _runtime_ctx.get()
     return runtime.overlay_host if runtime is not None else None
+
+
+# --- Layer stack helpers ---
 
 
 def layer_push(kind: LayerKind, overlay: Component) -> None:
@@ -432,97 +378,6 @@ def layer_top(kind: LayerKind) -> Component | None:
 def is_modal_open() -> bool:
     """Return ``True`` if a modal popup is currently open."""
     return layer_top(LayerKind.MODAL) is not None
-
-
-def show_toast(
-    message: str = "",
-    *,
-    segments: Sequence[Segment] | None = None,
-    duration: float = 2.0,
-    position: ToastPosition | None = None,
-) -> Toast | None:
-    """Display a transient toast notification via the current overlay host."""
-    return _with_host(
-        lambda h: h.show_toast(
-            message, segments=segments, duration=duration, position=position
-        )
-    )
-
-
-def show_sheet(
-    child: Component, height: int = 8, show_border: bool = False
-) -> Sheet | None:
-    """Display a bottom sheet via the current overlay host."""
-    return _with_host(lambda h: h.show_sheet(child, height, show_border=show_border))
-
-
-def dismiss_sheet() -> None:
-    """Dismiss the current bottom sheet via the overlay host."""
-    host = get_overlay_host()
-    if host is not None:
-        host.dismiss_sheet()
-
-
-def get_badge_signal() -> Signal[str | None]:
-    """Return the global badge-change signal for reactive header binding."""
-    return _badge_signal
-
-
-def show_badge(
-    text: str,
-    duration: float | None = None,
-    bg: tuple[int, int, int] | None = None,
-    fg: tuple[int, int, int] | None = None,
-) -> None:
-    """Show a badge on the overlay host."""
-    host = get_overlay_host()
-    if host is None:
-        return
-    host.show_badge(text, duration=duration, bg=bg, fg=fg)
-    if _badge_signal.value != text:
-        _badge_signal.set(text)
-
-
-def get_badge() -> tuple[
-    str | None,
-    tuple[int, int, int] | None,
-    tuple[int, int, int] | None,
-]:
-    """Get current badge state from the overlay host.
-
-    Returns:
-        Tuple of (badge_text, badge_bg, badge_fg). All None if no badge
-        or no host is active.
-    """
-    host = get_overlay_host()
-    if host is None:
-        return None, None, None
-    return host.badge_text, host.badge_bg, host.badge_fg
-
-
-def show_spinner(message: str) -> Toast | None:
-    """Display a persistent spinner toast (duration=3600s), replacing any current toast.
-
-    The message is prefixed with ``»`` and suffixed with ``…`` automatically.
-    """
-    from ._segment import Segment
-    from .types import ToastPosition
-
-    return _with_host(
-        lambda h: h.show_toast(
-            "",
-            segments=[Segment(f"» {message}…")],
-            duration=3600.0,
-            position=ToastPosition.BOTTOM_LEFT,
-        )
-    )
-
-
-def hide_spinner() -> None:
-    """Dismiss the current spinner toast."""
-    host = get_overlay_host()
-    if host is not None:
-        host.dismiss_toast()
 
 
 # --- Registry context helpers ---

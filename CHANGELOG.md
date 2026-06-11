@@ -1,5 +1,29 @@
 # Changelog of pigit
 
+## 1.8.15 (2026-06-11)
+
+### Performance
+
+- **Non-blocking keyboard input**: `KeyboardInput` now runs in a background daemon thread that feeds semantic keys into an internal queue. The event loop polls keys, `AsyncTask` results, and timers without blocking on `select()`. This eliminates the multi-second delay that could occur on status-panel `a`/`d` operations when the auto-refresh timer was active.
+- **Diff hunk scan cache**: the current file path is cached while navigating hunks, avoiding a per-frame re-scan of the diff structure.
+- **Commit Segment cache**: `Segment` objects are pre-built once and reused, reducing per-frame allocations in the commit renderer.
+
+### TUI — EventBus
+
+- **Framework-level EventBus**: `Application` now owns an `EventBus`; chrome panels (Footer, Inspector) subscribe to `selection_changed` / `mode_changed` themselves instead of relying on a monolithic `on_event()` god object.
+- **Weakref-based Signal subscriptions**: `Signal.subscribe()` stores `WeakMethod` references, preventing leaked bound-method references when components are destroyed.
+
+### Async
+
+- **Non-blocking patch apply**: `git apply` now runs via `AsyncTask` so the TUI remains responsive during large patches.
+- **Clipboard integration**: `AsyncTask`-backed clipboard read/write (`p` / `P` in diff view) with `xclip` / `xsel` / `pbcopy` / `wl-copy` auto-detection.
+- **Syntax-highlighted diff rendering**: diff content is tokenized on demand in a background thread; languages are detected from the file path.
+
+### Refactors
+
+- **Overlay API extraction**: `LayerStack` overlay APIs (`show_toast`, `show_sheet`, `show_modal`) moved to standalone module; `Toast` manages its own timer lifecycle.
+- **BoxFrame border-only API**: `Border` class removed; `BoxFrame` now supports border-only rendering with simplified API.
+
 ## 1.8.14 (2026-06-03)
 
 ### Diff — Time-travel File History

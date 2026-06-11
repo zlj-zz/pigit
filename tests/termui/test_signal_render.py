@@ -38,9 +38,9 @@ class _SignalLeaf(Component):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.cursor = Signal(0)
-        self._unsub = self.cursor.subscribe(lambda _: self._on_cursor_change())
+        self._unsub = self.cursor.subscribe(self._on_cursor_change)
 
-    def _on_cursor_change(self) -> None:
+    def _on_cursor_change(self, _: int) -> None:
         request_render()
 
     def _render_surface(self, surface) -> None:

@@ -31,8 +31,6 @@ class _FakeInput:
         time.sleep(self._delay)
         return None
 
-    def set_input_timeouts(self, timeout: float) -> None:
-        pass
 
 
 class _MockPanel(Component):
@@ -219,3 +217,67 @@ def test_async_task_race_new_start_drops_old_result():
         time.sleep(0.01)
 
     assert received == ["new"]
+
+
+# --- run_async + copy_to_clipboard tests ---
+
+
+def test_run_async_clipboard_callback(mocker):
+    """run_async with copy_to_clipboard delivers result via callback."""
+    import pigit.ext.utils
+    from pigit.termui._async_task import run_async
+
+    mocker.patch("pigit.ext.utils.copy_to_clipboard", return_value=True)
+    received = []
+
+    run_async(lambda: pigit.ext.utils.copy_to_clipboard("hello"), lambda ok: received.append(ok))
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if received:
+            break
+        time.sleep(0.01)
+
+    assert received == [True]
+
+
+def test_run_async_dedup(mocker):
+    """Rapid run_async calls cancel the old task when caller manages the handle."""
+    import pigit.ext.utils
+    from pigit.termui._async_task import run_async
+
+    old_started = threading.Event()
+    old_can_finish = threading.Event()
+
+    def slow_copy(text):
+        if text == "old":
+            old_started.set()
+        old_can_finish.wait(timeout=5.0)
+        return text == "new"
+
+    mocker.patch("pigit.ext.utils.copy_to_clipboard", side_effect=slow_copy)
+    received = []
+
+    old_task = run_async(
+        lambda: pigit.ext.utils.copy_to_clipboard("old"),
+        lambda ok: received.append("old"),
+    )
+    old_started.wait(timeout=1.0)
+    old_task.cancel()
+    old_can_finish.set()
+
+    run_async(
+        lambda: pigit.ext.utils.copy_to_clipboard("new"),
+        lambda ok: received.append("new"),
+    )
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if "new" in received:
+            break
+        time.sleep(0.01)
+
+    assert "new" in received
+    assert "old" not in received

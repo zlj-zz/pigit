@@ -7,43 +7,14 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pigit.ext.utils import relative_time
-from pigit.termui import Component, palette
+from pigit.termui import ActionEventType, Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
-
-if TYPE_CHECKING:
-    from .git.model import Branch, Commit, File
-
-
-@dataclass
-class FileInfo:
-    file: File
-    size: str
-    mtime: str
-
-
-@dataclass
-class BranchInfo:
-    branch: Branch
-    recent_msg: str
-    recent_author: str
-    created: str
-
-
-@dataclass
-class CommitInfo:
-    commit: Commit
-    changed_files: list[tuple[str, int, int]]
-    total_add: int
-    total_del: int
-
-
-InspectorData = FileInfo | BranchInfo | CommitInfo | None
+from .app_types import BranchInfo, CommitInfo, FileInfo, InspectorData
 
 
 class InspectorPanel(Component):
@@ -76,19 +47,43 @@ class InspectorPanel(Component):
             case CommitInfo():
                 self._show_commit_impl(data)
 
+    def activate(self) -> None:
+        super().activate()
+        self.subscribe(ActionEventType.selection_changed, self._on_selection)
+
+    def _stable_key(self, active: Component | None, idx: int) -> tuple[str, int]:
+        if active is None:
+            return ("", idx)
+        return (f"{type(active).__name__}:{id(active)}", idx)
+
+    def _on_selection(self, *, active: Component | None = None, **_) -> bool:
+        provider = getattr(active, "get_inspector_data", None) if active else None
+        if provider is None:
+            self.clear()
+            return True
+        idx = getattr(active, "curr_no", 0)
+        key = self._stable_key(active, idx)
+        if getattr(self, "_last_key", None) == key:
+            return True
+        self._last_key = key
+        self.show(provider())
+        return True
+
     def update_from(self, source) -> None:
         """Refresh content from *source* if it provides inspector data.
 
-        Caches by ``(id(source), curr_no)`` to avoid redundant git calls.
+        Caches by ``(type(source).__name__ + id(source), curr_no)`` to avoid
+        redundant git calls while remaining stable across object reuse.
         """
-        if not hasattr(source, "get_inspector_data"):
+        provider = getattr(source, "get_inspector_data", None)
+        if provider is None:
             return
         idx = getattr(source, "curr_no", 0)
-        key = (id(source), idx)
+        key = self._stable_key(source, idx)
         if getattr(self, "_last_key", None) == key:
             return
         self._last_key = key
-        self.show(source.get_inspector_data())
+        self.show(provider())
 
     def _show_file_impl(self, data: FileInfo) -> None:
         """Display file details."""
@@ -187,7 +182,6 @@ class InspectorPanel(Component):
                 content_x,
                 title,
                 fg=THEME.fg_branch_name,
-                bg=THEME.bg_base,
                 style_flags=palette.STYLE_BOLD,
             )
 
@@ -200,6 +194,4 @@ class InspectorPanel(Component):
             avail = w - content_x
             if wcswidth(text) > avail:
                 text = truncate_by_width(text, avail - 1) + "…"
-            surface.draw_text_rgb(
-                row, content_x, text, fg=THEME.fg_primary, bg=THEME.bg_base
-            )
+            surface.draw_text_rgb(row, content_x, text, fg=THEME.fg_primary)

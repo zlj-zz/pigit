@@ -20,8 +20,6 @@ from pigit.termui._runtime_context import (
     RendererNotBoundError,
     _runtime_ctx,
     by_id,
-    exec_external,
-    get_badge,
     get_focus_manager,
     get_overlay_host,
     get_registry,
@@ -29,7 +27,6 @@ from pigit.termui._runtime_context import (
     get_renderer_strict,
     get_render_request,
     get_session,
-    hide_spinner,
     is_modal_open,
     layer_pop,
     layer_push,
@@ -47,11 +44,6 @@ from pigit.termui._runtime_context import (
     set_render_request,
     set_renderer,
     set_session,
-    show_badge,
-    show_sheet,
-    show_spinner,
-    show_toast,
-    dismiss_sheet,
 )
 
 
@@ -275,30 +267,48 @@ class TestComponentRegistry:
 
 class TestById:
     def test_found(self):
+        from pigit.termui._component import Component
+
+        class _C(Component):
+            NAME = "c"
+
+            def _render_surface(self, surface):
+                pass
+
+        c = _C()
+        c.id = "x"
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
-        comp = MagicMock()
-        comp.id = "x"
-        get_registry().register(comp)
-        assert by_id("x") is comp
+        set_registry(runtime.registry)
+        runtime.registry.register(c)
+        assert by_id("x") is c
 
     def test_not_found_raises(self):
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
-        with pytest.raises(RuntimeError, match="not found"):
-            by_id("missing")
+        with pytest.raises(RuntimeError, match="Component 'nope' not found"):
+            by_id("nope")
 
     def test_type_mismatch_raises(self):
+        from pigit.termui._component import Component
+
+        class _A(Component):
+            NAME = "a"
+
+            def _render_surface(self, surface):
+                pass
+
+        a = _A()
+        a.id = "a"
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
-        comp = MagicMock()
-        comp.id = "x"
-        get_registry().register(comp)
-        with pytest.raises(TypeError, match="expected"):
-            by_id("x", expect_type=str)
+        set_registry(runtime.registry)
+        runtime.registry.register(a)
+        with pytest.raises(TypeError, match="expected str"):
+            by_id("a", expect_type=str)
 
     def test_no_runtime_raises(self):
-        with pytest.raises(RuntimeError, match="not found"):
+        with pytest.raises(RuntimeError, match="Component 'x' not found"):
             by_id("x")
 
 
@@ -321,122 +331,6 @@ class TestGetRendererStrict:
         _runtime_ctx.set(runtime)
         with pytest.raises(RendererNotBoundError):
             get_renderer_strict()
-
-
-class TestExecExternal:
-    def test_raises_when_no_session(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        with pytest.raises(RuntimeError, match="No active TUI session"):
-            exec_external(["echo", "hi"])
-
-    def test_runs_command_and_restores_session(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        session = MagicMock()
-        set_session(session)
-        renderer = MagicMock()
-        set_renderer(renderer)
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock()
-            exec_external(["echo", "hi"], cwd="/tmp")
-        session.suspend.assert_called_once()
-        session.resume.assert_called_once()
-        mock_run.assert_called_once_with(
-            ["echo", "hi"], cwd="/tmp", stdin=None, stdout=None, stderr=None
-        )
-        renderer.clear_cache.assert_called_once()
-
-    def test_resume_failure_is_logged_and_raised(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        session = MagicMock()
-        session.resume.side_effect = RuntimeError("boom")
-        set_session(session)
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock()
-            with pytest.raises(RuntimeError, match="boom"):
-                exec_external(["echo", "hi"])
-
-
-class TestOverlayHelpers:
-    def _make_host(self):
-        host = MagicMock()
-        host._layer_stack = MagicMock()
-        host._layer_stack.top.return_value = None
-        return host
-
-    def test_show_toast(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        set_overlay_host(host)
-        result = show_toast("hello", duration=1.0)
-        host.show_toast.assert_called_once()
-        assert result is host.show_toast.return_value
-
-    def test_show_toast_no_host(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        assert show_toast("hello") is None
-
-    def test_show_sheet(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        set_overlay_host(host)
-        child = MagicMock()
-        result = show_sheet(child, height=4)
-        host.show_sheet.assert_called_once_with(child, 4, show_border=False)
-        assert result is host.show_sheet.return_value
-
-    def test_dismiss_sheet(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        set_overlay_host(host)
-        dismiss_sheet()
-        host.dismiss_sheet.assert_called_once()
-
-    def test_show_badge(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        host.badge_text = "old"
-        set_overlay_host(host)
-        show_badge("new")
-        host.show_badge.assert_called_once_with("new", duration=None, bg=None, fg=None)
-
-    def test_get_badge_no_host(self):
-        assert get_badge() == (None, None, None)
-
-    def test_get_badge_with_host(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        host.badge_text = "txt"
-        host.badge_bg = (1, 2, 3)
-        host.badge_fg = (4, 5, 6)
-        set_overlay_host(host)
-        assert get_badge() == ("txt", (1, 2, 3), (4, 5, 6))
-
-    def test_show_spinner(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        set_overlay_host(host)
-        show_spinner("loading")
-        host.show_toast.assert_called_once()
-        call = host.show_toast.call_args
-        assert call.kwargs["duration"] == 3600.0
-
-    def test_hide_spinner(self):
-        runtime = RuntimeContext()
-        _runtime_ctx.set(runtime)
-        host = self._make_host()
-        set_overlay_host(host)
-        hide_spinner()
-        host.dismiss_toast.assert_called_once()
 
 
 class TestLayerHelpers:

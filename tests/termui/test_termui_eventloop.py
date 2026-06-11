@@ -180,24 +180,6 @@ def test_resize(size, expected_resize_calls):
     event_loop._child.resize.assert_called_once_with(size)
 
 
-@pytest.mark.parametrize(
-    "timeout, expected_set_timeout_calls",
-    [
-        (0.1, 1),
-        (1.0, 1),
-        (5.0, 1),
-    ],
-)
-def test_set_input_timeouts(timeout, expected_set_timeout_calls):
-    component = ComponentMock()
-    event_loop = EventLoop(component, alt=False)
-    event_loop._input_handle.set_input_timeouts = Mock()
-
-    event_loop.set_input_timeouts(timeout)
-
-    event_loop._input_handle.set_input_timeouts.assert_called_once_with(timeout)
-
-
 class _Leaf(Component):
     NAME = "leaf"
 
@@ -250,7 +232,7 @@ def test_loop_string_dispatch_calls_hooks_with_outcome(
 
     key = batch[0][0]
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [batch, ExitEventLoop("stop")]
+    loop._input_handle.get_key.side_effect = [key, ExitEventLoop("stop")]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
@@ -272,7 +254,7 @@ def test_loop_real_time_idle_does_not_call_dispatch_hooks(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[], ExitEventLoop("stop")]
+    loop._input_handle.get_key.side_effect = [None, ExitEventLoop("stop")]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
@@ -302,7 +284,7 @@ def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
     loop._child._handle_event = Mock()
 
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["k"]], ExitEventLoop("stop")]
+    loop._input_handle.get_key.side_effect = ["k", ExitEventLoop("stop")]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
@@ -372,7 +354,7 @@ def test_app_event_loop_accepts_callable_binding(mock_renderer):
     # renderer from mock_renderer fixture
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [[["q"]], ExitEventLoop("stop")]
+    loop._input_handle.get_key.side_effect = ["q", ExitEventLoop("stop")]
 
     with pytest.raises(ExitEventLoop, match="bye"):
         loop._run_impl()
@@ -503,8 +485,8 @@ def test_loop_mouse_event_is_ignored(mock_renderer):
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [
-        [[("mouse down", 1, 2, 3)]],
+    loop._input_handle.get_key.side_effect = [
+        "mouse down",
         ExitEventLoop("stop"),
     ]
 
@@ -529,8 +511,8 @@ def test_add_interval_fires_callback(mock_renderer):
     loop = AppEventLoop(_Leaf(), alt=False)
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [
-        [],  # first poll: timer fires
+    loop._input_handle.get_key.side_effect = [
+        None,  # first poll: no keys, timer fires
         ExitEventLoop("stop"),
     ]
 
@@ -548,9 +530,9 @@ def test_remove_interval_stops_firing(mock_renderer):
     loop = AppEventLoop(_Leaf(), alt=False)
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [
-        [],  # first poll
-        [],  # second poll
+    loop._input_handle.get_key.side_effect = [
+        None,  # first poll
+        None,  # second poll
         ExitEventLoop("stop"),
     ]
 
@@ -569,8 +551,8 @@ def test_timer_exception_isolated(mock_renderer):
     loop = AppEventLoop(_Leaf(), alt=False)
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [
-        [],  # both timers fire
+    loop._input_handle.get_key.side_effect = [
+        None,  # both timers fire
         ExitEventLoop("stop"),
     ]
 
@@ -589,8 +571,8 @@ def test_multiple_timers_fire_independently(mock_renderer):
     loop = AppEventLoop(_Leaf(), alt=False)
     loop.get_term_size = Mock(return_value=(80, 24))
     loop._input_handle = Mock()
-    loop._input_handle.get_input.side_effect = [
-        [],
+    loop._input_handle.get_key.side_effect = [
+        None,
         ExitEventLoop("stop"),
     ]
 

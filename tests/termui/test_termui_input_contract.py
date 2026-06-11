@@ -6,7 +6,6 @@ Contract tests for ``TermuiInputBridge`` and related termui input helpers
 
 from __future__ import annotations
 
-import math
 import pytest
 import termios
 from unittest.mock import patch
@@ -42,34 +41,6 @@ def test_termui_input_bridge_forwards_read_keys():
     assert keys == ["j", "enter"]
 
 
-@pytest.mark.parametrize(
-    "bad",
-    [
-        -1.0,
-        float("nan"),
-        float("inf"),
-    ],
-)
-def test_termui_input_bridge_rejects_invalid_timeout(bad):
-    bridge = TermuiInputBridge()
-    with pytest.raises(ValueError, match="non-negative finite"):
-        bridge.set_input_timeouts(bad)
-
-
-def test_termui_input_bridge_ignores_none_timeout():
-    bridge = TermuiInputBridge()
-    bridge.set_input_timeouts(0.5)
-    bridge.set_input_timeouts(None)
-    assert bridge._timeout == 0.5
-
-
-def test_termui_input_bridge_accepts_zero_timeout():
-    bridge = TermuiInputBridge()
-    bridge.set_input_timeouts(0.0)
-    assert bridge._timeout == 0.0
-    assert math.isfinite(bridge._timeout)
-
-
 def test_termui_input_bridge_start_stop_noop():
     bridge = TermuiInputBridge()
     bridge.start()
@@ -87,12 +58,6 @@ class TestInputTerminal:
         term = InputTerminal()
         with pytest.raises(NotImplementedError, match="Subclasses must implement"):
             term.get_input()
-
-    def test_set_input_timeouts_noop(self):
-        from pigit.termui.input import InputTerminal
-
-        term = InputTerminal()
-        term.set_input_timeouts(1.0)  # should not raise
 
     def test_tty_signal_keys_returns_early_on_non_tty(self):
         from pigit.termui.input import InputTerminal

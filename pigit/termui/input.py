@@ -8,9 +8,11 @@ Date: 2026-05-18
 
 from __future__ import annotations
 
-import math
+import logging
 import os
+import queue
 import sys
+import threading
 import time
 from typing import Any, BinaryIO
 from collections.abc import Callable
@@ -18,6 +20,8 @@ from collections.abc import Callable
 from shutil import get_terminal_size
 
 from . import keys
+
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Escape-sequence trie (formerly input_trie.py)
@@ -102,7 +106,7 @@ def _parse_csi_u(chunk: bytes) -> str | None:
         if modifier == 5:
             return keys.KEY_CTRL_ENTER
         if modifier == 6:
-            return "ctrl shift enter"
+            return keys.KEY_CTRL_SHIFT_ENTER
     return None
 
 
@@ -150,7 +154,7 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
 # Keyboard input (formerly input_keyboard.py)
 # ---------------------------------------------------------------------------
 
-_ReadHook = Callable[[float], bytes]
+_ReadHook = Callable[[float | None], bytes]
 
 
 def _utf8_byte_len(first: int) -> int:
@@ -181,6 +185,9 @@ class KeyboardInput:
         self._read_hook = read_hook
         self._buffer = bytearray()
         self._last_size: tuple[int, int] | None = None
+        self._queue: queue.Queue[str] = queue.Queue()
+        self._thread: threading.Thread | None = None
+        self._running = False
 
     def _default_stdin(self) -> BinaryIO:
         if self._stdin is not None:
@@ -188,14 +195,14 @@ class KeyboardInput:
         buf = sys.stdin.buffer
         return buf
 
-    def _read_chunk(self, timeout: float) -> bytes:
+    def _read_chunk(self, timeout: float | None) -> bytes:
         if self._read_hook is not None:
             return self._read_hook(timeout)
         if sys.platform == "win32":
             return self._read_chunk_windows(timeout)
         return self._read_chunk_posix(timeout)
 
-    def _read_chunk_posix(self, timeout: float) -> bytes:
+    def _read_chunk_posix(self, timeout: float | None) -> bytes:
         import select
 
         stdin = self._default_stdin()
@@ -213,10 +220,27 @@ class KeyboardInput:
         except BlockingIOError:
             return b""
 
-    def _read_chunk_windows(self, timeout: float) -> bytes:
+    def _read_chunk_windows(self, timeout: float | None) -> bytes:
         import msvcrt
 
         _msvcrt: Any = msvcrt
+        if timeout is None:
+            # Blocking indefinitely: msvcrt has no true blocking read with
+            # interrupt support, so we poll at 20 Hz (lower CPU than 1 kHz).
+            out = bytearray()
+            while True:
+                if _msvcrt.kbhit():
+                    ch = _msvcrt.getch()
+                    if ch in (b"\x00", b"\xe0"):
+                        ch += _msvcrt.getch()
+                    out.extend(ch)
+                    while _msvcrt.kbhit():
+                        ch2 = _msvcrt.getch()
+                        if ch2 in (b"\x00", b"\xe0"):
+                            ch2 += _msvcrt.getch()
+                        out.extend(ch2)
+                    return bytes(out)
+                time.sleep(0.05)
         deadline = time.monotonic() + timeout
         out = bytearray()
         while time.monotonic() < deadline:
@@ -312,7 +336,7 @@ class KeyboardInput:
             return [keys.KEY_WINDOW_RESIZE]
         return []
 
-    def read_keys(self, timeout: float = 0.1) -> list[str]:
+    def read_keys(self, timeout: float | None = 0.1) -> list[str]:
         """
         Block up to ``timeout`` seconds for input, then return semantic keys.
 
@@ -328,6 +352,42 @@ class KeyboardInput:
             self._buffer.clear()
         out.extend(self._resize_events())
         return out
+
+    def start(self) -> None:
+        """Start the keyboard reader thread."""
+        self._running = True
+        self._thread = threading.Thread(target=self._read_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the keyboard reader thread."""
+        self._running = False
+        if self._thread is not None:
+            self._thread.join(timeout=0.125)
+            self._thread = None
+
+    def get_key(self) -> str | None:
+        """Non-blocking fetch of one key. Returns None if none available."""
+        try:
+            return self._queue.get_nowait()
+        except queue.Empty:
+            return None
+
+    def _read_loop(self) -> None:
+        """Background thread: blocking read from stdin, parse and enqueue."""
+        while self._running:
+            # Fixed short timeout so we wait for ESC continuation bytes but
+            # also poll _running regularly, preventing indefinite blocking
+            # during stop().
+            timeout = 0.125
+            try:
+                keys = self.read_keys(timeout=timeout)
+            except Exception:
+                _logger.exception("Keyboard input read failed")
+                time.sleep(0.1)
+                continue
+            for key in keys:
+                self._queue.put(key)
 
 
 # ---------------------------------------------------------------------------
@@ -419,9 +479,17 @@ class InputTerminal:
 
         return skeys
 
-    def set_input_timeouts(self, timeout: float | None) -> None:
-        """Set the keyboard read timeout. No-op by default; override in subclasses."""
+    def start(self) -> None:
+        """Start the input reader. No-op by default; override in subclasses."""
         return
+
+    def stop(self) -> None:
+        """Stop the input reader. No-op by default; override in subclasses."""
+        return
+
+    def get_key(self) -> str | None:
+        """Non-blocking read of a single semantic key. Must be overridden in subclasses."""
+        raise NotImplementedError("Subclasses must implement get_key()")
 
     def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
         """Read semantic keys from the input source. Must be overridden in subclasses."""
@@ -445,26 +513,17 @@ class TermuiInputBridge(InputTerminal):
     def __init__(self) -> None:
         super().__init__()
         self._kb = KeyboardInput()
-        self._timeout = 0.125
 
     def start(self) -> None:
-        """No-op: terminal attributes are owned by Session."""
-        return
+        self._kb.start()
 
     def stop(self) -> None:
-        """No-op: terminal attributes are owned by Session."""
-        return
+        self._kb.stop()
 
-    def set_input_timeouts(self, timeout: float | None) -> None:
-        """Set the keyboard read timeout to a non-negative finite float."""
-        if timeout is None:
-            return
-        t = float(timeout)
-        if not math.isfinite(t) or t < 0:
-            raise ValueError("timeout must be a non-negative finite float")
-        self._timeout = t
+    def get_key(self) -> str | None:
+        return self._kb.get_key()
 
     def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
         """Read semantic keys from the keyboard and return them (raw_keys is ignored)."""
-        keys = self._kb.read_keys(timeout=self._timeout)
+        keys = self._kb.read_keys(timeout=0.125)
         return (keys, None) if not raw_keys else (keys, None)

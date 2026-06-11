@@ -8,22 +8,21 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from collections.abc import Callable, Sequence
 
 from ._component import Component
 from ._layer import LayerKind, LayerStack
-from .types import OverlayDispatchResult, ToastPosition
-from ._runtime_context import (
-    FocusManager,
-    get_badge_signal,
-)
+from .event_bus import EventBus
+from .types import OverlayDispatchResult
+from ._runtime_context import FocusManager
+from ._overlay_api import get_badge_signal
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
     from ._segment import Segment
     from ._surface import Surface, _Subsurface
-    from .widgets import Sheet, Toast
+    from .widgets import Sheet
 
 
 class ComponentRoot(Component):
@@ -36,6 +35,7 @@ class ComponentRoot(Component):
         self,
         body: Component,
         registry: ComponentRegistry | None = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         super().__init__()
         self._body = body
@@ -48,7 +48,18 @@ class ComponentRoot(Component):
         self._badge_bg: tuple[int, int, int] | None = None
         self._badge_fg: tuple[int, int, int] | None = None
         self._badge_until = 0
+        self._event_bus = event_bus
         self._app_on_event: Callable | None = None
+        self._event_loop: Any | None = None
+
+    def activate(self) -> None:
+        """Activate the root and propagate to the body component tree."""
+        super().activate()
+        self._body.activate()
+        # Reset stale badge from previous sessions.
+        sig = get_badge_signal()
+        if sig.value is not None:
+            sig.set(None)
 
     def destroy(self) -> None:
         """Destroy children. Runtime context is reset by the caller."""
@@ -65,6 +76,15 @@ class ComponentRoot(Component):
     def body(self) -> Component:
         """The root's single child component (the application body)."""
         return self._body
+
+    @property
+    def event_bus(self) -> EventBus | None:
+        """The framework event bus used for cross-panel subscriptions."""
+        return self._event_bus
+
+    def __del__(self) -> None:
+        """Best-effort cleanup: nothing to do; bus is owned by Application."""
+        pass
 
     # --- Badge API (framework-managed, not an overlay) ---
 
@@ -196,39 +216,6 @@ class ComponentRoot(Component):
         if top is not None and top.is_expired():
             self._pop_layer(LayerKind.TOAST)
 
-    def show_toast(
-        self,
-        message: str = "",
-        *,
-        segments: Sequence[Segment] | None = None,
-        duration: float = 2.0,
-        position: ToastPosition | None = None,
-    ) -> Toast:
-        """Display a transient toast notification on the TOAST layer.
-
-        Args:
-            message: Toast message content (backward compat).
-            segments: Optional styled segments for rich toast content.
-            duration: Display duration in seconds.
-            position: ToastPosition enum value (None for default TOP_RIGHT).
-
-        Returns:
-            Toast instance.
-        """
-        from .widgets import Toast
-
-        existing = self._layer_stack.top(LayerKind.TOAST)
-        if existing is not None:
-            self._pop_layer(LayerKind.TOAST)
-
-        if position is None:
-            position = ToastPosition.TOP_RIGHT
-
-        toast = Toast(message, segments=segments, duration=duration, position=position)
-        toast.resize(self._size)
-        self._layer_stack.push(LayerKind.TOAST, toast)
-        return toast
-
     def show_sheet(
         self, child: Component, height: int = 8, show_border: bool = False
     ) -> Sheet:
@@ -239,10 +226,6 @@ class ComponentRoot(Component):
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
         return sheet
-
-    def dismiss_toast(self) -> None:
-        """Dismiss the current toast, if any."""
-        self._pop_layer(LayerKind.TOAST)
 
     def dismiss_sheet(self) -> None:
         """Dismiss the current sheet, if any."""

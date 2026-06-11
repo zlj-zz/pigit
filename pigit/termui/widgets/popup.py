@@ -17,6 +17,7 @@ from .._frame import BoxFrame
 from .._runtime_context import get_focus_manager
 from .._surface import Surface, _Subsurface
 from .._text import sanitize_for_display
+from ..wcwidth_table import pad_by_width, truncate_by_width
 from ..types import LayerKind, OverlayDispatchResult
 
 _logger = logging.getLogger(__name__)
@@ -270,8 +271,18 @@ class AlertDialogBody(Component):
         surface.fill_rect_rgb(
             self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
-        self._frame.draw_onto(surface, self.x, self.y)
-        self._frame.draw_content(surface, self.x, self.y, self._content_lines)
+        self._frame.draw(surface, self.x, self.y)
+        cr, cc, cw, ch = self._frame.content_rect(self.x, self.y)
+        for i, line in enumerate(self._content_lines[:ch]):
+            text = pad_by_width(truncate_by_width(line, cw), cw)
+            surface.draw_text_rgb(
+                cr + i,
+                cc,
+                text,
+                fg=self._frame.fg,
+                bg=self._frame.bg,
+                style_flags=self._frame.style_flags,
+            )
 
     def _build_content_lines(self) -> list[str]:
         inner = self._inner_w

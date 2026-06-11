@@ -53,23 +53,6 @@ class Padding:
         return self.top, self.left
 
 
-class Border:
-    """Reserve 1 cell inward on each side (like a 1-cell thick frame).
-
-    This modifier only reserves space; it does NOT draw any visual border.
-    To draw an actual frame, pair this with :class:`BoxFrame`.
-    """
-
-    def apply(self, available: tuple[int, int]) -> tuple[int, int]:
-        """Shrink available space by 1 cell on each side."""
-        w, h = available
-        return max(0, w - 2), max(0, h - 2)
-
-    def offset(self) -> tuple[int, int]:
-        """Return the (top, left) offset introduced by this border."""
-        return 1, 1
-
-
 def layout_flex(
     sizes: Sequence[int | Literal["flex"]],
     total: int,

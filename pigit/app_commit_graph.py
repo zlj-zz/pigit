@@ -7,30 +7,13 @@ Date: 2026-05-04
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from collections.abc import Sequence
 
+from .app_types import GraphRow
+
 if TYPE_CHECKING:
     from pigit.git.model import Commit
-
-
-@dataclass
-class GraphRow:
-    """Lane layout for one commit row.
-
-    Lanes are not compacted between rows; once a column is allocated it stays
-    until that lane closes, at which point the column may be reused later.
-
-    `closed_lanes` / `opened_lanes` are always > `commit_lane` by construction,
-    so the renderer can use a single direction of curve glyphs.
-    """
-
-    lanes_before: list[str | None]
-    commit_lane: int
-    closed_lanes: list[int]
-    opened_lanes: list[int]
-    lanes_after: list[str | None]
 
 
 def compute_graph_rows(commits: Sequence[Commit]) -> list[GraphRow]:

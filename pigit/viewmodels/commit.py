@@ -14,8 +14,7 @@ from pigit.termui.reactive import Signal
 from .base import ActionResult, IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
-    from pigit.app_commit_graph import GraphRow
-    from pigit.app_inspector import CommitInfo
+    from pigit.app_types import CommitInfo, GraphRow
     from pigit.git.local_git import LocalGit
     from pigit.git.model import Commit
 
@@ -68,18 +67,12 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         self._bodies = None
         return commits
 
-    def _commit_at(self, idx: int) -> Commit | None:
-        items = self._items.value
-        if 0 <= idx < len(items):
-            return items[idx]
-        return None
-
     def get_inspector_data(self, idx: int) -> CommitInfo | None:
-        c = self._commit_at(idx)
+        c = self.item_at(idx)
         if c is None:
             return None
         changed_files, total_add, total_del = self._git.get_commit_stats(c.sha)
-        from pigit.app_inspector import CommitInfo
+        from pigit.app_types import CommitInfo
 
         return CommitInfo(
             commit=c,
@@ -89,7 +82,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         )
 
     def load_diff(self, idx: int) -> list[str]:
-        c = self._commit_at(idx)
+        c = self.item_at(idx)
         if c is None:
             return []
         text = self._git.load_commit_info(c.sha, plain=True)

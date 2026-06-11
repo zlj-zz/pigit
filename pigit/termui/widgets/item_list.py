@@ -49,12 +49,8 @@ class ItemList(Component):
         self._curr_no_sig = Signal(0)
         self._r_start_sig = Signal(0)
         self._unsubs: list[Callable[[], None]] = []
-        self._unsubs.append(
-            self._curr_no_sig.subscribe(lambda _: self._request_render())
-        )
-        self._unsubs.append(
-            self._r_start_sig.subscribe(lambda _: self._request_render())
-        )
+        self._unsubs.append(self._curr_no_sig.subscribe(self._on_curr_no_change))
+        self._unsubs.append(self._r_start_sig.subscribe(self._on_r_start_change))
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False
@@ -254,6 +250,14 @@ class ItemList(Component):
     def set_skip_indices(self, indices: set[int]) -> None:
         """Set content indices that should be skipped during navigation."""
         self._skip_indices = indices
+
+    def _on_curr_no_change(self, _: int) -> None:
+        """Handler for _curr_no_sig changes."""
+        self._request_render()
+
+    def _on_r_start_change(self, _: int) -> None:
+        """Handler for _r_start_sig changes."""
+        self._request_render()
 
     def _request_render(self) -> None:
         """Request a render if this component is currently activated."""

@@ -6,7 +6,7 @@ Author: Zev
 Date: 2026-04-17
 """
 
-from pigit.termui._layout import Padding, Border, layout_flex
+from pigit.termui._layout import Padding, layout_flex
 
 
 class TestPadding:
@@ -21,20 +21,6 @@ class TestPadding:
     def test_offset(self):
         p = Padding(top=1, right=2, bottom=3, left=4)
         assert p.offset() == (1, 4)
-
-
-class TestBorder:
-    def test_apply(self):
-        b = Border()
-        assert b.apply((10, 6)) == (8, 4)
-
-    def test_never_negative(self):
-        b = Border()
-        assert b.apply((1, 1)) == (0, 0)
-
-    def test_offset(self):
-        b = Border()
-        assert b.offset() == (1, 1)
 
 
 class TestLayoutFlex:

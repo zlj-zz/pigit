@@ -234,6 +234,8 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 - **Inline commit editor** — subject/body fields with lint bar inside the TUI.
 - **Hunk staging** — stage or unstage individual hunks directly in the diff viewer (`H`).
 - **Stash management** — push, pop, and drop stashes from the status panel.
+- **Auto refresh** — periodic background refresh of the active panel while the TUI is idle.
+- **Syntax highlighting** — diff and file-history views tokenize source code by language.
 - **Adaptive layout** — side-by-side preview panel on large terminals.
 - **Short commands** — aliases like `pigit cmd st` for `git status --short`.
 - **Command correction** — suggests the right command when you typo.

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component import Component
 from ._root import ComponentRoot
+from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
 from .types import ActionEventType, OverlayDispatchResult
 from . import keys
@@ -46,6 +47,7 @@ class _ApplicationEventLoop(AppEventLoop):
 
     def __init__(self, root: ComponentRoot, app: Application, **kwargs):
         super().__init__(root, **kwargs)
+        root._event_loop = self
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
         self._app_on_key = getattr(app, "on_key", None)
@@ -115,7 +117,6 @@ class Application:
 
     # Declarative lifecycle configuration (override in subclass)
     min_terminal_size: tuple[int, int] | None = None
-    input_timeouts: float = 0.0625
     help_popup_class: type[Component] | None = None
     help_binding: str = "?"
 
@@ -127,6 +128,7 @@ class Application:
             self, type(self), self.BINDINGS
         )
         self._help_popup: Any = None
+        self._event_bus = EventBus()
 
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""
@@ -187,14 +189,16 @@ class Application:
         token = _runtime_ctx.set(runtime)
         try:
             body = self.build_root()
-            self._root = root = ComponentRoot(body, runtime.registry)
+            self._root = root = ComponentRoot(
+                body, runtime.registry, event_bus=self._event_bus
+            )
             runtime.overlay_host = root
             runtime.focus_manager = root._focus_manager
             root._app_on_event = self.on_event
             self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
-            self._loop.set_input_timeouts(self.input_timeouts)
             self._auto_setup_root(root)
             self.setup_root(root)
+            root.activate()
             self._loop.run()
         finally:
             if self._root is not None:

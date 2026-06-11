@@ -68,7 +68,7 @@ def _make_root(body):
 class TestOverlayContext:
     def test_show_toast_with_host(self):
         """验证 show_toast 在 overlay host context 下能工作"""
-        from pigit.termui._runtime_context import show_toast
+        from pigit.termui._overlay_api import show_toast
         from pigit.termui._root import ComponentRoot
 
         root = _make_root(DummyBody())
@@ -85,8 +85,8 @@ class TestOverlayContext:
         from pigit.termui._runtime_context import (
             get_overlay_host,
             reset_overlay_host,
-            show_toast,
         )
+        from pigit.termui._overlay_api import show_toast
 
         # 清除 overlay host
         reset_overlay_host()
@@ -96,7 +96,7 @@ class TestOverlayContext:
 
     def test_show_sheet_with_host(self):
         """验证 show_sheet 在 overlay host context 下能工作"""
-        from pigit.termui._runtime_context import show_sheet
+        from pigit.termui._overlay_api import show_sheet
         from pigit.termui._root import ComponentRoot
 
         root = _make_root(DummyBody())
@@ -109,7 +109,7 @@ class TestOverlayContext:
 
     def test_show_toast_position_parameter(self):
         """验证 show_toast 支持传递 position 参数"""
-        from pigit.termui._runtime_context import show_toast
+        from pigit.termui._overlay_api import show_toast
         from pigit.termui._root import ComponentRoot
 
         root = _make_root(DummyBody())
@@ -369,12 +369,12 @@ class TestToast:
         # 退出动画开始（elapsed > duration - exit_duration = 1.5）
         # 使用较晚的时间点确保有明显偏移
         offset_exit_late = toast._compute_slide_offset(1.9)
-        # progress = (2.0 - 1.9) / 0.5 = 0.2, offset = int(15 * 0.8) = 12
+        # progress = (2.0 - 1.9) / 0.5 = 0.2, offset = int(16 * 0.8) = 12
         assert offset_exit_late > 0  # 向右滑出
 
         # 退出动画结束（elapsed == duration）
         offset_exit_end = toast._compute_slide_offset(2.0)
-        assert offset_exit_end == 15  # 完全滑出屏幕（宽度为15）
+        assert offset_exit_end == 16  # 完全滑出屏幕（宽度 + 1，确保彻底消失）
 
 
 class TestSheet:

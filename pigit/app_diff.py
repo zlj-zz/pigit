@@ -24,9 +24,11 @@ from pigit.termui import (
     keys,
     palette,
     bind_keys,
+    request_render,
     show_badge,
     show_toast,
 )
+from pigit.termui._async_task import AsyncTask
 from pigit.termui._text import plain
 from pigit.termui.widgets import LineTextBrowser
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
@@ -128,6 +130,11 @@ class DiffViewer(LineTextBrowser):
         self._repo_path = ""
         self._diff_type = DiffType.UNSTAGED
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
+        self._patch_task: AsyncTask[tuple[int, str, str, str, str]] = AsyncTask()
+        self._tokenize_task: AsyncTask[
+            list[list[tuple[str, tuple[int, int, int], int]]]
+        ] = AsyncTask()
+        self._tokenize_gen: int = 0
 
         # File history state
         self._file_history_mode = False
@@ -136,26 +143,40 @@ class DiffViewer(LineTextBrowser):
         self._file_history_index: int = 0
         self._file_history_cache: dict[str, list[str]] = {}
         self._saved_diff_state: _DiffStateSnapshot | None = None
+        self._cached_path_i = -1
+        self._cached_path_hunks_id = -1
+        self._cached_path: str | None = None
 
     def _current_file_path(self) -> str | None:
         """Return the file path at the current cursor position in diff mode."""
         if not self._hunks or not self._content:
             return None
+        hunks_id = id(self._hunks)
+        if self._cached_path_i == self._i and self._cached_path_hunks_id == hunks_id:
+            return self._cached_path
         target_hunk = None
         for h in self._hunks:
             if h.start <= self._i < h.end:
                 target_hunk = h
                 break
         if target_hunk is None:
+            self._cached_path_i = self._i
+            self._cached_path_hunks_id = hunks_id
+            self._cached_path = None
             return None
         header_idx = target_hunk.file_header_start
         if header_idx >= len(self._content):
+            self._cached_path_i = self._i
+            self._cached_path_hunks_id = hunks_id
+            self._cached_path = None
             return None
         line = self._content[header_idx]
         m = _DIFF_GIT_RE.match(line)
-        if m:
-            return m.group(2).strip('"')
-        return None
+        result = m.group(2).strip('"') if m else None
+        self._cached_path_i = self._i
+        self._cached_path_hunks_id = hunks_id
+        self._cached_path = result
+        return result
 
     def _set_plain_content(self, lines: list[str]) -> None:
         """Set plain file content (no diff parsing) for File History mode."""
@@ -230,6 +251,10 @@ class DiffViewer(LineTextBrowser):
         Carriage returns (``\\r``) are stripped because CRLF files cause
         ``\\r`` to reset the cursor to the start of the line, corrupting
         the rendered output.
+
+        Syntax highlighting is computed asynchronously to avoid freezing the
+        TUI on large diffs.  Lines render with plain text until tokenization
+        finishes.
         """
         self._content = []
         self._heatmap = []
@@ -253,10 +278,33 @@ class DiffViewer(LineTextBrowser):
         self._multiline_mask = self._tokenizer.compute_multiline_mask(
             self._content, self._line_langs
         )
-        self._render_tokens = self._pre_tokenize()
         self._hunks = self._parse_hunks()
         self._hunk_starts = [h.start for h in self._hunks]
         self._i = 0
+
+        # Async: syntax highlighting (slow for large files).
+        self._tokenize_task.cancel()
+        self._tokenize_gen += 1
+        current_gen = self._tokenize_gen
+        content = list(self._content)
+        line_langs = list(self._line_langs)
+        multiline_mask = list(self._multiline_mask)
+        tokenizer = self._tokenizer
+
+        def _work() -> list[list[tuple[str, tuple[int, int, int], int]]]:
+            return DiffViewer._pre_tokenize_with(
+                content, line_langs, multiline_mask, tokenizer
+            )
+
+        def _callback(
+            tokens: list[list[tuple[str, tuple[int, int, int], int]]],
+        ) -> None:
+            if not self.is_activated() or current_gen != self._tokenize_gen:
+                return
+            self._render_tokens = tokens
+            request_render()
+
+        self._tokenize_task.start(_work, _callback)
 
     def set_diff_type(self, diff_type: DiffType) -> None:
         """Set the diff type (unstaged, staged, or commit)."""
@@ -369,34 +417,38 @@ class DiffViewer(LineTextBrowser):
                 result.append(current_lang)
         return result
 
-    def _pre_tokenize(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
-        """Pre-tokenize all lines, resolve colors, and compute display widths."""
+    @staticmethod
+    def _pre_tokenize_with(
+        content: list[str],
+        line_langs: list[str],
+        multiline_mask: list[str | None],
+        tokenizer: SyntaxTokenizer,
+    ) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+        """Pre-tokenize all lines with a state snapshot (thread-safe)."""
         result: list[list[tuple[str, tuple[int, int, int], int]]] = []
-        for i, line in enumerate(self._content):
-            lang = self._line_langs[i] if i < len(self._line_langs) else "generic"
+        for i, line in enumerate(content):
+            lang = line_langs[i] if i < len(line_langs) else "generic"
             if line.startswith("@@"):
-                tokens = self._tokenizer.tokenize_diff_hunk(line)
+                tokens = tokenizer.tokenize_diff_hunk(line)
             elif line.startswith("\\"):
                 result.append([])
                 continue
             else:
-                if self._is_file_header(line):
+                if line.startswith("--- ") or line.startswith("+++ "):
                     code = line
                 elif line and line[0] in "+- ":
                     code = line[1:]
                 else:
                     code = line
-                ml_type = (
-                    self._multiline_mask[i] if i < len(self._multiline_mask) else None
-                )
+                ml_type = multiline_mask[i] if i < len(multiline_mask) else None
                 if lang == "plain":
                     tokens = [(code, "plain")]
                 elif ml_type is not None:
                     tokens = [(code, ml_type)]
                 elif lang == "md":
-                    tokens = self._tokenizer.tokenize_markdown(code)
+                    tokens = tokenizer.tokenize_markdown(code)
                 else:
-                    tokens = self._tokenizer.tokenize(code, lang)
+                    tokens = tokenizer.tokenize(code, lang)
             result.append(
                 [
                     (
@@ -404,7 +456,7 @@ class DiffViewer(LineTextBrowser):
                         (
                             THEME.fg_primary
                             if ttype == "plain"
-                            else self._tokenizer.resolve_color(ttype, lang)
+                            else tokenizer.resolve_color(ttype, lang)
                         ),
                         wcswidth(text),
                     )
@@ -412,6 +464,15 @@ class DiffViewer(LineTextBrowser):
                 ]
             )
         return result
+
+    def _pre_tokenize(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+        """Pre-tokenize all lines using current component state."""
+        return self._pre_tokenize_with(
+            self._content,
+            self._line_langs,
+            self._multiline_mask,
+            self._tokenizer,
+        )
 
     def get_help_title(self) -> str:
         return "Diff"
@@ -689,15 +750,24 @@ class DiffViewer(LineTextBrowser):
         hunk_lines = [self._content[i] for i in range(hunk.start, hunk.end)]
         return "\n".join(header_lines + hunk_lines) + "\n"
 
-    def _patch_cmd_and_msg(self, patch_path: str, action: str) -> tuple[list[str], str]:
+    def _patch_cmd_and_msg(
+        self, patch_path: str, action: str, diff_type: DiffType
+    ) -> tuple[list[str], str]:
         if action == "stage":
-            if self._diff_type is DiffType.STAGED:
+            if diff_type is DiffType.STAGED:
                 return ["git", "apply", "--cached", "-R", patch_path], "Hunk unstaged"
             return ["git", "apply", "--cached", patch_path], "Hunk staged"
         return ["git", "apply", "-R", patch_path], "Hunk discarded"
 
+    def deactivate(self) -> None:
+        """Cancel pending patch task and clear stuck badge."""
+        self._patch_task.cancel()
+        self._tokenize_task.cancel()
+        show_badge("", duration=0)
+        super().deactivate()
+
     def _apply_patch(self, patch: str, action: str) -> None:
-        """Apply or reverse-apply a patch using subprocess (no TUI flicker)."""
+        """Apply or reverse-apply a patch in background thread."""
         if not self._repo_path:
             show_toast("No repo path available", duration=2.0)
             return
@@ -705,27 +775,49 @@ class DiffViewer(LineTextBrowser):
         suffix = "_stage.patch" if action == "stage" else "_discard.patch"
         with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
             f.write(patch)
+            f.flush()
+            os.fsync(f.fileno())
             patch_path = f.name
 
-        try:
-            cmd, msg = self._patch_cmd_and_msg(patch_path, action)
-            result = subprocess.run(cmd, cwd=self._repo_path, capture_output=True)
-            if result.returncode == 0:
-                show_badge(msg, duration=1.0)
-            else:
+        show_badge("Applying...", duration=float("inf"))
+        diff_type = self._diff_type
+
+        def _work() -> tuple[int, str, str, str, str]:
+            """Run in thread pool. Returns (returncode, stdout, stderr, patch_path, msg)."""
+            try:
+                cmd, msg = self._patch_cmd_and_msg(patch_path, action, diff_type)
+                result = subprocess.run(cmd, cwd=self._repo_path, capture_output=True)
                 stderr = (
                     result.stderr.decode("utf-8", errors="replace")
                     if result.stderr
                     else ""
                 )
-                show_toast(f"Failed: {stderr[:100]}", duration=2.0)
-        except Exception as e:
-            show_toast(f"Failed: {e}", duration=2.0)
-        finally:
+                stdout = (
+                    result.stdout.decode("utf-8", errors="replace")
+                    if result.stdout
+                    else ""
+                )
+                return result.returncode, stdout, stderr, patch_path, msg
+            except Exception as e:
+                return -1, "", str(e), patch_path, ""
+
+        def _callback(result: tuple[int, str, str, str, str]) -> None:
+            """Run on main thread when work finishes."""
+            returncode, _, stderr, path, msg = result
             try:
-                os.unlink(patch_path)
+                os.unlink(path)
             except OSError:
                 pass
+
+            if not self.is_activated():
+                return
+
+            if returncode == 0:
+                show_badge(msg, duration=1.0)
+            else:
+                show_toast(f"Failed: {stderr[:100]}", duration=2.0)
+
+        self._patch_task.start(_work, _callback)
 
     def _compute_heatmap(self) -> None:
         """Compute density symbol and color for each line."""
@@ -854,7 +946,15 @@ class DiffViewer(LineTextBrowser):
         if line.startswith("\\"):
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
         else:
-            tokens = self._render_tokens[idx]
+            if idx < len(self._render_tokens):
+                tokens = self._render_tokens[idx]
+            else:
+                # Fallback plain text while async tokenization is in flight.
+                if line and line[0] in "+- ":
+                    code = line[1:]
+                else:
+                    code = line
+                tokens = [(code, THEME.fg_primary, wcswidth(code))]
 
         self._draw_tokens(surface, row, col, max_col, tokens, bg)
 

@@ -60,6 +60,16 @@ class Row(Component):
         if self._size is not None:
             self.resize(self._size)
 
+    def activate(self) -> None:
+        super().activate()
+        for child in self.children:
+            child.activate()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        for child in self.children:
+            child.deactivate()
+
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the row and lay out children horizontally according to widths."""
         self._size = size

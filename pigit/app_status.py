@@ -34,11 +34,12 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
-from .app_inspector import FileInfo
+from .app_types import FileInfo
 from .app_preview import PreviewPanel
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
+from pigit.termui._async_task import run_async
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -479,10 +480,14 @@ class StatusPanel(ItemList):
         if key == "Y":
             if self.files and 0 <= self.curr_no < len(self.files):
                 path = self.files[self.curr_no].name
-                if copy_to_clipboard(path):
-                    show_toast(f"Copied: {path}", duration=1.0)
-                else:
-                    show_toast("Failed to copy to clipboard", duration=2.0)
+                run_async(
+                    lambda: copy_to_clipboard(path),
+                    lambda ok, p=path: (
+                        show_toast(f"Copied: {p}", duration=1.0)
+                        if ok
+                        else show_toast("Failed to copy to clipboard", duration=2.0)
+                    ),
+                )
             return
 
     # --- Helpers ---

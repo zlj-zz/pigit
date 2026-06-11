@@ -10,7 +10,8 @@ from __future__ import annotations
 import contextvars
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any, TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
 from ._bindings import (
@@ -33,6 +34,21 @@ if TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 
 NONE_SIZE = (0, 0)
+
+
+@dataclass(eq=False)
+class _Subscription:
+    """Internal record tracking a framework-level event subscription."""
+
+    action: ActionEventType
+    handler: Callable[..., bool | None]
+    pending: bool = True
+    unsub: Callable[[], None] | None = None
+
+    def cancel(self) -> None:
+        if self.unsub is not None:
+            self.unsub()
+
 
 # Context variable for event-dispatch cycle detection during a single key event.
 _event_dispatch_state: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
@@ -96,18 +112,90 @@ class Component(ABC):
         self._key_handlers = resolve_key_handlers_merged(
             self, type(self), getattr(self, "BINDINGS", None)
         )
+        self._subscriptions: list[_Subscription] = []
 
     def activate(self):
         """Mark the component as active. Called when it enters the visible tree."""
+        self._unsubscribe_all()
+        self._replay_pending_subscriptions()
         self._activated = True
 
     def deactivate(self):
         """Mark the component as inactive. Called when it leaves the visible tree."""
+        self._unsubscribe_all()
         self._activated = False
 
     def is_activated(self):
         """Get current activate status."""
         return self._activated
+
+    def subscribe(
+        self,
+        action: ActionEventType,
+        handler: Callable[..., bool | None],
+    ) -> Callable[[], None]:
+        """Subscribe to a framework-level event.
+
+        If the component is not yet mounted, the subscription is queued and
+        replayed on activation. The returned callback unsubscribes the handler.
+        """
+        from ._root import ComponentRoot
+
+        root = self._root_component()
+        bus = root.event_bus if isinstance(root, ComponentRoot) else None
+        sub = _Subscription(action=action, handler=handler)
+        self._subscriptions.append(sub)
+
+        if bus is not None:
+            sub.pending = False
+            sub.unsub = bus.subscribe(action, handler)
+        else:
+            sub.pending = True
+
+        def delayed_unsub() -> None:
+            if sub.pending:
+                try:
+                    self._subscriptions.remove(sub)
+                except ValueError:
+                    pass
+                return
+            sub.cancel()
+            try:
+                self._subscriptions.remove(sub)
+            except ValueError:
+                pass
+
+        return delayed_unsub
+
+    def _replay_pending_subscriptions(self) -> None:
+        from ._root import ComponentRoot
+
+        root = self._root_component()
+        bus = root.event_bus if isinstance(root, ComponentRoot) else None
+        if bus is None:
+            return
+        for sub in self._subscriptions:
+            if sub.pending:
+                sub.pending = False
+                sub.unsub = bus.subscribe(sub.action, sub.handler)
+
+    def _unsubscribe_all(self) -> None:
+        """Cancel active subscriptions and remove them from the list."""
+        for sub in list(self._subscriptions):
+            if not sub.pending:
+                sub.cancel()
+                self._subscriptions.remove(sub)
+
+    def _root_component(self) -> Any:
+        """Walk parent chain to find the ComponentRoot, if mounted."""
+        from ._root import ComponentRoot
+
+        node = self.parent
+        while node is not None:
+            if isinstance(node, ComponentRoot):
+                return node
+            node = node.parent
+        return None
 
     def _try_register_id(self) -> None:
         """Register with the global component registry if an id is set."""
@@ -135,6 +223,14 @@ class Component(ABC):
         for child in self.children:
             child.destroy()
         self._try_unregister_id()
+
+    def hide(self) -> None:
+        """Close or hide this component. No-op by default; overlays override."""
+
+    @property
+    def size(self) -> tuple[int, int]:
+        """Current (width, height) assigned by the last resize()."""
+        return self._size
 
     def refresh(self):
         """Fresh content data.
@@ -439,18 +535,31 @@ def bind_signals(
     Returns:
         Unsubscribe function. Caller must store and call on destroy.
     """
+    import types
+
     cb = callback or component.refresh
 
-    def _handler(_: object) -> None:
+    def _handler(self: Component, _: object) -> None:
         cb()
+
+    bound = types.MethodType(_handler, component)
+    # Keep bound alive as long as component is alive so WeakMethod
+    # continues to resolve while the component exists.
+    handlers: list[object] = getattr(component, "_bind_signal_handlers", [])
+    handlers.append(bound)
+    component._bind_signal_handlers = handlers
 
     unsubs: list[Callable[[], None]] = []
     for sig in signals:
-        unsubs.append(sig.subscribe(_handler))
+        unsubs.append(sig.subscribe(bound))
 
     def unsubscribe() -> None:
         for unsub in unsubs:
             unsub()
+        try:
+            handlers.remove(bound)
+        except ValueError:
+            pass
 
     return unsubscribe
 
