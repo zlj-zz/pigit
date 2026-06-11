@@ -117,7 +117,6 @@ class Application:
 
     # Declarative lifecycle configuration (override in subclass)
     min_terminal_size: tuple[int, int] | None = None
-    input_timeouts: float = 0.0625
     help_popup_class: type[Component] | None = None
     help_binding: str = "?"
 
@@ -197,7 +196,6 @@ class Application:
             runtime.focus_manager = root._focus_manager
             root._app_on_event = self.on_event
             self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
-            self._loop.set_input_timeouts(self.input_timeouts)
             self._auto_setup_root(root)
             self.setup_root(root)
             root.activate()

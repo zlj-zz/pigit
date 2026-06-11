@@ -185,10 +185,6 @@ class AppEventLoop:
         if renderer is not None:
             renderer.render_surface(surface)
 
-    def set_input_timeouts(self, timeout: float) -> None:
-        """Set the input polling timeout on the underlying input handle."""
-        self._input_handle.set_input_timeouts(timeout)
-
     def add_interval(self, interval: float, callback: Callable[[], None]) -> int:
         """Register a repeating timer. Returns a handle for removal.
 
@@ -211,59 +207,53 @@ class AppEventLoop:
         self._timers.pop(tid, None)
 
     def _loop(self) -> None:
-        while True:
-            AsyncTask.poll_all()
-
-            # Timer firing (catch up drift: callback may take time or system
-            # clock may jump, so a single interval increment is not enough).
-            if self._timers:
-                now = time.monotonic()
-                for t in list(self._timers.values()):
-                    if now < t.next_fire:
+        self._input_handle.start()
+        try:
+            while True:
+                # 1. Process all keyboard input that has arrived.
+                while True:
+                    key = self._input_handle.get_key()
+                    if key is None:
+                        break
+                    if keys.is_mouse_event(key):
+                        self.before_mouse_event(key)
                         continue
-                    while now >= t.next_fire:
-                        t.next_fire += t.interval
-                    try:
-                        t.callback()
-                    except Exception:
-                        _logger.exception("Timer callback failed")
+                    _logger.debug("[RENDER] _loop: dispatch key=%r", key)
+                    outcome = self._dispatch_semantic_string(key)
+                    self.after_dispatch_key(key, outcome)
+                    if self._render_requested:
+                        _logger.debug("[RENDER] _loop: render (after dispatch)")
+                        self._render_requested = False
+                        self.render()
 
-            # Render before blocking on input (timer callback may request it).
-            if self._render_requested:
-                _logger.debug("[RENDER] _loop: render (poll)")
-                self._render_requested = False
-                self.render()
-
-            # Dynamic timeout: nearest timer first, 1s idle ceiling otherwise.
-            if self._timers:
-                now = time.monotonic()
-                timer_timeout = max(
-                    0.0, min(t.next_fire for t in self._timers.values()) - now
-                )
-                timeout = timer_timeout
-            else:
-                timeout = 1.0
-            self._input_handle.set_input_timeouts(timeout)
-
-            input_key = self._input_handle.get_input()
-            if not input_key or not input_key[0]:
+                # 2. Process AsyncTask results.
+                AsyncTask.poll_all()
                 if self._render_requested:
+                    _logger.debug("[RENDER] _loop: render (poll)")
                     self._render_requested = False
                     self.render()
-                continue
-            first = input_key[0][0]
-            if isinstance(first, str):
-                _logger.debug("[RENDER] _loop: dispatch key=%r", first)
-                outcome = self._dispatch_semantic_string(first)
-                self.after_dispatch_key(first, outcome)
-                if self._render_requested:
-                    _logger.debug("[RENDER] _loop: render (after dispatch)")
-                    self._render_requested = False
-                    self.render()
-                continue
-            if keys.is_mouse_event(first):
-                self.before_mouse_event(first)
-                continue
+
+                # 3. Timer firing (catch up drift).
+                if self._timers:
+                    now = time.monotonic()
+                    for t in list(self._timers.values()):
+                        if now < t.next_fire:
+                            continue
+                        while now >= t.next_fire:
+                            t.next_fire += t.interval
+                        try:
+                            t.callback()
+                        except Exception:
+                            _logger.exception("Timer callback failed")
+                    if self._render_requested:
+                        _logger.debug("[RENDER] _loop: render (timer)")
+                        self._render_requested = False
+                        self.render()
+
+                # 4. Sleep to avoid 100% CPU.
+                time.sleep(0.01)
+        finally:
+            self._input_handle.stop()
 
     def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
         self.before_dispatch_key(key)

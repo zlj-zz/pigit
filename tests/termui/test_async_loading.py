@@ -31,8 +31,6 @@ class _FakeInput:
         time.sleep(self._delay)
         return None
 
-    def set_input_timeouts(self, timeout: float) -> None:
-        pass
 
 
 class _MockPanel(Component):

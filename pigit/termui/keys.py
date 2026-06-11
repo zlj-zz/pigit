@@ -110,7 +110,9 @@ def is_mouse_event(ev: object) -> bool:
     that still mirror the old Urwid-style mouse shape.
     """
 
-    if not isinstance(ev, tuple) or len(ev) != 4:
-        return False
-    head = ev[0]
-    return isinstance(head, str) and "mouse" in head
+    if isinstance(ev, tuple) and len(ev) == 4:
+        head = ev[0]
+        return isinstance(head, str) and "mouse" in head
+    if isinstance(ev, str):
+        return ev.startswith("mouse ")
+    return False
