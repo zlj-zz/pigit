@@ -83,9 +83,19 @@ class TabView(Component):
         for child in self.children:
             child.deactivate()
 
-    def route_to(self, id: str) -> Component | None:
-        """Switch to the child component with the given id."""
-        resolved = self._id_map().get(id)
+    def route_to(self, target: str | Component) -> Component | None:
+        """Switch to the child identified by id string or component reference.
+
+        When given a Component, resolves it to a child id via the tree.
+        """
+        tid: str | None
+        if isinstance(target, Component):
+            tid = self._resolve_target_id(target)
+        else:
+            tid = target
+        if tid is None:
+            return None
+        resolved = self._id_map().get(tid)
         if resolved is None:
             return None
         if resolved is self._active:
