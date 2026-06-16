@@ -153,6 +153,21 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
 ]
 
 
+class TabPanel(Column):
+    """Column with tab metadata for TabView routing."""
+
+    def __init__(
+        self,
+        *,
+        tab_name: str,
+        tab_key: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.tab_name = tab_name
+        self.tab_key = tab_key
+
+
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
@@ -241,14 +256,14 @@ class PigitApplication(Application):
 
         status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
         stash_panel = StashPanel(vm=self._status_vm, id="stash")
-        self._status_stack = Column(
+        self._status_stack = TabPanel(
             children=[status_panel, stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
+            tab_name="Status",
+            tab_key="1",
         )
-        setattr(self._status_stack, "tab_name", "Status")
-        setattr(self._status_stack, "tab_key", "1")
 
         self._branch_panel = BranchPanel(
             vm=self._branch_vm,
