@@ -11,7 +11,8 @@ from typing import Any
 from collections.abc import Callable
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_SELECTION_CHANGED,
     Component,
     get_badge,
     get_badge_signal,
@@ -192,10 +193,8 @@ class HeaderState:
                 self.tab, self.tab_key = tab_config.get(type(active), ("", ""))
             return True
 
-        unsub_mode = bus.subscribe(ActionEventType.mode_changed, on_mode_changed)
-        unsub_sel = bus.subscribe(
-            ActionEventType.selection_changed, on_selection_changed
-        )
+        unsub_mode = bus.subscribe(EventType("mode_changed"), on_mode_changed)
+        unsub_sel = bus.subscribe(EVT_SELECTION_CHANGED, on_selection_changed)
 
         def _unsub() -> None:
             unsub_mode()

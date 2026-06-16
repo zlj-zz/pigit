@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pigit.termui import (
-    ActionEventType,
+    EVT_GOTO,
+    EVT_SELECTION_CHANGED,
     bind_keys,
     palette,
     Segment,
@@ -58,7 +59,7 @@ class StashPanel(ItemList):
             self.set_content([])
             return
         self.set_content([s.msg for s in self.stashes])
-        self.emit(ActionEventType.selection_changed)
+        self.emit(EVT_SELECTION_CHANGED)
 
     def refresh(self):
         self._load_stashes()
@@ -103,7 +104,7 @@ class StashPanel(ItemList):
             stash = self.stashes[self.curr_no]
             diff_lines = self._vm.load_stash_diff(stash.ref)
             self.emit(
-                ActionEventType.goto,
+                EVT_GOTO,
                 target="diff",
                 source=self,
                 key=stash.ref,

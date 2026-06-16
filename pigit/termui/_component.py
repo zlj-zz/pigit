@@ -23,7 +23,7 @@ from ._runtime_context import (
     get_renderer_strict,
 )
 from .reactive import Computed, Signal
-from .types import ActionEventType, OverlayDispatchResult
+from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from ._renderer import Renderer
@@ -38,7 +38,7 @@ NONE_SIZE = (0, 0)
 class _Subscription:
     """Internal record tracking a framework-level event subscription."""
 
-    action: ActionEventType
+    action: EventType
     handler: Callable[..., bool | None]
     pending: bool = True
     unsub: Callable[[], None] | None = None
@@ -123,7 +123,7 @@ class Component(ABC):
 
     def subscribe(
         self,
-        action: ActionEventType,
+        action: EventType,
         handler: Callable[..., bool | None],
     ) -> Callable[[], None]:
         """Subscribe to a framework-level event.
@@ -246,7 +246,7 @@ class Component(ABC):
 
         return dispatch_key(self, key)
 
-    def emit(self, action: ActionEventType, **data) -> None:
+    def emit(self, action: EventType, **data) -> None:
         """Bubble action up through parent chain to Application.
 
         Stops at the first ancestor whose ``on_event`` returns True.
@@ -256,7 +256,7 @@ class Component(ABC):
 
         bubble_event(self, action, **data)
 
-    def notify(self, action: ActionEventType, **data) -> None:
+    def notify(self, action: EventType, **data) -> None:
         """Notify all children by calling their ``update`` method."""
         from ._component_event import notify_children
 
@@ -276,14 +276,14 @@ class Component(ABC):
         """Dispatch a key to an overlay. Base components have no overlays."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def accept(self, action: ActionEventType, **data) -> None:
+    def accept(self, action: EventType, **data) -> None:
         """Handle an action event broadcast from a parent container.
 
         Default is no-op; container components override this to route or
         broadcast to children.
         """
 
-    def update(self, action: ActionEventType, **data) -> None:
+    def update(self, action: EventType, **data) -> None:
         """Receive an action update from a parent or sibling component.
 
         Default is no-op; interactive components override this to react to

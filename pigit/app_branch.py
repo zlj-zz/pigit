@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
     bind_keys,
     bind_signals,
     dismiss_sheet,
@@ -269,7 +269,7 @@ class BranchPanel(ItemList):
         source = self._vm.current_branch()
         target = branch.name
         self.emit(
-            ActionEventType.action_requested,
+            EventType("action_requested"),
             cmd="merge",
             source=source,
             target=target,

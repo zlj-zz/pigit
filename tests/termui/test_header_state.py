@@ -8,7 +8,7 @@ import pytest
 
 from pigit.app_header_state import HeaderState
 from pigit.app_theme import THEME
-from pigit.termui import ActionEventType
+from pigit.termui import EventType, EVT_SELECTION_CHANGED
 from pigit.termui.event_bus import EventBus
 
 
@@ -26,7 +26,7 @@ def test_bind_to_bus_updates_mode(header_state: HeaderState) -> None:
     bus = EventBus()
     header_state.bind_to_bus(bus, {})
 
-    bus.publish(ActionEventType.mode_changed, mode="visual")
+    bus.publish(EventType("mode_changed"), mode="visual")
 
     assert header_state.mode == "visual"
 
@@ -38,7 +38,7 @@ def test_bind_to_bus_updates_tab_from_active_metadata(
     header_state.bind_to_bus(bus, {})
 
     active = type("Active", (), {"tab_name": "Status", "tab_key": "1"})()
-    bus.publish(ActionEventType.selection_changed, active=active)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert header_state.tab == "Status"
     assert header_state.tab_key == "1"
@@ -51,7 +51,7 @@ def test_bind_to_bus_falls_back_to_tab_config(
     header_state.bind_to_bus(bus, tab_config)
 
     active = 42
-    bus.publish(ActionEventType.selection_changed, active=active)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert header_state.tab == "Fallback"
     assert header_state.tab_key == "9"
@@ -63,9 +63,9 @@ def test_bind_to_bus_unsubscribe_stops_updates(
     bus = EventBus()
     unsub = header_state.bind_to_bus(bus, {})
 
-    bus.publish(ActionEventType.mode_changed, mode="visual")
+    bus.publish(EventType("mode_changed"), mode="visual")
     assert header_state.mode == "visual"
 
     unsub()
-    bus.publish(ActionEventType.mode_changed, mode="normal")
+    bus.publish(EventType("mode_changed"), mode="normal")
     assert header_state.mode == "visual"

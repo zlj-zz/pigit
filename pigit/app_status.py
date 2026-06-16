@@ -16,7 +16,8 @@ from collections.abc import Callable
 _logger = logging.getLogger(__name__)
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_GOTO,
     AlertDialog,
     bind_keys,
     bind_signals,
@@ -371,7 +372,7 @@ class StatusPanel(ItemList):
                 else DiffType.UNSTAGED
             )
             self.emit(
-                ActionEventType.goto,
+                EVT_GOTO,
                 target="diff",
                 source=self,
                 key=f.name,
@@ -525,7 +526,7 @@ class StatusPanel(ItemList):
             mode = "Visual-scroll"
         else:
             mode = "Visual"
-        self.emit(ActionEventType.mode_changed, mode=mode)
+        self.emit(EventType("mode_changed"), mode=mode)
 
     def get_help_title(self) -> str:
         return "Status"

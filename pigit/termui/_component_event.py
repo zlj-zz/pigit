@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ._component import Component
-    from .types import ActionEventType
+    from .types import EventType
 
 _logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def _maybe_reestablish_focus(component: Component) -> None:
         fm.set_focus_chain(component)
 
 
-def bubble_event(component: Component, action: ActionEventType, **data) -> None:
+def bubble_event(component: Component, action: EventType, **data) -> None:
     """Bubble an action event up through the parent chain.
 
     Stops at the first ancestor whose ``on_event`` returns True.
@@ -145,7 +145,7 @@ def bubble_event(component: Component, action: ActionEventType, **data) -> None:
     _logger.warning("Unhandled event %r from %s", action, type(component).__name__)
 
 
-def notify_children(component: Component, action: ActionEventType, **data) -> None:
+def notify_children(component: Component, action: EventType, **data) -> None:
     """Notify all direct children by calling their ``update`` method.
 
     Children that do not implement ``update`` are silently skipped.

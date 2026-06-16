@@ -14,7 +14,7 @@ from pigit.termui import ToastPosition
 from pigit.termui.widgets import Toast
 from pigit.termui._layer import LayerKind
 from pigit.termui._root import ComponentRoot
-from pigit.termui.types import OverlayDispatchResult
+from pigit.termui.types import OverlayDispatchResult, EventType, EVT_GOTO
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 
@@ -91,13 +91,9 @@ class TestComponentRoot:
         assert not root.has_overlay_open()
         assert root._layer_stack.top(LayerKind.MODAL) is None
 
-    def test_accept_forwards_to_body(self):
-        from pigit.termui.types import ActionEventType
-
-        root = ComponentRoot(DummyBody())
         root.body.accept = MagicMock()
-        root.accept(ActionEventType.goto, target="x")
-        root.body.accept.assert_called_once_with(ActionEventType.goto, target="x")
+        root.accept(EVT_GOTO, target="x")
+        root.body.accept.assert_called_once_with(EVT_GOTO, target="x")
 
     def test_fresh_does_not_raise(self):
         root = ComponentRoot(DummyBody())

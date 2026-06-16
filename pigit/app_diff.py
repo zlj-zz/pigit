@@ -17,7 +17,8 @@ import subprocess
 import tempfile
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_GOTO,
     AlertDialog,
     Component,
     SyntaxTokenizer,
@@ -505,8 +506,8 @@ class DiffViewer(LineTextBrowser):
             entries.insert(2, ("v", "View file at commit"))
         return entries
 
-    def update(self, action: ActionEventType, **data) -> None:
-        if action is ActionEventType.goto:
+    def update(self, action: EventType, **data) -> None:
+        if action is EVT_GOTO:
             self.i_cache[self.i_cache_key] = self._i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
@@ -541,7 +542,7 @@ class DiffViewer(LineTextBrowser):
             self._hunk_mode = False
             return
         if self.come_from is not None:
-            self.emit(ActionEventType.goto, target=self.come_from)
+            self.emit(EVT_GOTO, target=self.come_from)
 
     @bind_keys("v")
     def _toggle_file_history(self) -> None:

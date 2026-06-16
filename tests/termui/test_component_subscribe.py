@@ -7,7 +7,7 @@ from __future__ import annotations
 from pigit.termui import Component
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_bus import EventBus
-from pigit.termui.types import ActionEventType
+from pigit.termui.types import EventType, EVT_SELECTION_CHANGED
 
 
 class _Leaf(Component):
@@ -27,8 +27,8 @@ def test_subscribe_after_mount_is_immediate() -> None:
     leaf.parent = root
 
     leaf.activate()
-    leaf.subscribe(ActionEventType.selection_changed, leaf._handler)
-    bus.publish(ActionEventType.selection_changed, msg="hi")
+    leaf.subscribe(EVT_SELECTION_CHANGED, leaf._handler)
+    bus.publish(EVT_SELECTION_CHANGED, msg="hi")
 
     assert leaf.calls == ["hi"]
 
@@ -38,7 +38,7 @@ def test_subscribe_before_mount_is_replayed() -> None:
     leaf = _Leaf()
 
     # Subscribe before mounting: queued, not yet active.
-    unsub = leaf.subscribe(ActionEventType.selection_changed, leaf._handler)
+    unsub = leaf.subscribe(EVT_SELECTION_CHANGED, leaf._handler)
     assert leaf.calls == []
 
     # Mount: pending subscriptions are replayed onto the bus.
@@ -46,11 +46,11 @@ def test_subscribe_before_mount_is_replayed() -> None:
     leaf.parent = root
     leaf.activate()
 
-    bus.publish(ActionEventType.selection_changed, msg="queued")
+    bus.publish(EVT_SELECTION_CHANGED, msg="queued")
     assert leaf.calls == ["queued"]
 
     unsub()
-    bus.publish(ActionEventType.selection_changed, msg="after")
+    bus.publish(EVT_SELECTION_CHANGED, msg="after")
     assert leaf.calls == ["queued"]
 
 
@@ -67,7 +67,7 @@ class _SubscribingLeaf(Component):
 
     def activate(self) -> None:
         super().activate()
-        self.subscribe(ActionEventType.selection_changed, self._handler)
+        self.subscribe(EVT_SELECTION_CHANGED, self._handler)
 
 
 def test_activate_is_reentrant() -> None:
@@ -77,12 +77,12 @@ def test_activate_is_reentrant() -> None:
     leaf.parent = root
 
     leaf.activate()
-    bus.publish(ActionEventType.selection_changed, msg="a")
+    bus.publish(EVT_SELECTION_CHANGED, msg="a")
     assert leaf.calls == ["a"]
 
     # Activate again: should unsubscribe previous and re-subscribe once.
     leaf.activate()
-    bus.publish(ActionEventType.selection_changed, msg="b")
+    bus.publish(EVT_SELECTION_CHANGED, msg="b")
     assert leaf.calls == ["a", "b"]
 
 
@@ -93,18 +93,18 @@ def test_deactivate_unsubscribes() -> None:
     leaf.parent = root
 
     leaf.activate()
-    bus.publish(ActionEventType.selection_changed, msg="hi")
+    bus.publish(EVT_SELECTION_CHANGED, msg="hi")
     assert leaf.calls == ["hi"]
 
     leaf.deactivate()
-    bus.publish(ActionEventType.selection_changed, msg="gone")
+    bus.publish(EVT_SELECTION_CHANGED, msg="gone")
     assert leaf.calls == ["hi"]
 
 
 def test_delayed_unsubscribe_before_mount() -> None:
     leaf = _Leaf()
 
-    unsub = leaf.subscribe(ActionEventType.selection_changed, leaf._handler)
+    unsub = leaf.subscribe(EVT_SELECTION_CHANGED, leaf._handler)
     unsub()  # Cancel before mount
 
     bus = EventBus()
@@ -112,5 +112,5 @@ def test_delayed_unsubscribe_before_mount() -> None:
     leaf.parent = root
     leaf.activate()
 
-    bus.publish(ActionEventType.selection_changed, msg="nope")
+    bus.publish(EVT_SELECTION_CHANGED, msg="nope")
     assert leaf.calls == []

@@ -18,7 +18,7 @@ from ._component import Component
 from ._root import ComponentRoot
 from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
-from .types import ActionEventType, OverlayDispatchResult
+from .types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED, OverlayDispatchResult
 from . import keys
 
 if TYPE_CHECKING:
@@ -148,7 +148,7 @@ class Application:
         if self._root is not None:
             self._root.resize(size)
 
-    def on_event(self, action: ActionEventType, **data) -> bool:
+    def on_event(self, action: EventType, **data) -> bool:
         """Override to handle events bubbled from component tree.
 
         Return True to stop bubbling, False to let it continue up.

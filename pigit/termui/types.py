@@ -8,21 +8,58 @@ Date: 2026-04-19
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
+
+# ---------------------------------------------------------------------------
+# EventType — unified event identifier
+# ---------------------------------------------------------------------------
 
 
-# Action types
-class ActionEventType(Enum):
-    """Action event types for parent-child communication in the component tree."""
+class EventType:
+    """Unified event identifier. Framework built-ins and user-defined events
+    are all instances of this type. Same-name instances are globally unique
+    (singleton per name), so events can be shared across modules without
+    explicit import.
+    """
 
-    goto = auto()  # Navigate to a target (e.g. open a file or branch)
-    mode_changed = auto()  # Mode switch (visual mode, filter mode, etc.)
-    action_requested = auto()  # User requested an action (merge, push, fetch, etc.)
-    selection_changed = auto()  # Cursor / selection changed
-    state_changed = auto()  # Generic state change notification
+    _registry: ClassVar[dict[str, EventType]] = {}
+    _name: str
+
+    def __new__(cls, name: str) -> EventType:
+        if name in cls._registry:
+            return cls._registry[name]
+        instance = super().__new__(cls)
+        instance._name = name
+        cls._registry[name] = instance
+        return instance
+
+    def __init__(self, name: str) -> None:
+        pass  # __new__ handles creation
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, EventType) and self._name == other._name
+
+    def __hash__(self) -> int:
+        return hash(self._name)
+
+    def __repr__(self) -> str:
+        return f"EventType({self._name!r})"
+
+    @property
+    def name(self) -> str:
+        return self._name
 
 
+# Framework built-in events
+EVT_GOTO = EventType("goto")
+EVT_SELECTION_CHANGED = EventType("selection_changed")
+
+
+# ---------------------------------------------------------------------------
 # Toast positions
+# ---------------------------------------------------------------------------
+
+
 class ToastPosition(Enum):
     """Toast display position."""
 
@@ -32,51 +69,51 @@ class ToastPosition(Enum):
     BOTTOM_RIGHT = auto()
 
 
-# Layer kinds (merged from LayerKind and OverlayKind)
+# ---------------------------------------------------------------------------
+# Layer kinds
+# ---------------------------------------------------------------------------
+
+
 class LayerKind(Enum):
     """Layer kind for overlay management."""
 
     NONE = 0
-    MODAL = 1  # Formerly POPUP (value 1), renamed to MODAL while keeping the value
+    MODAL = 1
     TOAST = 2
     SHEET = 3
 
 
+# ---------------------------------------------------------------------------
 # Overlay key dispatch results
+# ---------------------------------------------------------------------------
+
+
 class OverlayDispatchResult(Enum):
     """Result of overlay key dispatch."""
 
     HANDLED_EXPLICIT = auto()
     HANDLED_IMPLICIT = auto()
     DROPPED_UNBOUND = auto()
-    CLOSED_AFTER_ERROR = auto()  # Error recovery: slot cleared, host cleaned up
+    CLOSED_AFTER_ERROR = auto()
 
 
-# Overlay surface protocol
+# ---------------------------------------------------------------------------
+# Protocols
+# ---------------------------------------------------------------------------
+
+
 class OverlaySurface(Protocol):
-    """
-    Modal shell that may occupy a MODAL slot on a ComponentRoot via LayerStack.
-
-    Popup and AlertDialog satisfy this protocol structurally.
-    Other implementations may be introduced without subclassing Popup.
-    """
+    """Modal shell that may occupy a MODAL slot on a ComponentRoot."""
 
     open: bool
 
-    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
-        """Route one key for this modal (shell, then child, then fallback)."""
-        ...
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult: ...
 
-    def hide(self) -> None:
-        """Release visible state for this shell."""
-        ...
+    def hide(self) -> None: ...
 
-    def _render_surface(self, surface: SurfaceProtocol) -> None:
-        """Render this shell into the given Surface when active."""
-        ...
+    def _render_surface(self, surface: SurfaceProtocol) -> None: ...
 
 
-# Surface protocol (distinguished from the Surface implementation class)
 @runtime_checkable
 class SurfaceProtocol(Protocol):
     """Surface protocol for type checking."""

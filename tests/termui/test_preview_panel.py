@@ -11,7 +11,7 @@ from pigit.app_preview import PreviewPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.git.model import File, Stash
-from pigit.termui import ActionEventType, Component
+from pigit.termui import EVT_SELECTION_CHANGED, Component
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_bus import EventBus
 
@@ -76,7 +76,7 @@ def test_clears_when_active_is_not_status_or_stash(preview: PreviewPanel) -> Non
     _mount(bus, preview)
 
     preview.set_preview(["old"], title="Old", subtitle="sub")
-    bus.publish(ActionEventType.selection_changed, active=Component())
+    bus.publish(EVT_SELECTION_CHANGED, active=Component())
 
     assert preview._title == "Preview"
     assert preview._subtitle == ""
@@ -103,7 +103,7 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
     )
     active = _FakeStatusPanel([file], curr_no=0, source_index=7)
 
-    bus.publish(ActionEventType.selection_changed, active=active)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert vm.diff_calls == [7]
     assert preview._title == "src/main.py"
@@ -121,7 +121,7 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     stash = Stash(ref="stash@{0}", sha="abc123", msg="WIP")
     active = _FakeStashPanel([stash], curr_no=0)
 
-    bus.publish(ActionEventType.selection_changed, active=active)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert vm.stash_diff_calls == ["stash@{0}"]
     assert preview._title == "WIP"
@@ -150,7 +150,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     )
     active = _FakeStatusPanel([file], curr_no=0, source_index=0)
 
-    bus.publish(ActionEventType.selection_changed, active=active)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
     assert vm.diff_calls == [0]
     assert preview._title == "a.py"
 
@@ -173,7 +173,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
         curr_no=0,
         source_index=0,
     )
-    bus.publish(ActionEventType.selection_changed, active=other)
+    bus.publish(EVT_SELECTION_CHANGED, active=other)
 
     assert vm.diff_calls == []
     assert preview._title == "a.py"

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.termui import ActionEventType, Component, palette
+from pigit.termui import EVT_SELECTION_CHANGED, Component, palette
 from pigit.termui._component import _render_child_to_surface
 from pigit.termui.wcwidth_table import wcswidth
 
@@ -50,9 +50,7 @@ class PreviewPanel(Component):
         """Activate the preview and its internal diff viewer."""
         super().activate()
         self._diff_viewer.activate()
-        self._unsubs.append(
-            self.subscribe(ActionEventType.selection_changed, self._on_selection)
-        )
+        self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
     def deactivate(self) -> None:
         """Deactivate the preview and its internal diff viewer."""

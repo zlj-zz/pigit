@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui._async_task import run_async
 from pigit.termui import (
-    ActionEventType,
+    EVT_GOTO,
     bind_keys,
     bind_signals,
     keys,
@@ -759,7 +759,7 @@ class CommitPanel(ItemList):
             source_idx = self._filter.source_index(self.curr_no)
             content = self._vm.load_diff(source_idx)
             self.emit(
-                ActionEventType.goto,
+                EVT_GOTO,
                 target="diff",
                 source=self,
                 key=self.commits[self.curr_no].sha,

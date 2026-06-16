@@ -10,14 +10,16 @@ from __future__ import annotations
 
 # Types and enums
 from .types import (
-    ActionEventType,
+    EventType,
+    EVT_GOTO,
+    EVT_SELECTION_CHANGED,
     LayerKind,
     OverlayDispatchResult,
     ToastPosition,
 )
 
 # Core components
-from ._component import Component, ComponentError, bind_signals, resolve_presented
+from ._component import Component, ComponentError, bind_signals
 
 # Overlay components
 from .widgets import (
@@ -71,7 +73,9 @@ from ._syntax import SyntaxTokenizer
 
 __all__ = [
     # Types
-    "ActionEventType",
+    "EventType",
+    "EVT_GOTO",
+    "EVT_SELECTION_CHANGED",
     "LayerKind",
     "OverlayDispatchResult",
     "ToastPosition",

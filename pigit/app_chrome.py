@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import ActionEventType, by_id, Component, palette, resolve_presented
+from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, palette
+from pigit.termui._component import resolve_presented
 from pigit.termui.containers import TabView
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
@@ -32,8 +33,8 @@ class AppFooter(Component):
 
     def activate(self) -> None:
         super().activate()
-        self.subscribe(ActionEventType.selection_changed, self._sync_help)
-        self.subscribe(ActionEventType.mode_changed, self._sync_help)
+        self.subscribe(EVT_SELECTION_CHANGED, self._sync_help)
+        self.subscribe(EventType("mode_changed"), self._sync_help)
 
     def _sync_help(self, *, active: Component | None = None, **_) -> bool:
         if active is None:

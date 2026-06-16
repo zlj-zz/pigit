@@ -7,10 +7,8 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pigit.ext.utils import relative_time
-from pigit.termui import ActionEventType, Component, palette
+from pigit.termui import EVT_SELECTION_CHANGED, Component, palette
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -49,7 +47,7 @@ class InspectorPanel(Component):
 
     def activate(self) -> None:
         super().activate()
-        self.subscribe(ActionEventType.selection_changed, self._on_selection)
+        self.subscribe(EVT_SELECTION_CHANGED, self._on_selection)
 
     def _stable_key(self, active: Component | None, idx: int) -> tuple[str, int]:
         if active is None:
