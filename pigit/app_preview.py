@@ -43,7 +43,12 @@ class PreviewPanel(Component):
         self._status_vm = status_vm
         self._title = "Preview"
         self._subtitle = ""
-        self._diff_viewer = DiffViewer(x=self.TITLE_ROWS + 1, y=1, id="preview_diff")
+        self._diff_viewer = DiffViewer(
+            x=self.TITLE_ROWS + 1,
+            y=1,
+            id="preview_diff",
+            word_diff=True,
+        )
         self._unsubs: list[Callable[[], None]] = []
 
     def activate(self) -> None:

@@ -23,11 +23,11 @@ class _FakeStatusVM:
         self.diff_return: list[str] = ["diff line"]
         self.stash_diff_return: list[str] = ["stash diff line"]
 
-    def load_diff(self, idx: int, plain: bool = True) -> list[str]:
+    def load_diff(self, idx: int, plain: bool = True, word_diff: bool = False) -> list[str]:
         self.diff_calls.append(idx)
         return list(self.diff_return)
 
-    def load_stash_diff(self, ref: str) -> list[str]:
+    def load_stash_diff(self, ref: str, word_diff: bool = False) -> list[str]:
         self.stash_diff_calls.append(ref)
         return list(self.stash_diff_return)
 

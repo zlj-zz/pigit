@@ -253,7 +253,10 @@ class PigitApplication(Application):
 
         # Preview is created at app level but only inserted into layout when
         # Status tab is active on large screens.
-        self._preview_panel = PreviewPanel(id="preview", status_vm=self._status_vm)
+        self._preview_panel = PreviewPanel(
+            id="preview",
+            status_vm=self._status_vm,
+        )
 
         status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
         stash_panel = StashPanel(vm=self._status_vm, id="stash")
@@ -277,7 +280,7 @@ class PigitApplication(Application):
                 self._status_stack,
                 self._branch_panel,
                 CommitPanel(vm=self._commit_vm, id="commit"),
-                DiffViewer(id="diff"),
+                DiffViewer(id="diff", word_diff=self._config.word_diff),
             ],
             start="status",
             on_switch=self._on_tab_switch,

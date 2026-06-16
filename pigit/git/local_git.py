@@ -442,9 +442,6 @@ class LocalGit:
     ) -> str:
         path = path or self.path
 
-        limit_flag = f"-{limit}" if limit else ""
-        filter_flag = f"--follow -- {filter_path}" if filter_path else ""
-
         branch_part = shlex.quote(branch_name) if branch_name else ""
         limit_part = f"-{limit}" if limit else ""
         filter_part = f"--follow -- {shlex.quote(filter_path)}" if filter_path else ""
