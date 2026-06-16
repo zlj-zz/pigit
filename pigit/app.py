@@ -13,7 +13,8 @@ import os
 from collections.abc import Callable
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_SELECTION_CHANGED,
     AlertDialog,
     Application,
     Component,
@@ -26,13 +27,13 @@ from pigit.termui import (
     keys,
     Popup,
     request_render,
-    resolve_presented,
     show_badge,
     show_sheet,
     show_spinner,
     show_toast,
     ToastPosition,
 )
+from pigit.termui._component import resolve_presented
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
@@ -327,7 +328,7 @@ class PigitApplication(Application):
         if self._is_large_screen:
             cols, _ = terminal_size()
             self._apply_body_widths(cols)
-        panel.emit(ActionEventType.selection_changed)
+        panel.emit(EVT_SELECTION_CHANGED)
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
@@ -496,7 +497,7 @@ class PigitApplication(Application):
             self._preview_panel.clear()
         if not was_large and self._is_large_screen:
             if self._tab_view.active is not None:
-                self._tab_view.active.emit(ActionEventType.selection_changed)
+                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
 
     def goto_status(self):
         self._tab_view.route_to("status")
@@ -550,16 +551,16 @@ class PigitApplication(Application):
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
 
-    def on_event(self, action: ActionEventType, **data) -> bool:
+    def on_event(self, action: EventType, **data) -> bool:
         """Bridge bubbled events to the framework bus; enrich cross-cutting events.
 
         Application-level handlers (e.g. merge workflow) run after enrichment.
         Header, footer, inspector, and preview updates are handled by their own
         bus subscribers.
         """
-        if action in (ActionEventType.mode_changed, ActionEventType.selection_changed):
+        if action in (EventType("mode_changed"), EVT_SELECTION_CHANGED):
             data.setdefault("active", self._resolve_active_panel())
-        if action is ActionEventType.action_requested and data.get("cmd") == "merge":
+        if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
             return True
         return self._event_bus.publish(action, **data)
