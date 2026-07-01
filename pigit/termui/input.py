@@ -110,6 +110,26 @@ def _parse_csi_u(chunk: bytes) -> str | None:
     return None
 
 
+def _st_terminated_byte_count(buf: bytes, leader: bytes) -> int:
+    """
+    Return total length of an ST-terminated escape sequence, or 0 if incomplete.
+
+    Covers OSC (ESC ]), DCS (ESC P), APC (ESC _), and PM (ESC ^). These
+    sequences end with a BEL (0x07) or the String Terminator ``ESC \\``.
+    """
+    if not buf.startswith(leader):
+        return 0
+    i = len(leader)
+    n = len(buf)
+    while i < n:
+        if buf[i] == 0x07:
+            return i + 1
+        if buf[i] == 0x1B and i + 1 < n and buf[i + 1] == ord("\\"):
+            return i + 2
+        i += 1
+    return 0
+
+
 def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
     """
     Match a leading escape sequence.
@@ -145,6 +165,14 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
         if csi_27:
             return csi_27, n, False
         return None, n, False
+
+    # OSC / DCS / APC / PM: discard the whole sequence as a unit.
+    for leader in (b"\x1b]", b"\x1bP", b"\x1b_", b"\x1b^"):
+        if buf.startswith(leader):
+            n = _st_terminated_byte_count(buf, leader)
+            if n == 0:
+                return None, 0, True
+            return None, n, False
 
     # ESC + non-CSI: emit ESC; caller may re-parse following bytes.
     return keys.KEY_ESC, 1, False

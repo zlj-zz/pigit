@@ -49,6 +49,42 @@ class TestKeyboardInputConsume:
         assert n == 3
         assert len(ki._buffer) == 0
 
+    def test_parse_osc_color_report_dropped(self):
+        """OSC 11 color report must not emit ';' or rgb text as keys."""
+        ki = KeyboardInput()
+        ki._buffer = bytearray(b"\x1b]11;rgb:ffff/ffff/ffff\x07")
+        key, n = ki._consume_one()
+        assert key is None
+        assert n == 24
+        assert len(ki._buffer) == 0
+
+    def test_parse_osc_st_terminated_dropped(self):
+        """OSC sequence terminated by ESC \\ is consumed as a unit."""
+        ki = KeyboardInput()
+        ki._buffer = bytearray(b"\x1b]0;title\x1b\\")
+        key, n = ki._consume_one()
+        assert key is None
+        assert n == 11
+        assert len(ki._buffer) == 0
+
+    def test_parse_osc_incomplete_waits(self):
+        """Incomplete OSC sequence waits for more input."""
+        ki = KeyboardInput()
+        ki._buffer = bytearray(b"\x1b]11;rgb")
+        key, n = ki._consume_one()
+        assert key is None
+        assert n == 0
+        assert len(ki._buffer) == 8
+
+    def test_parse_dcs_sequence_dropped(self):
+        """DCS sequence terminated by ST is consumed as a unit."""
+        ki = KeyboardInput()
+        ki._buffer = bytearray(b"\x1bP1$r0 q\x1b\\")
+        key, n = ki._consume_one()
+        assert key is None
+        assert n == 10
+        assert len(ki._buffer) == 0
+
     def test_parse_tab(self):
         ki = KeyboardInput()
         ki._buffer = bytearray(b"\t")
