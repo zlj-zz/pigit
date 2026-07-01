@@ -134,10 +134,16 @@ class TestSessionSuspendResume:
 
         with mock.patch("sys.platform", "linux"):
             fake_tty = mock.Mock()
-            with mock.patch.dict("sys.modules", {"tty": fake_tty}):
+            fake_termios = mock.Mock()
+            with mock.patch.dict(
+                "sys.modules", {"tty": fake_tty, "termios": fake_termios}
+            ):
                 session.resume()
                 assert session._suspended is False
                 fake_tty.setcbreak.assert_called_once()
+                fake_termios.tcflush.assert_called_once_with(
+                    session._fd, fake_termios.TCIFLUSH
+                )
                 # Idempotent second call
                 session.resume()
                 assert session._suspended is False
@@ -150,10 +156,14 @@ class TestSessionSuspendResume:
 
         with mock.patch("sys.platform", "linux"):
             fake_tty = mock.Mock()
-            with mock.patch.dict("sys.modules", {"tty": fake_tty}):
+            fake_termios = mock.Mock()
+            with mock.patch.dict(
+                "sys.modules", {"tty": fake_tty, "termios": fake_termios}
+            ):
                 session.resume()
                 assert "\033[?1049h" not in stdout.getvalue()
                 assert "\033[?25l" in stdout.getvalue()
+                fake_termios.tcflush.assert_called_once()
 
     def test_resume_no_op_when_not_suspended(self):
         stdin = FakeTTY()
