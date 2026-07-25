@@ -1,5 +1,26 @@
 # Changelog of pigit
 
+## 1.8.16 (2026-07-01)
+
+### Diff — Word Diff
+
+- **GitHub-style local word diff**: paired `-`/`+` lines within hunks are compared at the word level using `difflib.SequenceMatcher`; changed words get green/red background highlights via `bg_word_diff_add` / `bg_word_diff_del` theme tokens.
+- **GitHub-aligned tokenization**: text is split at word-boundary transitions (`isalnum() or '_'` vs non-word chars) so that punctuation changes (`foo.bar()` → `fooBar()`) highlight only the affected sub-range.
+- **Config-driven**: `tui.word_diff` in config, default `True`. No runtime toggle key — word diff is a visual enhancement on top of normal unified diff.
+- **Per-token background override**: `_draw_tokens` now accepts 4-tuple render tokens `(text, fg, width, word_diff_bg_or_None)`, allowing individual tokens to carry a background color different from the line background.
+
+### Bug Fixes
+
+- **OSC/DCS/APC/PM escape sequences dropped**: `match_esc_sequence` now recognizes and discards ST-terminated sequences (`\x1b]`, `\x1bP`, `\x1b_`, `\x1b^`) as whole units. Previously, an OSC 11 color report from the terminal (e.g. `\x1b]11;rgb:...\x07`) was split into `esc` + plain characters, causing the embedded `;` to toggle the command palette and `rgb:` text to leak into the input field when returning from an external editor.
+- **stdin flushed on resume**: `Session.resume()` now calls `termios.tcflush(TCIFLUSH)` after restoring cbreak mode, discarding any stray bytes left in the terminal input buffer by external full-screen programs.
+
+### Refactors
+
+- **TabPanel**: introduces `TabPanel(Column)` with declarative `tab_name` / `tab_key` metadata so `TabView` no longer needs an external tab config lookup.
+- **Typed accessors**: `PigitApplication` uses explicit typed attributes (`_tab_view: TabView`, `_body_row: Row`, etc.) instead of `by_id()` lookups for key body components.
+- **EventDispatcher extraction**: component event dispatching (bus integration, bubble, overlay routing) moved to `_component_event.py`.
+- **EventBus subscriber alignment**: header and preview panel updates moved from the monolithic `on_event()` to individual `EventBus` subscribers.
+
 ## 1.8.15 (2026-06-11)
 
 ### Performance
