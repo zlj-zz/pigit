@@ -8,8 +8,18 @@ Date: 2026-05-07
 from __future__ import annotations
 
 from typing import Any
+from collections.abc import Callable
 
-from pigit.termui import get_badge, get_badge_signal, palette, Segment
+from pigit.termui import (
+    EventType,
+    EVT_SELECTION_CHANGED,
+    Component,
+    get_badge,
+    get_badge_signal,
+    palette,
+    Segment,
+)
+from pigit.termui.event_bus import EventBus
 from pigit.termui.reactive import Computed, Signal
 
 
@@ -152,3 +162,42 @@ class HeaderState:
     def branch_signal(self) -> Signal[str]:
         """Expose the underlying branch signal for external writers."""
         return self._branch
+
+    def bind_to_bus(
+        self,
+        bus: EventBus,
+        tab_config: dict[type, tuple[str, str]],
+    ) -> Callable[[], None]:
+        """Subscribe to framework events and update header state.
+
+        Args:
+            bus: Framework event bus.
+            tab_config: Fallback mapping from panel type to (tab_name, tab_key).
+
+        Returns:
+            Unsubscribe callback that removes both handlers.
+        """
+
+        def on_mode_changed(*, mode: str = "", **_) -> bool:
+            self.mode = mode
+            return True
+
+        def on_selection_changed(*, active: Component | None = None, **_) -> bool:
+            if active is None:
+                return True
+            tab_name = getattr(active, "tab_name", None)
+            tab_key = getattr(active, "tab_key", None)
+            if tab_name is not None:
+                self.tab, self.tab_key = tab_name, tab_key or ""
+            else:
+                self.tab, self.tab_key = tab_config.get(type(active), ("", ""))
+            return True
+
+        unsub_mode = bus.subscribe(EventType("mode_changed"), on_mode_changed)
+        unsub_sel = bus.subscribe(EVT_SELECTION_CHANGED, on_selection_changed)
+
+        def _unsub() -> None:
+            unsub_mode()
+            unsub_sel()
+
+        return _unsub

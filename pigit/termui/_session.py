@@ -79,9 +79,16 @@ class Session:
             return
         self._suspended = False
         if sys.platform != "win32":
+            import termios
             import tty
 
             tty.setcbreak(self._fd)
+            # External full-screen programs (e.g. vim/nvim) may leave focus
+            # events, color reports, or other escape sequences in the input
+            # buffer after they exit. Flushing the buffer before resuming the
+            # TUI prevents those bytes from leaking to KeyboardInput and being
+            # misinterpreted as user keystrokes (e.g. ';' opening the palette).
+            termios.tcflush(self._fd, termios.TCIFLUSH)
         if self.alt_screen:
             self.stdout.write("\033[?1049h")
         self.stdout.write("\033[?25l")

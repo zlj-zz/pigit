@@ -93,6 +93,9 @@ class Config(metaclass=Singleton):
         # (float) Auto-refresh interval in seconds for the TUI.
         # Set to 0 to disable auto-refresh.
         auto_refresh_interval = {tui_auto_refresh_interval}
+
+        # (bool) Enable word-diff by default in the diff viewer.
+        word_diff = {tui_word_diff}
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
@@ -140,7 +143,7 @@ class Config(metaclass=Singleton):
         width = min(72, term_width - 4)
         bar = "━" * width
 
-        print(console.render(f"@bold(@red(Config Warning))"), file=sys.stderr)
+        print(console.render("@bold(@red(Config Warning))"), file=sys.stderr)
         print(console.render(f"@bold(@red({bar}))"), file=sys.stderr)
         for i, warning in enumerate(self._warnings, 1):
             prefix = f"{i}. "
@@ -233,6 +236,7 @@ class Config(metaclass=Singleton):
         tui_raw = raw.get("tui", {})
         tui = TuiConfig(
             auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
+            word_diff=tui_raw.get("word_diff", False),
         )
 
         # Version check
@@ -300,6 +304,7 @@ class Config(metaclass=Singleton):
                         log_debug=str(data.log.debug).lower(),
                         log_output=str(data.log.output).lower(),
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
+                        tui_word_diff=str(data.tui.word_diff).lower(),
                     )
                 )
         except Exception:

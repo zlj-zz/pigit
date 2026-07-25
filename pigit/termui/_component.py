@@ -7,7 +7,6 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-import contextvars
 import logging
 from abc import ABC
 from dataclasses import dataclass
@@ -20,12 +19,11 @@ from ._bindings import (
     resolve_key_handlers_merged,
 )
 from ._runtime_context import (
-    get_focus_manager,
     get_renderer,
     get_renderer_strict,
 )
 from .reactive import Computed, Signal
-from .types import ActionEventType, OverlayDispatchResult
+from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from ._renderer import Renderer
@@ -40,7 +38,7 @@ NONE_SIZE = (0, 0)
 class _Subscription:
     """Internal record tracking a framework-level event subscription."""
 
-    action: ActionEventType
+    action: EventType
     handler: Callable[..., bool | None]
     pending: bool = True
     unsub: Callable[[], None] | None = None
@@ -48,12 +46,6 @@ class _Subscription:
     def cancel(self) -> None:
         if self.unsub is not None:
             self.unsub()
-
-
-# Context variable for event-dispatch cycle detection during a single key event.
-_event_dispatch_state: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
-    "_event_dispatch_state", default=None
-)
 
 
 class ComponentError(Exception):
@@ -131,7 +123,7 @@ class Component(ABC):
 
     def subscribe(
         self,
-        action: ActionEventType,
+        action: EventType,
         handler: Callable[..., bool | None],
     ) -> Callable[[], None]:
         """Subscribe to a framework-level event.
@@ -249,69 +241,26 @@ class Component(ABC):
         self.refresh()
 
     def _handle_event(self, key: str) -> bool:
-        """Process a key event. Return True if consumed."""
-        state = _event_dispatch_state.get()
-        if state is None:
-            state = {"visited": set()}
-            token = _event_dispatch_state.set(state)
-            try:
-                return self._dispatch_event_impl(key, state)
-            finally:
-                _event_dispatch_state.reset(token)
-        return self._dispatch_event_impl(key, state)
+        """Process a key event. Delegates to the event dispatch algorithm."""
+        from ._component_event import dispatch_key
 
-    def _dispatch_event_impl(self, key: str, state: dict) -> bool:
-        """Internal event dispatch with cycle detection."""
-        cid = id(self)
-        if cid in state["visited"]:
-            return False
-        state["visited"].add(cid)
+        return dispatch_key(self, key)
 
-        # 1. Bindings (always consumed)
-        handler = self._key_handlers.get(key)
-        if handler is not None:
-            handler()
-            self._maybe_reestablish_focus()
-            return True
+    def emit(self, action: EventType, **data) -> None:
+        """Bubble action up through parent chain to Application.
 
-        # 2. New bubbling-aware hook: handle_key -> bool
-        handle_key = getattr(self, "handle_key", None)
-        if handle_key is not None:
-            if handle_key(key):
-                self._maybe_reestablish_focus()
-                return True
+        Stops at the first ancestor whose ``on_event`` returns True.
+        If no handler consumes it, logs a warning.
+        """
+        from ._component_event import bubble_event
 
-        # 3. Legacy hook: on_key (always consumed, no bubbling)
-        on_key = getattr(self, "on_key", None)
-        if on_key is not None and callable(on_key):
-            on_key(key)
-            self._maybe_reestablish_focus()
-            return True
+        bubble_event(self, action, **data)
 
-        # 4. Forward to event_target
-        target = self.event_target
-        if target is not None and id(target) not in state["visited"]:
-            if target._handle_event(key):
-                return True
+    def notify(self, action: EventType, **data) -> None:
+        """Notify all children by calling their ``update`` method."""
+        from ._component_event import notify_children
 
-        # 5. Bubble to parent
-        if self.parent is not None:
-            return self.parent._handle_event(key)
-
-        return False
-
-    def _maybe_reestablish_focus(self) -> None:
-        """Re-establish focus chain if this component is the current leaf."""
-        fm = get_focus_manager()
-        if fm is None:
-            return
-        current_leaf = fm.get_focus_leaf()
-        has_active_child = self.active_child is not None
-        parent = self.parent
-        parent_active = parent.active_child if parent is not None else None
-        parent_switched = parent_active is not None and parent_active is not self
-        if not has_active_child and not parent_switched and current_leaf is self:
-            fm.set_focus_chain(self)
+        notify_children(self, action, **data)
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         """Render this component into the given Surface.
@@ -327,36 +276,14 @@ class Component(ABC):
         """Dispatch a key to an overlay. Base components have no overlays."""
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def emit(self, action: ActionEventType, **data) -> None:
-        """Bubble action up through parent chain to Application.
-
-        Stops at the first ancestor whose ``on_event`` returns True.
-        If no handler consumes it, logs a warning.
-        """
-        node = self.parent
-        while node is not None:
-            handler = getattr(node, "on_event", None)
-            if callable(handler):
-                if handler(action, **data):
-                    return
-            node = node.parent
-        _logger.warning("Unhandled event %r from %s", action, type(self).__name__)
-
-    def notify(self, action: ActionEventType, **data) -> None:
-        """Notify all children by calling their ``update`` method."""
-        for child in self.children:
-            update_fn = getattr(child, "update", None)
-            if callable(update_fn):
-                update_fn(action, **data)
-
-    def accept(self, action: ActionEventType, **data) -> None:
+    def accept(self, action: EventType, **data) -> None:
         """Handle an action event broadcast from a parent container.
 
         Default is no-op; container components override this to route or
         broadcast to children.
         """
 
-    def update(self, action: ActionEventType, **data) -> None:
+    def update(self, action: EventType, **data) -> None:
         """Receive an action update from a parent or sibling component.
 
         Default is no-op; interactive components override this to react to

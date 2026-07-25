@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import bisect
 import dataclasses
+import difflib
 import enum
 import logging
 import os
@@ -17,7 +18,8 @@ import subprocess
 import tempfile
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_GOTO,
     AlertDialog,
     Component,
     SyntaxTokenizer,
@@ -71,6 +73,74 @@ class _Hunk:
     file_header_start: int  # index of 'diff --git' line for this file
 
 
+def _tokenize_with_positions(
+    text: str,
+) -> tuple[list[str], list[tuple[int, int]]]:
+    """Split ``text`` into tokens at whitespace and word-boundary points.
+
+    A word character is ``[a-zA-Z0-9_]`` (``str.isalnum()`` plus underscore);
+    transitions between word and non-word characters produce a split.  This
+    matches GitHub's ``diff-highlight`` tokenisation so that e.g.
+    ``foo.bar`` → ``["foo", ".", "bar"]`` and only the truly changed
+    sub-tokens are highlighted.
+
+    Returns ``(tokens, positions)`` where each position is ``(start, end)``
+    in the original string.
+    """
+
+    def _is_word(c: str) -> bool:
+        return c.isalnum() or c == "_"
+
+    tokens: list[str] = []
+    positions: list[tuple[int, int]] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        # ── whitespace runs ──
+        if text[i].isspace():
+            start = i
+            while i < n and text[i].isspace():
+                i += 1
+            tokens.append(text[start:i])
+            positions.append((start, i))
+            continue
+
+        # ── non-whitespace: split at word/non-word transitions ──
+        start = i
+        if _is_word(text[i]):
+            while i < n and _is_word(text[i]):
+                i += 1
+        else:
+            while i < n and not text[i].isspace() and not _is_word(text[i]):
+                i += 1
+        tokens.append(text[start:i])
+        positions.append((start, i))
+    return tokens, positions
+
+
+def _merge_ranges(
+    ranges: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """Merge adjacent or overlapping ranges in sorted order."""
+    if not ranges:
+        return []
+    result: list[tuple[int, int]] = []
+    cur_start, cur_end = ranges[0]
+    for start, end in ranges[1:]:
+        if start <= cur_end:
+            cur_end = max(cur_end, end)
+        else:
+            result.append((cur_start, cur_end))
+            cur_start, cur_end = start, end
+    result.append((cur_start, cur_end))
+    return result
+
+
+# A render token is (text, fg_rgb, display_width, word_diff_bg_or_None).
+_RenderToken = tuple[str, tuple[int, int, int], int, tuple[int, int, int] | None]
+_RenderLine = list[_RenderToken]
+
+
 class DiffViewer(LineTextBrowser):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
 
@@ -107,6 +177,7 @@ class DiffViewer(LineTextBrowser):
         y: int = 1,
         size: tuple[int, int] | None = None,
         id: str | None = None,
+        word_diff: bool = False,
     ) -> None:
         super().__init__(x, y, size, [], id=id)
         # LineTextBrowser sets _max_line to full height; adjust for border rows
@@ -121,8 +192,8 @@ class DiffViewer(LineTextBrowser):
         self._tokenizer = SyntaxTokenizer()
         self._line_langs: list[str] = []
         self._multiline_mask: list[str | None] = []
-        # _render_tokens holds (text, fg_color, display_width) per token
-        self._render_tokens: list[list[tuple[str, tuple[int, int, int], int]]] = []
+        # _render_tokens holds (text, fg_color, display_width, word_diff_bg_or_None)
+        self._render_tokens: list[_RenderLine] = []
         self._hunk_starts: list[int] = []
         self._hunk_mode = False
         self._hunk_index = 0
@@ -131,10 +202,12 @@ class DiffViewer(LineTextBrowser):
         self._diff_type = DiffType.UNSTAGED
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self._patch_task: AsyncTask[tuple[int, str, str, str, str]] = AsyncTask()
-        self._tokenize_task: AsyncTask[
-            list[list[tuple[str, tuple[int, int, int], int]]]
-        ] = AsyncTask()
+        self._tokenize_task: AsyncTask[list[_RenderLine]] = AsyncTask()
         self._tokenize_gen: int = 0
+
+        # Word-diff state
+        self._word_diff = word_diff
+        self._word_diff_segments: list[list[tuple[str, str | None, int]]] = []
 
         # File history state
         self._file_history_mode = False
@@ -210,9 +283,11 @@ class DiffViewer(LineTextBrowser):
         self._hunk_starts = []
         self._i = 0
 
-    def _pre_tokenize_plain(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+    def _pre_tokenize_plain(
+        self,
+    ) -> list[_RenderLine]:
         """Pre-tokenize plain file content (no diff prefixes)."""
-        result: list[list[tuple[str, tuple[int, int, int], int]]] = []
+        result: list[_RenderLine] = []
         for i, line in enumerate(self._content):
             lang = self._line_langs[i] if i < len(self._line_langs) else "generic"
             ml_type = self._multiline_mask[i] if i < len(self._multiline_mask) else None
@@ -234,6 +309,7 @@ class DiffViewer(LineTextBrowser):
                             else self._tokenizer.resolve_color(ttype, lang)
                         ),
                         wcswidth(text),
+                        None,
                     )
                     for text, ttype in tokens
                 ]
@@ -255,6 +331,11 @@ class DiffViewer(LineTextBrowser):
         Syntax highlighting is computed asynchronously to avoid freezing the
         TUI on large diffs.  Lines render with plain text until tokenization
         finishes.
+
+        When word-diff mode is active, intra-line changes are computed locally
+        from the normal unified diff (old ``-`` line vs new ``+`` line) and
+        stored as per-line segments used during tokenization. This leaves
+        ``_content`` as a valid patch, so hunk stage/discard keep working.
         """
         self._content = []
         self._heatmap = []
@@ -272,6 +353,7 @@ class DiffViewer(LineTextBrowser):
             if "\t" in cleaned:
                 cleaned = cleaned.expandtabs(self.TAB_WIDTH)
             self._content.append(cleaned)
+
         self._compute_heatmap()
         self._compute_line_numbers()
         self._line_langs = self._detect_line_languages()
@@ -282,6 +364,10 @@ class DiffViewer(LineTextBrowser):
         self._hunk_starts = [h.start for h in self._hunks]
         self._i = 0
 
+        # Compute word-diff segments on the normal unified diff.
+        if self._word_diff:
+            self._compute_word_diff_segments()
+
         # Async: syntax highlighting (slow for large files).
         self._tokenize_task.cancel()
         self._tokenize_gen += 1
@@ -289,15 +375,16 @@ class DiffViewer(LineTextBrowser):
         content = list(self._content)
         line_langs = list(self._line_langs)
         multiline_mask = list(self._multiline_mask)
+        word_diff_segments = list(self._word_diff_segments)
         tokenizer = self._tokenizer
 
-        def _work() -> list[list[tuple[str, tuple[int, int, int], int]]]:
+        def _work() -> list[_RenderLine]:
             return DiffViewer._pre_tokenize_with(
-                content, line_langs, multiline_mask, tokenizer
+                content, line_langs, multiline_mask, tokenizer, word_diff_segments
             )
 
         def _callback(
-            tokens: list[list[tuple[str, tuple[int, int, int], int]]],
+            tokens: list[_RenderLine],
         ) -> None:
             if not self.is_activated() or current_gen != self._tokenize_gen:
                 return
@@ -305,6 +392,101 @@ class DiffViewer(LineTextBrowser):
             request_render()
 
         self._tokenize_task.start(_work, _callback)
+
+    def _compute_word_diff_segments(self) -> None:
+        """Compute per-line word-diff segments from a normal unified diff.
+
+        For each pair of adjacent ``-`` / ``+`` lines inside a hunk, we use
+        ``difflib.SequenceMatcher`` to find the changed character/word ranges.
+        Deletions are highlighted on the ``-`` line, additions on the ``+`` line.
+        This keeps ``_content`` as a valid patch and does not require git's
+        ``--word-diff`` flag.
+        """
+        self._word_diff_segments = [[] for _ in self._content]
+        for hunk in self._hunks:
+            self._process_hunk_word_diff(hunk, self._word_diff_segments)
+
+    def _process_hunk_word_diff(
+        self,
+        hunk: _Hunk,
+        segments: list[list[tuple[str, str | None, int]]],
+    ) -> None:
+        """Pair ``-``/``+`` lines inside a hunk and compute their word segments."""
+        minus_idxs: list[int] = []
+        plus_idxs: list[int] = []
+        # The first line of a hunk is the @@ header; content starts after it.
+        for idx in range(hunk.start + 1, hunk.end):
+            line = self._content[idx]
+            if line.startswith("-") and not line.startswith("--- "):
+                minus_idxs.append(idx)
+            elif line.startswith("+") and not line.startswith("+++ "):
+                plus_idxs.append(idx)
+
+        paired = min(len(minus_idxs), len(plus_idxs))
+        for i in range(paired):
+            old_idx = minus_idxs[i]
+            new_idx = plus_idxs[i]
+            old_code = self._content[old_idx][1:]
+            new_code = self._content[new_idx][1:]
+            del_ranges, add_ranges = self._word_diff_ranges(old_code, new_code)
+            segments[old_idx] = self._ranges_to_segments(old_code, del_ranges, "del")
+            segments[new_idx] = self._ranges_to_segments(new_code, add_ranges, "add")
+
+        # Unpaired lines (pure additions or deletions) already get their
+        # background from _draw_diff_line; no word-diff highlight needed.
+
+    @staticmethod
+    def _word_diff_ranges(
+        old: str, new: str
+    ) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        """Return changed (start, end) ranges in ``old`` and ``new``.
+
+        Uses word-level comparison: both strings are split into word tokens
+        (whitespace-separated), then ``SequenceMatcher`` finds matching token
+        blocks.  Token-level changes are mapped back to character ranges.
+        """
+        old_tokens, old_positions = _tokenize_with_positions(old)
+        new_tokens, new_positions = _tokenize_with_positions(new)
+
+        matcher = difflib.SequenceMatcher(None, old_tokens, new_tokens, autojunk=False)
+        matches = matcher.get_matching_blocks()
+
+        del_ranges: list[tuple[int, int]] = []
+        add_ranges: list[tuple[int, int]] = []
+        old_tok = 0
+        new_tok = 0
+        for m in matches:
+            if old_tok < m.a:
+                start = old_positions[old_tok][0]
+                end = old_positions[m.a - 1][1]
+                del_ranges.append((start, end))
+            if new_tok < m.b:
+                start = new_positions[new_tok][0]
+                end = new_positions[m.b - 1][1]
+                add_ranges.append((start, end))
+            old_tok = m.a + m.size
+            new_tok = m.b + m.size
+
+        # Merge adjacent ranges to minimise segment count.
+        del_ranges = _merge_ranges(del_ranges)
+        add_ranges = _merge_ranges(add_ranges)
+        return del_ranges, add_ranges
+
+    @staticmethod
+    def _ranges_to_segments(
+        text: str, ranges: list[tuple[int, int]], kind: str
+    ) -> list[tuple[str, str | None, int]]:
+        """Split ``text`` into unchanged / changed segments from sorted ranges."""
+        segments: list[tuple[str, str | None, int]] = []
+        last = 0
+        for start, end in ranges:
+            if start > last:
+                segments.append((text[last:start], None, wcswidth(text[last:start])))
+            segments.append((text[start:end], kind, wcswidth(text[start:end])))
+            last = end
+        if last < len(text):
+            segments.append((text[last:], None, wcswidth(text[last:])))
+        return segments
 
     def set_diff_type(self, diff_type: DiffType) -> None:
         """Set the diff type (unstaged, staged, or commit)."""
@@ -423,32 +605,83 @@ class DiffViewer(LineTextBrowser):
         line_langs: list[str],
         multiline_mask: list[str | None],
         tokenizer: SyntaxTokenizer,
-    ) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+        word_diff_segments: list[list[tuple[str, str | None, int]]] | None = None,
+    ) -> list[_RenderLine]:
         """Pre-tokenize all lines with a state snapshot (thread-safe)."""
-        result: list[list[tuple[str, tuple[int, int, int], int]]] = []
+        result: list[_RenderLine] = []
         for i, line in enumerate(content):
             lang = line_langs[i] if i < len(line_langs) else "generic"
             if line.startswith("@@"):
                 tokens = tokenizer.tokenize_diff_hunk(line)
-            elif line.startswith("\\"):
+                result.append(
+                    [
+                        (
+                            text,
+                            (
+                                THEME.fg_primary
+                                if ttype == "plain"
+                                else tokenizer.resolve_color(ttype, lang)
+                            ),
+                            wcswidth(text),
+                            None,
+                        )
+                        for text, ttype in tokens
+                    ]
+                )
+                continue
+            if line.startswith("\\"):
                 result.append([])
                 continue
+
+            if line.startswith("--- ") or line.startswith("+++ "):
+                code = line
+            elif line and line[0] in "+- ":
+                code = line[1:]
             else:
-                if line.startswith("--- ") or line.startswith("+++ "):
-                    code = line
-                elif line and line[0] in "+- ":
-                    code = line[1:]
-                else:
-                    code = line
-                ml_type = multiline_mask[i] if i < len(multiline_mask) else None
-                if lang == "plain":
-                    tokens = [(code, "plain")]
-                elif ml_type is not None:
-                    tokens = [(code, ml_type)]
-                elif lang == "md":
-                    tokens = tokenizer.tokenize_markdown(code)
-                else:
-                    tokens = tokenizer.tokenize(code, lang)
+                code = line
+            ml_type = multiline_mask[i] if i < len(multiline_mask) else None
+
+            segments = (
+                word_diff_segments[i]
+                if word_diff_segments
+                and i < len(word_diff_segments)
+                and word_diff_segments[i]
+                else None
+            )
+            if segments is not None:
+                line_result: _RenderLine = []
+                for seg_text, seg_kind, _ in segments:
+                    if lang == "plain":
+                        seg_tokens = [(seg_text, "plain")]
+                    elif ml_type is not None:
+                        seg_tokens = [(seg_text, ml_type)]
+                    elif lang == "md":
+                        seg_tokens = tokenizer.tokenize_markdown(seg_text)
+                    else:
+                        seg_tokens = tokenizer.tokenize(seg_text, lang)
+                    seg_bg = None
+                    if seg_kind == "add":
+                        seg_bg = THEME.bg_word_diff_add
+                    elif seg_kind == "del":
+                        seg_bg = THEME.bg_word_diff_del
+                    for text, ttype in seg_tokens:
+                        fg = (
+                            THEME.fg_primary
+                            if ttype == "plain"
+                            else tokenizer.resolve_color(ttype, lang)
+                        )
+                        line_result.append((text, fg, wcswidth(text), seg_bg))
+                result.append(line_result)
+                continue
+
+            if lang == "plain":
+                tokens = [(code, "plain")]
+            elif ml_type is not None:
+                tokens = [(code, ml_type)]
+            elif lang == "md":
+                tokens = tokenizer.tokenize_markdown(code)
+            else:
+                tokens = tokenizer.tokenize(code, lang)
             result.append(
                 [
                     (
@@ -459,19 +692,23 @@ class DiffViewer(LineTextBrowser):
                             else tokenizer.resolve_color(ttype, lang)
                         ),
                         wcswidth(text),
+                        None,
                     )
                     for text, ttype in tokens
                 ]
             )
         return result
 
-    def _pre_tokenize(self) -> list[list[tuple[str, tuple[int, int, int], int]]]:
+    def _pre_tokenize(
+        self,
+    ) -> list[_RenderLine]:
         """Pre-tokenize all lines using current component state."""
         return self._pre_tokenize_with(
             self._content,
             self._line_langs,
             self._multiline_mask,
             self._tokenizer,
+            self._word_diff_segments,
         )
 
     def get_help_title(self) -> str:
@@ -505,8 +742,8 @@ class DiffViewer(LineTextBrowser):
             entries.insert(2, ("v", "View file at commit"))
         return entries
 
-    def update(self, action: ActionEventType, **data) -> None:
-        if action is ActionEventType.goto:
+    def update(self, action: EventType, **data) -> None:
+        if action is EVT_GOTO:
             self.i_cache[self.i_cache_key] = self._i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
@@ -541,7 +778,7 @@ class DiffViewer(LineTextBrowser):
             self._hunk_mode = False
             return
         if self.come_from is not None:
-            self.emit(ActionEventType.goto, target=self.come_from)
+            self.emit(EVT_GOTO, target=self.come_from)
 
     @bind_keys("v")
     def _toggle_file_history(self) -> None:
@@ -941,7 +1178,7 @@ class DiffViewer(LineTextBrowser):
         text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
         col = text_start_col
         max_col = text_start_col + main_w
-        tokens: list[tuple[str, tuple[int, int, int], int]] = []
+        tokens: _RenderLine = []
 
         if line.startswith("\\"):
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
@@ -954,7 +1191,7 @@ class DiffViewer(LineTextBrowser):
                     code = line[1:]
                 else:
                     code = line
-                tokens = [(code, THEME.fg_primary, wcswidth(code))]
+                tokens = [(code, THEME.fg_primary, wcswidth(code), None)]
 
         self._draw_tokens(surface, row, col, max_col, tokens, bg)
 
@@ -968,18 +1205,25 @@ class DiffViewer(LineTextBrowser):
         row: int,
         col: int,
         max_col: int,
-        tokens: list[tuple[str, tuple[int, int, int], int]],
+        tokens: _RenderLine,
         bg: tuple[int, int, int] | None = None,
     ) -> None:
-        """Draw syntax tokens with width-aware truncation."""
-        for token_text, token_fg, token_width in tokens:
+        """Draw syntax tokens with width-aware truncation.
+
+        Each token may carry its own background (e.g. word-diff highlight).
+        If a token has no background, the line background is used.
+        """
+        for token_text, token_fg, token_width, token_bg in tokens:
+            effective_bg = token_bg if token_bg is not None else bg
             if col + token_width > max_col:
                 avail = max_col - col
                 if avail > 1:
                     token_text = truncate_by_width(token_text, avail - 1) + "…"
-                    surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+                    surface.draw_text_rgb(
+                        row, col, token_text, fg=token_fg, bg=effective_bg
+                    )
                 break
-            surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=bg)
+            surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=effective_bg)
             col += token_width
 
     def _file_history_header(self) -> str:

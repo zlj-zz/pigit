@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from pigit.termui.reactive import Signal
 
-from .base import ActionResult, IListViewModel, ViewModelBase
+from .base import IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
     from pigit.app_types import CommitInfo, GraphRow
@@ -24,12 +24,17 @@ class ICommitViewModel(IListViewModel["Commit"]):
 
     @property
     def repo_path(self) -> str: ...
+
     @property
     def graph_rows(self) -> list[GraphRow]: ...
+
     @property
     def remotes(self) -> tuple[str, ...]: ...
+
     def get_inspector_data(self, idx: int) -> CommitInfo | None: ...
+
     def load_diff(self, idx: int) -> list[str]: ...
+
     def get_bodies(self) -> dict[str, str] | None: ...
 
 

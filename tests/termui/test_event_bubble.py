@@ -13,7 +13,7 @@ import pytest
 
 from pigit.termui._component import Component
 from pigit.termui.containers import TabView
-from pigit.termui.types import ActionEventType
+from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
 
 # --- Helpers ---
 
@@ -33,7 +33,7 @@ class _EventLeaf(Component):
 
 
 class _EventTabView(TabView):
-    def update(self, action: ActionEventType, **data) -> None:
+    def update(self, action: EventType, **data) -> None:
         pass
 
 
@@ -48,9 +48,9 @@ class TestEmitReachesApplication:
         child.parent = parent
         parent.on_event = MagicMock(return_value=True)
 
-        child.emit(ActionEventType.goto, target="x")
+        child.emit(EVT_GOTO, target="x")
 
-        parent.on_event.assert_called_once_with(ActionEventType.goto, target="x")
+        parent.on_event.assert_called_once_with(EVT_GOTO, target="x")
 
     def test_emit_bubbles_through_multiple_parents(self):
         """An emitted action bubbles through intermediate parents to the root."""
@@ -62,10 +62,10 @@ class TestEmitReachesApplication:
 
         grandparent.on_event = MagicMock(return_value=True)
 
-        child.emit(ActionEventType.selection_changed, index=5)
+        child.emit(EVT_SELECTION_CHANGED, index=5)
 
         grandparent.on_event.assert_called_once_with(
-            ActionEventType.selection_changed, index=5
+            EVT_SELECTION_CHANGED, index=5
         )
 
     def test_emit_stops_at_first_handler(self):
@@ -79,7 +79,7 @@ class TestEmitReachesApplication:
         parent.on_event = MagicMock(return_value=True)
         grandparent.on_event = MagicMock(return_value=True)
 
-        child.emit(ActionEventType.goto, target="x")
+        child.emit(EVT_GOTO, target="x")
 
         parent.on_event.assert_called_once()
         grandparent.on_event.assert_not_called()
@@ -96,7 +96,7 @@ class TestSourceIdentification:
         child.parent = parent
         parent.on_event = MagicMock(return_value=True)
 
-        child.emit(ActionEventType.action_requested, cmd="test", source=child)
+        child.emit(EventType("action_requested"), cmd="test", source=child)
 
         call_args = parent.on_event.call_args
         assert call_args.kwargs["source"] is child
@@ -118,12 +118,12 @@ class TestSourceIdentification:
 
         app.on_event = on_event
 
-        panel_a.emit(ActionEventType.selection_changed, source=panel_a, index=1)
-        panel_b.emit(ActionEventType.selection_changed, source=panel_b, index=2)
+        panel_a.emit(EVT_SELECTION_CHANGED, source=panel_a, index=1)
+        panel_b.emit(EVT_SELECTION_CHANGED, source=panel_b, index=2)
 
         assert received == [
-            (panel_a, ActionEventType.selection_changed),
-            (panel_b, ActionEventType.selection_changed),
+            (panel_a, EVT_SELECTION_CHANGED),
+            (panel_b, EVT_SELECTION_CHANGED),
         ]
 
 
@@ -139,7 +139,7 @@ class TestGotoRouting:
 
         assert tab_view.active is main
 
-        tab_view.accept(ActionEventType.goto, target="secondary")
+        tab_view.accept(EVT_GOTO, target="secondary")
 
         assert tab_view.active is secondary
 
@@ -156,7 +156,7 @@ class TestGotoRouting:
         root.on_event = MagicMock(return_value=False)
 
         # Emit goto from main (active child)
-        main.emit(ActionEventType.goto, target="secondary")
+        main.emit(EVT_GOTO, target="secondary")
 
         # Event bubbles: main -> tab_view.on_event (handles it)
         assert tab_view.active is secondary

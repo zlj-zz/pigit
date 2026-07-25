@@ -45,6 +45,7 @@ class LogConfig:
 @dataclass
 class TuiConfig:
     auto_refresh_interval: float = 10.0
+    word_diff: bool = True
 
 
 @dataclass

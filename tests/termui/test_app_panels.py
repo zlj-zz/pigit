@@ -84,9 +84,9 @@ class TestDiffViewer:
         source = FakeSource()
         d = DiffViewer()
         d._i = 5
-        from pigit.termui.types import ActionEventType
+        from pigit.termui.types import EventType, EVT_GOTO
 
-        d.update(ActionEventType.goto, source=source, key="test.py", content=["line1"])
+        d.update(EVT_GOTO, source=source, key="test.py", content=["line1"])
         assert d.i_cache_key == "test.py"
         assert d.come_from is source
 
@@ -234,7 +234,7 @@ class TestDiffViewer:
     def test_update_expands_tabs(self):
         """update() with list content must also expand tabs via set_content."""
         from pigit.termui._component import Component
-        from pigit.termui.types import ActionEventType
+        from pigit.termui.types import EventType, EVT_GOTO
 
         class FakeSource(Component):
             def _render_surface(self, surface):
@@ -243,7 +243,7 @@ class TestDiffViewer:
         d = DiffViewer()
         d.parent = FakeSource()
         d.update(
-            ActionEventType.goto,
+            EVT_GOTO,
             source=FakeSource(),
             key="test.go",
             content=["+\t\tName"],

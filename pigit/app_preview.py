@@ -7,12 +7,18 @@ Date: 2026-05-26
 
 from __future__ import annotations
 
-from pigit.termui import Component, palette
+from typing import TYPE_CHECKING
+from collections.abc import Callable
+
+from pigit.termui import EVT_SELECTION_CHANGED, Component, palette
 from pigit.termui._component import _render_child_to_surface
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_diff import DiffType, DiffViewer
 from .app_theme import THEME
+
+if TYPE_CHECKING:
+    from .viewmodels.status import IStatusViewModel
 
 
 class PreviewPanel(Component):
@@ -26,25 +32,82 @@ class PreviewPanel(Component):
 
     def __init__(
         self,
+        *,
+        status_vm: IStatusViewModel | None = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
+        self._status_vm = status_vm
         self._title = "Preview"
         self._subtitle = ""
-        self._diff_viewer = DiffViewer(x=self.TITLE_ROWS + 1, y=1, id="preview_diff")
+        self._diff_viewer = DiffViewer(
+            x=self.TITLE_ROWS + 1,
+            y=1,
+            id="preview_diff",
+            word_diff=True,
+        )
+        self._unsubs: list[Callable[[], None]] = []
 
     def activate(self) -> None:
         """Activate the preview and its internal diff viewer."""
         super().activate()
         self._diff_viewer.activate()
+        self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
     def deactivate(self) -> None:
         """Deactivate the preview and its internal diff viewer."""
-        super().deactivate()
+        for unsub in self._unsubs:
+            unsub()
+        self._unsubs.clear()
         self._diff_viewer.deactivate()
+        super().deactivate()
+
+    def _on_selection(self, *, active: Component | None = None, **_) -> bool:
+        """Update preview content for the active Status or Stash panel."""
+        from .app_status import StatusPanel, _status_label
+        from .app_stash import StashPanel
+
+        if not isinstance(active, (StatusPanel, StashPanel)):
+            self.clear()
+            return True
+        if self._status_vm is None:
+            self.clear()
+            return True
+
+        if isinstance(active, StatusPanel):
+            if (
+                not active.files
+                or active.curr_no < 0
+                or active.curr_no >= len(active.files)
+            ):
+                self.clear()
+                return True
+            f = active.files[active.curr_no]
+            source_idx = active.filter_source_index()
+            diff_lines = self._status_vm.load_diff(source_idx)
+            diff_type = (
+                DiffType.STAGED
+                if (f.has_staged_change and not f.has_unstaged_change)
+                else DiffType.UNSTAGED
+            )
+            self.set_diff_type(diff_type)
+            self.set_preview(diff_lines, title=f.name, subtitle=_status_label(f))
+        elif isinstance(active, StashPanel):
+            if (
+                not active.stashes
+                or active.curr_no < 0
+                or active.curr_no >= len(active.stashes)
+            ):
+                self.clear()
+                return True
+            stash = active.stashes[active.curr_no]
+            diff_lines = self._status_vm.load_stash_diff(stash.ref)
+            self.set_diff_type(DiffType.STASH)
+            self.set_preview(diff_lines, title=stash.msg, subtitle=stash.ref)
+        return True
 
     def set_preview(
         self, diff_lines: list[str], title: str, subtitle: str = ""

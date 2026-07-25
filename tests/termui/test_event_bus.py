@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.termui.event_bus import EventBus
-from pigit.termui.types import ActionEventType
+from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
 
 
 def test_subscribe_and_publish() -> None:
@@ -18,8 +18,8 @@ def test_subscribe_and_publish() -> None:
         calls.append({"value": value})
         return True
 
-    unsub = bus.subscribe(ActionEventType.selection_changed, handler)
-    handled = bus.publish(ActionEventType.selection_changed, value=42)
+    unsub = bus.subscribe(EVT_SELECTION_CHANGED, handler)
+    handled = bus.publish(EVT_SELECTION_CHANGED, value=42)
 
     assert handled is True
     assert calls == [{"value": 42}]
@@ -38,9 +38,9 @@ def test_multiple_handlers_fire() -> None:
         calls.append(f"b:{msg}")
         return True
 
-    bus.subscribe(ActionEventType.mode_changed, a)
-    bus.subscribe(ActionEventType.mode_changed, b)
-    handled = bus.publish(ActionEventType.mode_changed, msg="x")
+    bus.subscribe(EventType("mode_changed"), a)
+    bus.subscribe(EventType("mode_changed"), b)
+    handled = bus.publish(EventType("mode_changed"), msg="x")
 
     assert handled is True
     assert calls == ["a:x", "b:x"]
@@ -54,10 +54,10 @@ def test_unsubscribe_stops_delivery() -> None:
         calls.append(n)
         return True
 
-    unsub = bus.subscribe(ActionEventType.selection_changed, handler)
-    bus.publish(ActionEventType.selection_changed, n=1)
+    unsub = bus.subscribe(EVT_SELECTION_CHANGED, handler)
+    bus.publish(EVT_SELECTION_CHANGED, n=1)
     unsub()
-    bus.publish(ActionEventType.selection_changed, n=2)
+    bus.publish(EVT_SELECTION_CHANGED, n=2)
 
     assert calls == [1]
 
@@ -73,9 +73,9 @@ def test_handler_exception_isolated() -> None:
         calls.append(msg)
         return True
 
-    bus.subscribe(ActionEventType.selection_changed, bad)
-    bus.subscribe(ActionEventType.selection_changed, good)
-    handled = bus.publish(ActionEventType.selection_changed, msg="ok")
+    bus.subscribe(EVT_SELECTION_CHANGED, bad)
+    bus.subscribe(EVT_SELECTION_CHANGED, good)
+    handled = bus.publish(EVT_SELECTION_CHANGED, msg="ok")
 
     assert handled is True
     assert calls == ["ok"]
@@ -89,9 +89,9 @@ def test_clear_removes_all() -> None:
         calls.append(n)
         return True
 
-    bus.subscribe(ActionEventType.selection_changed, handler)
+    bus.subscribe(EVT_SELECTION_CHANGED, handler)
     bus.clear()
-    handled = bus.publish(ActionEventType.selection_changed, n=1)
+    handled = bus.publish(EVT_SELECTION_CHANGED, n=1)
 
     assert handled is False
     assert calls == []
@@ -111,8 +111,8 @@ def test_publish_and_emit_bubble_independent() -> None:
         bubble_calls.append(f"bubble:{data.get('msg')}")
         return True
 
-    bus.subscribe(ActionEventType.goto, bus_handler)
-    handled = bus.publish(ActionEventType.goto, msg="x")
+    bus.subscribe(EVT_GOTO, bus_handler)
+    handled = bus.publish(EVT_GOTO, msg="x")
 
     # Bus delivery happens independently; bubble handler is not invoked here.
     assert handled is True
@@ -121,5 +121,5 @@ def test_publish_and_emit_bubble_independent() -> None:
 
     # Simulate what emit() does: walk parent chain looking for on_event.
     # This is independent of the bus.
-    assert bubble_handler(ActionEventType.goto, msg="x") is True
+    assert bubble_handler(EVT_GOTO, msg="x") is True
     assert bubble_calls == ["bubble:x"]

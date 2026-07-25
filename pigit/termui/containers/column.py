@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from .._component import Component
 from .._layout import layout_flex
 from .._runtime_context import request_render
-from ..types import ActionEventType
+from ..types import EventType, EVT_SELECTION_CHANGED
 
 _logger = logging.getLogger(__name__)
 
@@ -140,8 +140,8 @@ class Column(Component):
             old_child.deactivate()
         if new_child is not None and new_child is not old_child:
             new_child.activate()
-        self.emit(ActionEventType.mode_changed, mode="")
-        self.emit(ActionEventType.selection_changed)
+        self.emit(EventType("mode_changed"), mode="")
+        self.emit(EVT_SELECTION_CHANGED)
         request_render()
 
     def activate(self) -> None:
@@ -158,7 +158,7 @@ class Column(Component):
         for child in self.children:
             child.deactivate()
 
-    def accept(self, action: ActionEventType, **data) -> None:
+    def accept(self, action: EventType, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not
         override ``accept`` (e.g. ``_PickerHeader``).
         """

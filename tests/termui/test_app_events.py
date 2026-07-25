@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from pigit.termui import ActionEventType
+from pigit.termui import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
 from pigit.termui.event_bus import EventBus
 
 
@@ -22,9 +22,9 @@ class _FakeApp:
     def _on_merge_request(self, source: str, target: str) -> None:
         self.merge_calls.append((source, target))
 
-    def on_event(self, action: ActionEventType, **data) -> bool:
+    def on_event(self, action: EventType, **data) -> bool:
         handled = self._event_bus.publish(action, **data)
-        if action is ActionEventType.action_requested and data.get("cmd") == "merge":
+        if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
             return True
         return handled
@@ -38,8 +38,8 @@ def test_on_event_publishes_selection_changed_to_bus() -> None:
         calls.append("sub")
         return True
 
-    app._event_bus.subscribe(ActionEventType.selection_changed, subscriber)
-    result = app.on_event(ActionEventType.selection_changed, active=Mock())
+    app._event_bus.subscribe(EVT_SELECTION_CHANGED, subscriber)
+    result = app.on_event(EVT_SELECTION_CHANGED, active=Mock())
 
     assert result is True
     assert calls == ["sub"]
@@ -53,8 +53,8 @@ def test_on_event_publishes_mode_changed_to_bus() -> None:
         calls.append(mode)
         return True
 
-    app._event_bus.subscribe(ActionEventType.mode_changed, subscriber)
-    result = app.on_event(ActionEventType.mode_changed, mode="visual")
+    app._event_bus.subscribe(EventType("mode_changed"), subscriber)
+    result = app.on_event(EventType("mode_changed"), mode="visual")
 
     assert result is True
     assert calls == ["visual"]
@@ -63,7 +63,7 @@ def test_on_event_publishes_mode_changed_to_bus() -> None:
 def test_merge_request_routes_to_on_merge_request() -> None:
     app = _FakeApp()
     result = app.on_event(
-        ActionEventType.action_requested,
+        EventType("action_requested"),
         cmd="merge",
         source="feature",
         target="main",
@@ -75,7 +75,7 @@ def test_merge_request_routes_to_on_merge_request() -> None:
 
 def test_goto_returns_false_when_no_subscriber() -> None:
     app = _FakeApp()
-    result = app.on_event(ActionEventType.goto, target="status")
+    result = app.on_event(EVT_GOTO, target="status")
 
     assert result is False
 
@@ -86,9 +86,9 @@ def test_bus_subscriber_exception_does_not_crash_on_event() -> None:
     def bad(**_) -> bool:
         raise RuntimeError("boom")
 
-    app._event_bus.subscribe(ActionEventType.selection_changed, bad)
+    app._event_bus.subscribe(EVT_SELECTION_CHANGED, bad)
     # Should not raise despite bad handler
-    result = app.on_event(ActionEventType.selection_changed, active=Mock())
+    result = app.on_event(EVT_SELECTION_CHANGED, active=Mock())
 
     # No subscriber returned True, so handled is False
     assert result is False

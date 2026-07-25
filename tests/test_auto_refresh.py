@@ -49,14 +49,13 @@ def app():
 @pytest.fixture
 def mock_panel(app):
     """Set up mocked tab_view, presented panel, and VM for _refresh_active_panel."""
-    with patch("pigit.app.by_id") as mock_by_id:
-        mock_tab = MagicMock()
-        mock_by_id.return_value = mock_tab
-        with patch("pigit.app.resolve_presented") as mock_resolve:
-            panel = MagicMock()
-            panel._vm = MagicMock()
-            mock_resolve.return_value = panel
-            yield panel
+    mock_tab = MagicMock()
+    app._tab_view = mock_tab
+    with patch("pigit.app.resolve_presented") as mock_resolve:
+        panel = MagicMock()
+        panel._vm = MagicMock()
+        mock_resolve.return_value = panel
+        yield panel
 
 
 class TestRefreshActivePanel:
@@ -80,11 +79,10 @@ class TestRefreshActivePanel:
         """_refresh_active_panel skips when active panel has no _vm."""
         app._root = MagicMock()
         app._root.has_overlay_open.return_value = False
-        with patch("pigit.app.by_id") as mock_by_id:
-            mock_tab = MagicMock()
-            mock_by_id.return_value = mock_tab
-            with patch("pigit.app.resolve_presented") as mock_resolve:
-                panel = MagicMock()
-                del panel._vm
-                mock_resolve.return_value = panel
-                app._refresh_active_panel()
+        mock_tab = MagicMock()
+        app._tab_view = mock_tab
+        with patch("pigit.app.resolve_presented") as mock_resolve:
+            panel = MagicMock()
+            del panel._vm
+            mock_resolve.return_value = panel
+            app._refresh_active_panel()

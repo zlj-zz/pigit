@@ -13,7 +13,7 @@ from collections.abc import Callable, Sequence
 
 from .._component import Component, _render_child_to_surface
 from .._runtime_context import get_focus_manager
-from ..types import ActionEventType
+from ..types import EventType, EVT_GOTO
 
 _logger = logging.getLogger(__name__)
 
@@ -83,9 +83,19 @@ class TabView(Component):
         for child in self.children:
             child.deactivate()
 
-    def route_to(self, id: str) -> Component | None:
-        """Switch to the child component with the given id."""
-        resolved = self._id_map().get(id)
+    def route_to(self, target: str | Component) -> Component | None:
+        """Switch to the child identified by id string or component reference.
+
+        When given a Component, resolves it to a child id via the tree.
+        """
+        tid: str | None
+        if isinstance(target, Component):
+            tid = self._resolve_target_id(target)
+        else:
+            tid = target
+        if tid is None:
+            return None
+        resolved = self._id_map().get(tid)
         if resolved is None:
             return None
         if resolved is self._active:
@@ -116,9 +126,9 @@ class TabView(Component):
             fm.set_focus_chain(resolved)
         return resolved
 
-    def on_event(self, action: ActionEventType, **data) -> bool:
+    def on_event(self, action: EventType, **data) -> bool:
         """Route goto to accept; let all other events bubble up."""
-        if action is ActionEventType.goto:
+        if action is EVT_GOTO:
             self.accept(action, **data)
             return True
         return False
@@ -140,9 +150,9 @@ class TabView(Component):
                 node = node.parent
         return None
 
-    def accept(self, action: ActionEventType, **data):
+    def accept(self, action: EventType, **data):
         """Handle a goto action by routing to the target child."""
-        if action is ActionEventType.goto:
+        if action is EVT_GOTO:
             target = data.get("target")
             target_id = self._resolve_target_id(target)
             if target_id:

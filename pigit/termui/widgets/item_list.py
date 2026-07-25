@@ -16,8 +16,8 @@ from .._component import Component, ComponentError
 from .._runtime_context import request_render
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
-from ..reactive import Signal, ValueRef
-from ..types import ActionEventType
+from ..reactive import Signal
+from ..types import EVT_SELECTION_CHANGED
 from ..wcwidth_table import truncate_by_width, wcswidth
 
 _logger = logging.getLogger(__name__)
@@ -520,7 +520,7 @@ class ItemList(Component):
         if self._on_change is not None:
             self._on_change(self.curr_no)
         else:
-            self.emit(ActionEventType.selection_changed, index=self.curr_no)
+            self.emit(EVT_SELECTION_CHANGED, index=self.curr_no)
 
     def next(self, step: int = 1):
         """Move the selection forward by the given step, skipping separators."""

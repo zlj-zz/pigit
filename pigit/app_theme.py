@@ -65,6 +65,10 @@ class FlatTheme:
     fg_diff_add: tuple[int, int, int] = palette.GREEN
     fg_diff_del: tuple[int, int, int] = palette.RED
 
+    # ── Word-diff intra-line highlights ──
+    bg_word_diff_add: tuple[int, int, int] = (50, 105, 60)
+    bg_word_diff_del: tuple[int, int, int] = (120, 50, 50)
+
     # ── Overlay ──
     bg_overlay: tuple[int, int, int] = palette.SLATE_DARK
     bg_overlay_dim: tuple[int, int, int] = palette.NAVY_GRAY

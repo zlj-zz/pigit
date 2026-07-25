@@ -10,12 +10,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable
 
 from pigit.termui import (
-    ActionEventType,
+    EventType,
+    EVT_SELECTION_CHANGED,
     AlertDialog,
     Application,
-    by_id,
     Component,
     ComponentRoot,
     dismiss_sheet,
@@ -26,13 +27,13 @@ from pigit.termui import (
     keys,
     Popup,
     request_render,
-    resolve_presented,
     show_badge,
     show_sheet,
     show_spinner,
     show_toast,
     ToastPosition,
 )
+from pigit.termui._component import resolve_presented
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
@@ -42,12 +43,12 @@ from .git.local_git import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
-from .app_diff import DiffType, DiffViewer
+from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
 from .app_stash import StashPanel
-from .app_status import StatusPanel, _status_label
+from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.local_git import LocalGit
 from .git.managed_repos import ManagedRepos
@@ -153,6 +154,21 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
 ]
 
 
+class TabPanel(Column):
+    """Column with tab metadata for TabView routing."""
+
+    def __init__(
+        self,
+        *,
+        tab_name: str,
+        tab_key: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.tab_name = tab_name
+        self.tab_key = tab_key
+
+
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
@@ -185,6 +201,9 @@ class PigitApplication(Application):
         self._repo_name: str = ""
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
+        self._header_unsub = self._header_state.bind_to_bus(
+            self._event_bus, self._TAB_CONFIG
+        )
         # Merge workflow state
         self._merge_state: dict | None = None
         self._alert_dialog = AlertDialog(
@@ -203,6 +222,14 @@ class PigitApplication(Application):
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._is_large_screen = False
+        self._preview_unsub: Callable[[], None] | None = None
+        # Typed accessors for key body components (assigned in build_root)
+        self._tab_view: TabView
+        self._body_row: Row
+        self._inspector: InspectorPanel
+        self._palette: CommandPalette
+        self._status_stack: Column
+        self._branch_panel: BranchPanel
 
     LARGE_SCREEN_COLS = 120
 
@@ -218,92 +245,65 @@ class PigitApplication(Application):
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([("I", "Inspector"), (";", "Palette"), ("Q", "Quit")])
 
-        inspector_panel = InspectorPanel(id="inspector")
-        # Preview is created at app level but only inserted into layout when
-        # Status tab is active on large screens.
-        self._preview_panel = PreviewPanel(id="preview")
-
-        def _on_tab_switch(panel: Component) -> None:
-            presented = resolve_presented(panel)
-            provider = (
-                getattr(presented, "get_help_entries", None) if presented else None
-            )
-            footer.set_help_provider(provider)
-            target = presented if presented is not None else panel
-            tab_name = getattr(target, "tab_name", None)
-            tab_key = getattr(target, "tab_key", None)
-            if tab_name is not None:
-                self._header_state.tab, self._header_state.tab_key = (
-                    tab_name,
-                    tab_key or "",
-                )
-            else:
-                self._header_state.tab, self._header_state.tab_key = (
-                    self._TAB_CONFIG.get(type(target), ("", ""))
-                )
-            if presented is not None:
-                inspector_panel.update_from(presented)
-            if self._is_large_screen:
-                cols, _ = terminal_size()
-                self._apply_body_widths(cols)
-                self._update_preview()
+        self._inspector = InspectorPanel(id="inspector")
 
         self._status_vm = StatusViewModel(self._git, history=self._session_history)
         self._branch_vm = BranchViewModel(self._git, history=self._session_history)
         self._commit_vm = CommitViewModel(self._git)
 
+        # Preview is created at app level but only inserted into layout when
+        # Status tab is active on large screens.
+        self._preview_panel = PreviewPanel(
+            id="preview",
+            status_vm=self._status_vm,
+        )
+
         status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
         stash_panel = StashPanel(vm=self._status_vm, id="stash")
-        status_stack = Column(
+        self._status_stack = TabPanel(
             children=[status_panel, stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
+            tab_name="Status",
+            tab_key="1",
         )
-        setattr(status_stack, "tab_name", "Status")
-        setattr(status_stack, "tab_key", "1")
 
-        panel_tab = TabView(
+        self._branch_panel = BranchPanel(
+            vm=self._branch_vm,
+            branch_signal=self._branch_signal,
+            id="branch",
+        )
+
+        self._tab_view = TabView(
             children=[
-                status_stack,
-                BranchPanel(
-                    vm=self._branch_vm,
-                    branch_signal=self._branch_signal,
-                    id="branch",
-                ),
+                self._status_stack,
+                self._branch_panel,
                 CommitPanel(vm=self._commit_vm, id="commit"),
-                DiffViewer(id="diff"),
+                DiffViewer(id="diff", word_diff=self._config.word_diff),
             ],
             start="status",
-            on_switch=_on_tab_switch,
+            on_switch=self._on_tab_switch,
             id="tab_view",
         )
-        active = panel_tab.active
-        presented = resolve_presented(active)
-        provider = getattr(presented or active, "get_help_entries", None)
-        footer.set_help_provider(provider)
 
         cols, _ = terminal_size()
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
-        body = Row(
+        self._body_row = Row(
             children=[
-                panel_tab,
-                inspector_panel,
+                self._tab_view,
+                self._inspector,
             ],
             widths=["flex", 0],
             id="body_row",
         )
 
-        CommandPalette(
+        self._palette = CommandPalette(
             on_execute=self._on_palette_execute,
             on_dismiss=self._dismiss_palette,
             id="palette",
         )
-
-        # Initialize header/footer for the starting tab
-        if panel_tab.active is not None:
-            _on_tab_switch(panel_tab.active)
 
         return Column(
             children=[
@@ -315,11 +315,23 @@ class PigitApplication(Application):
                     sep_fg=THEME.fg_dim,
                     id="header",
                 ),
-                body,
+                self._body_row,
                 footer,
             ],
             heights=[2, "flex", 2],
         )
+
+    def _on_tab_switch(self, panel: Component) -> None:
+        """React to TabView switching to a new panel.
+
+        Adjusts the adaptive layout on large screens and emits
+        ``selection_changed`` so bus subscribers (footer, inspector, header,
+        preview) can update themselves.
+        """
+        if self._is_large_screen:
+            cols, _ = terminal_size()
+            self._apply_body_widths(cols)
+        panel.emit(EVT_SELECTION_CHANGED)
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
@@ -344,7 +356,6 @@ class PigitApplication(Application):
         self._sync_stash_height(rows)
         if self._is_large_screen:
             self._apply_body_widths(cols)
-            self._update_preview()
 
         # Initialize header with repo info
         try:
@@ -378,20 +389,21 @@ class PigitApplication(Application):
                 self._refresh_active_panel,
             )
 
+        # Initial sync: all components are activated now, so subscribers receive
+        # the event and update header/footer/inspector/preview.
+        if self._tab_view.active is not None:
+            self._on_tab_switch(self._tab_view.active)
+
     def _apply_body_widths(self, cols: int) -> None:
         """Recompute body_row widths based on screen size, active tab, and inspector state.
 
         PreviewPanel is only inserted into the layout when Status is active on
         large screens; otherwise it is removed so it does not appear global.
         """
-        body_row = by_id("body_row", Row)
-        if body_row is None:
-            return
-        tab_view = by_id("tab_view", TabView)
-        inspector = by_id("inspector", InspectorPanel)
-        active_presented = (
-            resolve_presented(tab_view.active) if tab_view is not None else None
-        )
+        body_row = self._body_row
+        tab_view = self._tab_view
+        inspector = self._inspector
+        active_presented = resolve_presented(tab_view.active)
         on_status = isinstance(active_presented, (StatusPanel, StashPanel))
 
         if self._is_large_screen and on_status:
@@ -431,53 +443,6 @@ class PigitApplication(Application):
                 preview.activate()
         body_row.set_widths(desired_widths)
 
-    def _update_preview(self) -> None:
-        """Update the preview panel for the current Status or Stash selection."""
-        if not self._is_large_screen or self._preview_panel is None:
-            return
-        tab_view = by_id("tab_view", TabView)
-        if tab_view is None:
-            return
-        active = resolve_presented(tab_view.active)
-        if isinstance(active, StatusPanel):
-            if (
-                not active.files
-                or active.curr_no < 0
-                or active.curr_no >= len(active.files)
-            ):
-                self._preview_panel.clear()
-                return
-            f = active.files[active.curr_no]
-            source_idx = active.filter_source_index()
-            diff_lines = (
-                self._status_vm.load_diff(source_idx) if self._status_vm else []
-            )
-            diff_type = (
-                DiffType.STAGED
-                if (f.has_staged_change and not f.has_unstaged_change)
-                else DiffType.UNSTAGED
-            )
-            self._preview_panel.set_diff_type(diff_type)
-            self._preview_panel.set_preview(
-                diff_lines, title=f.name, subtitle=_status_label(f)
-            )
-        elif active is not None and isinstance(active, StashPanel):  # type: ignore[reportAttributeAccessIssue]
-            if (
-                not active.stashes  # type: ignore[reportAttributeAccessIssue]
-                or active.curr_no < 0  # type: ignore[reportAttributeAccessIssue]
-                or active.curr_no >= len(active.stashes)  # type: ignore[reportAttributeAccessIssue]
-            ):
-                self._preview_panel.clear()
-                return
-            stash = active.stashes[active.curr_no]  # type: ignore[reportAttributeAccessIssue]
-            diff_lines = (
-                self._status_vm.load_stash_diff(stash.ref) if self._status_vm else []
-            )
-            self._preview_panel.set_diff_type(DiffType.STASH)
-            self._preview_panel.set_preview(
-                diff_lines, title=stash.msg, subtitle=stash.ref
-            )
-
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
         via HelpPanel.on_before_show before opening."""
@@ -487,14 +452,11 @@ class PigitApplication(Application):
         """Toggle command palette visibility."""
         if self._root is None:
             return
-        palette_widget = by_id("palette", CommandPalette)
-        if palette_widget is None:
-            return
-        if palette_widget.is_active:
-            palette_widget.close()
+        if self._palette.is_active:
+            self._palette.close()
         else:
-            palette_widget.open()
-            self._root.show_sheet(palette_widget, height=8)
+            self._palette.open()
+            self._root.show_sheet(self._palette, height=8)
 
     def _dismiss_palette(self) -> None:
         """Dismiss the palette sheet from the root."""
@@ -507,23 +469,19 @@ class PigitApplication(Application):
 
     def _sync_stash_height(self, rows: int) -> None:
         """Set StashPanel height to 25% of rows, capped at 10, min 3."""
-        status_stack = by_id("status", Column)
-        if status_stack is not None:
-            status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
+        self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
 
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
         was_visible = self._inspector_visible
         self._inspector_visible = not self._inspector_visible
         cols, _ = terminal_size()
-        inspector = by_id("inspector", InspectorPanel)
-        tab_view = by_id("tab_view", TabView)
         self._apply_body_widths(cols)
-        if self._inspector_visible and inspector is not None and tab_view is not None:
-            active = resolve_presented(tab_view.active)
-            if not was_visible and hasattr(inspector, "_last_key"):
-                delattr(inspector, "_last_key")
-            inspector.update_from(active or tab_view.active)
+        if self._inspector_visible:
+            active = resolve_presented(self._tab_view.active)
+            if not was_visible and hasattr(self._inspector, "_last_key"):
+                delattr(self._inspector, "_last_key")
+            self._inspector.update_from(active or self._tab_view.active)
         request_render()
 
     def resize(self, size: tuple[int, int]) -> None:
@@ -541,16 +499,17 @@ class PigitApplication(Application):
         if was_large and not self._is_large_screen and self._preview_panel is not None:
             self._preview_panel.clear()
         if not was_large and self._is_large_screen:
-            self._update_preview()
+            if self._tab_view.active is not None:
+                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
 
     def goto_status(self):
-        by_id("tab_view", TabView).route_to("status")
+        self._tab_view.route_to("status")
 
     def goto_branch(self):
-        by_id("tab_view", TabView).route_to("branch")
+        self._tab_view.route_to("branch")
 
     def goto_commit(self):
-        by_id("tab_view", TabView).route_to("commit")
+        self._tab_view.route_to("commit")
 
     def _refresh_active_panel(self) -> None:
         """Auto-refresh callback: refresh the currently active panel's VM.
@@ -559,13 +518,7 @@ class PigitApplication(Application):
         Does NOT call request_render(); vm.refresh() uses AsyncTask,
         and Signal subscribers trigger rendering when data arrives.
         """
-        try:
-            tab_view = by_id("tab_view", TabView)
-        except RuntimeError:
-            return
-        if tab_view is None:
-            return
-        active = resolve_presented(tab_view.active)
+        active = resolve_presented(self._tab_view.active)
         if active is None:
             return
         # Skip refresh when an overlay is open
@@ -601,49 +554,32 @@ class PigitApplication(Application):
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
 
-    def on_event(self, action: ActionEventType, **data) -> bool:
-        """Central event router: publishes to the framework bus and handles app-level logic."""
-        if action is ActionEventType.mode_changed:
-            self._header_state.mode = data.get("mode", "")
-            tab_view = by_id("tab_view", TabView)
-            active = (
-                resolve_presented(tab_view.active) if tab_view is not None else None
-            )
-            self._event_bus.publish(action, active=active, **data)
-            return True
-        if action is ActionEventType.selection_changed:
-            tab_view = by_id("tab_view", TabView)
-            active = (
-                resolve_presented(tab_view.active) if tab_view is not None else None
-            )
-            if active is not None:
-                tab_name = getattr(active, "tab_name", None)
-                tab_key = getattr(active, "tab_key", None)
-                if tab_name is not None:
-                    self._header_state.tab, self._header_state.tab_key = (
-                        tab_name,
-                        tab_key or "",
-                    )
-                else:
-                    self._header_state.tab, self._header_state.tab_key = (
-                        self._TAB_CONFIG.get(type(active), ("", ""))
-                    )
-            if isinstance(active, (StatusPanel, StashPanel)):
-                self._update_preview()
-            self._event_bus.publish(action, active=active, **data)
-            return True
-        if action is ActionEventType.action_requested and data.get("cmd") == "merge":
+    def on_event(self, action: EventType, **data) -> bool:
+        """Bridge bubbled events to the framework bus; enrich cross-cutting events.
+
+        Application-level handlers (e.g. merge workflow) run after enrichment.
+        Header, footer, inspector, and preview updates are handled by their own
+        bus subscribers.
+        """
+        if action in (EventType("mode_changed"), EVT_SELECTION_CHANGED):
+            data.setdefault("active", self._resolve_active_panel())
+        if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
             return True
         return self._event_bus.publish(action, **data)
 
+    def _resolve_active_panel(self) -> Component | None:
+        """Return the currently presented active panel, or None."""
+        if self._root is None:
+            return None
+        return resolve_presented(self._tab_view.active)
+
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
         lower = cmd.lower()
-        tab_view = by_id("tab_view", TabView)
         if lower == "quit":
             self.quit()
-        elif tab_view.route_to(lower) is not None:
+        elif self._tab_view.route_to(lower) is not None:
             return
         if lower in ("pull", "push", "fetch"):
             self._run_git_action(lower)
@@ -723,7 +659,7 @@ class PigitApplication(Application):
                         "Conflict! Resolve in Status, then continue-merge",
                         duration=3.0,
                     )
-                    by_id("tab_view", TabView).route_to("status")
+                    self._tab_view.route_to("status")
                     return
                 show_toast(f"Merge failed: {e}", duration=3.0)
                 return
@@ -784,8 +720,8 @@ class PigitApplication(Application):
             self._merge_state = None
             self._header_state.merge_target = ""
             self._clear_merge_state()
-            by_id("tab_view", TabView).route_to("branch")
-            by_id("branch", BranchPanel).refresh()
+            self._tab_view.route_to("branch")
+            self._branch_panel.refresh()
             show_toast(f"Merged into {target}", duration=2.0)
 
         self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)

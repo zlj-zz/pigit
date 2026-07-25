@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from pigit.termui._component import Component, ComponentError
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import ItemList, LineTextBrowser
-from pigit.termui.types import ActionEventType, OverlayDispatchResult
+from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED, OverlayDispatchResult
 
 # --- Helpers ---
 
@@ -41,7 +41,7 @@ class MockComponent(Component):
 
 
 class MockTabView(TabView):
-    def update(self, action: ActionEventType, **data):
+    def update(self, action: EventType, **data):
         pass
 
 
@@ -54,12 +54,12 @@ class TestComponentBase:
         child = _Leaf()
         child.parent = parent
         parent.on_event = MagicMock(return_value=True)
-        child.emit(ActionEventType.goto, target="x")
-        parent.on_event.assert_called_once_with(ActionEventType.goto, target="x")
+        child.emit(EVT_GOTO, target="x")
+        parent.on_event.assert_called_once_with(EVT_GOTO, target="x")
 
     def test_emit_without_parent_logs_warning(self):
         child = _Leaf()
-        child.emit(ActionEventType.goto, target="x")
+        child.emit(EVT_GOTO, target="x")
 
     def test_notify_children(self):
         a, b = _Leaf(), _Leaf()
@@ -68,14 +68,14 @@ class TestComponentBase:
         b.parent = parent
         a.update = MagicMock()
         b.update = MagicMock()
-        parent.notify(ActionEventType.goto, target="x")
-        a.update.assert_called_once_with(ActionEventType.goto, target="x")
-        b.update.assert_called_once_with(ActionEventType.goto, target="x")
+        parent.notify(EVT_GOTO, target="x")
+        a.update.assert_called_once_with(EVT_GOTO, target="x")
+        b.update.assert_called_once_with(EVT_GOTO, target="x")
 
     def test_notify_without_children_noop(self):
         leaf = _Leaf()
         leaf.children = []
-        leaf.notify(ActionEventType.goto, target="x")
+        leaf.notify(EVT_GOTO, target="x")
 
     def test_resize_propagates_to_children(self):
         child = _Leaf()
@@ -146,7 +146,7 @@ class TestTabView:
                 pass
 
         class RoutingTabView(TabView):
-            def update(self, action: ActionEventType, **data) -> None:
+            def update(self, action: EventType, **data) -> None:
                 pass
 
         main = RecordingChild("main")
