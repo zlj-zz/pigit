@@ -34,6 +34,7 @@ from pigit.termui import (
     ToastPosition,
 )
 from pigit.termui._component import resolve_presented
+from pigit.termui._runtime_context import get_renderer
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
@@ -482,6 +483,12 @@ class PigitApplication(Application):
             if not was_visible and hasattr(self._inspector, "_last_key"):
                 delattr(self._inspector, "_last_key")
             self._inspector.update_from(active or self._tab_view.active)
+        # Layout change invalidates the incremental-render cache so the
+        # old inspector columns are fully repainted instead of visually
+        # persisting as residue over the widened diff/status area.
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
         request_render()
 
     def resize(self, size: tuple[int, int]) -> None:
