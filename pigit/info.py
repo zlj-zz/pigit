@@ -22,10 +22,8 @@ def introduce() -> str:
         "|_|  |___\\____|___| |_|",
         fg="pink",
     )
-    _pink_version = styled(f" version: {__version__}", fg="pink")
-
     introduce_str = textwrap.dedent("""\
-        {pink_art}{pink_version}
+        {pink_art} version: {version}
 
         {git_version}
 
@@ -43,7 +41,7 @@ def introduce() -> str:
 
     return introduce_str.format(
         pink_art=_pink_art,
-        pink_version=_pink_version,
+        version=__version__,
         git_version=_git_version,
         local_path=os.path.dirname(__file__.replace("./", "")),
         url=__url__,
