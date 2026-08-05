@@ -35,6 +35,7 @@ from pigit.termui import (
 )
 from pigit.termui._component import resolve_presented
 from pigit.termui._runtime_context import get_renderer
+from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
@@ -770,6 +771,16 @@ class PigitApplication(Application):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
     def run(self):
+        if not self._repo_path:
+            Console().echo(
+                "@bold(@red(fatal:)) not a git repository"
+                " (or any of the parent directories): .git\n"
+                "\n"
+                "Pigit needs a git repository to start.\n"
+                "@dim(Use @green(cd) to enter one,"
+                " or @green(pigit --help) to see available commands.)"
+            )
+            return
         try:
             self._run_body()
         except ExitEventLoop as e:
