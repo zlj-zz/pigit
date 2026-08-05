@@ -632,8 +632,15 @@ class PigitApplication(Application):
             pass
 
     def _try_restore_merge_state(self) -> None:
-        """On startup: recover pending merge state if merge is still in progress."""
-        state = self._load_merge_state()
+        """On startup: recover pending merge state if merge is still in progress.
+
+        Swallows GitError (e.g. not a git repo) \u2014 merge state restoration is
+        best-effort and should never prevent the TUI from starting.
+        """
+        try:
+            state = self._load_merge_state()
+        except GitError:
+            return
         if state is None:
             return
         if self._git.is_merge_in_progress():
