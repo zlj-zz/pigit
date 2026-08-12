@@ -795,6 +795,127 @@ class ManagedRepos:
         results = self._switch_execute(target_repos, branch, create=create, force=force)
         return True, [], results
 
+    def switch_repos_stash(
+        self,
+        branch: str,
+        repos: list[str] | None = None,
+        *,
+        create: bool = False,
+        force: bool = False,
+        dry_run: bool = False,
+        dirty_repos: set[str] | None = None,
+    ) -> tuple[list[tuple[str, int, str | None]], list[tuple[str, str]]]:
+        """Switch branches with auto-stash for dirty repos.
+
+        For repos in *dirty_repos*, run ``git stash push -u`` before
+        switching and ``git stash pop`` afterwards.
+
+        .. note::
+           This method skips preflight validation.  Callers must run
+           :meth:`switch_repos` first to vet repos and obtain the
+           dirty-repo set.
+
+        Args:
+            branch: Target branch name.
+            repos: Optional repo-name filter.
+            create: Whether to create the branch if missing.
+            force: Force-switch, discarding local changes.
+            dry_run: If True, no-op — returns immediately with empty results.
+            dirty_repos: Set of repo names that need stash/pop.
+
+        Returns:
+            (results, stash_issues)
+            - results: list of (repo_name, exit_code, stderr_or_none).
+            - stash_issues: list of (repo_name, description) for stash or
+              stash-pop problems the caller should warn about.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos or dry_run:
+            return [], []
+
+        dirty_set = dirty_repos or set()
+        stashed: dict[str, str] = {}
+        stash_issues: list[tuple[str, str]] = []
+
+        # --- stash phase ---
+        if dirty_set:
+            stash_cmds: list[str] = []
+            stash_orders: list[dict] = []
+            stash_names: list[str] = []
+            stash_msg = f"pigit: auto stash before switch {branch}"
+
+            for name, prop in target_repos.items():
+                if name in dirty_set:
+                    stash_cmds.append(f'git stash push -u -m "{stash_msg}"')
+                    stash_orders.append({"cwd": prop["path"]})
+                    stash_names.append(name)
+
+            if stash_cmds:
+                stash_results = self.executor.exec_parallel(
+                    *stash_cmds,
+                    orders=stash_orders,
+                    flags=REPLY | DECODE,
+                    max_concurrent=self._repo_parallel_workers(),
+                )
+                failed_stash: set[str] = set()
+                for name, (code, stderr, _stdout) in zip(
+                    stash_names, stash_results, strict=True
+                ):
+                    if code == 0:
+                        stashed[name] = target_repos[name]["path"]
+                    else:
+                        stash_issues.append(
+                            (name, f"stash failed: {stderr or 'unknown'}")
+                        )
+                        failed_stash.add(name)
+
+                if failed_stash:
+                    target_repos = {
+                        k: v for k, v in target_repos.items()
+                        if k not in failed_stash
+                    }
+
+        # --- execute phase ---
+        results = self._switch_execute(
+            target_repos, branch, create=create, force=force
+        )
+
+        # --- pop phase ---
+        if stashed:
+            pop_cmds: list[str] = []
+            pop_orders: list[dict] = []
+            pop_names: list[str] = []
+
+            for name, cwd in stashed.items():
+                pop_cmds.append("git stash pop")
+                pop_orders.append({"cwd": cwd})
+                pop_names.append(name)
+
+            pop_results = self.executor.exec_parallel(
+                *pop_cmds,
+                orders=pop_orders,
+                flags=REPLY | DECODE,
+                max_concurrent=self._repo_parallel_workers(),
+            )
+            for name, (code, stderr, _stdout) in zip(
+                pop_names, pop_results, strict=True
+            ):
+                if code != 0:
+                    stash_issues.append(
+                        (
+                            name,
+                            f"stash pop failed (conflict?): {stderr or 'unknown'}. "
+                            f'Stash kept — resolve with "git stash pop" manually.',
+                        )
+                    )
+
+        return results, stash_issues
+
     def _switch_preflight(
         self,
         target_repos: dict[str, dict],
@@ -803,7 +924,20 @@ class ManagedRepos:
         create: bool,
         force: bool,
     ) -> list[Blocker]:
-        """Run pre-flight checks for batch branch switch."""
+        """Run three-phase pre-flight checks in parallel.
+
+        Phases:
+            1. validity — ``git rev-parse --git-dir`` per repo.
+            2. branch existence — ``git branch --list <branch>`` per repo.
+            3. workspace cleanliness — ``git status --porcelain`` (skipped
+               when ``force`` is set).
+
+        Returns:
+            List of Blocker objects. Use ``blocker.kind``
+            (BLOCKER_FATAL / BLOCKER_RECOVERABLE) to distinguish
+            fatal issues from recoverable ones.  Recoverable blockers
+            carry dirty-status detail for interactive stash workflows.
+        """
         blockers: list[Blocker] = []
         repo_items = list(target_repos.items())
 

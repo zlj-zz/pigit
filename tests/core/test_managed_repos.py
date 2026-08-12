@@ -556,6 +556,98 @@ class TestBranchNewReposStash:
         assert stash_issues == []
 
 
+class TestSwitchReposStash:
+    """Tests for :meth:`ManagedRepos.switch_repos_stash`."""
+
+    def test_stash_switch_pop_success(self, tmp_repos_json):
+        """Happy path: stash, switch branch, pop stash."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                    0, "", "Saved working directory\n"
+                ),
+                "git switch dev": (0, "", ""),
+                "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_stash_failure_excludes_from_switch(self, tmp_repos_json):
+        """Stash failure excludes the repo from switch."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                    1, "fatal: not a git repository\n", ""
+                ),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert results == []
+        assert any("stash failed" in desc for _, desc in stash_issues)
+
+    def test_dry_run_noop(self, tmp_repos_json):
+        """dry_run=True returns immediately."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor()
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}, dry_run=True
+        )
+        assert results == []
+        assert stash_issues == []
+
+    def test_force_switch_with_stash(self, tmp_repos_json):
+        """Force-switch with stash works."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                    0, "", "Saved working directory\n"
+                ),
+                "git switch -f dev": (0, "", ""),
+                "git stash pop": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], force=True, dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_create_switch_with_stash(self, tmp_repos_json):
+        """Create-and-switch with stash works."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                'git stash push -u -m "pigit: auto stash before switch feat/x"': (
+                    0, "", "Saved working directory\n"
+                ),
+                "git switch -c feat/x": (0, "", ""),
+                "git stash pop": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "feat/x", ["repo-a"], create=True, dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+
 class TestSwitchRepos:
     def test_switch_existing_branch(self, tmp_repos_json):
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
