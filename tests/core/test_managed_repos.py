@@ -445,7 +445,7 @@ class TestBranchNewReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before mkbranch feat/x"': (
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git branch feat/x": (0, "", ""),
@@ -465,7 +465,7 @@ class TestBranchNewReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before mkbranch feat/x"': (
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
                     1, "fatal: not a git repository\n", ""
                 ),
             }
@@ -483,7 +483,7 @@ class TestBranchNewReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before mkbranch feat/x"': (
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git branch feat/x": (0, "", ""),
@@ -531,7 +531,7 @@ class TestBranchNewReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before mkbranch feat/x"': (
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git checkout develop && git checkout -b feat/x": (0, "", ""),
@@ -564,7 +564,7 @@ class TestSwitchReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git switch dev": (0, "", ""),
@@ -584,7 +584,7 @@ class TestSwitchReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
                     1, "fatal: not a git repository\n", ""
                 ),
             }
@@ -612,7 +612,7 @@ class TestSwitchReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before switch dev"': (
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git switch -f dev": (0, "", ""),
@@ -632,7 +632,7 @@ class TestSwitchReposStash:
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
         ex = MockExecutor(
             responses={
-                'git stash push -u -m "pigit: auto stash before switch feat/x"': (
+                "git stash push -u -m 'pigit: auto stash before switch feat/x'": (
                     0, "", "Saved working directory\n"
                 ),
                 "git switch -c feat/x": (0, "", ""),

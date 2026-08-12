@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import pprint
+import shlex
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -530,7 +531,9 @@ class ManagedRepos:
             return blockers
 
         # 2. branch existence check
-        branch_cmds = [f"git branch --list {branch_name}"] * len(valid_repos)
+        branch_cmds = [
+            f"git branch --list {shlex.quote(branch_name)}"
+        ] * len(valid_repos)
         branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
         branch_results = self.executor.exec_parallel(
             *branch_cmds,
@@ -596,12 +599,12 @@ class ManagedRepos:
         """Execute branch creation across repos in parallel."""
         parts: list[str] = []
         if base:
-            parts.append(f"git checkout {base}")
+            parts.append(f"git checkout {shlex.quote(base)}")
         if checkout:
-            parts.append(f"git checkout -b {branch_name}")
+            parts.append(f"git checkout -b {shlex.quote(branch_name)}")
         else:
             flag = " -f" if force else ""
-            parts.append(f"git branch{flag} {branch_name}")
+            parts.append(f"git branch{flag} {shlex.quote(branch_name)}")
         cmd = " && ".join(parts)
 
         repo_items = list(target_repos.items())
@@ -682,7 +685,7 @@ class ManagedRepos:
                 if name in dirty_set:
                     # Include untracked files (-u) so checkout won't clash
                     stash_cmds.append(
-                        f'git stash push -u -m "{stash_msg}"'
+                        f"git stash push -u -m {shlex.quote(stash_msg)}"
                     )
                     stash_orders.append({"cwd": prop["path"]})
                     stash_names.append(name)
@@ -851,7 +854,9 @@ class ManagedRepos:
 
             for name, prop in target_repos.items():
                 if name in dirty_set:
-                    stash_cmds.append(f'git stash push -u -m "{stash_msg}"')
+                    stash_cmds.append(
+                        f"git stash push -u -m {shlex.quote(stash_msg)}"
+                    )
                     stash_orders.append({"cwd": prop["path"]})
                     stash_names.append(name)
 
@@ -964,7 +969,9 @@ class ManagedRepos:
         if not valid_repos:
             return blockers
 
-        branch_cmds = [f"git branch --list {branch}"] * len(valid_repos)
+        branch_cmds = [
+            f"git branch --list {shlex.quote(branch)}"
+        ] * len(valid_repos)
         branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
         branch_results = self.executor.exec_parallel(
             *branch_cmds,
@@ -1031,7 +1038,7 @@ class ManagedRepos:
         """Execute branch switch across repos in parallel."""
         flag = " -f" if force else ""
         create_flag = " -c" if create else ""
-        cmd = f"git switch{create_flag}{flag} {branch}"
+        cmd = f"git switch{create_flag}{flag} {shlex.quote(branch)}"
 
         repo_items = list(target_repos.items())
         cmds = [cmd] * len(repo_items)
