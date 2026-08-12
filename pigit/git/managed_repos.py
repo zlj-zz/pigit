@@ -6,12 +6,35 @@ import os
 import pprint
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 
 _logger = logging.getLogger(__name__)
+
+# Blocker.kind constants
+BLOCKER_FATAL = "fatal"
+BLOCKER_RECOVERABLE = "recoverable"
+
+
+@dataclass
+class Blocker:
+    """Pre-flight blocker for a repo operation.
+
+    Attributes:
+        name: Repo name.
+        reason: Human-readable reason.
+        kind: Blocker category — 'fatal' (invalid repo, branch exists) or
+              'recoverable' (uncommitted changes).
+        detail: Supplementary info (e.g. raw git status --porcelain output).
+    """
+
+    name: str
+    reason: str
+    kind: str = "fatal"
+    detail: str = ""
 
 
 def iter_managed_repo_names(repos: dict[str, dict]) -> list[str]:
@@ -428,13 +451,14 @@ class ManagedRepos:
         base: str | None = None,
         force: bool = False,
         dry_run: bool = False,
-    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+    ) -> tuple[bool, list[Blocker], list[tuple[str, int, str | None]]]:
         """Batch create new branches across managed repos.
 
         Returns:
             (all_ok, blockers, results)
             - all_ok: bool, whether pre-flight passed and execution succeeded.
-            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - blockers: list of Blocker from pre-flight failures.
+              Use ``blocker.kind`` to distinguish fatal from recoverable.
             - results: list of (repo_name, exit_code, stderr_or_none) from execution.
               Empty if pre-flight failed or dry_run.
         """
@@ -469,9 +493,16 @@ class ManagedRepos:
         checkout: bool,
         base: str | None,
         force: bool,
-    ) -> list[tuple[str, str]]:
-        """Run three-phase pre-flight checks in parallel."""
-        blockers: list[tuple[str, str]] = []
+    ) -> list[Blocker]:
+        """Run three-phase pre-flight checks in parallel.
+
+        Returns:
+            List of Blocker objects. Fatal blockers (invalid repo, existing
+            branch) cannot be automatically resolved. Recoverable blockers
+            (uncommitted changes) carry dirty-status detail for the caller
+            to present to the user.
+        """
+        blockers: list[Blocker] = []
         repo_items = list(target_repos.items())
 
         # 1. validity check
@@ -489,7 +520,9 @@ class ManagedRepos:
             repo_items, validity_results, strict=True
         ):
             if code != 0:
-                blockers.append((name, "invalid repo"))
+                blockers.append(
+                    Blocker(name=name, reason="invalid repo", kind=BLOCKER_FATAL)
+                )
             else:
                 valid_repos[name] = prop
 
@@ -512,7 +545,13 @@ class ManagedRepos:
         ):
             if out and out.strip():
                 if not force:
-                    blockers.append((name, f"branch '{branch_name}' already exists"))
+                    blockers.append(
+                        Blocker(
+                            name=name,
+                            reason=f"branch '{branch_name}' already exists",
+                            kind=BLOCKER_FATAL,
+                        )
+                    )
                     continue
             clean_repos[name] = prop
 
@@ -534,7 +573,14 @@ class ManagedRepos:
                 clean_repos.items(), status_results, strict=True
             ):
                 if out and out.strip():
-                    blockers.append((name, "uncommitted changes"))
+                    blockers.append(
+                        Blocker(
+                            name=name,
+                            reason="uncommitted changes",
+                            kind=BLOCKER_RECOVERABLE,
+                            detail=out.strip(),
+                        )
+                    )
 
         return blockers
 
@@ -575,6 +621,140 @@ class ManagedRepos:
             )
         ]
 
+    def branch_new_repos_stash(
+        self,
+        branch_name: str,
+        repos: list[str] | None = None,
+        *,
+        checkout: bool = False,
+        base: str | None = None,
+        force: bool = False,
+        dry_run: bool = False,
+        dirty_repos: set[str] | None = None,
+    ) -> tuple[list[tuple[str, int, str | None]], list[tuple[str, str]]]:
+        """Create branches with auto-stash for dirty repos.
+
+        For repos in *dirty_repos*, run ``git stash push -u`` before branch
+        creation and ``git stash pop`` afterwards.  Other repos follow the
+        normal branch-creation path.
+
+        .. note::
+           This method skips preflight validation.  Callers must run
+           :meth:`branch_new_repos` first to vet repos and obtain the
+           dirty-repo set.
+
+        Args:
+            branch_name: Name of the new branch.
+            repos: Optional repo-name filter.
+            checkout: Whether to checkout the new branch.
+            base: Base branch to create from.
+            force: Force-create if branch already exists.
+            dry_run: If True, no-op — returns immediately with empty results.
+            dirty_repos: Set of repo names that need stash/pop.
+
+        Returns:
+            (results, stash_issues)
+            - results: list of (repo_name, exit_code, stderr_or_none).
+            - stash_issues: list of (repo_name, description) for stash or
+              stash-pop problems the caller should warn about.
+        """
+        exist_repos = self.load_repos()
+        if repos:
+            target_repos = {k: v for k, v in exist_repos.items() if k in repos}
+        else:
+            target_repos = exist_repos
+
+        if not target_repos or dry_run:
+            return [], []
+
+        dirty_set = dirty_repos or set()
+        stashed: dict[str, str] = {}  # repo_name -> cwd path
+        stash_issues: list[tuple[str, str]] = []
+
+        # --- stash phase ---
+        if dirty_set:
+            stash_cmds: list[str] = []
+            stash_orders: list[dict] = []
+            stash_names: list[str] = []
+            stash_msg = f"pigit: auto stash before mkbranch {branch_name}"
+
+            for name, prop in target_repos.items():
+                if name in dirty_set:
+                    # Include untracked files (-u) so checkout won't clash
+                    stash_cmds.append(
+                        f'git stash push -u -m "{stash_msg}"'
+                    )
+                    stash_orders.append({"cwd": prop["path"]})
+                    stash_names.append(name)
+
+            if stash_cmds:
+                stash_results = self.executor.exec_parallel(
+                    *stash_cmds,
+                    orders=stash_orders,
+                    flags=REPLY | DECODE,
+                    max_concurrent=self._repo_parallel_workers(),
+                )
+                failed_stash: set[str] = set()
+                for name, (code, stderr, _stdout) in zip(
+                    stash_names, stash_results, strict=True
+                ):
+                    if code == 0:
+                        stashed[name] = target_repos[name]["path"]
+                    else:
+                        stash_issues.append(
+                            (name, f"stash failed: {stderr or 'unknown'}")
+                        )
+                        failed_stash.add(name)
+
+                # Exclude repos whose stash failed — executing branch
+                # creation on a dirty working tree is unsafe.
+                if failed_stash:
+                    target_repos = {
+                        k: v for k, v in target_repos.items()
+                        if k not in failed_stash
+                    }
+
+        # --- execute phase ---
+        results = self._branch_new_execute(
+            target_repos,
+            branch_name,
+            checkout=checkout,
+            base=base,
+            force=force,
+        )
+
+        # --- pop phase ---
+        if stashed:
+            pop_cmds: list[str] = []
+            pop_orders: list[dict] = []
+            pop_names: list[str] = []
+
+            for name, cwd in stashed.items():
+                pop_cmds.append("git stash pop")
+                pop_orders.append({"cwd": cwd})
+                pop_names.append(name)
+
+            pop_results = self.executor.exec_parallel(
+                *pop_cmds,
+                orders=pop_orders,
+                flags=REPLY | DECODE,
+                max_concurrent=self._repo_parallel_workers(),
+            )
+            for name, (code, stderr, _stdout) in zip(
+                pop_names, pop_results, strict=True
+            ):
+                if code != 0:
+                    # stash stays in the stack — no data loss
+                    stash_issues.append(
+                        (
+                            name,
+                            f"stash pop failed (conflict?): {stderr or 'unknown'}. "
+                            f'Stash kept — resolve with "git stash pop" manually.',
+                        )
+                    )
+
+        return results, stash_issues
+
     def switch_repos(
         self,
         branch: str,
@@ -583,13 +763,14 @@ class ManagedRepos:
         create: bool = False,
         force: bool = False,
         dry_run: bool = False,
-    ) -> tuple[bool, list[tuple[str, str]], list[tuple[str, int, str | None]]]:
+    ) -> tuple[bool, list[Blocker], list[tuple[str, int, str | None]]]:
         """Batch switch branch across managed repos.
 
         Returns:
             (all_ok, blockers, results)
             - all_ok: bool, whether pre-flight passed and execution succeeded.
-            - blockers: list of (repo_name, reason) from pre-flight failures.
+            - blockers: list of Blocker from pre-flight failures.
+              Use ``blocker.kind`` to distinguish fatal from recoverable.
             - results: list of (repo_name, exit_code, stderr_or_none) from execution.
               Empty if pre-flight failed or dry_run.
         """
@@ -621,9 +802,9 @@ class ManagedRepos:
         *,
         create: bool,
         force: bool,
-    ) -> list[tuple[str, str]]:
+    ) -> list[Blocker]:
         """Run pre-flight checks for batch branch switch."""
-        blockers: list[tuple[str, str]] = []
+        blockers: list[Blocker] = []
         repo_items = list(target_repos.items())
 
         validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
@@ -640,7 +821,9 @@ class ManagedRepos:
             repo_items, validity_results, strict=True
         ):
             if code != 0:
-                blockers.append((name, "invalid repo"))
+                blockers.append(
+                    Blocker(name=name, reason="invalid repo", kind=BLOCKER_FATAL)
+                )
             else:
                 valid_repos[name] = prop
 
@@ -668,7 +851,13 @@ class ManagedRepos:
 
         if repos_without_branch and not create:
             for name in repos_without_branch:
-                blockers.append((name, f"branch '{branch}' does not exist"))
+                blockers.append(
+                    Blocker(
+                        name=name,
+                        reason=f"branch '{branch}' does not exist",
+                        kind=BLOCKER_FATAL,
+                    )
+                )
 
         if force:
             return blockers
@@ -686,7 +875,14 @@ class ManagedRepos:
             valid_repos.items(), status_results, strict=True
         ):
             if out and out.strip():
-                blockers.append((name, "uncommitted changes"))
+                blockers.append(
+                    Blocker(
+                        name=name,
+                        reason="uncommitted changes",
+                        kind=BLOCKER_RECOVERABLE,
+                        detail=out.strip(),
+                    )
+                )
 
         return blockers
 
