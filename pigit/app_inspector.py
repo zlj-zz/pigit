@@ -168,9 +168,7 @@ class InspectorPanel(Component):
         content_x = 2
         surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim)
         if h > 1:
-            surface.draw_hline_rgb(
-                1, content_x, w - content_x, fg=THEME.fg_dim
-            )
+            surface.draw_hline_rgb(1, content_x, w - content_x, fg=THEME.fg_dim)
 
         # Title
         title = f" {self._title} "

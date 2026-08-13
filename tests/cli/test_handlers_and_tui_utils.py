@@ -157,7 +157,13 @@ def test_mkbranch_blockers_exit_1(mock_ctx):
 
     mock_ctx.managed_repos.branch_new_repos.return_value = (
         False,
-        [Blocker(name="repo-a", reason="branch 'feat/x' already exists", kind=BLOCKER_FATAL)],
+        [
+            Blocker(
+                name="repo-a",
+                reason="branch 'feat/x' already exists",
+                kind=BLOCKER_FATAL,
+            )
+        ],
         [],
     )
     echo = MagicMock()
@@ -253,7 +259,11 @@ def test_switch_blockers_exit_1(mock_ctx):
 
     mock_ctx.managed_repos.switch_repos.return_value = (
         False,
-        [Blocker(name="repo-a", reason="branch 'dev' does not exist", kind=BLOCKER_FATAL)],
+        [
+            Blocker(
+                name="repo-a", reason="branch 'dev' does not exist", kind=BLOCKER_FATAL
+            )
+        ],
         [],
     )
     echo = MagicMock()

@@ -4,7 +4,12 @@ from unittest.mock import MagicMock
 from pigit.termui._component import Component, ComponentError
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import ItemList, LineTextBrowser
-from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED, OverlayDispatchResult
+from pigit.termui.types import (
+    EventType,
+    EVT_GOTO,
+    EVT_SELECTION_CHANGED,
+    OverlayDispatchResult,
+)
 
 # --- Helpers ---
 

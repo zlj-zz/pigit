@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Files that are allowed to reference palette directly
 _EXEMPT_FILES = {
     "app_theme.py",
@@ -62,5 +61,7 @@ def _collect_app_files() -> list[Path]:
 def test_no_direct_palette_color_refs(file_path: Path) -> None:
     violations = _find_violations(file_path)
     if violations:
-        msg = "\n  ".join([f"Direct palette color refs in {file_path.name}:"] + violations)
+        msg = "\n  ".join(
+            [f"Direct palette color refs in {file_path.name}:"] + violations
+        )
         pytest.fail(msg)

@@ -127,14 +127,14 @@ def _status_label(file: File) -> str:
 class StatusTreeRow:
     """A row in the status tree: a directory node or a file node."""
 
-    kind: str                  # "dir" | "file"
-    path: str                  # Full relative path (directory or file path)
-    name: str                  # Display name (basename)
-    depth: int                 # Indent depth (0 = top level)
-    file: File | None          # Non-None for file nodes; None for directory nodes
-    source_index: int          # Source index into _all_files for files; -1 for dirs
+    kind: str  # "dir" | "file"
+    path: str  # Full relative path (directory or file path)
+    name: str  # Display name (basename)
+    depth: int  # Indent depth (0 = top level)
+    file: File | None  # Non-None for file nodes; None for directory nodes
+    source_index: int  # Source index into _all_files for files; -1 for dirs
     child_indices: frozenset[int] = frozenset()  # Dirs: all file source indices below
-    summary: str = ""          # Dirs: change summary
+    summary: str = ""  # Dirs: change summary
 
 
 @dataclass
@@ -225,8 +225,12 @@ def build_status_tree(
         node = dirs[prefix]
         rows.append(
             StatusTreeRow(
-                kind="dir", path=prefix, name=prefix.rsplit("/", 1)[-1],
-                depth=depth, file=None, source_index=-1,
+                kind="dir",
+                path=prefix,
+                name=prefix.rsplit("/", 1)[-1],
+                depth=depth,
+                file=None,
+                source_index=-1,
                 child_indices=frozenset(node.all_indices),
                 summary=_summarize(node.all_files),
             )
@@ -239,8 +243,12 @@ def build_status_tree(
             p = f.get_file_str().replace("\\", "/")
             rows.append(
                 StatusTreeRow(
-                    kind="file", path=p, name=p.rsplit("/", 1)[-1],
-                    depth=depth + 1, file=f, source_index=idx,
+                    kind="file",
+                    path=p,
+                    name=p.rsplit("/", 1)[-1],
+                    depth=depth + 1,
+                    file=f,
+                    source_index=idx,
                 )
             )
 
@@ -250,8 +258,12 @@ def build_status_tree(
         p = f.get_file_str().replace("\\", "/")
         rows.append(
             StatusTreeRow(
-                kind="file", path=p, name=p.rsplit("/", 1)[-1],
-                depth=0, file=f, source_index=idx,
+                kind="file",
+                path=p,
+                name=p.rsplit("/", 1)[-1],
+                depth=0,
+                file=f,
+                source_index=idx,
             )
         )
     return rows
@@ -621,9 +633,7 @@ class StatusPanel(ItemList):
         """Return (file, source_index) at cursor; None on dir row or no file."""
         if not self._tree_mode:
             if self.files and 0 <= self.curr_no < len(self.files):
-                return self.files[self.curr_no], self._filter.source_index(
-                    self.curr_no
-                )
+                return self.files[self.curr_no], self._filter.source_index(self.curr_no)
             return None
         row = self._row(self.curr_no)
         if row is None or row.kind == "dir":

@@ -85,7 +85,9 @@ class _DisplayOps(_OpsBase):
 
         # Get all branches.
         if not include_part or "branch" in include_part:
-            branches = self._branch.get_branches(path, include_remote=True, plain=not color)
+            branches = self._branch.get_branches(
+                path, include_remote=True, plain=not color
+            )
             branches_str = (
                 "\n".join(f"\t{branch}" for branch in branches)
                 if branches

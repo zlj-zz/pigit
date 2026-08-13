@@ -16,16 +16,14 @@ class TestAutoRefreshConfig:
         "toml_content,expected",
         [
             ("", 10.0),  # default when no [tui] section
-            ('[tui]\nauto_refresh_interval = 30.0\n', 30.0),
-            ('[tui]\nauto_refresh_interval = 0\n', 0.0),
+            ("[tui]\nauto_refresh_interval = 30.0\n", 30.0),
+            ("[tui]\nauto_refresh_interval = 0\n", 0.0),
         ],
     )
     def test_auto_refresh_interval(self, toml_content, expected):
         """Config file can set, override, or disable auto_refresh_interval."""
         Config._instances.clear()
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             path = f.name
         try:

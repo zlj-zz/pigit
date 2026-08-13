@@ -14,7 +14,6 @@ from pigit.cmdparse.completion import (
 from pigit.init import get_shell
 
 
-
 def _inject_registry_commands(complete_vars):
     """Inject cmd_new registry commands into cmd completion, mirroring entry.py."""
     from pigit.git.cmds import get_registry, register_user_commands

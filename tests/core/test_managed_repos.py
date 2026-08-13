@@ -446,7 +446,9 @@ class TestBranchNewReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git branch feat/x": (0, "", ""),
                 "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
@@ -466,7 +468,9 @@ class TestBranchNewReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
-                    1, "fatal: not a git repository\n", ""
+                    1,
+                    "fatal: not a git repository\n",
+                    "",
                 ),
             }
         )
@@ -484,7 +488,9 @@ class TestBranchNewReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git branch feat/x": (0, "", ""),
                 "git stash pop": (1, "CONFLICT: Merge conflict\n", ""),
@@ -532,7 +538,9 @@ class TestBranchNewReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git checkout develop && git checkout -b feat/x": (0, "", ""),
                 "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
@@ -540,8 +548,7 @@ class TestBranchNewReposStash:
         )
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         results, stash_issues = mr.branch_new_repos_stash(
-            "feat/x", ["repo-a"], checkout=True, base="develop",
-            dirty_repos={"repo-a"}
+            "feat/x", ["repo-a"], checkout=True, base="develop", dirty_repos={"repo-a"}
         )
         assert len(results) == 1
         assert results[0] == ("repo-a", 0, None)
@@ -565,7 +572,9 @@ class TestSwitchReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before switch dev'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git switch dev": (0, "", ""),
                 "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
@@ -585,7 +594,9 @@ class TestSwitchReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before switch dev'": (
-                    1, "fatal: not a git repository\n", ""
+                    1,
+                    "fatal: not a git repository\n",
+                    "",
                 ),
             }
         )
@@ -613,7 +624,9 @@ class TestSwitchReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before switch dev'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git switch -f dev": (0, "", ""),
                 "git stash pop": (0, "", ""),
@@ -633,7 +646,9 @@ class TestSwitchReposStash:
         ex = MockExecutor(
             responses={
                 "git stash push -u -m 'pigit: auto stash before switch feat/x'": (
-                    0, "", "Saved working directory\n"
+                    0,
+                    "",
+                    "Saved working directory\n",
                 ),
                 "git switch -c feat/x": (0, "", ""),
                 "git stash pop": (0, "", ""),

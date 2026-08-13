@@ -103,14 +103,10 @@ class _BranchOps(_OpsBase):
 
             track = items[4]
             branch.ahead = (
-                str(m[1])
-                if (m := _RE_BRANCH_AHEAD.search(cast(str, track)))
-                else "0"
+                str(m[1]) if (m := _RE_BRANCH_AHEAD.search(cast(str, track))) else "0"
             )
             branch.behind = (
-                str(m[1])
-                if (m := _RE_BRANCH_BEHIND.search(cast(str, track)))
-                else "0"
+                str(m[1]) if (m := _RE_BRANCH_BEHIND.search(cast(str, track))) else "0"
             )
             branches.append(branch)
 

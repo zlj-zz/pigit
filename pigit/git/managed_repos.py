@@ -541,9 +541,9 @@ class ManagedRepos:
             return blockers
 
         # 2. branch existence check
-        branch_cmds = [
-            f"git branch --list {shlex.quote(branch_name)}"
-        ] * len(valid_repos)
+        branch_cmds = [f"git branch --list {shlex.quote(branch_name)}"] * len(
+            valid_repos
+        )
         branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
         branch_results = self.executor.exec_parallel(
             *branch_cmds,
@@ -748,8 +748,7 @@ class ManagedRepos:
                 if failed_stash:
                     # Executing on a dirty tree is unsafe — exclude those repos.
                     target_repos = {
-                        k: v for k, v in target_repos.items()
-                        if k not in failed_stash
+                        k: v for k, v in target_repos.items() if k not in failed_stash
                     }
 
         # --- execute phase ---
@@ -909,9 +908,7 @@ class ManagedRepos:
         if not valid_repos:
             return blockers
 
-        branch_cmds = [
-            f"git branch --list {shlex.quote(branch)}"
-        ] * len(valid_repos)
+        branch_cmds = [f"git branch --list {shlex.quote(branch)}"] * len(valid_repos)
         branch_orders = [{"cwd": prop["path"]} for prop in valid_repos.values()]
         branch_results = self.executor.exec_parallel(
             *branch_cmds,

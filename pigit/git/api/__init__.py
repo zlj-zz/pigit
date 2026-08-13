@@ -117,14 +117,29 @@ class GitApi:
         return self._branch.get_branch_creation_time(branch_name, path)
 
     # ── _commit ──
-    def load_log(self, branch_name="", limit=None, filter_path="", arg_str=_DEFAULT_LOG_FORMAT, path=None):
+    def load_log(
+        self,
+        branch_name="",
+        limit=None,
+        filter_path="",
+        arg_str=_DEFAULT_LOG_FORMAT,
+        path=None,
+    ):
         return self._commit.load_log(branch_name, limit, filter_path, arg_str, path)
 
-    def iter_commits(self, branch_name, limit=True, max_commits=300, filter_path="", path=None):
-        return self._commit.iter_commits(branch_name, limit, max_commits, filter_path, path)
+    def iter_commits(
+        self, branch_name, limit=True, max_commits=300, filter_path="", path=None
+    ):
+        return self._commit.iter_commits(
+            branch_name, limit, max_commits, filter_path, path
+        )
 
-    def load_commits(self, branch_name, limit=True, filter_path="", path=None, max_commits=300):
-        return self._commit.load_commits(branch_name, limit, filter_path, path, max_commits)
+    def load_commits(
+        self, branch_name, limit=True, filter_path="", path=None, max_commits=300
+    ):
+        return self._commit.load_commits(
+            branch_name, limit, filter_path, path, max_commits
+        )
 
     def get_commit_bodies(self, branch_name, max_commits=300, path=None):
         return self._commit.get_commit_bodies(branch_name, max_commits, path)

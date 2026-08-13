@@ -1246,7 +1246,12 @@ class DiffViewer(LineTextBrowser):
                 tokens = [(code, THEME.fg_primary, wcswidth(code), None)]
 
         self._draw_tokens(
-            surface, row, col, max_col, tokens, bg,
+            surface,
+            row,
+            col,
+            max_col,
+            tokens,
+            bg,
             clip_left=text_start_col,
         )
 

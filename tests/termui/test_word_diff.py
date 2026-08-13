@@ -16,7 +16,7 @@ class TestWordDiffRanges:
     def test_range_word_replace(self):
         del_r, add_r = DiffViewer._word_diff_ranges("hello world", "hello new")
         assert del_r == [(6, 11)]  # "world"
-        assert add_r == [(6, 9)]   # "new"
+        assert add_r == [(6, 9)]  # "new"
 
     def test_range_multiple_word_changes(self):
         del_r, add_r = DiffViewer._word_diff_ranges(
@@ -41,9 +41,7 @@ class TestWordBoundaryTokenization:
 
     def test_punctuation_splits(self):
         """``foo.bar()`` → ``["foo", ".", "bar", "(", ")"]``."""
-        del_r, add_r = DiffViewer._word_diff_ranges(
-            "func foo.bar()", "func fooBar()"
-        )
+        del_r, add_r = DiffViewer._word_diff_ranges("func foo.bar()", "func fooBar()")
         # ".bar()" → "Bar()": only the changed sub-range highlighted.
         assert del_r == [(5, 12)]  # "foo.bar"
         assert add_r == [(5, 11)]  # "fooBar"
@@ -136,14 +134,16 @@ class TestSetContentLocalWordDiff:
     def test_unpaired_lines_no_word_diff(self):
         """Pure additions / deletions get no word-diff (line bg is enough)."""
         dv = DiffViewer(word_diff=True)
-        dv.set_content([
-            "diff --git a/f.py b/f.py",
-            "@@ -1,2 +1,3 @@",
-            " ctx",
-            "-old1",
-            "-old2",
-            "+new1",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,2 +1,3 @@",
+                " ctx",
+                "-old1",
+                "-old2",
+                "+new1",
+            ]
+        )
         # old1 paired (with new1), old2 unpaired -> no word-diff segments.
         assert dv._word_diff_segments[4] == []  # unpaired "-old2"
 

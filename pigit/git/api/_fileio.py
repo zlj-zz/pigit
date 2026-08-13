@@ -38,9 +38,7 @@ class _FileioOps(_OpsBase):
             return None
         return cast(str, out).strip()
 
-    def cat_file_to_path(
-        self, sha: str, dest, path: str | None = None
-    ) -> None:
+    def cat_file_to_path(self, sha: str, dest, path: str | None = None) -> None:
         """git cat-file -p <sha> > <dest>. Restores exact blob content."""
         path = path or self.path
         dest_name = _file_path_for_cmd(dest)
