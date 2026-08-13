@@ -44,8 +44,10 @@ class _FakeStatusPanel(StatusPanel):
         self.files = files
         self._source_index = source_index
 
-    def filter_source_index(self, visible_idx: int | None = None) -> int:
-        return self._source_index
+    def file_at_cursor(self):
+        if self.files and 0 <= self.curr_no < len(self.files):
+            return self.files[self.curr_no], self._source_index
+        return None
 
 
 class _FakeStashPanel(StashPanel):

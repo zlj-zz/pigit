@@ -96,10 +96,14 @@ class Config(metaclass=Singleton):
 
         # (bool) Enable word-diff by default in the diff viewer.
         word_diff = {tui_word_diff}
+
+        # (str) Status panel default view. Supported: [flat, tree]
+        status_view = "{tui_status_view}"
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
     _git_config_format_candidate: list[str] = ["normal", "table"]
+    _status_view_candidate: list[str] = ["flat", "tree"]
 
     def __init__(
         self, path: str, version: str = "unknown", auto_load: bool = True
@@ -234,9 +238,18 @@ class Config(metaclass=Singleton):
 
         # Parse [tui] section
         tui_raw = raw.get("tui", {})
+        status_view = tui_raw.get("status_view", "tree")
+        if status_view not in self._status_view_candidate:
+            status_view = "tree"
+            self._warnings.append(
+                'Config key "tui.status_view" support must in {}'.format(
+                    self._status_view_candidate
+                )
+            )
         tui = TuiConfig(
             auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
-            word_diff=tui_raw.get("word_diff", False),
+            word_diff=tui_raw.get("word_diff", True),
+            status_view=status_view,
         )
 
         # Version check
@@ -305,6 +318,7 @@ class Config(metaclass=Singleton):
                         log_output=str(data.log.output).lower(),
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                         tui_word_diff=str(data.tui.word_diff).lower(),
+                        tui_status_view=data.tui.status_view,
                     )
                 )
         except Exception:

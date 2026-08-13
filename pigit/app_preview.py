@@ -78,15 +78,11 @@ class PreviewPanel(Component):
             return True
 
         if isinstance(active, StatusPanel):
-            if (
-                not active.files
-                or active.curr_no < 0
-                or active.curr_no >= len(active.files)
-            ):
+            hit = active.file_at_cursor()
+            if hit is None:
                 self.clear()
                 return True
-            f = active.files[active.curr_no]
-            source_idx = active.filter_source_index()
+            f, source_idx = hit
             diff_lines = self._status_vm.load_diff(source_idx)
             diff_type = (
                 DiffType.STAGED

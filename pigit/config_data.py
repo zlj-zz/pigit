@@ -46,6 +46,7 @@ class LogConfig:
 class TuiConfig:
     auto_refresh_interval: float = 10.0
     word_diff: bool = True
+    status_view: Literal["flat", "tree"] = "tree"
 
 
 @dataclass

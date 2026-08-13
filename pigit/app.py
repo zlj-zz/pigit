@@ -91,6 +91,9 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("E", "Open file in external $EDITOR"),
             ("o", "Checkout ours (conflict)"),
             ("t", "Checkout theirs (conflict)"),
+            ("T", "Toggle tree / flat file view"),
+            ("l", "Expand directory (tree view)"),
+            ("h", "Collapse directory (tree view)"),
         ],
     ),
     (
@@ -260,7 +263,11 @@ class PigitApplication(Application):
             status_vm=self._status_vm,
         )
 
-        status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
+        status_panel = StatusPanel(
+            vm=self._status_vm,
+            id="status_panel",
+            default_view=self._config.status_view,
+        )
         stash_panel = StashPanel(vm=self._status_vm, id="stash")
         self._status_stack = TabPanel(
             children=[status_panel, stash_panel],
