@@ -76,10 +76,14 @@ def register_user_commands(
 
 
 class GitCommandNew:
-    """New Git command processor running parallel to GitProxy.
+    """Processor for the ``pigit cmd`` short-command DSL.
 
-    This class provides the main interface for the new command system,
-    integrating registry, resolver, config, validator, and secure executor.
+    Maps short command names (e.g. ``b.c``) to git command strings and
+    executes them. This is a separate abstraction from ``LocalGit``, which
+    exposes structured git data to the TUI panels — the two are not layered
+    on top of each other.
+
+    Integrates registry, resolver, config, validator, and secure executor.
     """
 
     def __init__(

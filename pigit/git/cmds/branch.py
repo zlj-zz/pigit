@@ -17,7 +17,7 @@ from ._completion_types import CompletionType
     category=CommandCategory.BRANCH,
     help="List, create, rename, and delete branches.",
     has_args=True,
-    examples=["pigit cmd_new b", "pigit cmd_new b --list"],
+    examples=["pigit cmd b", "pigit cmd b --list"],
     related=["b.c", "b.d", "b.m"],
 )
 def branch_list(args: list[str]) -> str:
@@ -30,7 +30,7 @@ def branch_list(args: list[str]) -> str:
     category=CommandCategory.BRANCH,
     help="Create a new branch.",
     has_args=True,
-    examples=["pigit cmd_new b.c feature-branch", "pigit cmd_new b.c hotfix/123 main"],
+    examples=["pigit cmd b.c feature-branch", "pigit cmd b.c hotfix/123 main"],
     related=["b", "b.o"],
 )
 def branch_create(args: list[str]) -> str:
@@ -49,7 +49,7 @@ def branch_create(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Delete branch? Unmerged changes may be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new b.d old-feature"],
+    examples=["pigit cmd b.d old-feature"],
     related=["b.D", "b"],
 )
 def branch_delete(args: list[str]) -> str:
@@ -68,7 +68,7 @@ def branch_delete(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Force delete branch? Unmerged changes WILL be lost!",
     security_level=SecurityLevel.DESTRUCTIVE,
-    examples=["pigit cmd_new b.D stale-branch"],
+    examples=["pigit cmd b.D stale-branch"],
     related=["b.d", "b"],
 )
 def branch_force_delete(args: list[str]) -> str:
@@ -84,7 +84,7 @@ def branch_force_delete(args: list[str]) -> str:
     help="Rename (move) a branch.",
     has_args=True,
     arg_completion=[CompletionType.BRANCH, CompletionType.BRANCH],
-    examples=["pigit cmd_new b.m old-name new-name"],
+    examples=["pigit cmd b.m old-name new-name"],
     related=["b.M", "b"],
 )
 def branch_move(args: list[str]) -> str:
@@ -103,7 +103,7 @@ def branch_move(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Force rename branch? Target branch will be overwritten.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new b.M old-name existing-name"],
+    examples=["pigit cmd b.M old-name existing-name"],
     related=["b.m", "b"],
 )
 def branch_move_force(args: list[str]) -> str:
@@ -117,7 +117,7 @@ def branch_move_force(args: list[str]) -> str:
     short="b.v",
     category=CommandCategory.BRANCH,
     help="List branches with verbose output (upstream, last commit).",
-    examples=["pigit cmd_new b.v", "pigit cmd_new b.v -r"],
+    examples=["pigit cmd b.v", "pigit cmd b.v -r"],
     related=["b", "b.a"],
 )
 def branch_verbose(args: list[str]) -> str:
@@ -129,7 +129,7 @@ def branch_verbose(args: list[str]) -> str:
     short="b.a",
     category=CommandCategory.BRANCH,
     help="List all branches (local and remote).",
-    examples=["pigit cmd_new b.a", "pigit cmd_new b.a -vv"],
+    examples=["pigit cmd b.a", "pigit cmd b.a -vv"],
     related=["b", "b.v"],
 )
 def branch_all(args: list[str]) -> str:
@@ -143,7 +143,7 @@ def branch_all(args: list[str]) -> str:
     help="Checkout (switch to) a branch.",
     has_args=True,
     arg_completion=[CompletionType.BRANCH],
-    examples=["pigit cmd_new b.o main", "pigit cmd_new b.o -b new-branch"],
+    examples=["pigit cmd b.o main", "pigit cmd b.o -b new-branch"],
     related=["b.c", "b"],
 )
 def branch_checkout(args: list[str]) -> str:

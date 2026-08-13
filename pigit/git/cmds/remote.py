@@ -17,7 +17,7 @@ from ._completion_types import CompletionType
     category=CommandCategory.REMOTE,
     help="Manage remote repositories.",
     has_args=True,
-    examples=["pigit cmd_new r", "pigit cmd_new r -v"],
+    examples=["pigit cmd r", "pigit cmd r -v"],
     related=["r.v", "r.a", "r.u"],
 )
 def remote(args: list[str]) -> str:
@@ -32,7 +32,7 @@ def remote(args: list[str]) -> str:
     short="r.v",
     category=CommandCategory.REMOTE,
     help="Show remote URLs.",
-    examples=["pigit cmd_new r.v", "pigit cmd_new r.v -v"],
+    examples=["pigit cmd r.v", "pigit cmd r.v -v"],
     related=["r", "r.s"],
 )
 def remote_verbose(args: list[str]) -> str:
@@ -45,7 +45,7 @@ def remote_verbose(args: list[str]) -> str:
     category=CommandCategory.REMOTE,
     help="Add a remote.",
     has_args=True,
-    examples=["pigit cmd_new r.a origin https://github.com/user/repo.git"],
+    examples=["pigit cmd r.a origin https://github.com/user/repo.git"],
     related=["r", "r.rm"],
 )
 def remote_add(args: list[str]) -> str:
@@ -64,7 +64,7 @@ def remote_add(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Remove remote?",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new r.rm old-remote"],
+    examples=["pigit cmd r.rm old-remote"],
     related=["r", "r.a"],
 )
 def remote_remove(args: list[str]) -> str:
@@ -80,7 +80,7 @@ def remote_remove(args: list[str]) -> str:
     help="Rename a remote.",
     has_args=True,
     arg_completion=[CompletionType.REMOTE, CompletionType.NONE],
-    examples=["pigit cmd_new r.rn old-name new-name"],
+    examples=["pigit cmd r.rn old-name new-name"],
     related=["r", "r.a"],
 )
 def remote_rename(args: list[str]) -> str:
@@ -96,7 +96,7 @@ def remote_rename(args: list[str]) -> str:
     help="Update remote branches.",
     has_args=True,
     arg_completion=[CompletionType.REMOTE],
-    examples=["pigit cmd_new r.u", "pigit cmd_new r.u origin"],
+    examples=["pigit cmd r.u", "pigit cmd r.u origin"],
     related=["f", "r"],
 )
 def remote_update(args: list[str]) -> str:
@@ -113,7 +113,7 @@ def remote_update(args: list[str]) -> str:
     help="Show remote information.",
     has_args=True,
     arg_completion=[CompletionType.REMOTE],
-    examples=["pigit cmd_new r.s origin"],
+    examples=["pigit cmd r.s origin"],
     related=["r", "r.v"],
 )
 def remote_show(args: list[str]) -> str:
@@ -133,7 +133,7 @@ def remote_show(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Prune stale remote branches?",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new r.prune", "pigit cmd_new r.prune origin"],
+    examples=["pigit cmd r.prune", "pigit cmd r.prune origin"],
     related=["f.p", "r"],
 )
 def remote_prune(args: list[str]) -> str:

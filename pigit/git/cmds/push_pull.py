@@ -17,7 +17,7 @@ from ._models import CommandCategory, SecurityLevel
     category=CommandCategory.PUSH,
     help="Push commits to remote.",
     has_args=True,
-    examples=["pigit cmd_new p", "pigit cmd_new p origin main"],
+    examples=["pigit cmd p", "pigit cmd p origin main"],
     related=["p.f", "p.F", "f"],
 )
 def push(args: list[str]) -> str:
@@ -36,7 +36,7 @@ def push(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Force push? Ensure no one else has pushed.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new p.f", "pigit cmd_new p.f origin main"],
+    examples=["pigit cmd p.f", "pigit cmd p.f origin main"],
     related=["p", "p.F"],
 )
 def push_force(args: list[str]) -> str:
@@ -55,7 +55,7 @@ def push_force(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Force push WITHOUT lease check? This may overwrite others' work!",
     security_level=SecurityLevel.DESTRUCTIVE,
-    examples=["pigit cmd_new p.F origin main"],
+    examples=["pigit cmd p.F origin main"],
     related=["p", "p.f"],
 )
 def push_force_destructive(args: list[str]) -> str:
@@ -71,7 +71,7 @@ def push_force_destructive(args: list[str]) -> str:
     category=CommandCategory.PUSH,
     help="Push and set upstream for current branch.",
     has_args=True,
-    examples=["pigit cmd_new p.u", "pigit cmd_new p.u origin feature-branch"],
+    examples=["pigit cmd p.u", "pigit cmd p.u origin feature-branch"],
     related=["p", "b.c"],
 )
 def push_upstream(args: list[str]) -> str:
@@ -90,7 +90,7 @@ def push_upstream(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Delete remote branch?",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new p.d origin old-branch"],
+    examples=["pigit cmd p.d origin old-branch"],
     related=["b.d", "p"],
 )
 def push_delete(args: list[str]) -> str:
@@ -105,7 +105,7 @@ def push_delete(args: list[str]) -> str:
     category=CommandCategory.PUSH,
     help="Push all tags.",
     has_args=True,
-    examples=["pigit cmd_new p.tags", "pigit cmd_new p.tags origin"],
+    examples=["pigit cmd p.tags", "pigit cmd p.tags origin"],
     related=["t", "p"],
 )
 def push_tags(args: list[str]) -> str:
@@ -121,7 +121,7 @@ def push_tags(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Fetch from remote.",
     has_args=True,
-    examples=["pigit cmd_new f", "pigit cmd_new f origin"],
+    examples=["pigit cmd f", "pigit cmd f origin"],
     related=["f.a", "f.p", "p"],
 )
 def fetch(args: list[str]) -> str:
@@ -136,7 +136,7 @@ def fetch(args: list[str]) -> str:
     short="f.a",
     category=CommandCategory.FETCH,
     help="Fetch from all remotes.",
-    examples=["pigit cmd_new f.a"],
+    examples=["pigit cmd f.a"],
     related=["f", "f.p"],
 )
 def fetch_all(args: list[str]) -> str:
@@ -148,7 +148,7 @@ def fetch_all(args: list[str]) -> str:
     short="f.p",
     category=CommandCategory.FETCH,
     help="Prune deleted remote branches.",
-    examples=["pigit cmd_new f.p", "pigit cmd_new f.a --prune"],
+    examples=["pigit cmd f.p", "pigit cmd f.a --prune"],
     related=["f", "f.a"],
 )
 def fetch_prune(args: list[str]) -> str:
@@ -161,7 +161,7 @@ def fetch_prune(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Fetch tags.",
     has_args=True,
-    examples=["pigit cmd_new f.t", "pigit cmd_new f.t origin"],
+    examples=["pigit cmd f.t", "pigit cmd f.t origin"],
     related=["f", "t"],
 )
 def fetch_tags(args: list[str]) -> str:
@@ -177,7 +177,7 @@ def fetch_tags(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Fetch and merge (pull).",
     has_args=True,
-    examples=["pigit cmd_new f.m", "pigit cmd_new f.m origin main"],
+    examples=["pigit cmd f.m", "pigit cmd f.m origin main"],
     related=["f", "f.r", "p"],
 )
 def fetch_merge(args: list[str]) -> str:
@@ -193,7 +193,7 @@ def fetch_merge(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Fetch and rebase (pull --rebase).",
     has_args=True,
-    examples=["pigit cmd_new f.r", "pigit cmd_new f.r origin main"],
+    examples=["pigit cmd f.r", "pigit cmd f.r origin main"],
     related=["f", "f.m", "p"],
 )
 def fetch_rebase(args: list[str]) -> str:
@@ -208,7 +208,7 @@ def fetch_rebase(args: list[str]) -> str:
     short="f.u",
     category=CommandCategory.FETCH,
     help="Update: fetch all remotes, prune, and fast-forward merge.",
-    examples=["pigit cmd_new f.u"],
+    examples=["pigit cmd f.u"],
     related=["f", "f.a", "f.p"],
 )
 def fetch_update(args: list[str]) -> str:
@@ -222,8 +222,8 @@ def fetch_update(args: list[str]) -> str:
     help="Clone a repository.",
     has_args=True,
     examples=[
-        "pigit cmd_new f.c https://github.com/user/repo.git",
-        "pigit cmd_new f.c https://github.com/user/repo.git my-dir",
+        "pigit cmd f.c https://github.com/user/repo.git",
+        "pigit cmd f.c https://github.com/user/repo.git my-dir",
     ],
     related=["f", "f.C"],
 )
@@ -239,7 +239,7 @@ def fetch_clone(args: list[str]) -> str:
     category=CommandCategory.FETCH,
     help="Shallow clone (depth=1) for quick checkout.",
     has_args=True,
-    examples=["pigit cmd_new f.C https://github.com/user/repo.git"],
+    examples=["pigit cmd f.C https://github.com/user/repo.git"],
     related=["f", "f.c"],
 )
 def fetch_clone_shallow(args: list[str]) -> str:
