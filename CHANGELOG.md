@@ -1,5 +1,40 @@
 # Changelog of pigit
 
+## 1.9.0 (2026-08-13)
+
+### Features
+
+- **Mouse support**: the TUI is now mouse-operable — xterm SGR mouse parsing (`\x1b[<b;x;yM/m`), recursive hit-testing, click-to-focus panels, and wheel scrolling. `ItemList` rows are click-selectable, `DiffViewer` scrolls on wheel, and `AlertDialog` `[OK]`/`[Cancel]` are clickable.
+- **File tree view**: the status panel renders changed files as a collapsible directory tree (config `tui.status_view`, default `tree`) with directory-level batch stage/discard.
+- **Diff horizontal scrolling**: long diff lines scroll horizontally (`l`/`h`, `0`/`$`).
+- **Auto-stash**: `repo mkbranch` and `repo switch` detect uncommitted changes, show details, and offer stash → execute → pop.
+
+### Refactors
+
+- **Git layer split**: `GitApi` is now a facade over domain submodules under `pigit/git/api/` (`_core`, `_branch`, `_commit`, `_status`, `_stash`, `_diff`, `_worktree`, `_merge`, `_fileio`, `_display`, `_errors`), removing duplicated logic.
+- **cmdparse simplification**: dropped `from_dict`; `to_dict` no longer traverses argparse private internals.
+- **Dead code removal**: removed unused helpers (e.g. `similar_command`).
+
+### Bug Fixes
+
+- **Shell injection in branch names**: branch names are passed through `shlex.quote()` when building shell commands.
+- **Graceful exit outside a repo**: `pigit` exits with a styled message instead of an error when run outside a git repository.
+- **Merge-state restore**: startup catches `GitError` when restoring a pending merge.
+- **Inspector / commit cache fixes**: clear the renderer cache when toggling the inspector; remove explicit backgrounds from inspector border/separator; clear commit-bodies cache before rebuilding rows.
+- **CLI styling**: ASCII art and the version number no longer use raw `@pink` markup.
+
+### Tests
+
+- **Adversarial GitApi tests**: edge-case coverage for the `GitApi` facade and `api/` submodules (path binding, error paths, sentinels).
+- **Mouse tests**: SGR parsing, hit-testing, session escape output, and routing.
+- **Test suite cleanup**: removed no-assertion tests and merged duplicate invalid-index cases.
+
+### Chores
+
+- Format the codebase with `black`.
+- Ignore lore knowledge-base directories (`.pi/`, `.pikb/`).
+- Add project guidance (`CLAUDE.md`).
+
 ## 1.8.16 (2026-07-01)
 
 ### Diff — Word Diff

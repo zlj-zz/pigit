@@ -21,7 +21,7 @@ from pigit.handlers.cmd_picker_data import (
     CmdNewEntry,
 )
 from pigit.git.model import File
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 from pigit.git.managed_repos import ManagedRepos
 
 
@@ -46,11 +46,11 @@ class TestBuildContextSignals:
     def test_repo_status_detects_signals(self, monkeypatch):
         cfg = Config(path="/nonexistent/pigit-test.conf", version="0", auto_load=False)
         ex = MockExecutor()
-        repo = LocalGit(executor=ex)
+        repo = GitApi(executor=ex)
         ctx = Context(
             config=cfg,
             executor=ex,
-            local_git=repo,
+            git_api=repo,
             managed_repos=ManagedRepos(executor=ex),
             log=logging.getLogger("test"),
         )
@@ -104,11 +104,11 @@ class TestBuildContextSignals:
     def test_repo_status_exception_falls_back(self):
         cfg = Config(path="/nonexistent/pigit-test.conf", version="0", auto_load=False)
         ex = MockExecutor()
-        repo = LocalGit(executor=ex)
+        repo = GitApi(executor=ex)
         ctx = Context(
             config=cfg,
             executor=ex,
-            local_git=repo,
+            git_api=repo,
             managed_repos=ManagedRepos(executor=ex),
             log=logging.getLogger("test"),
         )

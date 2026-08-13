@@ -13,6 +13,7 @@ import logging
 
 from .. import palette
 from .._component import Component, ComponentError
+from .._mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
@@ -553,3 +554,43 @@ class ItemList(Component):
         self.curr_no = tmp_no
         self._scroll_into_view()
         self._notify_change()
+
+    def _select_row(self, item_index: int) -> None:
+        """Select ``item_index`` (clamped) and notify listeners."""
+        n_total = (
+            len(self._item_starts)
+            if self._item_starts is not None
+            else len(self.content)
+        )
+        if item_index < 0 or item_index >= n_total:
+            return
+        self.curr_no = item_index
+        self._scroll_into_view()
+        self._notify_change()
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Handle a mouse click (select row) or wheel (scroll) at local coords."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button is MouseButton.WHEEL_UP:
+            self.previous()
+            return True
+        if event.button is MouseButton.WHEEL_DOWN:
+            self.next()
+            return True
+        if event.button is not MouseButton.LEFT:
+            return False
+        row0 = event.row - 1
+        if row0 < 0 or row0 >= self._size[1]:
+            return False
+        content_index = self._r_start + row0
+        if content_index >= len(self.content):
+            return False
+        if self._item_starts is not None:
+            item_index, _sub = self.row_to_item(content_index)
+        else:
+            item_index = content_index
+        if item_index in self._skip_indices:
+            return False
+        self._select_row(item_index)
+        return True

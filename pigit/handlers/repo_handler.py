@@ -299,10 +299,65 @@ class RepoCommandHandler:
         )
 
         if blockers:
-            self.console.echo("Pre-flight blocked:")
-            for name, reason in blockers:
-                self.console.echo(f"  ✗ {name} — {reason}")
-            self.console.echo("\nFix the issues and retry.")
+            # Split blockers into fatal (cannot auto-resolve) and
+            # recoverable (uncommitted changes — can stash).
+            from pigit.git.managed_repos import BLOCKER_RECOVERABLE
+
+            fatal = [b for b in blockers if b.kind != BLOCKER_RECOVERABLE]
+            recoverable = [b for b in blockers if b.kind == BLOCKER_RECOVERABLE]
+
+            # Always report fatal blockers.
+            if fatal:
+                self.console.echo("Pre-flight blocked:")
+                for b in fatal:
+                    self.console.echo(f"  ✗ {b.name} — {b.reason}")
+
+            # Recoverable: show dirty details and ask user.
+            if recoverable:
+                self.console.echo("\n@yellow(⚠) Uncommitted changes detected:")
+                for b in recoverable:
+                    self.console.echo(f"\n  @bold({b.name}):")
+                    for line in b.detail.split("\n"):
+                        self.console.echo(f"    {line}")
+
+            if fatal:
+                # If there are fatal blockers, still exit — but also list
+                # recoverable ones so user sees the full picture.
+                if recoverable:
+                    self.console.echo(
+                        "\nAlso has uncommitted changes (above). "
+                        "Resolve fatal issues first."
+                    )
+                self.console.echo("\nFix the issues and retry.")
+                raise SystemExit(1)
+
+            # Only recoverable blockers — offer stash.
+            from pigit.ext.utils import confirm
+
+            dirty_names = {b.name for b in recoverable}
+            self.console.echo(f"\nAffected repos: {', '.join(sorted(dirty_names))}")
+            if confirm("\nAuto-stash, create branch, then pop? [Y/n]: "):
+                results, stash_issues = self.managed_repos.branch_new_repos_stash(
+                    branch_name,
+                    repo_names,
+                    checkout=checkout,
+                    base=base,
+                    force=force,
+                    dry_run=dry_run,
+                    dirty_repos=dirty_names,
+                )
+                for name, code, stderr in results:
+                    if code == 0:
+                        self.console.echo(f"✓ {name}")
+                    else:
+                        self.console.echo(f"✗ {name} — {stderr or 'unknown error'}")
+                if stash_issues:
+                    self.console.echo("\n@yellow(⚠) Stash issues:")
+                    for name, desc in stash_issues:
+                        self.console.echo(f"  ! {name}: {desc}")
+                return
+
+            self.console.echo("\nAborted. Fix the issues and retry.")
             raise SystemExit(1)
 
         if dry_run:
@@ -340,18 +395,64 @@ class RepoCommandHandler:
         )
 
         if blockers:
-            self.console.echo("Pre-flight blocked:")
-            for name, reason in blockers:
-                self.console.echo(f"  ✗ {name} — {reason}")
-            has_missing_branch = any(
-                "does not exist" in reason for _, reason in blockers
-            )
-            if has_missing_branch:
-                self.console.echo(
-                    "\nFix the issues and retry, or use -c/--create to create missing branches."
+            from pigit.git.managed_repos import BLOCKER_RECOVERABLE
+
+            fatal = [b for b in blockers if b.kind != BLOCKER_RECOVERABLE]
+            recoverable = [b for b in blockers if b.kind == BLOCKER_RECOVERABLE]
+
+            if fatal:
+                self.console.echo("Pre-flight blocked:")
+                for b in fatal:
+                    self.console.echo(f"  ✗ {b.name} — {b.reason}")
+
+            if recoverable:
+                self.console.echo("\n@yellow(⚠) Uncommitted changes detected:")
+                for b in recoverable:
+                    self.console.echo(f"\n  @bold({b.name}):")
+                    for line in b.detail.split("\n"):
+                        self.console.echo(f"    {line}")
+
+            if fatal:
+                has_missing_branch = any("does not exist" in b.reason for b in fatal)
+                if recoverable:
+                    self.console.echo(
+                        "\nAlso has uncommitted changes (above). "
+                        "Resolve fatal issues first."
+                    )
+                if has_missing_branch:
+                    self.console.echo(
+                        "\nFix the issues and retry, or use -c/--create "
+                        "to create missing branches."
+                    )
+                else:
+                    self.console.echo("\nFix the issues and retry.")
+                raise SystemExit(1)
+
+            from pigit.ext.utils import confirm
+
+            dirty_names = {b.name for b in recoverable}
+            self.console.echo(f"\nAffected repos: {', '.join(sorted(dirty_names))}")
+            if confirm("\nAuto-stash, switch branch, then pop? [Y/n]: "):
+                results, stash_issues = self.managed_repos.switch_repos_stash(
+                    branch,
+                    repo_names,
+                    create=create,
+                    force=force,
+                    dry_run=dry_run,
+                    dirty_repos=dirty_names,
                 )
-            else:
-                self.console.echo("\nFix the issues and retry.")
+                for name, code, stderr in results:
+                    if code == 0:
+                        self.console.echo(f"✓ {name}")
+                    else:
+                        self.console.echo(f"✗ {name} — {stderr or 'unknown error'}")
+                if stash_issues:
+                    self.console.echo("\n@yellow(⚠) Stash issues:")
+                    for name, desc in stash_issues:
+                        self.console.echo(f"  ! {name}: {desc}")
+                return
+
+            self.console.echo("\nAborted. Fix the issues and retry.")
             raise SystemExit(1)
 
         if dry_run:

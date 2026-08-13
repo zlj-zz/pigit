@@ -64,9 +64,7 @@ class TestEmitReachesApplication:
 
         child.emit(EVT_SELECTION_CHANGED, index=5)
 
-        grandparent.on_event.assert_called_once_with(
-            EVT_SELECTION_CHANGED, index=5
-        )
+        grandparent.on_event.assert_called_once_with(EVT_SELECTION_CHANGED, index=5)
 
     def test_emit_stops_at_first_handler(self):
         """Event bubbling stops at the first ancestor whose on_event returns True."""

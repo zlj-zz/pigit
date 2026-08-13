@@ -80,6 +80,26 @@ class Sheet(Component):
         if getattr(self, "_size", None) == new_size:
             return
         self._size = new_size
+        # Position: bottom of the screen, full width (1-based x=row, y=col).
+        self.x = size[1] - sheet_h + 1
+        self.y = 1
         border_h = 1 if self._show_border else 0
         child_h = max(1, sheet_h - border_h)
         self._child.resize((size[0], child_h))
+
+    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
+        """Hit-test the sheet's bottom region, delegating to the wrapped child."""
+        w, h = self._size
+        if w <= 0 or h <= 0:
+            return None
+        if not (self.y <= col < self.y + w and self.x <= row < self.x + h):
+            return None
+        border_h = 1 if self._show_border else 0
+        child = self._child
+        cw, ch = child._size
+        if cw <= 0 or ch <= 0:
+            return self, col, row
+        local_col = col - (self.y - 1)
+        local_row = row - (self.x - 1) - border_h
+        hit = child._hit_test(local_col, local_row)
+        return hit if hit is not None else (self, col, row)

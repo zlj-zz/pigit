@@ -16,7 +16,7 @@ from ._models import CommandCategory
     category=CommandCategory.SETTINGS,
     help="Get or set git configuration.",
     has_args=True,
-    examples=["pigit cmd_new set user.name", "pigit cmd_new set user.name 'John Doe'"],
+    examples=["pigit cmd set user.name", "pigit cmd set user.name 'John Doe'"],
     related=["set.l", "set.g", "set.e"],
 )
 def settings(args: list[str]) -> str:
@@ -33,7 +33,7 @@ def settings(args: list[str]) -> str:
     category=CommandCategory.SETTINGS,
     help="List all git configuration.",
     has_args=True,
-    examples=["pigit cmd_new set.l", "pigit cmd_new set.l --local"],
+    examples=["pigit cmd set.l", "pigit cmd set.l --local"],
     related=["set", "set.g"],
 )
 def settings_list(args: list[str]) -> str:
@@ -49,7 +49,7 @@ def settings_list(args: list[str]) -> str:
     category=CommandCategory.SETTINGS,
     help="Get a config value.",
     has_args=True,
-    examples=["pigit cmd_new set.g user.email"],
+    examples=["pigit cmd set.g user.email"],
     related=["set", "set.l"],
 )
 def settings_get(args: list[str]) -> str:
@@ -63,7 +63,7 @@ def settings_get(args: list[str]) -> str:
     short="set.e",
     category=CommandCategory.SETTINGS,
     help="Edit git config file.",
-    examples=["pigit cmd_new set.e", "pigit cmd_new set.e --global"],
+    examples=["pigit cmd set.e", "pigit cmd set.e --global"],
     related=["set", "set.l"],
 )
 def settings_edit(args: list[str]) -> str:

@@ -305,11 +305,11 @@ class HelpPanel(Component):
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
+            0, 0, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
-        self._frame.draw(surface, self.x, self.y)
+        self._frame.draw(surface, 0, 0)
 
-        content_row, content_col, cw, _ch = self._frame.content_rect(self.x, self.y)
+        content_row, content_col, cw, _ch = self._frame.content_rect(0, 0)
         chunk = self._line_segments[self._offset : self._offset + self._scroll_h]
         for i, segments in enumerate(chunk):
             row = content_row + i

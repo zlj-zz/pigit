@@ -19,7 +19,7 @@ from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
     from pigit.app_types import FileInfo
-    from pigit.git.local_git import LocalGit
+    from pigit.git.api import GitApi
     from pigit.git.model import File, Stash
 
 _logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class IStatusViewModel(IListViewModel["File"]):
 class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     """Concrete ViewModel for working tree status."""
 
-    def __init__(self, git: LocalGit, history: SessionHistory | None = None) -> None:
+    def __init__(self, git: GitApi, history: SessionHistory | None = None) -> None:
         super().__init__()
         self._git = git
         self._history = history
@@ -114,7 +114,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         count = 0
         try:
             for idx in sorted(indices):
-                if idx < len(items):
+                if 0 <= idx < len(items):
                     op(items[idx])
                     count += 1
         except Exception as e:
@@ -251,7 +251,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         count = 0
         try:
             for idx in sorted(indices):
-                if idx < len(items):
+                if 0 <= idx < len(items):
                     f = items[idx]
                     was_staged = f.has_staged_change
                     self._git.switch_file_status(f)
@@ -283,14 +283,14 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         count = 0
         try:
             for idx in sorted(indices):
-                if idx < len(items):
+                if 0 <= idx < len(items):
                     self._git.discard_file(items[idx])
                     count += 1
         except Exception as e:
             return ActionResult(success=False, message=str(e))
         if count > 0 and self._history is not None:
             for idx in sorted(indices):
-                if idx < len(items):
+                if 0 <= idx < len(items):
                     f = items[idx]
                     payload: dict = {"path": f.name, "tracked": f.tracked}
                     if f.tracked:
@@ -320,7 +320,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         count = 0
         try:
             for idx in sorted(indices):
-                if idx < len(items):
+                if 0 <= idx < len(items):
                     f = items[idx]
                     self._git.ignore_file(f)
                     commands.append(

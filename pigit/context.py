@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .config import Config
     from .ext.executor_factory import ExecutorStrategy
-    from .git.local_git import LocalGit
+    from .git.api import GitApi
     from .git.managed_repos import ManagedRepos
 
 
@@ -25,7 +25,7 @@ class Context:
 
     config: Config
     executor: ExecutorStrategy
-    local_git: LocalGit
+    git_api: GitApi
     managed_repos: ManagedRepos
     log: logging.Logger
     _token: Token | None = field(default=None, init=False, repr=False)
@@ -75,7 +75,7 @@ class Context:
         from .const import LOG_FILE_PATH
         from .ext.executor_factory import ExecutorFactory, LocalExecutor
         from .ext.log import logger, setup_logging
-        from .git.local_git import LocalGit
+        from .git.api import GitApi
         from .git.managed_repos import ManagedRepos
 
         setup_logging(
@@ -86,12 +86,12 @@ class Context:
         app_log = logger(log_name)
         executor = LocalExecutor(log=app_log)
         ExecutorFactory.set_strategy(executor)
-        local_git = LocalGit(executor=executor)
+        git_api = GitApi(executor=executor)
         managed_repos = ManagedRepos(executor=executor, repo_json_path=repo_json_path)
         return cls(
             config=config,
             executor=executor,
-            local_git=local_git,
+            git_api=git_api,
             managed_repos=managed_repos,
             log=app_log,
         )

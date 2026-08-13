@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pigit.ext.executor_factory import MockExecutor
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 from pigit.git.managed_repos import ManagedRepos, _fuzzy_match, _logger
 
 
@@ -244,7 +244,7 @@ def test_ll_repos_reverse_invalid(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"bad": {"path": "/nope"}}))
     ex = MockExecutor()
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    with patch.object(LocalGit, "get_head", return_value=None):
+    with patch.object(GitApi, "get_head", return_value=None):
         rows = list(r.ll_repos(reverse=True))
     assert rows and rows[0][0][0] == "bad"
 
@@ -257,9 +257,9 @@ def test_ll_repos_normal_summary(tmp_repos_json):
         }
     )
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    with patch.object(LocalGit, "get_head", return_value="main"):
-        with patch.object(LocalGit, "get_first_pushed_commit", return_value="deadbeef"):
-            with patch.object(LocalGit, "load_log", return_value="hello||[main]"):
+    with patch.object(GitApi, "get_head", return_value="main"):
+        with patch.object(GitApi, "get_first_pushed_commit", return_value="deadbeef"):
+            with patch.object(GitApi, "load_log", return_value="hello||[main]"):
                 rows = list(r.ll_repos(reverse=False))
     assert len(rows) == 1
     assert rows[0][1][0] == "Branch"
@@ -285,7 +285,7 @@ def test_ll_repos_filter(tmp_repos_json):
     )
     ex = MockExecutor()
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    with patch.object(LocalGit, "get_head", return_value=None):
+    with patch.object(GitApi, "get_head", return_value=None):
         rows = list(r.ll_repos(reverse=True, filter_query="et"))
     names = [row[0][0] for row in rows]
     assert "beta" in names
@@ -299,7 +299,7 @@ def test_ll_repos_filter_case_insensitive(tmp_repos_json):
     )
     ex = MockExecutor()
     r = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
-    with patch.object(LocalGit, "get_head", return_value=None):
+    with patch.object(GitApi, "get_head", return_value=None):
         rows = list(r.ll_repos(reverse=True, filter_query="alp"))
     names = [row[0][0] for row in rows]
     assert "AlphaGo" in names
@@ -342,7 +342,7 @@ class TestBranchNewRepos:
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
         assert ok is False
-        assert any("already exists" in r for _, r in blockers)
+        assert any("already exists" in b.reason for b in blockers)
         assert results == []
 
     def test_preflight_blocks_unclean_workspace(self, tmp_repos_json):
@@ -357,7 +357,7 @@ class TestBranchNewRepos:
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"], checkout=True)
         assert ok is False
-        assert any("uncommitted" in r for _, r in blockers)
+        assert any("uncommitted" in b.reason for b in blockers)
         assert results == []
 
     def test_dry_run(self, tmp_repos_json):
@@ -400,7 +400,7 @@ class TestBranchNewRepos:
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         ok, blockers, results = mr.branch_new_repos("feat/x", ["repo-a"])
         assert ok is False
-        assert any("invalid repo" in r for _, r in blockers)
+        assert any("invalid repo" in b.reason for b in blockers)
         assert results == []
 
     def test_execute_failure_returns_stderr(self, tmp_repos_json):
@@ -437,6 +437,232 @@ class TestBranchNewRepos:
         assert results[0] == ("repo-a", 0, None)
 
 
+class TestBranchNewReposStash:
+    """Tests for :meth:`ManagedRepos.branch_new_repos_stash`."""
+
+    def test_stash_execute_pop_success(self, tmp_repos_json):
+        """Happy path: stash dirty repo, create branch, pop stash — all succeed."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git branch feat/x": (0, "", ""),
+                "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_stash_failure_excludes_repo(self, tmp_repos_json):
+        """When stash fails, the repo is excluded from branch creation."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
+                    1,
+                    "fatal: not a git repository\n",
+                    "",
+                ),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        # repo excluded — no execute called, so branch command not in responses
+        assert results == []
+        assert any("stash failed" in desc for _, desc in stash_issues)
+
+    def test_pop_failure_reports_issue(self, tmp_repos_json):
+        """When stash pop fails, result is still success but stash issue reported."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git branch feat/x": (0, "", ""),
+                "git stash pop": (1, "CONFLICT: Merge conflict\n", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert len(stash_issues) == 1
+        assert "stash pop failed" in stash_issues[0][1]
+
+    def test_dry_run_noop(self, tmp_repos_json):
+        """dry_run=True returns immediately without executing any git commands."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor()
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], dirty_repos={"repo-a"}, dry_run=True
+        )
+        assert results == []
+        assert stash_issues == []
+
+    def test_no_dirty_repos_just_executes(self, tmp_repos_json):
+        """When no repos are dirty, runs plain branch creation without stash/pop."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git branch feat/x": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], dirty_repos=set()
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_checkout_with_base_and_stash(self, tmp_repos_json):
+        """Stash + checkout with base branch works end-to-end."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before mkbranch feat/x'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git checkout develop && git checkout -b feat/x": (0, "", ""),
+                "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash(
+            "feat/x", ["repo-a"], checkout=True, base="develop", dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_empty_repos_returns_empty(self, tmp_repos_json):
+        """No managed repos returns empty results."""
+        ex = MockExecutor()
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.branch_new_repos_stash("feat/x")
+        assert results == []
+        assert stash_issues == []
+
+
+class TestSwitchReposStash:
+    """Tests for :meth:`ManagedRepos.switch_repos_stash`."""
+
+    def test_stash_switch_pop_success(self, tmp_repos_json):
+        """Happy path: stash, switch branch, pop stash."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git switch dev": (0, "", ""),
+                "git stash pop": (0, "", "Dropped refs/stash@{0}\n"),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_stash_failure_excludes_from_switch(self, tmp_repos_json):
+        """Stash failure excludes the repo from switch."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
+                    1,
+                    "fatal: not a git repository\n",
+                    "",
+                ),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}
+        )
+        assert results == []
+        assert any("stash failed" in desc for _, desc in stash_issues)
+
+    def test_dry_run_noop(self, tmp_repos_json):
+        """dry_run=True returns immediately."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor()
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], dirty_repos={"repo-a"}, dry_run=True
+        )
+        assert results == []
+        assert stash_issues == []
+
+    def test_force_switch_with_stash(self, tmp_repos_json):
+        """Force-switch with stash works."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before switch dev'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git switch -f dev": (0, "", ""),
+                "git stash pop": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "dev", ["repo-a"], force=True, dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+    def test_create_switch_with_stash(self, tmp_repos_json):
+        """Create-and-switch with stash works."""
+        tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
+        ex = MockExecutor(
+            responses={
+                "git stash push -u -m 'pigit: auto stash before switch feat/x'": (
+                    0,
+                    "",
+                    "Saved working directory\n",
+                ),
+                "git switch -c feat/x": (0, "", ""),
+                "git stash pop": (0, "", ""),
+            }
+        )
+        mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+        results, stash_issues = mr.switch_repos_stash(
+            "feat/x", ["repo-a"], create=True, dirty_repos={"repo-a"}
+        )
+        assert len(results) == 1
+        assert results[0] == ("repo-a", 0, None)
+        assert stash_issues == []
+
+
 class TestSwitchRepos:
     def test_switch_existing_branch(self, tmp_repos_json):
         tmp_repos_json.write_text(json.dumps({"repo-a": {"path": "/p1"}}))
@@ -465,7 +691,7 @@ class TestSwitchRepos:
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         ok, blockers, results = mr.switch_repos("dev", ["repo-a"])
         assert ok is False
-        assert any("does not exist" in r for _, r in blockers)
+        assert any("does not exist" in b.reason for b in blockers)
         assert results == []
 
     def test_switch_create_missing_branch(self, tmp_repos_json):
@@ -496,7 +722,7 @@ class TestSwitchRepos:
         mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
         ok, blockers, results = mr.switch_repos("dev", ["repo-a"])
         assert ok is False
-        assert any("uncommitted changes" in r for _, r in blockers)
+        assert any("uncommitted changes" in b.reason for b in blockers)
         assert results == []
 
     def test_switch_force_dirty(self, tmp_repos_json):

@@ -8,7 +8,7 @@ from ..termui.cli_output import get_console
 if TYPE_CHECKING:
     from ..config import Config
     from ..context import Context
-    from ..git.local_git import LocalGit
+    from ..git.api import GitApi
     from ..git.managed_repos import ManagedRepos
 
 
@@ -24,8 +24,8 @@ class BaseHandler(ABC):
         return self.ctx.config
 
     @property
-    def local_git(self) -> "LocalGit":
-        return self.ctx.local_git
+    def git_api(self) -> "GitApi":
+        return self.ctx.git_api
 
     @property
     def managed_repos(self) -> "ManagedRepos":

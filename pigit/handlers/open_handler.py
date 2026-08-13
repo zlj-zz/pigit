@@ -24,7 +24,7 @@ class OpenHandler:
         self.console = get_console()
 
     def open_browser(self, args: "Namespace") -> None:
-        remote_url = self.ctx.local_git.get_remote_url()
+        remote_url = self.ctx.git_api.get_remote_url()
         if not remote_url:
             self.console.echo("@tomato(No remote URL found.)")
             return

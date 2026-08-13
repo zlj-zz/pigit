@@ -23,7 +23,9 @@ class _FakeStatusVM:
         self.diff_return: list[str] = ["diff line"]
         self.stash_diff_return: list[str] = ["stash diff line"]
 
-    def load_diff(self, idx: int, plain: bool = True, word_diff: bool = False) -> list[str]:
+    def load_diff(
+        self, idx: int, plain: bool = True, word_diff: bool = False
+    ) -> list[str]:
         self.diff_calls.append(idx)
         return list(self.diff_return)
 
@@ -44,8 +46,10 @@ class _FakeStatusPanel(StatusPanel):
         self.files = files
         self._source_index = source_index
 
-    def filter_source_index(self, visible_idx: int | None = None) -> int:
-        return self._source_index
+    def file_at_cursor(self):
+        if self.files and 0 <= self.curr_no < len(self.files):
+            return self.files[self.curr_no], self._source_index
+        return None
 
 
 class _FakeStashPanel(StashPanel):
@@ -158,18 +162,20 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     del vm.diff_calls[:]
 
     other = _FakeStatusPanel(
-        [File(
-            name="b.py",
-            display_str="b.py",
-            short_status=" M",
-            has_staged_change=False,
-            has_unstaged_change=True,
-            tracked=True,
-            deleted=False,
-            added=False,
-            has_merged_conflicts=False,
-            has_inline_merged_conflicts=False,
-        )],
+        [
+            File(
+                name="b.py",
+                display_str="b.py",
+                short_status=" M",
+                has_staged_change=False,
+                has_unstaged_change=True,
+                tracked=True,
+                deleted=False,
+                added=False,
+                has_merged_conflicts=False,
+                has_inline_merged_conflicts=False,
+            )
+        ],
         curr_no=0,
         source_index=0,
     )

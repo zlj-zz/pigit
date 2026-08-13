@@ -18,7 +18,7 @@ from ._completion_types import CompletionType
     category=CommandCategory.LOG,
     help="Show commit log.",
     has_args=True,
-    examples=["pigit cmd_new l", "pigit cmd_new l -5"],
+    examples=["pigit cmd l", "pigit cmd l -5"],
     related=["l.o", "l.g", "l.s"],
 )
 def log(args: list[str]) -> str:
@@ -34,7 +34,7 @@ def log(args: list[str]) -> str:
     category=CommandCategory.LOG,
     help="Show one-line log.",
     has_args=True,
-    examples=["pigit cmd_new l.o", "pigit cmd_new l.o --graph"],
+    examples=["pigit cmd l.o", "pigit cmd l.o --graph"],
     related=["l", "l.g"],
 )
 def log_oneline(args: list[str]) -> str:
@@ -50,7 +50,7 @@ def log_oneline(args: list[str]) -> str:
     category=CommandCategory.LOG,
     help="Show log with graph.",
     has_args=True,
-    examples=["pigit cmd_new l.g", "pigit cmd_new l.g --all"],
+    examples=["pigit cmd l.g", "pigit cmd l.g --all"],
     related=["l", "l.o"],
 )
 def log_graph(args: list[str]) -> str:
@@ -66,7 +66,7 @@ def log_graph(args: list[str]) -> str:
     category=CommandCategory.LOG,
     help="Show log with stats.",
     has_args=True,
-    examples=["pigit cmd_new l.s", "pigit cmd_new l.s -3"],
+    examples=["pigit cmd l.s", "pigit cmd l.s -3"],
     related=["l", "l.p"],
 )
 def log_stat(args: list[str]) -> str:
@@ -82,7 +82,7 @@ def log_stat(args: list[str]) -> str:
     category=CommandCategory.LOG,
     help="Show log with patches.",
     has_args=True,
-    examples=["pigit cmd_new l.p", "pigit cmd_new l.p -1"],
+    examples=["pigit cmd l.p", "pigit cmd l.p -1"],
     related=["l", "l.s"],
 )
 def log_patch(args: list[str]) -> str:
@@ -98,7 +98,7 @@ def log_patch(args: list[str]) -> str:
     category=CommandCategory.LOG,
     help="Show contributor statistics (commit count per contributor).",
     has_args=True,
-    examples=["pigit cmd_new l.c", "pigit cmd_new l.c -n 10"],
+    examples=["pigit cmd l.c", "pigit cmd l.c -n 10"],
     related=["l", "l.s"],
 )
 def log_contributors(args: list[str]) -> str:
@@ -115,7 +115,7 @@ def log_contributors(args: list[str]) -> str:
     category=CommandCategory.STASH,
     help="Stash changes.",
     has_args=True,
-    examples=["pigit cmd_new s", "pigit cmd_new s push -m 'WIP'"],
+    examples=["pigit cmd s", "pigit cmd s push -m 'WIP'"],
     related=["s.l", "s.p", "s.d"],
 )
 def stash(args: list[str]) -> str:
@@ -130,7 +130,7 @@ def stash(args: list[str]) -> str:
     short="s.l",
     category=CommandCategory.STASH,
     help="List stashes.",
-    examples=["pigit cmd_new s.l"],
+    examples=["pigit cmd s.l"],
     related=["s", "s.s"],
 )
 def stash_list(args: list[str]) -> str:
@@ -144,7 +144,7 @@ def stash_list(args: list[str]) -> str:
     help="Pop stash (apply and remove).",
     has_args=True,
     arg_completion=[CompletionType.STASH],
-    examples=["pigit cmd_new s.p", "pigit cmd_new s.p stash@{1}"],
+    examples=["pigit cmd s.p", "pigit cmd s.p stash@{1}"],
     related=["s", "s.a"],
 )
 def stash_pop(args: list[str]) -> str:
@@ -161,7 +161,7 @@ def stash_pop(args: list[str]) -> str:
     help="Apply stash (keep in stash list).",
     has_args=True,
     arg_completion=[CompletionType.STASH],
-    examples=["pigit cmd_new s.a", "pigit cmd_new s.a stash@{0}"],
+    examples=["pigit cmd s.a", "pigit cmd s.a stash@{0}"],
     related=["s", "s.p"],
 )
 def stash_apply(args: list[str]) -> str:
@@ -181,7 +181,7 @@ def stash_apply(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Drop stash? Changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new s.d stash@{0}"],
+    examples=["pigit cmd s.d stash@{0}"],
     related=["s", "s.c"],
 )
 def stash_drop(args: list[str]) -> str:
@@ -199,7 +199,7 @@ def stash_drop(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Clear ALL stashes? This cannot be undone!",
     security_level=SecurityLevel.DESTRUCTIVE,
-    examples=["pigit cmd_new s.c"],
+    examples=["pigit cmd s.c"],
     related=["s", "s.d"],
 )
 def stash_clear(args: list[str]) -> str:
@@ -212,7 +212,7 @@ def stash_clear(args: list[str]) -> str:
     category=CommandCategory.STASH,
     help="Show stash diff.",
     has_args=True,
-    examples=["pigit cmd_new s.s", "pigit cmd_new s.s -p"],
+    examples=["pigit cmd s.s", "pigit cmd s.s -p"],
     related=["s", "s.l"],
 )
 def stash_show(args: list[str]) -> str:
@@ -229,7 +229,7 @@ def stash_show(args: list[str]) -> str:
     category=CommandCategory.TAG,
     help="List or create tags.",
     has_args=True,
-    examples=["pigit cmd_new t", "pigit cmd_new t v1.0.0"],
+    examples=["pigit cmd t", "pigit cmd t v1.0.0"],
     related=["t.a", "t.d", "t.p"],
 )
 def tag(args: list[str]) -> str:
@@ -245,7 +245,7 @@ def tag(args: list[str]) -> str:
     category=CommandCategory.TAG,
     help="Create an annotated tag.",
     has_args=True,
-    examples=["pigit cmd_new t.a v1.0.0 -m 'Version 1.0.0'"],
+    examples=["pigit cmd t.a v1.0.0 -m 'Version 1.0.0'"],
     related=["t", "t.d"],
 )
 def tag_annotated(args: list[str]) -> str:
@@ -265,7 +265,7 @@ def tag_annotated(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Delete tag?",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new t.d v1.0.0"],
+    examples=["pigit cmd t.d v1.0.0"],
     related=["t", "t.a"],
 )
 def tag_delete(args: list[str]) -> str:
@@ -281,7 +281,7 @@ def tag_delete(args: list[str]) -> str:
     category=CommandCategory.TAG,
     help="Push tags to remote.",
     has_args=True,
-    examples=["pigit cmd_new t.p", "pigit cmd_new t.p origin v1.0.0"],
+    examples=["pigit cmd t.p", "pigit cmd t.p origin v1.0.0"],
     related=["t", "p.tags"],
 )
 def tag_push(args: list[str]) -> str:

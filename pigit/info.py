@@ -4,19 +4,26 @@ import os
 import textwrap
 
 from .const import __url__, __version__
-from .git import LocalGit, git_version
+from .git import GitApi, git_version
+from .termui.cli_output import styled
 
 
 def introduce() -> str:
     """Print the description information."""
 
-    # Print version.
+    # ASCII art pre-colored with styled() instead of @pink() markup,
+    # because the art itself contains a ")" on the third line (|_|))
+    # that would prematurely close the @pink( tag.
+    _pink_art = styled(
+        " ____ ___ ____ ___ _____\n"
+        "|  _ \\ _/ ___|_ _|_   _|\n"
+        "| |_) | | |  _ | |  | |\n"
+        "|  __/| | |_| || |  | |\n"
+        "|_|  |___\\____|___| |_|",
+        fg="pink",
+    )
     introduce_str = textwrap.dedent("""\
-        @pink( ____ ___ ____ ___ _____
-        |  _ \\ _/ ___|_ _|_   _|
-        | |_) | | |  _ | |  | |
-        |  __/| | |_| || |  | |
-        |_|  |___\\____|___| |_|) version: {version}
+        {pink_art} version: {version}
 
         {git_version}
 
@@ -33,6 +40,7 @@ def introduce() -> str:
     _git_version = git_version() or "@red(Don't found Git, maybe need install.)"
 
     return introduce_str.format(
+        pink_art=_pink_art,
         version=__version__,
         git_version=_git_version,
         local_path=os.path.dirname(__file__.replace("./", "")),
@@ -53,7 +61,7 @@ def show_gitconfig(
     Returns:
         Formatted git config string.
     """
-    repo_handle = LocalGit(path=path)
+    repo_handle = GitApi(path=path)
     repo_path, _ = repo_handle.confirm_repo()
 
     if not repo_path:

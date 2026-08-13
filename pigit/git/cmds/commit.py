@@ -17,7 +17,7 @@ from ._completion_types import CompletionType
     category=CommandCategory.COMMIT,
     help="Record changes to the repository.",
     has_args=True,
-    examples=["pigit cmd_new c -m 'message'", "pigit cmd_new c --amend"],
+    examples=["pigit cmd c -m 'message'", "pigit cmd c --amend"],
     related=["c.a", "c.m", "c.F"],
 )
 def commit(args: list[str]) -> str:
@@ -32,7 +32,7 @@ def commit(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Commit all modified files.",
     has_args=True,
-    examples=["pigit cmd_new c.a", "pigit cmd_new c.a -m 'message'"],
+    examples=["pigit cmd c.a", "pigit cmd c.a -m 'message'"],
     related=["c", "c.m"],
 )
 def commit_all(args: list[str]) -> str:
@@ -48,7 +48,7 @@ def commit_all(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Commit with a message.",
     has_args=True,
-    examples=["pigit cmd_new c.m 'Initial commit'"],
+    examples=["pigit cmd c.m 'Initial commit'"],
     related=["c", "c.a"],
 )
 def commit_message(args: list[str]) -> str:
@@ -65,7 +65,7 @@ def commit_message(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Amend last commit reusing HEAD message? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new c.f"],
+    examples=["pigit cmd c.f"],
     related=["c.F", "c"],
 )
 def commit_fixup(args: list[str]) -> str:
@@ -81,7 +81,7 @@ def commit_fixup(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Amend last commit? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new c.F", "pigit cmd_new c.F --no-edit"],
+    examples=["pigit cmd c.F", "pigit cmd c.F --no-edit"],
     related=["c.f", "c"],
 )
 def commit_amend(args: list[str]) -> str:
@@ -98,7 +98,7 @@ def commit_amend(args: list[str]) -> str:
     help="Create a fixup commit (for autosquash rebase).",
     has_args=True,
     arg_completion=[CompletionType.COMMIT],
-    examples=["pigit cmd_new c.fix HEAD~1", "pigit cmd_new c.fix abc123"],
+    examples=["pigit cmd c.fix HEAD~1", "pigit cmd c.fix abc123"],
     related=["c", "c.s"],
 )
 def commit_fixup_target(args: list[str]) -> str:
@@ -114,7 +114,7 @@ def commit_fixup_target(args: list[str]) -> str:
     help="Create a squash commit (for autosquash rebase).",
     has_args=True,
     arg_completion=[CompletionType.COMMIT],
-    examples=["pigit cmd_new c.s HEAD~1", "pigit cmd_new c.s abc123"],
+    examples=["pigit cmd c.s HEAD~1", "pigit cmd c.s abc123"],
     related=["c", "c.fix"],
 )
 def commit_squash(args: list[str]) -> str:
@@ -130,7 +130,7 @@ def commit_squash(args: list[str]) -> str:
     help="Checkout a branch or paths.",
     has_args=True,
     arg_completion=[CompletionType.REF],
-    examples=["pigit cmd_new c.o main", "pigit cmd_new c.o -- file.txt"],
+    examples=["pigit cmd c.o main", "pigit cmd c.o -- file.txt"],
     related=["b.o", "c"],
 )
 def commit_checkout(args: list[str]) -> str:
@@ -145,7 +145,7 @@ def commit_checkout(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Checkout interactively.",
     has_args=True,
-    examples=["pigit cmd_new c.O -p"],
+    examples=["pigit cmd c.O -p"],
     related=["c.o", "c"],
 )
 def commit_checkout_interactive(args: list[str]) -> str:
@@ -164,7 +164,7 @@ def commit_checkout_interactive(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Undo last commit? Changes will be preserved in working tree.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new c.R", "pigit cmd_new c.R --hard"],
+    examples=["pigit cmd c.R", "pigit cmd c.R --hard"],
     related=["c.F", "c"],
 )
 def commit_undo(args: list[str]) -> str:
@@ -177,7 +177,7 @@ def commit_undo(args: list[str]) -> str:
     category=CommandCategory.COMMIT,
     help="Create an empty commit.",
     has_args=True,
-    examples=["pigit cmd_new c.empty -m 'Trigger CI'"],
+    examples=["pigit cmd c.empty -m 'Trigger CI'"],
     related=["c", "c.m"],
 )
 def commit_empty(args: list[str]) -> str:

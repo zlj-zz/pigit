@@ -32,7 +32,6 @@ class _FakeInput:
         return None
 
 
-
 class _MockPanel(Component):
     """Panel that uses AsyncTask to load data."""
 
@@ -230,7 +229,10 @@ def test_run_async_clipboard_callback(mocker):
     mocker.patch("pigit.ext.utils.copy_to_clipboard", return_value=True)
     received = []
 
-    run_async(lambda: pigit.ext.utils.copy_to_clipboard("hello"), lambda ok: received.append(ok))
+    run_async(
+        lambda: pigit.ext.utils.copy_to_clipboard("hello"),
+        lambda ok: received.append(ok),
+    )
 
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:

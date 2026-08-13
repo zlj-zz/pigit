@@ -181,3 +181,9 @@ class TabView(Component):
         if self._active is not None:
             return self._active._handle_event(key)
         return False
+
+    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
+        """Only the active child is rendered, so only it is hit-testable."""
+        if self._active is not None:
+            return self._active._hit_test(col, row)
+        return None

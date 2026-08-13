@@ -16,7 +16,7 @@ from ._models import CommandCategory, SecurityLevel
     category=CommandCategory.SUBMODULE,
     help="Initialize, update or inspect submodules.",
     has_args=True,
-    examples=["pigit cmd_new S", "pigit cmd_new S status"],
+    examples=["pigit cmd S", "pigit cmd S status"],
     related=["S.u", "S.a", "S.f"],
 )
 def submodule(args: list[str]) -> str:
@@ -32,7 +32,7 @@ def submodule(args: list[str]) -> str:
     category=CommandCategory.SUBMODULE,
     help="Add a submodule.",
     has_args=True,
-    examples=["pigit cmd_new S.a https://github.com/user/repo.git path/to/sub"],
+    examples=["pigit cmd S.a https://github.com/user/repo.git path/to/sub"],
     related=["S", "S.f"],
 )
 def submodule_add(args: list[str]) -> str:
@@ -48,7 +48,7 @@ def submodule_add(args: list[str]) -> str:
     category=CommandCategory.SUBMODULE,
     help="Update submodules.",
     has_args=True,
-    examples=["pigit cmd_new S.u", "pigit cmd_new S.u --init --recursive"],
+    examples=["pigit cmd S.u", "pigit cmd S.u --init --recursive"],
     related=["S", "S.a"],
 )
 def submodule_update(args: list[str]) -> str:
@@ -67,7 +67,7 @@ def submodule_update(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Remove submodule? This will delete submodule contents.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new S.f path/to/sub"],
+    examples=["pigit cmd S.f path/to/sub"],
     related=["S", "S.a"],
 )
 def submodule_force_remove(args: list[str]) -> str:
@@ -89,7 +89,7 @@ def submodule_force_remove(args: list[str]) -> str:
     category=CommandCategory.SUBMODULE,
     help="Show submodule summary.",
     has_args=True,
-    examples=["pigit cmd_new S.s"],
+    examples=["pigit cmd S.s"],
     related=["S", "S.l"],
 )
 def submodule_summary(args: list[str]) -> str:

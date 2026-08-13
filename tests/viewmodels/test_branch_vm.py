@@ -53,8 +53,17 @@ def test_checkout_success(branch_vm):
     branch_vm._git.checkout_branch.assert_called_once_with("feat")
 
 
-def test_checkout_invalid_index(branch_vm):
-    result = branch_vm.checkout(99)
+@pytest.mark.parametrize(
+    "method, args",
+    [
+        ("checkout", (99,)),
+        ("rename_branch", (99, "x")),
+        ("delete_branch", (99,)),
+    ],
+    ids=["checkout", "rename_branch", "delete_branch"],
+)
+def test_invalid_index(branch_vm, method, args):
+    result = getattr(branch_vm, method)(*args)
     assert result.success is False
     assert "Invalid index" in result.message
 
@@ -81,12 +90,6 @@ def test_rename_branch_success(branch_vm):
     branch_vm._git.rename_branch.assert_called_once_with("feat", "renamed")
 
 
-def test_rename_branch_invalid_index(branch_vm):
-    result = branch_vm.rename_branch(99, "x")
-    assert result.success is False
-    assert "Invalid index" in result.message
-
-
 def test_delete_branch_success(branch_vm):
     result = branch_vm.delete_branch(1)
     assert result.success is True
@@ -99,12 +102,6 @@ def test_delete_branch_force(branch_vm):
     result = branch_vm.delete_branch(1, force=True)
     assert result.success is True
     branch_vm._git.delete_branch.assert_called_once_with("feat", force=True)
-
-
-def test_delete_branch_invalid_index(branch_vm):
-    result = branch_vm.delete_branch(99)
-    assert result.success is False
-    assert "Invalid index" in result.message
 
 
 def test_delete_branch_failure(branch_vm):

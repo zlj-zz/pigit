@@ -149,6 +149,7 @@ class DiffViewer(LineTextBrowser):
     LINE_NO_STR_WIDTH = 4  # LINE_NO_WIDTH - 1
     DIFF_PREFIX_WIDTH = 1
     SCROLL_PAGE_SIZE = 5
+    SCROLL_COL_STEP = 8
     TAB_WIDTH = 8
     DENSITY_SHORT = 10
     DENSITY_MEDIUM = 30
@@ -216,6 +217,9 @@ class DiffViewer(LineTextBrowser):
         self._file_history_index: int = 0
         self._file_history_cache: dict[str, list[str]] = {}
         self._saved_diff_state: _DiffStateSnapshot | None = None
+        # Horizontal scroll state
+        self._col_offset: int = 0
+        self._max_col_offset: int = 0
         self._cached_path_i = -1
         self._cached_path_hunks_id = -1
         self._cached_path: str | None = None
@@ -282,6 +286,30 @@ class DiffViewer(LineTextBrowser):
         self._hunks = []
         self._hunk_starts = []
         self._i = 0
+        self._compute_max_col_offset()
+
+    def _compute_max_col_offset(self, content_w: int | None = None) -> None:
+        """Compute how far right the user can horizontally scroll.
+
+        Args:
+            content_w: Available width for the content area.  Derived from
+                the current surface size when omitted.
+        """
+        if not self._content:
+            self._max_col_offset = 0
+            self._col_offset = 0
+            return
+        # Widest line after stripping the diff prefix (+/ -/ ).
+        max_text_w = max(
+            (wcswidth(line) - 1 if line and line[0] in "+- " else wcswidth(line))
+            for line in self._content
+        )
+        if content_w is None:
+            w = self._size[0] if self._size else 80
+            content_w = max(0, w - self.BORDER_COLS)
+        main_w = self._main_width(content_w)
+        self._max_col_offset = max(0, max_text_w - main_w)
+        self._col_offset = min(self._col_offset, self._max_col_offset)
 
     def _pre_tokenize_plain(
         self,
@@ -363,6 +391,7 @@ class DiffViewer(LineTextBrowser):
         self._hunks = self._parse_hunks()
         self._hunk_starts = [h.start for h in self._hunks]
         self._i = 0
+        self._compute_max_col_offset()
 
         # Compute word-diff segments on the normal unified diff.
         if self._word_diff:
@@ -806,9 +835,9 @@ class DiffViewer(LineTextBrowser):
         self._file_history_path = path
         self._file_history_cache = {}
 
-        from .git.local_git import LocalGit
+        from .git.api import GitApi
 
-        git = LocalGit(path=self._repo_path)
+        git = GitApi(path=self._repo_path)
         self._file_history_commits = git.get_file_history(path, self._repo_path)
 
         current_sha = self.i_cache_key
@@ -830,9 +859,9 @@ class DiffViewer(LineTextBrowser):
         if sha in self._file_history_cache:
             content = self._file_history_cache[sha]
         else:
-            from .git.local_git import LocalGit
+            from .git.api import GitApi
 
-            git = LocalGit(path=self._repo_path)
+            git = GitApi(path=self._repo_path)
             raw = git.get_file_at_commit(sha, self._file_history_path, self._repo_path)
             if raw is None:
                 content = ["File deleted in this commit"]
@@ -922,6 +951,25 @@ class DiffViewer(LineTextBrowser):
         pos = bisect.bisect_left(self._hunk_starts, self._i) - 1
         if pos >= 0:
             self._i = self._hunk_starts[pos]
+
+    # ── Horizontal scroll ──
+    @bind_keys("l")
+    def _scroll_right(self) -> None:
+        self._col_offset = min(
+            self._col_offset + self.SCROLL_COL_STEP, self._max_col_offset
+        )
+
+    @bind_keys("h")
+    def _scroll_left(self) -> None:
+        self._col_offset = max(self._col_offset - self.SCROLL_COL_STEP, 0)
+
+    @bind_keys("0")
+    def _scroll_col_home(self) -> None:
+        self._col_offset = 0
+
+    @bind_keys("$")
+    def _scroll_col_end(self) -> None:
+        self._col_offset = self._max_col_offset
 
     @bind_keys("H")
     def toggle_hunk_mode(self) -> None:
@@ -1131,6 +1179,9 @@ class DiffViewer(LineTextBrowser):
         self._max_line = max(0, size[1] - self.BORDER_ROWS)
         # Bypass LineTextBrowser.resize() which would reset _max_line to full height
         super(LineTextBrowser, self).resize(size)
+        # Recompute horizontal scroll bounds for the new viewport width.
+        content_w = max(0, size[0] - self.BORDER_COLS)
+        self._compute_max_col_offset(content_w=content_w)
 
     def _draw_diff_line(
         self,
@@ -1143,6 +1194,7 @@ class DiffViewer(LineTextBrowser):
         main_w: int,
         heatmap_x: int,
         fill_width: int,
+        col_offset: int = 0,
     ) -> None:
         """Render one diff line: background, line number, text, and heatmap."""
         is_add = self._is_add_line(line)
@@ -1176,7 +1228,7 @@ class DiffViewer(LineTextBrowser):
 
         # ── Syntax-highlighted text rendering ──
         text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
-        col = text_start_col
+        col = text_start_col - col_offset
         max_col = text_start_col + main_w
         tokens: _RenderLine = []
 
@@ -1193,7 +1245,15 @@ class DiffViewer(LineTextBrowser):
                     code = line
                 tokens = [(code, THEME.fg_primary, wcswidth(code), None)]
 
-        self._draw_tokens(surface, row, col, max_col, tokens, bg)
+        self._draw_tokens(
+            surface,
+            row,
+            col,
+            max_col,
+            tokens,
+            bg,
+            clip_left=text_start_col,
+        )
 
         sym = self._heatmap[idx]
         color = self._heatmap_colors[idx]
@@ -1207,14 +1267,36 @@ class DiffViewer(LineTextBrowser):
         max_col: int,
         tokens: _RenderLine,
         bg: tuple[int, int, int] | None = None,
+        clip_left: int = 0,
     ) -> None:
         """Draw syntax tokens with width-aware truncation.
 
         Each token may carry its own background (e.g. word-diff highlight).
         If a token has no background, the line background is used.
+
+        Tokens whose right edge falls before *clip_left* are skipped.
+        A token straddling *clip_left* is drawn from *clip_left* onward
+        (the hidden left portion is discarded via character clipping).
         """
         for token_text, token_fg, token_width, token_bg in tokens:
             effective_bg = token_bg if token_bg is not None else bg
+
+            # Skip tokens fully to the left of the visible area.
+            if col + token_width <= clip_left:
+                col += token_width
+                continue
+
+            # Clip token that straddles the left edge.
+            if col < clip_left:
+                skip = clip_left - col
+                if skip >= len(token_text):
+                    col += token_width
+                    continue
+                token_text = token_text[skip:]
+                token_width -= skip
+                col = clip_left
+
+            # Right-edge truncation.
             if col + token_width > max_col:
                 avail = max_col - col
                 if avail > 1:
@@ -1284,13 +1366,14 @@ class DiffViewer(LineTextBrowser):
             self._draw_tokens(
                 surface,
                 row,
-                text_start,
+                text_start - self._col_offset,
                 text_start + main_w,
                 tokens,
+                clip_left=text_start,
             )
 
         # Footer hint (overwrites bottom border)
-        hint = " jk:nav  p:older  n:newer  d:diff  Esc:back "
+        hint = " jk:nav  p:older  n:newer  h/l:⇔  d:diff  Esc:back "
         hint_trim = truncate_by_width(hint, w - 4) if wcswidth(hint) > w - 4 else hint
         surface.draw_text_rgb(h - 1, 1, hint_trim, fg=THEME.fg_dim)
 
@@ -1316,9 +1399,10 @@ class DiffViewer(LineTextBrowser):
             self._draw_tokens(
                 surface,
                 row,
-                text_start,
+                text_start - self._col_offset,
                 text_start + main_w,
                 tokens,
+                clip_left=text_start,
             )
 
     def _render_surface(self, surface) -> None:
@@ -1351,6 +1435,7 @@ class DiffViewer(LineTextBrowser):
                 main_w=main_w,
                 heatmap_x=w - self.BORDER_COLS,
                 fill_width=w - self.BORDER_COLS,
+                col_offset=self._col_offset,
             )
 
         last_content_row = end - self._i
@@ -1374,6 +1459,18 @@ class DiffViewer(LineTextBrowser):
                     else path_badge
                 )
                 surface.draw_text_rgb(h - 1, 1, path_trim, fg=THEME.fg_muted)
+
+        # Horizontal scroll indicator
+        if self._max_col_offset > 0:
+            pct = (
+                0
+                if self._max_col_offset == 0
+                else int(self._col_offset / self._max_col_offset * 100)
+            )
+            indicator = f" ← {pct}% → "
+            ind_x = w - len(indicator) - 2
+            if ind_x > 4:
+                surface.draw_text_rgb(h - 1, ind_x, indicator, fg=THEME.fg_dim)
 
         if self._hunk_mode:
             badge = " HUNK "
@@ -1408,4 +1505,5 @@ class DiffViewer(LineTextBrowser):
                 main_w=main_w,
                 heatmap_x=w - 1,
                 fill_width=w,
+                col_offset=self._col_offset,
             )

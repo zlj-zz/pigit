@@ -34,12 +34,14 @@ from pigit.termui import (
     ToastPosition,
 )
 from pigit.termui._component import resolve_presented
+from pigit.termui._runtime_context import get_renderer
+from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
-from .git.local_git import GitError
+from .git.api import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -50,7 +52,7 @@ from .app_preview import PreviewPanel
 from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
-from .git.local_git import LocalGit
+from .git.api import GitApi
 from .git.managed_repos import ManagedRepos
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
@@ -89,6 +91,9 @@ _HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("E", "Open file in external $EDITOR"),
             ("o", "Checkout ours (conflict)"),
             ("t", "Checkout theirs (conflict)"),
+            ("T", "Toggle tree / flat file view"),
+            ("l", "Expand directory (tree view)"),
+            ("h", "Collapse directory (tree view)"),
         ],
     ),
     (
@@ -187,15 +192,15 @@ class PigitApplication(Application):
     def __init__(
         self,
         *,
-        local_git: LocalGit | None = None,
+        git_api: GitApi | None = None,
         managed_repos: ManagedRepos | None = None,
         config: TuiConfig,
     ) -> None:
         super().__init__(input_takeover=True)
-        self._local_git = local_git or LocalGit()
+        self._git_api = git_api or GitApi()
         self._managed_repos = managed_repos
-        self._repo_path, self._repo_conf = self._local_git.confirm_repo()
-        self._git = self._local_git.bind_path(self._repo_path)
+        self._repo_path, self._repo_conf = self._git_api.confirm_repo()
+        self._git = self._git_api.bind_path(self._repo_path)
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
@@ -258,7 +263,11 @@ class PigitApplication(Application):
             status_vm=self._status_vm,
         )
 
-        status_panel = StatusPanel(vm=self._status_vm, id="status_panel")
+        status_panel = StatusPanel(
+            vm=self._status_vm,
+            id="status_panel",
+            default_view=self._config.status_view,
+        )
         stash_panel = StashPanel(vm=self._status_vm, id="stash")
         self._status_stack = TabPanel(
             children=[status_panel, stash_panel],
@@ -482,6 +491,12 @@ class PigitApplication(Application):
             if not was_visible and hasattr(self._inspector, "_last_key"):
                 delattr(self._inspector, "_last_key")
             self._inspector.update_from(active or self._tab_view.active)
+        # Layout change invalidates the incremental-render cache so the
+        # old inspector columns are fully repainted instead of visually
+        # persisting as residue over the widened diff/status area.
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
         request_render()
 
     def resize(self, size: tuple[int, int]) -> None:
@@ -625,8 +640,15 @@ class PigitApplication(Application):
             pass
 
     def _try_restore_merge_state(self) -> None:
-        """On startup: recover pending merge state if merge is still in progress."""
-        state = self._load_merge_state()
+        """On startup: recover pending merge state if merge is still in progress.
+
+        Swallows GitError (e.g. not a git repo) \u2014 merge state restoration is
+        best-effort and should never prevent the TUI from starting.
+        """
+        try:
+            state = self._load_merge_state()
+        except GitError:
+            return
         if state is None:
             return
         if self._git.is_merge_in_progress():
@@ -756,6 +778,16 @@ class PigitApplication(Application):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
     def run(self):
+        if not self._repo_path:
+            Console().echo(
+                "@bold(@red(fatal:)) not a git repository"
+                " (or any of the parent directories): .git\n"
+                "\n"
+                "Pigit needs a git repository to start.\n"
+                "@dim(Use @green(cd) to enter one,"
+                " or @green(pigit --help) to see available commands.)"
+            )
+            return
         try:
             self._run_body()
         except ExitEventLoop as e:

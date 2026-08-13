@@ -126,7 +126,7 @@ flowchart LR
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
 | `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
 | `_bindings.py` | `bind_keys`, `list_bindings`, `BindingError`, merged handler resolution |
-| `keys.py` | Semantic key constants and helpers (e.g. `KEY_ESC`, `is_mouse_event`) |
+| `keys.py` | Semantic key constants and the `SemanticEvent` union (`str` or `MouseEvent`) |
 | `_text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
 | `input.py` | Low-level byte reader -> semantic strings, terminal input handling |
 | `_async_task.py` | `AsyncTask` for non-blocking data loading in components |

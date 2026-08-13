@@ -236,11 +236,16 @@ class CommitPanel(ItemList):
             return
         commits = self._vm.items.value
         self._all_commits = list(commits)
+        # Clear bodies BEFORE _apply_filter so that _ensure_bodies()
+        # actually re-fetches them. Otherwise _build_expanded() builds
+        # row starts using stale body schemas while later describe_row()
+        # calls _schema_for() with the cleared _bodies — causing a
+        # sub_row IndexError when the schemas no longer match.
+        self._bodies = None
+        self._body_lines_cache.clear()
         self._apply_filter()
         self._contrib_graph.set_commits(commits)
         self._refs_cache.clear()
-        self._bodies = None
-        self._body_lines_cache.clear()
 
     def _apply_filter(self) -> None:
         """Filter commits by query and rebuild display state."""

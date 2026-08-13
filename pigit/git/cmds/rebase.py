@@ -19,7 +19,7 @@ from ._models import CommandCategory, SecurityLevel
     dangerous=True,
     confirm_msg="Rebase? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new rb main", "pigit cmd_new rb --onto main feature"],
+    examples=["pigit cmd rb main", "pigit cmd rb --onto main feature"],
     related=["rb.c", "rb.a", "rb.i"],
 )
 def rebase(args: list[str]) -> str:
@@ -34,7 +34,7 @@ def rebase(args: list[str]) -> str:
     short="rb.c",
     category=CommandCategory.COMMIT,
     help="Continue rebase after resolving conflicts.",
-    examples=["pigit cmd_new rb.c"],
+    examples=["pigit cmd rb.c"],
     related=["rb", "rb.a"],
 )
 def rebase_continue(args: list[str]) -> str:
@@ -49,7 +49,7 @@ def rebase_continue(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Abort rebase? All progress will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new rb.a"],
+    examples=["pigit cmd rb.a"],
     related=["rb", "rb.c"],
 )
 def rebase_abort(args: list[str]) -> str:
@@ -61,7 +61,7 @@ def rebase_abort(args: list[str]) -> str:
     short="rb.s",
     category=CommandCategory.COMMIT,
     help="Skip current commit during rebase.",
-    examples=["pigit cmd_new rb.s"],
+    examples=["pigit cmd rb.s"],
     related=["rb", "rb.c"],
 )
 def rebase_skip(args: list[str]) -> str:
@@ -77,7 +77,7 @@ def rebase_skip(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Interactive rebase? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new rb.i HEAD~5", "pigit cmd_new rb.i main"],
+    examples=["pigit cmd rb.i HEAD~5", "pigit cmd rb.i main"],
     related=["rb", "rb.c"],
 )
 def rebase_interactive(args: list[str]) -> str:
@@ -96,7 +96,7 @@ def rebase_interactive(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Rebase with autosquash? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new rb.m main", "pigit cmd_new rb.m -i HEAD~5"],
+    examples=["pigit cmd rb.m main", "pigit cmd rb.m -i HEAD~5"],
     related=["rb", "rb.i"],
 )
 def rebase_autosquash(args: list[str]) -> str:

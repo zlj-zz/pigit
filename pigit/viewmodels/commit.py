@@ -15,7 +15,7 @@ from .base import IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
     from pigit.app_types import CommitInfo, GraphRow
-    from pigit.git.local_git import LocalGit
+    from pigit.git.api import GitApi
     from pigit.git.model import Commit
 
 
@@ -41,7 +41,7 @@ class ICommitViewModel(IListViewModel["Commit"]):
 class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     """Concrete ViewModel for commit log."""
 
-    def __init__(self, git: LocalGit) -> None:
+    def __init__(self, git: GitApi) -> None:
         super().__init__()
         self._git = git
         self._graph_rows: Signal[list[GraphRow]] = Signal([])

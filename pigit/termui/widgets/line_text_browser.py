@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from .. import palette
 from .._component import Component
+from .._mouse import MouseButton, MouseKind, MouseEvent
 from .._surface import Surface, _Subsurface
 
 
 class LineTextBrowser(Component):
+    WHEEL_SCROLL_LINES = 1
+
     def __init__(
         self,
         x: int = 1,
@@ -56,3 +59,15 @@ class LineTextBrowser(Component):
         if not self._content:
             return
         self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Scroll on wheel; one detent scrolls ``WHEEL_SCROLL_LINES`` lines."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button is MouseButton.WHEEL_UP:
+            self.scroll_up(self.WHEEL_SCROLL_LINES)
+            return True
+        if event.button is MouseButton.WHEEL_DOWN:
+            self.scroll_down(self.WHEEL_SCROLL_LINES)
+            return True
+        return False

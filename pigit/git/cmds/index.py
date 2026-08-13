@@ -18,7 +18,7 @@ from ._completion_types import CompletionType
     help="Add file contents to the index (stage files).",
     has_args=True,
     arg_completion=[CompletionType.FILE],
-    examples=["pigit cmd_new i", "pigit cmd_new i file.txt"],
+    examples=["pigit cmd i", "pigit cmd i file.txt"],
     related=["i.a", "i.p", "i.r"],
 )
 def index(args: list[str]) -> str:
@@ -32,7 +32,7 @@ def index(args: list[str]) -> str:
     short="i.a",
     category=CommandCategory.INDEX,
     help="Add all changes to the index.",
-    examples=["pigit cmd_new i.a", "pigit cmd_new i.a -A"],
+    examples=["pigit cmd i.a", "pigit cmd i.a -A"],
     related=["i", "i.p"],
 )
 def index_all(args: list[str]) -> str:
@@ -46,7 +46,7 @@ def index_all(args: list[str]) -> str:
     help="Add changes interactively (patch mode).",
     has_args=True,
     arg_completion=[CompletionType.FILE],
-    examples=["pigit cmd_new i.p", "pigit cmd_new i.p file.txt"],
+    examples=["pigit cmd i.p", "pigit cmd i.p file.txt"],
     related=["i", "i.a"],
 )
 def index_patch(args: list[str]) -> str:
@@ -60,7 +60,7 @@ def index_patch(args: list[str]) -> str:
     short="i.u",
     category=CommandCategory.INDEX,
     help="Add only updated/modified files (not new files).",
-    examples=["pigit cmd_new i.u"],
+    examples=["pigit cmd i.u"],
     related=["i", "i.a"],
 )
 def index_update(args: list[str]) -> str:
@@ -77,7 +77,7 @@ def index_update(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Unstage files? Changes will remain in working tree.",
     security_level=SecurityLevel.NORMAL,
-    examples=["pigit cmd_new i.r", "pigit cmd_new i.r file.txt"],
+    examples=["pigit cmd i.r", "pigit cmd i.r file.txt"],
     related=["i.R", "i"],
 )
 def index_reset(args: list[str]) -> str:
@@ -95,7 +95,7 @@ def index_reset(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Hard reset? Uncommitted changes WILL be lost!",
     security_level=SecurityLevel.DESTRUCTIVE,
-    examples=["pigit cmd_new i.R", "pigit cmd_new i.R --hard"],
+    examples=["pigit cmd i.R", "pigit cmd i.R --hard"],
     related=["i.r", "i"],
 )
 def index_reset_hard(args: list[str]) -> str:
@@ -110,7 +110,7 @@ def index_reset_hard(args: list[str]) -> str:
     category=CommandCategory.INDEX,
     help="Show differences between index and working tree.",
     has_args=True,
-    examples=["pigit cmd_new i.d", "pigit cmd_new i.d --cached"],
+    examples=["pigit cmd i.d", "pigit cmd i.d --cached"],
     related=["i.ds", "w.d"],
 )
 def index_diff(args: list[str]) -> str:
@@ -126,7 +126,7 @@ def index_diff(args: list[str]) -> str:
     category=CommandCategory.INDEX,
     help="Show diff of staged changes.",
     has_args=True,
-    examples=["pigit cmd_new i.ds", "pigit cmd_new i.ds --stat"],
+    examples=["pigit cmd i.ds", "pigit cmd i.ds --stat"],
     related=["i.d", "i"],
 )
 def index_diff_staged(args: list[str]) -> str:

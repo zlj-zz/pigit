@@ -15,7 +15,7 @@ from ._models import CommandCategory, SecurityLevel
     short="C",
     category=CommandCategory.CONFLICT,
     help="Show conflict status.",
-    examples=["pigit cmd_new C"],
+    examples=["pigit cmd C"],
     related=["C.l", "C.d", "C.r"],
 )
 def conflict(args: list[str]) -> str:
@@ -27,7 +27,7 @@ def conflict(args: list[str]) -> str:
     short="C.l",
     category=CommandCategory.CONFLICT,
     help="List conflicted files.",
-    examples=["pigit cmd_new C.l"],
+    examples=["pigit cmd C.l"],
     related=["C", "C.s"],
 )
 def conflict_list(args: list[str]) -> str:
@@ -40,7 +40,7 @@ def conflict_list(args: list[str]) -> str:
     category=CommandCategory.CONFLICT,
     help="Show conflict diff.",
     has_args=True,
-    examples=["pigit cmd_new C.d", "pigit cmd_new C.d file.txt"],
+    examples=["pigit cmd C.d", "pigit cmd C.d file.txt"],
     related=["C", "C.l"],
 )
 def conflict_diff(args: list[str]) -> str:
@@ -59,7 +59,7 @@ def conflict_diff(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Accept our version? Their changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new C.ours file.txt", "pigit cmd_new C.ours --all"],
+    examples=["pigit cmd C.ours file.txt", "pigit cmd C.ours --all"],
     related=["C", "C.theirs"],
 )
 def conflict_ours(args: list[str]) -> str:
@@ -77,7 +77,7 @@ def conflict_ours(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Accept their version? Our changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new C.theirs file.txt", "pigit cmd_new C.theirs --all"],
+    examples=["pigit cmd C.theirs file.txt", "pigit cmd C.theirs --all"],
     related=["C", "C.ours"],
 )
 def conflict_theirs(args: list[str]) -> str:
@@ -92,7 +92,7 @@ def conflict_theirs(args: list[str]) -> str:
     category=CommandCategory.CONFLICT,
     help="Mark file as resolved (add to index).",
     has_args=True,
-    examples=["pigit cmd_new C.mark file.txt"],
+    examples=["pigit cmd C.mark file.txt"],
     related=["C", "i"],
 )
 def conflict_mark(args: list[str]) -> str:
@@ -107,7 +107,7 @@ def conflict_mark(args: list[str]) -> str:
     category=CommandCategory.CONFLICT,
     help="Launch merge tool.",
     has_args=True,
-    examples=["pigit cmd_new C.tool", "pigit cmd_new C.tool file.txt"],
+    examples=["pigit cmd C.tool", "pigit cmd C.tool file.txt"],
     related=["C", "C.d"],
 )
 def conflict_tool(args: list[str]) -> str:

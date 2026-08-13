@@ -5,10 +5,8 @@ import shlex
 import subprocess
 import sys
 import time
-from collections import Counter
 from functools import lru_cache
-from math import sqrt
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -123,67 +121,6 @@ def confirm(text: str = "Confirm[y/n]:", default: bool = True) -> bool:
         return True
     else:
         return default
-
-
-def similar_command(command: str, all_commands: Iterable) -> str:
-    """Get the most similar command with K-NearestNeighbor.
-
-    Args:
-        command (str): command string.
-        all_commands (list): The list of all command.
-
-    Returns:
-        (str): most similar command string.
-
-    Docs test
-        >>> commands = [
-        ...     'branch', 'working tree', 'index', 'log', 'push',
-        ...     'pull', 'tag','commit','conflict'
-        ... ]
-        >>> similar_command('br', commands)
-        'branch'
-        >>> similar_command('wo', commands)
-        'working tree'
-        >>> similar_command('com', commands)
-        'commit'
-    """
-    #  The dictionary of letter frequency of all commands.
-    words: dict = {word: dict(Counter(word)) for word in all_commands}
-    # Letter frequency of command.
-    fre = dict(Counter(command))
-    # The distance between the frequency of each letter in the command
-    # to be tested and all candidate commands, that is the difference
-    # between the frequency of letters.
-    frequency_difference: dict[str, list[int]] = {
-        word: [fre[ch] - words[word].get(ch, 0) for ch in command]
-        + [words[word][ch] - fre.get(ch, 0) for ch in word]
-        for word in words
-    }
-    # Square of sum of squares of word frequency difference.
-    frequency_sum_square: list[tuple[str, int]] = list(
-        map(
-            lambda item: (item[0], int(sqrt(sum(map(lambda i: i**2, item[1]))))),
-            frequency_difference.items(),
-        )
-    )
-
-    # The value of `frequency_sum_square` is multiplied by the weight to find
-    # the minimum.
-    # Distance weight: compensate for the effect of length difference.
-    # Compare Weight: The more similar the beginning, the higher the weight.
-    # sourcery skip: inline-immediately-returned-variable, or-if-exp-identity
-    min_frequency_command: str = min(
-        frequency_sum_square,
-        key=lambda item: item[1]
-        * (
-            len(command) / len(item[0])
-            if len(command) / len(item[0])
-            else len(item[0]) / len(command)
-        )
-        # Returns how many identical letters are compared from the head. sigmod to 0 ~ 1.
-        * (1 / (len(list(filter(lambda i: i[0] == i[1], zip(command, item[0])))) + 1)),
-    )[0]
-    return min_frequency_command
 
 
 # Mark the type corresponding to the file suffix.

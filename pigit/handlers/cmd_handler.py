@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from ..termui.cli_output import get_console
 from ..ext.utils import page_output
 
-from ..git.cmds import GitCommandNew, CommandCategory
+from ..git.cmds import GitCommand, CommandCategory
 
 if TYPE_CHECKING:
     from ..cmdparse.parser import Namespace
@@ -22,7 +22,7 @@ class CmdHandler:
     """Handler for cmd subcommand."""
 
     def __init__(self):
-        self._processor = GitCommandNew()
+        self._processor = GitCommand()
         self._console = get_console()
 
     @staticmethod

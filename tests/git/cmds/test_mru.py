@@ -6,10 +6,6 @@ Author: Zev
 Date: 2026-04-14
 """
 
-import json
-
-import pytest
-
 from pigit.git.cmds._mru import load_mru, save_mru, record_command_use
 
 
@@ -27,13 +23,6 @@ class TestMruPersistence:
         path = tmp_path / "mru.json"
         save_mru(["b.o", "i.a", "c.m"], path)
         assert load_mru(path) == ["b.o", "i.a", "c.m"]
-
-    def test_record_command_use_prepends_and_dedupes(self, tmp_path):
-        path = tmp_path / "mru.json"
-        save_mru(["b.o", "i.a"], path)
-        record_command_use("c.m", max_size=20)
-        # default path is PIGIT_HOME, so this actually writes there unless patched
-        # Better to patch load_mru/save_mru or use a monkeypatched path
 
     def test_record_command_use_with_custom_path(self, tmp_path):
         path = tmp_path / "mru.json"

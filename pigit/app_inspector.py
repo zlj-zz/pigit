@@ -163,13 +163,12 @@ class InspectorPanel(Component):
         if w <= 0 or h <= 0:
             return
 
-        # Left border and separator
+        # Left border and separator (no explicit bg — inherit terminal default
+        # so they blend with the transparent title and content rows).
         content_x = 2
-        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim, bg=THEME.bg_base)
+        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim)
         if h > 1:
-            surface.draw_hline_rgb(
-                1, content_x, w - content_x, fg=THEME.fg_dim, bg=THEME.bg_base
-            )
+            surface.draw_hline_rgb(1, content_x, w - content_x, fg=THEME.fg_dim)
 
         # Title
         title = f" {self._title} "

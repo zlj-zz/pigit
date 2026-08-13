@@ -13,6 +13,12 @@ from typing import TextIO
 
 from ._renderer import Renderer
 
+# xterm mouse reporting: button-event tracking (1002) + SGR extended
+# coordinates (1006). Enabled on POSIX terminals only; the Windows msvcrt
+# input path has no VT mouse support.
+_MOUSE_ENABLE = "\033[?1002h\033[?1006h"
+_MOUSE_DISABLE = "\033[?1002l\033[?1006l"
+
 
 class Session:
     """
@@ -48,6 +54,8 @@ class Session:
             self.stdout.write("\033[?1049h\033[?25l")
         else:
             self.stdout.write("\033[?25l")
+        if sys.platform != "win32":
+            self.stdout.write(_MOUSE_ENABLE)
         self.stdout.flush()
         return self
 
@@ -60,6 +68,8 @@ class Session:
         if getattr(self, "_suspended", False):
             return
         self._suspended = True
+        if sys.platform != "win32":
+            self.stdout.write(_MOUSE_DISABLE)
         if self.alt_screen:
             self.stdout.write("\033[?1049l")
         self.stdout.write("\033[?25h")
@@ -92,6 +102,8 @@ class Session:
         if self.alt_screen:
             self.stdout.write("\033[?1049h")
         self.stdout.write("\033[?25l")
+        if sys.platform != "win32":
+            self.stdout.write(_MOUSE_ENABLE)
         self.stdout.flush()
 
     def __exit__(
@@ -101,6 +113,8 @@ class Session:
         exc_tb: TracebackType | None,
     ) -> None:
         try:
+            if sys.platform != "win32":
+                self.stdout.write(_MOUSE_DISABLE)
             if self.alt_screen:
                 self.stdout.write("\033[?1049l")
             self.stdout.write("\033[?25h")

@@ -9,7 +9,7 @@ Date: 2026-04-10
 import pytest
 
 from pigit.git.cmds import (
-    GitCommandNew,
+    GitCommand,
     CommandRegistry,
     get_registry,
     CommandCategory,
@@ -25,7 +25,7 @@ def create_mock_config():
     return UserCommandConfig()
 
 
-class TestGitCommandNewIntegration:
+class TestGitCommandIntegration:
     def test_full_workflow(self, fresh_registry):
         """Test a complete command execution workflow."""
         # Register commands
@@ -53,7 +53,7 @@ class TestGitCommandNewIntegration:
         )
 
         # Create processor with mock config
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
 
         # Test help
         help_text = processor.get_help()
@@ -76,7 +76,7 @@ class TestGitCommandNewIntegration:
             )
         )
 
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
 
         # Mock confirmation to return False
         monkeypatch.setattr("builtins.input", lambda _: "n")
@@ -135,7 +135,7 @@ class TestGitCommandNewIntegration:
             )
         )
 
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
 
         results = processor.search("delete")
         assert len(results) == 1
@@ -170,7 +170,7 @@ class TestGitCommandNewIntegration:
             )
         )
 
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
         dangerous = processor.list_dangerous()
 
         assert len(dangerous) == 1
@@ -199,7 +199,7 @@ class TestGitCommandNewIntegration:
             )
         )
 
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
 
         branch_help = processor.get_help(category=CommandCategory.BRANCH)
         assert "Branch command" in branch_help
@@ -233,7 +233,7 @@ class TestGitCommandNewIntegration:
         # We just verify the modules can be imported without errors
 
 
-class TestGitCommandNewPreview:
+class TestGitCommandPreview:
     def test_preview_string_handler(self, fresh_registry):
         """Preview returns templated string for string handlers."""
         fresh_registry.register(
@@ -246,7 +246,7 @@ class TestGitCommandNewPreview:
                 handler="git status",
             )
         )
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
         assert processor.preview("s") == (0, "git status")
 
     def test_preview_with_args(self, fresh_registry):
@@ -263,14 +263,14 @@ class TestGitCommandNewPreview:
                 ),
             )
         )
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
         assert processor.preview("b.c", ["feature"]) == (0, "git checkout -b feature")
 
     def test_preview_override(self, fresh_registry):
         """Preview respects config overrides."""
         config = create_mock_config()
         config.overrides["s"] = "git status --short"
-        processor = GitCommandNew(registry=fresh_registry, config=config)
+        processor = GitCommand(registry=fresh_registry, config=config)
         assert processor.preview("s") == (0, "git status --short")
 
     def test_preview_unknown_command(self, fresh_registry):
@@ -285,7 +285,7 @@ class TestGitCommandNewPreview:
                 handler="git status",
             )
         )
-        processor = GitCommandNew(registry=fresh_registry, config=create_mock_config())
+        processor = GitCommand(registry=fresh_registry, config=create_mock_config())
         exit_code, output = processor.preview("st")
         assert exit_code == 1
         assert "Did you mean" in output

@@ -9,7 +9,7 @@ from paths import TEST_PATH
 from pigit.ext.executor import WAITING, Executor
 from pigit.git import git_version
 from pigit.git.model import File
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 
 exec_patch = "pigit.ext.executor.Executor.exec"
 
@@ -70,7 +70,7 @@ class TestRepo:
         create_repo(test_repo)
 
         # create git handle
-        cls.git = LocalGit()
+        cls.git = GitApi()
         cls.git.path = test_repo
 
     def test(self):
@@ -91,15 +91,6 @@ class TestRepo:
 
         assert git.get_repo_desc()
         assert git.get_config()
-
-    def test_api(self):
-        git = self.git
-        git.load_branches()
-        git.load_log()
-        git.load_status()
-        git.load_file_diff("example.py", tracked=False)
-        git.load_commits("A")
-        git.load_commit_info()
 
     @pytest.mark.parametrize(
         ["side_effect", "expected"],
@@ -139,7 +130,7 @@ class TestRepo:
         old = os.getcwd()
         try:
             os.chdir(nested)
-            git = LocalGit().bind_path(test_repo)
+            git = GitApi().bind_path(test_repo)
             files = git.load_status(path=test_repo)
             ut = next(f for f in files if "to_discard" in f.name)
             git.discard_file(ut)

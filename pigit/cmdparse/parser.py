@@ -19,7 +19,7 @@ from collections.abc import Callable, Iterable, Sequence
 from ..termui.cli_output import styled
 
 if TYPE_CHECKING:
-    from argparse import Action, FileType, _ArgumentGroup
+    from argparse import Action, FileType
 
 
 class ParserOptions(TypedDict, total=False):
@@ -161,6 +161,10 @@ class Parser(ArgumentParser):
 
         self.subparsers_action: _SubParsersAction | None = None
         self.default_callback = callback
+        # Declaration-ordered actions and subparser help, used by to_dict()
+        # so it does not have to traverse argparse's private group internals.
+        self._declared_actions: list[Action] = []
+        self._declared_subparsers: dict[str, str] = {}
 
     # ================================
     # overload ~ArgumentParser method
@@ -192,77 +196,6 @@ class Parser(ArgumentParser):
     # ===============================
     # tools methods of serialization
     # ===============================
-    @classmethod
-    def from_dict(cls, parser_dict: dict) -> Parser:
-        """Parse a `dict` to generate a ~Parser."""
-        from copy import deepcopy
-
-        # Use `deepcopy` to ensure that the original dict will not be changed.
-        parser_dict = deepcopy(parser_dict)
-
-        def add_command(
-            handle: Parser | _ArgumentGroup,
-            name: str,
-            args: dict[str, Any],
-        ) -> None:
-            """Add command to ~Parser or ~Group object."""
-
-            names: list[str] = name.split(" ")
-            handle.add_argument(*names, **args)
-
-        def parse_args(handle: Parser, args: dict) -> None:
-            sub_parsers: _SubParsersAction | None = None
-
-            for name, prop in args.items():
-                # Get command type.
-                prop_type = prop.pop("type", "")
-
-                # If the type is 'groups', it's mean that need create a new custom
-                # group. The command of the group in 'args', so we should iterative
-                # the 'args' to add each command.
-                if prop_type == "groups":
-                    g_handle: _ArgumentGroup = handle.add_argument_group(
-                        title=prop.get("title", ""),
-                        description=prop.get("description", ""),
-                    )
-                    for g_name, g_prop in prop.get("args", {}).items():
-                        add_command(g_handle, g_name, g_prop)
-
-                # If the type is 'sub', is's mean that need create a new sub-parser.
-                # Before create sub-parse, we need create a subparsers which a sub-parser
-                # group. Be careful that cannot have multiple subparser arguments for same
-                # ~ArgumentParser. The command of sub-parser in 'args' and it may include
-                # smaller sub-parser, so should resolve it recursively.
-                elif prop_type == "sub":
-                    #
-                    if not sub_parsers:
-                        sub_parsers = handle.add_subparsers()
-
-                    sub_args: dict = prop.pop("args", None)
-
-                    sub_handle: Parser = sub_parsers.add_parser(name, **prop)
-
-                    # If `set_defaults` in args, special treatment is required.
-                    set_defaults = sub_args.get("set_defaults")
-                    if set_defaults is not None:
-                        del sub_args["set_defaults"]
-                        sub_handle.set_defaults(**set_defaults)
-
-                    parse_args(sub_handle, sub_args)
-
-                # Other types will be ignored, and it is considered that the current is
-                # just an ordinary command to add.
-                else:
-                    add_command(handle, name, prop)
-
-        args: dict = parser_dict.pop("args", {})
-
-        # Create root parser. Parse and add command.
-        root_parser = cls(**parser_dict)
-        parse_args(root_parser, args)
-
-        return root_parser
-
     def to_dict(self) -> dict:
         """Return a dict of a parameter serialization of ~Parser."""
 
@@ -283,45 +216,44 @@ class Parser(ArgumentParser):
             "help",
         ]
 
-        def _process(parser: Parser, target_dict: dict) -> dict:
-            # Set parser parameters.
-            for name in cmd_names:
-                target_dict[name] = getattr(parser, name, None)
+        def _process(parser: Parser) -> dict:
+            result: dict = {name: getattr(parser, name, None) for name in cmd_names}
+            args: dict = {}
 
-            # Init `args`.
-            target_dict["args"] = args = {}
+            # ``-h --help`` is added by argparse internally, not through
+            # ``_apply_params``, so it is absent from ``_declared_actions``.
+            if parser.add_help:
+                args["-h --help"] = {
+                    "nargs": 0,
+                    "const": None,
+                    "dest": "help",
+                    "default": "==SUPPRESS==",
+                    "type": None,
+                    "metavar": None,
+                    "help": "show this help message and exit",
+                }
 
-            # Iterative action groups. Include 'option', 'position' and 'subparsers'.
-            # If define custom group, also include them.
-            for action_group in parser._action_groups:
-                # Iterative action in the group. The each action is adding by `add_argument`,
-                # so one action is one argument. It include the parameters that we needed,
-                # the name is define in `argument_names`. The only special type is
-                # ～_SubParserAction, which is a sub-parser. We need to deal with it
-                # separately and resolve its action groups recursively.
-                for action in action_group._group_actions:
-                    if isinstance(action, _SubParsersAction):
-                        sub_helps = {
-                            choices_action.dest: choices_action.help
-                            for choices_action in action._choices_actions
-                        }
-                        for sub_prog, sub_parser in action._name_parser_map.items():
-                            args[sub_prog] = _process(sub_parser, {})
-                            args[sub_prog]["help"] = sub_helps.get(sub_prog, "_")
-                            args[sub_prog]["type"] = "sub"
-                    else:
-                        option_string = " ".join(action.option_strings)
-                        args[option_string] = {}
+            # Declaration-ordered arguments (positional and optional).
+            for action in parser._declared_actions:
+                option_string = " ".join(action.option_strings)
+                args[option_string] = {}
+                for name in argument_names:
+                    args[option_string][name] = getattr(action, name, None)
+                arg_completion = getattr(action, "arg_completion", None)
+                if arg_completion is not None:
+                    args[option_string]["arg_completion"] = arg_completion
 
-                        for name in argument_names:
-                            args[option_string][name] = getattr(action, name, None)
-                        arg_completion = getattr(action, "arg_completion", None)
-                        if arg_completion is not None:
-                            args[option_string]["arg_completion"] = arg_completion
+            # Sub-parsers, keyed by prog, via argparse's public ``choices`` map.
+            if parser.subparsers_action is not None:
+                for prog, sub_parser in parser.subparsers_action.choices.items():
+                    args[prog] = _process(sub_parser)
+                    args[prog]["help"] = parser._declared_subparsers.get(prog, "_")
+                    args[prog]["type"] = "sub"
 
-            return target_dict
+            result["args"] = args
+            return result
 
-        return _process(self, {})
+        return _process(self)
 
     # ===============================
     # quick add sub-parser decorator
@@ -379,6 +311,7 @@ class Parser(ArgumentParser):
                 kwargs["description"] = fn.__doc__
 
             parser = self.add_subparsers().add_parser(prog, **kwargs)
+            self._declared_subparsers[prog] = kwargs.get("help", "_")
 
             _apply_params(parser, params)
 
@@ -506,6 +439,7 @@ def _apply_params(
         action = target.add_argument(*arg_names, **arg_kwargs)
         if arg_completion is not None:
             action.arg_completion = arg_completion
+        parser._declared_actions.append(action)
 
 
 @overload

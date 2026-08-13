@@ -21,7 +21,7 @@ from ._models import CommandCategory, SecurityLevel
     dangerous=True,
     confirm_msg="Merge branch? This may create merge conflicts.",
     security_level=SecurityLevel.NORMAL,
-    examples=["pigit cmd_new m feature-branch", "pigit cmd_new m origin/main"],
+    examples=["pigit cmd m feature-branch", "pigit cmd m origin/main"],
     related=["m.a", "m.s", "C"],
 )
 def merge(args: list[str]) -> str:
@@ -39,7 +39,7 @@ def merge(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Abort merge? Uncommitted changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new m.a"],
+    examples=["pigit cmd m.a"],
     related=["m", "m.c"],
 )
 def merge_abort(args: list[str]) -> str:
@@ -51,7 +51,7 @@ def merge_abort(args: list[str]) -> str:
     short="m.c",
     category=CommandCategory.MERGE,
     help="Continue merge after resolving conflicts.",
-    examples=["pigit cmd_new m.c"],
+    examples=["pigit cmd m.c"],
     related=["m", "m.a", "C"],
 )
 def merge_continue(args: list[str]) -> str:
@@ -63,7 +63,7 @@ def merge_continue(args: list[str]) -> str:
     short="m.s",
     category=CommandCategory.MERGE,
     help="Show merge status.",
-    examples=["pigit cmd_new m.s"],
+    examples=["pigit cmd m.s"],
     related=["m", "w.s"],
 )
 def merge_status(args: list[str]) -> str:
@@ -77,7 +77,7 @@ def merge_status(args: list[str]) -> str:
     help="Merge without fast-forward (create merge commit).",
     has_args=True,
     arg_completion=[CompletionType.BRANCH],
-    examples=["pigit cmd_new m.no feature-branch"],
+    examples=["pigit cmd m.no feature-branch"],
     related=["m", "m.ff"],
 )
 def merge_no_ff(args: list[str]) -> str:
@@ -94,7 +94,7 @@ def merge_no_ff(args: list[str]) -> str:
     help="Merge with fast-forward only (fail if not possible).",
     has_args=True,
     arg_completion=[CompletionType.BRANCH],
-    examples=["pigit cmd_new m.ff feature-branch"],
+    examples=["pigit cmd m.ff feature-branch"],
     related=["m", "m.no"],
 )
 def merge_ff_only(args: list[str]) -> str:
@@ -111,7 +111,7 @@ def merge_ff_only(args: list[str]) -> str:
     help="Squash merge (combine all commits into one).",
     has_args=True,
     arg_completion=[CompletionType.BRANCH],
-    examples=["pigit cmd_new m.squash feature-branch"],
+    examples=["pigit cmd m.squash feature-branch"],
     related=["m", "c.F"],
 )
 def merge_squash(args: list[str]) -> str:

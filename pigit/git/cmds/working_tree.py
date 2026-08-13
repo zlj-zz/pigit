@@ -16,7 +16,7 @@ from ._models import CommandCategory, SecurityLevel
     category=CommandCategory.WORKING_TREE,
     help="Show working tree status.",
     has_args=True,
-    examples=["pigit cmd_new w", "pigit cmd_new w -s"],
+    examples=["pigit cmd w", "pigit cmd w -s"],
     related=["w.s", "w.S", "w.d"],
 )
 def working_tree(args: list[str]) -> str:
@@ -32,7 +32,7 @@ def working_tree(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Show short status.",
     has_args=True,
-    examples=["pigit cmd_new w.s", "pigit cmd_new w.s -b"],
+    examples=["pigit cmd w.s", "pigit cmd w.s -b"],
     related=["w", "w.S"],
 )
 def working_tree_short(args: list[str]) -> str:
@@ -48,7 +48,7 @@ def working_tree_short(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Show full status with details.",
     has_args=True,
-    examples=["pigit cmd_new w.S"],
+    examples=["pigit cmd w.S"],
     related=["w", "w.s"],
 )
 def working_tree_full(args: list[str]) -> str:
@@ -64,7 +64,7 @@ def working_tree_full(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Show changes in working tree.",
     has_args=True,
-    examples=["pigit cmd_new w.d", "pigit cmd_new w.d file.txt"],
+    examples=["pigit cmd w.d", "pigit cmd w.d file.txt"],
     related=["w.ds", "i.d"],
 )
 def working_tree_diff(args: list[str]) -> str:
@@ -80,7 +80,7 @@ def working_tree_diff(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Show diff stat summary.",
     has_args=True,
-    examples=["pigit cmd_new w.ds", "pigit cmd_new w.ds --stat"],
+    examples=["pigit cmd w.ds", "pigit cmd w.ds --stat"],
     related=["w.d", "w"],
 )
 def working_tree_diff_stat(args: list[str]) -> str:
@@ -99,7 +99,7 @@ def working_tree_diff_stat(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Remove untracked files? This cannot be undone.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new w.c -n", "pigit cmd_new w.c -f"],
+    examples=["pigit cmd w.c -n", "pigit cmd w.c -f"],
     related=["w"],
 )
 def working_tree_clean(args: list[str]) -> str:
@@ -118,7 +118,7 @@ def working_tree_clean(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Restore files? Local changes will be lost.",
     security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd_new w.r file.txt", "pigit cmd_new w.r --source=HEAD~1"],
+    examples=["pigit cmd w.r file.txt", "pigit cmd w.r --source=HEAD~1"],
     related=["w.R", "w"],
 )
 def working_tree_restore(args: list[str]) -> str:
@@ -135,7 +135,7 @@ def working_tree_restore(args: list[str]) -> str:
     dangerous=True,
     confirm_msg="Hard reset working tree? ALL uncommitted changes will be lost!",
     security_level=SecurityLevel.DESTRUCTIVE,
-    examples=["pigit cmd_new w.R"],
+    examples=["pigit cmd w.R"],
     related=["w.r", "i.R"],
 )
 def working_tree_reset_hard(args: list[str]) -> str:
@@ -148,7 +148,7 @@ def working_tree_reset_hard(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Stash changes.",
     has_args=True,
-    examples=["pigit cmd_new w.stash", "pigit cmd_new w.stash push -m 'WIP'"],
+    examples=["pigit cmd w.stash", "pigit cmd w.stash push -m 'WIP'"],
     related=["s", "w"],
 )
 def working_tree_stash(args: list[str]) -> str:
@@ -164,7 +164,7 @@ def working_tree_stash(args: list[str]) -> str:
     category=CommandCategory.WORKING_TREE,
     help="Check for whitespace errors.",
     has_args=True,
-    examples=["pigit cmd_new w.check"],
+    examples=["pigit cmd w.check"],
     related=["w"],
 )
 def working_tree_check(args: list[str]) -> str:

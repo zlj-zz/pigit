@@ -6,7 +6,7 @@ import pytest
 
 from pigit.app_diff import DiffViewer, DiffType
 
-_LOCALGIT_PATH = "pigit.git.local_git.LocalGit"
+_LOCALGIT_PATH = "pigit.git.api.GitApi"
 
 
 class TestCurrentFilePath:
@@ -66,15 +66,17 @@ class TestFileHistoryState:
         dv._diff_type = DiffType.COMMIT
         dv.i_cache_key = "abc1234"
         dv.come_from = MagicMock()
-        dv.set_content([
-            "diff --git a/src/main.py b/src/main.py",
-            "--- a/src/main.py",
-            "+++ b/src/main.py",
-            "@@ -1,3 +1,3 @@",
-            " old_line",
-            "-removed",
-            "+added",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/src/main.py b/src/main.py",
+                "--- a/src/main.py",
+                "+++ b/src/main.py",
+                "@@ -1,3 +1,3 @@",
+                " old_line",
+                "-removed",
+                "+added",
+            ]
+        )
         dv._i = 2
         return dv
 
@@ -142,11 +144,13 @@ class TestFileHistoryNavigation:
         dv._repo_path = "/fake/repo"
         dv._diff_type = DiffType.COMMIT
         dv.i_cache_key = "sha0"
-        dv.set_content([
-            "diff --git a/f.py b/f.py",
-            "@@ -1,1 +1,1 @@",
-            " old",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,1 +1,1 @@",
+                " old",
+            ]
+        )
 
         with patch(_LOCALGIT_PATH) as mock_cls:
             mock_git = MagicMock()
@@ -257,11 +261,13 @@ class TestFileHistoryCache:
         dv._repo_path = "/fake/repo"
         dv._diff_type = DiffType.COMMIT
         dv.i_cache_key = "sha0"
-        dv.set_content([
-            "diff --git a/f.py b/f.py",
-            "@@ -1,1 +1,1 @@",
-            " x",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,1 +1,1 @@",
+                " x",
+            ]
+        )
 
         mock_git = MagicMock()
         mock_git.get_file_history.return_value = [
@@ -293,11 +299,13 @@ class TestFileHistoryBinaryAndDeleted:
         dv._repo_path = "/fake/repo"
         dv._diff_type = DiffType.COMMIT
         dv.i_cache_key = "sha0"
-        dv.set_content([
-            "diff --git a/f.bin b/f.bin",
-            "@@ -1,1 +1,1 @@",
-            " x",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/f.bin b/f.bin",
+                "@@ -1,1 +1,1 @@",
+                " x",
+            ]
+        )
 
         mock_git = MagicMock()
         mock_git.get_file_history.return_value = [("sha0", "add binary")]
@@ -313,11 +321,13 @@ class TestFileHistoryBinaryAndDeleted:
         dv._repo_path = "/fake/repo"
         dv._diff_type = DiffType.COMMIT
         dv.i_cache_key = "sha0"
-        dv.set_content([
-            "diff --git a/f.py b/f.py",
-            "@@ -1,1 +0,0 @@",
-            "-x",
-        ])
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,1 +0,0 @@",
+                "-x",
+            ]
+        )
 
         mock_git = MagicMock()
         mock_git.get_file_history.return_value = [("sha0", "delete file")]
