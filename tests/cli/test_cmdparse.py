@@ -1,12 +1,9 @@
 import pytest
 import os
-import copy
-from pprint import pprint
 
 from paths import PROJECT_ROOT as _PIGIT_PATH
 from utils import analyze_it
 
-from pigit.cmdparse.parser import command, Parser
 from pigit.cmdparse.completion.base import ShellCompletion, ShellCompletionError
 from pigit.cmdparse.completion import (
     ZshCompletion,
@@ -16,80 +13,6 @@ from pigit.cmdparse.completion import (
 )
 from pigit.init import get_shell
 
-argparse_dict = {
-    "prog": "pigit",
-    "prefix_chars": "-",
-    "description": "Pigit TUI is called automatically if no parameters are followed.",
-    "args": {
-        "-v --version": {
-            "action": "version",
-            "help": "Show version and exit.",
-            "version": "Version: ",
-        },
-        "-d --debug": {
-            "action": "store_true",
-            "help": "Current runtime in debug mode.",
-        },
-        "--out-log": {"action": "store_true", "help": "Print log to console."},
-        "tools": {
-            "type": "groups",
-            "title": "tools arguments",
-            "description": "Auxiliary type commands.",
-            "args": {
-                "-c --count": {
-                    "nargs": "?",
-                    "const": ".",
-                    "type": str,
-                    "metavar": "PATH",
-                    "help": "Count the number of codes and output them in tabular form."
-                    "A given path can be accepted, and the default is the current directory.",
-                },
-                "--create-config": {
-                    "action": "store_true",
-                    "help": "Create a pre-configured file of PIGIT."
-                    "(If a profile exists, the values available in it are used)",
-                },
-            },
-        },
-        "cmd": {
-            "type": "sub",
-            "help": "git short command system.",
-            "description": "Execute short git commands.",
-            "args": {
-                "command": {
-                    "nargs": "*",
-                    "help": "Command to execute with arguments.",
-                },
-                "-l --list": {
-                    "action": "store_true",
-                    "help": "List all commands.",
-                },
-                "-d --dangerous": {
-                    "action": "store_true",
-                    "help": "List only dangerous commands.",
-                },
-                "-s --search": {
-                    "dest": "search",
-                    "metavar": "QUERY",
-                    "help": "Search commands by keyword.",
-                },
-                "-p --pick": {
-                    "dest": "pick",
-                    "metavar": "CATEGORY",
-                    "nargs": "?",
-                    "const": True,
-                    "help": "Interactively pick and run a command (TTY). Optional CATEGORY to filter.",
-                },
-                "-t --type": {
-                    "dest": "type",
-                    "metavar": "CATEGORY",
-                    "help": "Filter by category (branch, commit, index, etc.).",
-                },
-                "set_defaults": {"func": range},
-            },
-        },
-    },
-}
 
 
 def _inject_registry_commands(complete_vars):
@@ -125,30 +48,16 @@ def _inject_registry_commands(complete_vars):
         complete_vars["args"]["cmd"]["args"][alias_name] = cmd_entry
 
 
-def test_generate_about_dict():
-    parser = Parser.from_dict(argparse_dict)
-    parser.print_help()
-
-    ShellCompletion.SHELL = ""
-    args = parser.to_dict()["args"]
-    pprint(ShellCompletion("", {})._parse(args))
-
-
 class TestCompletion:
     @classmethod
     def setup_class(cls):
-        real = True
-
         cls.prog = "pigit"
         cls.script_dir = os.path.join(_PIGIT_PATH, "docs")
 
-        if real:
-            from pigit.entry import pigit
+        from pigit.entry import pigit
 
-            cls.complete_vars = pigit.to_dict()
-            _inject_registry_commands(cls.complete_vars)
-        else:
-            cls.complete_vars = copy.deepcopy(argparse_dict)
+        cls.complete_vars = pigit.to_dict()
+        _inject_registry_commands(cls.complete_vars)
 
     def test_error(self):
         # error complete_vars
