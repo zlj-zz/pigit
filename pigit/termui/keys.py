@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from ._mouse import MouseEvent
+
+# A semantic input token: a keyboard string or a structured mouse event.
+SemanticEvent = str | MouseEvent
+
 # Stable semantic tokens (public documentation; values match existing app conventions).
 KEY_SPACE = " "
 KEY_TAB = "tab"
@@ -98,21 +103,3 @@ WIN_EXT_TO_SEMANTIC: dict[bytes, str] = {
     b"\x00K": KEY_LEFT,
     b"\x00M": KEY_RIGHT,
 }
-
-
-def is_mouse_event(ev: object) -> bool:
-    """
-    Return True if ``ev`` is a legacy 4-tuple mouse event from a custom
-    :class:`~pigit.termui.input_terminal.InputTerminal`.
-
-    ``KeyboardInput`` / :class:`~pigit.termui.input_bridge.TermuiInputBridge`
-    emit semantic strings only; tuple events are optional for injected terminals
-    that still mirror the old Urwid-style mouse shape.
-    """
-
-    if isinstance(ev, tuple) and len(ev) == 4:
-        head = ev[0]
-        return isinstance(head, str) and "mouse" in head
-    if isinstance(ev, str):
-        return ev.startswith("mouse ")
-    return False

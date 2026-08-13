@@ -20,6 +20,7 @@ from collections.abc import Callable
 from shutil import get_terminal_size
 
 from . import keys
+from ._mouse import parse_sgr_mouse
 
 _logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ def _st_terminated_byte_count(buf: bytes, leader: bytes) -> int:
     return 0
 
 
-def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
+def match_esc_sequence(buf: bytes) -> tuple[keys.SemanticEvent | None, int, bool]:
     """
     Match a leading escape sequence.
 
@@ -156,6 +157,8 @@ def match_esc_sequence(buf: bytes) -> tuple[str | None, int, bool]:
         if n == 0:
             return None, 0, True
         chunk = buf[:n]
+        if chunk.startswith(b"\x1b[<"):
+            return parse_sgr_mouse(chunk), n, False
         if chunk in keys.ESC_TO_SEMANTIC:
             return keys.ESC_TO_SEMANTIC[chunk], n, False
         csi_u = _parse_csi_u(chunk)
@@ -213,7 +216,7 @@ class KeyboardInput:
         self._read_hook = read_hook
         self._buffer = bytearray()
         self._last_size: tuple[int, int] | None = None
-        self._queue: queue.Queue[str] = queue.Queue()
+        self._queue: queue.Queue[keys.SemanticEvent] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._running = False
 
@@ -286,7 +289,7 @@ class KeyboardInput:
             time.sleep(0.001)
         return b""
 
-    def _consume_one(self) -> tuple[str | None, int]:
+    def _consume_one(self) -> tuple[keys.SemanticEvent | None, int]:
         buf = self._buffer
         if not buf:
             return None, 0
@@ -343,8 +346,8 @@ class KeyboardInput:
         except UnicodeDecodeError:
             return chr(chunk[0]), ln
 
-    def _drain_buffer(self) -> list[str]:
-        out: list[str] = []
+    def _drain_buffer(self) -> list[keys.SemanticEvent]:
+        out: list[keys.SemanticEvent] = []
         while True:
             key, n = self._consume_one()
             if n == 0:
@@ -364,7 +367,7 @@ class KeyboardInput:
             return [keys.KEY_WINDOW_RESIZE]
         return []
 
-    def read_keys(self, timeout: float | None = 0.1) -> list[str]:
+    def read_keys(self, timeout: float | None = 0.1) -> list[keys.SemanticEvent]:
         """
         Block up to ``timeout`` seconds for input, then return semantic keys.
 
@@ -394,7 +397,7 @@ class KeyboardInput:
             self._thread.join(timeout=0.125)
             self._thread = None
 
-    def get_key(self) -> str | None:
+    def get_key(self) -> keys.SemanticEvent | None:
         """Non-blocking fetch of one key. Returns None if none available."""
         try:
             return self._queue.get_nowait()
@@ -515,11 +518,13 @@ class InputTerminal:
         """Stop the input reader. No-op by default; override in subclasses."""
         return
 
-    def get_key(self) -> str | None:
+    def get_key(self) -> keys.SemanticEvent | None:
         """Non-blocking read of a single semantic key. Must be overridden in subclasses."""
         raise NotImplementedError("Subclasses must implement get_key()")
 
-    def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
+    def get_input(
+        self, raw_keys: bool = False
+    ) -> tuple[list[keys.SemanticEvent], list[int] | None]:
         """Read semantic keys from the input source. Must be overridden in subclasses."""
         raise NotImplementedError("Subclasses must implement get_input()")
 
@@ -548,10 +553,12 @@ class TermuiInputBridge(InputTerminal):
     def stop(self) -> None:
         self._kb.stop()
 
-    def get_key(self) -> str | None:
+    def get_key(self) -> keys.SemanticEvent | None:
         return self._kb.get_key()
 
-    def get_input(self, raw_keys: bool = False) -> tuple[list[str], list[int] | None]:
+    def get_input(
+        self, raw_keys: bool = False
+    ) -> tuple[list[keys.SemanticEvent], list[int] | None]:
         """Read semantic keys from the keyboard and return them (raw_keys is ignored)."""
         keys = self._kb.read_keys(timeout=0.125)
         return (keys, None) if not raw_keys else (keys, None)

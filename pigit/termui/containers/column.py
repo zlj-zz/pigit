@@ -127,11 +127,17 @@ class Column(Component):
         """Cycle focus to the next child panel."""
         if self._focus_index is None or not self.children:
             return
+        self.set_focus_index((self._focus_index + 1) % len(self.children))
+
+    def set_focus_index(self, idx: int) -> None:
+        """Set the focused child by index, handling activate/deactivate and notify."""
+        if self._focus_index is None or not self.children:
+            return
         old_child = self._focused_child()
-        self._focus_index = (self._focus_index + 1) % len(self.children)
+        self._focus_index = idx
         new_child = self._focused_child()
         _logger.debug(
-            "[FOCUS] focus_next: old=%s new=%s focus_index=%s",
+            "[FOCUS] set_focus_index: old=%s new=%s focus_index=%s",
             type(old_child).__name__ if old_child else None,
             type(new_child).__name__ if new_child else None,
             self._focus_index,

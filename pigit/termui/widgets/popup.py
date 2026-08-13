@@ -14,6 +14,7 @@ from .. import _runtime_context, keys, palette
 from .._bindings import resolve_key_handlers_merged
 from .._component import Component
 from .._frame import BoxFrame
+from .._mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
 from .._surface import Surface, _Subsurface
 from .._text import sanitize_for_display
@@ -157,8 +158,9 @@ class Popup(Component):
             col = max(0, (tw - ow) // 2)
         else:
             row, col = int(self._offset[0]), int(self._offset[1])
-        self._child.x = row
-        self._child.y = col
+        # x/y are 1-based (row/col), consistent with Column/Row child layout.
+        self._child.x = row + 1
+        self._child.y = col + 1
         self._child._size = (ow, oh)
 
     def refresh(self) -> None:
@@ -175,7 +177,21 @@ class Popup(Component):
         if self._term_size != curr_size or self._child._size == (0, 0):
             self.resize(curr_size)
         self._layout_content()
-        self._child._render_surface(surface)
+        w, h = self._child._size
+        sub = surface.subsurface(
+            max(0, self._child.x - 1), max(0, self._child.y - 1), w, h
+        )
+        self._child._render_surface(sub)
+
+    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
+        """Hit-test the sole rendered child (local coords after normalization)."""
+        child = self._child
+        w, h = child._size
+        if w <= 0 or h <= 0:
+            return None
+        if not (child.y <= col < child.y + w and child.x <= row < child.x + h):
+            return None
+        return child._hit_test(col - (child.y - 1), row - (child.x - 1))
 
 
 class AlertDialogBody(Component):
@@ -263,16 +279,40 @@ class AlertDialogBody(Component):
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
 
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Map a left click on the footer row to OK / Cancel."""
+        if not self.open:
+            return False
+        if event.kind is not MouseKind.PRESS or event.button is not MouseButton.LEFT:
+            return False
+        if self._needs_rebuild:
+            self._rebuild_frame()
+        cr, cc, _cw, ch = self._frame.content_rect(0, 0)
+        footer_row0 = cr + min(ch, len(self._content_lines)) - 1
+        if event.row - 1 != footer_row0:
+            return False
+        footer = self._footer_text()
+        col0 = event.col - 1
+        ok_col = cc + footer.index("OK")
+        cancel_col = cc + footer.index("Cancel")
+        if ok_col <= col0 < ok_col + len("OK"):
+            self._shell._finish_alert(True)
+            return True
+        if cancel_col <= col0 < cancel_col + len("Cancel"):
+            self._shell._finish_alert(False)
+            return True
+        return False
+
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if not self.open:
             return
         if self._needs_rebuild:
             self._rebuild_frame()
         surface.fill_rect_rgb(
-            self.x, self.y, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
+            0, 0, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
         )
-        self._frame.draw(surface, self.x, self.y)
-        cr, cc, cw, ch = self._frame.content_rect(self.x, self.y)
+        self._frame.draw(surface, 0, 0)
+        cr, cc, cw, ch = self._frame.content_rect(0, 0)
         for i, line in enumerate(self._content_lines[:ch]):
             text = pad_by_width(truncate_by_width(line, cw), cw)
             surface.draw_text_rgb(
@@ -295,7 +335,7 @@ class AlertDialogBody(Component):
                 seg = seg[inner:]
         if not wrapped:
             wrapped = [""]
-        footer = f"[{self._confirm_key}] OK  [{self._cancel_key}] Cancel"
+        footer = self._footer_text()
         footer_lines: list[str] = []
         rest = footer
         while rest:
@@ -308,6 +348,10 @@ class AlertDialogBody(Component):
         for fl in footer_lines:
             lines.append(fl[:inner].ljust(inner))
         return lines
+
+    def _footer_text(self) -> str:
+        """Return the footer label rendered on the last content line."""
+        return f"[{self._confirm_key}] OK  [{self._cancel_key}] Cancel"
 
 
 class AlertDialog(Popup):

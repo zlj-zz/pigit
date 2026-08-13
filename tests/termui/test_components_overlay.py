@@ -479,7 +479,7 @@ class TestHelpPanel:
         panel._render_surface(surface)
 
         # Frame should have drawn a border; content rows should include bindings.
-        row_text = surface._rows[2]
+        row_text = surface._rows[1]
         combined = "".join(c.char for c in row_text)
         assert "j" in combined or "down" in combined
 

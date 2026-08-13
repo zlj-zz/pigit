@@ -18,6 +18,7 @@ from ._bindings import (
     list_bindings,
     resolve_key_handlers_merged,
 )
+from ._mouse import MouseEvent
 from ._runtime_context import (
     get_renderer,
     get_renderer_strict,
@@ -245,6 +246,42 @@ class Component(ABC):
         from ._component_event import dispatch_key
 
         return dispatch_key(self, key)
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Handle a mouse event at this component's local coordinates.
+
+        Returns True when consumed. The default is False (not interactive);
+        interactive components override this to map a click/wheel to an action.
+        """
+        return False
+
+    def _handle_mouse(self, event: MouseEvent) -> bool:
+        """Route a mouse event to this component (default: interpret directly).
+
+        ``ComponentRoot`` overrides this to hit-test the tree and route to the
+        component under the cursor; leaves interpret the event via
+        :meth:`handle_mouse`.
+        """
+        return self.handle_mouse(event)
+
+    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
+        """Return the deepest component under 1-based ``(col, row)``.
+
+        The result is ``(component, local_col, local_row)`` where the local
+        coordinates are 1-based relative to the returned component. Mirrors
+        rendering: children painted last are tested first, and a child's
+        ``x``/``y`` (1-based, parent-relative) offset the recursion.
+        """
+        for child in reversed(self.children):
+            w, h = child._size
+            if w <= 0 or h <= 0:
+                continue
+            if not (child.y <= col < child.y + w and child.x <= row < child.x + h):
+                continue
+            hit = child._hit_test(col - (child.y - 1), row - (child.x - 1))
+            if hit is not None:
+                return hit
+        return self, col, row
 
     def emit(self, action: EventType, **data) -> None:
         """Bubble action up through parent chain to Application.

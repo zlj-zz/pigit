@@ -474,7 +474,9 @@ def test_context_manager_start_stop():
     loop.stop.assert_called_once()
 
 
-def test_loop_mouse_event_is_ignored(mock_renderer):
+def test_loop_mouse_event_is_handled(mock_renderer):
+    from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
             super().__init__(_Leaf(), alt=False)
@@ -484,17 +486,42 @@ def test_loop_mouse_event_is_ignored(mock_renderer):
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.before_dispatch_key = Mock()
     loop.after_dispatch_key = Mock()
+    loop.before_mouse_event = Mock()
     loop._input_handle = Mock()
     loop._input_handle.get_key.side_effect = [
-        "mouse down",
+        MouseEvent(col=1, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS),
         ExitEventLoop("stop"),
     ]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
 
+    loop.before_mouse_event.assert_called_once()
     loop.before_dispatch_key.assert_not_called()
     loop.after_dispatch_key.assert_not_called()
+
+
+def test_loop_mouse_event_requests_render(mock_renderer):
+    from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_Leaf(), alt=False)
+
+    loop = _Hooked()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.render = Mock()
+    loop._input_handle = Mock()
+    loop._input_handle.get_key.side_effect = [
+        MouseEvent(col=1, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS),
+        ExitEventLoop("stop"),
+    ]
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    # Initial render (start -> resize) plus a render after the mouse event.
+    assert loop.render.call_count >= 2
 
 
 def test_quit_raises_exit_event_loop():

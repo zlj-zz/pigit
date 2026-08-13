@@ -10,23 +10,7 @@ import pytest
 import termios
 from unittest.mock import patch
 
-from pigit.termui.keys import is_mouse_event
 from pigit.termui.input import TermuiInputBridge
-
-
-@pytest.mark.parametrize(
-    "ev, expected",
-    [
-        (("mouse press", 1, 0, 0), True),
-        (("meta mouse drag", 0, 0, 0), True),
-        (("click", 1, 0, 0), False),
-        ((), False),
-        ((1, 2, 3), False),
-        ("up", False),
-    ],
-)
-def test_is_mouse_event(ev, expected):
-    assert is_mouse_event(ev) is expected
 
 
 def test_termui_input_bridge_forwards_read_keys():

@@ -8,11 +8,13 @@ Date: 2026-04-19
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from ._component import Component
 from ._layer import LayerKind, LayerStack
+from ._mouse import MouseEvent
 from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
@@ -20,7 +22,6 @@ from ._overlay_api import get_badge_signal
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
-    from ._segment import Segment
     from ._surface import Surface, _Subsurface
     from .widgets import Sheet
 
@@ -206,6 +207,71 @@ class ComponentRoot(Component):
             return consumed
         self._focus_manager.sync_focus_to_overlay()
         return False
+
+    def _handle_mouse(self, event: MouseEvent) -> bool:
+        """Route a mouse event: overlays first, then body with click-to-focus.
+
+        A MODAL swallows clicks outside it (mirroring ``LayerStack.dispatch``);
+        a SHEET passes through to the body when the click misses it.
+        """
+        modal = self._layer_stack.top(LayerKind.MODAL)
+        if modal is not None and getattr(modal, "open", False):
+            hit = modal._hit_test(event.col, event.row)
+            if hit is None:
+                return True
+            target, lcol, lrow = hit
+            target.handle_mouse(replace(event, col=lcol, row=lrow))
+            # handle_mouse may close the modal (e.g. OK/Cancel); re-sync focus
+            # after, so a closed modal restores focus to the body.
+            self._focus_manager.sync_focus_to_overlay_or_leaf()
+            return True
+
+        sheet = self._layer_stack.top(LayerKind.SHEET)
+        if sheet is not None and getattr(sheet, "open", False):
+            hit = sheet._hit_test(event.col, event.row)
+            if hit is not None:
+                target, lcol, lrow = hit
+                target.handle_mouse(replace(event, col=lcol, row=lrow))
+                return True
+
+        hit = self._body._hit_test(event.col, event.row)
+        if hit is None:
+            return False
+        target, lcol, lrow = hit
+        self.focus_component(target)
+        target.handle_mouse(replace(event, col=lcol, row=lrow))
+        return True
+
+    def focus_component(self, leaf: Component) -> None:
+        """Move focus to ``leaf`` through its focus-managed ancestor containers.
+
+        Only a focus-managed ``Column`` routes focus: clicking one of its
+        children switches ``_focus_index``. ``TabView`` never needs this — its
+        ``_hit_test`` only returns the active child, so a click cannot land on
+        a non-active tab. When no focus-managed ancestor is on the path
+        (e.g. clicking the header or footer), focus is left unchanged so
+        keyboard focus is not stolen by a non-focusable click.
+        """
+        from .containers import Column
+
+        path: list[Component] = []
+        node: Component | None = leaf
+        while node is not None and node is not self._body:
+            path.append(node)
+            node = node.parent
+        path.append(self._body)
+
+        changed = False
+        for i in range(len(path) - 1, 0, -1):
+            parent, child = path[i], path[i - 1]
+            if isinstance(parent, Column) and parent._focus_index is not None:
+                idx = parent.children.index(child)
+                if parent._focus_index != idx:
+                    parent.set_focus_index(idx)
+                    changed = True
+
+        if changed:
+            self._focus_manager.set_focus_chain(self._body.find_focus_leaf())
 
     def _expire_badge(self) -> None:
         if getattr(self, "_badge_until", 0) and time.monotonic() > self._badge_until:

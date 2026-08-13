@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
-from . import keys
 from ._async_task import AsyncTask
 from ._bindings import BindingsList, resolve_key_handlers_merged
 from ._component import Component
+from ._mouse import MouseEvent
 from ._runtime_context import get_renderer
 from ._session import Session
 from .tty_io import terminal_size
@@ -122,7 +122,7 @@ class AppEventLoop:
     def after_dispatch_key(self, key: str, outcome: KeyDispatchOutcome) -> None:
         """Hook after dispatching a string key; ``outcome`` matches the branch taken."""
 
-    def before_mouse_event(self, event: str) -> None:
+    def before_mouse_event(self, event: MouseEvent) -> None:
         """Hook before handling a mouse event (subclasses may override)."""
 
     def clear_screen(self) -> None:
@@ -212,15 +212,21 @@ class AppEventLoop:
             while True:
                 # 1. Process all keyboard input that has arrived.
                 while True:
-                    key = self._input_handle.get_key()
-                    if key is None:
+                    event = self._input_handle.get_key()
+                    if event is None:
                         break
-                    if keys.is_mouse_event(key):
-                        self.before_mouse_event(key)
+                    if isinstance(event, MouseEvent):
+                        self.before_mouse_event(event)
+                        self._child._handle_mouse(event)
+                        self.request_render()
+                        if self._render_requested:
+                            _logger.debug("[RENDER] _loop: render (after mouse)")
+                            self._render_requested = False
+                            self.render()
                         continue
-                    _logger.debug("[RENDER] _loop: dispatch key=%r", key)
-                    outcome = self._dispatch_semantic_string(key)
-                    self.after_dispatch_key(key, outcome)
+                    _logger.debug("[RENDER] _loop: dispatch key=%r", event)
+                    outcome = self._dispatch_semantic_string(event)
+                    self.after_dispatch_key(event, outcome)
                     if self._render_requested:
                         _logger.debug("[RENDER] _loop: render (after dispatch)")
                         self._render_requested = False
