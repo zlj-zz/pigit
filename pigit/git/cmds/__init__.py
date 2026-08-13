@@ -75,11 +75,11 @@ def register_user_commands(
             pass
 
 
-class GitCommandNew:
+class GitCommand:
     """Processor for the ``pigit cmd`` short-command DSL.
 
     Maps short command names (e.g. ``b.c``) to git command strings and
-    executes them. This is a separate abstraction from ``LocalGit``, which
+    executes them. This is a separate abstraction from ``GitApi``, which
     exposes structured git data to the TUI panels — the two are not layered
     on top of each other.
 
@@ -93,7 +93,7 @@ class GitCommandNew:
         config: UserCommandConfig | None = None,
         executor: SecureExecutor | None = None,
     ):
-        """Initialize GitCommandNew processor.
+        """Initialize GitCommand processor.
 
         Args:
             registry: Command registry instance
@@ -333,7 +333,7 @@ class GitCommandNew:
 # Backward compatibility exports
 __all__ = [
     # Core classes
-    "GitCommandNew",
+    "GitCommand",
     "CommandRegistry",
     "CommandResolver",
     "SecureExecutor",

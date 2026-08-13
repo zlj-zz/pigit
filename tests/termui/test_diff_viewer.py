@@ -6,7 +6,7 @@ import pytest
 
 from pigit.app_diff import DiffViewer, DiffType
 
-_LOCALGIT_PATH = "pigit.git.local_git.LocalGit"
+_LOCALGIT_PATH = "pigit.git.api.GitApi"
 
 
 class TestCurrentFilePath:

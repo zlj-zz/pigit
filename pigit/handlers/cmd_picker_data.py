@@ -77,7 +77,7 @@ def build_context_signals() -> dict[str, bool]:
     if ctx is None:
         return signals
     try:
-        files = ctx.local_git.load_status()
+        files = ctx.git_api.load_status()
     except Exception:
         return signals
 

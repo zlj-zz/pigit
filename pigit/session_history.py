@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pigit.viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
-    from pigit.git.local_git import LocalGit
+    from pigit.git.api import GitApi
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class ReverseCommand:
     op_type: OpType
     payload: dict  # plain dict — no object references
 
-    def execute(self, git: LocalGit) -> ActionResult:
+    def execute(self, git: GitApi) -> ActionResult:
         dispatcher = _REVERSE_DISPATCHERS.get(self.op_type)
         if dispatcher is None:
             return ActionResult(
@@ -65,7 +65,7 @@ class HistoryRecord:
     timestamp: float
     panel_hint: str
 
-    def reverse(self, git: LocalGit) -> ActionResult:
+    def reverse(self, git: GitApi) -> ActionResult:
         """Execute inverses in reverse order."""
         for cmd in reversed(self.commands):
             result = cmd.execute(git)
@@ -104,7 +104,7 @@ class SessionHistory:
         self._stack.append(record)
         self._current_memory += cost
 
-    def reverse(self, git: LocalGit) -> ActionResult:
+    def reverse(self, git: GitApi) -> ActionResult:
         if not self._stack:
             return ActionResult(success=False, message="Nothing to reverse")
         record = self._stack.pop()
@@ -114,7 +114,7 @@ class SessionHistory:
         # Truncate on failure — timeline is broken.
         return result
 
-    def reverse_to(self, index: int, git: LocalGit) -> ActionResult:
+    def reverse_to(self, index: int, git: GitApi) -> ActionResult:
         """Rewind: reverse all items from top down to index (inclusive)."""
         n = len(self._stack)
         if index < 0 or index >= n:
@@ -172,19 +172,19 @@ class SessionHistory:
 # ------------------------------------------------------------------
 
 
-def _stage_file(payload: dict, git: LocalGit) -> ActionResult:
+def _stage_file(payload: dict, git: GitApi) -> ActionResult:
     path = payload["path"]
     git.add_file(path)
     return ActionResult(success=True, message=f"Restored (staged) {path}")
 
 
-def _unstage_file(payload: dict, git: LocalGit) -> ActionResult:
+def _unstage_file(payload: dict, git: GitApi) -> ActionResult:
     path = payload["path"]
     git.reset_head_file(path)
     return ActionResult(success=True, message=f"Restored (unstaged) {path}")
 
 
-def _restore_file(payload: dict, git: LocalGit) -> ActionResult:
+def _restore_file(payload: dict, git: GitApi) -> ActionResult:
     path = payload["path"]
     if payload.get("tracked"):
         blob_sha = payload.get("blob_sha")
@@ -204,30 +204,30 @@ def _restore_file(payload: dict, git: LocalGit) -> ActionResult:
     return ActionResult(success=True, message=f"Restored {path}")
 
 
-def _ignore_file(payload: dict, git: LocalGit) -> ActionResult:
+def _ignore_file(payload: dict, git: GitApi) -> ActionResult:
     path = payload["path"]
     git.ignore_file(path)
     return ActionResult(success=True, message=f"Restored (ignored) {path}")
 
 
-def _unignore_file(payload: dict, git: LocalGit) -> ActionResult:
+def _unignore_file(payload: dict, git: GitApi) -> ActionResult:
     path = payload["path"]
     git.unignore_file(path)
     return ActionResult(success=True, message=f"Restored (unignored) {path}")
 
 
-def _soft_reset_head1(_payload: dict, git: LocalGit) -> ActionResult:  # noqa: ARG001
+def _soft_reset_head1(_payload: dict, git: GitApi) -> ActionResult:  # noqa: ARG001
     git.soft_reset_head1()
     return ActionResult(success=True, message="Uncommitted (changes re-staged)")
 
 
-def _checkout_branch(payload: dict, git: LocalGit) -> ActionResult:
+def _checkout_branch(payload: dict, git: GitApi) -> ActionResult:
     branch = payload["branch"]
     git.checkout_branch(branch)
     return ActionResult(success=True, message=f"Restored branch: {branch}")
 
 
-def _create_branch(payload: dict, git: LocalGit) -> ActionResult:
+def _create_branch(payload: dict, git: GitApi) -> ActionResult:
     name = payload["name"]
     sha = payload.get("sha")
     if sha:
@@ -237,25 +237,25 @@ def _create_branch(payload: dict, git: LocalGit) -> ActionResult:
     return ActionResult(success=True, message=f"Restored branch: {name}")
 
 
-def _rename_branch(payload: dict, git: LocalGit) -> ActionResult:
+def _rename_branch(payload: dict, git: GitApi) -> ActionResult:
     old_name = payload["old_name"]
     new_name = payload["new_name"]
     git.rename_branch(new_name, old_name)
     return ActionResult(success=True, message=f"Restored branch name: {old_name}")
 
 
-def _stash_pop(_payload: dict, git: LocalGit) -> ActionResult:  # noqa: ARG001
+def _stash_pop(_payload: dict, git: GitApi) -> ActionResult:  # noqa: ARG001
     git.stash_pop("stash@{0}")
     return ActionResult(success=True, message="Restored stash")
 
 
-def _stash_store(payload: dict, git: LocalGit) -> ActionResult:
+def _stash_store(payload: dict, git: GitApi) -> ActionResult:
     sha = payload["stash_sha"]
     git.stash_store(sha)
     return ActionResult(success=True, message="Restored stash")
 
 
-_REVERSE_DISPATCHERS: dict[OpType, Callable[[dict, LocalGit], ActionResult]] = {
+_REVERSE_DISPATCHERS: dict[OpType, Callable[[dict, GitApi], ActionResult]] = {
     "stage": _stage_file,
     "unstage": _unstage_file,
     "discard": _restore_file,

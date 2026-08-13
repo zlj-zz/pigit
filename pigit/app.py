@@ -41,7 +41,7 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
-from .git.local_git import GitError
+from .git.api import GitError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -52,7 +52,7 @@ from .app_preview import PreviewPanel
 from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
-from .git.local_git import LocalGit
+from .git.api import GitApi
 from .git.managed_repos import ManagedRepos
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
@@ -192,15 +192,15 @@ class PigitApplication(Application):
     def __init__(
         self,
         *,
-        local_git: LocalGit | None = None,
+        git_api: GitApi | None = None,
         managed_repos: ManagedRepos | None = None,
         config: TuiConfig,
     ) -> None:
         super().__init__(input_takeover=True)
-        self._local_git = local_git or LocalGit()
+        self._git_api = git_api or GitApi()
         self._managed_repos = managed_repos
-        self._repo_path, self._repo_conf = self._local_git.confirm_repo()
-        self._git = self._local_git.bind_path(self._repo_path)
+        self._repo_path, self._repo_conf = self._git_api.confirm_repo()
+        self._git = self._git_api.bind_path(self._repo_path)
         self._inspector_visible = False
         # Header state
         self._repo_name: str = ""

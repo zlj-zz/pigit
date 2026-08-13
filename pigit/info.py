@@ -4,7 +4,7 @@ import os
 import textwrap
 
 from .const import __url__, __version__
-from .git import LocalGit, git_version
+from .git import GitApi, git_version
 from .termui.cli_output import styled
 
 
@@ -61,7 +61,7 @@ def show_gitconfig(
     Returns:
         Formatted git config string.
     """
-    repo_handle = LocalGit(path=path)
+    repo_handle = GitApi(path=path)
     repo_path, _ = repo_handle.confirm_repo()
 
     if not repo_path:

@@ -7,7 +7,7 @@ import pytest
 from pigit.config import Config
 from pigit.context import Context
 from pigit.ext.executor_factory import ExecutorFactory, MockExecutor
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 from pigit.git.managed_repos import ManagedRepos
 
 
@@ -33,7 +33,7 @@ def test_with_context_restores_previous():
     outer = Context(
         config=cfg,
         executor=ex,
-        local_git=LocalGit(executor=ex),
+        git_api=GitApi(executor=ex),
         managed_repos=ManagedRepos(executor=ex),
         log=log,
     )
@@ -45,7 +45,7 @@ def test_with_context_restores_previous():
     inner = Context(
         config=cfg,
         executor=inner_ex,
-        local_git=LocalGit(executor=inner_ex),
+        git_api=GitApi(executor=inner_ex),
         managed_repos=ManagedRepos(executor=inner_ex),
         log=log,
     )
@@ -62,6 +62,6 @@ def test_bootstrap_aligns_factory_and_repos():
     cfg = Config(path="/nonexistent/pigit-boot.conf", version="0", auto_load=False)
     ctx = Context.bootstrap(config=cfg, repo_json_path="/tmp/pigit-repos-test.json")
     assert ExecutorFactory.get() is ctx.executor
-    assert ctx.local_git.executor is ctx.executor
+    assert ctx.git_api.executor is ctx.executor
     assert ctx.managed_repos.executor is ctx.executor
     assert isinstance(ctx.log, logging.Logger)

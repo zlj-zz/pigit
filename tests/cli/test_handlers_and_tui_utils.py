@@ -32,10 +32,10 @@ def mock_ctx():
         ]
     )
     managed_repos.report_repos.return_value = "report-text"
-    local_git = MagicMock()
-    local_git.get_remote_url.return_value = "https://github.com/user/repo"
+    git_api = MagicMock()
+    git_api.get_remote_url.return_value = "https://github.com/user/repo"
     return SimpleNamespace(
-        managed_repos=managed_repos, local_git=local_git, config=MagicMock()
+        managed_repos=managed_repos, git_api=git_api, config=MagicMock()
     )
 
 
@@ -341,7 +341,7 @@ def test_open_handler_print(mock_ctx):
     ):
         h = OpenHandler(mock_ctx)
         h.open_browser(SimpleNamespace(branch="dev", issue="", commit="", print=True))
-    mock_ctx.local_git.get_remote_url.assert_called_once()
+    mock_ctx.git_api.get_remote_url.assert_called_once()
     texts = [c.args[0] for c in echo.call_args_list if c.args]
     assert any("https://github.com/user/repo/tree/dev" in t for t in texts)
 
@@ -354,12 +354,12 @@ def test_open_handler_open(mock_ctx):
         with patch("webbrowser.open") as mock_wb:
             h = OpenHandler(mock_ctx)
             h.open_browser(SimpleNamespace(branch="", issue="", commit="", print=False))
-    mock_ctx.local_git.get_remote_url.assert_called_once()
+    mock_ctx.git_api.get_remote_url.assert_called_once()
     mock_wb.assert_called_once_with("https://github.com/user/repo")
 
 
 def test_open_handler_no_remote(mock_ctx):
-    mock_ctx.local_git.get_remote_url.return_value = ""
+    mock_ctx.git_api.get_remote_url.return_value = ""
     echo = MagicMock()
     with patch(
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)

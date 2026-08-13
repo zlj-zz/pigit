@@ -16,7 +16,7 @@ from pigit.termui import Segment, keys
 from pigit.termui.widgets import ItemList
 
 if TYPE_CHECKING:
-    from pigit.git.local_git import LocalGit
+    from pigit.git.api import GitApi
     from pigit.session_history import SessionHistory, HistoryRecord
 
 
@@ -28,7 +28,7 @@ class RecentActionsPanel(ItemList):
     def __init__(
         self,
         history: SessionHistory,
-        git: LocalGit,
+        git: GitApi,
         on_done: Callable[[], None],
     ) -> None:
         super().__init__(on_selection_changed=None)

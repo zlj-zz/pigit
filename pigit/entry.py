@@ -139,7 +139,7 @@ def pigit(args: Namespace, _) -> None:
 
     elif args.information:
         console.echo(
-            ctx.local_git.get_repo_desc(include_part=ctx.config.get().info.repo_include)
+            ctx.git_api.get_repo_desc(include_part=ctx.config.get().info.repo_include)
         )
 
     elif args.ignore_type:

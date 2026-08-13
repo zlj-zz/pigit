@@ -48,7 +48,7 @@ from .cmd_picker_data import (
 )
 
 if TYPE_CHECKING:
-    from pigit.git.cmds import GitCommandNew
+    from pigit.git.cmds import GitCommand
 
 NO_TTY_MSG = (
     "@red(pigit cmd --pick) needs an interactive terminal.\n"
@@ -112,7 +112,7 @@ def _highlight_match(
 
 
 def run_cmd_new_picker(
-    processor: GitCommandNew | None = None,
+    processor: GitCommand | None = None,
     *,
     pick_alt_screen: bool = False,
     category: str | None = None,
@@ -121,7 +121,7 @@ def run_cmd_new_picker(
     """Run interactive picker for cmd commands.
 
     Args:
-        processor: GitCommandNew instance (created if None)
+        processor: GitCommand instance (created if None)
         pick_alt_screen: Use alternate screen buffer
         category: Optional category filter (e.g., "branch", "commit")
         print_only: Print command instead of executing
@@ -133,9 +133,9 @@ def run_cmd_new_picker(
         return 1, NO_TTY_MSG
 
     # Import here to avoid circular imports at module level
-    from pigit.git.cmds import GitCommandNew
+    from pigit.git.cmds import GitCommand
 
-    processor = processor or GitCommandNew()
+    processor = processor or GitCommand()
 
     # 1. Data preparation
     entries = [

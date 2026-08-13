@@ -84,15 +84,15 @@ class ManagedRepos:
             Path("./repos.json") if repo_json_path is None else Path(repo_json_path)
         )
         self.repo_json_path.parent.mkdir(parents=True, exist_ok=True)
-        self._local_git = None
+        self._git_api = None
 
     @property
     def _git(self):
-        if self._local_git is None:
-            from .local_git import LocalGit
+        if self._git_api is None:
+            from .api import GitApi
 
-            self._local_git = LocalGit(executor=self.executor)
-        return self._local_git
+            self._git_api = GitApi(executor=self.executor)
+        return self._git_api
 
     @staticmethod
     def _make_repo_name(path: str, repos: dict[str, dict], name_counts: Counter) -> str:
@@ -486,6 +486,34 @@ class ManagedRepos:
         )
         return True, [], results
 
+    def _validity_check(
+        self,
+        repo_items: list[tuple[str, dict]],
+    ) -> tuple[dict[str, dict], list[Blocker]]:
+        """Run git rev-parse --git-dir per repo, returning (valid_repos, blockers)."""
+        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
+        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
+        validity_results = self.executor.exec_parallel(
+            *validity_cmds,
+            orders=validity_orders,
+            flags=REPLY | DECODE,
+            max_concurrent=self._repo_parallel_workers(),
+        )
+
+        valid_repos: dict[str, dict] = {}
+        blockers: list[Blocker] = []
+        for (name, prop), (code, _err, _out) in zip(
+            repo_items, validity_results, strict=True
+        ):
+            if code != 0:
+                blockers.append(
+                    Blocker(name=name, reason="invalid repo", kind=BLOCKER_FATAL)
+                )
+            else:
+                valid_repos[name] = prop
+
+        return valid_repos, blockers
+
     def _branch_new_preflight(
         self,
         target_repos: dict[str, dict],
@@ -506,26 +534,8 @@ class ManagedRepos:
         blockers: list[Blocker] = []
         repo_items = list(target_repos.items())
 
-        # 1. validity check
-        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
-        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
-        validity_results = self.executor.exec_parallel(
-            *validity_cmds,
-            orders=validity_orders,
-            flags=REPLY | DECODE,
-            max_concurrent=self._repo_parallel_workers(),
-        )
-
-        valid_repos: dict[str, dict] = {}
-        for (name, prop), (code, _err, _out) in zip(
-            repo_items, validity_results, strict=True
-        ):
-            if code != 0:
-                blockers.append(
-                    Blocker(name=name, reason="invalid repo", kind=BLOCKER_FATAL)
-                )
-            else:
-                valid_repos[name] = prop
+        valid_repos, validity_blockers = self._validity_check(repo_items)
+        blockers.extend(validity_blockers)
 
         if not valid_repos:
             return blockers
@@ -893,25 +903,8 @@ class ManagedRepos:
         blockers: list[Blocker] = []
         repo_items = list(target_repos.items())
 
-        validity_cmds = ["git rev-parse --git-dir"] * len(repo_items)
-        validity_orders = [{"cwd": prop["path"]} for _, prop in repo_items]
-        validity_results = self.executor.exec_parallel(
-            *validity_cmds,
-            orders=validity_orders,
-            flags=REPLY | DECODE,
-            max_concurrent=self._repo_parallel_workers(),
-        )
-
-        valid_repos: dict[str, dict] = {}
-        for (name, prop), (code, _err, _out) in zip(
-            repo_items, validity_results, strict=True
-        ):
-            if code != 0:
-                blockers.append(
-                    Blocker(name=name, reason="invalid repo", kind=BLOCKER_FATAL)
-                )
-            else:
-                valid_repos[name] = prop
+        valid_repos, validity_blockers = self._validity_check(repo_items)
+        blockers.extend(validity_blockers)
 
         if not valid_repos:
             return blockers

@@ -8,7 +8,7 @@ from pigit.ext.executor_factory import (
     LocalExecutor,
     MockExecutor,
 )
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 
 
 @pytest.fixture(autouse=True)
@@ -92,7 +92,7 @@ def test_repo_uses_factory_executor(tmp_path):
         }
     )
     ExecutorFactory.set_strategy(mock)
-    repo = LocalGit(path=root_s)
+    repo = GitApi(path=root_s)
     out_root, gd = repo.confirm_repo(root_s)
     assert out_root == root_s
     assert gd.endswith(".git")

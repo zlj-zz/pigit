@@ -1,6 +1,6 @@
 """
 Module: pigit/git/cmds/_executor.py
-Description: Command execution helpers for GitCommandNew.
+Description: Command execution helpers for GitCommand.
 Author: Zev
 Date: 2026-04-15
 """

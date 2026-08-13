@@ -9,7 +9,7 @@ from paths import TEST_PATH
 from pigit.ext.executor import WAITING, Executor
 from pigit.git import git_version
 from pigit.git.model import File
-from pigit.git.local_git import LocalGit
+from pigit.git.api import GitApi
 
 exec_patch = "pigit.ext.executor.Executor.exec"
 
@@ -70,7 +70,7 @@ class TestRepo:
         create_repo(test_repo)
 
         # create git handle
-        cls.git = LocalGit()
+        cls.git = GitApi()
         cls.git.path = test_repo
 
     def test(self):
@@ -139,7 +139,7 @@ class TestRepo:
         old = os.getcwd()
         try:
             os.chdir(nested)
-            git = LocalGit().bind_path(test_repo)
+            git = GitApi().bind_path(test_repo)
             files = git.load_status(path=test_repo)
             ut = next(f for f in files if "to_discard" in f.name)
             git.discard_file(ut)

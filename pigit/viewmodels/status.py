@@ -19,7 +19,7 @@ from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
     from pigit.app_types import FileInfo
-    from pigit.git.local_git import LocalGit
+    from pigit.git.api import GitApi
     from pigit.git.model import File, Stash
 
 _logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class IStatusViewModel(IListViewModel["File"]):
 class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     """Concrete ViewModel for working tree status."""
 
-    def __init__(self, git: LocalGit, history: SessionHistory | None = None) -> None:
+    def __init__(self, git: GitApi, history: SessionHistory | None = None) -> None:
         super().__init__()
         self._git = git
         self._history = history

@@ -835,9 +835,9 @@ class DiffViewer(LineTextBrowser):
         self._file_history_path = path
         self._file_history_cache = {}
 
-        from .git.local_git import LocalGit
+        from .git.api import GitApi
 
-        git = LocalGit(path=self._repo_path)
+        git = GitApi(path=self._repo_path)
         self._file_history_commits = git.get_file_history(path, self._repo_path)
 
         current_sha = self.i_cache_key
@@ -859,9 +859,9 @@ class DiffViewer(LineTextBrowser):
         if sha in self._file_history_cache:
             content = self._file_history_cache[sha]
         else:
-            from .git.local_git import LocalGit
+            from .git.api import GitApi
 
-            git = LocalGit(path=self._repo_path)
+            git = GitApi(path=self._repo_path)
             raw = git.get_file_at_commit(sha, self._file_history_path, self._repo_path)
             if raw is None:
                 content = ["File deleted in this commit"]
