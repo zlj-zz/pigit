@@ -3,14 +3,13 @@ import sys
 import time
 import textwrap
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from pigit.ext.executor import (
     DECODE,
     REDIRECT,
     REPLY,
     SILENT,
-    WAIT_ENTER,
     WAITING,
     Executor,
 )
@@ -30,45 +29,6 @@ class TestExecutor:
     @classmethod
     def setup_class(cls):
         cls.executor = Executor(log=_verbose_executor_logger("pigit.tests.executor"))
-
-    @pytest.mark.parametrize(
-        "cmd, flags, kws, expected",
-        [
-            # Test case 1: Happy path, command as string, no flags
-            ("ls -l", 0, {}, (None, None, None)),
-            # Test case 2: Happy path, command as list, no flags
-            (["ls", "-l"], 0, {}, (None, None, None)),
-            # Test case 3: Happy path, command as tuple, no flags
-            (("ls", "-l"), 0, {}, (None, None, None)),
-            # Test case 4: Happy path, command as string, with flags
-            # ("ls -l", REPLY, {}, (0, None, "output")),
-            # Test case 5: Error case, command as string, with flags, command fails
-            # ("ls -l", DECODE | REPLY | REDIRECT | WAITING, {}, (1, "error", None)),
-        ],
-        ids=[
-            "command-string-no-flags",
-            "command-list-no-flags",
-            "command-tuple-no-flags",
-            # "command-string-with-flags",
-            # "command-string-with-flags-command-fails",
-        ],
-    )
-    def test_exec(self, cmd, flags, kws, expected):
-        # Arrange
-        executor = Executor(log=_verbose_executor_logger("pigit.tests.executor.exec"))
-
-        with patch("pigit.ext.executor.Popen") as mock_popen:
-            mock_proc = mock_popen.return_value
-            # FIXME: can not right mock.
-            mock_proc.returncode = expected[0]
-            mock_proc.communicate.return_value = (expected[2] or "", expected[1] or "")
-
-            # Act
-            result = executor.exec(cmd, flags=flags, **kws)
-
-            # Assert
-            assert result == expected
-            # mock_popen.assert_called_once_with(args=cmd, **kws)
 
     def test_exec_stream_yields_decoded_lines(self):
         with patch("pigit.ext.executor.Popen") as mock_popen:

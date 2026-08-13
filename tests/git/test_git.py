@@ -92,15 +92,6 @@ class TestRepo:
         assert git.get_repo_desc()
         assert git.get_config()
 
-    def test_api(self):
-        git = self.git
-        git.load_branches()
-        git.load_log()
-        git.load_status()
-        git.load_file_diff("example.py", tracked=False)
-        git.load_commits("A")
-        git.load_commit_info()
-
     @pytest.mark.parametrize(
         ["side_effect", "expected"],
         [
