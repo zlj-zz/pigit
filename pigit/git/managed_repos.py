@@ -9,7 +9,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
 from pigit.ext.executor import WAITING, REPLY, DECODE, Executor
 
@@ -670,23 +670,49 @@ class ManagedRepos:
         if not target_repos or dry_run:
             return [], []
 
-        dirty_set = dirty_repos or set()
-        stashed: dict[str, str] = {}  # repo_name -> cwd path
+        return self._run_with_auto_stash(
+            target_repos,
+            stash_label=f"mkbranch {branch_name}",
+            dirty_repos=dirty_repos or set(),
+            execute=lambda tr: self._branch_new_execute(
+                tr, branch_name, checkout=checkout, base=base, force=force
+            ),
+        )
+
+    def _run_with_auto_stash(
+        self,
+        target_repos: dict[str, dict],
+        *,
+        stash_label: str,
+        dirty_repos: set[str],
+        execute: Callable[[dict[str, dict]], list[tuple[str, int, str | None]]],
+    ) -> tuple[list[tuple[str, int, str | None]], list[tuple[str, str]]]:
+        """Stash dirty repos → execute → pop, collecting stash issues.
+
+        Args:
+            target_repos: Mapping of repo name -> {"path": ...}.
+            stash_label: Label embedded in the stash message (e.g. "mkbranch feat/x").
+            dirty_repos: Repos to stash before executing.
+            execute: Performs the actual git operation on the (possibly
+                reduced) target_repos and returns results.
+
+        Returns:
+            (results, stash_issues) where stash_issues are (repo, description)
+            pairs for stash push/pop failures the caller should surface.
+        """
+        stashed: dict[str, str] = {}
         stash_issues: list[tuple[str, str]] = []
 
         # --- stash phase ---
-        if dirty_set:
+        if dirty_repos:
+            stash_msg = f"pigit: auto stash before {stash_label}"
             stash_cmds: list[str] = []
             stash_orders: list[dict] = []
             stash_names: list[str] = []
-            stash_msg = f"pigit: auto stash before mkbranch {branch_name}"
-
             for name, prop in target_repos.items():
-                if name in dirty_set:
-                    # Include untracked files (-u) so checkout won't clash
-                    stash_cmds.append(
-                        f"git stash push -u -m {shlex.quote(stash_msg)}"
-                    )
+                if name in dirty_repos:
+                    # Include untracked files (-u) so checkout won't clash.
+                    stash_cmds.append(f"git stash push -u -m {shlex.quote(stash_msg)}")
                     stash_orders.append({"cwd": prop["path"]})
                     stash_names.append(name)
 
@@ -709,29 +735,21 @@ class ManagedRepos:
                         )
                         failed_stash.add(name)
 
-                # Exclude repos whose stash failed — executing branch
-                # creation on a dirty working tree is unsafe.
                 if failed_stash:
+                    # Executing on a dirty tree is unsafe — exclude those repos.
                     target_repos = {
                         k: v for k, v in target_repos.items()
                         if k not in failed_stash
                     }
 
         # --- execute phase ---
-        results = self._branch_new_execute(
-            target_repos,
-            branch_name,
-            checkout=checkout,
-            base=base,
-            force=force,
-        )
+        results = execute(target_repos)
 
         # --- pop phase ---
         if stashed:
             pop_cmds: list[str] = []
             pop_orders: list[dict] = []
             pop_names: list[str] = []
-
             for name, cwd in stashed.items():
                 pop_cmds.append("git stash pop")
                 pop_orders.append({"cwd": cwd})
@@ -747,7 +765,7 @@ class ManagedRepos:
                 pop_names, pop_results, strict=True
             ):
                 if code != 0:
-                    # stash stays in the stack — no data loss
+                    # stash stays in the stack — no data loss.
                     stash_issues.append(
                         (
                             name,
@@ -841,85 +859,14 @@ class ManagedRepos:
         if not target_repos or dry_run:
             return [], []
 
-        dirty_set = dirty_repos or set()
-        stashed: dict[str, str] = {}
-        stash_issues: list[tuple[str, str]] = []
-
-        # --- stash phase ---
-        if dirty_set:
-            stash_cmds: list[str] = []
-            stash_orders: list[dict] = []
-            stash_names: list[str] = []
-            stash_msg = f"pigit: auto stash before switch {branch}"
-
-            for name, prop in target_repos.items():
-                if name in dirty_set:
-                    stash_cmds.append(
-                        f"git stash push -u -m {shlex.quote(stash_msg)}"
-                    )
-                    stash_orders.append({"cwd": prop["path"]})
-                    stash_names.append(name)
-
-            if stash_cmds:
-                stash_results = self.executor.exec_parallel(
-                    *stash_cmds,
-                    orders=stash_orders,
-                    flags=REPLY | DECODE,
-                    max_concurrent=self._repo_parallel_workers(),
-                )
-                failed_stash: set[str] = set()
-                for name, (code, stderr, _stdout) in zip(
-                    stash_names, stash_results, strict=True
-                ):
-                    if code == 0:
-                        stashed[name] = target_repos[name]["path"]
-                    else:
-                        stash_issues.append(
-                            (name, f"stash failed: {stderr or 'unknown'}")
-                        )
-                        failed_stash.add(name)
-
-                if failed_stash:
-                    target_repos = {
-                        k: v for k, v in target_repos.items()
-                        if k not in failed_stash
-                    }
-
-        # --- execute phase ---
-        results = self._switch_execute(
-            target_repos, branch, create=create, force=force
+        return self._run_with_auto_stash(
+            target_repos,
+            stash_label=f"switch {branch}",
+            dirty_repos=dirty_repos or set(),
+            execute=lambda tr: self._switch_execute(
+                tr, branch, create=create, force=force
+            ),
         )
-
-        # --- pop phase ---
-        if stashed:
-            pop_cmds: list[str] = []
-            pop_orders: list[dict] = []
-            pop_names: list[str] = []
-
-            for name, cwd in stashed.items():
-                pop_cmds.append("git stash pop")
-                pop_orders.append({"cwd": cwd})
-                pop_names.append(name)
-
-            pop_results = self.executor.exec_parallel(
-                *pop_cmds,
-                orders=pop_orders,
-                flags=REPLY | DECODE,
-                max_concurrent=self._repo_parallel_workers(),
-            )
-            for name, (code, stderr, _stdout) in zip(
-                pop_names, pop_results, strict=True
-            ):
-                if code != 0:
-                    stash_issues.append(
-                        (
-                            name,
-                            f"stash pop failed (conflict?): {stderr or 'unknown'}. "
-                            f'Stash kept — resolve with "git stash pop" manually.',
-                        )
-                    )
-
-        return results, stash_issues
 
     def _switch_preflight(
         self,
