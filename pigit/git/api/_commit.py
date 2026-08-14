@@ -137,6 +137,44 @@ class _CommitOps(_OpsBase):
             )
         )
 
+    def list_commits_in_range(self, base: str, path: str | None = None) -> list[Commit]:
+        """Return commits in ``base..HEAD`` (oldest-first) with sha, parents, subject.
+
+        Used to build the interactive-rebase todo list. Unlike :meth:`iter_commits`,
+        this does not apply a ``-n`` cap or pushed/unpushed status logic, and it
+        preserves ``--reverse`` order.
+        """
+        path = path or self.path
+        cmd = (
+            f'git log --reverse --topo-order --pretty=format:"%H|%P|%s" '
+            f"{shlex.quote(base)}..HEAD"
+        )
+        _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
+        commits: list[Commit] = []
+        if not resp:
+            return commits
+        for line in cast(str, resp).splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                continue
+            sha, parents_str, subject = parts
+            parents = parents_str.split() if parents_str.strip() else []
+            commits.append(
+                Commit(
+                    sha=sha,
+                    msg=subject,
+                    author="",
+                    unix_timestamp=0,
+                    status="",
+                    extra_info="",
+                    tag=[],
+                    parents=parents,
+                )
+            )
+        return commits
+
     def get_commit_bodies(
         self,
         branch_name: str,

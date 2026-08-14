@@ -54,6 +54,7 @@ def _with_host(fn: Callable[..., _R]) -> _R | None:
 def exec_external(
     cmd: list[str],
     cwd: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess:
     """Suspend TUI, run an external command, then resume TUI and redraw.
 
@@ -61,6 +62,12 @@ def exec_external(
 
     Note: stdout and stderr are not captured because the command inherits
     the terminal directly. Use the return code to check success/failure.
+
+    Args:
+        cmd: Command argv (no shell).
+        cwd: Working directory.
+        env: Environment. When given, it REPLACES the current environment
+            (merge with ``os.environ`` if inheriting is needed).
     """
     session = get_session()
     if session is None:
@@ -68,7 +75,7 @@ def exec_external(
 
     session.suspend()
     try:
-        result = subprocess.run(cmd, cwd=cwd, stdin=None, stdout=None, stderr=None)
+        result = subprocess.run(cmd, cwd=cwd, env=env, stdin=None, stdout=None, stderr=None)
     finally:
         resume_error = None
         try:

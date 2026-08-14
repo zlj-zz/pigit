@@ -123,6 +123,7 @@ class BranchPanel(ItemList):
             ("n", "New branch"),
             ("r", "Rename"),
             ("d", "Delete"),
+            ("i", "Interactive rebase onto"),
             ("R", f"Scope ({scope_label})"),
         ]
 
@@ -229,6 +230,8 @@ class BranchPanel(ItemList):
             self._trigger_delete()
         elif key == "m":
             self._trigger_merge()
+        elif key == "i":
+            self._trigger_rebase()
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""
@@ -274,6 +277,16 @@ class BranchPanel(ItemList):
             source=source,
             target=target,
         )
+
+    def _trigger_rebase(self) -> None:
+        """Validate and emit an interactive-rebase request for the selected branch."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_head:
+            show_toast("Already on this branch", duration=1.5)
+            return
+        self.emit(EventType("action_requested"), cmd="rebase", target=branch.name)
 
     def _show_new_branch_sheet(self) -> None:
         self._new_branch_input.clear()

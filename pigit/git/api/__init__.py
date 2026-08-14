@@ -144,6 +144,9 @@ class GitApi:
     def get_commit_bodies(self, branch_name, max_commits=300, path=None):
         return self._commit.get_commit_bodies(branch_name, max_commits, path)
 
+    def list_commits_in_range(self, base, path=None):
+        return self._commit.list_commits_in_range(base, path)
+
     def load_commit_info(self, commit_sha="", file_name="", plain=False, path=None):
         return self._commit.load_commit_info(commit_sha, file_name, plain, path)
 
@@ -229,6 +232,9 @@ class GitApi:
 
     def is_merge_in_progress(self, path=None):
         return self._merge.is_merge_in_progress(path)
+
+    def is_rebase_in_progress(self, path=None):
+        return self._merge.is_rebase_in_progress(path)
 
     def commit_no_edit(self, path=None):
         return self._merge.commit_no_edit(path)

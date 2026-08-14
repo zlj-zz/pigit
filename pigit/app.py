@@ -569,6 +569,19 @@ class PigitApplication(Application):
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
 
+    def _on_rebase_request(self, target: str) -> None:
+        """Open the interactive-rebase todo panel for ``target``."""
+        from .app_rebase import RebasePanel
+
+        def _on_done() -> None:
+            dismiss_sheet()
+            self._refresh_active_panel()
+
+        panel = RebasePanel(self._git, target, on_done=_on_done)
+        rows = terminal_size()[1]
+        show_sheet(panel, height=min(20, rows - 4), show_border=True)
+        panel.activate()
+
     def on_event(self, action: EventType, **data) -> bool:
         """Bridge bubbled events to the framework bus; enrich cross-cutting events.
 
@@ -580,6 +593,9 @@ class PigitApplication(Application):
             data.setdefault("active", self._resolve_active_panel())
         if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
+            return True
+        if action is EventType("action_requested") and data.get("cmd") == "rebase":
+            self._on_rebase_request(data["target"])
             return True
         return self._event_bus.publish(action, **data)
 

@@ -62,6 +62,16 @@ class _MergeOps(_OpsBase):
             return False
         return (Path(git_dir) / "MERGE_HEAD").exists()
 
+    def is_rebase_in_progress(self, path: str | None = None) -> bool:
+        """Return True if a rebase is in progress (rebase-merge or rebase-apply dir)."""
+        try:
+            git_dir = self._core.get_git_dir(path)
+        except GitError:
+            return False
+        return (Path(git_dir) / "rebase-merge").exists() or (
+            Path(git_dir) / "rebase-apply"
+        ).exists()
+
     def commit_no_edit(self, path: str | None = None) -> None:
         """Complete a merge with the default message (``git commit --no-edit``)."""
         path = path or self.path

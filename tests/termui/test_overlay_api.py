@@ -176,7 +176,7 @@ class TestExecExternal:
             mock_run.return_value = MagicMock()
             result = exec_external(["echo", "hi"])
             mock_run.assert_called_once_with(
-                ["echo", "hi"], cwd=None, stdin=None, stdout=None, stderr=None
+                ["echo", "hi"], cwd=None, env=None, stdin=None, stdout=None, stderr=None
             )
             session.suspend.assert_called_once()
             session.resume.assert_called_once()

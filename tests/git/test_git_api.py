@@ -110,3 +110,27 @@ class TestFileioEdgeCases:
     def test_hash_object_file_failure_returns_none(self):
         git = GitApi(executor=MockExecutor(default=(1, "error", None)), path="/repo")
         assert git.hash_object_file("file.py") is None
+
+
+class TestListCommitsInRange:
+    def test_parses_commits_oldest_first(self):
+        ex = MockExecutor(
+            responses={
+                'git log --reverse --topo-order --pretty=format:"%H|%P|%s" main..HEAD': (
+                    0,
+                    "",
+                    "aaa1||root commit\nbbb1|aaa1|second commit\nccc1|aaa1 bbb1|merge commit\n",
+                )
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        commits = git.list_commits_in_range("main")
+        assert [c.sha for c in commits] == ["aaa1", "bbb1", "ccc1"]
+        assert commits[0].parents == []
+        assert commits[0].msg == "root commit"
+        assert commits[1].parents == ["aaa1"]
+        assert commits[2].is_merge is True
+
+    def test_empty_output_returns_empty(self):
+        git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
+        assert git.list_commits_in_range("main") == []
