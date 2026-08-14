@@ -144,22 +144,6 @@ def working_tree_reset_hard(args: list[str]) -> str:
 
 
 @command(
-    short="w.stash",
-    category=CommandCategory.WORKING_TREE,
-    help="Stash changes.",
-    has_args=True,
-    examples=["pigit cmd w.stash", "pigit cmd w.stash push -m 'WIP'"],
-    related=["s", "w"],
-)
-def working_tree_stash(args: list[str]) -> str:
-    """Stash changes."""
-    base = "git stash"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
-@command(
     short="w.check",
     category=CommandCategory.WORKING_TREE,
     help="Check for whitespace errors.",

@@ -125,28 +125,12 @@ def commit_squash(args: list[str]) -> str:
 
 
 @command(
-    short="c.o",
-    category=CommandCategory.COMMIT,
-    help="Checkout a branch or paths.",
-    has_args=True,
-    arg_completion=[CompletionType.REF],
-    examples=["pigit cmd c.o main", "pigit cmd c.o -- file.txt"],
-    related=["b.o", "c"],
-)
-def commit_checkout(args: list[str]) -> str:
-    """Checkout branch or paths."""
-    if not args:
-        return "git checkout"
-    return f"git checkout {' '.join(args)}"
-
-
-@command(
     short="c.O",
     category=CommandCategory.COMMIT,
     help="Checkout interactively.",
     has_args=True,
     examples=["pigit cmd c.O -p"],
-    related=["c.o", "c"],
+    related=["c"],
 )
 def commit_checkout_interactive(args: list[str]) -> str:
     """Interactive checkout."""

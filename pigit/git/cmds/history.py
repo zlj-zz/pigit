@@ -230,7 +230,7 @@ def stash_show(args: list[str]) -> str:
     help="List or create tags.",
     has_args=True,
     examples=["pigit cmd t", "pigit cmd t v1.0.0"],
-    related=["t.a", "t.d", "t.p"],
+    related=["t.a", "t.d"],
 )
 def tag(args: list[str]) -> str:
     """Manage tags."""
@@ -274,21 +274,6 @@ def tag_delete(args: list[str]) -> str:
     if args:
         return f"{base} {' '.join(args)}"
     return base
-
-
-@command(
-    short="t.p",
-    category=CommandCategory.TAG,
-    help="Push tags to remote.",
-    has_args=True,
-    examples=["pigit cmd t.p", "pigit cmd t.p origin v1.0.0"],
-    related=["t", "p.tags"],
-)
-def tag_push(args: list[str]) -> str:
-    """Push tags."""
-    if args:
-        return f"git push {' '.join(args)} --tags"
-    return "git push --tags"
 
 
 # Aliases

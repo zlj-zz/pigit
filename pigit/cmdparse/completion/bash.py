@@ -148,7 +148,7 @@ class BashCompletion(ShellCompletion):
     def _escape_case_pattern(self, pattern: str) -> str:
         """Escape case statement patterns to prevent wildcard matching.
 
-        For example: b.o contains '.' which is a bash wildcard, must be quoted as "b.o"
+        For example: b.co contains '.' which is a bash wildcard, must be quoted as "b.co"
 
         Args:
             pattern: The command pattern to escape.
