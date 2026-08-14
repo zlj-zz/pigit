@@ -157,22 +157,6 @@ def fetch_prune(args: list[str]) -> str:
 
 
 @command(
-    short="f.t",
-    category=CommandCategory.FETCH,
-    help="Fetch tags.",
-    has_args=True,
-    examples=["pigit cmd f.t", "pigit cmd f.t origin"],
-    related=["f", "t"],
-)
-def fetch_tags(args: list[str]) -> str:
-    """Fetch tags."""
-    base = "git fetch --tags"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
-@command(
     short="f.m",
     category=CommandCategory.FETCH,
     help="Fetch and merge (pull).",
@@ -225,28 +209,13 @@ def fetch_update(args: list[str]) -> str:
         "pigit cmd f.c https://github.com/user/repo.git",
         "pigit cmd f.c https://github.com/user/repo.git my-dir",
     ],
-    related=["f", "f.C"],
+    related=["f"],
 )
 def fetch_clone(args: list[str]) -> str:
     """Clone a repository."""
     if args:
         return f"git clone {' '.join(args)}"
     return "git clone"
-
-
-@command(
-    short="f.C",
-    category=CommandCategory.FETCH,
-    help="Shallow clone (depth=1) for quick checkout.",
-    has_args=True,
-    examples=["pigit cmd f.C https://github.com/user/repo.git"],
-    related=["f", "f.c"],
-)
-def fetch_clone_shallow(args: list[str]) -> str:
-    """Shallow clone (depth=1)."""
-    if args:
-        return f"git clone --depth=1 {' '.join(args)}"
-    return "git clone --depth=1"
 
 
 # Aliases
@@ -259,4 +228,3 @@ alias("fm", "f.m")
 alias("fr", "f.r")
 alias("fu", "f.u")
 alias("fc", "f.c")
-alias("fC", "f.C")
