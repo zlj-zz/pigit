@@ -47,6 +47,7 @@ class TuiConfig:
     auto_refresh_interval: float = 10.0
     word_diff: bool = True
     status_view: Literal["flat", "tree"] = "tree"
+    show_footer: bool = True
 
 
 @dataclass
@@ -58,3 +59,4 @@ class ConfigData:
     repo: RepoConfig = field(default_factory=RepoConfig)
     log: LogConfig = field(default_factory=LogConfig)
     tui: TuiConfig = field(default_factory=TuiConfig)
+    keybindings: dict[str, str | list[str]] = field(default_factory=dict)

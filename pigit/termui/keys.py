@@ -103,3 +103,22 @@ WIN_EXT_TO_SEMANTIC: dict[bytes, str] = {
     b"\x00K": KEY_LEFT,
     b"\x00M": KEY_RIGHT,
 }
+
+# Semantic key -> friendly display name (for footer/help rendering).
+_KEY_DISPLAY: dict[str, str] = {
+    KEY_SPACE: "Space",
+    KEY_ENTER: "Enter",
+    KEY_ESC: "Esc",
+    KEY_RIGHT: "→",
+    KEY_LEFT: "←",
+    KEY_UP: "↑",
+    KEY_DOWN: "↓",
+    KEY_TAB: "Tab",
+    KEY_SHIFT_TAB: "Shift+Tab",
+    KEY_CTRL_ENTER: "Ctrl+Enter",
+}
+
+
+def display_key(key: str) -> str:
+    """Return a friendly display name for a semantic key (identity otherwise)."""
+    return _KEY_DISPLAY.get(key, key)

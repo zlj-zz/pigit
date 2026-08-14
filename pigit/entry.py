@@ -20,6 +20,7 @@ from .git import create_gitignore
 from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
 from .hook import before_hook
 from .info import introduce, show_gitconfig
+from .termui import set_key_overrides
 from .termui.cli_output import get_console
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ def _bootstrap() -> Context:
     conf = Config(
         path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
     ).output_warnings()
+    set_key_overrides(conf.get().keybindings)
     ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
     Context.install(ctx)
     before_hook(ctx)

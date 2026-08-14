@@ -28,8 +28,8 @@ class TestCommandPalette:
         executed = []
         p = CommandPalette(on_execute=lambda cmd: executed.append(cmd))
         p.open()
-        p.on_key("s")
-        p.on_key("t")
+        p.handle_key("s")
+        p.handle_key("t")
         assert len(p._candidates) > 0
         assert "status" in p._candidates
 
@@ -37,13 +37,13 @@ class TestCommandPalette:
         executed = []
         p = CommandPalette(on_execute=lambda cmd: executed.append(cmd))
         p.open()
-        p.on_key("s")
-        p.on_key("t")
-        p.on_key("a")
-        p.on_key("t")
-        p.on_key("u")
-        p.on_key("s")
-        p.on_key("enter")  # enter
+        p.handle_key("s")
+        p.handle_key("t")
+        p.handle_key("a")
+        p.handle_key("t")
+        p.handle_key("u")
+        p.handle_key("s")
+        p.handle_key("enter")  # enter
         assert len(executed) == 1
         assert executed[0] == "status"
 
@@ -53,7 +53,7 @@ class TestCommandPalette:
         assert p.is_active
         from pigit.termui import keys
 
-        p.on_key(keys.KEY_ESC)
+        p.handle_key(keys.KEY_ESC)
         assert not p.is_active
 
     def test_render_inactive(self):

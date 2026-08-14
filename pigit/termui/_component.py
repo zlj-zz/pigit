@@ -15,10 +15,12 @@ from collections.abc import Callable, Sequence
 
 from ._bindings import (
     BindingsList,
-    list_bindings,
-    resolve_key_handlers_merged,
+    collect_action_bindings,
+    resolve_action_keys,
+    resolve_key_handlers,
 )
 from ._mouse import MouseEvent
+from .keys import display_key
 from ._runtime_context import (
     get_renderer,
     get_renderer_strict,
@@ -102,8 +104,10 @@ class Component(ABC):
         self.id = id
         self._try_register_id()
 
-        self._key_handlers = resolve_key_handlers_merged(
-            self, type(self), getattr(self, "BINDINGS", None)
+        namespace = getattr(type(self), "keymap_namespace", "")
+        self._action_bindings = collect_action_bindings(type(self), namespace)
+        self._key_handlers = resolve_key_handlers(
+            self, getattr(self, "BINDINGS", None), self._action_bindings
         )
         self._subscriptions: list[_Subscription] = []
 
@@ -240,6 +244,14 @@ class Component(ABC):
         """
         self._size = size
         self.refresh()
+
+    def capture_key(self, key: str) -> bool:
+        """Return True to consume the key before any binding.
+
+        Override for modal input (e.g. an active text filter) that must
+        intercept keys ahead of the component's key bindings.
+        """
+        return False
 
     def _handle_event(self, key: str) -> bool:
         """Process a key event. Delegates to the event dispatch algorithm."""
@@ -454,34 +466,47 @@ class Component(ABC):
         """
         return get_renderer_strict()
 
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Derive help entries from ``@bind_action`` bindings.
 
-def _truncate_help_line(text: str, max_len: int = 120) -> str:
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 1] + "…"
+        Panels using ``@bind_action`` inherit this; panels may still override
+        for fully custom help. Multi-key actions render their keys joined
+        with ``/``.
+        """
+        entries: list[tuple[str, str]] = []
+        for binding in self._action_bindings:
+            if binding.when is not None and not binding.when(self):
+                continue
+            desc = binding.desc(self) if callable(binding.desc) else binding.desc
+            if desc is None:
+                desc = binding.action
+            entries.append(
+                ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
+            )
+        return entries
 
+    def get_footer_entries(self) -> list[tuple[str, str]]:
+        """Derive the compact footer subset (bindings with a ``tip``).
 
-def _default_help_entries(component: Component) -> list[tuple[str, str]]:
-    cls = type(component)
-    rows: list[tuple[str, str]] = []
-    for semantic_key, target in list_bindings(component, cls)[:64]:
-        desc = _describe_binding_target(component, target)
-        rows.append((semantic_key, _truncate_help_line(desc)))
-    return rows
-
-
-def _describe_binding_target(
-    owner: Component,
-    target: str | Callable[..., object],
-) -> str:
-    if isinstance(target, str):
-        fn = getattr(owner, target, None)
-        if callable(fn):
-            doc = getattr(fn, "__doc__", None)
-            if doc and doc.strip():
-                return doc.strip().splitlines()[0].strip()
-        return f"{target} action"
-    return "bound command"
+        Bindings sharing the same ``tip`` are merged into one entry with their
+        keys joined, saving horizontal space (e.g. ``j/k/down/up Navigate``).
+        State-dependent actions handled by ``capture_key``/``handle_key`` (not
+        ``@bind_action``) are intentionally absent — the footer shows the
+        always-available, high-frequency keys.
+        """
+        grouped: dict[str, list[str]] = {}
+        order: list[str] = []
+        for binding in self._action_bindings:
+            if binding.tip is None:
+                continue
+            if binding.when is not None and not binding.when(self):
+                continue
+            keys = resolve_action_keys(binding)
+            if binding.tip not in grouped:
+                grouped[binding.tip] = []
+                order.append(binding.tip)
+            grouped[binding.tip].extend(keys)
+        return [("/".join(display_key(k) for k in grouped[tip]), tip) for tip in order]
 
 
 def bind_signals(

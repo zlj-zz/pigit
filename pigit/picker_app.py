@@ -133,7 +133,7 @@ class BasePickerApp(Application):
             allow_newline=False,
         )
 
-    def on_key_extra(self, key: str) -> None:
+    def handle_extra_key(self, key: str) -> None:
         """Hook for subclasses to add extra key handling. Default no-op."""
 
     # --- Shared implementation ---
@@ -181,15 +181,15 @@ class BasePickerApp(Application):
         if term_rows < 5:  # need header (2) + at least 2 list row + footer
             self.quit(exit_code=1, result_message=self.get_terminal_too_small_msg())
 
-    def on_key(self, key: str) -> None:
+    def handle_key(self, key: str) -> bool:
         if self._input.is_visible:
             # InputLine is active (filter mode) — route keys to it.
             # ESC hides the input; everything else edits the filter text.
             if key in (keys.KEY_ESC,):
-                self._input.on_key(keys.KEY_ESC)
+                self._input.handle_key(keys.KEY_ESC)
             else:
-                self._input.on_key(key)
-            return
+                self._input.handle_key(key)
+            return True
         if key in ("j", keys.KEY_DOWN):
             self._list.next()
         elif key in ("k", keys.KEY_UP):
@@ -204,7 +204,8 @@ class BasePickerApp(Application):
         elif key == "?":
             self._help_popup.toggle()
         else:
-            self.on_key_extra(key)
+            self.handle_extra_key(key)
+        return True
 
     def abort(self) -> None:
         """Abort picker via Ctrl+C."""

@@ -71,14 +71,14 @@ class TestRebasePanel:
         panel, _ = _panel([_commit("a1"), _commit("b1")])
         panel.activate()
         panel.curr_no = 0
-        panel._set_action("s")
+        panel._set_action("squash")
         assert panel._items[0].action == "pick"
 
     def test_squash_second_row_ok(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
         panel.activate()
         panel.curr_no = 1
-        panel._set_action("s")
+        panel._set_action("squash")
         assert panel._items[1].action == "squash"
 
     def test_move_up_squash_to_top_rejected(self):
@@ -127,7 +127,7 @@ class TestRebasePanel:
         panel, _ = _panel([_commit("a1")])
         panel.activate()
         panel.curr_no = 0
-        panel._set_action("d")
+        panel._set_action("drop")
         assert panel._items[0].action == "drop"
 
     def test_render_reserves_last_row_for_hint(self):

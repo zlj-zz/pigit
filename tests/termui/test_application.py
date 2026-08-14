@@ -127,3 +127,57 @@ class TestApplicationEventLoop:
         # Focus should be restored to body leaf
         assert body.is_focus_leaf
         loop.render.assert_called_once()
+
+    def test_app_handle_key_fallback_consumes_key(self):
+        """Application.handle_key is bridged after bindings (pick app catch-all)."""
+        body = DummyRoot()
+        root = ComponentRoot(body)
+
+        class _App(Application):
+            def build_root(self):
+                return body
+
+            def handle_key(self, key):
+                if key == "j":
+                    self.seen = key
+                    return True
+                return False
+
+        app = _App()
+        app.seen = None
+        loop = _ApplicationEventLoop(root, app, alt=False)
+        loop.before_dispatch_key = Mock()
+        loop.render = Mock()
+
+        assert loop._dispatch_semantic_string("j") == "app"
+        assert app.seen == "j"
+        loop.render.assert_called_once()
+
+    def test_app_binding_precedes_handle_key(self):
+        """App BINDINGS take precedence over the handle_key fallback."""
+        body = DummyRoot()
+        root = ComponentRoot(body)
+
+        class _App(Application):
+            BINDINGS = [("x", "bound")]
+
+            def build_root(self):
+                return body
+
+            def bound(self):
+                self.bound_called = True
+
+            def handle_key(self, key):
+                self.handle_called = key
+                return True
+
+        app = _App()
+        app.bound_called = False
+        app.handle_called = None
+        loop = _ApplicationEventLoop(root, app, alt=False)
+        loop.before_dispatch_key = Mock()
+        loop.render = Mock()
+
+        assert loop._dispatch_semantic_string("x") == "binding"
+        assert app.bound_called is True
+        assert app.handle_called is None

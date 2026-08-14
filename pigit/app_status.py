@@ -21,12 +21,11 @@ from pigit.termui import (
     FeedbackKind,
     EVT_GOTO,
     AlertDialog,
-    bind_keys,
+    bind_action,
     bind_signals,
     by_id,
     dismiss_sheet,
     exec_external,
-    keys,
     palette,
     Segment,
     show_badge,
@@ -274,6 +273,7 @@ class StatusPanel(ItemList):
     """Status panel with visual mode."""
 
     CURSOR = "●"  # filled circle
+    keymap_namespace = "status"
 
     def __init__(
         self,
@@ -397,7 +397,7 @@ class StatusPanel(ItemList):
                 valid.add("/".join(parts[:i]))
         self._collapsed_dirs &= valid
 
-    @bind_keys("j", keys.KEY_DOWN)
+    @bind_action("next", "j", "down", desc="Navigate file list", tip="Navigate")
     def next(self, step: int = 1) -> None:
         super().next(step)
         if (
@@ -407,7 +407,7 @@ class StatusPanel(ItemList):
         ):
             self._update_visual_selection()
 
-    @bind_keys("k", keys.KEY_UP)
+    @bind_action("previous", "k", "up", desc="Navigate file list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
         if (
@@ -437,19 +437,33 @@ class StatusPanel(ItemList):
             elif row.source_index >= 0:
                 self._selected.add(row.source_index)
 
-    @bind_keys("J")
+    @bind_action(
+        "preview_down",
+        "J",
+        desc="Scroll preview down",
+        tip="Preview down",
+        when=lambda self: not self._visual_mode,
+    )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
         if preview is not None:
             preview.scroll_down(DiffViewer.SCROLL_PAGE_SIZE)
 
-    @bind_keys("K")
+    @bind_action(
+        "preview_up",
+        "K",
+        desc="Scroll preview up",
+        tip="Preview up",
+        when=lambda self: not self._visual_mode,
+    )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
         if preview is not None:
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
-    @bind_keys("v")
+    @bind_action(
+        "visual_mode", "v", desc="Toggle visual multi-select mode", tip="Visual"
+    )
     def toggle_visual_mode(self) -> None:
         """Toggle visual (multi-select) mode."""
         if not self.files:
@@ -465,7 +479,13 @@ class StatusPanel(ItemList):
             self._visual_scroll = False
         self._notify_mode()
 
-    @bind_keys("s")
+    @bind_action(
+        "visual_scroll",
+        "s",
+        desc="Toggle visual scroll mode",
+        tip="V-scroll",
+        when=lambda self: self._visual_mode,
+    )
     def toggle_visual_scroll(self) -> None:
         """Toggle visual scroll mode (auto-select while navigating)."""
         if not self._visual_mode:
@@ -476,7 +496,13 @@ class StatusPanel(ItemList):
             self._update_visual_selection()
         self._notify_mode()
 
-    @bind_keys(keys.KEY_SPACE)
+    @bind_action(
+        "toggle_select",
+        " ",
+        desc="Toggle selection of current row",
+        tip="Select",
+        when=lambda self: self._visual_mode,
+    )
     def toggle_space_selection(self) -> None:
         """Toggle selection of current row in visual mode (source-index based)."""
         if not self._visual_mode:
@@ -641,195 +667,291 @@ class StatusPanel(ItemList):
             return None
         return row.file, row.source_index
 
-    def on_key(self, key: str) -> None:
+    def _cursor_has_conflict(self) -> bool:
+        """Return True if the file at cursor has an unresolved merge conflict."""
+        hit = self.file_at_cursor()
+        return hit is not None and hit[0].has_merged_conflicts
+
+    def capture_key(self, key: str) -> bool:
         if self._filter.handle_key(key):
-            return
+            return True
         if self._filter.active:
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
-            return
-
+            return True
         if not self.files:
-            return
-        if key == keys.KEY_ENTER:
-            if self._tree_mode:
-                row = self._row(self.curr_no)
-                if row is not None and row.kind == "dir":
-                    self._toggle_collapse(row.path)
-                    return
-            hit = self.file_at_cursor()
-            if hit is None:
-                return
-            f, source_idx = hit
-            diff = self._vm.load_diff(source_idx)
-            diff_type = (
-                DiffType.STAGED
-                if (f.has_staged_change and not f.has_unstaged_change)
-                else DiffType.UNSTAGED
-            )
-            self.emit(
-                EVT_GOTO,
-                target="diff",
-                source=self,
-                key=f.name,
-                content=diff,
-                repo_path=self._vm.repo_path,
-                diff_type=diff_type,
-            )
-            return
-        if key == "a":
-            _logger.debug("[STATUS] on_key: stage")
-            if self._tree_mode and not self._visual_mode:
-                row = self._row(self.curr_no)
-                if row is not None and row.kind == "dir":
-                    self._dir_action(StatusAction.STAGE, row)
-                    return
-            hit = self.file_at_cursor()
-            if hit is None:
-                return
-            f = hit[0]
-            if f.has_merged_conflicts or f.has_inline_merged_conflicts:
-                self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
-            else:
-                action = "Unstaged" if f.has_staged_change else "Staged"
-                self._run_action(
-                    self._vm.stage,
-                    single_msg=f"{action} {f.name}",
-                    batch_msg="Updated {} file(s)",
-                    action_type=StatusAction.STAGE,
-                )
-            return
-        if key == "i":
-            if self._tree_mode and not self._visual_mode:
-                row = self._row(self.curr_no)
-                if row is not None and row.kind == "dir":
-                    self._dir_action(StatusAction.IGNORE, row)
-                    return
-            self._run_action(
-                self._vm.ignore,
-                single_msg="Ignored",
-                batch_msg="Ignored {} file(s)",
-                action_type=StatusAction.IGNORE,
-            )
-            return
-        if key == "d":
-            _logger.debug("[STATUS] on_key: discard")
-            if self._tree_mode and not self._visual_mode:
-                row = self._row(self.curr_no)
-                if row is not None and row.kind == "dir":
-                    self._dir_action(StatusAction.DISCARD, row)
-                    return
-            self._run_action(
-                self._vm.discard,
-                single_msg="Discard file",
-                batch_msg="Discard {} file(s)",
-                action_type=StatusAction.DISCARD,
-                needs_confirm=True,
-            )
-            return
-        if key == "c":
-            if not self._vm.staged_files:
-                show_toast(
-                    "No staged changes to commit", duration=1.5, kind=FeedbackKind.WARNING
-                )
-                return
-            from .app_commit_editor import CommitEditor
+            return True
+        return False
 
-            def _do_commit(msg: str) -> None:
-                subject = msg.split("\n", 1)[0].strip()
-                result = self._vm.commit(msg)
-                if result.success:
-                    dismiss_sheet()
-                    self._vm.refresh()
-                    show_badge(
-                        f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
-                    )
-                else:
-                    show_toast(
-                        result.message, duration=2.0, kind=FeedbackKind.ERROR
-                    )
-
-            editor = CommitEditor(
-                vm=self._vm,
-                staged_files=self._vm.staged_files,
-                on_submit=_do_commit,
-                on_cancel=dismiss_sheet,
-            )
-            rows = terminal_size()[1]
-            show_sheet(
-                editor,
-                height=min(rows - 2, max(10, int(rows * 0.35))),
-                show_border=True,
-            )
-            editor.activate()
-            return
-        if key == "C":
-            if not any(f.has_staged_change for f in self.files):
-                show_toast(
-                    "No staged changes to commit", duration=2.0, kind=FeedbackKind.WARNING
-                )
+    @bind_action(
+        "open_diff",
+        "enter",
+        desc="Open diff for selected file",
+        tip="Open",
+        when=lambda self: not self._visual_mode,
+    )
+    def open_diff(self) -> None:
+        if self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._toggle_collapse(row.path)
                 return
-            try:
-                result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
-                if result.returncode == 0:
-                    show_toast("Commit created", duration=1.5, kind=FeedbackKind.SUCCESS)
-                else:
-                    show_toast(
-                        "Commit aborted or failed", duration=2.0, kind=FeedbackKind.ERROR
-                    )
-            except Exception:
-                show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
-                raise
-            finally:
+        hit = self.file_at_cursor()
+        if hit is None:
+            return
+        f, source_idx = hit
+        diff = self._vm.load_diff(source_idx)
+        diff_type = (
+            DiffType.STAGED
+            if (f.has_staged_change and not f.has_unstaged_change)
+            else DiffType.UNSTAGED
+        )
+        self.emit(
+            EVT_GOTO,
+            target="diff",
+            source=self,
+            key=f.name,
+            content=diff,
+            repo_path=self._vm.repo_path,
+            diff_type=diff_type,
+        )
+
+    @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
+    def stage(self) -> None:
+        _logger.debug("[STATUS] stage")
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.STAGE, row)
+                return
+        hit = self.file_at_cursor()
+        if hit is None:
+            return
+        f = hit[0]
+        if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+            self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
+        else:
+            action = "Unstaged" if f.has_staged_change else "Staged"
+            self._run_action(
+                self._vm.stage,
+                single_msg=f"{action} {f.name}",
+                batch_msg="Updated {} file(s)",
+                action_type=StatusAction.STAGE,
+            )
+
+    @bind_action("ignore", "i", desc="Add file to .gitignore", tip="Ignore")
+    def ignore(self) -> None:
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.IGNORE, row)
+                return
+        self._run_action(
+            self._vm.ignore,
+            single_msg="Ignored",
+            batch_msg="Ignored {} file(s)",
+            action_type=StatusAction.IGNORE,
+        )
+
+    @bind_action(
+        "discard",
+        "d",
+        desc="Discard changes irreversibly (confirm if modified)",
+        tip="Discard",
+    )
+    def discard(self) -> None:
+        _logger.debug("[STATUS] discard")
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.DISCARD, row)
+                return
+        self._run_action(
+            self._vm.discard,
+            single_msg="Discard file",
+            batch_msg="Discard {} file(s)",
+            action_type=StatusAction.DISCARD,
+            needs_confirm=True,
+        )
+
+    @bind_action(
+        "commit",
+        "c",
+        desc="Open inline commit editor",
+        tip="Commit",
+        when=lambda self: not self._visual_mode,
+    )
+    def commit(self) -> None:
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to commit",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_commit_editor import CommitEditor
+
+        def _do_commit(msg: str) -> None:
+            subject = msg.split("\n", 1)[0].strip()
+            result = self._vm.commit(msg)
+            if result.success:
+                dismiss_sheet()
                 self._vm.refresh()
-            return
-        if key == "E":
-            hit = self.file_at_cursor()
-            if hit is not None:
-                self._open_external_editor(hit[0])
-            return
-        if key == "o":
-            hit = self.file_at_cursor()
-            if hit is not None:
-                result = self._vm.checkout_ours(hit[1])
-                self._handle_result(result)
-            return
-        if key == "t":
-            hit = self.file_at_cursor()
-            if hit is not None:
-                result = self._vm.checkout_theirs(hit[1])
-                self._handle_result(result)
-            return
-        if key == "z":
-            result = self._vm.stash_push()
-            self._handle_result(result)
-            return
-        if key == "Y":
-            hit = self.file_at_cursor()
-            if hit is not None:
-                path = hit[0].name
-                run_async(
-                    lambda: copy_to_clipboard(path),
-                    lambda ok, p=path: (
-                        show_toast(f"Copied: {p}", duration=1.0, kind=FeedbackKind.SUCCESS)
-                        if ok
-                        else show_toast(
-                            "Failed to copy to clipboard",
-                            duration=2.0,
-                            kind=FeedbackKind.ERROR,
-                        )
-                    ),
+                show_badge(
+                    f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
                 )
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        editor = CommitEditor(
+            vm=self._vm,
+            staged_files=self._vm.staged_files,
+            on_submit=_do_commit,
+            on_cancel=dismiss_sheet,
+        )
+        rows = terminal_size()[1]
+        show_sheet(
+            editor,
+            height=min(rows - 2, max(10, int(rows * 0.35))),
+            show_border=True,
+        )
+        editor.activate()
+
+    @bind_action(
+        "commit_editor",
+        "C",
+        desc="Open external $EDITOR for commit",
+        tip="Commit",
+        when=lambda self: not self._visual_mode,
+    )
+    def commit_editor(self) -> None:
+        if not any(f.has_staged_change for f in self.files):
+            show_toast(
+                "No staged changes to commit",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
             return
-        if key == "T":
-            self._toggle_tree_mode()
-            return
-        if key == "l" or key == keys.KEY_RIGHT:
-            self._expand_current_dir()
-            return
-        if key == "h" or key == keys.KEY_LEFT:
-            self._collapse_current_dir()
-            return
+        try:
+            result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
+            if result.returncode == 0:
+                show_toast("Commit created", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(
+                    "Commit aborted or failed",
+                    duration=2.0,
+                    kind=FeedbackKind.ERROR,
+                )
+        except Exception:
+            show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
+            raise
+        finally:
+            self._vm.refresh()
+
+    @bind_action(
+        "open_editor",
+        "E",
+        desc="Open file in external $EDITOR",
+        tip="Edit",
+        when=lambda self: not self._visual_mode,
+    )
+    def open_editor(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            self._open_external_editor(hit[0])
+
+    @bind_action(
+        "checkout_ours",
+        "o",
+        desc="Checkout ours (conflict; discards theirs)",
+        tip="Ours",
+        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+    )
+    def checkout_ours(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            result = self._vm.checkout_ours(hit[1])
+            self._handle_result(result)
+
+    @bind_action(
+        "checkout_theirs",
+        "t",
+        desc="Checkout theirs (conflict; discards ours)",
+        tip="Theirs",
+        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+    )
+    def checkout_theirs(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            result = self._vm.checkout_theirs(hit[1])
+            self._handle_result(result)
+
+    @bind_action(
+        "stash",
+        "z",
+        desc="Stash working tree changes",
+        tip="Stash",
+        when=lambda self: not self._visual_mode,
+    )
+    def stash(self) -> None:
+        result = self._vm.stash_push()
+        self._handle_result(result)
+
+    @bind_action(
+        "copy_path",
+        "Y",
+        desc="Copy file path",
+        tip="Copy",
+        when=lambda self: not self._visual_mode,
+    )
+    def copy_path(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            path = hit[0].name
+            run_async(
+                lambda: copy_to_clipboard(path),
+                lambda ok, p=path: (
+                    show_toast(f"Copied: {p}", duration=1.0, kind=FeedbackKind.SUCCESS)
+                    if ok
+                    else show_toast(
+                        "Failed to copy to clipboard",
+                        duration=2.0,
+                        kind=FeedbackKind.ERROR,
+                    )
+                ),
+            )
+
+    @bind_action(
+        "toggle_tree",
+        "T",
+        desc="Toggle tree / flat file view",
+        tip="Tree",
+        when=lambda self: not self._visual_mode,
+    )
+    def toggle_tree(self) -> None:
+        self._toggle_tree_mode()
+
+    @bind_action(
+        "expand_dir",
+        "l",
+        "right",
+        desc="Expand directory (tree view)",
+        tip="Expand",
+        when=lambda self: not self._visual_mode,
+    )
+    def expand_dir(self) -> None:
+        self._expand_current_dir()
+
+    @bind_action(
+        "collapse_dir",
+        "h",
+        "left",
+        desc="Collapse directory (tree view)",
+        tip="Collapse",
+        when=lambda self: not self._visual_mode,
+    )
+    def collapse_dir(self) -> None:
+        self._collapse_current_dir()
 
     # --- Helpers ---
 
@@ -909,38 +1031,6 @@ class StatusPanel(ItemList):
 
     def get_help_title(self) -> str:
         return "Status"
-
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        """Return help pairs based on current mode."""
-        if self._visual_mode:
-            if self._visual_scroll:
-                return [
-                    ("jk/↑↓", "Navigate & select"),
-                    ("s", "Exit scroll mode"),
-                ]
-            return [
-                ("jk/↑↓", "Navigate"),
-                ("Space", "Select"),
-                ("a", "Stage selected"),
-                ("d", "Discard selected"),
-                ("i", "Ignore selected"),
-                ("v", "Exit visual"),
-                ("s", "Toggle scroll mode"),
-            ]
-        entries = [
-            ("jk/↑↓", "Navigate"),
-            ("↵ ", "Open"),
-            ("/", "Filter"),
-            ("a", "Stage"),
-            ("d", "Discard"),
-            ("i", "Ignore"),
-            ("c", "Commit"),
-            ("v", "Visual"),
-        ]
-        hit = self.file_at_cursor()
-        if hit is not None and hit[0].has_merged_conflicts:
-            entries.extend([("o", "Ours"), ("t", "Theirs")])
-        return entries
 
     def get_inspector_data(self) -> FileInfo | None:
         """Return inspector data for the currently selected file."""

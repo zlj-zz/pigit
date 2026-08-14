@@ -273,7 +273,7 @@ def run_multi_select_picker(
                 ("n", "Select none"),
             ]
 
-        def on_key_extra(self, key: str) -> None:
+        def handle_extra_key(self, key: str) -> None:
             if key == " ":
                 self._list.toggle()
                 self._update_status()

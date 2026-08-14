@@ -5,7 +5,7 @@ Description: Keyboard event routing algorithm for the component tree.
     beyond the cycle-detection ContextVar.
 
     Extracted from ``_component.py`` so the 5-layer dispatch logic
-    (bindings → handle_key → on_key → event_target → parent bubble)
+    (capture_key → bindings → handle_key → event_target → parent bubble)
     can be understood and tested independently.
 
 Author: Zev
@@ -59,16 +59,22 @@ def _dispatch_impl(component: Component, key: str, state: dict) -> bool:
     """5-layer priority dispatch with cycle detection.
 
     Layers (first match wins):
+        0. ``capture_key(key) -> bool`` hook (intercept before bindings)
         1. Key bindings (``_key_handlers``) — always consumed
         2. ``handle_key(key) -> bool`` hook (new-style, can bubble)
-        3. ``on_key(key)`` hook (legacy, always consumed)
-        4. Forward to ``event_target`` child
-        5. Bubble to ``parent``
+        3. Forward to ``event_target`` child
+        4. Bubble to ``parent``
     """
     cid = id(component)
     if cid in state["visited"]:
         return False
     state["visited"].add(cid)
+
+    # 0. Capture hook: intercept keys before bindings (e.g. an active text filter)
+    capture = getattr(component, "capture_key", None)
+    if capture is not None and capture(key):
+        _maybe_reestablish_focus(component)
+        return True
 
     # 1. Bindings (always consumed)
     handler = component._key_handlers.get(key)
@@ -77,27 +83,20 @@ def _dispatch_impl(component: Component, key: str, state: dict) -> bool:
         _maybe_reestablish_focus(component)
         return True
 
-    # 2. New bubbling-aware hook: handle_key -> bool
+    # 2. Bubbling-aware hook: handle_key -> bool
     handle_key = getattr(component, "handle_key", None)
     if handle_key is not None:
         if handle_key(key):
             _maybe_reestablish_focus(component)
             return True
 
-    # 3. Legacy hook: on_key (always consumed, no bubbling)
-    on_key = getattr(component, "on_key", None)
-    if on_key is not None and callable(on_key):
-        on_key(key)
-        _maybe_reestablish_focus(component)
-        return True
-
-    # 4. Forward to event_target
+    # 3. Forward to event_target
     target = component.event_target
     if target is not None and id(target) not in state["visited"]:
         if target._handle_event(key):
             return True
 
-    # 5. Bubble to parent
+    # 4. Bubble to parent
     if component.parent is not None:
         return component.parent._handle_event(key)
 

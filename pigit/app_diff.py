@@ -24,9 +24,8 @@ from pigit.termui import (
     AlertDialog,
     Component,
     SyntaxTokenizer,
-    keys,
+    bind_action,
     palette,
-    bind_keys,
     request_render,
     show_badge,
     show_toast,
@@ -145,6 +144,7 @@ _RenderLine = list[_RenderToken]
 class DiffViewer(LineTextBrowser):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
 
+    keymap_namespace = "diff"
     _CACHE_MAX = 64
     LINE_NO_WIDTH = 5
     LINE_NO_STR_WIDTH = 4  # LINE_NO_WIDTH - 1
@@ -744,34 +744,6 @@ class DiffViewer(LineTextBrowser):
     def get_help_title(self) -> str:
         return "Diff"
 
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        """Return help pairs for diff viewer."""
-        if self._file_history_mode:
-            return [
-                ("jk", "Scroll"),
-                ("p", "Older commit"),
-                ("n", "Newer commit"),
-                ("Esc", "Back"),
-            ]
-        if self._hunk_mode:
-            return [
-                ("jk", "Prev/Next hunk"),
-                ("s", "Stage/Unstage hunk"),
-                ("d", "Discard hunk"),
-                ("H/Esc", "Exit hunk mode"),
-            ]
-        entries = [
-            ("jk", "Navigate"),
-            ("JK", "Quick Navigate"),
-            ("] [", "Next/Prev hunk"),
-            ("esc", "Back"),
-        ]
-        if self._diff_type is not DiffType.COMMIT:
-            entries.insert(2, ("H", "Hunk mode"))
-        else:
-            entries.insert(2, ("v", "View file at commit"))
-        return entries
-
     def update(self, action: EventType, **data) -> None:
         if action is EVT_GOTO:
             self.i_cache[self.i_cache_key] = self._i
@@ -799,7 +771,7 @@ class DiffViewer(LineTextBrowser):
                     self.set_content(content.splitlines())
             self._i = self.i_cache.get(self.i_cache_key, 0)
 
-    @bind_keys(keys.KEY_ESC)
+    @bind_action("back", "esc", desc="Close diff and return", tip="Back")
     def _leave_display(self) -> None:
         if self._file_history_mode:
             self._exit_file_history()
@@ -810,7 +782,14 @@ class DiffViewer(LineTextBrowser):
         if self.come_from is not None:
             self.emit(EVT_GOTO, target=self.come_from)
 
-    @bind_keys("v")
+    @bind_action(
+        "file_history",
+        "v",
+        desc="View file at selected commit",
+        tip="History",
+        when=lambda self: not self._file_history_mode
+        and self._diff_type is DiffType.COMMIT,
+    )
     def _toggle_file_history(self) -> None:
         if self._file_history_mode:
             self._exit_file_history()
@@ -824,7 +803,9 @@ class DiffViewer(LineTextBrowser):
             return
         path = self._current_file_path()
         if not path:
-            show_toast("No file at current position", duration=1.5, kind=FeedbackKind.WARNING)
+            show_toast(
+                "No file at current position", duration=1.5, kind=FeedbackKind.WARNING
+            )
             return
         self._enter_file_history(path)
 
@@ -899,7 +880,13 @@ class DiffViewer(LineTextBrowser):
             self.come_from = snap.come_from
         self._saved_diff_state = None
 
-    @bind_keys("p")
+    @bind_action(
+        "prev_commit",
+        "p",
+        desc="Go to older commit that touched this file",
+        tip="Older",
+        when=lambda self: self._file_history_mode,
+    )
     def _prev_file_commit(self) -> None:
         """Go to older commit that touched this file."""
         if not self._file_history_mode:
@@ -908,7 +895,13 @@ class DiffViewer(LineTextBrowser):
             self._file_history_index += 1
             self._load_file_history_at_current_index()
 
-    @bind_keys("n")
+    @bind_action(
+        "next_commit",
+        "n",
+        desc="Go to newer commit that touched this file",
+        tip="Newer",
+        when=lambda self: self._file_history_mode,
+    )
     def _next_file_commit(self) -> None:
         """Go to newer commit that touched this file."""
         if not self._file_history_mode:
@@ -917,29 +910,29 @@ class DiffViewer(LineTextBrowser):
             self._file_history_index -= 1
             self._load_file_history_at_current_index()
 
-    @bind_keys("j")
+    @bind_action("down", "j", desc="Navigate diff lines down", tip="Down")
     def _on_j(self) -> None:
         if self._hunk_mode:
             self._next_hunk_nav()
         else:
             self.scroll_down()
 
-    @bind_keys("k")
+    @bind_action("up", "k", desc="Navigate diff lines up", tip="Up")
     def _on_k(self) -> None:
         if self._hunk_mode:
             self._prev_hunk_nav()
         else:
             self.scroll_up()
 
-    @bind_keys("J")
+    @bind_action("page_down", "J", desc="Page down diff", tip="Page down")
     def _scroll_page_down(self) -> None:
         self.scroll_down(self.SCROLL_PAGE_SIZE)
 
-    @bind_keys("K")
+    @bind_action("page_up", "K", desc="Page up diff", tip="Page up")
     def _scroll_page_up(self) -> None:
         self.scroll_up(self.SCROLL_PAGE_SIZE)
 
-    @bind_keys("]")
+    @bind_action("next_hunk", "]", desc="Jump to next hunk", tip="Next hunk")
     def _next_hunk(self) -> None:
         """Jump to next hunk header (@@ line)."""
         if not self._hunk_starts:
@@ -948,7 +941,7 @@ class DiffViewer(LineTextBrowser):
         if pos < len(self._hunk_starts):
             self._i = self._hunk_starts[pos]
 
-    @bind_keys("[")
+    @bind_action("prev_hunk", "[", desc="Jump to previous hunk", tip="Prev hunk")
     def _prev_hunk(self) -> None:
         """Jump to previous hunk header (@@ line)."""
         if not self._hunk_starts:
@@ -958,25 +951,32 @@ class DiffViewer(LineTextBrowser):
             self._i = self._hunk_starts[pos]
 
     # ── Horizontal scroll ──
-    @bind_keys("l")
+    @bind_action("scroll_right", "l", desc="Scroll diff right")
     def _scroll_right(self) -> None:
         self._col_offset = min(
             self._col_offset + self.SCROLL_COL_STEP, self._max_col_offset
         )
 
-    @bind_keys("h")
+    @bind_action("scroll_left", "h", desc="Scroll diff left")
     def _scroll_left(self) -> None:
         self._col_offset = max(self._col_offset - self.SCROLL_COL_STEP, 0)
 
-    @bind_keys("0")
+    @bind_action("col_home", "0", desc="Scroll to first column")
     def _scroll_col_home(self) -> None:
         self._col_offset = 0
 
-    @bind_keys("$")
+    @bind_action("col_end", "$", desc="Scroll to last column")
     def _scroll_col_end(self) -> None:
         self._col_offset = self._max_col_offset
 
-    @bind_keys("H")
+    @bind_action(
+        "hunk_mode",
+        "H",
+        desc="Toggle hunk staging mode",
+        tip="Hunk mode",
+        when=lambda self: not self._file_history_mode
+        and self._diff_type is not DiffType.COMMIT,
+    )
     def toggle_hunk_mode(self) -> None:
         if self._diff_type is DiffType.COMMIT:
             return
@@ -1004,7 +1004,9 @@ class DiffViewer(LineTextBrowser):
     def _run_hunk_action(self, action: str, *, needs_confirm: bool = False) -> None:
         if not self._hunks or self._diff_type is DiffType.COMMIT:
             show_toast(
-                "Not available for commit diffs", duration=1.5, kind=FeedbackKind.WARNING
+                "Not available for commit diffs",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
             )
             return
         patch = self._extract_hunk_patch(self._hunk_index)
@@ -1020,11 +1022,23 @@ class DiffViewer(LineTextBrowser):
         else:
             self._apply_patch(patch, action=action)
 
-    @bind_keys("s")
+    @bind_action(
+        "stage_hunk",
+        "s",
+        desc="Stage current hunk",
+        tip="Stage hunk",
+        when=lambda self: self._hunk_mode,
+    )
     def _stage_current_hunk(self) -> None:
         self._run_hunk_action("stage")
 
-    @bind_keys("d")
+    @bind_action(
+        "discard_hunk",
+        "d",
+        desc="Discard current hunk (irreversible)",
+        tip="Discard hunk",
+        when=lambda self: self._hunk_mode,
+    )
     def _discard_current_hunk(self) -> None:
         self._run_hunk_action("discard", needs_confirm=True)
 
@@ -1063,7 +1077,9 @@ class DiffViewer(LineTextBrowser):
     def _apply_patch(self, patch: str, action: str) -> None:
         """Apply or reverse-apply a patch in background thread."""
         if not self._repo_path:
-            show_toast("No repo path available", duration=2.0, kind=FeedbackKind.WARNING)
+            show_toast(
+                "No repo path available", duration=2.0, kind=FeedbackKind.WARNING
+            )
             return
 
         suffix = "_stage.patch" if action == "stage" else "_discard.patch"

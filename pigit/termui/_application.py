@@ -13,8 +13,14 @@ from typing import TYPE_CHECKING, Any, TypedDict
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-from ._bindings import BindingsList, resolve_key_handlers_merged
+from ._bindings import (
+    BindingsList,
+    collect_action_bindings,
+    resolve_action_keys,
+    resolve_key_handlers,
+)
 from ._component import Component
+from .keys import display_key
 from ._root import ComponentRoot
 from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
@@ -37,10 +43,11 @@ class LoopKwargs(TypedDict, total=False):
 
 
 class _ApplicationEventLoop(AppEventLoop):
-    """Bridge that delegates after_start and app-level bindings to Application.
+    """Bridge that delegates after_start and app-level keys to Application.
 
-    Binding precedence: App bindings > Loop bindings > Component tree.
-    ComponentRoot routes keys to the overlay stack or leaf internally.
+    Key precedence: overlay > App bindings > App handle_key > Loop bindings
+    > Component tree. ComponentRoot routes keys to the overlay stack or leaf
+    internally.
     """
 
     _child: ComponentRoot
@@ -50,7 +57,6 @@ class _ApplicationEventLoop(AppEventLoop):
         root._event_loop = self
         self._app = app
         self._app_key_handlers = getattr(app, "_key_handlers", {})
-        self._app_on_key = getattr(app, "on_key", None)
 
     def after_start(self):
         """Delegate the after-start hook to the Application instance."""
@@ -85,27 +91,32 @@ class _ApplicationEventLoop(AppEventLoop):
             self._run_app_handler(handler, key, "App binding for '%s' failed")
             return "binding"
 
-        app_on_key = self._app_on_key
-        if app_on_key is not None:
-            self._run_app_handler(
-                lambda: app_on_key(key), key, "App on_key for '%s' failed"
+        # Application is not a Component, so its handle_key (the catch-all
+        # fallback after @bind_action/BINDINGS) must be bridged explicitly.
+        app_handle_key = getattr(self._app, "handle_key", None)
+        if app_handle_key is not None:
+            consumed = self._run_app_handler(
+                lambda: app_handle_key(key), key, "App handle_key for '%s' failed"
             )
-            return "app"
+            if consumed:
+                return "app"
 
         return super()._dispatch_semantic_string(key)
 
-    def _run_app_handler(self, handler, key: str, log_fmt: str) -> None:
+    def _run_app_handler(self, handler, key: str, log_fmt: str) -> Any:
         overlay_was_open = self._child.has_overlay_open()
         try:
-            handler()
+            result = handler()
         except ExitEventLoop:
             raise
         except Exception:
             _logger.exception(log_fmt, key)
+            result = None
         overlay_now_open = self._child.has_overlay_open()
         if overlay_was_open != overlay_now_open:
             self._child._focus_manager.sync_focus_to_overlay_or_leaf()
         self.render()
+        return result
 
 
 class Application:
@@ -124,11 +135,25 @@ class Application:
         self._loop: AppEventLoop | None = None
         self._root: ComponentRoot | None = None
         self._loop_kwargs = loop_kwargs
-        self._key_handlers = resolve_key_handlers_merged(
-            self, type(self), self.BINDINGS
+        namespace = getattr(type(self), "keymap_namespace", "")
+        self._action_bindings = collect_action_bindings(type(self), namespace)
+        self._key_handlers = resolve_key_handlers(
+            self, self.BINDINGS, self._action_bindings
         )
         self._help_popup: Any = None
         self._event_bus = EventBus()
+
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Derive app-level (universal) help entries from ``@bind_action``."""
+        entries: list[tuple[str, str]] = []
+        for binding in self._action_bindings:
+            desc = binding.desc(self) if callable(binding.desc) else binding.desc
+            if desc is None:
+                desc = binding.action
+            entries.append(
+                ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
+            )
+        return entries
 
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""

@@ -13,7 +13,7 @@ from pigit.termui import (
     EVT_GOTO,
     EVT_SELECTION_CHANGED,
     FeedbackKind,
-    bind_keys,
+    bind_action,
     palette,
     Segment,
     show_badge,
@@ -33,6 +33,7 @@ class StashPanel(ItemList):
     """Stash list panel with cursor navigation."""
 
     CURSOR = "●"
+    keymap_namespace = "stash"
 
     def __init__(
         self,
@@ -65,11 +66,11 @@ class StashPanel(ItemList):
     def refresh(self):
         self._load_stashes()
 
-    @bind_keys("j")
+    @bind_action("next", "j", "down", desc="Navigate stash list", tip="Navigate")
     def next_item(self, step: int = 1) -> None:
         self.next(step)
 
-    @bind_keys("k")
+    @bind_action("previous", "k", "up", desc="Navigate stash list", tip="Navigate")
     def previous_item(self, step: int = 1) -> None:
         self.previous(step)
 
@@ -98,32 +99,41 @@ class StashPanel(ItemList):
         main = [ref_seg, msg_seg]
         return left, main, []
 
-    def on_key(self, key: str) -> None:
+    @bind_action(
+        "view_diff", "enter", desc="View diff for selected stash", tip="View diff"
+    )
+    def view_diff(self) -> None:
         if not self.stashes:
             return
-        if key == "\r":
-            stash = self.stashes[self.curr_no]
-            diff_lines = self._vm.load_stash_diff(stash.ref)
-            self.emit(
-                EVT_GOTO,
-                target="diff",
-                source=self,
-                key=stash.ref,
-                content=diff_lines,
-                repo_path=self._vm.repo_path,
-                diff_type=DiffType.STASH,
-            )
+        stash = self.stashes[self.curr_no]
+        diff_lines = self._vm.load_stash_diff(stash.ref)
+        self.emit(
+            EVT_GOTO,
+            target="diff",
+            source=self,
+            key=stash.ref,
+            content=diff_lines,
+            repo_path=self._vm.repo_path,
+            diff_type=DiffType.STASH,
+        )
+
+    @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
+    def pop(self) -> None:
+        if not self.stashes:
             return
-        if key == "p":
-            stash = self.stashes[self.curr_no]
-            result = self._vm.stash_pop(stash.ref)
-            self._handle_result(result)
+        stash = self.stashes[self.curr_no]
+        result = self._vm.stash_pop(stash.ref)
+        self._handle_result(result)
+
+    @bind_action(
+        "drop", "d", desc="Drop selected stash permanently (irreversible)", tip="Drop"
+    )
+    def drop(self) -> None:
+        if not self.stashes:
             return
-        if key == "d":
-            stash = self.stashes[self.curr_no]
-            result = self._vm.stash_drop(stash.ref)
-            self._handle_result(result)
-            return
+        stash = self.stashes[self.curr_no]
+        result = self._vm.stash_drop(stash.ref)
+        self._handle_result(result)
 
     def _handle_result(self, result) -> None:
         if result.success:
@@ -134,15 +144,6 @@ class StashPanel(ItemList):
 
     def get_help_title(self) -> str:
         return "Stash"
-
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        entries = [
-            ("jk/↑↓", "Navigate"),
-            ("↵ ", "View diff"),
-            ("p", "Pop stash"),
-            ("d", "Drop stash"),
-        ]
-        return entries
 
     def get_inspector_data(self):
         return None

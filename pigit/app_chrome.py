@@ -42,7 +42,7 @@ class AppFooter(Component):
             active = (
                 resolve_presented(tab_view.active) if tab_view is not None else None
             )
-        provider = getattr(active, "get_help_entries", None) if active else None
+        provider = getattr(active, "get_footer_entries", None) if active else None
         self.set_help_provider(provider)
         return True
 

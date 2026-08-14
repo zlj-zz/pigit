@@ -11,7 +11,6 @@ import logging
 from collections.abc import Callable
 
 from .. import _runtime_context, keys, palette
-from .._bindings import resolve_key_handlers_merged
 from .._feedback import FeedbackKind
 from .._component import Component
 from .._frame import BoxFrame
@@ -54,12 +53,6 @@ class Popup(Component):
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
-        self._resolved_handlers = resolve_key_handlers_merged(
-            self, type(self), getattr(self, "BINDINGS", None)
-        )
-        self._resolved_child_handlers = resolve_key_handlers_merged(
-            self._child, type(self._child), getattr(self._child, "BINDINGS", None)
-        )
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -73,17 +66,13 @@ class Popup(Component):
         return self._fallback_overlay_key(key)
 
     def _invoke_binding_target(self, target: Component, key: str) -> bool:
-        if target is self:
-            handlers = self._resolved_handlers
-        elif target is self._child:
-            handlers = self._resolved_child_handlers
-        else:
-            handlers = resolve_key_handlers_merged(
-                target,
-                type(target),
-                getattr(target, "BINDINGS", None),
-            )
-        fn = handlers.get(key)
+        """Invoke a handler from the target's resolved ``_key_handlers``.
+
+        ``_key_handlers`` already merges ``BINDINGS`` and ``@bind_action``
+        (resolved in :meth:`Component.__init__`), so both shell and child
+        bindings are honoured uniformly.
+        """
+        fn = target._key_handlers.get(key)
         if fn is None:
             return False
         fn()

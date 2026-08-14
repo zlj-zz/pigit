@@ -12,7 +12,7 @@ from collections.abc import Callable
 
 from pigit.app_theme import THEME
 from pigit.ext.utils import relative_time
-from pigit.termui import FeedbackKind, Segment, keys
+from pigit.termui import FeedbackKind, Segment, bind_action, show_badge, show_toast
 from pigit.termui.widgets import ItemList
 
 if TYPE_CHECKING:
@@ -24,6 +24,7 @@ class RecentActionsPanel(ItemList):
     """Sheet overlay for browsing and reversing session history records."""
 
     CURSOR = "●"
+    keymap_namespace = "recent"
 
     def __init__(
         self,
@@ -45,30 +46,29 @@ class RecentActionsPanel(ItemList):
         self._records = self._history.peek(20)
         self.set_content([r.description for r in self._records])
 
-    def on_key(self, key: str) -> None:
-        if key == keys.KEY_ESC:
-            self._on_done()
-            return
-        if key == keys.KEY_ENTER and self._records:
-            target_idx = self.curr_no
-            result = self._history.reverse_to(target_idx, self._git)
-            if result.success:
-                from pigit.termui import show_badge
+    @bind_action("next", "j", "down", desc="Navigate history list", tip="Navigate")
+    def next(self, step: int = 1) -> None:
+        super().next(step)
 
-                show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                from pigit.termui import show_toast
+    @bind_action("previous", "k", "up", desc="Navigate history list", tip="Navigate")
+    def previous(self, step: int = 1) -> None:
+        super().previous(step)
 
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
-            self._on_done()
+    @bind_action("reverse", "enter", desc="Reverse to selected action", tip="Reverse")
+    def reverse(self) -> None:
+        if not self._records:
             return
-        # Delegate navigation to parent ItemList
-        if key == keys.KEY_DOWN or key == "j":
-            self.next()
-            return
-        if key == keys.KEY_UP or key == "k":
-            self.previous()
-            return
+        target_idx = self.curr_no
+        result = self._history.reverse_to(target_idx, self._git)
+        if result.success:
+            show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
+        else:
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+        self._on_done()
+
+    @bind_action("close", "esc", desc="Close panel", tip="Close")
+    def close(self) -> None:
+        self._on_done()
 
     def describe_row(
         self,
@@ -88,10 +88,3 @@ class RecentActionsPanel(ItemList):
         right = [Segment(right_text, fg=THEME.fg_dim)]
 
         return left, main, right
-
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        return [
-            ("jk/↑↓", "Navigate"),
-            ("Enter", "Reverse to here"),
-            ("Esc", "Close"),
-        ]

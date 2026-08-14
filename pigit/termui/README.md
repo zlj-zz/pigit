@@ -125,7 +125,7 @@ flowchart LR
 | `_session.py` | `Session`: TTY setup, creates `Renderer` |
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
 | `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
-| `_bindings.py` | `bind_keys`, `list_bindings`, `BindingError`, merged handler resolution |
+| `_bindings.py` | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | `keys.py` | Semantic key constants and the `SemanticEvent` union (`str` or `MouseEvent`) |
 | `_text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
 | `input.py` | Low-level byte reader -> semantic strings, terminal input handling |
@@ -150,7 +150,7 @@ Stable names are listed in `__all__` inside `__init__.py`.
 | **Overlay types** | `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, `OverlaySurface` |
 | **Application** | `Application`, `ComponentRoot`, `ExitEventLoop` |
 | **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
-| **Bindings** | `bind_keys`, `list_bindings`, `BindingError` |
+| **Bindings** | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | **Registry** | `by_id`, `get_registry` |
 | **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `get_badge_signal`, `show_spinner`, `hide_spinner`, `exec_external` |
 | **Text** | `plain`, `SyntaxTokenizer` |
@@ -161,7 +161,7 @@ Stable names are listed in `__all__` inside `__init__.py`.
 Import the package once for app-level wiring:
 
 ```python
-from pigit.termui import Application, Component, bind_keys, keys
+from pigit.termui import Application, Component, bind_action, keys
 from pigit.termui.containers import TabView
 ```
 
@@ -171,7 +171,7 @@ from pigit.termui.containers import TabView
 from pigit.termui import keys, palette, Segment
 
 # Key constants
-@bind_keys("j", keys.KEY_DOWN)
+@bind_action("next", "j", keys.KEY_DOWN)
 def next(self): ...
 
 # Style flags
@@ -272,19 +272,31 @@ segments = [
 
 ### Bindings
 
-`bind_keys` attaches handlers to methods; class-level `BINDINGS` lists are merged with `resolve_key_handlers_merged`. Duplicate keys toward the same target raise `BindingError` in strict mode (see `_bindings.py`).
+`@bind_action` is the single source of truth for key bindings. It declares a stable
+action id, default keys, and help metadata on a method:
 
 ```python
 class MyPanel(Component):
     BINDINGS = [("q", "quit")]
 
-    @bind_keys("j", keys.KEY_DOWN)
+    @bind_action("next", "j", keys.KEY_DOWN, desc="Next item", tip="Next")
     def next(self):
         ...
 
     def quit(self):
         raise ExitEventLoop("Quit")
 ```
+
+- `action` — stable id (namespace-scoped via `keymap_namespace`), used for remapping.
+- `*keys` — default semantic keys triggering the method.
+- `desc` — full help text; `tip` — compact footer hint.
+- `when` — callable hiding the entry from help/footer when it returns False.
+- `configurable` — whether the user may remap via the `[keybindings]` config section.
+
+`BINDINGS` remains for simple `(key, target)` pairs that need no help/footer metadata.
+`Component.__init__` resolves both into `_key_handlers` (semantic key → callable) via
+`resolve_key_handlers` and `collect_action_bindings`; `set_key_overrides` installs user
+remaps that `resolve_action_keys` then applies.
 
 ## Minimal example
 

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
 from ._async_task import AsyncTask
-from ._bindings import BindingsList, resolve_key_handlers_merged
+from ._bindings import BindingsList, resolve_key_handlers
 from ._component import Component
 from ._mouse import MouseEvent
 from ._runtime_context import get_renderer
@@ -95,9 +95,7 @@ class AppEventLoop:
 
         self._alt = alt
 
-        self._key_handlers = resolve_key_handlers_merged(
-            self, type(self), self.BINDINGS
-        )
+        self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
 
         self._render_requested = False
         self._surface: Any = None
