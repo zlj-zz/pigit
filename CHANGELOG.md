@@ -1,5 +1,20 @@
 # Changelog of pigit
 
+## 1.10.0 (2026-08-14)
+
+### Features
+
+- **Interactive rebase TUI**: a bottom-sheet panel edits the `git rebase -i` todo list visually — set pick/squash/fixup/drop/reword/edit per commit, reorder with `J`/`K`, then execute via the user's `$EDITOR`. Guards reject in-progress rebases/merges, merge commits, and dirty worktrees. Continue/abort/skip are reachable from the command palette.
+- **Semantic feedback**: `show_toast` / `show_badge` / `AlertDialog.alert` accept a `FeedbackKind` (info/success/warning/error) that tints the toast border and prefix glyph (`i`/`✓`/`!`/`✗`), the header badge, and the dialog border. Destructive confirms (abort rebase, delete branch, rewrite history, discard hunk) render a danger-red border.
+
+### Refactors
+
+- **CLI command trimming**: removed duplicate and low-frequency short commands (`rb.i`, `c.o`, `t.p`, `w.stash`, `c.O`, `r.v`, `f.C`, `f.t`, `w.check`) and renamed `b.o` → `b.co`, keeping the `co` alias.
+
+### Chores
+
+- Update the bundled gitignore template.
+
 ## 1.9.0 (2026-08-13)
 
 ### Features
