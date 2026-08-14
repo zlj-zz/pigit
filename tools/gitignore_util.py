@@ -16,8 +16,7 @@ _{0}: str = r"""
 """
 '''
 
-_code_template = """# -*- coding:utf-8 -*-
-# https://github.com/github/gitignore
+_code_template = """# https://github.com/github/gitignore
 # Generate by script `gitignore.py`.
 
 from typing import Dict

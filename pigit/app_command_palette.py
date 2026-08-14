@@ -36,6 +36,9 @@ DEFAULT_COMMANDS: list[str] = [
     "help",
     "quit",
     "continue-merge",
+    "rebase-continue",
+    "rebase-abort",
+    "rebase-skip",
 ]
 
 

@@ -125,38 +125,6 @@ def commit_squash(args: list[str]) -> str:
 
 
 @command(
-    short="c.o",
-    category=CommandCategory.COMMIT,
-    help="Checkout a branch or paths.",
-    has_args=True,
-    arg_completion=[CompletionType.REF],
-    examples=["pigit cmd c.o main", "pigit cmd c.o -- file.txt"],
-    related=["b.o", "c"],
-)
-def commit_checkout(args: list[str]) -> str:
-    """Checkout branch or paths."""
-    if not args:
-        return "git checkout"
-    return f"git checkout {' '.join(args)}"
-
-
-@command(
-    short="c.O",
-    category=CommandCategory.COMMIT,
-    help="Checkout interactively.",
-    has_args=True,
-    examples=["pigit cmd c.O -p"],
-    related=["c.o", "c"],
-)
-def commit_checkout_interactive(args: list[str]) -> str:
-    """Interactive checkout."""
-    base = "git checkout -p"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
-@command(
     short="c.R",
     category=CommandCategory.COMMIT,
     help="Revert/undo the last commit (soft reset).",
@@ -193,4 +161,3 @@ alias("ca", "c.a")
 alias("cm", "c.m")
 alias("cf", "c.f")
 alias("cF", "c.F")
-alias("cO", "c.O")

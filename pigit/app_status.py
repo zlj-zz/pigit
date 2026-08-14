@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 
 from pigit.termui import (
     EventType,
+    FeedbackKind,
     EVT_GOTO,
     AlertDialog,
     bind_keys,
@@ -728,7 +729,9 @@ class StatusPanel(ItemList):
             return
         if key == "c":
             if not self._vm.staged_files:
-                show_toast("No staged changes to commit", duration=1.5)
+                show_toast(
+                    "No staged changes to commit", duration=1.5, kind=FeedbackKind.WARNING
+                )
                 return
             from .app_commit_editor import CommitEditor
 
@@ -738,9 +741,13 @@ class StatusPanel(ItemList):
                 if result.success:
                     dismiss_sheet()
                     self._vm.refresh()
-                    show_badge(f"Committed: {subject}", duration=1.5)
+                    show_badge(
+                        f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
+                    )
                 else:
-                    show_toast(result.message, duration=2.0)
+                    show_toast(
+                        result.message, duration=2.0, kind=FeedbackKind.ERROR
+                    )
 
             editor = CommitEditor(
                 vm=self._vm,
@@ -758,16 +765,20 @@ class StatusPanel(ItemList):
             return
         if key == "C":
             if not any(f.has_staged_change for f in self.files):
-                show_toast("No staged changes to commit", duration=2.0)
+                show_toast(
+                    "No staged changes to commit", duration=2.0, kind=FeedbackKind.WARNING
+                )
                 return
             try:
                 result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
                 if result.returncode == 0:
-                    show_toast("Commit created", duration=1.5)
+                    show_toast("Commit created", duration=1.5, kind=FeedbackKind.SUCCESS)
                 else:
-                    show_toast("Commit aborted or failed", duration=2.0)
+                    show_toast(
+                        "Commit aborted or failed", duration=2.0, kind=FeedbackKind.ERROR
+                    )
             except Exception:
-                show_toast("Failed to open editor", duration=2.0)
+                show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
                 raise
             finally:
                 self._vm.refresh()
@@ -800,9 +811,13 @@ class StatusPanel(ItemList):
                 run_async(
                     lambda: copy_to_clipboard(path),
                     lambda ok, p=path: (
-                        show_toast(f"Copied: {p}", duration=1.0)
+                        show_toast(f"Copied: {p}", duration=1.0, kind=FeedbackKind.SUCCESS)
                         if ok
-                        else show_toast("Failed to copy to clipboard", duration=2.0)
+                        else show_toast(
+                            "Failed to copy to clipboard",
+                            duration=2.0,
+                            kind=FeedbackKind.ERROR,
+                        )
                     ),
                 )
             return
@@ -849,7 +864,7 @@ class StatusPanel(ItemList):
         """Run a batch action on a directory row (child_indices)."""
         indices = set(row.child_indices)
         if not indices:
-            show_toast("No files in directory", duration=1.5)
+            show_toast("No files in directory", duration=1.5, kind=FeedbackKind.WARNING)
             return
         if action_type == StatusAction.DISCARD:
             self._confirm_batch("Discard", action_type, indices)
@@ -866,9 +881,9 @@ class StatusPanel(ItemList):
             result.message,
         )
         if result.success:
-            show_badge(result.message, duration=1.0)
+            show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:
-            show_toast(result.message, duration=2.0)
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
         if result.should_refresh:
             self._vm.refresh()
 
@@ -878,7 +893,7 @@ class StatusPanel(ItemList):
         try:
             exec_external([editor, file.name], cwd=self._vm.repo_path)
         except Exception:
-            show_toast("Failed to open editor", duration=2.0)
+            show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
         finally:
             self._vm.refresh()
 
@@ -936,7 +951,7 @@ class StatusPanel(ItemList):
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""
-        show_toast("No files selected", duration=2.0)
+        show_toast("No files selected", duration=2.0, kind=FeedbackKind.WARNING)
 
     def _clear_visual_mode(self) -> None:
         """Exit visual mode and clear selection state."""
@@ -958,7 +973,9 @@ class StatusPanel(ItemList):
         """Unified handler for single / visual mode actions."""
         if self._visual_mode:
             if self._visual_scroll:
-                show_toast("Press s to exit scroll mode", duration=2.0)
+                show_toast(
+                    "Press s to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
+                )
                 return
             if not self._selected:
                 self._toast_no_selection()

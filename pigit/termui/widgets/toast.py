@@ -11,7 +11,9 @@ import time
 from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
+from .. import palette
 from .._component import Component
+from .._feedback import FeedbackKind, style_for
 from .._frame import BoxFrame
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
@@ -36,6 +38,7 @@ class Toast(Component):
         size: tuple[int, int] | None = None,
         clock: Callable[[], float] = time.monotonic,
         position: ToastPosition = ToastPosition.TOP_RIGHT,
+        kind: FeedbackKind | None = None,
         enter_duration: float = 0.5,
         exit_duration: float = 0.5,
     ) -> None:
@@ -46,6 +49,14 @@ class Toast(Component):
         self.duration = duration
         self._clock = clock
         self._position = position
+
+        # Semantic level: None means neutral (no glyph, no semantic color).
+        self._kind = kind
+        _style = style_for(kind)
+        self._kind_fg = _style.fg if _style else None
+        self._kind_glyph = _style.glyph if _style else None
+        self._kind_style = _style.style_flags if _style else 0
+        self._prefix_w = (wcswidth(self._kind_glyph) + 1) if self._kind_glyph else 0
 
         if enter_duration + exit_duration > duration:
             enter_duration = 0.0
@@ -81,6 +92,8 @@ class Toast(Component):
     def _rebuild_frame(self) -> None:
         """Rebuild BoxFrame and content lines based on current terminal size."""
         max_inner_w = max(0, self._term_size[0] - 4)
+        max_text_w = max(0, max_inner_w - self._prefix_w)
+        text_fg = self._kind_fg
         line_segments: list[list[Segment]] = [[]]
         for seg in self._segments:
             parts = seg.text.split("\n")
@@ -89,7 +102,12 @@ class Toast(Component):
                     line_segments.append([])
                 if part:
                     line_segments[-1].append(
-                        Segment(part, fg=seg.fg, bg=seg.bg, style_flags=seg.style_flags)
+                        Segment(
+                            part,
+                            fg=seg.fg if seg.fg is not None else text_fg,
+                            bg=seg.bg,
+                            style_flags=seg.style_flags,
+                        )
                     )
         truncated: list[list[Segment]] = []
         inner_w = 0
@@ -98,8 +116,8 @@ class Toast(Component):
             new_line: list[Segment] = []
             for seg in line:
                 seg_w = wcswidth(seg.text)
-                if line_w + seg_w > max_inner_w:
-                    avail = max(0, max_inner_w - line_w)
+                if line_w + seg_w > max_text_w:
+                    avail = max(0, max_text_w - line_w)
                     if avail > 0:
                         truncated_text = truncate_by_width(seg.text, avail)
                         new_line.append(
@@ -115,14 +133,16 @@ class Toast(Component):
                 new_line.append(seg)
                 line_w += seg_w
             truncated.append(new_line)
-            inner_w = max(inner_w, line_w)
+            inner_w = max(inner_w, self._prefix_w + line_w)
 
         self._line_segments = truncated
         inner_h = len(self._line_segments)
 
+        frame_fg = self._kind_fg or palette.DEFAULT_FG
         if self._frame is None:
-            self._frame = BoxFrame(inner_w, inner_h)
+            self._frame = BoxFrame(inner_w, inner_h, fg=frame_fg)
         else:
+            self._frame.fg = frame_fg
             self._frame.set_inner_size(inner_w, inner_h)
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
@@ -218,14 +238,23 @@ class Toast(Component):
         content_row, content_col, cw, _ch = self._frame.content_rect(
             base_row, render_col
         )
+        text_col = content_col + self._prefix_w
+        if self._kind_glyph and content_row < surface.height:
+            surface.draw_text_rgb(
+                content_row,
+                content_col,
+                self._kind_glyph,
+                fg=self._kind_fg,
+                style_flags=self._kind_style,
+            )
         for i, segments in enumerate(self._line_segments):
             row = content_row + i
             if row >= surface.height:
                 break
-            surface.draw_segments(row, content_col, segments)
+            surface.draw_segments(row, text_col, segments)
             line_text = "".join(s.text for s in segments)
             line_w = wcswidth(line_text)
-            pad_col = content_col + line_w
+            pad_col = text_col + line_w
             pad_w = content_col + cw - pad_col
             if pad_w > 0:
                 surface.fill_rect_rgb(row, pad_col, pad_w, 1)

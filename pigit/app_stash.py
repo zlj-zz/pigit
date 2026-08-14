@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from pigit.termui import (
     EVT_GOTO,
     EVT_SELECTION_CHANGED,
+    FeedbackKind,
     bind_keys,
     palette,
     Segment,
@@ -126,10 +127,10 @@ class StashPanel(ItemList):
 
     def _handle_result(self, result) -> None:
         if result.success:
-            show_badge(result.message, duration=1.0)
+            show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
             self._load_stashes()
         else:
-            show_toast(result.message, duration=2.0)
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
     def get_help_title(self) -> str:
         return "Stash"

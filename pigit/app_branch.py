@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from pigit.termui import (
     EventType,
+    FeedbackKind,
     bind_keys,
     bind_signals,
     dismiss_sheet,
@@ -105,9 +106,9 @@ class BranchPanel(ItemList):
 
     def _handle_result(self, result: ActionResult) -> None:
         if result.success:
-            show_badge(result.message, duration=1.0)
+            show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:
-            show_toast(result.message, duration=2.0)
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
         if result.should_refresh:
             self._vm.refresh()
 
@@ -123,6 +124,7 @@ class BranchPanel(ItemList):
             ("n", "New branch"),
             ("r", "Rename"),
             ("d", "Delete"),
+            ("i", "Interactive rebase onto"),
             ("R", f"Scope ({scope_label})"),
         ]
 
@@ -194,7 +196,7 @@ class BranchPanel(ItemList):
         self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
         scope = self._SCOPES[self._scope_idx]
         label = self._SCOPE_LABELS[scope]
-        show_toast(f"Branch scope: {label}", duration=2.0)
+        show_toast(f"Branch scope: {label}", duration=2.0, kind=FeedbackKind.INFO)
         self.curr_no = 0
         self._r_start = 0
         self._vm.set_scope(scope)
@@ -206,10 +208,16 @@ class BranchPanel(ItemList):
                 return
             local_branch = self.branches[self.curr_no]
             if local_branch.is_head:
-                show_toast("Already on this branch.", duration=1.5)
+                show_toast(
+                    "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
+                )
                 return
             if local_branch.is_remote:
-                show_toast("Cannot checkout remote branch directly.", duration=1.5)
+                show_toast(
+                    "Cannot checkout remote branch directly.",
+                    duration=1.5,
+                    kind=FeedbackKind.WARNING,
+                )
                 return
             result = self._vm.checkout(self.curr_no)
             self._handle_result(result)
@@ -222,13 +230,17 @@ class BranchPanel(ItemList):
                 return
             branch = self.branches[self.curr_no]
             if branch.is_remote:
-                show_toast("Cannot rename remote branch.", duration=1.5)
+                show_toast(
+                    "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
+                )
                 return
             self._show_rename_sheet(branch.name)
         elif key == "d":
             self._trigger_delete()
         elif key == "m":
             self._trigger_merge()
+        elif key == "i":
+            self._trigger_rebase()
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""
@@ -236,10 +248,14 @@ class BranchPanel(ItemList):
             return
         branch = self.branches[self.curr_no]
         if branch.is_remote:
-            show_toast("Cannot delete remote branch", duration=2.0)
+            show_toast(
+                "Cannot delete remote branch", duration=2.0, kind=FeedbackKind.WARNING
+            )
             return
         if branch.is_head:
-            show_toast("Cannot delete current branch", duration=1.5)
+            show_toast(
+                "Cannot delete current branch", duration=1.5, kind=FeedbackKind.WARNING
+            )
             return
         text = f"Delete branch '{branch.name}' ?"
 
@@ -249,7 +265,7 @@ class BranchPanel(ItemList):
             result = self._vm.delete_branch(self.curr_no)
             self._handle_result(result)
 
-        self._alert_dialog.alert(text, on_result)
+        self._alert_dialog.alert(text, on_result, kind=FeedbackKind.ERROR)
 
     def _trigger_merge(self) -> None:
         """Validate constraints and emit merge request via callback."""
@@ -257,14 +273,18 @@ class BranchPanel(ItemList):
             return
         branch = self.branches[self.curr_no]
         if branch.is_remote:
-            show_toast("Cannot merge into remote branch", duration=2.0)
+            show_toast(
+                "Cannot merge into remote branch", duration=2.0, kind=FeedbackKind.WARNING
+            )
             return
         if branch.is_head:
-            show_toast("Already on this branch", duration=1.5)
+            show_toast(
+                "Already on this branch", duration=1.5, kind=FeedbackKind.WARNING
+            )
             return
         ok, msg = self._vm.can_merge()
         if not ok:
-            show_toast(msg, duration=2.0)
+            show_toast(msg, duration=2.0, kind=FeedbackKind.WARNING)
             return
         source = self._vm.current_branch()
         target = branch.name
@@ -274,6 +294,22 @@ class BranchPanel(ItemList):
             source=source,
             target=target,
         )
+
+    def _trigger_rebase(self) -> None:
+        """Validate and emit an interactive-rebase request for the selected branch."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_head:
+            show_toast(
+                "Already on this branch", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        ok, msg = self._vm.can_rebase()
+        if not ok:
+            show_toast(msg, duration=2.0, kind=FeedbackKind.WARNING)
+            return
+        self.emit(EventType("action_requested"), cmd="rebase", target=branch.name)
 
     def _show_new_branch_sheet(self) -> None:
         self._new_branch_input.clear()

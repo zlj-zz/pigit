@@ -143,38 +143,6 @@ def working_tree_reset_hard(args: list[str]) -> str:
     return "git reset --hard HEAD"
 
 
-@command(
-    short="w.stash",
-    category=CommandCategory.WORKING_TREE,
-    help="Stash changes.",
-    has_args=True,
-    examples=["pigit cmd w.stash", "pigit cmd w.stash push -m 'WIP'"],
-    related=["s", "w"],
-)
-def working_tree_stash(args: list[str]) -> str:
-    """Stash changes."""
-    base = "git stash"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
-@command(
-    short="w.check",
-    category=CommandCategory.WORKING_TREE,
-    help="Check for whitespace errors.",
-    has_args=True,
-    examples=["pigit cmd w.check"],
-    related=["w"],
-)
-def working_tree_check(args: list[str]) -> str:
-    """Check whitespace."""
-    base = "git diff --check"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
 # Aliases
 alias("ws", "w.s")
 alias("wS", "w.S")

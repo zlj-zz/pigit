@@ -31,7 +31,7 @@ def branch_list(args: list[str]) -> str:
     help="Create a new branch.",
     has_args=True,
     examples=["pigit cmd b.c feature-branch", "pigit cmd b.c hotfix/123 main"],
-    related=["b", "b.o"],
+    related=["b", "b.co"],
 )
 def branch_create(args: list[str]) -> str:
     """Create a new branch."""
@@ -138,12 +138,12 @@ def branch_all(args: list[str]) -> str:
 
 
 @command(
-    short="b.o",
+    short="b.co",
     category=CommandCategory.BRANCH,
     help="Checkout (switch to) a branch.",
     has_args=True,
     arg_completion=[CompletionType.BRANCH],
-    examples=["pigit cmd b.o main", "pigit cmd b.o -b new-branch"],
+    examples=["pigit cmd b.co main", "pigit cmd b.co -b new-branch"],
     related=["b.c", "b"],
 )
 def branch_checkout(args: list[str]) -> str:
@@ -161,4 +161,4 @@ alias("bm", "b.m")
 alias("bM", "b.M")
 alias("bl", "b.v")
 alias("bL", "b.a")
-alias("co", "b.o")
+alias("co", "b.co")

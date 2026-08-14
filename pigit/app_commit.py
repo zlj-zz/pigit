@@ -16,6 +16,7 @@ from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui._async_task import run_async
 from pigit.termui import (
     EVT_GOTO,
+    FeedbackKind,
     bind_keys,
     bind_signals,
     keys,
@@ -189,9 +190,13 @@ class CommitPanel(ItemList):
         run_async(
             lambda: copy_to_clipboard(commit.sha),
             lambda ok, sha=commit.sha: (
-                show_toast(f"Copied {sha[:7]}", duration=1.5)
+                show_toast(f"Copied {sha[:7]}", duration=1.5, kind=FeedbackKind.SUCCESS)
                 if ok
-                else show_toast("Failed to copy to clipboard", duration=2.0)
+                else show_toast(
+                    "Failed to copy to clipboard",
+                    duration=2.0,
+                    kind=FeedbackKind.ERROR,
+                )
             ),
         )
 
@@ -295,9 +300,9 @@ class CommitPanel(ItemList):
 
     def _handle_result(self, result: ActionResult) -> None:
         if result.success:
-            show_badge(result.message, duration=1.0)
+            show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:
-            show_toast(result.message, duration=2.0)
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
         if result.should_refresh:
             self._vm.refresh()
 

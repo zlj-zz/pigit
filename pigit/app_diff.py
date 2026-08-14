@@ -19,6 +19,7 @@ import tempfile
 
 from pigit.termui import (
     EventType,
+    FeedbackKind,
     EVT_GOTO,
     AlertDialog,
     Component,
@@ -815,11 +816,15 @@ class DiffViewer(LineTextBrowser):
             self._exit_file_history()
             return
         if self._diff_type is not DiffType.COMMIT:
-            show_toast("File history only available for commit diffs", duration=1.5)
+            show_toast(
+                "File history only available for commit diffs",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
             return
         path = self._current_file_path()
         if not path:
-            show_toast("No file at current position", duration=1.5)
+            show_toast("No file at current position", duration=1.5, kind=FeedbackKind.WARNING)
             return
         self._enter_file_history(path)
 
@@ -976,7 +981,7 @@ class DiffViewer(LineTextBrowser):
         if self._diff_type is DiffType.COMMIT:
             return
         if not self._hunks:
-            show_toast("No hunks available", duration=1.5)
+            show_toast("No hunks available", duration=1.5, kind=FeedbackKind.WARNING)
             return
         self._hunk_mode = not self._hunk_mode
         if self._hunk_mode:
@@ -998,7 +1003,9 @@ class DiffViewer(LineTextBrowser):
 
     def _run_hunk_action(self, action: str, *, needs_confirm: bool = False) -> None:
         if not self._hunks or self._diff_type is DiffType.COMMIT:
-            show_toast("Not available for commit diffs", duration=1.5)
+            show_toast(
+                "Not available for commit diffs", duration=1.5, kind=FeedbackKind.WARNING
+            )
             return
         patch = self._extract_hunk_patch(self._hunk_index)
         if needs_confirm:
@@ -1007,7 +1014,9 @@ class DiffViewer(LineTextBrowser):
                 if confirmed:
                     self._apply_patch(patch, action=action)
 
-            self._alert_dialog.alert("Discard hunk?", on_confirm)
+            self._alert_dialog.alert(
+                "Discard hunk?", on_confirm, kind=FeedbackKind.ERROR
+            )
         else:
             self._apply_patch(patch, action=action)
 
@@ -1054,7 +1063,7 @@ class DiffViewer(LineTextBrowser):
     def _apply_patch(self, patch: str, action: str) -> None:
         """Apply or reverse-apply a patch in background thread."""
         if not self._repo_path:
-            show_toast("No repo path available", duration=2.0)
+            show_toast("No repo path available", duration=2.0, kind=FeedbackKind.WARNING)
             return
 
         suffix = "_stage.patch" if action == "stage" else "_discard.patch"
@@ -1098,9 +1107,11 @@ class DiffViewer(LineTextBrowser):
                 return
 
             if returncode == 0:
-                show_badge(msg, duration=1.0)
+                show_badge(msg, duration=1.0, kind=FeedbackKind.SUCCESS)
             else:
-                show_toast(f"Failed: {stderr[:100]}", duration=2.0)
+                show_toast(
+                    f"Failed: {stderr[:100]}", duration=2.0, kind=FeedbackKind.ERROR
+                )
 
         self._patch_task.start(_work, _callback)
 

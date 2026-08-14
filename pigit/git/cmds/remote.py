@@ -18,7 +18,7 @@ from ._completion_types import CompletionType
     help="Manage remote repositories.",
     has_args=True,
     examples=["pigit cmd r", "pigit cmd r -v"],
-    related=["r.v", "r.a", "r.u"],
+    related=["r.a", "r.u"],
 )
 def remote(args: list[str]) -> str:
     """Manage remotes."""
@@ -26,18 +26,6 @@ def remote(args: list[str]) -> str:
     if args:
         return f"{base} {' '.join(args)}"
     return base
-
-
-@command(
-    short="r.v",
-    category=CommandCategory.REMOTE,
-    help="Show remote URLs.",
-    examples=["pigit cmd r.v", "pigit cmd r.v -v"],
-    related=["r", "r.s"],
-)
-def remote_verbose(args: list[str]) -> str:
-    """Show remotes with URLs."""
-    return "git remote -v"
 
 
 @command(
@@ -114,7 +102,7 @@ def remote_update(args: list[str]) -> str:
     has_args=True,
     arg_completion=[CompletionType.REMOTE],
     examples=["pigit cmd r.s origin"],
-    related=["r", "r.v"],
+    related=["r"],
 )
 def remote_show(args: list[str]) -> str:
     """Show remote info."""
@@ -145,7 +133,6 @@ def remote_prune(args: list[str]) -> str:
 
 
 # Aliases
-alias("rv", "r.v")
 alias("ra", "r.a")
 alias("rrm", "r.rm")
 alias("rrn", "r.rn")
