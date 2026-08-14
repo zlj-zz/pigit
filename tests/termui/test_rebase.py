@@ -27,7 +27,9 @@ def _commit(sha: str, parents: tuple[str, ...] = ()) -> Commit:
     )
 
 
-def _panel(commits: list[Commit], in_progress: bool = False) -> tuple[RebasePanel, MagicMock]:
+def _panel(
+    commits: list[Commit], in_progress: bool = False
+) -> tuple[RebasePanel, MagicMock]:
     git = MagicMock()
     git.list_commits_in_range.return_value = commits
     git.is_rebase_in_progress.return_value = in_progress
@@ -107,6 +109,19 @@ class TestRebasePanel:
         panel._move_down()
         assert panel._items[0].action == "pick"
         assert panel._items[1].action == "squash"
+
+    def test_validate_squash_after_drop(self):
+        panel, _ = _panel([_commit("a1"), _commit("b1")])
+        panel.activate()
+        panel._items[0].action = "drop"
+        panel._items[1].action = "squash"
+        assert panel._validate() is not None
+
+    def test_validate_ok(self):
+        panel, _ = _panel([_commit("a1"), _commit("b1")])
+        panel.activate()
+        panel._items[1].action = "squash"
+        assert panel._validate() is None
 
     def test_set_drop(self):
         panel, _ = _panel([_commit("a1")])

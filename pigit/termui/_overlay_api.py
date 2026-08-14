@@ -75,7 +75,9 @@ def exec_external(
 
     session.suspend()
     try:
-        result = subprocess.run(cmd, cwd=cwd, env=env, stdin=None, stdout=None, stderr=None)
+        result = subprocess.run(
+            cmd, cwd=cwd, env=env, stdin=None, stdout=None, stderr=None
+        )
     finally:
         resume_error = None
         try:

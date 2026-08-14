@@ -149,3 +149,19 @@ def test_can_merge_blocked(branch_vm):
     ok, msg = branch_vm.can_merge()
     assert ok is False
     assert "Uncommitted changes" in msg
+
+
+def test_can_rebase_ok(branch_vm):
+    branch_vm._git.has_staged_changes.return_value = False
+    branch_vm._git.has_unstaged_changes.return_value = False
+    ok, msg = branch_vm.can_rebase()
+    assert ok is True
+    assert msg == ""
+
+
+def test_can_rebase_blocked_by_unstaged(branch_vm):
+    branch_vm._git.has_staged_changes.return_value = False
+    branch_vm._git.has_unstaged_changes.return_value = True
+    ok, msg = branch_vm.can_rebase()
+    assert ok is False
+    assert "Uncommitted changes" in msg

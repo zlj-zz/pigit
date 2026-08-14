@@ -617,6 +617,9 @@ class PigitApplication(Application):
             return
         if lower == "continue-merge":
             self._continue_merge()
+            return
+        if lower in ("rebase-continue", "rebase-abort", "rebase-skip"):
+            self._run_rebase_control(lower)
 
     def _run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""
@@ -629,6 +632,38 @@ class PigitApplication(Application):
                 show_toast(f"Git {action} failed: {stderr}", duration=3.0)
         except Exception as e:
             show_toast(f"Git {action} error: {e}", duration=3.0)
+
+    def _run_rebase_control(self, action: str) -> None:
+        """Run a rebase control flag (--continue/--abort/--skip)."""
+        flag = action[len("rebase-") :]
+        if flag == "abort":
+
+            def on_confirm(confirmed: bool) -> None:
+                if confirmed:
+                    self._do_rebase_control(flag)
+
+            self._alert_dialog.alert(
+                "Abort rebase? All progress will be lost.", on_confirm
+            )
+            return
+        self._do_rebase_control(flag)
+
+    def _do_rebase_control(self, flag: str) -> None:
+        """Execute ``git rebase --<flag>`` via exec_external and refresh panels."""
+        try:
+            result = exec_external(["git", "rebase", f"--{flag}"], cwd=self._repo_path)
+        except Exception as e:
+            show_toast(f"Rebase {flag} error: {e}", duration=3.0)
+            return
+        if result.returncode == 0:
+            show_toast(f"Rebase {flag} completed", duration=1.5)
+            # Refresh the VMs directly: _refresh_active_panel() early-returns
+            # while the command-palette overlay is still open.
+            self._branch_vm.refresh()
+            self._commit_vm.refresh()
+            self._status_vm.refresh()
+        else:
+            show_toast(f"Rebase {flag} failed", duration=3.0)
 
     def _merge_state_path(self) -> str:
         """Return the path to the persistent merge state file."""

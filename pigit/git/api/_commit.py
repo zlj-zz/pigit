@@ -15,6 +15,7 @@ from pigit.ext.executor import REPLY, DECODE
 
 from ..model import Commit
 from ._base import _OpsBase
+from ._errors import GitError
 from ._util import _RE_COMMIT_TAG
 
 # Default pretty format for git log output (shared with the facade).
@@ -149,7 +150,9 @@ class _CommitOps(_OpsBase):
             f'git log --reverse --topo-order --pretty=format:"%H|%P|%s" '
             f"{shlex.quote(base)}..HEAD"
         )
-        _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
+        code, err, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
+        if code != 0:
+            raise GitError(err or f"git log failed for {base}")
         commits: list[Commit] = []
         if not resp:
             return commits

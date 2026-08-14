@@ -163,6 +163,9 @@ class GitApi:
     def has_staged_changes(self, path=None):
         return self._status.has_staged_changes(path)
 
+    def has_unstaged_changes(self, path=None):
+        return self._status.has_unstaged_changes(path)
+
     # ── _stash ──
     def load_stashes(self, path=None):
         return self._stash.load_stashes(path)

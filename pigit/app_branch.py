@@ -286,6 +286,10 @@ class BranchPanel(ItemList):
         if branch.is_head:
             show_toast("Already on this branch", duration=1.5)
             return
+        ok, msg = self._vm.can_rebase()
+        if not ok:
+            show_toast(msg, duration=2.0)
+            return
         self.emit(EventType("action_requested"), cmd="rebase", target=branch.name)
 
     def _show_new_branch_sheet(self) -> None:

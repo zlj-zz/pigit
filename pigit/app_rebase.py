@@ -27,6 +27,8 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
+from .git.api import GitError
+
 if TYPE_CHECKING:
     from pigit.git.api import GitApi
 
@@ -99,7 +101,12 @@ class RebasePanel(ItemList):
             show_toast("A rebase or merge is already in progress", duration=2.0)
             self._on_done()
             return
-        commits = self._git.list_commits_in_range(self._base)
+        try:
+            commits = self._git.list_commits_in_range(self._base)
+        except GitError as e:
+            show_toast(f"Rebase range error: {e}", duration=2.0)
+            self._on_done()
+            return
         if not commits:
             show_toast("No commits to rebase", duration=2.0)
             self._on_done()
@@ -112,9 +119,11 @@ class RebasePanel(ItemList):
         self.set_content([self._display(item) for item in self._items])
 
     def _display(self, item: _TodoItem) -> str:
+        """Return the plain-text form of an item (used as ItemList content)."""
         return f"{item.action} {item.sha[:8]} {item.subject}"
 
     def on_key(self, key: str) -> None:
+        """Handle navigation, action, reorder, confirm, and cancel keys."""
         if key == keys.KEY_ESC:
             self._on_done()
             return
@@ -144,6 +153,7 @@ class RebasePanel(ItemList):
         item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
+        """Render one todo row: cursor, colored action, short sha + subject."""
         item = self._items[idx]
         left = [
             Segment(self.CURSOR if is_cursor else " ", fg=THEME.fg_primary),
@@ -155,6 +165,7 @@ class RebasePanel(ItemList):
         return left, main, []
 
     def get_help_entries(self) -> list[tuple[str, str]]:
+        """Return the panel keybindings."""
         return [
             ("jk/↑↓", "Navigate"),
             ("p/s/f/d/r/e", "pick/squash/fixup/drop/reword/edit"),
@@ -198,6 +209,7 @@ class RebasePanel(ItemList):
     # ── editing ──
 
     def _set_action(self, key: str) -> None:
+        """Set the current row's action, rejecting squash/fixup on the first row."""
         idx = self.curr_no
         action = _ACTION_BY_KEY[key]
         if action in _MERGE_ACTIONS and idx == 0:
@@ -207,6 +219,7 @@ class RebasePanel(ItemList):
         request_render()
 
     def _move_up(self) -> None:
+        """Move the current row up, rejecting moves that put squash/fixup first."""
         idx = self.curr_no
         if idx == 0:
             return
@@ -217,6 +230,7 @@ class RebasePanel(ItemList):
         self.curr_no = idx - 1
 
     def _move_down(self) -> None:
+        """Move the current row down, rejecting moves that put squash/fixup first."""
         idx = self.curr_no
         if idx >= len(self._items) - 1:
             return
@@ -229,18 +243,41 @@ class RebasePanel(ItemList):
     # ── execute ──
 
     def _confirm(self) -> None:
+        """Validate the todo and ask for confirmation before executing."""
+        error = self._validate()
+        if error is not None:
+            show_toast(error, duration=2.0)
+            return
         n = len(self._items)
         self._alert.alert(
             f"Rewrite {n} commits? This rewrites history.",
             self._on_confirm_result,
         )
 
+    def _validate(self) -> str | None:
+        """Return an error message if the todo is invalid, otherwise None.
+
+        squash/fixup merge into the previous commit, so they cannot be first
+        nor follow a dropped commit.
+        """
+        prev_action: str | None = None
+        for item in self._items:
+            if item.action in _MERGE_ACTIONS:
+                if prev_action is None or prev_action == "drop":
+                    return "squash/fixup needs a non-dropped commit above it"
+            prev_action = item.action
+        return None
+
     def _on_confirm_result(self, confirmed: bool) -> None:
+        """Execute the rebase when the user confirms."""
         if confirmed:
             self._execute()
 
     def _execute(self) -> None:
-        todo_lines = [f"{item.action} {item.sha} {item.subject}" for item in self._items]
+        """Write the todo and run the rebase; always dismiss on completion."""
+        todo_lines = [
+            f"{item.action} {item.sha} {item.subject}" for item in self._items
+        ]
         tmp = tempfile.NamedTemporaryFile("w", suffix=".todo", delete=False)
         tmp.write("\n".join(todo_lines))
         tmp.close()
@@ -248,15 +285,22 @@ class RebasePanel(ItemList):
             result = exec_external(
                 ["git", "rebase", "-i", self._base],
                 cwd=self._git.path,
-                env={**os.environ, "GIT_SEQUENCE_EDITOR": f"cp {shlex.quote(tmp.name)}"},
+                env={
+                    **os.environ,
+                    "GIT_SEQUENCE_EDITOR": f"cp {shlex.quote(tmp.name)}",
+                },
             )
+            if self._git.is_rebase_in_progress():
+                show_toast(
+                    "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
+                    duration=3.0,
+                )
+            elif result.returncode != 0:
+                show_toast("Rebase failed", duration=2.0)
+            else:
+                show_badge("Rebase complete", duration=1.5)
+        except Exception as e:
+            show_toast(f"Rebase error: {e}", duration=3.0)
         finally:
             os.unlink(tmp.name)
-
-        if self._git.is_rebase_in_progress():
-            show_toast("Rebase paused. Resolve, then rb.c / rb.a / rb.s", duration=3.0)
-        elif result.returncode != 0:
-            show_toast("Rebase failed", duration=2.0)
-        else:
-            show_badge("Rebase complete", duration=1.5)
-        self._on_done()
+            self._on_done()

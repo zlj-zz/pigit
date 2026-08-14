@@ -145,3 +145,15 @@ class _StatusOps(_OpsBase):
         if code == 1:
             return True
         raise RepoError(f"git diff --cached failed with exit code {code}")
+
+    def has_unstaged_changes(self, path: str | None = None) -> bool:
+        """Return True if the working tree has unstaged changes."""
+        path = path or self.path
+        code, _, _ = self.executor.exec(
+            "git diff --quiet", flags=REPLY | SILENT, cwd=path
+        )
+        if code == 0:
+            return False
+        if code == 1:
+            return True
+        raise RepoError(f"git diff failed with exit code {code}")

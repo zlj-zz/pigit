@@ -134,3 +134,22 @@ class TestListCommitsInRange:
     def test_empty_output_returns_empty(self):
         git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
         assert git.list_commits_in_range("main") == []
+
+    def test_failed_command_raises(self):
+        git = GitApi(
+            executor=MockExecutor(default=(1, "fatal: bad revision", "")), path="/repo"
+        )
+        with pytest.raises(GitError):
+            git.list_commits_in_range("nonexistent")
+
+
+class TestUnstagedChanges:
+    def test_has_unstaged_changes_true(self):
+        ex = MockExecutor(responses={"git diff --quiet": (1, "", "")})
+        git = GitApi(executor=ex, path="/repo")
+        assert git.has_unstaged_changes() is True
+
+    def test_has_unstaged_changes_false(self):
+        ex = MockExecutor(responses={"git diff --quiet": (0, "", "")})
+        git = GitApi(executor=ex, path="/repo")
+        assert git.has_unstaged_changes() is False

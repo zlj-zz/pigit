@@ -32,6 +32,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def get_inspector_data(self, idx: int) -> BranchInfo | None: ...
     def current_branch(self) -> str: ...
     def can_merge(self) -> tuple[bool, str]: ...
+    def can_rebase(self) -> tuple[bool, str]: ...
 
 
 class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
@@ -171,6 +172,14 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
     def can_merge(self) -> tuple[bool, str]:
         try:
             if self._git.has_staged_changes():
+                return False, "Uncommitted changes, stash or commit first"
+        except Exception:
+            pass
+        return True, ""
+
+    def can_rebase(self) -> tuple[bool, str]:
+        try:
+            if self._git.has_staged_changes() or self._git.has_unstaged_changes():
                 return False, "Uncommitted changes, stash or commit first"
         except Exception:
             pass
