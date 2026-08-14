@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pigit.termui import (
     EventType,
     EVT_SELECTION_CHANGED,
+    FeedbackKind,
     AlertDialog,
     Application,
     Component,
@@ -380,12 +381,14 @@ class PigitApplication(Application):
                 "Failed to load repo info. Check git configuration.",
                 duration=3.0,
                 position=ToastPosition.BOTTOM_LEFT,
+                kind=FeedbackKind.ERROR,
             )
 
         show_toast(
             "Welcome to Pigit! Press ? for help.",
             duration=3.0,
             position=ToastPosition.BOTTOM_LEFT,
+            kind=FeedbackKind.INFO,
         )
         self._try_restore_merge_state()
 
@@ -551,10 +554,10 @@ class PigitApplication(Application):
         """Reverse the most recent session action."""
         result = self._session_history.reverse(self._git)
         if result.success:
-            show_badge(result.message, duration=1.5)
+            show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
             self._refresh_active_panel()
         else:
-            show_toast(result.message, duration=2.0)
+            show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
     def open_recent_actions(self) -> None:
         """Open the RecentActionsPanel sheet overlay."""
@@ -626,12 +629,18 @@ class PigitApplication(Application):
         try:
             result = exec_external(["git", action], cwd=self._repo_path)
             if result.returncode == 0:
-                show_toast(f"Git {action} completed", duration=1.5)
+                show_toast(
+                    f"Git {action} completed", duration=1.5, kind=FeedbackKind.SUCCESS
+                )
             else:
                 stderr = result.stderr.strip() if result.stderr else "Unknown error"
-                show_toast(f"Git {action} failed: {stderr}", duration=3.0)
+                show_toast(
+                    f"Git {action} failed: {stderr}",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
         except Exception as e:
-            show_toast(f"Git {action} error: {e}", duration=3.0)
+            show_toast(f"Git {action} error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
 
     def _run_rebase_control(self, action: str) -> None:
         """Run a rebase control flag (--continue/--abort/--skip)."""
@@ -643,7 +652,9 @@ class PigitApplication(Application):
                     self._do_rebase_control(flag)
 
             self._alert_dialog.alert(
-                "Abort rebase? All progress will be lost.", on_confirm
+                "Abort rebase? All progress will be lost.",
+                on_confirm,
+                kind=FeedbackKind.ERROR,
             )
             return
         self._do_rebase_control(flag)
@@ -653,17 +664,19 @@ class PigitApplication(Application):
         try:
             result = exec_external(["git", "rebase", f"--{flag}"], cwd=self._repo_path)
         except Exception as e:
-            show_toast(f"Rebase {flag} error: {e}", duration=3.0)
+            show_toast(f"Rebase {flag} error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
             return
         if result.returncode == 0:
-            show_toast(f"Rebase {flag} completed", duration=1.5)
+            show_toast(
+                f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
+            )
             # Refresh the VMs directly: _refresh_active_panel() early-returns
             # while the command-palette overlay is still open.
             self._branch_vm.refresh()
             self._commit_vm.refresh()
             self._status_vm.refresh()
         else:
-            show_toast(f"Rebase {flag} failed", duration=3.0)
+            show_toast(f"Rebase {flag} failed", duration=3.0, kind=FeedbackKind.ERROR)
 
     def _merge_state_path(self) -> str:
         """Return the path to the persistent merge state file."""
@@ -708,6 +721,7 @@ class PigitApplication(Application):
             show_toast(
                 f"Resume merge: {state['source']} \u2192 {state['target']} (continue-merge)",
                 duration=3.0,
+                kind=FeedbackKind.INFO,
             )
         else:
             self._clear_merge_state()
@@ -731,10 +745,11 @@ class PigitApplication(Application):
                     show_toast(
                         "Conflict! Resolve in Status, then continue-merge",
                         duration=3.0,
+                        kind=FeedbackKind.WARNING,
                     )
                     self._tab_view.route_to("status")
                     return
-                show_toast(f"Merge failed: {e}", duration=3.0)
+                show_toast(f"Merge failed: {e}", duration=3.0, kind=FeedbackKind.ERROR)
                 return
             except Exception:
                 hide_spinner()
@@ -788,14 +803,16 @@ class PigitApplication(Application):
             try:
                 self._git.checkout_branch(source)
             except GitError as e:
-                show_toast(f"Checkout back failed: {e}", duration=3.0)
+                show_toast(
+                    f"Checkout back failed: {e}", duration=3.0, kind=FeedbackKind.ERROR
+                )
                 return
             self._merge_state = None
             self._header_state.merge_target = ""
             self._clear_merge_state()
             self._tab_view.route_to("branch")
             self._branch_panel.refresh()
-            show_toast(f"Merged into {target}", duration=2.0)
+            show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
 
         self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)
 
@@ -803,7 +820,7 @@ class PigitApplication(Application):
         """Resume a pending merge after conflicts have been resolved."""
         state = self._merge_state
         if not state:
-            show_toast("No pending merge", duration=2.0)
+            show_toast("No pending merge", duration=2.0, kind=FeedbackKind.WARNING)
             return
 
         target = state["target"]
@@ -818,9 +835,14 @@ class PigitApplication(Application):
                     show_toast(
                         "Unresolved conflicts remain. Fix in Status, then retry.",
                         duration=3.0,
+                        kind=FeedbackKind.WARNING,
                     )
                 else:
-                    show_toast(f"Merge commit failed: {e}", duration=3.0)
+                    show_toast(
+                        f"Merge commit failed: {e}",
+                        duration=3.0,
+                        kind=FeedbackKind.ERROR,
+                    )
                 return
 
         self._confirm_push_and_finish(target, source)

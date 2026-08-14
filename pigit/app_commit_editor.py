@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.app_theme import THEME
-from pigit.termui import keys, show_toast
+from pigit.termui import FeedbackKind, keys, show_toast
 from pigit.termui._component import Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.widgets import InputLine, LintBar
@@ -188,12 +188,12 @@ class CommitEditor(Component):
         subject = self._subject.value.strip()
         body = self._body.value.strip()
         if not subject:
-            show_toast("Subject is required", duration=1.5)
+            show_toast("Subject is required", duration=1.5, kind=FeedbackKind.WARNING)
             return
         message = subject + ("\n\n" + body if body else "")
         lint = self._lint_check(subject, body)
         if lint:
-            show_toast(lint, duration=1.5)
+            show_toast(lint, duration=1.5, kind=FeedbackKind.WARNING)
             return
         self._on_submit(message)
 

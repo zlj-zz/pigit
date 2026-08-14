@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pigit.app_theme import THEME
 from pigit.termui import (
     Segment,
+    FeedbackKind,
     exec_external,
     keys,
     palette,
@@ -98,21 +99,29 @@ class RebasePanel(ItemList):
     def activate(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
         if self._git.is_rebase_in_progress() or self._git.is_merge_in_progress():
-            show_toast("A rebase or merge is already in progress", duration=2.0)
+            show_toast(
+                "A rebase or merge is already in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
             self._on_done()
             return
         try:
             commits = self._git.list_commits_in_range(self._base)
         except GitError as e:
-            show_toast(f"Rebase range error: {e}", duration=2.0)
+            show_toast(f"Rebase range error: {e}", duration=2.0, kind=FeedbackKind.ERROR)
             self._on_done()
             return
         if not commits:
-            show_toast("No commits to rebase", duration=2.0)
+            show_toast("No commits to rebase", duration=2.0, kind=FeedbackKind.WARNING)
             self._on_done()
             return
         if any(c.is_merge for c in commits):
-            show_toast("Range contains merges (unsupported)", duration=2.0)
+            show_toast(
+                "Range contains merges (unsupported)",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
             self._on_done()
             return
         self._items = [_TodoItem(c.sha, c.msg) for c in commits]
@@ -213,7 +222,11 @@ class RebasePanel(ItemList):
         idx = self.curr_no
         action = _ACTION_BY_KEY[key]
         if action in _MERGE_ACTIONS and idx == 0:
-            show_toast("Cannot squash/fixup the first commit", duration=1.5)
+            show_toast(
+                "Cannot squash/fixup the first commit",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
             return
         self._items[idx].action = action
         request_render()
@@ -224,7 +237,11 @@ class RebasePanel(ItemList):
         if idx == 0:
             return
         if idx == 1 and self._items[idx].action in _MERGE_ACTIONS:
-            show_toast("Cannot move squash/fixup to the top", duration=1.5)
+            show_toast(
+                "Cannot move squash/fixup to the top",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
             return
         self._items[idx], self._items[idx - 1] = self._items[idx - 1], self._items[idx]
         self.curr_no = idx - 1
@@ -235,7 +252,11 @@ class RebasePanel(ItemList):
         if idx >= len(self._items) - 1:
             return
         if idx == 0 and self._items[idx + 1].action in _MERGE_ACTIONS:
-            show_toast("Cannot move squash/fixup to the top", duration=1.5)
+            show_toast(
+                "Cannot move squash/fixup to the top",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
             return
         self._items[idx], self._items[idx + 1] = self._items[idx + 1], self._items[idx]
         self.curr_no = idx + 1
@@ -246,12 +267,13 @@ class RebasePanel(ItemList):
         """Validate the todo and ask for confirmation before executing."""
         error = self._validate()
         if error is not None:
-            show_toast(error, duration=2.0)
+            show_toast(error, duration=2.0, kind=FeedbackKind.WARNING)
             return
         n = len(self._items)
         self._alert.alert(
             f"Rewrite {n} commits? This rewrites history.",
             self._on_confirm_result,
+            kind=FeedbackKind.ERROR,
         )
 
     def _validate(self) -> str | None:
@@ -294,13 +316,14 @@ class RebasePanel(ItemList):
                 show_toast(
                     "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
                     duration=3.0,
+                    kind=FeedbackKind.WARNING,
                 )
             elif result.returncode != 0:
-                show_toast("Rebase failed", duration=2.0)
+                show_toast("Rebase failed", duration=2.0, kind=FeedbackKind.ERROR)
             else:
-                show_badge("Rebase complete", duration=1.5)
+                show_badge("Rebase complete", duration=1.5, kind=FeedbackKind.SUCCESS)
         except Exception as e:
-            show_toast(f"Rebase error: {e}", duration=3.0)
+            show_toast(f"Rebase error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
         finally:
             os.unlink(tmp.name)
             self._on_done()

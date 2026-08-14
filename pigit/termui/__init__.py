@@ -17,6 +17,7 @@ from .types import (
     OverlayDispatchResult,
     ToastPosition,
 )
+from ._feedback import FeedbackKind
 
 # Core components
 from ._component import Component, ComponentError, bind_signals
@@ -79,6 +80,7 @@ __all__ = [
     "LayerKind",
     "OverlayDispatchResult",
     "ToastPosition",
+    "FeedbackKind",
     # Core
     "Component",
     "ComponentError",

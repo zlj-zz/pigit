@@ -12,7 +12,7 @@ from collections.abc import Callable
 
 from pigit.app_theme import THEME
 from pigit.ext.utils import relative_time
-from pigit.termui import Segment, keys
+from pigit.termui import FeedbackKind, Segment, keys
 from pigit.termui.widgets import ItemList
 
 if TYPE_CHECKING:
@@ -55,11 +55,11 @@ class RecentActionsPanel(ItemList):
             if result.success:
                 from pigit.termui import show_badge
 
-                show_badge(result.message, duration=1.5)
+                show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
             else:
                 from pigit.termui import show_toast
 
-                show_toast(result.message, duration=2.0)
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
             self._on_done()
             return
         # Delegate navigation to parent ItemList

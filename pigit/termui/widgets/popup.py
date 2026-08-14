@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from .. import _runtime_context, keys, palette
 from .._bindings import resolve_key_handlers_merged
+from .._feedback import FeedbackKind
 from .._component import Component
 from .._frame import BoxFrame
 from .._mouse import MouseButton, MouseEvent, MouseKind
@@ -241,10 +242,21 @@ class AlertDialogBody(Component):
             return
         self.open = True
 
-    def prepare(self, message: str, on_result: Callable[[bool], None]) -> None:
-        """Configure message and callback, then open the alert."""
+    def prepare(
+        self,
+        message: str,
+        on_result: Callable[[bool], None],
+        kind: FeedbackKind | None = None,
+    ) -> None:
+        """Configure message and callback, then open the alert.
+
+        ``kind`` tints the border: ``ERROR`` -> danger red, anything else ->
+        the default neutral border."""
         self._message = sanitize_for_display(message)
         self._on_result = on_result
+        self._frame.fg = (
+            palette.RED if kind is FeedbackKind.ERROR else palette.DEFAULT_FG
+        )
         self.open_alert()
         self._needs_rebuild = True
 
@@ -319,7 +331,7 @@ class AlertDialogBody(Component):
                 cr + i,
                 cc,
                 text,
-                fg=self._frame.fg,
+                fg=palette.DEFAULT_FG,
                 bg=self._frame.bg,
                 style_flags=self._frame.style_flags,
             )
@@ -395,16 +407,26 @@ class AlertDialog(Popup):
     def _on_exit_key(self) -> None:
         self._finish_alert(False)
 
-    def alert(self, message: str, on_result: Callable[[bool], None]) -> bool:
+    def alert(
+        self,
+        message: str,
+        on_result: Callable[[bool], None],
+        kind: FeedbackKind | None = None,
+    ) -> bool:
         """
         Prepare content, show this popup, and register the overlay host alert session.
+
+        Args:
+            message: Confirmation prompt.
+            on_result: Callback receiving the user's True/False choice.
+            kind: Optional semantic level; ``ERROR`` renders a danger-red border.
 
         Returns:
             True if the dialog was shown; False if another modal is already open.
         """
         if _runtime_context.is_modal_open():
             return False
-        self._pane.prepare(message, on_result)
+        self._pane.prepare(message, on_result, kind)
         self.relayout_content()
         self.show()
         self.begin_session()

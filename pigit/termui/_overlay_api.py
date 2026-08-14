@@ -15,6 +15,7 @@ from collections.abc import Callable, Sequence
 
 _R = TypeVar("_R")
 
+from ._feedback import FeedbackKind, style_for
 from ._layer import LayerKind
 from .reactive import Signal
 from .types import ToastPosition
@@ -99,8 +100,13 @@ def show_toast(
     segments: Sequence[Segment] | None = None,
     duration: float = 2.0,
     position: ToastPosition | None = None,
+    kind: FeedbackKind | None = None,
 ) -> Toast | None:
-    """Display a transient toast notification via the current overlay host."""
+    """Display a transient toast notification via the current overlay host.
+
+    ``kind`` selects the semantic level (info/success/warning/error); ``None``
+    is the neutral level with no glyph or semantic color. ``segments``, when
+    given, overrides ``kind`` (the glyph/color are skipped)."""
     from .widgets import Toast
 
     host = get_overlay_host()
@@ -116,7 +122,13 @@ def show_toast(
     if position is None:
         position = ToastPosition.TOP_RIGHT
 
-    toast = Toast(message, segments=segments, duration=duration, position=position)
+    # segments (e.g. show_spinner) render verbatim; suppress kind glyph/color.
+    if segments is not None:
+        kind = None
+
+    toast = Toast(
+        message, segments=segments, duration=duration, position=position, kind=kind
+    )
     toast._event_loop = getattr(host, "_event_loop", None)
     toast.resize(host.size)
     layer_push(LayerKind.TOAST, toast)
@@ -151,8 +163,16 @@ def show_badge(
     duration: float | None = None,
     bg: tuple[int, int, int] | None = None,
     fg: tuple[int, int, int] | None = None,
+    kind: FeedbackKind | None = None,
 ) -> None:
-    """Show a badge on the overlay host."""
+    """Show a badge on the overlay host.
+
+    ``kind`` sets the foreground from the semantic palette unless ``fg`` is
+    given explicitly."""
+    if kind is not None and fg is None:
+        _style = style_for(kind)
+        if _style is not None:
+            fg = _style.fg
     host = get_overlay_host()
     if host is None:
         return
