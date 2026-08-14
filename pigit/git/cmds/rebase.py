@@ -20,7 +20,7 @@ from ._models import CommandCategory, SecurityLevel
     confirm_msg="Rebase? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
     examples=["pigit cmd rb main", "pigit cmd rb --onto main feature"],
-    related=["rb.c", "rb.a", "rb.i"],
+    related=["rb.c", "rb.a"],
 )
 def rebase(args: list[str]) -> str:
     """Rebase current branch."""
@@ -70,25 +70,6 @@ def rebase_skip(args: list[str]) -> str:
 
 
 @command(
-    short="rb.i",
-    category=CommandCategory.COMMIT,
-    help="Interactive rebase (reorder, edit, squash commits).",
-    has_args=True,
-    dangerous=True,
-    confirm_msg="Interactive rebase? This rewrites history.",
-    security_level=SecurityLevel.DANGEROUS,
-    examples=["pigit cmd rb.i HEAD~5", "pigit cmd rb.i main"],
-    related=["rb", "rb.c"],
-)
-def rebase_interactive(args: list[str]) -> str:
-    """Interactive rebase."""
-    base = "git rebase -i"
-    if args:
-        return f"{base} {' '.join(args)}"
-    return base
-
-
-@command(
     short="rb.m",
     category=CommandCategory.COMMIT,
     help="Rebase with autosquash (merge fixup commits).",
@@ -97,7 +78,7 @@ def rebase_interactive(args: list[str]) -> str:
     confirm_msg="Rebase with autosquash? This rewrites history.",
     security_level=SecurityLevel.DANGEROUS,
     examples=["pigit cmd rb.m main", "pigit cmd rb.m -i HEAD~5"],
-    related=["rb", "rb.i"],
+    related=["rb"],
 )
 def rebase_autosquash(args: list[str]) -> str:
     """Rebase with autosquash."""
@@ -111,5 +92,4 @@ def rebase_autosquash(args: list[str]) -> str:
 alias("rbc", "rb.c")
 alias("rba", "rb.a")
 alias("rbs", "rb.s")
-alias("rbi", "rb.i")
 alias("rbm", "rb.m")
