@@ -111,6 +111,9 @@ class Config(metaclass=Singleton):
 
         # (str) Status panel default view. Supported: [flat, tree]
         status_view = "{tui_status_view}"
+
+        # (bool) Show the footer key-hint bar.
+        show_footer = {tui_show_footer}
         {keybindings}
         """)
 
@@ -337,6 +340,7 @@ class Config(metaclass=Singleton):
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                         tui_word_diff=str(data.tui.word_diff).lower(),
                         tui_status_view=data.tui.status_view,
+                        tui_show_footer=str(data.tui.show_footer).lower(),
                         keybindings=keybindings_block,
                     )
                 )

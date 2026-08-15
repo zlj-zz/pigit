@@ -60,3 +60,19 @@ output = false
 # (float) Auto-refresh interval in seconds for the TUI.
 # Set to 0 to disable auto-refresh.
 auto_refresh_interval = 10.0
+
+# (bool) Enable word-diff by default in the diff viewer.
+word_diff = true
+
+# (str) Status panel default view. Supported: [flat, tree]
+status_view = "tree"
+
+# (bool) Show the footer key-hint bar.
+show_footer = true
+
+# Keybindings: remap TUI actions. Keys are semantic strings ("c", "down",
+# "ctrl c", " " for space); use an array for multiple keys. Run
+# `pigit --create-config --with-keybindings` to list all actions and defaults.
+
+[keybindings.branch]
+# checkout = "c"  # Checkout selected branch
