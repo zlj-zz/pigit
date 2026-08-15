@@ -232,17 +232,17 @@ def run_multi_select_picker(
     title: str,
     *,
     initial_filter: str = "",
-) -> tuple[int, list[str]]:
+) -> tuple[int, list[str] | str]:
     """Interactive multi-select picker.
 
     Returns:
-        ``(exit_code, selected_repo_names)``. ``0`` on confirm, ``130`` on Ctrl+C.
-        Empty list if user cancelled or selected nothing.
+        ``(exit_code, selected_repo_names)`` on success, or ``(exit_code, message)``
+        when the platform is unsupported. Empty list if cancelled or no selection.
     """
     if not rows:
         return 1, []
     if not platform_supported():
-        return 1, []
+        return 1, UNSUPPORTED_PLATFORM_MSG
     if not tty_ok():
         return 1, []
 

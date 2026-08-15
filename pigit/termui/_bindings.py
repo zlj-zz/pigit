@@ -13,7 +13,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from typing import Any
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 BindingTarget = str | Callable[[], Any]
 BindingEntry = tuple[str, BindingTarget]
@@ -229,7 +229,7 @@ _key_overrides: dict[str, tuple[str, ...]] = {}
 
 
 def set_key_overrides(
-    overrides: dict[str, tuple[str, ...] | list[str] | str],
+    overrides: Mapping[str, tuple[str, ...] | list[str] | str],
 ) -> None:
     """Install user key overrides (action id -> keys), replacing any prior set.
 

@@ -111,6 +111,7 @@ class Config(metaclass=Singleton):
 
         # (str) Status panel default view. Supported: [flat, tree]
         status_view = "{tui_status_view}"
+        {keybindings}
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
@@ -304,7 +305,7 @@ class Config(metaclass=Singleton):
                 f"Can not load the config file. Path: {self.config_file_path}"
             )
 
-    def create_config_template(self) -> bool:
+    def create_config_template(self, keybindings_block: str = "") -> bool:
         parent_dir = os.path.dirname(self.config_file_path)
         if not os.path.isdir(parent_dir):
             os.makedirs(parent_dir, exist_ok=True)
@@ -336,6 +337,7 @@ class Config(metaclass=Singleton):
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                         tui_word_diff=str(data.tui.word_diff).lower(),
                         tui_status_view=data.tui.status_view,
+                        keybindings=keybindings_block,
                     )
                 )
         except Exception:

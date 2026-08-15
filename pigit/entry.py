@@ -120,6 +120,14 @@ def _color_index(count: int) -> str:
     help="Create a pre-configured file of PIGIT."
     "(If a profile exists, the values available in it are used)",
 )
+@argument(
+    "--with-keybindings",
+    action="store_true",
+    dest="with_keybindings",
+    group=_TOOLS_GROUP,
+    help="Dump commented default keys into the generated [keybindings] block."
+    " (requires --create-config)",
+)
 def pigit(args: Namespace, _) -> None:
     if args.init:
         from .init import run_shell_init
@@ -128,7 +136,19 @@ def pigit(args: Namespace, _) -> None:
         return None
 
     elif args.create_config:
-        ctx.config.create_config_template()
+        from .app_keybindings import (
+            collect_all_action_bindings,
+            render_keybindings_template,
+            warn_unmatched_keybindings,
+        )
+
+        bindings = collect_all_action_bindings()
+        current = ctx.config.get().keybindings
+        warn_unmatched_keybindings(bindings, current)
+        block = render_keybindings_template(
+            bindings, current, include_defaults=args.with_keybindings
+        )
+        ctx.config.create_config_template(keybindings_block=block)
         return
 
     elif args.report:
