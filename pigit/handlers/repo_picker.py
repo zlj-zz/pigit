@@ -14,7 +14,7 @@ from pigit.app_theme import THEME
 from pigit.picker_app import BasePickerApp, PickerRow
 from pigit.termui._segment import Segment
 from pigit.termui.widgets import CheckList, ItemList
-from pigit.termui.tty_io import tty_ok
+from pigit.termui.tty_io import UNSUPPORTED_PLATFORM_MSG, platform_supported, tty_ok
 
 from pigit.git._repo_status import query_repos_status
 
@@ -135,6 +135,8 @@ def run_repo_cd_picker(
     """
     if not rows:
         return 1, EMPTY_MANAGED_REPOS_MSG
+    if not platform_supported():
+        return 1, UNSUPPORTED_PLATFORM_MSG
     if not tty_ok():
         return 1, REPO_CD_NO_TTY_MSG
 
@@ -238,6 +240,8 @@ def run_multi_select_picker(
         Empty list if user cancelled or selected nothing.
     """
     if not rows:
+        return 1, []
+    if not platform_supported():
         return 1, []
     if not tty_ok():
         return 1, []

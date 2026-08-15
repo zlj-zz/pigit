@@ -217,10 +217,15 @@ class RepoCommandHandler:
         """Return explicit repo names, or let the user pick via TUI."""
         from pigit.picker_app import PickerRow
         from pigit.git.managed_repos import iter_managed_repo_names
+        from ..termui.tty_io import UNSUPPORTED_PLATFORM_MSG, platform_supported
         from .repo_picker import EMPTY_MANAGED_REPOS_MSG, run_multi_select_picker
 
         if explicit:
             return list(explicit)
+
+        if not platform_supported():
+            self.console.echo(UNSUPPORTED_PLATFORM_MSG)
+            return None
 
         exist_repos = self.managed_repos.load_repos()
         if not exist_repos:

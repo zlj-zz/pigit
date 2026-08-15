@@ -26,6 +26,8 @@ from pigit.termui.containers import Column
 from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import InputLine, ItemList, StatusBar
 from pigit.termui.tty_io import (
+    UNSUPPORTED_PLATFORM_MSG,
+    platform_supported,
     terminal_size,
     truncate_line,
     tty_ok,
@@ -129,6 +131,8 @@ def run_cmd_new_picker(
     Returns:
         (exit_code, message) tuple
     """
+    if not platform_supported():
+        return 1, UNSUPPORTED_PLATFORM_MSG
     if not _tty_ok():
         return 1, NO_TTY_MSG
 

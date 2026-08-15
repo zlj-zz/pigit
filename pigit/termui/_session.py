@@ -14,17 +14,16 @@ from typing import TextIO
 from ._renderer import Renderer
 
 # xterm mouse reporting: button-event tracking (1002) + SGR extended
-# coordinates (1006). Enabled on POSIX terminals only; the Windows msvcrt
-# input path has no VT mouse support.
+# coordinates (1006). Enabled on POSIX terminals.
 _MOUSE_ENABLE = "\033[?1002h\033[?1006h"
 _MOUSE_DISABLE = "\033[?1002l\033[?1006l"
 
 
 class Session:
     """
-    Enter and restore terminal state (POSIX termios; optional alternate screen).
+    Enter and restore terminal state (termios; optional alternate screen).
 
-    KeyboardInput must not call termios; this class owns terminal attributes on POSIX.
+    KeyboardInput must not call termios; this class owns terminal attributes.
     """
 
     def __init__(
@@ -44,18 +43,16 @@ class Session:
         if not self.stdin.isatty() or not self.stdout.isatty():
             raise RuntimeError("A TTY is required for interactive terminal mode.")
         self._suspended = False
-        if sys.platform != "win32":
-            import termios
-            import tty
+        import termios
+        import tty
 
-            self._old_termios = termios.tcgetattr(self._fd)
-            tty.setcbreak(self._fd)
+        self._old_termios = termios.tcgetattr(self._fd)
+        tty.setcbreak(self._fd)
         if self.alt_screen:
             self.stdout.write("\033[?1049h\033[?25l")
         else:
             self.stdout.write("\033[?25l")
-        if sys.platform != "win32":
-            self.stdout.write(_MOUSE_ENABLE)
+        self.stdout.write(_MOUSE_ENABLE)
         self.stdout.flush()
         return self
 
@@ -63,18 +60,16 @@ class Session:
         """Temporarily restore terminal to normal state for external full-screen processes.
 
         Idempotent: skips if already suspended.
-        On Windows only toggles alternate screen and cursor; does not restore termios.
         """
         if getattr(self, "_suspended", False):
             return
         self._suspended = True
-        if sys.platform != "win32":
-            self.stdout.write(_MOUSE_DISABLE)
+        self.stdout.write(_MOUSE_DISABLE)
         if self.alt_screen:
             self.stdout.write("\033[?1049l")
         self.stdout.write("\033[?25h")
         self.stdout.flush()
-        if sys.platform != "win32" and self._old_termios is not None:
+        if self._old_termios is not None:
             import termios
 
             termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)
@@ -83,27 +78,24 @@ class Session:
         """Restore terminal back to TUI mode from normal state.
 
         Idempotent: skips if not currently suspended.
-        On Windows only toggles alternate screen and cursor; does not restore termios.
         """
         if not getattr(self, "_suspended", False):
             return
         self._suspended = False
-        if sys.platform != "win32":
-            import termios
-            import tty
+        import termios
+        import tty
 
-            tty.setcbreak(self._fd)
-            # External full-screen programs (e.g. vim/nvim) may leave focus
-            # events, color reports, or other escape sequences in the input
-            # buffer after they exit. Flushing the buffer before resuming the
-            # TUI prevents those bytes from leaking to KeyboardInput and being
-            # misinterpreted as user keystrokes (e.g. ';' opening the palette).
-            termios.tcflush(self._fd, termios.TCIFLUSH)
+        tty.setcbreak(self._fd)
+        # External full-screen programs (e.g. vim/nvim) may leave focus
+        # events, color reports, or other escape sequences in the input
+        # buffer after they exit. Flushing the buffer before resuming the
+        # TUI prevents those bytes from leaking to KeyboardInput and being
+        # misinterpreted as user keystrokes (e.g. ';' opening the palette).
+        termios.tcflush(self._fd, termios.TCIFLUSH)
         if self.alt_screen:
             self.stdout.write("\033[?1049h")
         self.stdout.write("\033[?25l")
-        if sys.platform != "win32":
-            self.stdout.write(_MOUSE_ENABLE)
+        self.stdout.write(_MOUSE_ENABLE)
         self.stdout.flush()
 
     def __exit__(
@@ -113,14 +105,13 @@ class Session:
         exc_tb: TracebackType | None,
     ) -> None:
         try:
-            if sys.platform != "win32":
-                self.stdout.write(_MOUSE_DISABLE)
+            self.stdout.write(_MOUSE_DISABLE)
             if self.alt_screen:
                 self.stdout.write("\033[?1049l")
             self.stdout.write("\033[?25h")
             self.stdout.flush()
         finally:
-            if sys.platform != "win32" and self._old_termios is not None:
+            if self._old_termios is not None:
                 import termios
 
                 termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)

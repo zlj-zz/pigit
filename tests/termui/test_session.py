@@ -87,16 +87,6 @@ class TestSessionEnterExit:
                 session.__exit__(None, None, None)
                 fake_termios.tcsetattr.assert_called_once()
 
-    def test_exit_on_windows_skips_termios(self):
-        stdin = FakeTTY()
-        stdout = FakeTTY()
-        session = Session(stdin=stdin, stdout=stdout)
-
-        with mock.patch("sys.platform", "win32"):
-            session.__exit__(None, None, None)
-            # Should not raise even without termios module
-
-
 class TestSessionSuspendResume:
     def test_suspend_restores_cursor(self):
         stdin = FakeTTY()
@@ -208,26 +198,6 @@ class TestSessionSuspendResume:
                 except ValueError:
                     pass
                 fake_termios.tcsetattr.assert_called_once()
-
-    def test_enter_on_windows_skips_termios(self):
-        stdin = FakeTTY()
-        stdout = FakeTTY()
-        session = Session(stdin=stdin, stdout=stdout)
-
-        with mock.patch("sys.platform", "win32"):
-            result = session.__enter__()
-            assert result is session
-            # Should not raise even without termios/tty module
-
-    def test_resume_on_windows_skips_termios(self):
-        stdin = FakeTTY()
-        stdout = FakeTTY()
-        session = Session(alt_screen=True, stdin=stdin, stdout=stdout)
-        session._suspended = True
-
-        with mock.patch("sys.platform", "win32"):
-            session.resume()
-            assert session._suspended is False
 
     def test_exit_with_alt_screen(self):
         stdin = FakeTTY()
