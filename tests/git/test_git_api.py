@@ -72,6 +72,19 @@ class TestStashEdgeCases:
         with pytest.raises(GitError):
             git.stash_pop("stash@{0}")
 
+    def test_stash_push_includes_untracked(self):
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+        git.stash_push()
+        assert ex.exec_calls
+        assert ex.exec_calls[0][0] == "git stash push -u"
+
+    def test_stash_push_with_message_keeps_untracked_flag(self):
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+        git.stash_push(message="wip")
+        assert ex.exec_calls[0][0] == "git stash push -u -m wip"
+
 
 class TestDiffEdgeCases:
     def test_load_file_diff_error_returns_sentinel(self):

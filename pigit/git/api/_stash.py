@@ -56,7 +56,7 @@ class _StashOps(_OpsBase):
         path: str | None = None,
         message: str = "",
     ) -> None:
-        """Stash current changes.
+        """Stash tracked and untracked changes (``git stash push -u``).
 
         Args:
             path: Repository path.
@@ -66,7 +66,7 @@ class _StashOps(_OpsBase):
             GitError: If the stash command fails.
         """
         path = path or self.path
-        cmd = "git stash push"
+        cmd = "git stash push -u"
         if message:
             cmd += f" -m {shlex.quote(message)}"
         code, err, _ = self.executor.exec(

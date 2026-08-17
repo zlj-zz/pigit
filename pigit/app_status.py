@@ -628,8 +628,8 @@ class StatusPanel(ItemList):
 
     @bind_action(
         "stash",
-        "z",
-        desc="Stash working tree changes (not in visual mode)",
+        "s",
+        desc="Stash working tree including untracked (not in visual mode)",
         tip="Stash",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -657,7 +657,7 @@ class StatusPanel(ItemList):
 
     @bind_action(
         "visual_scroll",
-        "s",
+        "V",
         desc="Toggle visual scroll mode (visual mode)",
         tip="V-scroll",
         tip_when=lambda self: self._visual_mode,
@@ -1078,7 +1078,7 @@ class StatusPanel(ItemList):
         if self._visual_mode:
             if self._visual_scroll:
                 show_toast(
-                    "Press s to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
+                    "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
                 )
                 return
             if not self._selected:

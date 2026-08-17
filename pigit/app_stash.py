@@ -50,7 +50,7 @@ class StashPanel(ItemList):
         super().__init__(
             empty_state=[
                 Segment("  No stashes", fg=THEME.fg_dim),
-                Segment("  Press 'z' to stash current changes", fg=THEME.fg_dim),
+                Segment("  Press 's' to stash current changes", fg=THEME.fg_dim),
             ],
             id=id,
         )

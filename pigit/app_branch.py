@@ -171,9 +171,7 @@ class BranchPanel(ItemList):
     def merge(self) -> None:
         self._trigger_merge()
 
-    @bind_action(
-        "create_pull_request", "p", desc="Open create pull request page in browser"
-    )
+    @bind_action("create_pull_request", "p", desc="Create pull request page in browser")
     def create_pull_request(self) -> None:
         """Open the hosting provider create-PR URL for the selected branch."""
         if not self.branches:
@@ -215,9 +213,8 @@ class BranchPanel(ItemList):
 
     @bind_action(
         "scope",
-        "R",
+        "ctrl f",
         desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
-        tip="Scope",
     )
     def toggle_scope(self) -> None:
         """Cycle branch scope: local -> remote -> all -> local."""
@@ -230,7 +227,7 @@ class BranchPanel(ItemList):
         self._vm.set_scope(scope)
         self._vm.refresh()
 
-    @bind_action("rename", "r", desc="Rename selected branch", tip="Rename")
+    @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
     def rename(self) -> None:
         if not self.branches:
             return
@@ -253,7 +250,7 @@ class BranchPanel(ItemList):
 
     @bind_action(
         "rebase",
-        "i",
+        "r",
         desc="Interactive rebase onto selected branch (rewrites history)",
         tip="Rebase",
     )
