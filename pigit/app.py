@@ -576,7 +576,7 @@ class PigitApplication(Application):
             self._alert_dialog.alert(
                 "Abort rebase? All progress will be lost.",
                 on_confirm,
-                kind=FeedbackKind.ERROR,
+                destructive=True,
             )
             return
         self._do_rebase_control(flag)

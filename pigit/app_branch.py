@@ -284,7 +284,7 @@ class BranchPanel(ItemList):
             result = self._vm.delete_branch(self.curr_no)
             self._handle_result(result)
 
-        self._alert_dialog.alert(text, on_result, kind=FeedbackKind.ERROR)
+        self._alert_dialog.alert(text, on_result, destructive=True)
 
     def _trigger_merge(self) -> None:
         """Validate constraints and emit merge request via callback."""

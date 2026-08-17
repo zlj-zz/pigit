@@ -672,3 +672,26 @@ class TestAlertDialogBody:
         )
         body._confirm()
         shell._finish_alert.assert_called_once_with(True)
+
+    def test_prepare_destructive_uses_error_style_border(self):
+        from pigit.termui._feedback import FeedbackKind, style_for
+
+        body = AlertDialogBody(
+            shell=MagicMock(),
+            message="m",
+            on_result=lambda x: None,
+        )
+        body.prepare("Discard?", lambda x: None, destructive=True)
+        assert body._frame.fg == style_for(FeedbackKind.ERROR).fg
+
+    def test_prepare_resets_border_after_destructive(self):
+        from pigit.termui import palette
+
+        body = AlertDialogBody(
+            shell=MagicMock(),
+            message="m",
+            on_result=lambda x: None,
+        )
+        body.prepare("Discard?", lambda x: None, destructive=True)
+        body.prepare("Merge?", lambda x: None, destructive=False)
+        assert body._frame.fg == palette.DEFAULT_FG

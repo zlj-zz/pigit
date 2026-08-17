@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 
 from .. import _runtime_context, keys, palette
-from .._feedback import FeedbackKind
+from .._feedback import FeedbackKind, style_for
 from .._component import Component
 from .._frame import BoxFrame
 from .._mouse import MouseButton, MouseEvent, MouseKind
@@ -232,17 +232,18 @@ class AlertDialogBody(Component):
         self,
         message: str,
         on_result: Callable[[bool], None],
-        kind: FeedbackKind | None = None,
+        *,
+        destructive: bool = False,
     ) -> None:
         """Configure message and callback, then open the alert.
 
-        ``kind`` tints the border: ``ERROR`` -> danger red, anything else ->
-        the default neutral border."""
+        ``destructive`` tints the border with the error-style foreground
+        (irreversible confirm). Ordinary confirms stay the default border.
+        """
         self._message = sanitize_for_display(message)
         self._on_result = on_result
-        self._frame.fg = (
-            palette.RED if kind is FeedbackKind.ERROR else palette.DEFAULT_FG
-        )
+        style = style_for(FeedbackKind.ERROR) if destructive else None
+        self._frame.fg = style.fg if style is not None else palette.DEFAULT_FG
         self.open_alert()
         self._needs_rebuild = True
 
@@ -394,7 +395,8 @@ class AlertDialog(Popup):
         self,
         message: str,
         on_result: Callable[[bool], None],
-        kind: FeedbackKind | None = None,
+        *,
+        destructive: bool = False,
     ) -> bool:
         """
         Prepare content, show this popup, and register the overlay host alert session.
@@ -402,14 +404,14 @@ class AlertDialog(Popup):
         Args:
             message: Confirmation prompt.
             on_result: Callback receiving the user's True/False choice.
-            kind: Optional semantic level; ``ERROR`` renders a danger-red border.
+            destructive: If True, use the irreversible (danger) border color.
 
         Returns:
             True if the dialog was shown; False if another modal is already open.
         """
         if _runtime_context.is_modal_open():
             return False
-        self._pane.prepare(message, on_result, kind)
+        self._pane.prepare(message, on_result, destructive=destructive)
         self.relayout_content()
         self.show()
         self.begin_session()
