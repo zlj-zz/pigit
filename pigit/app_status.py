@@ -26,6 +26,7 @@ from pigit.termui import (
     by_id,
     dismiss_sheet,
     exec_external,
+    keys,
     palette,
     Segment,
     show_badge,
@@ -962,8 +963,10 @@ class StatusPanel(ItemList):
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
             return True
+        # Clean tree: swallow panel actions, but let Tab bubble to the status
+        # Column so focus can move to StashPanel.
         if not self.files:
-            return True
+            return key != keys.KEY_TAB
         return False
 
     # --- Helpers ---

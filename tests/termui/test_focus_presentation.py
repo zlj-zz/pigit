@@ -184,3 +184,34 @@ class TestCommitEditorHooks:
         assert editor.presentation_child is None
         editor._focus_index = 1
         assert editor.focus_child is editor._body
+
+
+class TestEmptyStatusTabToStash:
+    def test_tab_moves_focus_when_status_has_no_files(self):
+        """Empty StatusPanel must not swallow Tab; Column cycles to Stash."""
+        from unittest.mock import Mock
+
+        from pigit.app_stash import StashPanel
+        from pigit.app_status import StatusPanel
+        from pigit.termui.reactive import Signal
+        from pigit.viewmodels.status import IStatusViewModel
+
+        vm = Mock(spec=IStatusViewModel)
+        vm.items = Signal([])
+        vm.load_stashes.return_value = []
+        status = StatusPanel(vm=vm, id="status_panel")
+        status.files = []
+        stash = StashPanel(vm=vm, id="stash")
+        col = Column(
+            children=[status, stash],
+            heights=["flex", 4],
+            focus_index=0,
+            id="status",
+        )
+        root = _make_root(col)
+        root.resize((40, 20))
+        fm = root._focus_manager
+        assert fm.get_focus_leaf() is status
+
+        root._handle_event("tab")
+        assert fm.get_focus_leaf() is stash
