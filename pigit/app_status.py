@@ -683,6 +683,11 @@ class StatusPanel(ItemList):
             return True
         return False
 
+    @bind_action("search", "/", desc="Filter file list by name")
+    def search(self) -> None:
+        """Activate the file-list search filter."""
+        self._filter.enter()
+
     @bind_action(
         "open_diff",
         "enter",

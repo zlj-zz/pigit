@@ -67,10 +67,8 @@ class SearchFilter:
                 return True
             return False
 
-        if key == "/":
-            self.enter()
-            return True
-
+        # Inactive: ``/`` is bound via ``@bind_action`` on the host panel so it
+        # appears in help and remains remappable; do not capture it here.
         return False
 
     def render_bar(self, surface) -> None:

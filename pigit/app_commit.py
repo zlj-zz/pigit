@@ -221,10 +221,10 @@ class CommitPanel(ItemList):
             diff_type=DiffType.COMMIT,
         )
 
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        entries = super().get_help_entries()
-        entries.append(("/", "Search"))
-        return entries
+    @bind_action("search", "/", desc="Filter commit list by message or SHA")
+    def search(self) -> None:
+        """Activate the commit-list search filter."""
+        self._filter.enter()
 
     def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""
