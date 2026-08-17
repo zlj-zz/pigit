@@ -238,7 +238,7 @@ class ItemList(Component):
     def _scroll_into_view(self) -> None:
         """Adjust ``_r_start`` so the cursor row is visible."""
         row = self.cursor_row()
-        visible_h = self._size[1]
+        visible_h = self.visible_row_count
         if visible_h <= 0:
             return
         if row >= self._r_start + visible_h:
@@ -306,7 +306,7 @@ class ItemList(Component):
             if self.empty_state is not None:
                 self._render_empty_state(surface)
             return
-        end = min(self._r_start + self._size[1], len(self.content))
+        end = min(self._r_start + self.visible_row_count, len(self.content))
         if self._item_starts is None:
             for idx in range(self._r_start, end):
                 row = idx - self._r_start
@@ -581,7 +581,7 @@ class ItemList(Component):
         if event.button is not MouseButton.LEFT:
             return False
         row0 = event.row - 1
-        if row0 < 0 or row0 >= self._size[1]:
+        if row0 < 0 or row0 >= self.visible_row_count:
             return False
         content_index = self._r_start + row0
         if content_index >= len(self.content):

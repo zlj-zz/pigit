@@ -780,7 +780,7 @@ class PigitApplication(Application):
 
         self._confirm_push_and_finish(target, source)
 
-    @bind_action("quit", "Q", desc="Quit Pigit", tip="Quit")
+    @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 

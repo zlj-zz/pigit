@@ -19,6 +19,9 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
+from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+from pigit.termui._surface import Surface, _Subsurface
+from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType
@@ -34,6 +37,9 @@ class StashPanel(ItemList):
 
     CURSOR = "●"
     keymap_namespace = "stash"
+    HEADER_ROWS = 1
+    _SECTION_LABEL = "Stash"
+    _SECTION_TAIL = "──"
 
     def __init__(
         self,
@@ -51,6 +57,11 @@ class StashPanel(ItemList):
         self._vm = vm
         self.stashes: list[Stash] = []
 
+    @property
+    def visible_row_count(self) -> int:
+        """Viewport rows available for stash entries (excludes section header)."""
+        return max(0, self._size[1] - self.HEADER_ROWS)
+
     def activate(self) -> None:
         super().activate()
         self._load_stashes()
@@ -65,6 +76,66 @@ class StashPanel(ItemList):
 
     def refresh(self):
         self._load_stashes()
+
+    def _draw_section_header(self, surface: Surface | _Subsurface) -> None:
+        """Draw ``──── Stash ──`` across the top row."""
+        w = surface.width
+        if w <= 0 or surface.height <= 0:
+            return
+        label = self._SECTION_LABEL
+        # " Stash ──" — space, bold label, space, two dashes
+        suffix = f" {label} {self._SECTION_TAIL}"
+        suffix_w = wcswidth(suffix)
+        fill_w = max(0, w - suffix_w)
+        if fill_w:
+            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=THEME.fg_dim)
+        col = fill_w
+        surface.draw_text_rgb(0, col, " ", fg=THEME.fg_dim)
+        col += 1
+        surface.draw_text_rgb(
+            0,
+            col,
+            label,
+            fg=THEME.fg_muted,
+            style_flags=palette.STYLE_BOLD,
+        )
+        col += wcswidth(label)
+        surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=THEME.fg_dim)
+
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+        """Section header on row 0; stash rows in the remaining viewport."""
+        w = surface.width
+        h = surface.height
+        if w <= 0 or h <= 0:
+            return
+        self._draw_section_header(surface)
+        if h <= self.HEADER_ROWS:
+            return
+        sub = surface.subsurface(self.HEADER_ROWS, 0, w, h - self.HEADER_ROWS)
+        ItemList._render_surface(self, sub)
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Ignore clicks on the header row; map remaining rows to list items."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button in (MouseButton.WHEEL_UP, MouseButton.WHEEL_DOWN):
+            return super().handle_mouse(event)
+        if event.button is not MouseButton.LEFT:
+            return False
+        row0 = event.row - 1
+        if row0 < self.HEADER_ROWS:
+            return True
+        adjusted = MouseEvent(
+            col=event.col,
+            row=event.row - self.HEADER_ROWS,
+            button=event.button,
+            kind=event.kind,
+            shift=event.shift,
+            alt=event.alt,
+            ctrl=event.ctrl,
+            motion=event.motion,
+        )
+        return ItemList.handle_mouse(self, adjusted)
 
     @bind_action("next", "j", "down", desc="Navigate stash list", tip="Navigate")
     def next_item(self, step: int = 1) -> None:
