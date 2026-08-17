@@ -38,7 +38,6 @@ KeyDispatchOutcome = Literal[
     "binding",
     "resize",
     "child",
-    "app",
 ]
 
 
@@ -67,8 +66,10 @@ class AppEventLoop:
     Application-level keyboard loop over a component tree.
 
     ``run()`` always enters :class:`~pigit.termui.session.Session` and binds
-    ``session.renderer`` to the whole component tree. When ``input_handle`` is
-    omitted, a :class:`~pigit.termui.input.TermuiInputBridge` over
+    ``session.renderer`` to the whole component tree. Keys go to
+    ``_child._handle_event`` (``ComponentRoot`` owns overlay and app-level
+    bindings). When ``input_handle`` is omitted, a
+    :class:`~pigit.termui.input.TermuiInputBridge` over
     :class:`~pigit.termui.input.KeyboardInput` is used.
     """
 
@@ -81,6 +82,9 @@ class AppEventLoop:
         input_handle: InputTerminal | None = None,
         real_time: bool = True,
         alt: bool = True,
+        *,
+        on_after_start: Callable[[], None] | None = None,
+        on_before_resize: Callable[[tuple[int, int]], None] | None = None,
     ) -> None:
         self._child = child
         self._real_time = real_time
@@ -94,6 +98,8 @@ class AppEventLoop:
         self._input_handle = input_handle
 
         self._alt = alt
+        self._on_after_start = on_after_start
+        self._on_before_resize = on_before_resize
 
         self._key_handlers = resolve_key_handlers(self, self.BINDINGS)
 
@@ -112,7 +118,9 @@ class AppEventLoop:
         self._render_requested = True
 
     def after_start(self):
-        """Hook invoked after the loop is ready (subclasses may override)."""
+        """Hook invoked after the loop is ready."""
+        if self._on_after_start is not None:
+            self._on_after_start()
 
     def before_dispatch_key(self, key: str) -> None:
         """Hook before dispatching a string semantic key (subclasses may override)."""
@@ -153,6 +161,8 @@ class AppEventLoop:
         """Refresh terminal size, propagate to the root component, and redraw."""
 
         self._size = self.get_term_size()
+        if self._on_before_resize is not None:
+            self._on_before_resize(self._size)
         self._child.resize(self._size)
         renderer = get_renderer()
         if renderer is not None:

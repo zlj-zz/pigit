@@ -7,7 +7,8 @@ Description: Keyboard event routing algorithm for the component tree.
     Dispatch layers (first match wins):
         capture_key → bindings → handle_key → parent bubble.
     TabView._handle_event may still forward to its active child (not
-    this algorithm). Overlay keys use dispatch_overlay_key.
+    this algorithm). Overlay and app-level keys are dispatched by
+    ComponentRoot before this algorithm runs on the focus leaf.
 
 Author: Zev
 Date: 2026-06-15

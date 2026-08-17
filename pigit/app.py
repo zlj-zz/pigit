@@ -422,9 +422,7 @@ class PigitApplication(Application):
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute layout widths and stash height on terminal resize.
 
-        Note: super().resize() is NOT called here because
-        _ApplicationEventLoop.resize() already propagates resize to the
-        component tree after this method returns.
+        The event loop resizes the component tree after this returns.
         """
         cols, rows = size
         was_large = self._is_large_screen

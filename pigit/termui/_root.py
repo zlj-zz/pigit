@@ -29,7 +29,10 @@ if TYPE_CHECKING:
 class ComponentRoot(Component):
     """
     Internal framework root: wraps the user body component and manages overlays.
-    Not exported in the public termui API.
+
+    Single keyboard entry for ``AppEventLoop``: overlay, then root-level
+    bindings / ``handle_key``, then the focus leaf. Not exported in the
+    public termui API.
     """
 
     def __init__(
@@ -37,6 +40,9 @@ class ComponentRoot(Component):
         body: Component,
         registry: ComponentRegistry | None = None,
         event_bus: EventBus | None = None,
+        *,
+        key_handlers: dict[str, Callable[..., Any]] | None = None,
+        handle_key: Callable[[str], bool] | None = None,
     ) -> None:
         super().__init__()
         self._body = body
@@ -52,6 +58,10 @@ class ComponentRoot(Component):
         self._event_bus = event_bus
         self._app_on_event: Callable | None = None
         self._event_loop: Any | None = None
+        self._root_handle_key = handle_key
+        self._dispatch_depth = 0
+        if key_handlers:
+            self._key_handlers.update(key_handlers)
 
     def activate(self) -> None:
         """Activate the root and propagate to the body component tree."""
@@ -66,12 +76,6 @@ class ComponentRoot(Component):
         """Destroy children. Runtime context is reset by the caller."""
         self._body.destroy()
         super().destroy()
-
-    def sync_focus_after_app_binding(self, overlay_was_open: bool) -> None:
-        """Restore focus to body leaf when an app binding closes an overlay."""
-        self._focus_manager.sync_focus_if_overlay_closed(
-            overlay_was_open, self.has_overlay_open()
-        )
 
     @property
     def body(self) -> Component:
@@ -195,18 +199,48 @@ class ComponentRoot(Component):
                 return top
         return None
 
-    def _handle_event(self, key: str) -> bool:
-        result = self.try_dispatch_overlay(key)
-        if result != OverlayDispatchResult.DROPPED_UNBOUND:
+    def _sync_focus_if_overlay_changed(self, overlay_was_open: bool) -> None:
+        """Re-resolve focus when a root handler opened or closed an overlay."""
+        if overlay_was_open != self.has_overlay_open():
             self._focus_manager.sync_focus_to_overlay_or_leaf()
-            return True
-        leaf = self._focus_manager.get_focus_leaf() or resolve_focus_leaf(self._body)
-        if leaf is not None:
-            consumed = leaf._handle_event(key)
+
+    def _handle_event(self, key: str) -> bool:
+        """Dispatch overlay, then root keys, then the focus leaf.
+
+        Re-entry from a leaf bubble returns False: root bindings already
+        had their chance before the tree ran.
+        """
+        if self._dispatch_depth:
+            return False
+        self._dispatch_depth += 1
+        try:
+            overlay_was_open = self.has_overlay_open()
+            result = self.try_dispatch_overlay(key)
+            if result != OverlayDispatchResult.DROPPED_UNBOUND:
+                self._focus_manager.sync_focus_to_overlay_or_leaf()
+                return True
+
+            handler = self._key_handlers.get(key)
+            if handler is not None:
+                handler()
+                self._sync_focus_if_overlay_changed(overlay_was_open)
+                return True
+
+            if self._root_handle_key is not None and self._root_handle_key(key):
+                self._sync_focus_if_overlay_changed(overlay_was_open)
+                return True
+
+            leaf = self._focus_manager.get_focus_leaf() or resolve_focus_leaf(
+                self._body
+            )
+            if leaf is not None:
+                consumed = leaf._handle_event(key)
+                self._focus_manager.sync_focus_to_overlay()
+                return consumed
             self._focus_manager.sync_focus_to_overlay()
-            return consumed
-        self._focus_manager.sync_focus_to_overlay()
-        return False
+            return False
+        finally:
+            self._dispatch_depth -= 1
 
     def _handle_mouse(self, event: MouseEvent) -> bool:
         """Route a mouse event: overlays first, then body with click-to-focus.

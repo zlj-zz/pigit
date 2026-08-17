@@ -27,28 +27,23 @@ flowchart TB
     subgraph loop["AppEventLoop._loop"]
         D{semantic string key?}
         RS["window resize?"]
-        OV{has_overlay_open?}
-        OVR[LayerStack.dispatch -> Popup.dispatch_overlay_key]
-        APP[_key_handlers or root._handle_event]
+        ROOT["ComponentRoot._handle_event"]
     end
     KB --> D
     D -->|yes| RS
-    RS -->|yes| resize[resize + render]
-    RS -->|no| OV
-    OV -->|yes| OVR
-    OV -->|no| APP
+    RS -->|yes| resize[on_before_resize + tree resize + render]
+    RS -->|no| ROOT
+    ROOT --> OVR[overlay → root bindings / handle_key → focus leaf]
     OVR --> render1[render]
-    APP --> maybe[overlay opened mid-handler?]
-    maybe -->|yes| render1
     R --> loop
 ```
 
 - **Session** opens the alternate screen and creates a **Renderer**.
 - **Renderer** is bound to the current context via `ContextVar` (`set_renderer` / `reset_renderer`).
-- **Loop root** (`_child`) is `ComponentRoot`, which delegates overlay checks and dispatch to `LayerStack`.
+- **Loop root** (`_child`) is `ComponentRoot`, which owns overlay dispatch, app-level bindings / `handle_key`, then the focus leaf.
 - After an overlay consumes a key, `sync_focus_to_overlay_or_leaf()` re-resolves the overlay focus leaf (load-bearing for Sheet editors that change `focus_child` without `set_focus_chain`).
-- Body keys start at `FocusManager.get_focus_leaf()` (or `resolve_focus_leaf(body)`), then `capture_key` → bindings → `handle_key` → parent bubble. `TabView._handle_event` may still forward to the active tab.
-- **Application** facade (`Application` class) wraps `build_root()` -> `ComponentRoot` -> `_ApplicationEventLoop` assembly.
+- Body keys start at `FocusManager.get_focus_leaf()` (or `resolve_focus_leaf(body)`), then `capture_key` → bindings → `handle_key` → parent bubble. `TabView._handle_event` may still forward to the active tab. Bubble into `ComponentRoot` is a no-op (root keys already ran).
+- **Application** facade (`Application` class) wraps `build_root()` → `ComponentRoot` (with app keys installed) → `AppEventLoop`.
 
 ### Focus and presentation
 
@@ -228,11 +223,11 @@ class MyApp(Application):
 MyApp().run()
 ```
 
-`_ApplicationEventLoop` bridges `Application` into `AppEventLoop`: app-level bindings take precedence over child tree bindings when no overlay is open.
+Application installs its `@bind_action` / `BINDINGS` / `handle_key` on `ComponentRoot`. Overlay keys win; then those root-level keys; then the focused leaf. `AppEventLoop` does not special-case Application.
 
 ### Component tree and loop root
 
-`AppEventLoop` holds a single root `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack` and a body component. `ComponentRoot` implements `has_overlay_open()` and `try_dispatch_overlay(key)` by delegating to its `LayerStack`.
+`AppEventLoop` holds a single root `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack`, the body, and the app-level `key_handlers` / `handle_key` installed by `Application`. Keys enter at `ComponentRoot._handle_event`.
 
 Application code constructs `Popup(help_panel)` (`_help_panel` / `_help_popup`); `_runtime_context` provides overlay helpers to push/pop modal layers onto the host's `LayerStack`. Call `HelpPanel.refresh_entries_from_source()` from the app when opening help if you want rows synced from `host.children` (not from `Popup`). Bind `?` to a handler that refreshes help then `_help_popup.toggle()`. `AlertDialog` subclasses `Popup` and overrides ESC via `_on_exit_key`; it uses `_runtime_context` for session management.
 
