@@ -771,6 +771,64 @@ class DiffViewer(LineTextBrowser):
                     self.set_content(content.splitlines())
             self._i = self.i_cache.get(self.i_cache_key, 0)
 
+    @bind_action("down", "j", desc="Navigate diff lines down", tip="Navigate")
+    def _on_j(self) -> None:
+        if self._hunk_mode:
+            self._next_hunk_nav()
+        else:
+            self.scroll_down()
+
+    @bind_action("up", "k", desc="Navigate diff lines up", tip="Navigate")
+    def _on_k(self) -> None:
+        if self._hunk_mode:
+            self._prev_hunk_nav()
+        else:
+            self.scroll_up()
+
+    @bind_action("page_down", "J", desc="Page down diff", tip="Page move")
+    def _scroll_page_down(self) -> None:
+        self.scroll_down(self.SCROLL_PAGE_SIZE)
+
+    @bind_action("page_up", "K", desc="Page up diff", tip="Page move")
+    def _scroll_page_up(self) -> None:
+        self.scroll_up(self.SCROLL_PAGE_SIZE)
+
+    @bind_action("next_hunk", "]", desc="Jump to next hunk", tip="Jump hunk")
+    def _next_hunk(self) -> None:
+        """Jump to next hunk header (@@ line)."""
+        if not self._hunk_starts:
+            return
+        pos = bisect.bisect_right(self._hunk_starts, self._i)
+        if pos < len(self._hunk_starts):
+            self._i = self._hunk_starts[pos]
+
+    @bind_action("prev_hunk", "[", desc="Jump to previous hunk", tip="Jump hunk")
+    def _prev_hunk(self) -> None:
+        """Jump to previous hunk header (@@ line)."""
+        if not self._hunk_starts:
+            return
+        pos = bisect.bisect_left(self._hunk_starts, self._i) - 1
+        if pos >= 0:
+            self._i = self._hunk_starts[pos]
+
+    @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
+    def _scroll_left(self) -> None:
+        self._col_offset = max(self._col_offset - self.SCROLL_COL_STEP, 0)
+
+    @bind_action("scroll_right", "l", desc="Scroll diff right", tip="Scroll")
+    def _scroll_right(self) -> None:
+        self._col_offset = min(
+            self._col_offset + self.SCROLL_COL_STEP, self._max_col_offset
+        )
+
+    @bind_action("col_home", "0", desc="Scroll to first column")
+    def _scroll_col_home(self) -> None:
+        self._col_offset = 0
+
+    @bind_action("col_end", "$", desc="Scroll to last column")
+    def _scroll_col_end(self) -> None:
+        self._col_offset = self._max_col_offset
+
     @bind_action("back", "esc", desc="Close diff and return", tip="Back")
     def _leave_display(self) -> None:
         if self._file_history_mode:
@@ -781,6 +839,45 @@ class DiffViewer(LineTextBrowser):
             return
         if self.come_from is not None:
             self.emit(EVT_GOTO, target=self.come_from)
+
+    @bind_action(
+        "hunk_mode",
+        "H",
+        desc="Toggle hunk staging mode (working-tree diffs; not in file history)",
+        tip="Hunk mode",
+        tip_when=lambda self: not self._file_history_mode
+        and self._diff_type is not DiffType.COMMIT,
+    )
+    def toggle_hunk_mode(self) -> None:
+        if self._diff_type is DiffType.COMMIT:
+            return
+        if not self._hunks:
+            show_toast("No hunks available", duration=1.5, kind=FeedbackKind.WARNING)
+            return
+        self._hunk_mode = not self._hunk_mode
+        if self._hunk_mode:
+            self._hunk_index = 0
+            self._scroll_to_hunk(self._hunk_index)
+
+    @bind_action(
+        "stage_hunk",
+        "s",
+        desc="Stage current hunk (hunk mode)",
+        tip="Stage hunk",
+        tip_when=lambda self: self._hunk_mode,
+    )
+    def _stage_current_hunk(self) -> None:
+        self._run_hunk_action("stage")
+
+    @bind_action(
+        "discard_hunk",
+        "d",
+        desc="Discard current hunk (hunk mode; irreversible)",
+        tip="Discard hunk",
+        tip_when=lambda self: self._hunk_mode,
+    )
+    def _discard_current_hunk(self) -> None:
+        self._run_hunk_action("discard", needs_confirm=True)
 
     @bind_action(
         "file_history",
@@ -808,6 +905,36 @@ class DiffViewer(LineTextBrowser):
             )
             return
         self._enter_file_history(path)
+
+    @bind_action(
+        "prev_commit",
+        "p",
+        desc="Go to older commit that touched this file (file history mode)",
+        tip="Older",
+        tip_when=lambda self: self._file_history_mode,
+    )
+    def _prev_file_commit(self) -> None:
+        """Go to older commit that touched this file."""
+        if not self._file_history_mode:
+            return
+        if self._file_history_index < len(self._file_history_commits) - 1:
+            self._file_history_index += 1
+            self._load_file_history_at_current_index()
+
+    @bind_action(
+        "next_commit",
+        "n",
+        desc="Go to newer commit that touched this file (file history mode)",
+        tip="Newer",
+        tip_when=lambda self: self._file_history_mode,
+    )
+    def _next_file_commit(self) -> None:
+        """Go to newer commit that touched this file."""
+        if not self._file_history_mode:
+            return
+        if self._file_history_index > 0:
+            self._file_history_index -= 1
+            self._load_file_history_at_current_index()
 
     def _enter_file_history(self, path: str) -> None:
         """Save diff state and switch to File History view."""
@@ -880,113 +1007,7 @@ class DiffViewer(LineTextBrowser):
             self.come_from = snap.come_from
         self._saved_diff_state = None
 
-    @bind_action(
-        "prev_commit",
-        "p",
-        desc="Go to older commit that touched this file (file history mode)",
-        tip="Older",
-        tip_when=lambda self: self._file_history_mode,
-    )
-    def _prev_file_commit(self) -> None:
-        """Go to older commit that touched this file."""
-        if not self._file_history_mode:
-            return
-        if self._file_history_index < len(self._file_history_commits) - 1:
-            self._file_history_index += 1
-            self._load_file_history_at_current_index()
-
-    @bind_action(
-        "next_commit",
-        "n",
-        desc="Go to newer commit that touched this file (file history mode)",
-        tip="Newer",
-        tip_when=lambda self: self._file_history_mode,
-    )
-    def _next_file_commit(self) -> None:
-        """Go to newer commit that touched this file."""
-        if not self._file_history_mode:
-            return
-        if self._file_history_index > 0:
-            self._file_history_index -= 1
-            self._load_file_history_at_current_index()
-
-    @bind_action("down", "j", desc="Navigate diff lines down", tip="Navigate")
-    def _on_j(self) -> None:
-        if self._hunk_mode:
-            self._next_hunk_nav()
-        else:
-            self.scroll_down()
-
-    @bind_action("up", "k", desc="Navigate diff lines up", tip="Navigate")
-    def _on_k(self) -> None:
-        if self._hunk_mode:
-            self._prev_hunk_nav()
-        else:
-            self.scroll_up()
-
-    @bind_action("page_down", "J", desc="Page down diff", tip="Page move")
-    def _scroll_page_down(self) -> None:
-        self.scroll_down(self.SCROLL_PAGE_SIZE)
-
-    @bind_action("page_up", "K", desc="Page up diff", tip="Page move")
-    def _scroll_page_up(self) -> None:
-        self.scroll_up(self.SCROLL_PAGE_SIZE)
-
-    @bind_action("next_hunk", "]", desc="Jump to next hunk", tip="Jump hunk")
-    def _next_hunk(self) -> None:
-        """Jump to next hunk header (@@ line)."""
-        if not self._hunk_starts:
-            return
-        pos = bisect.bisect_right(self._hunk_starts, self._i)
-        if pos < len(self._hunk_starts):
-            self._i = self._hunk_starts[pos]
-
-    @bind_action("prev_hunk", "[", desc="Jump to previous hunk", tip="Jump hunk")
-    def _prev_hunk(self) -> None:
-        """Jump to previous hunk header (@@ line)."""
-        if not self._hunk_starts:
-            return
-        pos = bisect.bisect_left(self._hunk_starts, self._i) - 1
-        if pos >= 0:
-            self._i = self._hunk_starts[pos]
-
     # ── Horizontal scroll ──
-    @bind_action("scroll_right", "l", desc="Scroll diff right", tip="Scroll")
-    def _scroll_right(self) -> None:
-        self._col_offset = min(
-            self._col_offset + self.SCROLL_COL_STEP, self._max_col_offset
-        )
-
-    @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
-    def _scroll_left(self) -> None:
-        self._col_offset = max(self._col_offset - self.SCROLL_COL_STEP, 0)
-
-    @bind_action("col_home", "0", desc="Scroll to first column")
-    def _scroll_col_home(self) -> None:
-        self._col_offset = 0
-
-    @bind_action("col_end", "$", desc="Scroll to last column")
-    def _scroll_col_end(self) -> None:
-        self._col_offset = self._max_col_offset
-
-    @bind_action(
-        "hunk_mode",
-        "H",
-        desc="Toggle hunk staging mode (working-tree diffs; not in file history)",
-        tip="Hunk mode",
-        tip_when=lambda self: not self._file_history_mode
-        and self._diff_type is not DiffType.COMMIT,
-    )
-    def toggle_hunk_mode(self) -> None:
-        if self._diff_type is DiffType.COMMIT:
-            return
-        if not self._hunks:
-            show_toast("No hunks available", duration=1.5, kind=FeedbackKind.WARNING)
-            return
-        self._hunk_mode = not self._hunk_mode
-        if self._hunk_mode:
-            self._hunk_index = 0
-            self._scroll_to_hunk(self._hunk_index)
 
     def _next_hunk_nav(self) -> None:
         self._hunk_index = min(self._hunk_index + 1, len(self._hunks) - 1)
@@ -1019,26 +1040,6 @@ class DiffViewer(LineTextBrowser):
             self._alert_dialog.alert("Discard hunk?", on_confirm, destructive=True)
         else:
             self._apply_patch(patch, action=action)
-
-    @bind_action(
-        "stage_hunk",
-        "s",
-        desc="Stage current hunk (hunk mode)",
-        tip="Stage hunk",
-        tip_when=lambda self: self._hunk_mode,
-    )
-    def _stage_current_hunk(self) -> None:
-        self._run_hunk_action("stage")
-
-    @bind_action(
-        "discard_hunk",
-        "d",
-        desc="Discard current hunk (hunk mode; irreversible)",
-        tip="Discard hunk",
-        tip_when=lambda self: self._hunk_mode,
-    )
-    def _discard_current_hunk(self) -> None:
-        self._run_hunk_action("discard", needs_confirm=True)
 
     def _extract_hunk_patch(self, hunk_idx: int) -> str:
         """Extract file header + single hunk as a valid git patch.

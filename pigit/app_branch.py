@@ -134,66 +134,6 @@ class BranchPanel(ItemList):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    def describe_row(
-        self,
-        idx: int,
-        is_cursor: bool,
-        *,
-        item_idx: int | None = None,
-        sub_row: int = 0,
-    ) -> tuple[
-        list[Segment],
-        list[Segment] | None,
-        list[Segment],
-    ]:
-        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
-        focused = self.is_focus_leaf
-        is_head = idx < len(self.branches) and self.branches[idx].is_head
-        prefix = self.CURSOR if is_cursor else " "
-        if is_head:
-            fg = THEME.fg_success if focused else THEME.fg_dim
-        else:
-            fg = THEME.fg_primary if focused else THEME.fg_dim
-        left = [
-            Segment(
-                f"{prefix} {self.content[idx]}",
-                fg=fg,
-                style_flags=palette.STYLE_BOLD if is_cursor else 0,
-            )
-        ]
-
-        right: list[Segment] = []
-        if idx < len(self.branches):
-            branch = self.branches[idx]
-            if not branch.is_remote:
-                ahead = branch.ahead if branch.ahead != "?" else ""
-                behind = branch.behind if branch.behind != "?" else ""
-                if ahead:
-                    right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
-                if behind:
-                    if right:
-                        right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
-
-        return left, None, right
-
-    @bind_action(
-        "scope",
-        "R",
-        desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
-        tip="Scope",
-    )
-    def toggle_scope(self) -> None:
-        """Cycle branch scope: local -> remote -> all -> local."""
-        self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
-        scope = self._SCOPES[self._scope_idx]
-        label = self._SCOPE_LABELS[scope]
-        show_toast(f"Branch scope: {label}", duration=2.0, kind=FeedbackKind.INFO)
-        self.curr_no = 0
-        self._r_start = 0
-        self._vm.set_scope(scope)
-        self._vm.refresh()
-
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
     def checkout(self) -> None:
         if not self.branches:
@@ -222,27 +162,6 @@ class BranchPanel(ItemList):
     def new_branch(self) -> None:
         self._show_new_branch_sheet()
 
-    @bind_action("rename", "r", desc="Rename selected branch", tip="Rename")
-    def rename(self) -> None:
-        if not self.branches:
-            return
-        branch = self.branches[self.curr_no]
-        if branch.is_remote:
-            show_toast(
-                "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
-            )
-            return
-        self._show_rename_sheet(branch.name)
-
-    @bind_action(
-        "delete",
-        "d",
-        desc="Delete selected branch (fails if unmerged unless forced)",
-        tip="Delete",
-    )
-    def delete(self) -> None:
-        self._trigger_delete()
-
     @bind_action(
         "merge",
         "m",
@@ -251,15 +170,6 @@ class BranchPanel(ItemList):
     )
     def merge(self) -> None:
         self._trigger_merge()
-
-    @bind_action(
-        "rebase",
-        "i",
-        desc="Interactive rebase onto selected branch (rewrites history)",
-        tip="Rebase",
-    )
-    def rebase(self) -> None:
-        self._trigger_rebase()
 
     @bind_action(
         "create_pull_request", "p", desc="Open create pull request page in browser"
@@ -302,6 +212,96 @@ class BranchPanel(ItemList):
             return
 
         show_toast(f"Opened PR page for {head}", duration=1.5, kind=FeedbackKind.INFO)
+
+    @bind_action(
+        "scope",
+        "R",
+        desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
+        tip="Scope",
+    )
+    def toggle_scope(self) -> None:
+        """Cycle branch scope: local -> remote -> all -> local."""
+        self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
+        scope = self._SCOPES[self._scope_idx]
+        label = self._SCOPE_LABELS[scope]
+        show_toast(f"Branch scope: {label}", duration=2.0, kind=FeedbackKind.INFO)
+        self.curr_no = 0
+        self._r_start = 0
+        self._vm.set_scope(scope)
+        self._vm.refresh()
+
+    @bind_action("rename", "r", desc="Rename selected branch", tip="Rename")
+    def rename(self) -> None:
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_remote:
+            show_toast(
+                "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        self._show_rename_sheet(branch.name)
+
+    @bind_action(
+        "delete",
+        "d",
+        desc="Delete selected branch (fails if unmerged unless forced)",
+        tip="Delete",
+    )
+    def delete(self) -> None:
+        self._trigger_delete()
+
+    @bind_action(
+        "rebase",
+        "i",
+        desc="Interactive rebase onto selected branch (rewrites history)",
+        tip="Rebase",
+    )
+    def rebase(self) -> None:
+        self._trigger_rebase()
+
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[
+        list[Segment],
+        list[Segment] | None,
+        list[Segment],
+    ]:
+        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
+        focused = self.is_focus_leaf
+        is_head = idx < len(self.branches) and self.branches[idx].is_head
+        prefix = self.CURSOR if is_cursor else " "
+        if is_head:
+            fg = THEME.fg_success if focused else THEME.fg_dim
+        else:
+            fg = THEME.fg_primary if focused else THEME.fg_dim
+        left = [
+            Segment(
+                f"{prefix} {self.content[idx]}",
+                fg=fg,
+                style_flags=palette.STYLE_BOLD if is_cursor else 0,
+            )
+        ]
+
+        right: list[Segment] = []
+        if idx < len(self.branches):
+            branch = self.branches[idx]
+            if not branch.is_remote:
+                ahead = branch.ahead if branch.ahead != "?" else ""
+                behind = branch.behind if branch.behind != "?" else ""
+                if ahead:
+                    right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
+                if behind:
+                    if right:
+                        right.append(Segment(" ", fg=THEME.fg_muted))
+                    right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
+
+        return left, None, right
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""

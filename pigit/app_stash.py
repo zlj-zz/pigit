@@ -145,31 +145,6 @@ class StashPanel(ItemList):
     def previous_item(self, step: int = 1) -> None:
         self.previous(step)
 
-    def describe_row(
-        self,
-        idx: int,
-        is_cursor: bool,
-        *,
-        item_idx: int | None = None,
-        sub_row: int = 0,
-    ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
-        focused = self.is_focus_leaf
-        if not self.stashes or idx >= len(self.stashes):
-            return ([], None, [])
-        stash = self.stashes[idx]
-        cursor_prefix = self.CURSOR if is_cursor else " "
-        fg = THEME.fg_primary if focused else THEME.fg_dim
-        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-
-        left = [
-            Segment(cursor_prefix, fg=fg, style_flags=cursor_flags),
-            Segment(" ", fg=fg),
-        ]
-        ref_seg = Segment(f"{stash.ref}: ", fg=THEME.fg_muted)
-        msg_seg = Segment(stash.msg, fg=fg, style_flags=cursor_flags)
-        main = [ref_seg, msg_seg]
-        return left, main, []
-
     @bind_action(
         "view_diff", "enter", desc="View diff for selected stash", tip="View diff"
     )
@@ -205,6 +180,31 @@ class StashPanel(ItemList):
         stash = self.stashes[self.curr_no]
         result = self._vm.stash_drop(stash.ref)
         self._handle_result(result)
+
+    def describe_row(
+        self,
+        idx: int,
+        is_cursor: bool,
+        *,
+        item_idx: int | None = None,
+        sub_row: int = 0,
+    ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
+        focused = self.is_focus_leaf
+        if not self.stashes or idx >= len(self.stashes):
+            return ([], None, [])
+        stash = self.stashes[idx]
+        cursor_prefix = self.CURSOR if is_cursor else " "
+        fg = THEME.fg_primary if focused else THEME.fg_dim
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
+
+        left = [
+            Segment(cursor_prefix, fg=fg, style_flags=cursor_flags),
+            Segment(" ", fg=fg),
+        ]
+        ref_seg = Segment(f"{stash.ref}: ", fg=THEME.fg_muted)
+        msg_seg = Segment(stash.msg, fg=fg, style_flags=cursor_flags)
+        main = [ref_seg, msg_seg]
+        return left, main, []
 
     def _handle_result(self, result) -> None:
         if result.success:

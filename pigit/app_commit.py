@@ -157,6 +157,24 @@ class CommitPanel(ItemList):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
+    @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
+    def view_diff(self) -> None:
+        if self._view_mode is CommitViewMode.HEATMAP:
+            return
+        if not self.commits:
+            return
+        source_idx = self._filter.source_index(self.curr_no)
+        content = self._vm.load_diff(source_idx)
+        self.emit(
+            EVT_GOTO,
+            target="diff",
+            source=self,
+            key=self.commits[self.curr_no].sha,
+            content=content,
+            repo_path=self._vm.repo_path,
+            diff_type=DiffType.COMMIT,
+        )
+
     @bind_action(
         "toggle_expanded", "z", desc="Toggle expanded commit details", tip="Expand"
     )
@@ -173,8 +191,18 @@ class CommitPanel(ItemList):
             self.curr_no = max(0, min(saved_idx, len(self.commits) - 1))
             self._scroll_into_view()
 
-    def get_help_title(self) -> str:
-        return "Commit"
+    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="Graph")
+    def toggle_view(self) -> None:
+        """Toggle between list and contribution graph view."""
+        if self._view_mode is CommitViewMode.LIST:
+            self._view_mode = CommitViewMode.HEATMAP
+        else:
+            self._view_mode = CommitViewMode.LIST
+
+    @bind_action("search", "/", desc="Filter commit list by message or SHA")
+    def search(self) -> None:
+        """Activate the commit-list search filter."""
+        self._filter.enter()
 
     @bind_action("copy_sha", "Y", desc="Copy commit SHA to clipboard")
     def copy_sha(self) -> None:
@@ -195,36 +223,8 @@ class CommitPanel(ItemList):
             ),
         )
 
-    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="Graph")
-    def toggle_view(self) -> None:
-        """Toggle between list and contribution graph view."""
-        if self._view_mode is CommitViewMode.LIST:
-            self._view_mode = CommitViewMode.HEATMAP
-        else:
-            self._view_mode = CommitViewMode.LIST
-
-    @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
-    def view_diff(self) -> None:
-        if self._view_mode is CommitViewMode.HEATMAP:
-            return
-        if not self.commits:
-            return
-        source_idx = self._filter.source_index(self.curr_no)
-        content = self._vm.load_diff(source_idx)
-        self.emit(
-            EVT_GOTO,
-            target="diff",
-            source=self,
-            key=self.commits[self.curr_no].sha,
-            content=content,
-            repo_path=self._vm.repo_path,
-            diff_type=DiffType.COMMIT,
-        )
-
-    @bind_action("search", "/", desc="Filter commit list by message or SHA")
-    def search(self) -> None:
-        """Activate the commit-list search filter."""
-        self._filter.enter()
+    def get_help_title(self) -> str:
+        return "Commit"
 
     def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""

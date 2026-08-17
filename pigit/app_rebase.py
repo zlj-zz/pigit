@@ -174,10 +174,6 @@ class RebasePanel(ItemList):
     def action_fixup(self) -> None:
         self._set_action("fixup")
 
-    @bind_action("drop", "d", desc="Drop this commit (irreversible)", tip="drop")
-    def action_drop(self) -> None:
-        self._set_action("drop")
-
     @bind_action(
         "reword", "r", desc="Reword commit message (opens $EDITOR)", tip="reword"
     )
@@ -189,6 +185,10 @@ class RebasePanel(ItemList):
     )
     def action_edit(self) -> None:
         self._set_action("edit")
+
+    @bind_action("drop", "d", desc="Drop this commit (irreversible)", tip="drop")
+    def action_drop(self) -> None:
+        self._set_action("drop")
 
     def describe_row(
         self,
