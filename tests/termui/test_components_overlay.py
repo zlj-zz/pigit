@@ -561,6 +561,32 @@ class TestHelpPanel:
         assert panel._lines[0] == "[Global]"
         assert panel._line_segments[0][0].text == "[Global]"
 
+    def test_help_panel_mouse_wheel_scrolls(self):
+        """Wheel events scroll the help list like keyboard j/k."""
+        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
+        panel = HelpPanel(inner_width=40, inner_height=6)
+        panel.set_entries([(str(i), f"desc {i}") for i in range(20)])
+        panel.resize((80, 24))
+        assert panel._offset == 0
+
+        down = MouseEvent(
+            button=MouseButton.WHEEL_DOWN, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(down) is True
+        assert panel._offset == 1
+
+        up = MouseEvent(
+            button=MouseButton.WHEEL_UP, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(up) is True
+        assert panel._offset == 0
+
+        left = MouseEvent(
+            button=MouseButton.LEFT, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(left) is False
+
 
 class TestPopup:
     def _with_host(self, host):
