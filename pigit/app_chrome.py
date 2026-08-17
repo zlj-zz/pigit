@@ -40,7 +40,9 @@ class AppFooter(Component):
         if active is None:
             tab_view = by_id("tab_view", TabView)
             active = (
-                resolve_presentation_leaf(tab_view.active) if tab_view is not None else None
+                resolve_presentation_leaf(tab_view.active)
+                if tab_view is not None
+                else None
             )
         provider = getattr(active, "get_footer_entries", None) if active else None
         self.set_help_provider(provider)

@@ -3,7 +3,6 @@
 
 from typing import Dict
 
-
 _ada: str = r"""
 # Object file
 *.o
