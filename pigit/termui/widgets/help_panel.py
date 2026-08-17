@@ -70,8 +70,8 @@ class HelpPanel(Component):
     cramped in narrow terminals nor wastefully wide in large ones.
     """
 
-    MIN_INNER_W = 58
-    MAX_INNER_W = 108
+    MIN_INNER_W = 88
+    MAX_INNER_W = 158
 
     BINDINGS = [
         (keys.KEY_DOWN, "scroll_down"),
@@ -216,13 +216,15 @@ class HelpPanel(Component):
             for i, desc_line in enumerate(wrapped):
                 if i == 0:
                     pad = max_key_w - wcswidth(key_disp)
-                    line = f"{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                    line = f"{' ' * pad}{key_disp}{' ' * gap}{desc_line}"
                     seg: list[Segment] = []
+                    if pad:
+                        seg.append(Segment(" " * pad))
                     if self._key_fg is not None:
                         seg.append(Segment(key_disp, fg=self._key_fg))
-                        seg.append(Segment(" " * pad + " " * gap))
+                        seg.append(Segment(" " * gap))
                     else:
-                        seg.append(Segment(key_disp + " " * pad + " " * gap))
+                        seg.append(Segment(key_disp + " " * gap))
                     seg.append(Segment(desc_line))
                 else:
                     indent = max_key_w + gap
@@ -251,21 +253,27 @@ class HelpPanel(Component):
         for title, entries in groups:
             if not entries:
                 continue
-            lines.append(title)
-            segments.append([Segment(title, style_flags=palette.STYLE_BOLD)])
+            header = f"[{title}]"
+            lines.append(header)
+            segments.append([Segment(header, style_flags=palette.STYLE_BOLD)])
             for key_disp, desc in entries:
                 wrapped = _wrap_text(desc, desc_avail)
                 for i, desc_line in enumerate(wrapped):
                     if i == 0:
                         pad = max_key_w - wcswidth(key_disp)
-                        line = f"{' ' * group_indent}{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                        line = (
+                            f"{' ' * group_indent}{' ' * pad}{key_disp}"
+                            f"{' ' * gap}{desc_line}"
+                        )
                         seg: list[Segment] = []
                         seg.append(Segment(" " * group_indent))
+                        if pad:
+                            seg.append(Segment(" " * pad))
                         if self._key_fg is not None:
                             seg.append(Segment(key_disp, fg=self._key_fg))
-                            seg.append(Segment(" " * pad + " " * gap))
+                            seg.append(Segment(" " * gap))
                         else:
-                            seg.append(Segment(key_disp + " " * pad + " " * gap))
+                            seg.append(Segment(key_disp + " " * gap))
                         seg.append(Segment(desc_line))
                     else:
                         indent = group_indent + max_key_w + gap
