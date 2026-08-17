@@ -132,8 +132,8 @@ class CommitEditor(Component):
     # -- Component overrides ----------------------------------------------
 
     @property
-    def presented_child(self) -> Component | None:
-        """Return the currently focused input for focus/inspector delegation."""
+    def focus_child(self) -> Component | None:
+        """Return the currently focused input."""
         return self._current_input()
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:

@@ -90,10 +90,10 @@ class CommandPalette(Component):
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """Route key to palette while active on a sheet layer."""
-        self.on_key(key)
+        self.handle_key(key)
         return OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def on_key(self, key: str) -> None:
+    def handle_key(self, key: str) -> bool:
         """Process keyboard input."""
         match key:
             case keys.KEY_ESC:
@@ -114,7 +114,8 @@ class CommandPalette(Component):
                     self._selected = min(len(self._candidates) - 1, self._selected + 1)
             case _:
                 # Delegate all editing keys to InputLine.
-                self._input_line.on_key(key)
+                self._input_line.handle_key(key)
+        return True
 
     def _on_input_changed(self, value: str) -> None:
         """Callback fired by InputLine when value changes."""

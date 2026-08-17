@@ -300,9 +300,6 @@ class HelpPanel(Component):
         if self._on_toggle is not None:
             self._on_toggle()
 
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""
-
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         surface.fill_rect_rgb(
             0, 0, self._outer_w, self.outer_row_count, palette.DEFAULT_BG

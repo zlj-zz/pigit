@@ -27,26 +27,34 @@ flowchart TB
     subgraph loop["AppEventLoop._loop"]
         D{semantic string key?}
         RS["window resize?"]
-        OV{has_overlay_open?}
-        OVR[LayerStack.dispatch -> Popup.dispatch_overlay_key]
-        APP[_key_handlers or root._handle_event]
+        ROOT["ComponentRoot._handle_event"]
     end
     KB --> D
     D -->|yes| RS
-    RS -->|yes| resize[resize + render]
-    RS -->|no| OV
-    OV -->|yes| OVR
-    OV -->|no| APP
+    RS -->|yes| resize[on_before_resize + tree resize + render]
+    RS -->|no| ROOT
+    ROOT --> OVR[overlay → root bindings / handle_key → focus leaf]
     OVR --> render1[render]
-    APP --> maybe[overlay opened mid-handler?]
-    maybe -->|yes| render1
     R --> loop
 ```
 
 - **Session** opens the alternate screen and creates a **Renderer**.
 - **Renderer** is bound to the current context via `ContextVar` (`set_renderer` / `reset_renderer`).
-- **Loop root** (`_child`) is `ComponentRoot`, which delegates overlay checks and dispatch to `LayerStack`.
-- **Application** facade (`Application` class) wraps `build_root()` -> `ComponentRoot` -> `_ApplicationEventLoop` assembly.
+- **Loop root** (`_child`) is `ComponentRoot`, which owns overlay dispatch, app-level bindings / `handle_key`, then the focus leaf.
+- After an overlay consumes a key, `sync_focus_to_overlay_or_leaf()` re-resolves the overlay focus leaf (load-bearing for Sheet editors that change `focus_child` without `set_focus_chain`).
+- Body keys start at `FocusManager.get_focus_leaf()` (or `resolve_focus_leaf(body)`), then `capture_key` → bindings → `handle_key` → parent bubble. `TabView._handle_event` may still forward to the active tab. Bubble into `ComponentRoot` is a no-op (root keys already ran).
+- **Application** facade (`Application` class) wraps `build_root()` → `ComponentRoot` (with app keys installed) → `AppEventLoop`.
+
+### Focus and presentation
+
+Two orthogonal walks (containers override the hooks; default is `None`):
+
+| Hook | Walk | Meaning |
+|------|------|---------|
+| `focus_child` | `resolve_focus_leaf` | Who receives the next key |
+| `presentation_child` | `resolve_presentation_leaf` | Who owns help / footer / panel chrome |
+
+A focus-managed `Column` exposes both as the focused child. `CommitEditor` sets `focus_child` to the current `InputLine` and leaves `presentation_child` as `None` (the editor owns chrome). `FocusManager._leaf` is always a resolved focus leaf; `Column.set_focus_index` and `TabView` start/route call `set_focus_chain(resolve_focus_leaf(...))`.
 
 ### Layer stacking
 
@@ -124,8 +132,8 @@ flowchart LR
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize -> overlay -> main dispatch |
 | `_session.py` | `Session`: TTY setup, creates `Renderer` |
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
-| `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
-| `_bindings.py` | `bind_keys`, `list_bindings`, `BindingError`, merged handler resolution |
+| `_surface.py` | `Surface` / `FlatCell` intermediate layer; `subsurface` for component clipping |
+| `_bindings.py` | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | `keys.py` | Semantic key constants and the `SemanticEvent` union (`str` or `MouseEvent`) |
 | `_text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
 | `input.py` | Low-level byte reader -> semantic strings, terminal input handling |
@@ -149,8 +157,8 @@ Stable names are listed in `__all__` inside `__init__.py`.
 | **Overlays** | `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast` |
 | **Overlay types** | `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, `OverlaySurface` |
 | **Application** | `Application`, `ComponentRoot`, `ExitEventLoop` |
-| **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
-| **Bindings** | `bind_keys`, `list_bindings`, `BindingError` |
+| **Rendering** | `Surface`, `FlatCell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
+| **Bindings** | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | **Registry** | `by_id`, `get_registry` |
 | **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `get_badge_signal`, `show_spinner`, `hide_spinner`, `exec_external` |
 | **Text** | `plain`, `SyntaxTokenizer` |
@@ -161,7 +169,7 @@ Stable names are listed in `__all__` inside `__init__.py`.
 Import the package once for app-level wiring:
 
 ```python
-from pigit.termui import Application, Component, bind_keys, keys
+from pigit.termui import Application, Component, bind_action, keys
 from pigit.termui.containers import TabView
 ```
 
@@ -171,7 +179,7 @@ from pigit.termui.containers import TabView
 from pigit.termui import keys, palette, Segment
 
 # Key constants
-@bind_keys("j", keys.KEY_DOWN)
+@bind_action("next", "j", keys.KEY_DOWN)
 def next(self): ...
 
 # Style flags
@@ -215,11 +223,11 @@ class MyApp(Application):
 MyApp().run()
 ```
 
-`_ApplicationEventLoop` bridges `Application` into `AppEventLoop`: app-level bindings take precedence over child tree bindings when no overlay is open.
+Application installs its `@bind_action` / `BINDINGS` / `handle_key` on `ComponentRoot`. Overlay keys win; then those root-level keys; then the focused leaf. `AppEventLoop` does not special-case Application.
 
 ### Component tree and loop root
 
-`AppEventLoop` holds a single root `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack` and a body component. `ComponentRoot` implements `has_overlay_open()` and `try_dispatch_overlay(key)` by delegating to its `LayerStack`.
+`AppEventLoop` holds a single root `Component` (`_child`). In practice this is `ComponentRoot`, which owns a `LayerStack`, the body, and the app-level `key_handlers` / `handle_key` installed by `Application`. Keys enter at `ComponentRoot._handle_event`.
 
 Application code constructs `Popup(help_panel)` (`_help_panel` / `_help_popup`); `_runtime_context` provides overlay helpers to push/pop modal layers onto the host's `LayerStack`. Call `HelpPanel.refresh_entries_from_source()` from the app when opening help if you want rows synced from `host.children` (not from `Popup`). Bind `?` to a handler that refreshes help then `_help_popup.toggle()`. `AlertDialog` subclasses `Popup` and overrides ESC via `_on_exit_key`; it uses `_runtime_context` for session management.
 
@@ -272,19 +280,31 @@ segments = [
 
 ### Bindings
 
-`bind_keys` attaches handlers to methods; class-level `BINDINGS` lists are merged with `resolve_key_handlers_merged`. Duplicate keys toward the same target raise `BindingError` in strict mode (see `_bindings.py`).
+`@bind_action` is the single source of truth for key bindings. It declares a stable
+action id, default keys, and help metadata on a method:
 
 ```python
 class MyPanel(Component):
     BINDINGS = [("q", "quit")]
 
-    @bind_keys("j", keys.KEY_DOWN)
+    @bind_action("next", "j", keys.KEY_DOWN, desc="Next item", tip="Next")
     def next(self):
         ...
 
     def quit(self):
         raise ExitEventLoop("Quit")
 ```
+
+- `action` — stable id (namespace-scoped via `keymap_namespace`), used for remapping.
+- `*keys` — default semantic keys triggering the method.
+- `desc` — full help text; `tip` — compact footer hint.
+- `when` — callable hiding the entry from help/footer when it returns False.
+- `configurable` — whether the user may remap via the `[keybindings]` config section.
+
+`BINDINGS` remains for simple `(key, target)` pairs that need no help/footer metadata.
+`Component.__init__` resolves both into `_key_handlers` (semantic key → callable) via
+`resolve_key_handlers` and `collect_action_bindings`; `set_key_overrides` installs user
+remaps that `resolve_action_keys` then applies.
 
 ## Minimal example
 
@@ -321,7 +341,7 @@ When adding new components or extending existing ones, follow these rules so the
 1. **Segment-first rendering**
    - All new text rendering must use `Segment` (or `draw_segments`).
    - The old `(text, fg, bold)` tuple is deprecated; do not introduce new call sites.
-   - `FlatCell(..., bold=True)` remains supported for backward compatibility (internally mapped to `style_flags |= STYLE_BOLD`).
+   - Use `style_flags=STYLE_BOLD` (and other `palette` flags) on `FlatCell` / `Segment`.
 
 2. **Colors and style flags via `palette`**
    - Never hard-code RGB tuples in component code.

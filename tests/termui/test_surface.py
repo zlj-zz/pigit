@@ -5,19 +5,19 @@ Tests for pigit.termui.surface.
 
 from __future__ import annotations
 
-from pigit.termui._surface import Cell, FlatCell, Surface
+from pigit.termui._surface import FlatCell, Surface
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 
 class TestCell:
     def test_default_cell_is_blank(self):
-        c = Cell()
+        c = FlatCell()
         assert c.char == " "
         assert c.fg is None
         assert c.bg is None
 
     def test_cell_with_values(self):
-        c = Cell(char="X", fg=(255, 0, 0))
+        c = FlatCell(char="X", fg=(255, 0, 0))
         assert c.char == "X"
         assert c.fg == (255, 0, 0)
 
@@ -178,11 +178,6 @@ class TestFlatCell:
         assert a == b
         assert a != c
         assert hash(a) == hash(b)
-
-    def test_cell_alias(self):
-        c = Cell("X", fg=(255, 0, 0))
-        assert isinstance(c, FlatCell)
-        assert c.fg == (255, 0, 0)
 
 
 class TestSurfaceRGB:

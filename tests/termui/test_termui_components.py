@@ -18,11 +18,6 @@ class _Leaf(Component):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_help_entries(self):
-        from pigit.termui._component import _default_help_entries
-
-        return _default_help_entries(self)
-
     def refresh(self):
         pass
 
@@ -100,11 +95,11 @@ class TestComponentBase:
         leaf._handle_event("x")
         assert leaf.called is True
 
-    def test_handle_event_on_key(self):
+    def test_handle_event_handle_key(self):
         leaf = _Leaf()
-        leaf.on_key = MagicMock()
+        leaf.handle_key = MagicMock(return_value=True)
         leaf._handle_event("k")
-        leaf.on_key.assert_called_once_with("k")
+        leaf.handle_key.assert_called_once_with("k")
 
     def test_has_overlay_open_default(self):
         assert _Leaf().has_overlay_open() is False
@@ -113,17 +108,6 @@ class TestComponentBase:
         assert (
             _Leaf().try_dispatch_overlay("k") is OverlayDispatchResult.DROPPED_UNBOUND
         )
-
-    def test_get_help_entries_derives_from_bindings(self):
-        class _Bound(_Leaf):
-            BINDINGS = [("x", "on_x")]
-
-            def on_x(self):
-                """Do the thing."""
-                pass
-
-        entries = _Bound().get_help_entries()
-        assert any("x" == e[0] and "Do the thing." in e[1] for e in entries)
 
 
 class TestTabView:

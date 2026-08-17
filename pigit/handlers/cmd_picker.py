@@ -26,6 +26,8 @@ from pigit.termui.containers import Column
 from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import InputLine, ItemList, StatusBar
 from pigit.termui.tty_io import (
+    UNSUPPORTED_PLATFORM_MSG,
+    platform_supported,
     terminal_size,
     truncate_line,
     tty_ok,
@@ -129,6 +131,8 @@ def run_cmd_new_picker(
     Returns:
         (exit_code, message) tuple
     """
+    if not platform_supported():
+        return 1, UNSUPPORTED_PLATFORM_MSG
     if not _tty_ok():
         return 1, NO_TTY_MSG
 
@@ -361,17 +365,18 @@ def run_cmd_new_picker(
         def get_terminal_too_small_msg(self) -> str:
             return _TERMINAL_TOO_SMALL_MSG
 
-        def on_key(self, key: str) -> None:
+        def handle_key(self, key: str) -> bool:
             if self._number_buf is not None:
                 self._on_number_prefix(key)
-                return
+                return True
             if self._mode == PickerMode.PARAM_INPUT:
-                self._input.on_key(key)
-                return
+                self._input.handle_key(key)
+                return True
             if self._input.is_visible:
-                self._input.on_key(key)
-                return
+                self._input.handle_key(key)
+                return True
             self._on_browse(key)
+            return True
 
         def on_confirm(self) -> None:
             self._enter_param_input()

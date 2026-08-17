@@ -14,7 +14,6 @@ from .._component import Component
 from .._runtime_context import get_focus_manager, request_render
 from .._surface import Surface, _Subsurface
 from ..reactive import Signal
-from ..tty_io import truncate_line
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
 
@@ -275,7 +274,7 @@ class InputLine(Component):
         self._candidate_idx = 0
         self._showing_candidates = False
 
-    def on_key(self, key: str) -> None:
+    def handle_key(self, key: str) -> bool:
         """Process keyboard input for this input line.
 
         Callers (e.g. ``Application`` subclasses) are responsible for
@@ -284,7 +283,7 @@ class InputLine(Component):
         if self._overlay_mode and not self._visible:
             if key == self._activate_key:
                 self._enter_overlay_mode()
-                return
+                return True
 
         # ── Enter / Shift+Enter ──────────────────────────────────────────
         if key in (keys.KEY_ENTER, keys.KEY_SHIFT_ENTER):
@@ -295,15 +294,15 @@ class InputLine(Component):
                 self._cursor_sig.set(len(self._value_sig.value))
                 self._showing_candidates = False
                 self._candidates = []
-                return
+                return True
             # on_submit (Enter only, not Shift+Enter)
             if not is_shift and self._on_submit:
                 self._on_submit(self._value_sig.value)
-                return
+                return True
             # Insert newline if allowed
             if self._allow_newline:
                 self.insert("\n")
-            return
+            return True
 
         # ── Esc ──────────────────────────────────────────────────────────
         if key == keys.KEY_ESC:
@@ -312,13 +311,13 @@ class InputLine(Component):
                 self._cursor_sig.set(len(self._value_sig.value))
                 self._showing_candidates = False
                 self._candidates = []
-                return
+                return True
             if self._overlay_mode and self._visible:
                 self._exit_overlay_mode()
-                return
+                return True
             if self._on_cancel:
                 self._on_cancel()
-            return
+            return True
 
         # ── Tab / Shift+Tab (completion) ─────────────────────────────────
         if key in (keys.KEY_TAB, keys.KEY_SHIFT_TAB) and self._candidate_provider:
@@ -335,7 +334,7 @@ class InputLine(Component):
             if self._candidates:
                 self._value_sig.set(self._candidates[self._candidate_idx])
                 self._cursor_sig.set(len(self._value_sig.value))
-            return
+            return True
 
         # ── Up / Down ────────────────────────────────────────────────────
         if key in (keys.KEY_UP, keys.KEY_DOWN):
@@ -346,12 +345,12 @@ class InputLine(Component):
                 )
                 self._value_sig.set(self._candidates[self._candidate_idx])
                 self._cursor_sig.set(len(self._value_sig.value))
-                return
+                return True
             if key == keys.KEY_UP:
                 self.cursor_up()
             else:
                 self.cursor_down()
-            return
+            return True
 
         # ── Plain text editing ───────────────────────────────────────────
         if key == keys.KEY_BACKSPACE:
@@ -368,10 +367,11 @@ class InputLine(Component):
             self.end()
         elif len(key) == 1 and key.isprintable() and ord(key) >= 32:
             self.insert(key)
+        return True
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """Route keys to this input line when it is inside an overlay (Sheet/Popup)."""
-        self.on_key(key)
+        self.handle_key(key)
         return OverlayDispatchResult.HANDLED_EXPLICIT
 
     def cursor_left(self) -> None:

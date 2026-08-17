@@ -17,9 +17,8 @@ from pigit.termui._async_task import run_async
 from pigit.termui import (
     EVT_GOTO,
     FeedbackKind,
-    bind_keys,
+    bind_action,
     bind_signals,
-    keys,
     palette,
     Segment,
     show_badge,
@@ -148,23 +147,19 @@ class CommitPanel(ItemList):
             tuple[tuple[Segment, ...], tuple[Segment, ...]]
         ] = []
 
-    @bind_keys("j", keys.KEY_DOWN)
+    keymap_namespace = "commit"
+
+    @bind_action("next", "j", "down", desc="Navigate commit list", tip="Navigate")
     def next(self, step: int = 1) -> None:
         super().next(step)
 
-    @bind_keys("k", keys.KEY_UP)
+    @bind_action("previous", "k", "up", desc="Navigate commit list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    @bind_keys("g")
-    def toggle_view(self) -> None:
-        """Toggle between list and contribution graph view."""
-        if self._view_mode is CommitViewMode.LIST:
-            self._view_mode = CommitViewMode.HEATMAP
-        else:
-            self._view_mode = CommitViewMode.LIST
-
-    @bind_keys("z")
+    @bind_action(
+        "toggle_expanded", "z", desc="Toggle expanded commit details", tip="Expand"
+    )
     def toggle_expanded(self) -> None:
         """Toggle compact (single-line) and expanded (git-log style) commit rows."""
         if self._view_mode is not CommitViewMode.LIST:
@@ -181,7 +176,7 @@ class CommitPanel(ItemList):
     def get_help_title(self) -> str:
         return "Commit"
 
-    @bind_keys("Y")
+    @bind_action("copy_sha", "Y", desc="Copy commit SHA to clipboard")
     def copy_sha(self) -> None:
         """Copy the selected commit SHA to the clipboard."""
         commit = self._current_commit()
@@ -200,16 +195,36 @@ class CommitPanel(ItemList):
             ),
         )
 
+    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="Graph")
+    def toggle_view(self) -> None:
+        """Toggle between list and contribution graph view."""
+        if self._view_mode is CommitViewMode.LIST:
+            self._view_mode = CommitViewMode.HEATMAP
+        else:
+            self._view_mode = CommitViewMode.LIST
+
+    @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
+    def view_diff(self) -> None:
+        if self._view_mode is CommitViewMode.HEATMAP:
+            return
+        if not self.commits:
+            return
+        source_idx = self._filter.source_index(self.curr_no)
+        content = self._vm.load_diff(source_idx)
+        self.emit(
+            EVT_GOTO,
+            target="diff",
+            source=self,
+            key=self.commits[self.curr_no].sha,
+            content=content,
+            repo_path=self._vm.repo_path,
+            diff_type=DiffType.COMMIT,
+        )
+
     def get_help_entries(self) -> list[tuple[str, str]]:
-        """Return help pairs for commit panel."""
-        return [
-            ("jk/↑↓", "Navigate"),
-            ("↵ ", "View"),
-            ("/", "Search"),
-            ("g", "Toggle view"),
-            ("z", "Toggle expanded"),
-            ("Y", "Copy SHA"),
-        ]
+        entries = super().get_help_entries()
+        entries.append(("/", "Search"))
+        return entries
 
     def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""
@@ -755,25 +770,9 @@ class CommitPanel(ItemList):
         self._contrib_graph.resize((w, graph_h))
         self._contrib_graph.render_into(surface)
 
-    def on_key(self, key: str) -> None:
+    def capture_key(self, key: str) -> bool:
         if self._view_mode is CommitViewMode.HEATMAP:
-            # Contribution graph is view-only; g toggles back to list.
-            return
-
+            return False
         if self._filter.handle_key(key):
-            return
-
-        if key == keys.KEY_ENTER:
-            if not self.commits:
-                return
-            source_idx = self._filter.source_index(self.curr_no)
-            content = self._vm.load_diff(source_idx)
-            self.emit(
-                EVT_GOTO,
-                target="diff",
-                source=self,
-                key=self.commits[self.curr_no].sha,
-                content=content,
-                repo_path=self._vm.repo_path,
-                diff_type=DiffType.COMMIT,
-            )
+            return True
+        return self._filter.active

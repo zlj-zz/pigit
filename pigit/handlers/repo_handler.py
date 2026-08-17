@@ -240,7 +240,11 @@ class RepoCommandHandler:
             title=title,
             initial_filter=filter_regex,
         )
-        if exit_code != 0 or not selected:
+        if exit_code != 0:
+            if isinstance(selected, str):
+                self.console.echo(selected)
+            return None
+        if not isinstance(selected, list) or not selected:
             return None
         return selected
 

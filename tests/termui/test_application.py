@@ -6,18 +6,10 @@ Author: Zev
 Date: 2026-04-17
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 
-from pigit.termui._application import Application, _ApplicationEventLoop
+from pigit.termui._application import Application
 from pigit.termui._component import Component
-from pigit.termui._runtime_context import (
-    get_focus_manager,
-    set_focus_manager,
-    FocusManager,
-)
-from pigit.termui._root import ComponentRoot
-from pigit.termui.types import LayerKind
 
 
 class DummyRoot(Component):
@@ -36,13 +28,37 @@ class DummyApp(Application):
 
 
 class TestApplication:
-    def test_run_builds_root_and_starts_loop(self):
+    def test_run_uses_app_event_loop(self):
         app = DummyApp()
-        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
+        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
             mock_loop = MagicMock()
             MockLoop.return_value = mock_loop
             app.run()
+            MockLoop.assert_called_once()
             mock_loop.run.assert_called_once()
+            root = MockLoop.call_args.args[0]
+            assert root.body.__class__ is DummyRoot
+
+    def test_run_installs_bindings_and_handle_key_on_root(self):
+        class _App(DummyApp):
+            BINDINGS = [("x", "do_x")]
+
+            def do_x(self):
+                pass
+
+            def handle_key(self, key):
+                return False
+
+        app = _App()
+        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
+            app.run()
+            root = MockLoop.call_args.args[0]
+            assert "x" in root._key_handlers
+            assert root._root_handle_key is not None
+            kwargs = MockLoop.call_args.kwargs
+            assert callable(kwargs.get("on_after_start"))
+            assert kwargs.get("on_before_resize") == app.resize
 
     def test_after_start_hook_called(self):
         class Hooked(DummyApp):
@@ -50,80 +66,16 @@ class TestApplication:
                 self.hooked = True
 
         app = Hooked()
-        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
-            mock_loop = MagicMock()
-
-            def _simulate_run():
-                mock_loop.after_start()
-
-            mock_loop.run = Mock(side_effect=_simulate_run)
-            mock_loop.after_start = Mock(side_effect=app.after_start)
-            MockLoop.return_value = mock_loop
+        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
             app.run()
-            mock_loop.run.assert_called_once()
+            MockLoop.call_args.kwargs["on_after_start"]()
             assert app.hooked is True
 
     def test_destroy_called_after_loop_exit(self):
         """root.destroy() must be called in finally block after loop exits."""
         app = DummyApp()
-        with patch("pigit.termui._application._ApplicationEventLoop") as MockLoop:
-            mock_loop = MagicMock()
-            MockLoop.return_value = mock_loop
+        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
             app.run()
             assert app._root is None
-            # destroy() was called during cleanup in finally block
-
-
-class _FakeOverlay(Component):
-    NAME = "overlay"
-
-    def __init__(self):
-        super().__init__()
-        self.open = True
-
-    def _render_surface(self, surface):
-        pass
-
-    def refresh(self):
-        pass
-
-    def dispatch_overlay_key(self, key: str):
-        from pigit.termui.types import OverlayDispatchResult
-
-        return OverlayDispatchResult.DROPPED_UNBOUND
-
-
-class TestApplicationEventLoop:
-    def test_app_binding_closes_overlay_restores_focus(self):
-        """When an app-level binding closes an open overlay, focus must be
-        restored to the body component tree so background panels undim."""
-        body = DummyRoot()
-        root = ComponentRoot(body)
-
-        class _App(Application):
-            BINDINGS = [("x", "close_overlay")]
-
-            def build_root(self):
-                return body
-
-            def close_overlay(self):
-                root._layer_stack.pop(LayerKind.MODAL)
-
-        app = _App()
-        loop = _ApplicationEventLoop(root, app, alt=False)
-        loop.before_dispatch_key = Mock()
-        loop.render = Mock()
-
-        # Simulate an overlay being open
-        overlay = _FakeOverlay()
-        root._layer_stack.push(LayerKind.MODAL, overlay)
-        fm = get_focus_manager()
-        if fm is not None:
-            fm.set_focus_chain(overlay)
-
-        # Dispatch the app binding that closes the overlay
-        loop._dispatch_semantic_string("x")
-
-        # Focus should be restored to body leaf
-        assert body.is_focus_leaf
-        loop.render.assert_called_once()

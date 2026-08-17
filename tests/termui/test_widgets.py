@@ -136,13 +136,13 @@ class TestInputLine:
         called = []
         inp = InputLine(on_submit=lambda v: called.append(v))
         inp.insert("x")
-        inp.on_key("enter")
+        inp.handle_key("enter")
         assert called == ["x"]
 
     def test_on_cancel(self):
         called = []
         inp = InputLine(on_cancel=lambda: called.append("cancel"))
-        inp.on_key("esc")
+        inp.handle_key("esc")
         assert called == ["cancel"]
 
     def test_set_prompt(self):
@@ -154,7 +154,7 @@ class TestInputLine:
     def test_tab_triggers_completion(self):
         inp = InputLine(candidate_provider=lambda text: ["foo", "bar", "baz"])
         inp.insert("f")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp._showing_candidates is True
         assert inp._candidates == ["foo", "bar", "baz"]
         assert inp.value == "foo"
@@ -162,19 +162,19 @@ class TestInputLine:
     def test_tab_with_no_provider_is_ignored(self):
         inp = InputLine()
         inp.insert("x")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "x"
         assert not inp._showing_candidates
 
     def test_completion_navigate_up_down(self):
         inp = InputLine(candidate_provider=lambda text: ["a", "b", "c"])
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "a"
-        inp.on_key("down")
+        inp.handle_key("down")
         assert inp.value == "b"
-        inp.on_key("down")
+        inp.handle_key("down")
         assert inp.value == "c"
-        inp.on_key("up")
+        inp.handle_key("up")
         assert inp.value == "b"
 
     def test_completion_enter_closes_without_submit(self):
@@ -184,14 +184,14 @@ class TestInputLine:
             on_submit=lambda v: submitted.append(v),
         )
         inp.insert("a")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp._showing_candidates
-        inp.on_key("enter")
+        inp.handle_key("enter")
         assert not inp._showing_candidates
         assert inp.value == "alpha"
         assert submitted == []
         # Second Enter triggers submit
-        inp.on_key("enter")
+        inp.handle_key("enter")
         assert submitted == ["alpha"]
 
     def test_completion_esc_restores_original(self):
@@ -199,9 +199,9 @@ class TestInputLine:
             candidate_provider=lambda text: ["alpha"],
         )
         inp.set_value("orig")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "alpha"
-        inp.on_key("esc")
+        inp.handle_key("esc")
         assert not inp._showing_candidates
         assert inp.value == "orig"
 
@@ -209,40 +209,40 @@ class TestInputLine:
         inp = InputLine(
             candidate_provider=lambda text: ["a", "b", "c"],
         )
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "a"
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "b"
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "c"
         # does not wrap past end
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "c"
 
     def test_shift_tab_prev_candidate(self):
         inp = InputLine(
             candidate_provider=lambda text: ["a", "b", "c"],
         )
-        inp.on_key("tab")
-        inp.on_key("tab")
-        inp.on_key("tab")
+        inp.handle_key("tab")
+        inp.handle_key("tab")
+        inp.handle_key("tab")
         assert inp.value == "c"
-        inp.on_key("shift tab")
+        inp.handle_key("shift tab")
         assert inp.value == "b"
-        inp.on_key("shift tab")
+        inp.handle_key("shift tab")
         assert inp.value == "a"
         # does not wrap past start
-        inp.on_key("shift tab")
+        inp.handle_key("shift tab")
         assert inp.value == "a"
 
     def test_set_candidate_provider_none_disables_tab(self):
         inp = InputLine(
             candidate_provider=lambda text: ["x"],
         )
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert inp._showing_candidates
         inp.set_candidate_provider(None)
-        inp.on_key("tab")
+        inp.handle_key("tab")
         assert not inp._showing_candidates
 
     def test_render_with_candidates(self):
@@ -255,7 +255,7 @@ class TestInputLine:
             size=(20, 1),
         )
         inp.set_value("a")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         s = Surface(20, 1)
         inp._render_surface(s)
         assert s.lines()[0].startswith("> abc")
@@ -296,7 +296,7 @@ class TestInputLine:
             size=(12, 1),
         )
         inp.set_value("o")
-        inp.on_key("tab")
+        inp.handle_key("tab")
         inp._focus_level = 0  # mark as focused so cursor is drawn
         inp._render_surface(mock_surface)
         # Candidate mode draws prefix + dim suffix, then block cursor at end.
@@ -324,14 +324,14 @@ class TestInputLine:
 
     def test_on_key_plain_text_editing(self):
         inp = InputLine()
-        inp.on_key("h")
-        inp.on_key("i")
+        inp.handle_key("h")
+        inp.handle_key("i")
         assert inp.value == "hi"
-        inp.on_key("backspace")
+        inp.handle_key("backspace")
         assert inp.value == "h"
-        inp.on_key("left")
+        inp.handle_key("left")
         assert inp.cursor == 0
-        inp.on_key("delete")
+        inp.handle_key("delete")
         assert inp.value == ""
 
 

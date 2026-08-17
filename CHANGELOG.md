@@ -1,5 +1,26 @@
 # Changelog of pigit
 
+## 1.11.0 (2026-08-17)
+
+### Features
+
+- **Custom keybindings**: TUI actions are declared with `@bind_action` and can be remapped in config under `[keybindings]` (`namespace.action = "key"`). `pigit --create-config --with-keybindings` dumps commented defaults into the config file.
+
+### Refactors
+
+- **POSIX-only TUI**: the full-screen TUI no longer runs on Windows; `pigit` with no arguments exits with a platform message. CLI short-commands remain available.
+- **AlertDialog `destructive`**: confirmation dialogs take `destructive=True` for irreversible actions (discard, delete branch, abort rebase, rewrite history) instead of `FeedbackKind.ERROR`. Toast and badge still use `FeedbackKind` for outcome.
+- **Termui keyboard root**: `ComponentRoot` is the single key-dispatch entry (overlay → app bindings → focus leaf). Removed `_ApplicationEventLoop` and leftover compat aliases (`Cell`, `FlatCell(bold=True)`, ignored `reset_*` tokens). Focus and presentation walks are now two orthogonal hooks (`focus_child` / `presentation_child`).
+
+### Bug Fixes
+
+- **Paused rebase**: `rebase --continue` / `--skip` that land in another pause report as paused, not completed.
+- **Untracked files**: merge and rebase are blocked when untracked files would be overwritten.
+
+### Docs
+
+- Overhaul the project README and complete the config documentation.
+
 ## 1.10.0 (2026-08-14)
 
 ### Features

@@ -229,8 +229,6 @@ class KeyboardInput:
     def _read_chunk(self, timeout: float | None) -> bytes:
         if self._read_hook is not None:
             return self._read_hook(timeout)
-        if sys.platform == "win32":
-            return self._read_chunk_windows(timeout)
         return self._read_chunk_posix(timeout)
 
     def _read_chunk_posix(self, timeout: float | None) -> bytes:
@@ -251,58 +249,10 @@ class KeyboardInput:
         except BlockingIOError:
             return b""
 
-    def _read_chunk_windows(self, timeout: float | None) -> bytes:
-        import msvcrt
-
-        _msvcrt: Any = msvcrt
-        if timeout is None:
-            # Blocking indefinitely: msvcrt has no true blocking read with
-            # interrupt support, so we poll at 20 Hz (lower CPU than 1 kHz).
-            out = bytearray()
-            while True:
-                if _msvcrt.kbhit():
-                    ch = _msvcrt.getch()
-                    if ch in (b"\x00", b"\xe0"):
-                        ch += _msvcrt.getch()
-                    out.extend(ch)
-                    while _msvcrt.kbhit():
-                        ch2 = _msvcrt.getch()
-                        if ch2 in (b"\x00", b"\xe0"):
-                            ch2 += _msvcrt.getch()
-                        out.extend(ch2)
-                    return bytes(out)
-                time.sleep(0.05)
-        deadline = time.monotonic() + timeout
-        out = bytearray()
-        while time.monotonic() < deadline:
-            if _msvcrt.kbhit():
-                ch = _msvcrt.getch()
-                if ch in (b"\x00", b"\xe0"):
-                    ch += _msvcrt.getch()
-                out.extend(ch)
-                while _msvcrt.kbhit():
-                    ch2 = _msvcrt.getch()
-                    if ch2 in (b"\x00", b"\xe0"):
-                        ch2 += _msvcrt.getch()
-                    out.extend(ch2)
-                return bytes(out)
-            time.sleep(0.001)
-        return b""
-
     def _consume_one(self) -> tuple[keys.SemanticEvent | None, int]:
         buf = self._buffer
         if not buf:
             return None, 0
-
-        if sys.platform == "win32":
-            if len(buf) >= 2:
-                pair = bytes(buf[:2])
-                if pair in keys.WIN_EXT_TO_SEMANTIC:
-                    sem = keys.WIN_EXT_TO_SEMANTIC[pair]
-                    del buf[:2]
-                    return sem, 2
-            if buf[0] in (0, 0xE0) and len(buf) < 2:
-                return None, 0
 
         b0 = buf[0]
 

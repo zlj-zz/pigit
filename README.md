@@ -1,27 +1,39 @@
-# PIGIT
+<div align="center">
+
+<pre>
+ ____ ___ ____ ___ _____
+|  _ \_ _/ ___|_ _|_   _|
+| |_) | | |  _ | |  | |
+|  __/| | |_| || |  | |
+|_|  |___\____|___| |_|
+</pre>
 
 ![Python 3](https://img.shields.io/badge/Python-v3.10%5E-green?logo=python)
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A terminal UI for Git, plus short command aliases and multi-repo management. Run `pigit` with no arguments to launch the TUI, or use sub-commands for quick one-off tasks.
+**A terminal UI for Git** — short commands and multi-repo management.
 
-![interaction demo](./docs/resources/demo_interaction.gif)
+</div>
+
+<div align="center">
+  <img src="./docs/resources/demo_interaction.gif" width="80%" alt="interaction demo">
+</div>
 
 ## Quick Start
 
 ```bash
-pip install -U pigit
-pigit          # Launch TUI
+$ pip install -U pigit
+
+$ pigit                 # launch the TUI
+$ pigit cmd -l          # list short commands
+$ pigit repo add ~/dev/foo ~/dev/bar
+$ pigit repo ll         # summary across repos
+$ pigit open            # open remote in browser
 ```
 
 ## Installation
-
-### Pip
-
-```bash
-pip install -U pigit
-```
 
 ### Source
 
@@ -43,22 +55,34 @@ pip install -e ".[dev]"
 
 Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments to enter it.
 
-The TUI provides interactive panels for status, branch list, commit log, diff viewer, and more. Use `j`/`k` or arrow keys to navigate, `Enter` to select, and `q` or `Esc` to go back. Press `?` at any time to see available key bindings.
+| panel | what you can do |
+|-------|------------------|
+| Status | stage / unstage / discard / ignore files; inline diff; copy path (`Y`); stash list; file preview on wide terminals |
+| Diff | stage individual hunks; browse file history (`v`, `p`/`n`) |
+| Commit | inline subject/body editor with lint feedback |
+| History | undo the last action, browse and reverse multiple steps |
+| Branch | checkout, create, rename, delete branches; scope to a sub-directory (`R`) |
 
-**Status panel** — stage/unstage files with `a`, discard with `d`, ignore with `i`, and view inline diffs with `Enter`. `Y` copies the selected file path to the clipboard. A stash list sits at the bottom (`z` to push, `Z` to pop). On wide terminals a file-preview splits the view.
+### Key bindings
 
-**Diff viewer** — press `H` to toggle hunk mode and stage/unstage individual hunks inline. In commit diffs, press `v` to view the file at that commit and `p`/`n` to browse older/newer revisions.
+| key | action | panel |
+|-----|--------|-------|
+| `j` / `k`, `↑` / `↓` | navigate lists | all |
+| `Enter` | select / open | all |
+| `q` / `Esc` | back / quit | all |
+| `?` | help | all |
+| `a` / `d` / `i` | stage / discard / ignore | Status |
+| `c` | inline commit editor | Status |
+| `H` | toggle hunk staging | Diff |
+| `u` / `U` | undo / undo stack | all |
+| `z` / `Z` | stash push / pop | Status |
 
-**Commit editor** — press `c` in the status panel to open an inline subject/body editor with lint feedback; `Ctrl+Enter` submits.
-
-**Session history** — press `u` to undo the last action, or `U` to open a sheet and reverse multiple steps.
-
-**Branch panel** — checkout, create, rename, and delete branches; `R` scopes to a repo sub-directory.
+Press `?` for the full per-panel list. Every key is remappable via `[keybindings]` — see [Keybindings](#keybindings).
 
 For operations that are cumbersome on the command line—such as staging individual hunks, browsing commit history with inline graphs, or resolving merge conflicts—the TUI is the recommended workflow.
 
 > [!NOTE]
-> The TUI requires an interactive terminal (both stdin and stdout must be TTYs). It will not launch in CI pipelines, scripts, or when piped.
+> The TUI runs on macOS / Linux and requires an interactive terminal (both stdin and stdout must be TTYs). It will not launch in CI pipelines, scripts, or when piped. On Windows, only the CLI sub-commands are available.
 
 ## CLI Usage
 
@@ -66,7 +90,7 @@ For scripting, CI, or quick tasks, Pigit exposes sub-commands and flags.
 
 ```bash
 usage: pigit [-h] [-i] [-f] [-r] [-v] [-c [PATH]] [--create-ignore TYPE]
-             [--init [SHELL]] [--create-config]
+             [--init [SHELL]] [--create-config] [--with-keybindings]
              {cmd,repo,open} ...
 
 Pigit TUI is called automatically if no parameters are followed.
@@ -76,7 +100,9 @@ Pigit TUI is called automatically if no parameters are followed.
 
 Short aliases for common git operations.
 
-![demo display](./docs/resources/demo.gif)
+<div align="center">
+  <img src="./docs/resources/demo.gif" width="80%" alt="demo display">
+</div>
 
 **Discovery**
 
@@ -104,15 +130,18 @@ These are short commands that can replace git operations:
 
 Manage multiple repositories at once.
 
-![demo display](./docs/resources/demo_repo_1.png)
-![demo display](./docs/resources/demo_repo_2.png)
-![demo display](./docs/resources/demo_repo_3.png)
+<div align="center">
+  <img src="./docs/resources/demo_repo_1.png" width="80%" alt="demo display"><br>
+  <img src="./docs/resources/demo_repo_2.png" width="80%" alt="demo display"><br>
+  <img src="./docs/resources/demo_repo_3.png" width="80%" alt="demo display">
+</div>
 
 - `pigit repo add <path>` — add repo(s) to the managed list.
 - `pigit repo rm <name>` — remove repo(s).
 - `pigit repo ll` — display summary of all repos.
 - `pigit repo cd <name>` — print the path of a managed repo.
 - `pigit repo cd -p` — open the interactive picker to choose a repo.
+- `pigit repo cd --output-file <path>` — write the selected path to a file instead (for scripts/CI).
 - `pigit repo fetch|pull|push [<name>...]` — run git operations across repos in parallel.
 
 ### `open`
@@ -137,6 +166,7 @@ pigit open -p           # print URL instead of opening
 | `-c [PATH]`, `--count [PATH]` | code statistics (table or simple format) |
 | `--create-ignore TYPE` | generate a `.gitignore` template |
 | `--create-config` | create a config file at `~/.config/pigit/pigit.toml` |
+| `--with-keybindings` | with `--create-config`, dump commented keybinding defaults into the config |
 
 ## Shell Integration
 
@@ -160,23 +190,6 @@ After sourcing the init script, `pigit repo cd -p` automatically changes your sh
 
 For scripts and CI, use `--output-file <path>` to write the selected directory to a file instead.
 
-## Alias
-
-Add to your shell profile for faster access:
-
-```bash
-if type pigit >/dev/null 2>&1; then
-    alias pg="pigit"
-    alias gr="pigit repo"
-fi
-```
-
-**Windows (PowerShell)**
-
-```ps
-set-alias pg pigit
-```
-
 ## Configuration
 
 Create a template config with `pigit --create-config`. The config lives at:
@@ -199,6 +212,33 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[repo]` | `auto_append` | bool | `True` | auto-add current repo to managed list |
 | `[log]` | `debug` | bool | `False` | debug mode |
 | `[log]` | `output` | bool | `False` | print logs to terminal |
+| `[tui]` | `auto_refresh_interval` | float | `10.0` | auto-refresh interval in seconds (`0` disables) |
+| `[tui]` | `word_diff` | bool | `True` | enable word-diff in the diff viewer |
+| `[tui]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
+| `[tui]` | `show_footer` | bool | `True` | show the footer key-hint bar |
+
+### Keybindings
+
+Remap TUI actions with a `[keybindings]` section. Keys are semantic strings
+(`"c"`, `"down"`, `"ctrl c"`, `" "` for space); use an array for multiple keys.
+
+To list every configurable action with its default key, regenerate the config with:
+
+```bash
+pigit --create-config --with-keybindings
+```
+
+This appends a commented `[keybindings]` block to the generated file (existing
+overrides are preserved as active lines). For example:
+
+```toml
+[keybindings.branch]
+checkout = "C"  # default: "c"
+# next = ["j", "down"]  # Navigate branch list
+```
+
+Actions are scoped by namespace: `universal`, `status`, `diff`, `rebase`,
+`branch`, `commit`, `stash`, `recent`.
 
 ## Custom Commands
 
@@ -229,24 +269,30 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 
 ## Features
 
-- **TUI-first workflow** — interactive panels for status, branch, commit log, diff, and more.
+**TUI**
+
 - **Session history / undo** — one-key reversal (`u`) and a browsable undo stack (`U`).
-- **Inline commit editor** — subject/body fields with lint bar inside the TUI.
 - **Hunk staging** — stage or unstage individual hunks directly in the diff viewer (`H`).
+- **Inline commit editor** — subject/body fields with lint bar inside the TUI.
 - **Stash management** — push, pop, and drop stashes from the status panel.
 - **Auto refresh** — periodic background refresh of the active panel while the TUI is idle.
 - **Syntax highlighting** — diff and file-history views tokenize source code by language.
 - **Adaptive layout** — side-by-side preview panel on large terminals.
+
+**CLI**
+
 - **Short commands** — aliases like `pigit cmd st` for `git status --short`.
 - **Command correction** — suggests the right command when you typo.
-- **Multi-repo management** — `repo` sub-commands for bulk operations across projects.
-- **Shell completion** — bash/zsh/fish with `pigit --init`.
-- **Auto `cd`** — shell wrapper enables `pigit repo cd -p` to change directory after picking.
 - **Code statistics** — count lines/files by type with table or simple output.
 - **`.gitignore` templates** — generate from common types.
 - **Quick open remote** — open repo/commit/issue in browser.
-- **Custom aliases & scripts** — extend via TOML config.
 
----
+**Multi-repo & shell**
 
-LICENSE: [MIT](./LICENSE)
+- **Multi-repo management** — `repo` sub-commands for bulk operations across projects.
+- **Shell completion** — bash/zsh/fish with `pigit --init`.
+- **Auto `cd`** — shell wrapper enables `pigit repo cd -p` to change directory after picking.
+
+**Customization**
+
+- **Custom keybindings** — remap any TUI action via `[keybindings]`; dump defaults with `--create-config --with-keybindings`.

@@ -6,9 +6,9 @@ from __future__ import annotations
 from unittest import mock
 
 from pigit.termui._color import ColorAdapter, ColorMode
-from pigit.termui._surface import Cell, FlatCell, Surface
+from pigit.termui._surface import FlatCell, Surface
 from pigit.termui._renderer import Renderer
-from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 
 class FakeSession:
@@ -23,12 +23,12 @@ def _capture_output(session: FakeSession) -> str:
 class TestRowToStr:
     def test_plain_cells(self):
         r = Renderer(FakeSession())
-        row = [Cell("a"), Cell("b"), Cell("c")]
+        row = [FlatCell("a"), FlatCell("b"), FlatCell("c")]
         assert r._row_to_str(row) == "abc"
 
     def test_skips_empty_spacer_cells(self):
         r = Renderer(FakeSession())
-        row = [Cell("中"), Cell(""), Cell("a")]
+        row = [FlatCell("中"), FlatCell(""), FlatCell("a")]
         assert r._row_to_str(row) == "中a"
 
 
@@ -170,7 +170,7 @@ class TestRowToStrRGB:
 
     def test_rgb_bold(self):
         r = Renderer(FakeSession())
-        row = [FlatCell("B", bold=True)]
+        row = [FlatCell("B", style_flags=STYLE_BOLD)]
         result = r._row_to_str(row)
         assert result == "\033[1mB\033[0m"
 

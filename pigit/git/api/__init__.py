@@ -166,6 +166,9 @@ class GitApi:
     def has_unstaged_changes(self, path=None):
         return self._status.has_unstaged_changes(path)
 
+    def has_untracked_changes(self, path=None):
+        return self._status.has_untracked_changes(path)
+
     # ── _stash ──
     def load_stashes(self, path=None):
         return self._stash.load_stashes(path)

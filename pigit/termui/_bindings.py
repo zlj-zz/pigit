@@ -1,6 +1,6 @@
 """
 Module: pigit/termui/_bindings.py
-Description: Resolve declarative ``BINDINGS`` and ``@bind_keys`` into key handlers.
+Description: Resolve declarative ``BINDINGS`` and ``@bind_action`` into key handlers.
 Author: Zev
 Date: 2026-04-19
 
@@ -11,14 +11,17 @@ Decorator metadata is read after the class body completes; runtime mutation of
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass
 from typing import Any
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+
+from .keys import display_key
 
 BindingTarget = str | Callable[[], Any]
 BindingEntry = tuple[str, BindingTarget]
 BindingsList = list[BindingEntry]
 
-_PIGIT_BINDING_ATTR = "_pigit_binding_keys"
+_ACTION_ATTR = "_pigit_action"
 
 
 class BindingError(TypeError):
@@ -38,66 +41,6 @@ class BindingError(TypeError):
         self.first_target = first_target
         self.second_target = second_target
         self.owner_class_name = owner_class_name
-
-
-def bind_keys(*semantic_keys: str) -> Callable[[Any], Any]:
-    """Register one or more semantic keys on a method (collected with class bindings)."""
-
-    def decorator(fn: Any) -> Any:
-        setattr(fn, _PIGIT_BINDING_ATTR, semantic_keys)
-        return fn
-
-    return decorator
-
-
-def collect_decorator_bindings(cls: type) -> BindingsList:
-    """Collect ``(key, method_name)`` from ``@bind_keys`` across the MRO.
-
-    Parent class bindings are collected before subclass bindings, so
-    overrides in subclasses are discovered naturally.
-    """
-
-    out: BindingsList = []
-    for klass in reversed(cls.__mro__[:-1]):  # exclude object
-        for name, obj in klass.__dict__.items():
-            keys = getattr(obj, _PIGIT_BINDING_ATTR, None)
-            if not keys:
-                continue
-            if not isinstance(keys, tuple):
-                continue
-            for semantic_key in keys:
-                out.append((semantic_key, name))
-    return out
-
-
-def merge_binding_entries(
-    decorator_entries: BindingsList,
-    class_bindings: Sequence[BindingEntry] | None,
-) -> BindingsList:
-    """Order: decorator-expanded entries first, then ``cls.BINDINGS``."""
-
-    merged: BindingsList = list(decorator_entries)
-    if class_bindings:
-        merged.extend(list(class_bindings))
-    return merged
-
-
-def _describe_target(target: BindingTarget) -> str:
-    if isinstance(target, str):
-        return target
-    return repr(target)
-
-
-def _same_resolved_handler(a: Callable[..., Any], b: Callable[..., Any]) -> bool:
-    """Whether two callables count as one binding target (§4.5)."""
-
-    if a is b:
-        return True
-    if inspect.ismethod(a) and inspect.ismethod(b):
-        return a.__func__ is b.__func__ and a.__self__ is b.__self__
-    if inspect.isfunction(a) and inspect.isfunction(b):
-        return a is b
-    return False
 
 
 def _resolve_one_target(
@@ -124,65 +67,223 @@ def _resolve_one_target(
     )
 
 
+def _describe_target(target: BindingTarget) -> str:
+    """Human-readable label for a binding target in error messages."""
+    if isinstance(target, str):
+        return target
+    return repr(target)
+
+
+def _same_resolved_handler(a: Callable[..., Any], b: Callable[..., Any]) -> bool:
+    """Whether two callables count as the same binding target.
+
+    Bound methods are compared by ``__func__``/``__self__`` because attribute
+    access returns a fresh bound-method object each time.
+    """
+    if a is b:
+        return True
+    if inspect.ismethod(a) and inspect.ismethod(b):
+        return a.__func__ is b.__func__ and a.__self__ is b.__self__
+    if inspect.isfunction(a) and inspect.isfunction(b):
+        return a is b
+    return False
+
+
 def resolve_key_handlers(
     owner: object,
     bindings: Sequence[BindingEntry] | None,
+    action_bindings: Sequence[Binding] | None = None,
 ) -> dict[str, Callable[..., Any]]:
-    """
-    Build ``semantic_key -> callable`` from a declarative binding list.
+    """Build ``semantic_key -> callable`` from ``BINDINGS`` and ``@bind_action``.
 
-    Prefer :func:`resolve_key_handlers_merged` for classes that use ``@bind_keys``.
-    """
+    Args:
+        owner: The component/application whose methods are bound.
+        bindings: Declarative ``(key, target)`` pairs from ``BINDINGS``.
+        action_bindings: ``@bind_action`` entries collected via
+            :func:`collect_action_bindings`; effective keys honour
+            :func:`resolve_action_keys`.
 
-    if not bindings:
-        return {}
-    result: dict[str, Callable[..., Any]] = {}
-    for semantic_key, target in bindings:
-        result[semantic_key] = _resolve_one_target(owner, semantic_key, target)
-    return result
-
-
-def resolve_key_handlers_merged(
-    owner: object,
-    cls: type,
-    bindings: Sequence[BindingEntry] | None,
-) -> dict[str, Callable[..., Any]]:
-    """
-    Merge ``@bind_keys`` metadata with ``BINDINGS``, then resolve to callables.
+    Returns:
+        Mapping of semantic key to bound callable.
 
     Raises:
-        BindingError: Duplicate semantic key mapping to different callables.
+        BindingError: A semantic key maps to two different callables.
     """
-
-    merged = merge_binding_entries(collect_decorator_bindings(cls), bindings)
-    if not merged:
-        return {}
     result: dict[str, Callable[..., Any]] = {}
-    first_target_for_key: dict[str, BindingTarget] = {}
-    for semantic_key, target in merged:
-        call = _resolve_one_target(owner, semantic_key, target)
+    first_target_for_key: dict[str, str] = {}
+
+    def _register(semantic_key: str, target_label: str, fn: Callable[..., Any]) -> None:
         existing = result.get(semantic_key)
         if existing is not None:
-            if _same_resolved_handler(existing, call):
-                continue
+            if _same_resolved_handler(existing, fn):
+                return
             raise BindingError(
                 f"Duplicate binding for semantic key {semantic_key!r}: "
-                f"{_describe_target(first_target_for_key[semantic_key])!r} "
-                f"conflicts with {_describe_target(target)!r}",
+                f"{first_target_for_key[semantic_key]!r} conflicts with {target_label!r}",
                 semantic_key=semantic_key,
-                first_target=_describe_target(first_target_for_key[semantic_key]),
-                second_target=_describe_target(target),
-                owner_class_name=cls.__name__,
+                first_target=first_target_for_key[semantic_key],
+                second_target=target_label,
+                owner_class_name=type(owner).__name__,
             )
-        first_target_for_key[semantic_key] = target
-        result[semantic_key] = call
+        first_target_for_key[semantic_key] = target_label
+        result[semantic_key] = fn
+
+    for semantic_key, target in bindings or []:
+        _register(
+            semantic_key,
+            _describe_target(target),
+            _resolve_one_target(owner, semantic_key, target),
+        )
+
+    for binding in action_bindings or []:
+        fn = getattr(owner, binding.target, None)
+        if not callable(fn):
+            continue
+        for semantic_key in resolve_action_keys(binding):
+            _register(semantic_key, binding.target, fn)
+
     return result
 
 
-def list_bindings(owner: object, cls: type) -> BindingsList:
-    """Merged binding entries (same order as :func:`resolve_key_handlers_merged`)."""
+@dataclass(frozen=True)
+class Binding:
+    """One action binding: a stable action id mapped to default keys + help metadata.
 
-    return merge_binding_entries(
-        collect_decorator_bindings(cls),
-        getattr(cls, "BINDINGS", None),
+    Collected from ``@bind_action``-decorated methods. ``desc`` and ``when`` may
+    be callables taking the owning component (bound at resolution time).
+    """
+
+    action: str
+    keys: tuple[str, ...]
+    target: str = ""
+    desc: str | Callable[[Any], str] | None = None
+    tip: str | None = None
+    when: Callable[[Any], bool] | None = None
+    configurable: bool = True
+
+
+def bind_action(
+    action: str,
+    *keys: str,
+    desc: str | Callable[[Any], str] | None = None,
+    tip: str | None = None,
+    when: Callable[[Any], bool] | None = None,
+    configurable: bool = True,
+) -> Callable[[Any], Any]:
+    """Register an action binding on a method (collected with class bindings).
+
+    Carries a stable action id plus help metadata, enabling config remapping
+    and derived help/footer display.
+
+    Args:
+        action: Stable action id (e.g. ``"checkout"``).
+        *keys: Default semantic keys that trigger the action.
+        desc: Full help description; a callable receives the component.
+        tip: Short footer hint; ``None`` means the action is not shown in the
+            compact footer.
+        when: Optional callable returning False to hide the help entry.
+        configurable: Whether the user may remap this action's keys via config.
+    """
+
+    def decorator(fn: Any) -> Any:
+        setattr(fn, _ACTION_ATTR, (action, tuple(keys), desc, tip, when, configurable))
+        return fn
+
+    return decorator
+
+
+def collect_action_bindings(cls: type, namespace: str = "") -> list[Binding]:
+    """Collect ``Binding`` entries from ``@bind_action`` across the MRO.
+
+    Parent class bindings are collected before subclass bindings.
+
+    Args:
+        cls: The component class.
+        namespace: Optional action namespace; prefixes each action as
+            ``"{namespace}.{action}"`` so config keys are unambiguous across
+            panels.
+    """
+    out: list[Binding] = []
+    for klass in reversed(cls.__mro__[:-1]):  # exclude object
+        for name, obj in klass.__dict__.items():
+            meta = getattr(obj, _ACTION_ATTR, None)
+            if meta is None:
+                continue
+            action, keys, desc, tip, when, configurable = meta
+            full_action = f"{namespace}.{action}" if namespace else action
+            out.append(
+                Binding(
+                    action=full_action,
+                    keys=keys,
+                    target=name,
+                    desc=desc,
+                    tip=tip,
+                    when=when,
+                    configurable=configurable,
+                )
+            )
+    return out
+
+
+# User key overrides: action id -> replacement keys. Installed once at startup
+# from the app config; empty by default (no overrides).
+_key_overrides: dict[str, tuple[str, ...]] = {}
+
+
+def set_key_overrides(
+    overrides: Mapping[str, tuple[str, ...] | list[str] | str],
+) -> None:
+    """Install user key overrides (action id -> keys), replacing any prior set.
+
+    Actions not present in ``overrides`` keep their default binding. An empty
+    dict clears all overrides.
+    """
+    _key_overrides.clear()
+    for action, keys in overrides.items():
+        if isinstance(keys, str):
+            keys = (keys,)
+        _key_overrides[action] = tuple(keys)
+
+
+def resolve_action_keys(binding: Binding) -> tuple[str, ...]:
+    """Return the effective keys for a binding, honoring user overrides."""
+    if not binding.configurable:
+        return binding.keys
+    return _key_overrides.get(binding.action, binding.keys)
+
+
+def resolve_instance_bindings(
+    owner: Any,
+) -> tuple[list[Binding], dict[str, Callable[..., Any]]]:
+    """Resolve ``@bind_action`` + ``BINDINGS`` into ``(action_bindings, key_handlers)``.
+
+    The namespace is read from the owner's class ``keymap_namespace``.
+    """
+    namespace = getattr(type(owner), "keymap_namespace", "")
+    action_bindings = collect_action_bindings(type(owner), namespace)
+    key_handlers = resolve_key_handlers(
+        owner, getattr(owner, "BINDINGS", None), action_bindings
     )
+    return action_bindings, key_handlers
+
+
+def derive_help_entries(
+    bindings: Sequence[Binding],
+    owner: Any,
+) -> list[tuple[str, str]]:
+    """Derive ``(keys, desc)`` help entries from ``@bind_action`` bindings.
+
+    Hides entries whose ``when`` predicate returns False; ``desc`` falls back to
+    the action id when callable or None.
+    """
+    entries: list[tuple[str, str]] = []
+    for binding in bindings:
+        if binding.when is not None and not binding.when(owner):
+            continue
+        desc = binding.desc(owner) if callable(binding.desc) else binding.desc
+        if desc is None:
+            desc = binding.action
+        entries.append(
+            ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
+        )
+    return entries

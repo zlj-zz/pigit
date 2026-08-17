@@ -20,6 +20,7 @@ from .git import create_gitignore
 from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
 from .hook import before_hook
 from .info import introduce, show_gitconfig
+from .termui import set_key_overrides
 from .termui.cli_output import get_console
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ def _bootstrap() -> Context:
     conf = Config(
         path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
     ).output_warnings()
+    set_key_overrides(conf.get().keybindings)
     ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
     Context.install(ctx)
     before_hook(ctx)
@@ -118,6 +120,14 @@ def _color_index(count: int) -> str:
     help="Create a pre-configured file of PIGIT."
     "(If a profile exists, the values available in it are used)",
 )
+@argument(
+    "--with-keybindings",
+    action="store_true",
+    dest="with_keybindings",
+    group=_TOOLS_GROUP,
+    help="Dump commented default keys into the generated [keybindings] block."
+    " (requires --create-config)",
+)
 def pigit(args: Namespace, _) -> None:
     if args.init:
         from .init import run_shell_init
@@ -126,7 +136,19 @@ def pigit(args: Namespace, _) -> None:
         return None
 
     elif args.create_config:
-        ctx.config.create_config_template()
+        from .app_keybindings import (
+            collect_all_action_bindings,
+            render_keybindings_template,
+            warn_unmatched_keybindings,
+        )
+
+        bindings = collect_all_action_bindings()
+        current = ctx.config.get().keybindings
+        warn_unmatched_keybindings(bindings, current)
+        block = render_keybindings_template(
+            bindings, current, include_defaults=args.with_keybindings
+        )
+        ctx.config.create_config_template(keybindings_block=block)
         return
 
     elif args.report:

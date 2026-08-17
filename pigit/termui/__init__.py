@@ -63,7 +63,13 @@ from ._overlay_api import (
 )
 
 # Other utilities
-from ._bindings import bind_keys, BindingError, list_bindings
+from ._bindings import (
+    Binding,
+    bind_action,
+    BindingError,
+    collect_action_bindings,
+    set_key_overrides,
+)
 from . import keys
 from ._renderer import Renderer
 from ._surface import Surface
@@ -101,9 +107,11 @@ __all__ = [
     "by_id",
     "get_registry",
     # Utils
-    "bind_keys",
+    "bind_action",
+    "Binding",
+    "collect_action_bindings",
+    "set_key_overrides",
     "BindingError",
-    "list_bindings",
     "keys",
     "Surface",
     "Segment",

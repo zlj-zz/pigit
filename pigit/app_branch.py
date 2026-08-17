@@ -13,10 +13,9 @@ from collections.abc import Callable
 from pigit.termui import (
     EventType,
     FeedbackKind,
-    bind_keys,
+    bind_action,
     bind_signals,
     dismiss_sheet,
-    keys,
     palette,
     Segment,
     show_badge,
@@ -39,6 +38,7 @@ class BranchPanel(ItemList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
+    keymap_namespace = "branch"
     _SCOPES = ["local", "remote", "all"]
     _SCOPE_LABELS = {"local": "Local", "remote": "Remote", "all": "All"}
 
@@ -115,19 +115,6 @@ class BranchPanel(ItemList):
     def get_help_title(self) -> str:
         return "Branch"
 
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        """Return help pairs for branch panel."""
-        scope_label = self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]
-        return [
-            ("jk/↑↓", "Navigate"),
-            ("c", "Checkout"),
-            ("n", "New branch"),
-            ("r", "Rename"),
-            ("d", "Delete"),
-            ("i", "Interactive rebase onto"),
-            ("R", f"Scope ({scope_label})"),
-        ]
-
     def get_inspector_data(self) -> BranchInfo | None:
         """Return inspector data for the currently selected branch."""
         return self._vm.get_inspector_data(self.curr_no)
@@ -139,11 +126,11 @@ class BranchPanel(ItemList):
             name = name[len("remotes/") :]
         return name
 
-    @bind_keys("j", keys.KEY_DOWN)
+    @bind_action("next", "j", "down", desc="Navigate branch list", tip="Navigate")
     def next(self, step: int = 1) -> None:
         super().next(step)
 
-    @bind_keys("k", keys.KEY_UP)
+    @bind_action("previous", "k", "up", desc="Navigate branch list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
@@ -190,7 +177,12 @@ class BranchPanel(ItemList):
 
         return left, None, right
 
-    @bind_keys("R")
+    @bind_action(
+        "scope",
+        "R",
+        desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
+        tip="Scope",
+    )
     def toggle_scope(self) -> None:
         """Cycle branch scope: local -> remote -> all -> local."""
         self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
@@ -202,45 +194,72 @@ class BranchPanel(ItemList):
         self._vm.set_scope(scope)
         self._vm.refresh()
 
-    def on_key(self, key: str) -> None:
-        if key == "c":
-            if not self.branches:
-                return
-            local_branch = self.branches[self.curr_no]
-            if local_branch.is_head:
-                show_toast(
-                    "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
-                )
-                return
-            if local_branch.is_remote:
-                show_toast(
-                    "Cannot checkout remote branch directly.",
-                    duration=1.5,
-                    kind=FeedbackKind.WARNING,
-                )
-                return
-            result = self._vm.checkout(self.curr_no)
-            self._handle_result(result)
-            if result.success and self._branch_signal is not None:
-                self._branch_signal.set(local_branch.name)
-        elif key == "n":
-            self._show_new_branch_sheet()
-        elif key == "r":
-            if not self.branches:
-                return
-            branch = self.branches[self.curr_no]
-            if branch.is_remote:
-                show_toast(
-                    "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
-                )
-                return
-            self._show_rename_sheet(branch.name)
-        elif key == "d":
-            self._trigger_delete()
-        elif key == "m":
-            self._trigger_merge()
-        elif key == "i":
-            self._trigger_rebase()
+    @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
+    def checkout(self) -> None:
+        if not self.branches:
+            return
+        local_branch = self.branches[self.curr_no]
+        if local_branch.is_head:
+            show_toast(
+                "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        if local_branch.is_remote:
+            show_toast(
+                "Cannot checkout remote branch directly.",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        result = self._vm.checkout(self.curr_no)
+        self._handle_result(result)
+        if result.success and self._branch_signal is not None:
+            self._branch_signal.set(local_branch.name)
+
+    @bind_action(
+        "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
+    )
+    def new_branch(self) -> None:
+        self._show_new_branch_sheet()
+
+    @bind_action("rename", "r", desc="Rename selected branch", tip="Rename")
+    def rename(self) -> None:
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_remote:
+            show_toast(
+                "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        self._show_rename_sheet(branch.name)
+
+    @bind_action(
+        "delete",
+        "d",
+        desc="Delete selected branch (fails if unmerged unless forced)",
+        tip="Delete",
+    )
+    def delete(self) -> None:
+        self._trigger_delete()
+
+    @bind_action(
+        "merge",
+        "m",
+        desc="Merge selected branch into current (requires clean worktree; may conflict)",
+        tip="Merge",
+    )
+    def merge(self) -> None:
+        self._trigger_merge()
+
+    @bind_action(
+        "rebase",
+        "i",
+        desc="Interactive rebase onto selected branch (rewrites history)",
+        tip="Rebase",
+    )
+    def rebase(self) -> None:
+        self._trigger_rebase()
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""
@@ -265,7 +284,7 @@ class BranchPanel(ItemList):
             result = self._vm.delete_branch(self.curr_no)
             self._handle_result(result)
 
-        self._alert_dialog.alert(text, on_result, kind=FeedbackKind.ERROR)
+        self._alert_dialog.alert(text, on_result, destructive=True)
 
     def _trigger_merge(self) -> None:
         """Validate constraints and emit merge request via callback."""
@@ -274,7 +293,9 @@ class BranchPanel(ItemList):
         branch = self.branches[self.curr_no]
         if branch.is_remote:
             show_toast(
-                "Cannot merge into remote branch", duration=2.0, kind=FeedbackKind.WARNING
+                "Cannot merge into remote branch",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
             )
             return
         if branch.is_head:

@@ -18,8 +18,8 @@ from pigit.app_theme import THEME
 from pigit.termui import (
     Segment,
     FeedbackKind,
+    bind_action,
     exec_external,
-    keys,
     palette,
     request_render,
     show_badge,
@@ -34,14 +34,6 @@ if TYPE_CHECKING:
     from pigit.git.api import GitApi
 
 # Ordered git sequence commands; squash/fixup merge into the previous line.
-_ACTION_BY_KEY: dict[str, str] = {
-    "p": "pick",
-    "s": "squash",
-    "f": "fixup",
-    "d": "drop",
-    "r": "reword",
-    "e": "edit",
-}
 _ACTION_FG = {
     "pick": THEME.fg_primary,
     "squash": THEME.fg_info,
@@ -82,6 +74,7 @@ class RebasePanel(ItemList):
     """Sheet overlay for editing the interactive-rebase todo list."""
 
     CURSOR = "●"
+    keymap_namespace = "rebase"
 
     def __init__(
         self,
@@ -109,7 +102,9 @@ class RebasePanel(ItemList):
         try:
             commits = self._git.list_commits_in_range(self._base)
         except GitError as e:
-            show_toast(f"Rebase range error: {e}", duration=2.0, kind=FeedbackKind.ERROR)
+            show_toast(
+                f"Rebase range error: {e}", duration=2.0, kind=FeedbackKind.ERROR
+            )
             self._on_done()
             return
         if not commits:
@@ -131,28 +126,69 @@ class RebasePanel(ItemList):
         """Return the plain-text form of an item (used as ItemList content)."""
         return f"{item.action} {item.sha[:8]} {item.subject}"
 
-    def on_key(self, key: str) -> None:
-        """Handle navigation, action, reorder, confirm, and cancel keys."""
-        if key == keys.KEY_ESC:
-            self._on_done()
-            return
-        if key == keys.KEY_ENTER:
-            self._confirm()
-            return
-        if key in (keys.KEY_DOWN, "j"):
-            self.next()
-            return
-        if key in (keys.KEY_UP, "k"):
-            self.previous()
-            return
-        if key in _ACTION_BY_KEY:
-            self._set_action(key)
-            return
-        if key == "J":
-            self._move_up()
-            return
-        if key == "K":
-            self._move_down()
+    @bind_action("next", "j", "down", desc="Navigate todo list", tip="Navigate")
+    def next(self, step: int = 1) -> None:
+        super().next(step)
+
+    @bind_action("previous", "k", "up", desc="Navigate todo list", tip="Navigate")
+    def previous(self, step: int = 1) -> None:
+        super().previous(step)
+
+    @bind_action(
+        "confirm", "enter", desc="Confirm and execute the rebase", tip="Confirm"
+    )
+    def confirm(self) -> None:
+        self._confirm()
+
+    @bind_action("cancel", "esc", desc="Cancel the rebase", tip="Cancel")
+    def cancel(self) -> None:
+        self._on_done()
+
+    @bind_action("move_up", "J", desc="Move commit up", tip="Move up")
+    def move_up(self) -> None:
+        self._move_up()
+
+    @bind_action("move_down", "K", desc="Move commit down", tip="Move down")
+    def move_down(self) -> None:
+        self._move_down()
+
+    @bind_action("pick", "p", desc="Keep this commit", tip="pick")
+    def action_pick(self) -> None:
+        self._set_action("pick")
+
+    @bind_action(
+        "squash",
+        "s",
+        desc="Squash into previous commit (combines messages)",
+        tip="squash",
+    )
+    def action_squash(self) -> None:
+        self._set_action("squash")
+
+    @bind_action(
+        "fixup",
+        "f",
+        desc="Fixup into previous commit (discards its message)",
+        tip="fixup",
+    )
+    def action_fixup(self) -> None:
+        self._set_action("fixup")
+
+    @bind_action("drop", "d", desc="Drop this commit (irreversible)", tip="drop")
+    def action_drop(self) -> None:
+        self._set_action("drop")
+
+    @bind_action(
+        "reword", "r", desc="Reword commit message (opens $EDITOR)", tip="reword"
+    )
+    def action_reword(self) -> None:
+        self._set_action("reword")
+
+    @bind_action(
+        "edit", "e", desc="Edit this commit (stops for manual changes)", tip="edit"
+    )
+    def action_edit(self) -> None:
+        self._set_action("edit")
 
     def describe_row(
         self,
@@ -172,16 +208,6 @@ class RebasePanel(ItemList):
         fg = THEME.fg_primary if is_cursor else THEME.fg_dim
         main = [Segment(f"{item.sha[:8]}  {item.subject}", fg=fg)]
         return left, main, []
-
-    def get_help_entries(self) -> list[tuple[str, str]]:
-        """Return the panel keybindings."""
-        return [
-            ("jk/↑↓", "Navigate"),
-            ("p/s/f/d/r/e", "pick/squash/fixup/drop/reword/edit"),
-            ("J/K", "Move up/down"),
-            ("Enter", "Confirm and execute"),
-            ("Esc", "Cancel"),
-        ]
 
     def _render_surface(self, surface) -> None:
         """Render the list, reserving the last row for the key hint."""
@@ -217,10 +243,9 @@ class RebasePanel(ItemList):
 
     # ── editing ──
 
-    def _set_action(self, key: str) -> None:
+    def _set_action(self, action: str) -> None:
         """Set the current row's action, rejecting squash/fixup on the first row."""
         idx = self.curr_no
-        action = _ACTION_BY_KEY[key]
         if action in _MERGE_ACTIONS and idx == 0:
             show_toast(
                 "Cannot squash/fixup the first commit",
@@ -273,7 +298,7 @@ class RebasePanel(ItemList):
         self._alert.alert(
             f"Rewrite {n} commits? This rewrites history.",
             self._on_confirm_result,
-            kind=FeedbackKind.ERROR,
+            destructive=True,
         )
 
     def _validate(self) -> str | None:

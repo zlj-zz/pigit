@@ -7,24 +7,25 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-from ._bindings import BindingsList, resolve_key_handlers_merged
+from ._bindings import (
+    BindingsList,
+    derive_help_entries,
+    resolve_instance_bindings,
+)
 from ._component import Component
 from ._root import ComponentRoot
 from .event_bus import EventBus
-from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
-from .types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED, OverlayDispatchResult
+from .event_loop import AppEventLoop, ExitEventLoop
+from .types import EventType
 from . import keys
 
 if TYPE_CHECKING:
     from .input import InputTerminal
-
-_logger = logging.getLogger(__name__)
 
 
 class LoopKwargs(TypedDict, total=False):
@@ -36,81 +37,12 @@ class LoopKwargs(TypedDict, total=False):
     alt: bool
 
 
-class _ApplicationEventLoop(AppEventLoop):
-    """Bridge that delegates after_start and app-level bindings to Application.
-
-    Binding precedence: App bindings > Loop bindings > Component tree.
-    ComponentRoot routes keys to the overlay stack or leaf internally.
-    """
-
-    _child: ComponentRoot
-
-    def __init__(self, root: ComponentRoot, app: Application, **kwargs):
-        super().__init__(root, **kwargs)
-        root._event_loop = self
-        self._app = app
-        self._app_key_handlers = getattr(app, "_key_handlers", {})
-        self._app_on_key = getattr(app, "on_key", None)
-
-    def after_start(self):
-        """Delegate the after-start hook to the Application instance."""
-        self._app.after_start()
-        self._app._auto_after_start()
-
-    def resize(self) -> None:
-        """Propagate resize to the Application before the component tree."""
-        self._app.resize(self.get_term_size())
-        super().resize()
-
-    def _dispatch_semantic_string(self, key: str) -> KeyDispatchOutcome:
-        self.before_dispatch_key(key)
-        if key == "window resize":
-            self.resize()
-            return "resize"
-
-        # When an overlay is open, give it first dibs.  If the overlay
-        # consumes the key (anything other than DROPPED_UNBOUND) we stop
-        # here so that Sheet/Modal interactions are not hijacked by global
-        # shortcuts (e.g. "2" switching tabs while typing in a commit).
-        if self._child.has_overlay_open():
-            result = self._child.try_dispatch_overlay(key)
-            if result != OverlayDispatchResult.DROPPED_UNBOUND:
-                self._child._focus_manager.sync_focus_to_overlay_or_leaf()
-                self.request_render()
-                return "child"
-            # Overlay explicitly dropped the key — fall through to app bindings.
-
-        handler = self._app_key_handlers.get(key)
-        if handler is not None:
-            self._run_app_handler(handler, key, "App binding for '%s' failed")
-            return "binding"
-
-        app_on_key = self._app_on_key
-        if app_on_key is not None:
-            self._run_app_handler(
-                lambda: app_on_key(key), key, "App on_key for '%s' failed"
-            )
-            return "app"
-
-        return super()._dispatch_semantic_string(key)
-
-    def _run_app_handler(self, handler, key: str, log_fmt: str) -> None:
-        overlay_was_open = self._child.has_overlay_open()
-        try:
-            handler()
-        except ExitEventLoop:
-            raise
-        except Exception:
-            _logger.exception(log_fmt, key)
-        overlay_now_open = self._child.has_overlay_open()
-        if overlay_was_open != overlay_now_open:
-            self._child._focus_manager.sync_focus_to_overlay_or_leaf()
-        self.render()
-
-
 class Application:
     """
     High-level facade: subclasses implement build_root() and optional app-level bindings.
+
+    Bindings and ``handle_key`` are installed on :class:`ComponentRoot`, which
+    is the single keyboard entry for :class:`AppEventLoop`.
     """
 
     BINDINGS: BindingsList | None = None
@@ -124,11 +56,13 @@ class Application:
         self._loop: AppEventLoop | None = None
         self._root: ComponentRoot | None = None
         self._loop_kwargs = loop_kwargs
-        self._key_handlers = resolve_key_handlers_merged(
-            self, type(self), self.BINDINGS
-        )
+        self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._help_popup: Any = None
         self._event_bus = EventBus()
+
+    def get_help_entries(self) -> list[tuple[str, str]]:
+        """Derive app-level (universal) help entries from ``@bind_action``."""
+        return derive_help_entries(self._action_bindings, self)
 
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""
@@ -144,9 +78,11 @@ class Application:
         """Lifecycle hook invoked after the loop is ready."""
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Manually trigger resize on the root component tree."""
-        if self._root is not None:
-            self._root.resize(size)
+        """Adjust layout before the loop resizes the component tree.
+
+        Override for app-level layout (column widths, stash height). The
+        event loop always resizes ``ComponentRoot`` after this returns.
+        """
 
     def on_event(self, action: EventType, **data) -> bool:
         """Override to handle events bubbled from component tree.
@@ -162,7 +98,11 @@ class Application:
 
             help_panel = self.help_popup_class()
             self._help_popup = Popup(help_panel, exit_key=keys.KEY_ESC)
-            # Binding registered in _ApplicationEventLoop via app bindings
+
+    def _on_loop_after_start(self) -> None:
+        """Run user ``after_start`` then framework terminal-size checks."""
+        self.after_start()
+        self._auto_after_start()
 
     def _auto_after_start(self) -> None:
         """Inject framework-level checks after user ``after_start`` runs."""
@@ -189,13 +129,24 @@ class Application:
         token = _runtime_ctx.set(runtime)
         try:
             body = self.build_root()
+            handle_key = getattr(self, "handle_key", None)
             self._root = root = ComponentRoot(
-                body, runtime.registry, event_bus=self._event_bus
+                body,
+                runtime.registry,
+                event_bus=self._event_bus,
+                key_handlers=self._key_handlers,
+                handle_key=handle_key if callable(handle_key) else None,
             )
             runtime.overlay_host = root
             runtime.focus_manager = root._focus_manager
             root._app_on_event = self.on_event
-            self._loop = _ApplicationEventLoop(root, self, **self._loop_kwargs)
+            self._loop = AppEventLoop(
+                root,
+                on_after_start=self._on_loop_after_start,
+                on_before_resize=self.resize,
+                **self._loop_kwargs,
+            )
+            root._event_loop = self._loop
             self._auto_setup_root(root)
             self.setup_root(root)
             root.activate()

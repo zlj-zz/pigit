@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from .._component import Component, _render_child_to_surface
+from .._component import Component, _render_child_to_surface, resolve_focus_leaf
 from .._runtime_context import get_focus_manager
 from ..types import EventType, EVT_GOTO
 
@@ -66,11 +66,16 @@ class TabView(Component):
         self._active.activate()
         fm = get_focus_manager()
         if fm is not None:
-            fm.set_focus_chain(self._active)
+            fm.set_focus_chain(resolve_focus_leaf(self._active))
 
     @property
     def active(self) -> Component | None:
         """Return the currently active child panel."""
+        return self._active
+
+    @property
+    def focus_child(self) -> Component | None:
+        """Focus drills into the active tab."""
         return self._active
 
     def activate(self) -> None:
@@ -123,7 +128,7 @@ class TabView(Component):
             self._on_switch(resolved)
         fm = get_focus_manager()
         if fm is not None:
-            fm.set_focus_chain(resolved)
+            fm.set_focus_chain(resolve_focus_leaf(resolved))
         return resolved
 
     def on_event(self, action: EventType, **data) -> bool:

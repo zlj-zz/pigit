@@ -171,7 +171,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
 
     def can_merge(self) -> tuple[bool, str]:
         try:
-            if self._git.has_staged_changes():
+            if self._git.has_staged_changes() or self._git.has_untracked_changes():
                 return False, "Uncommitted changes, stash or commit first"
         except Exception:
             pass
@@ -179,7 +179,11 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
 
     def can_rebase(self) -> tuple[bool, str]:
         try:
-            if self._git.has_staged_changes() or self._git.has_unstaged_changes():
+            if (
+                self._git.has_staged_changes()
+                or self._git.has_unstaged_changes()
+                or self._git.has_untracked_changes()
+            ):
                 return False, "Uncommitted changes, stash or commit first"
         except Exception:
             pass

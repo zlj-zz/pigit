@@ -305,30 +305,35 @@ def test_switch_dry_run(mock_ctx):
     assert any("Would switch" in t for t in texts)
 
 
-def test_tui_handler_preprocess_windows():
-    with patch("pigit.handlers.tui_handler.IS_WIN", True):
-        h = TuiHandler(MagicMock())
-        assert h.preprocess() is False
+def test_tui_handler_preprocess_unsupported_platform():
+    echo = MagicMock()
+    with patch(
+        "pigit.handlers.base_handler.get_console", return_value=MagicMock(echo=echo)
+    ):
+        with patch(
+            "pigit.handlers.tui_handler.platform_supported", return_value=False
+        ):
+            h = TuiHandler(MagicMock())
+            assert h.preprocess() is False
+    echo.assert_called_once()
 
 
 def test_tui_handler_execute_first_run_skipped():
-    with patch("pigit.handlers.tui_handler.IS_WIN", False):
-        with patch("pigit.handlers.tui_handler.IS_FIRST_RUN", True):
-            with patch("pigit.handlers.tui_handler.introduce"):
-                with patch("pigit.handlers.tui_handler.confirm", return_value=False):
-                    h = TuiHandler(MagicMock())
-                    with patch("pigit.app.PigitApplication") as m_app:
-                        h.execute()
-                    m_app.assert_not_called()
+    with patch("pigit.handlers.tui_handler.IS_FIRST_RUN", True):
+        with patch("pigit.handlers.tui_handler.introduce"):
+            with patch("pigit.handlers.tui_handler.confirm", return_value=False):
+                h = TuiHandler(MagicMock())
+                with patch("pigit.app.PigitApplication") as m_app:
+                    h.execute()
+                m_app.assert_not_called()
 
 
 def test_tui_handler_execute_runs_app():
-    with patch("pigit.handlers.tui_handler.IS_WIN", False):
-        with patch("pigit.handlers.tui_handler.IS_FIRST_RUN", False):
-            h = TuiHandler(MagicMock())
-            with patch("pigit.app.PigitApplication") as m_app:
-                h.execute()
-            m_app.return_value.run.assert_called_once()
+    with patch("pigit.handlers.tui_handler.IS_FIRST_RUN", False):
+        h = TuiHandler(MagicMock())
+        with patch("pigit.app.PigitApplication") as m_app:
+            h.execute()
+        m_app.return_value.run.assert_called_once()
 
 
 def test_repo_handler_cd_pick_no_tty(mock_ctx):

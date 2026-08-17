@@ -38,7 +38,7 @@ _DEFAULT_COLORS: dict[str, tuple[int, int, int]] = {
     "diff_count": palette.PURPLE,
 }
 
-# Public alias for backward compatibility and external callers.
+# Public color table used by the tokenizer and tests.
 SYNTAX_COLORS = _DEFAULT_COLORS
 
 

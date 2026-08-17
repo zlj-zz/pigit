@@ -21,7 +21,6 @@ _code_template = """# https://github.com/github/gitignore
 
 from typing import Dict
 
-
 %(vals)s
 
 

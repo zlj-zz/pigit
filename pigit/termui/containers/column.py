@@ -11,9 +11,9 @@ import logging
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Sequence
 
-from .._component import Component
+from .._component import Component, resolve_focus_leaf
 from .._layout import layout_flex
-from .._runtime_context import request_render
+from .._runtime_context import get_focus_manager, request_render
 from ..types import EventType, EVT_SELECTION_CHANGED
 
 _logger = logging.getLogger(__name__)
@@ -27,9 +27,9 @@ class Column(Component):
 
     Children receive geometry from this container; manual ``x, y`` is ignored.
 
-    When ``focus_index`` is set, Column manages ``presented_child`` and
-    ``event_target`` so the active child receives events and external queries
-    (help, inspector) penetrate transparently. Tab cycles focus between children.
+    When ``focus_index`` is set, Column exposes ``focus_child`` and
+    ``presentation_child`` as the focused child so keys land on that child
+    (Tab bubbles here) and chrome queries penetrate. Tab cycles focus.
     """
 
     def __init__(
@@ -107,13 +107,13 @@ class Column(Component):
         return None
 
     @property
-    def presented_child(self) -> Component | None:
+    def focus_child(self) -> Component | None:
         """Return the focused child when ``focus_index`` is set."""
         return self._focused_child()
 
     @property
-    def event_target(self) -> Component | None:
-        """Forward events to the focused child when ``focus_index`` is set."""
+    def presentation_child(self) -> Component | None:
+        """Return the focused child when ``focus_index`` is set."""
         return self._focused_child()
 
     def handle_key(self, key: str) -> bool:
@@ -146,6 +146,10 @@ class Column(Component):
             old_child.deactivate()
         if new_child is not None and new_child is not old_child:
             new_child.activate()
+        if new_child is not None:
+            fm = get_focus_manager()
+            if fm is not None:
+                fm.set_focus_chain(resolve_focus_leaf(new_child))
         self.emit(EventType("mode_changed"), mode="")
         self.emit(EVT_SELECTION_CHANGED)
         request_render()

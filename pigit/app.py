@@ -17,6 +17,7 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     AlertDialog,
+    bind_action,
     Application,
     Component,
     ComponentRoot,
@@ -34,7 +35,7 @@ from pigit.termui import (
     show_toast,
     ToastPosition,
 )
-from pigit.termui._component import resolve_presented
+from pigit.termui._component import resolve_presentation_leaf
 from pigit.termui._runtime_context import get_renderer
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
@@ -61,104 +62,6 @@ from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
 from .config_data import TuiConfig
 
-# Static help groups for HelpPanel (all operations, grouped by panel).
-# Footer uses panel-specific get_help_entries() dynamically (trimmed to top-4).
-_HELP_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
-    (
-        "Global",
-        [
-            ("1 2 3", "Switch to Status / Branch / Commit tab"),
-            ("Q", "Quit Pigit"),
-            ("?", "Toggle this help panel"),
-            (";", "Open command palette"),
-            ("I", "Toggle file inspector"),
-            ("u", "Reverse last action"),
-            ("U", "Open recent actions sheet"),
-        ],
-    ),
-    (
-        "Status",
-        [
-            ("jk/↑↓", "Navigate file list"),
-            ("Enter", "Open diff for selected file"),
-            ("/", "Filter files by name"),
-            ("a", "Stage current file or selection"),
-            ("d", "Discard changes (confirm if modified)"),
-            ("i", "Add file to .gitignore"),
-            ("c", "Open inline commit editor"),
-            ("C", "Open external $EDITOR for commit"),
-            ("v", "Toggle visual multi-select mode"),
-            ("Y", "Copy file path"),
-            ("E", "Open file in external $EDITOR"),
-            ("o", "Checkout ours (conflict)"),
-            ("t", "Checkout theirs (conflict)"),
-            ("T", "Toggle tree / flat file view"),
-            ("l", "Expand directory (tree view)"),
-            ("h", "Collapse directory (tree view)"),
-        ],
-    ),
-    (
-        "Stash",
-        [
-            ("jk/↑↓", "Navigate stash list"),
-            ("Enter", "View diff for selected stash"),
-            ("p", "Pop selected stash onto working tree"),
-            ("d", "Drop selected stash permanently"),
-        ],
-    ),
-    (
-        "Branch",
-        [
-            ("jk/↑↓", "Navigate branch list"),
-            ("c", "Checkout selected branch"),
-            ("n", "Create new branch from current HEAD"),
-            ("r", "Rename selected branch"),
-            ("d", "Delete selected branch"),
-            ("R", "Scope to repository subdir"),
-            ("m", "Merge selected branch into current"),
-        ],
-    ),
-    (
-        "Commit",
-        [
-            ("jk/↑↓", "Navigate commit list"),
-            ("Enter", "View commit diff"),
-            ("/", "Search commits by message or author"),
-            ("g", "Toggle graph / flat view"),
-            ("z", "Toggle expanded commit details"),
-            ("Y", "Copy commit SHA to clipboard"),
-        ],
-    ),
-    (
-        "Commit Editor",
-        [
-            ("Tab", "Focus body field"),
-            ("Shift+Tab", "Focus subject field"),
-            ("Ctrl+Enter", "Submit commit message"),
-            ("Esc", "Cancel and close editor"),
-        ],
-    ),
-    (
-        "Diff",
-        [
-            ("jk", "Navigate diff lines"),
-            ("JK", "Page up / down diff"),
-            ("] [", "Jump to next / previous hunk"),
-            ("H", "Toggle hunk staging mode"),
-            ("v", "View file at commit"),
-            ("esc", "Close diff and return to status"),
-        ],
-    ),
-    (
-        "Session History",
-        [
-            ("jk/↑↓", "Navigate history list"),
-            ("Enter", "Reverse to selected action"),
-            ("Esc", "Close panel"),
-        ],
-    ),
-]
-
 
 class TabPanel(Column):
     """Column with tab metadata for TabView routing."""
@@ -178,17 +81,7 @@ class TabPanel(Column):
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
-    BINDINGS = [
-        ("Q", "quit"),
-        ("?", "toggle_help"),
-        (";", "toggle_palette"),
-        ("I", "toggle_inspector"),
-        ("1", "goto_status"),
-        ("2", "goto_branch"),
-        ("3", "goto_commit"),
-        ("u", "reverse_last_action"),
-        ("U", "open_recent_actions"),
-    ]
+    keymap_namespace = "universal"
 
     def __init__(
         self,
@@ -221,10 +114,10 @@ class PigitApplication(Application):
         # Auto-refresh
         self._config = config
         self._refresh_timer_id: int | None = None
-        # ViewModels (stored for preview updates)
-        self._status_vm: StatusViewModel | None = None
-        self._commit_vm: CommitViewModel | None = None
-        self._branch_vm: BranchViewModel | None = None
+        # ViewModels (assigned in build_root, same lifetime as panels)
+        self._status_vm: StatusViewModel
+        self._commit_vm: CommitViewModel
+        self._branch_vm: BranchViewModel
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._is_large_screen = False
@@ -249,7 +142,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("I", "Inspector"), (";", "Palette"), ("Q", "Quit")])
+        footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
 
         self._inspector = InspectorPanel(id="inspector")
 
@@ -264,14 +157,14 @@ class PigitApplication(Application):
             status_vm=self._status_vm,
         )
 
-        status_panel = StatusPanel(
+        self._status_panel = StatusPanel(
             vm=self._status_vm,
             id="status_panel",
             default_view=self._config.status_view,
         )
-        stash_panel = StashPanel(vm=self._status_vm, id="stash")
+        self._stash_panel = StashPanel(vm=self._status_vm, id="stash")
         self._status_stack = TabPanel(
-            children=[status_panel, stash_panel],
+            children=[self._status_panel, self._stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
@@ -285,12 +178,14 @@ class PigitApplication(Application):
             id="branch",
         )
 
+        self._commit_panel = CommitPanel(vm=self._commit_vm, id="commit")
+        self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
         self._tab_view = TabView(
             children=[
                 self._status_stack,
                 self._branch_panel,
-                CommitPanel(vm=self._commit_vm, id="commit"),
-                DiffViewer(id="diff", word_diff=self._config.word_diff),
+                self._commit_panel,
+                self._diff_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
@@ -315,21 +210,22 @@ class PigitApplication(Application):
             id="palette",
         )
 
-        return Column(
-            children=[
-                Header(
-                    left=self._header_state.left,
-                    center=self._header_state.center,
-                    right=self._header_state.right,
-                    separator=True,
-                    sep_fg=THEME.fg_dim,
-                    id="header",
-                ),
-                self._body_row,
-                footer,
-            ],
-            heights=[2, "flex", 2],
-        )
+        children = [
+            Header(
+                left=self._header_state.left,
+                center=self._header_state.center,
+                right=self._header_state.right,
+                separator=True,
+                sep_fg=THEME.fg_dim,
+                id="header",
+            ),
+            self._body_row,
+        ]
+        heights: list = [2, "flex"]
+        if self._config.show_footer:
+            children.append(footer)
+            heights.append(2)
+        return Column(children=children, heights=heights)
 
     def _on_tab_switch(self, panel: Component) -> None:
         """React to TabView switching to a new panel.
@@ -347,11 +243,29 @@ class PigitApplication(Application):
         self._help_panel = HelpPanel(
             key_fg=THEME.fg_info,
         )
-        self._help_panel.set_grouped_entries(_HELP_GROUPS)
+        self._help_panel.set_grouped_entries(self._build_help_groups())
         self._help_popup = Popup(
             self._help_panel,
             exit_key=keys.KEY_ESC,
         )
+
+    def _build_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+        """Aggregate full-help groups from app + panel action bindings."""
+        groups: list[tuple[str, list[tuple[str, str]]]] = []
+        universal = self.get_help_entries()
+        if universal:
+            groups.append(("Global", universal))
+        for panel in (
+            self._status_panel,
+            self._stash_panel,
+            self._branch_panel,
+            self._commit_panel,
+            self._diff_panel,
+        ):
+            entries = panel.get_help_entries()
+            if entries:
+                groups.append((panel.get_help_title(), entries))
+        return groups
 
     def after_start(self):
         cols, rows = terminal_size()
@@ -415,7 +329,7 @@ class PigitApplication(Application):
         body_row = self._body_row
         tab_view = self._tab_view
         inspector = self._inspector
-        active_presented = resolve_presented(tab_view.active)
+        active_presented = resolve_presentation_leaf(tab_view.active)
         on_status = isinstance(active_presented, (StatusPanel, StashPanel))
 
         if self._is_large_screen and on_status:
@@ -455,11 +369,13 @@ class PigitApplication(Application):
                 preview.activate()
         body_row.set_widths(desired_widths)
 
+    @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
         """Toggle help popup visibility. Entries are refreshed automatically
         via HelpPanel.on_before_show before opening."""
         self._help_popup.toggle()
 
+    @bind_action("palette", ";", desc="Open command palette", tip="Palette")
     def toggle_palette(self):
         """Toggle command palette visibility."""
         if self._root is None:
@@ -483,6 +399,7 @@ class PigitApplication(Application):
         """Set StashPanel height to 25% of rows, capped at 10, min 3."""
         self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
 
+    @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
     def toggle_inspector(self):
         """Toggle inspector panel visibility."""
         was_visible = self._inspector_visible
@@ -490,7 +407,7 @@ class PigitApplication(Application):
         cols, _ = terminal_size()
         self._apply_body_widths(cols)
         if self._inspector_visible:
-            active = resolve_presented(self._tab_view.active)
+            active = resolve_presentation_leaf(self._tab_view.active)
             if not was_visible and hasattr(self._inspector, "_last_key"):
                 delattr(self._inspector, "_last_key")
             self._inspector.update_from(active or self._tab_view.active)
@@ -505,9 +422,7 @@ class PigitApplication(Application):
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute layout widths and stash height on terminal resize.
 
-        Note: super().resize() is NOT called here because
-        _ApplicationEventLoop.resize() already propagates resize to the
-        component tree after this method returns.
+        The event loop resizes the component tree after this returns.
         """
         cols, rows = size
         was_large = self._is_large_screen
@@ -520,12 +435,15 @@ class PigitApplication(Application):
             if self._tab_view.active is not None:
                 self._tab_view.active.emit(EVT_SELECTION_CHANGED)
 
+    @bind_action("goto_status", "1", desc="Switch to Status tab", tip="Status")
     def goto_status(self):
         self._tab_view.route_to("status")
 
+    @bind_action("goto_branch", "2", desc="Switch to Branch tab", tip="Branch")
     def goto_branch(self):
         self._tab_view.route_to("branch")
 
+    @bind_action("goto_commit", "3", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
         self._tab_view.route_to("commit")
 
@@ -536,7 +454,7 @@ class PigitApplication(Application):
         Does NOT call request_render(); vm.refresh() uses AsyncTask,
         and Signal subscribers trigger rendering when data arrives.
         """
-        active = resolve_presented(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.active)
         if active is None:
             return
         # Skip refresh when an overlay is open
@@ -550,6 +468,7 @@ class PigitApplication(Application):
             if vm is not None and hasattr(vm, "refresh"):
                 vm.refresh()
 
+    @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
         """Reverse the most recent session action."""
         result = self._session_history.reverse(self._git)
@@ -559,6 +478,7 @@ class PigitApplication(Application):
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
+    @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
     def open_recent_actions(self) -> None:
         """Open the RecentActionsPanel sheet overlay."""
         from .app_recent_actions import RecentActionsPanel
@@ -606,7 +526,7 @@ class PigitApplication(Application):
         """Return the currently presented active panel, or None."""
         if self._root is None:
             return None
-        return resolve_presented(self._tab_view.active)
+        return resolve_presentation_leaf(self._tab_view.active)
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
@@ -640,7 +560,9 @@ class PigitApplication(Application):
                     kind=FeedbackKind.ERROR,
                 )
         except Exception as e:
-            show_toast(f"Git {action} error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
+            show_toast(
+                f"Git {action} error: {e}", duration=3.0, kind=FeedbackKind.ERROR
+            )
 
     def _run_rebase_control(self, action: str) -> None:
         """Run a rebase control flag (--continue/--abort/--skip)."""
@@ -654,7 +576,7 @@ class PigitApplication(Application):
             self._alert_dialog.alert(
                 "Abort rebase? All progress will be lost.",
                 on_confirm,
-                kind=FeedbackKind.ERROR,
+                destructive=True,
             )
             return
         self._do_rebase_control(flag)
@@ -664,12 +586,23 @@ class PigitApplication(Application):
         try:
             result = exec_external(["git", "rebase", f"--{flag}"], cwd=self._repo_path)
         except Exception as e:
-            show_toast(f"Rebase {flag} error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
+            show_toast(
+                f"Rebase {flag} error: {e}", duration=3.0, kind=FeedbackKind.ERROR
+            )
             return
         if result.returncode == 0:
-            show_toast(
-                f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
-            )
+            if self._git.is_rebase_in_progress():
+                # --continue/--skip resumed into another paused stop (e.g. the
+                # next "edit" action) — report that, not a false "completed".
+                show_toast(
+                    "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
+                    duration=3.0,
+                    kind=FeedbackKind.WARNING,
+                )
+            else:
+                show_toast(
+                    f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
+                )
             # Refresh the VMs directly: _refresh_active_panel() early-returns
             # while the command-palette overlay is still open.
             self._branch_vm.refresh()
@@ -847,6 +780,7 @@ class PigitApplication(Application):
 
         self._confirm_push_and_finish(target, source)
 
+    @bind_action("quit", "Q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 

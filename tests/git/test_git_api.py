@@ -153,3 +153,19 @@ class TestUnstagedChanges:
         ex = MockExecutor(responses={"git diff --quiet": (0, "", "")})
         git = GitApi(executor=ex, path="/repo")
         assert git.has_unstaged_changes() is False
+
+
+class TestUntrackedChanges:
+    def test_has_untracked_changes_true(self):
+        ex = MockExecutor(
+            responses={"git ls-files --others --exclude-standard": (0, "", "new.txt\n")}
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.has_untracked_changes() is True
+
+    def test_has_untracked_changes_false(self):
+        ex = MockExecutor(
+            responses={"git ls-files --others --exclude-standard": (0, "", "")}
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.has_untracked_changes() is False

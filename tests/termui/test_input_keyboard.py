@@ -137,16 +137,6 @@ class TestKeyboardInputConsume:
         assert key == "\xff"
         assert n == 1
 
-    def test_parse_windows_extended_key(self):
-        ki = KeyboardInput()
-        # Simulate windows extended key: prefix + second byte
-        ki._buffer = bytearray(b"\x00\x48")
-        with patch("sys.platform", "win32"):
-            key, n = ki._consume_one()
-        # May or may not be mapped depending on WIN_EXT_TO_SEMANTIC
-        assert n == 2
-
-
 class TestKeyboardInputReadKeys:
     def test_read_with_timeout_returns_empty(self):
         ki = KeyboardInput()
@@ -206,22 +196,6 @@ class TestKeyboardInputReadKeys:
         # Second call detects change
         result = ki.read_keys(timeout=0.01)
         assert keys.KEY_WINDOW_RESIZE in result
-
-    def test_read_windows_path(self):
-        """Coverage for _read_chunk_windows branch via mock."""
-        import sys
-
-        mock_msvcrt = MagicMock()
-        mock_msvcrt.kbhit.side_effect = [True, False]
-        mock_msvcrt.getch.return_value = b"x"
-        sys.modules["msvcrt"] = mock_msvcrt
-        try:
-            ki = KeyboardInput()
-            ki._read_chunk = ki._read_chunk_windows
-            result = ki.read_keys(timeout=0.01)
-            assert result == ["x"]
-        finally:
-            del sys.modules["msvcrt"]
 
     def test_default_stdin_returns_buffer(self):
         ki = KeyboardInput()
@@ -355,11 +329,3 @@ class TestKeyboardInputGoldenSequences:
             kb.read_keys(0.01)
             assert kb.read_keys(0.01) == []
             assert kb.read_keys(0.01) == [keys.KEY_WINDOW_RESIZE]
-
-    @pytest.mark.skipif(sys.platform != "win32", reason="Windows extended-key mapping")
-    def test_windows_arrow_mapping(self):
-        def read_hook(_timeout: float) -> bytes:
-            return b"\xe0H"
-
-        kb = KeyboardInput(read_hook=read_hook)
-        assert kb.read_keys(0.01) == ["up"]

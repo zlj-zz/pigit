@@ -128,49 +128,33 @@ class FocusManager:
     # --- Policy API (high-level decisions about where focus should go) ---
 
     def _resolve_overlay_target(self, overlay: Component) -> Component:
-        """Walk the presented_child chain to the deepest leaf."""
-        from ._component import resolve_presented
+        """Walk focus_child to the resolved overlay leaf."""
+        from ._component import resolve_focus_leaf
 
-        result = resolve_presented(overlay)
-        return result if result is not None else overlay
+        return resolve_focus_leaf(overlay)
 
     def sync_focus_to_overlay_or_leaf(self) -> None:
         """Set focus to the top open overlay, or body leaf if none."""
+        from ._component import resolve_focus_leaf
+
         top = self._root._top_open_overlay()
         if top is not None:
             self.set_focus_chain(self._resolve_overlay_target(top))
         else:
-            self.set_focus_chain(self._root.body.find_focus_leaf())
+            self.set_focus_chain(resolve_focus_leaf(self._root.body))
 
     def sync_focus_to_overlay(self) -> None:
-        """If an overlay is open, set focus to its deepest presented child."""
+        """If an overlay is open, set focus to its resolved focus leaf."""
         top = self._root._top_open_overlay()
         if top is not None:
             self.set_focus_chain(self._resolve_overlay_target(top))
 
     def sync_focus_if_overlay_closed(self, was_open: bool, now_open: bool) -> None:
         """Restore focus to body leaf when an overlay closes."""
-        if was_open and not now_open:
-            self.set_focus_chain(self._root.body.find_focus_leaf())
+        from ._component import resolve_focus_leaf
 
-    def get_event_target(self) -> Component | None:
-        """Return the component that should receive the next key event."""
-        leaf = self._leaf or self._root.body.find_focus_leaf()
-        if leaf is None:
-            return None
-        node: Component | None = leaf
-        for _ in range(128):
-            if node is None:
-                break
-            parent = node.parent
-            if (
-                parent is not None
-                and parent.presented_child is node
-                and parent.event_target is node
-            ):
-                return parent
-            node = parent
-        return leaf
+        if was_open and not now_open:
+            self.set_focus_chain(resolve_focus_leaf(self._root.body))
 
     # --- Mechanics API (low-level focus chain manipulation) ---
 
@@ -179,11 +163,13 @@ class FocusManager:
 
         Use :meth:`focus_release` to restore the previous focus chain.
         """
+        from ._component import resolve_focus_leaf
+
         if len(self._focus_stack) >= self._MAX_FOCUS_STACK:
             _logger.warning("Focus stack overflow; dropping oldest entry")
             self._focus_stack.pop(0)
         self._focus_stack.append(self._leaf)
-        self.set_focus_chain(component)
+        self.set_focus_chain(resolve_focus_leaf(component))
 
     def focus_release(self) -> None:
         """Restore focus to the leaf saved by the most recent :meth:`focus_grab`."""
@@ -269,13 +255,8 @@ def set_session(session: Session) -> None:
         runtime.session = session
 
 
-def reset_session(token: object | None = None) -> None:
-    """Reset session context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility with old code
-            that passed a ContextVar token.
-    """
+def reset_session() -> None:
+    """Reset session context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.session = None
@@ -297,12 +278,8 @@ def set_renderer(renderer: Renderer) -> None:
         runtime.renderer = renderer
 
 
-def reset_renderer(token: object | None = None) -> None:
-    """Reset renderer context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_renderer() -> None:
+    """Reset renderer context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.renderer = None
@@ -332,12 +309,8 @@ def set_overlay_host(host: ComponentRoot) -> None:
         runtime.overlay_host = host
 
 
-def reset_overlay_host(token: object | None = None) -> None:
-    """Reset overlay host context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_overlay_host() -> None:
+    """Reset overlay host context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.overlay_host = None
@@ -396,12 +369,8 @@ def set_registry(registry: ComponentRegistry) -> None:
         runtime.registry = registry
 
 
-def reset_registry(token: object | None = None) -> None:
-    """Reset registry context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_registry() -> None:
+    """Reset registry context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.registry = None
@@ -443,12 +412,8 @@ def set_focus_manager(fm: FocusManager) -> None:
         runtime.focus_manager = fm
 
 
-def reset_focus_manager(token: object | None = None) -> None:
-    """Reset FocusManager context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_focus_manager() -> None:
+    """Reset FocusManager context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.focus_manager = None
@@ -470,12 +435,8 @@ def set_render_request(callback: Callable[[], None]) -> None:
         runtime.render_request = callback
 
 
-def reset_render_request(token: object | None = None) -> None:
-    """Reset render request context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_render_request() -> None:
+    """Reset render request context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.render_request = None

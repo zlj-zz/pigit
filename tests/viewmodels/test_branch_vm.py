@@ -139,6 +139,7 @@ def test_current_branch_empty():
 
 def test_can_merge_ok(branch_vm):
     branch_vm._git.has_staged_changes.return_value = False
+    branch_vm._git.has_untracked_changes.return_value = False
     ok, msg = branch_vm.can_merge()
     assert ok is True
     assert msg == ""
@@ -146,6 +147,16 @@ def test_can_merge_ok(branch_vm):
 
 def test_can_merge_blocked(branch_vm):
     branch_vm._git.has_staged_changes.return_value = True
+    branch_vm._git.has_untracked_changes.return_value = False
+    ok, msg = branch_vm.can_merge()
+    assert ok is False
+    assert "Uncommitted changes" in msg
+
+
+def test_can_merge_blocked_by_untracked(branch_vm):
+    """Untracked files that a merge would overwrite must block the merge."""
+    branch_vm._git.has_staged_changes.return_value = False
+    branch_vm._git.has_untracked_changes.return_value = True
     ok, msg = branch_vm.can_merge()
     assert ok is False
     assert "Uncommitted changes" in msg
@@ -154,6 +165,7 @@ def test_can_merge_blocked(branch_vm):
 def test_can_rebase_ok(branch_vm):
     branch_vm._git.has_staged_changes.return_value = False
     branch_vm._git.has_unstaged_changes.return_value = False
+    branch_vm._git.has_untracked_changes.return_value = False
     ok, msg = branch_vm.can_rebase()
     assert ok is True
     assert msg == ""
@@ -162,6 +174,17 @@ def test_can_rebase_ok(branch_vm):
 def test_can_rebase_blocked_by_unstaged(branch_vm):
     branch_vm._git.has_staged_changes.return_value = False
     branch_vm._git.has_unstaged_changes.return_value = True
+    branch_vm._git.has_untracked_changes.return_value = False
+    ok, msg = branch_vm.can_rebase()
+    assert ok is False
+    assert "Uncommitted changes" in msg
+
+
+def test_can_rebase_blocked_by_untracked(branch_vm):
+    """Untracked files that a rebase would overwrite must block the rebase."""
+    branch_vm._git.has_staged_changes.return_value = False
+    branch_vm._git.has_unstaged_changes.return_value = False
+    branch_vm._git.has_untracked_changes.return_value = True
     ok, msg = branch_vm.can_rebase()
     assert ok is False
     assert "Uncommitted changes" in msg

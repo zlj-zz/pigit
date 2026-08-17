@@ -17,9 +17,25 @@ from .wcwidth_table import truncate_by_width, wcswidth
 #   \x03 (3)      ETX — Ctrl+C; turned into KeyboardInterrupt.
 #   \x08 (8) BS   Backspace; \x7f (127) DEL — often Backspace on Unix TTYs.
 #   0x40–0x7E     Inclusive range of the final byte of a CSI/SS3 sequence (``@`` through ``~``).
-#   \x00 / \xe0   Windows ``msvcrt``: extended-key prefix; \xe0\x53 is often Delete.
 
 MIN_LIST_ROWS = 1
+
+SUPPORTED_SYSTEMS = "macOS, Linux"
+
+UNSUPPORTED_PLATFORM_MSG = (
+    f"@red(Pigit TUI) is not supported on Windows. "
+    f"Supported systems: {SUPPORTED_SYSTEMS}."
+)
+
+
+def platform_supported() -> bool:
+    """Return True if the current OS supports the TUI.
+
+    Uses ``sys.platform != "win32"`` because the TUI relies on ``termios``,
+    present on every non-Windows CPython. Deliberately independent of
+    ``const.IS_WIN`` (which picks the home path and is an app-level concern).
+    """
+    return sys.platform != "win32"
 
 
 def tty_ok() -> bool:

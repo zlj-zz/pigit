@@ -85,21 +85,21 @@ def ctrl_letter_semantic(byte: int) -> str:
     return "ctrl " + chr(ord("a") + byte - 1)
 
 
-# Windows msvcrt: extended scancode after prefix b'\\x00' or b'\\xe0'
-# Second byte maps to semantic string (aligned with POSIX names).
-WIN_EXT_TO_SEMANTIC: dict[bytes, str] = {
-    b"\xe0H": KEY_UP,
-    b"\xe0P": KEY_DOWN,
-    b"\xe0K": KEY_LEFT,
-    b"\xe0M": KEY_RIGHT,
-    b"\xe0G": KEY_HOME,
-    b"\xe0O": KEY_END,
-    b"\xe0I": KEY_PAGE_UP,
-    b"\xe0Q": KEY_PAGE_DOWN,
-    b"\xe0S": KEY_DELETE,
-    # Duplicate with \xe0 prefix for some keyboards
-    b"\x00H": KEY_UP,
-    b"\x00P": KEY_DOWN,
-    b"\x00K": KEY_LEFT,
-    b"\x00M": KEY_RIGHT,
+# Semantic key -> friendly display name (for footer/help rendering).
+_KEY_DISPLAY: dict[str, str] = {
+    KEY_SPACE: "Space",
+    KEY_ENTER: "Enter",
+    KEY_ESC: "Esc",
+    KEY_RIGHT: "→",
+    KEY_LEFT: "←",
+    KEY_UP: "↑",
+    KEY_DOWN: "↓",
+    KEY_TAB: "Tab",
+    KEY_SHIFT_TAB: "Shift+Tab",
+    KEY_CTRL_ENTER: "Ctrl+Enter",
 }
+
+
+def display_key(key: str) -> str:
+    """Return a friendly display name for a semantic key (identity otherwise)."""
+    return _KEY_DISPLAY.get(key, key)

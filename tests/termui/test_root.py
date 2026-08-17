@@ -64,14 +64,19 @@ class TestComponentRoot:
         root = ComponentRoot(DummyBody())
         body = root.body
         body._handle_event = MagicMock()
-        popup = MagicMock()
-        popup.open = True
-        popup.parent = None
-        popup.presented_child = None
-        popup.dispatch_overlay_key.return_value = OverlayDispatchResult.HANDLED_EXPLICIT
+
+        class _ModalPopup(Component):
+            open = True
+
+            def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+                return OverlayDispatchResult.HANDLED_EXPLICIT
+
+            def _render_surface(self, surface) -> None:
+                pass
+
+        popup = _ModalPopup()
         root._layer_stack.push(LayerKind.MODAL, popup)
         root._handle_event("k")
-        popup.dispatch_overlay_key.assert_called_once_with("k")
         body._handle_event.assert_not_called()
 
     def test_handle_event_passthrough_to_body(self):
@@ -228,3 +233,149 @@ class TestComponentRoot:
         """destroy() cleans up the overlay host ContextVar without error."""
         root = ComponentRoot(DummyBody())
         root.destroy()  # should not raise
+
+
+class _DroppingOverlay(Component):
+    """Modal that is open but does not consume keys."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.open = True
+
+    def _render_surface(self, surface) -> None:
+        pass
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        return OverlayDispatchResult.DROPPED_UNBOUND
+
+
+class _ConsumingOverlay(Component):
+    """Modal that consumes every key."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.open = True
+        self.received: list[str] = []
+
+    def _render_surface(self, surface) -> None:
+        pass
+
+    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+        self.received.append(key)
+        return OverlayDispatchResult.HANDLED_EXPLICIT
+
+
+class _RecordingBody(Component):
+    """Body that records keys reaching handle_key."""
+
+    NAME = "recording"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.received: list[str] = []
+
+    def _render_surface(self, surface) -> None:
+        pass
+
+    def handle_key(self, key: str) -> bool:
+        self.received.append(key)
+        return True
+
+
+class TestComponentRootKeyDispatch:
+    def test_root_binding_closes_overlay_restores_focus(self):
+        body = DummyBody()
+        root = ComponentRoot(
+            body,
+            key_handlers={"x": lambda: root._layer_stack.pop(LayerKind.MODAL)},
+        )
+        overlay = _DroppingOverlay()
+        root._layer_stack.push(LayerKind.MODAL, overlay)
+        root._focus_manager.set_focus_chain(overlay)
+
+        assert root._handle_event("x") is True
+        assert body.is_focus_leaf
+
+    def test_root_handle_key_consumes_before_body(self):
+        body = _RecordingBody()
+        seen: list[str] = []
+
+        def handle_key(key: str) -> bool:
+            if key == "j":
+                seen.append(key)
+                return True
+            return False
+
+        root = ComponentRoot(body, handle_key=handle_key)
+
+        assert root._handle_event("j") is True
+        assert seen == ["j"]
+        assert body.received == []
+
+        assert root._handle_event("k") is True
+        assert body.received == ["k"]
+
+    def test_root_binding_precedes_handle_key(self):
+        body = DummyBody()
+        bound_called = []
+        handle_called = []
+
+        root = ComponentRoot(
+            body,
+            key_handlers={"x": lambda: bound_called.append(True)},
+            handle_key=lambda key: handle_called.append(key) or True,
+        )
+
+        assert root._handle_event("x") is True
+        assert bound_called == [True]
+        assert handle_called == []
+
+    def test_overlay_consumes_before_root_binding(self):
+        body = DummyBody()
+        bound_called = []
+        overlay = _ConsumingOverlay()
+        root = ComponentRoot(
+            body,
+            key_handlers={"x": lambda: bound_called.append(True)},
+        )
+        root._layer_stack.push(LayerKind.MODAL, overlay)
+
+        assert root._handle_event("x") is True
+        assert overlay.received == ["x"]
+        assert bound_called == []
+
+    def test_overlay_drop_falls_through_to_root_binding(self):
+        body = DummyBody()
+        bound_called = []
+        root = ComponentRoot(
+            body,
+            key_handlers={"x": lambda: bound_called.append(True)},
+        )
+        root._layer_stack.push(LayerKind.MODAL, _DroppingOverlay())
+
+        assert root._handle_event("x") is True
+        assert bound_called == [True]
+
+    def test_leaf_bubble_does_not_rerun_root_binding(self):
+        hits: list[str] = []
+
+        class _BubblingBody(Component):
+            def _render_surface(self, surface) -> None:
+                pass
+
+            def handle_key(self, key: str) -> bool:
+                hits.append("body")
+                return False
+
+        body = _BubblingBody()
+        root = ComponentRoot(
+            body,
+            key_handlers={"z": lambda: hits.append("root")},
+        )
+
+        assert root._handle_event("z") is True
+        assert hits == ["root"]
+
+        hits.clear()
+        assert root._handle_event("q") is False
+        assert hits == ["body"]

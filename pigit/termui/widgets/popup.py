@@ -11,8 +11,7 @@ import logging
 from collections.abc import Callable
 
 from .. import _runtime_context, keys, palette
-from .._bindings import resolve_key_handlers_merged
-from .._feedback import FeedbackKind
+from .._feedback import FeedbackKind, style_for
 from .._component import Component
 from .._frame import BoxFrame
 from .._mouse import MouseButton, MouseEvent, MouseKind
@@ -54,12 +53,6 @@ class Popup(Component):
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
-        self._resolved_handlers = resolve_key_handlers_merged(
-            self, type(self), getattr(self, "BINDINGS", None)
-        )
-        self._resolved_child_handlers = resolve_key_handlers_merged(
-            self._child, type(self._child), getattr(self._child, "BINDINGS", None)
-        )
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -73,17 +66,13 @@ class Popup(Component):
         return self._fallback_overlay_key(key)
 
     def _invoke_binding_target(self, target: Component, key: str) -> bool:
-        if target is self:
-            handlers = self._resolved_handlers
-        elif target is self._child:
-            handlers = self._resolved_child_handlers
-        else:
-            handlers = resolve_key_handlers_merged(
-                target,
-                type(target),
-                getattr(target, "BINDINGS", None),
-            )
-        fn = handlers.get(key)
+        """Invoke a handler from the target's resolved ``_key_handlers``.
+
+        ``_key_handlers`` already merges ``BINDINGS`` and ``@bind_action``
+        (resolved in :meth:`Component.__init__`), so both shell and child
+        bindings are honoured uniformly.
+        """
+        fn = target._key_handlers.get(key)
         if fn is None:
             return False
         fn()
@@ -164,9 +153,6 @@ class Popup(Component):
         self._child.y = col + 1
         self._child._size = (ow, oh)
 
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""
-
     def _on_exit_key(self) -> None:
         self.end_session()
         self.hide()
@@ -246,17 +232,18 @@ class AlertDialogBody(Component):
         self,
         message: str,
         on_result: Callable[[bool], None],
-        kind: FeedbackKind | None = None,
+        *,
+        destructive: bool = False,
     ) -> None:
         """Configure message and callback, then open the alert.
 
-        ``kind`` tints the border: ``ERROR`` -> danger red, anything else ->
-        the default neutral border."""
+        ``destructive`` tints the border with the error-style foreground
+        (irreversible confirm). Ordinary confirms stay the default border.
+        """
         self._message = sanitize_for_display(message)
         self._on_result = on_result
-        self._frame.fg = (
-            palette.RED if kind is FeedbackKind.ERROR else palette.DEFAULT_FG
-        )
+        style = style_for(FeedbackKind.ERROR) if destructive else None
+        self._frame.fg = style.fg if style is not None else palette.DEFAULT_FG
         self.open_alert()
         self._needs_rebuild = True
 
@@ -284,9 +271,6 @@ class AlertDialogBody(Component):
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
-
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""
 
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
@@ -411,7 +395,8 @@ class AlertDialog(Popup):
         self,
         message: str,
         on_result: Callable[[bool], None],
-        kind: FeedbackKind | None = None,
+        *,
+        destructive: bool = False,
     ) -> bool:
         """
         Prepare content, show this popup, and register the overlay host alert session.
@@ -419,14 +404,14 @@ class AlertDialog(Popup):
         Args:
             message: Confirmation prompt.
             on_result: Callback receiving the user's True/False choice.
-            kind: Optional semantic level; ``ERROR`` renders a danger-red border.
+            destructive: If True, use the irreversible (danger) border color.
 
         Returns:
             True if the dialog was shown; False if another modal is already open.
         """
         if _runtime_context.is_modal_open():
             return False
-        self._pane.prepare(message, on_result, kind)
+        self._pane.prepare(message, on_result, destructive=destructive)
         self.relayout_content()
         self.show()
         self.begin_session()

@@ -27,6 +27,18 @@ class ConfigError(Exception):
     """Config error. Using by `Config`."""
 
 
+def _flatten_keybindings(raw: dict, prefix: str = "") -> dict:
+    """Flatten a nested ``[keybindings]`` table into dotted ``"{ns}.{action}"`` keys."""
+    out: dict = {}
+    for key, value in raw.items():
+        dotted = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            out.update(_flatten_keybindings(value, dotted))
+        else:
+            out[dotted] = value
+    return out
+
+
 class Config(metaclass=Singleton):
     """PIGIT configuration class."""
 
@@ -99,6 +111,10 @@ class Config(metaclass=Singleton):
 
         # (str) Status panel default view. Supported: [flat, tree]
         status_view = "{tui_status_view}"
+
+        # (bool) Show the footer key-hint bar.
+        show_footer = {tui_show_footer}
+        {keybindings}
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
@@ -250,7 +266,11 @@ class Config(metaclass=Singleton):
             auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
             word_diff=tui_raw.get("word_diff", True),
             status_view=status_view,
+            show_footer=tui_raw.get("show_footer", True),
         )
+
+        # Parse [keybindings] section (nested tables flattened to dotted keys)
+        keybindings = _flatten_keybindings(raw.get("keybindings", {}))
 
         # Version check
         if not (
@@ -274,6 +294,7 @@ class Config(metaclass=Singleton):
             repo=repo,
             log=log,
             tui=tui,
+            keybindings=keybindings,
         )
 
     def load_config(self) -> None:
@@ -287,7 +308,7 @@ class Config(metaclass=Singleton):
                 f"Can not load the config file. Path: {self.config_file_path}"
             )
 
-    def create_config_template(self) -> bool:
+    def create_config_template(self, keybindings_block: str = "") -> bool:
         parent_dir = os.path.dirname(self.config_file_path)
         if not os.path.isdir(parent_dir):
             os.makedirs(parent_dir, exist_ok=True)
@@ -319,6 +340,8 @@ class Config(metaclass=Singleton):
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                         tui_word_diff=str(data.tui.word_diff).lower(),
                         tui_status_view=data.tui.status_view,
+                        tui_show_footer=str(data.tui.show_footer).lower(),
+                        keybindings=keybindings_block,
                     )
                 )
         except Exception:

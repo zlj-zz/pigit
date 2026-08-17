@@ -222,36 +222,6 @@ class TestToggleFileHistory:
             assert "No file" in mock_toast.call_args[0][0]
 
 
-class TestFileHistoryHelp:
-    """Help entries reflect current mode."""
-
-    def test_diff_mode_shows_v_for_commit(self):
-        dv = DiffViewer()
-        dv._diff_type = DiffType.COMMIT
-        entries = dv.get_help_entries()
-        keys = [k for k, _ in entries]
-        assert "v" in keys
-
-    def test_diff_mode_shows_h_for_unstaged(self):
-        dv = DiffViewer()
-        dv._diff_type = DiffType.UNSTAGED
-        entries = dv.get_help_entries()
-        keys = [k for k, _ in entries]
-        assert "H" in keys
-        assert "v" not in keys
-
-    def test_file_history_mode_help(self):
-        dv = DiffViewer()
-        dv._file_history_mode = True
-        entries = dv.get_help_entries()
-        keys = [k for k, _ in entries]
-        assert "p" in keys
-        assert "n" in keys
-        assert "d" not in keys
-        assert "Esc" in keys
-        assert "v" not in keys
-
-
 class TestFileHistoryCache:
     """LRU caching of file content."""
 
