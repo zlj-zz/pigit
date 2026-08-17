@@ -819,6 +819,39 @@ class StatusPanel(ItemList):
         editor.activate()
 
     @bind_action(
+        "amend",
+        "A",
+        desc="Amend last commit with staged changes (not in visual mode)",
+    )
+    def amend(self) -> None:
+        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
+        if self._visual_mode:
+            return
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to amend",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.amend()
+            if result.success:
+                self._vm.refresh()
+                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        self._alert_dialog.alert(
+            "Amend last commit with staged changes?",
+            on_result,
+            destructive=True,
+        )
+
+    @bind_action(
         "commit_editor",
         "C",
         desc="Open external $EDITOR for commit (not in visual mode)",
