@@ -15,16 +15,14 @@ if TYPE_CHECKING:
 
 from ._bindings import (
     BindingsList,
-    collect_action_bindings,
-    resolve_action_keys,
-    resolve_key_handlers,
+    derive_help_entries,
+    resolve_instance_bindings,
 )
 from ._component import Component
-from .keys import display_key
 from ._root import ComponentRoot
 from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop, KeyDispatchOutcome
-from .types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED, OverlayDispatchResult
+from .types import EventType, OverlayDispatchResult
 from . import keys
 
 if TYPE_CHECKING:
@@ -135,25 +133,13 @@ class Application:
         self._loop: AppEventLoop | None = None
         self._root: ComponentRoot | None = None
         self._loop_kwargs = loop_kwargs
-        namespace = getattr(type(self), "keymap_namespace", "")
-        self._action_bindings = collect_action_bindings(type(self), namespace)
-        self._key_handlers = resolve_key_handlers(
-            self, self.BINDINGS, self._action_bindings
-        )
+        self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._help_popup: Any = None
         self._event_bus = EventBus()
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Derive app-level (universal) help entries from ``@bind_action``."""
-        entries: list[tuple[str, str]] = []
-        for binding in self._action_bindings:
-            desc = binding.desc(self) if callable(binding.desc) else binding.desc
-            if desc is None:
-                desc = binding.action
-            entries.append(
-                ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
-            )
-        return entries
+        return derive_help_entries(self._action_bindings, self)
 
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""

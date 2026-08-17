@@ -14,7 +14,6 @@ from .._component import Component
 from .._runtime_context import get_focus_manager, request_render
 from .._surface import Surface, _Subsurface
 from ..reactive import Signal
-from ..tty_io import truncate_line
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
 

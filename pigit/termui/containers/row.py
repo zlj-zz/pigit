@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 from .._component import Component
 from .._layout import layout_flex
-from ..types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
+from ..types import EventType
 
 _logger = logging.getLogger(__name__)
 

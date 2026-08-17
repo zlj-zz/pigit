@@ -15,9 +15,9 @@ from collections.abc import Callable, Sequence
 
 from ._bindings import (
     BindingsList,
-    collect_action_bindings,
+    derive_help_entries,
     resolve_action_keys,
-    resolve_key_handlers,
+    resolve_instance_bindings,
 )
 from ._mouse import MouseEvent
 from .keys import display_key
@@ -104,11 +104,7 @@ class Component(ABC):
         self.id = id
         self._try_register_id()
 
-        namespace = getattr(type(self), "keymap_namespace", "")
-        self._action_bindings = collect_action_bindings(type(self), namespace)
-        self._key_handlers = resolve_key_handlers(
-            self, getattr(self, "BINDINGS", None), self._action_bindings
-        )
+        self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._subscriptions: list[_Subscription] = []
 
     def activate(self):
@@ -473,17 +469,7 @@ class Component(ABC):
         for fully custom help. Multi-key actions render their keys joined
         with ``/``.
         """
-        entries: list[tuple[str, str]] = []
-        for binding in self._action_bindings:
-            if binding.when is not None and not binding.when(self):
-                continue
-            desc = binding.desc(self) if callable(binding.desc) else binding.desc
-            if desc is None:
-                desc = binding.action
-            entries.append(
-                ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
-            )
-        return entries
+        return derive_help_entries(self._action_bindings, self)
 
     def get_footer_entries(self) -> list[tuple[str, str]]:
         """Derive the compact footer subset (bindings with a ``tip``).

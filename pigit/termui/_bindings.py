@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from typing import Any
 from collections.abc import Callable, Mapping, Sequence
 
+from .keys import display_key
+
 BindingTarget = str | Callable[[], Any]
 BindingEntry = tuple[str, BindingTarget]
 BindingsList = list[BindingEntry]
@@ -248,3 +250,40 @@ def resolve_action_keys(binding: Binding) -> tuple[str, ...]:
     if not binding.configurable:
         return binding.keys
     return _key_overrides.get(binding.action, binding.keys)
+
+
+def resolve_instance_bindings(
+    owner: Any,
+) -> tuple[list[Binding], dict[str, Callable[..., Any]]]:
+    """Resolve ``@bind_action`` + ``BINDINGS`` into ``(action_bindings, key_handlers)``.
+
+    The namespace is read from the owner's class ``keymap_namespace``.
+    """
+    namespace = getattr(type(owner), "keymap_namespace", "")
+    action_bindings = collect_action_bindings(type(owner), namespace)
+    key_handlers = resolve_key_handlers(
+        owner, getattr(owner, "BINDINGS", None), action_bindings
+    )
+    return action_bindings, key_handlers
+
+
+def derive_help_entries(
+    bindings: Sequence[Binding],
+    owner: Any,
+) -> list[tuple[str, str]]:
+    """Derive ``(keys, desc)`` help entries from ``@bind_action`` bindings.
+
+    Hides entries whose ``when`` predicate returns False; ``desc`` falls back to
+    the action id when callable or None.
+    """
+    entries: list[tuple[str, str]] = []
+    for binding in bindings:
+        if binding.when is not None and not binding.when(owner):
+            continue
+        desc = binding.desc(owner) if callable(binding.desc) else binding.desc
+        if desc is None:
+            desc = binding.action
+        entries.append(
+            ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
+        )
+    return entries
