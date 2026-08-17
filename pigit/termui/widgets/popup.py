@@ -153,9 +153,6 @@ class Popup(Component):
         self._child.y = col + 1
         self._child._size = (ow, oh)
 
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""
-
     def _on_exit_key(self) -> None:
         self.end_session()
         self.hide()
@@ -273,9 +270,6 @@ class AlertDialogBody(Component):
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
-
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""
 
     def _confirm(self) -> None:
         self._shell._finish_alert(True)

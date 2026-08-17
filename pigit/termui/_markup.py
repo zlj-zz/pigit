@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/_makrup.py
+Module: pigit/termui/_markup.py
 Description: CLI markup parser for @color(content) syntax.
 Author: Zev
 Date: 2026-05-19

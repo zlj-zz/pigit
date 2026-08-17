@@ -261,13 +261,10 @@ class Toast(Component):
 
     @property
     def message(self) -> str:
-        """Toast message content (backward compatibility)."""
+        """Toast message content."""
         return "".join(s.text for s in self._segments)
 
     def hide(self) -> None:
         """Close the toast."""
         self.open = False
         self._stop_animation_timer()
-
-    def refresh(self) -> None:
-        """No-op refresh for compatibility."""

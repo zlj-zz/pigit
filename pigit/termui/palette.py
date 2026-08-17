@@ -50,7 +50,7 @@ ALMOST_WHITE: tuple[int, int, int] = (220, 220, 220)
 MAGENTA: tuple[int, int, int] = (240, 130, 200)
 AMBER: tuple[int, int, int] = (255, 175, 80)
 
-# ── Legacy role assignments (kept for backward compat) ──
+# ── Semantic role colors ──
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK

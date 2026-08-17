@@ -44,13 +44,11 @@ class FlatCell:
         fg: tuple[int, int, int] | None = None,
         bg: tuple[int, int, int] | None = None,
         style_flags: int = 0,
-        *,
-        bold: bool = False,
     ) -> None:
         self.char = char
         self.fg = fg
         self.bg = bg
-        self.style_flags = style_flags | palette.STYLE_BOLD if bold else style_flags
+        self.style_flags = style_flags
         self._hash: int | None = None
 
     def __eq__(self, other: object) -> bool:
@@ -74,9 +72,6 @@ class FlatCell:
             f"style_flags={self.style_flags})"
         )
 
-
-# Backward compatibility: Cell is an alias for FlatCell.
-Cell = FlatCell
 
 _BLANK_CELL = FlatCell()
 _SPACER_CELL = FlatCell("")

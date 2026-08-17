@@ -68,8 +68,8 @@ class AppEventLoop:
 
     ``run()`` always enters :class:`~pigit.termui.session.Session` and binds
     ``session.renderer`` to the whole component tree. When ``input_handle`` is
-    omitted, a :class:`~pigit.termui.input_bridge.TermuiInputBridge` over
-    :class:`~pigit.termui.input_keyboard.KeyboardInput` is used.
+    omitted, a :class:`~pigit.termui.input.TermuiInputBridge` over
+    :class:`~pigit.termui.input.KeyboardInput` is used.
     """
 
     BINDINGS: BindingsList | None = None

@@ -255,13 +255,8 @@ def set_session(session: Session) -> None:
         runtime.session = session
 
 
-def reset_session(token: object | None = None) -> None:
-    """Reset session context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility with old code
-            that passed a ContextVar token.
-    """
+def reset_session() -> None:
+    """Reset session context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.session = None
@@ -283,12 +278,8 @@ def set_renderer(renderer: Renderer) -> None:
         runtime.renderer = renderer
 
 
-def reset_renderer(token: object | None = None) -> None:
-    """Reset renderer context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_renderer() -> None:
+    """Reset renderer context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.renderer = None
@@ -318,12 +309,8 @@ def set_overlay_host(host: ComponentRoot) -> None:
         runtime.overlay_host = host
 
 
-def reset_overlay_host(token: object | None = None) -> None:
-    """Reset overlay host context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_overlay_host() -> None:
+    """Reset overlay host context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.overlay_host = None
@@ -382,12 +369,8 @@ def set_registry(registry: ComponentRegistry) -> None:
         runtime.registry = registry
 
 
-def reset_registry(token: object | None = None) -> None:
-    """Reset registry context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_registry() -> None:
+    """Reset registry context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.registry = None
@@ -429,12 +412,8 @@ def set_focus_manager(fm: FocusManager) -> None:
         runtime.focus_manager = fm
 
 
-def reset_focus_manager(token: object | None = None) -> None:
-    """Reset FocusManager context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_focus_manager() -> None:
+    """Reset FocusManager context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.focus_manager = None
@@ -456,12 +435,8 @@ def set_render_request(callback: Callable[[], None]) -> None:
         runtime.render_request = callback
 
 
-def reset_render_request(token: object | None = None) -> None:
-    """Reset render request context to ``None``.
-
-    Args:
-        token: Ignored; kept for backward compatibility.
-    """
+def reset_render_request() -> None:
+    """Reset render request context to ``None``."""
     runtime = _runtime_ctx.get()
     if runtime is not None:
         runtime.render_request = None

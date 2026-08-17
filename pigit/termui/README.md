@@ -137,7 +137,7 @@ flowchart LR
 | `event_loop.py` | `AppEventLoop`, `ExitEventLoop`; resize -> overlay -> main dispatch |
 | `_session.py` | `Session`: TTY setup, creates `Renderer` |
 | `_renderer.py` | `Renderer`: cursor moves, `draw_panel`, incremental `render_surface` |
-| `_surface.py` | `Surface` / `Cell` intermediate layer; `subsurface` for component clipping |
+| `_surface.py` | `Surface` / `FlatCell` intermediate layer; `subsurface` for component clipping |
 | `_bindings.py` | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | `keys.py` | Semantic key constants and the `SemanticEvent` union (`str` or `MouseEvent`) |
 | `_text.py` | Display width (`get_width`, `plain`), `sanitize_for_display` |
@@ -162,7 +162,7 @@ Stable names are listed in `__all__` inside `__init__.py`.
 | **Overlays** | `Popup`, `AlertDialog`, `AlertDialogBody`, `HelpPanel`, `HelpEntry`, `Sheet`, `Toast` |
 | **Overlay types** | `LayerKind`, `OverlayDispatchResult`, `ToastPosition`, `OverlaySurface` |
 | **Application** | `Application`, `ComponentRoot`, `ExitEventLoop` |
-| **Rendering** | `Surface`, `FlatCell`, `Cell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
+| **Rendering** | `Surface`, `FlatCell`, `Segment`, `palette`, `ColorAdapter`, `ColorMode`, `Renderer`, `get_renderer_strict`, `SurfaceProtocol` |
 | **Bindings** | `bind_action`, `Binding`, `collect_action_bindings`, `set_key_overrides`, `BindingError` |
 | **Registry** | `by_id`, `get_registry` |
 | **Overlay context** | `show_toast`, `show_sheet`, `dismiss_sheet`, `show_badge`, `get_badge`, `get_badge_signal`, `show_spinner`, `hide_spinner`, `exec_external` |
@@ -346,7 +346,7 @@ When adding new components or extending existing ones, follow these rules so the
 1. **Segment-first rendering**
    - All new text rendering must use `Segment` (or `draw_segments`).
    - The old `(text, fg, bold)` tuple is deprecated; do not introduce new call sites.
-   - `FlatCell(..., bold=True)` remains supported for backward compatibility (internally mapped to `style_flags |= STYLE_BOLD`).
+   - Use `style_flags=STYLE_BOLD` (and other `palette` flags) on `FlatCell` / `Segment`.
 
 2. **Colors and style flags via `palette`**
    - Never hard-code RGB tuples in component code.
