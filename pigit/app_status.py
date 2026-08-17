@@ -440,7 +440,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "preview_down",
         "J",
-        desc="Scroll preview down",
+        desc="Scroll preview down (not in visual mode)",
         tip="Preview Navigate",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -452,7 +452,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "preview_up",
         "K",
-        desc="Scroll preview up",
+        desc="Scroll preview up (not in visual mode)",
         tip="Preview Navigate",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -482,7 +482,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "visual_scroll",
         "s",
-        desc="Toggle visual scroll mode",
+        desc="Toggle visual scroll mode (visual mode)",
         tip="V-scroll",
         tip_when=lambda self: self._visual_mode,
     )
@@ -499,7 +499,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "toggle_select",
         " ",
-        desc="Toggle selection of current row",
+        desc="Toggle selection of current row (visual mode)",
         tip="Select",
         tip_when=lambda self: self._visual_mode,
     )
@@ -686,7 +686,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "open_diff",
         "enter",
-        desc="Open diff for selected file",
+        desc="Open diff for selected file (not in visual mode)",
         tip="Open",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -778,7 +778,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "commit",
         "c",
-        desc="Open inline commit editor",
+        desc="Open inline commit editor (not in visual mode)",
         tip="Commit",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -821,7 +821,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "commit_editor",
         "C",
-        desc="Open external $EDITOR for commit",
+        desc="Open external $EDITOR for commit (not in visual mode)",
         tip="Commit",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -852,7 +852,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "open_editor",
         "E",
-        desc="Open file in external $EDITOR",
+        desc="Open file in external $EDITOR (not in visual mode)",
         tip="Edit",
         tip_when=lambda self: not self._visual_mode,
     )
@@ -864,7 +864,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "checkout_ours",
         "o",
-        desc="Checkout ours (conflict; discards theirs)",
+        desc="Checkout ours on conflict (discards theirs; not in visual mode)",
         tip="Ours",
         tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
@@ -877,7 +877,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "checkout_theirs",
         "t",
-        desc="Checkout theirs (conflict; discards ours)",
+        desc="Checkout theirs on conflict (discards ours; not in visual mode)",
         tip="Theirs",
         tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
@@ -890,7 +890,7 @@ class StatusPanel(ItemList):
     @bind_action(
         "stash",
         "z",
-        desc="Stash working tree changes",
+        desc="Stash working tree changes (not in visual mode)",
         tip="Stash",
         tip_when=lambda self: not self._visual_mode,
     )

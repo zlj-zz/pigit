@@ -299,6 +299,7 @@ class MyPanel(Component):
 - `*keys` — default semantic keys triggering the method.
 - `desc` — full help text; `tip` — compact footer hint.
 - `tip_when` — callable hiding the footer tip when it returns False; help (`desc`) is always shown.
+- Mode- or context-only actions should say so in ``desc`` (e.g. ``(visual mode)``, ``(hunk mode)``), since help lists them regardless of ``tip_when``.
 - `configurable` — whether the user may remap via the `[keybindings]` config section.
 
 `BINDINGS` remains for simple `(key, target)` pairs that need no help/footer metadata.

@@ -182,7 +182,8 @@ def bind_action(
         tip: Short footer hint; ``None`` means the action is not shown in the
             compact footer.
         tip_when: Optional callable returning False to hide the footer tip
-            only; help (``desc``) is always shown.
+            only; help (``desc``) is always shown. Mode-only actions should
+            still spell the context out in ``desc``.
         configurable: Whether the user may remap this action's keys via config.
     """
 

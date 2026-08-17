@@ -785,7 +785,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "file_history",
         "v",
-        desc="View file at selected commit",
+        desc="Enter file history for the selected commit path (commit diffs)",
         tip="History",
         tip_when=lambda self: not self._file_history_mode
         and self._diff_type is DiffType.COMMIT,
@@ -883,7 +883,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "prev_commit",
         "p",
-        desc="Go to older commit that touched this file",
+        desc="Go to older commit that touched this file (file history mode)",
         tip="Older",
         tip_when=lambda self: self._file_history_mode,
     )
@@ -898,7 +898,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "next_commit",
         "n",
-        desc="Go to newer commit that touched this file",
+        desc="Go to newer commit that touched this file (file history mode)",
         tip="Newer",
         tip_when=lambda self: self._file_history_mode,
     )
@@ -972,7 +972,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "hunk_mode",
         "H",
-        desc="Toggle hunk staging mode",
+        desc="Toggle hunk staging mode (working-tree diffs; not in file history)",
         tip="Hunk mode",
         tip_when=lambda self: not self._file_history_mode
         and self._diff_type is not DiffType.COMMIT,
@@ -1023,7 +1023,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "stage_hunk",
         "s",
-        desc="Stage current hunk",
+        desc="Stage current hunk (hunk mode)",
         tip="Stage hunk",
         tip_when=lambda self: self._hunk_mode,
     )
@@ -1033,7 +1033,7 @@ class DiffViewer(LineTextBrowser):
     @bind_action(
         "discard_hunk",
         "d",
-        desc="Discard current hunk (irreversible)",
+        desc="Discard current hunk (hunk mode; irreversible)",
         tip="Discard hunk",
         tip_when=lambda self: self._hunk_mode,
     )
