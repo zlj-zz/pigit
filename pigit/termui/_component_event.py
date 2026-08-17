@@ -4,9 +4,10 @@ Description: Keyboard event routing algorithm for the component tree.
     Pure functions that operate on a Component — no state held here
     beyond the cycle-detection ContextVar.
 
-    Extracted from ``_component.py`` so the 5-layer dispatch logic
-    (capture_key → bindings → handle_key → event_target → parent bubble)
-    can be understood and tested independently.
+    Dispatch layers (first match wins):
+        capture_key → bindings → handle_key → parent bubble.
+    TabView._handle_event may still forward to its active child (not
+    this algorithm). Overlay keys use dispatch_overlay_key.
 
 Author: Zev
 Date: 2026-06-15
@@ -35,7 +36,7 @@ def dispatch_key(component: Component, key: str) -> bool:
 
     Entry point called by ``Component._handle_event()``.
     Sets up the cycle-detection ContextVar scope, then delegates to the
-    5-layer dispatch algorithm.
+    4-layer dispatch algorithm.
 
     Args:
         component: The component receiving the key event.
@@ -56,47 +57,36 @@ def dispatch_key(component: Component, key: str) -> bool:
 
 
 def _dispatch_impl(component: Component, key: str, state: dict) -> bool:
-    """5-layer priority dispatch with cycle detection.
+    """4-layer priority dispatch with cycle detection.
 
     Layers (first match wins):
         0. ``capture_key(key) -> bool`` hook (intercept before bindings)
         1. Key bindings (``_key_handlers``) — always consumed
         2. ``handle_key(key) -> bool`` hook (new-style, can bubble)
-        3. Forward to ``event_target`` child
-        4. Bubble to ``parent``
+        3. Bubble to ``parent``
     """
     cid = id(component)
     if cid in state["visited"]:
         return False
     state["visited"].add(cid)
 
-    # 0. Capture hook: intercept keys before bindings (e.g. an active text filter)
     capture = getattr(component, "capture_key", None)
     if capture is not None and capture(key):
         _maybe_reestablish_focus(component)
         return True
 
-    # 1. Bindings (always consumed)
     handler = component._key_handlers.get(key)
     if handler is not None:
         handler()
         _maybe_reestablish_focus(component)
         return True
 
-    # 2. Bubbling-aware hook: handle_key -> bool
     handle_key = getattr(component, "handle_key", None)
     if handle_key is not None:
         if handle_key(key):
             _maybe_reestablish_focus(component)
             return True
 
-    # 3. Forward to event_target
-    target = component.event_target
-    if target is not None and id(target) not in state["visited"]:
-        if target._handle_event(key):
-            return True
-
-    # 4. Bubble to parent
     if component.parent is not None:
         return component.parent._handle_event(key)
 
@@ -104,23 +94,26 @@ def _dispatch_impl(component: Component, key: str, state: dict) -> bool:
 
 
 def _maybe_reestablish_focus(component: Component) -> None:
-    """Re-establish focus chain if *component* is the current leaf.
+    """After a consumed key, re-resolve focus if *component* is on the chain.
 
-    Called after a key binding or hook consumes a key, in case the
-    handler changed the component tree state.
+    If *component* is the current leaf or an ancestor of it, set the chain
+    to ``resolve_focus_leaf(component)``. Same-leaf is a no-op.
     """
+    from ._component import resolve_focus_leaf
     from ._runtime_context import get_focus_manager
 
     fm = get_focus_manager()
     if fm is None:
         return
     current_leaf = fm.get_focus_leaf()
-    has_active_child = component.active_child is not None
-    parent = component.parent
-    parent_active = parent.active_child if parent is not None else None
-    parent_switched = parent_active is not None and parent_active is not component
-    if not has_active_child and not parent_switched and current_leaf is component:
-        fm.set_focus_chain(component)
+    if current_leaf is None:
+        return
+    node: Component | None = current_leaf
+    while node is not None:
+        if node is component:
+            fm.set_focus_chain(resolve_focus_leaf(component))
+            return
+        node = node.parent
 
 
 def bubble_event(component: Component, action: EventType, **data) -> None:

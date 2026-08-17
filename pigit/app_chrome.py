@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, palette
-from pigit.termui._component import resolve_presented
+from pigit.termui._component import resolve_presentation_leaf
 from pigit.termui.containers import TabView
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
@@ -40,7 +40,7 @@ class AppFooter(Component):
         if active is None:
             tab_view = by_id("tab_view", TabView)
             active = (
-                resolve_presented(tab_view.active) if tab_view is not None else None
+                resolve_presentation_leaf(tab_view.active) if tab_view is not None else None
             )
         provider = getattr(active, "get_footer_entries", None) if active else None
         self.set_help_provider(provider)

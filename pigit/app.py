@@ -35,7 +35,7 @@ from pigit.termui import (
     show_toast,
     ToastPosition,
 )
-from pigit.termui._component import resolve_presented
+from pigit.termui._component import resolve_presentation_leaf
 from pigit.termui._runtime_context import get_renderer
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
@@ -114,10 +114,10 @@ class PigitApplication(Application):
         # Auto-refresh
         self._config = config
         self._refresh_timer_id: int | None = None
-        # ViewModels (stored for preview updates)
-        self._status_vm: StatusViewModel | None = None
-        self._commit_vm: CommitViewModel | None = None
-        self._branch_vm: BranchViewModel | None = None
+        # ViewModels (assigned in build_root, same lifetime as panels)
+        self._status_vm: StatusViewModel
+        self._commit_vm: CommitViewModel
+        self._branch_vm: BranchViewModel
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._is_large_screen = False
@@ -329,7 +329,7 @@ class PigitApplication(Application):
         body_row = self._body_row
         tab_view = self._tab_view
         inspector = self._inspector
-        active_presented = resolve_presented(tab_view.active)
+        active_presented = resolve_presentation_leaf(tab_view.active)
         on_status = isinstance(active_presented, (StatusPanel, StashPanel))
 
         if self._is_large_screen and on_status:
@@ -407,7 +407,7 @@ class PigitApplication(Application):
         cols, _ = terminal_size()
         self._apply_body_widths(cols)
         if self._inspector_visible:
-            active = resolve_presented(self._tab_view.active)
+            active = resolve_presentation_leaf(self._tab_view.active)
             if not was_visible and hasattr(self._inspector, "_last_key"):
                 delattr(self._inspector, "_last_key")
             self._inspector.update_from(active or self._tab_view.active)
@@ -456,7 +456,7 @@ class PigitApplication(Application):
         Does NOT call request_render(); vm.refresh() uses AsyncTask,
         and Signal subscribers trigger rendering when data arrives.
         """
-        active = resolve_presented(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.active)
         if active is None:
             return
         # Skip refresh when an overlay is open
@@ -528,7 +528,7 @@ class PigitApplication(Application):
         """Return the currently presented active panel, or None."""
         if self._root is None:
             return None
-        return resolve_presented(self._tab_view.active)
+        return resolve_presentation_leaf(self._tab_view.active)
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""

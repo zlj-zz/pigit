@@ -369,6 +369,19 @@ class TestRootMouse:
         root.resize((10, 6))
         root.focus_component(b)
         assert col._focus_index == 1
+        assert root._focus_manager.get_focus_leaf() is b
+
+    def test_focus_component_non_focusable_does_not_steal(self):
+        header = _Leaf()
+        a = _Leaf()
+        b = _Leaf()
+        col = Column(children=[a, b], heights=["flex", "flex"], focus_index=0)
+        outer = Column(children=[header, col], heights=[1, "flex"])
+        root = ComponentRoot(outer)
+        root.resize((10, 8))
+        before = root._focus_manager.get_focus_leaf()
+        root.focus_component(header)
+        assert root._focus_manager.get_focus_leaf() is before
 
     def test_modal_click_closing_restores_body_focus(self):
         root = ComponentRoot(_DummyBody())

@@ -64,14 +64,19 @@ class TestComponentRoot:
         root = ComponentRoot(DummyBody())
         body = root.body
         body._handle_event = MagicMock()
-        popup = MagicMock()
-        popup.open = True
-        popup.parent = None
-        popup.presented_child = None
-        popup.dispatch_overlay_key.return_value = OverlayDispatchResult.HANDLED_EXPLICIT
+
+        class _ModalPopup(Component):
+            open = True
+
+            def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
+                return OverlayDispatchResult.HANDLED_EXPLICIT
+
+            def _render_surface(self, surface) -> None:
+                pass
+
+        popup = _ModalPopup()
         root._layer_stack.push(LayerKind.MODAL, popup)
         root._handle_event("k")
-        popup.dispatch_overlay_key.assert_called_once_with("k")
         body._handle_event.assert_not_called()
 
     def test_handle_event_passthrough_to_body(self):

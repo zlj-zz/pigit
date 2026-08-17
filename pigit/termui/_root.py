@@ -12,7 +12,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 
-from ._component import Component
+from ._component import Component, resolve_focus_leaf
 from ._layer import LayerKind, LayerStack
 from ._mouse import MouseEvent
 from .event_bus import EventBus
@@ -200,7 +200,7 @@ class ComponentRoot(Component):
         if result != OverlayDispatchResult.DROPPED_UNBOUND:
             self._focus_manager.sync_focus_to_overlay_or_leaf()
             return True
-        leaf = self._focus_manager.get_event_target()
+        leaf = self._focus_manager.get_focus_leaf() or resolve_focus_leaf(self._body)
         if leaf is not None:
             consumed = leaf._handle_event(key)
             self._focus_manager.sync_focus_to_overlay()
@@ -271,7 +271,7 @@ class ComponentRoot(Component):
                     changed = True
 
         if changed:
-            self._focus_manager.set_focus_chain(self._body.find_focus_leaf())
+            self._focus_manager.set_focus_chain(resolve_focus_leaf(self._body))
 
     def _expire_badge(self) -> None:
         if getattr(self, "_badge_until", 0) and time.monotonic() > self._badge_until:

@@ -46,7 +46,20 @@ flowchart TB
 - **Session** opens the alternate screen and creates a **Renderer**.
 - **Renderer** is bound to the current context via `ContextVar` (`set_renderer` / `reset_renderer`).
 - **Loop root** (`_child`) is `ComponentRoot`, which delegates overlay checks and dispatch to `LayerStack`.
+- After an overlay consumes a key, `sync_focus_to_overlay_or_leaf()` re-resolves the overlay focus leaf (load-bearing for Sheet editors that change `focus_child` without `set_focus_chain`).
+- Body keys start at `FocusManager.get_focus_leaf()` (or `resolve_focus_leaf(body)`), then `capture_key` → bindings → `handle_key` → parent bubble. `TabView._handle_event` may still forward to the active tab.
 - **Application** facade (`Application` class) wraps `build_root()` -> `ComponentRoot` -> `_ApplicationEventLoop` assembly.
+
+### Focus and presentation
+
+Two orthogonal walks (containers override the hooks; default is `None`):
+
+| Hook | Walk | Meaning |
+|------|------|---------|
+| `focus_child` | `resolve_focus_leaf` | Who receives the next key |
+| `presentation_child` | `resolve_presentation_leaf` | Who owns help / footer / panel chrome |
+
+A focus-managed `Column` exposes both as the focused child. `CommitEditor` sets `focus_child` to the current `InputLine` and leaves `presentation_child` as `None` (the editor owns chrome). `FocusManager._leaf` is always a resolved focus leaf; `Column.set_focus_index` and `TabView` start/route call `set_focus_chain(resolve_focus_leaf(...))`.
 
 ### Layer stacking
 

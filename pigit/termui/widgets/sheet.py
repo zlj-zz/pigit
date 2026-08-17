@@ -35,8 +35,13 @@ class Sheet(Component):
         self.open = True
 
     @property
-    def presented_child(self) -> Component | None:
-        """Delegate focus and inspector queries to the wrapped child."""
+    def focus_child(self) -> Component | None:
+        """Delegate focus to the wrapped child."""
+        return self._child
+
+    @property
+    def presentation_child(self) -> Component | None:
+        """Delegate chrome queries to the wrapped child."""
         return self._child
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:

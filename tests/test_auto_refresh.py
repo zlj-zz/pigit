@@ -49,7 +49,7 @@ def mock_panel(app):
     """Set up mocked tab_view, presented panel, and VM for _refresh_active_panel."""
     mock_tab = MagicMock()
     app._tab_view = mock_tab
-    with patch("pigit.app.resolve_presented") as mock_resolve:
+    with patch("pigit.app.resolve_presentation_leaf") as mock_resolve:
         panel = MagicMock()
         panel._vm = MagicMock()
         mock_resolve.return_value = panel
@@ -79,7 +79,7 @@ class TestRefreshActivePanel:
         app._root.has_overlay_open.return_value = False
         mock_tab = MagicMock()
         app._tab_view = mock_tab
-        with patch("pigit.app.resolve_presented") as mock_resolve:
+        with patch("pigit.app.resolve_presentation_leaf") as mock_resolve:
             panel = MagicMock()
             del panel._vm
             mock_resolve.return_value = panel

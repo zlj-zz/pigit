@@ -432,11 +432,11 @@ class TestFocusManagerPolicy:
         fm.sync_focus_if_overlay_closed(was_open=True, now_open=True)
         assert fm.get_focus_leaf() is overlay
 
-    def test_get_event_target_returns_leaf(self):
+    def test_get_focus_leaf_returns_leaf(self):
         body = _Leaf()
         root = ComponentRoot(body)
         fm = root._focus_manager
-        assert fm.get_event_target() is body
+        assert fm.get_focus_leaf() is body
 
 
 class TestFocusManagerMechanics:

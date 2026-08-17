@@ -336,110 +336,22 @@ class Component(ABC):
         """
 
     @property
-    def active_child(self) -> Component | None:
-        """Return the currently active child component, or ``None``.
+    def focus_child(self) -> Component | None:
+        """Child that currently holds focus among this node's children.
 
-        Reads the ``active`` attribute if it exists and is a Component.
-        This provides a safe, type-checked alternative to
-        ``getattr(obj, "active", None)`` probes.
-        """
-        active = getattr(self, "active", None)
-        return active if isinstance(active, Component) else None
-
-    @property
-    def presented_child(self) -> Component | None:
-        """Child that represents this container for external UI (help, inspector).
-
-        None means this container presents itself.
-        Containers with an active sub-panel override this.
+        ``None`` means this node does not manage focus (not "I am the leaf").
         """
         return None
 
     @property
-    def event_target(self) -> Component | None:
-        """Child to which unhandled events are forwarded.
-
-        None means events bubble to parent instead.
-        """
+    def presentation_child(self) -> Component | None:
+        """Chrome delegate. ``None`` means this node is the presentation unit."""
         return None
 
     @property
     def is_focus_leaf(self) -> bool:
-        """Return True if this component should render as focused."""
-        if self._focus_level == 0:
-            return True
-        # Container transparency: if an ancestor presents this component as its
-        # delegate child, treat this component as focused.
-        node = self.parent
-        while node is not None:
-            if node.presented_child is self and node._focus_level >= 0:
-                return True
-            node = node.parent
-        return False
-
-    def find_focus_leaf(self) -> Component:
-        """Walk down the tree to find the deepest focusable leaf.
-
-        Follows :meth:`active_child` and :attr:`presented_child` when available
-        and drills into :attr:`children` for layout containers that do not
-        manage an active child.
-
-        .. warning::
-            This method walks via :meth:`active_child`, :attr:`presented_child`,
-            and :attr:`children`. Passing a ``MagicMock`` (or any object that
-            returns a new object for every attribute access) will cause an
-            infinite loop because ``active_child`` and ``children`` never
-            resolve to ``None`` / empty. Tests that create a ``ComponentRoot``
-            must use a real ``Component`` instance as the ``body`` argument.
-        """
-        leaf = self
-        visited: set[int] = set()
-        while True:
-            cid = id(leaf)
-            if cid in visited:
-                _logger.warning(
-                    "Cycle detected in presented_child/active_child chain at %s",
-                    type(leaf).__name__,
-                )
-                break
-            visited.add(cid)
-
-            presented = leaf.presented_child
-            if presented is not None:
-                leaf = presented
-                continue
-
-            active = leaf.active_child
-            if active is not None:
-                leaf = active
-                continue
-
-            children = leaf.children
-            if children:
-                for child in children:
-                    if (
-                        child.presented_child is not None
-                        or child.active_child is not None
-                    ):
-                        leaf = child
-                        break
-                    if child.children:
-                        leaf = child
-                        break
-                else:
-                    break
-            else:
-                break
-        # If leaf is nested inside a focus-managed container, return the
-        # container so that the framework routes events to it (not the leaf).
-        parent = leaf.parent
-        if (
-            parent is not None
-            and parent.presented_child is leaf
-            and parent.event_target is leaf
-        ):
-            return parent
-        return leaf
+        """Return True if this component is the resolved focus leaf."""
+        return self._focus_level == 0
 
     @property
     def renderer(self) -> Renderer | None:
@@ -539,31 +451,54 @@ def bind_signals(
     return unsubscribe
 
 
-def resolve_presented(component: Component | None) -> Component | None:
-    """Walk the presented_child chain to find the outermost presented component.
+def resolve_focus_leaf(node: Component) -> Component:
+    """Follow ``focus_child``, then drill layout children. Cycle-guarded.
 
-    Used for help text, inspector data, and other external queries that should
-    penetrate container wrappers.
+    Does not return a focus-managing parent: a Column with ``focus_index``
+    resolves to its focused child, not itself.
     """
+    leaf = node
+    visited: set[int] = set()
+    while True:
+        cid = id(leaf)
+        if cid in visited:
+            _logger.warning(
+                "Cycle detected in focus_child chain at %s",
+                type(leaf).__name__,
+            )
+            break
+        visited.add(cid)
+
+        child = leaf.focus_child
+        if child is not None:
+            leaf = child
+            continue
+
+        children = leaf.children
+        if not children:
+            break
+        for nested in children:
+            if nested.focus_child is not None or nested.children:
+                leaf = nested
+                break
+        else:
+            break
+    return leaf
+
+
+def resolve_presentation_leaf(node: Component | None) -> Component | None:
+    """Follow ``presentation_child`` while not None. Cycle-guarded."""
+    if node is None:
+        return None
     seen: set[int] = set()
-    while component is not None:
-        cid = id(component)
+    while True:
+        cid = id(node)
         if cid in seen:
-            _logger.warning("Cycle in presented_child chain")
+            _logger.warning("Cycle in presentation_child chain")
             break
         seen.add(cid)
-        presented = component.presented_child
-        if presented is None:
+        child = node.presentation_child
+        if child is None:
             break
-        component = presented
-    return component
-
-
-def _proxy_to_presented(component: Component, method_name: str, *, default=None):
-    """Call method on component's presented_child if available."""
-    child = resolve_presented(component)
-    if child is not None and child is not component:
-        method = getattr(child, method_name, None)
-        if callable(method):
-            return method()
-    return default
+        node = child
+    return node
