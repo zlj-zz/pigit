@@ -320,6 +320,30 @@ class TestBranchPanelLifecycle:
         assert len(panel.content) == 1
         assert panel.branches[0].name == "main"
 
+    def test_create_pull_request_opens_github_compare(self, monkeypatch):
+        from unittest.mock import Mock
+        from pigit.git.model import Branch
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_branch import BranchPanel
+
+        vm = Mock(spec=IBranchViewModel)
+        vm.items = Signal([])
+        vm.get_remote_url.return_value = "git@github.com:zlj-zz/pigit.git"
+        opened: list[str] = []
+        monkeypatch.setattr(
+            "webbrowser.open", lambda url: opened.append(url) or True
+        )
+
+        panel = BranchPanel(vm=vm)
+        panel.activate()
+        vm.items.set([Branch("dev", "0", "0", True)])
+        panel.create_pull_request()
+
+        assert opened == [
+            "https://github.com/zlj-zz/pigit/compare/dev?expand=1"
+        ]
+
 
 class TestCommitPanelLifecycle:
     """CommitPanel + ViewModel integration tests."""

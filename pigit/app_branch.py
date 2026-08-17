@@ -261,6 +261,48 @@ class BranchPanel(ItemList):
     def rebase(self) -> None:
         self._trigger_rebase()
 
+    @bind_action(
+        "create_pull_request", "p", desc="Open create pull request page in browser"
+    )
+    def create_pull_request(self) -> None:
+        """Open the hosting provider create-PR URL for the selected branch."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        from pigit.git.hosting import (
+            RemoteParseError,
+            UnsupportedHostingError,
+            build_create_pr_url,
+            head_branch_for_pr,
+        )
+
+        remote_url = self._vm.get_remote_url()
+        if not remote_url:
+            show_toast("No remote URL found.", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+
+        head = head_branch_for_pr(name=branch.name, is_remote=branch.is_remote)
+        try:
+            url = build_create_pr_url(remote_url=remote_url, head_branch=head)
+        except UnsupportedHostingError as exc:
+            show_toast(str(exc), duration=2.5, kind=FeedbackKind.WARNING)
+            return
+        except (RemoteParseError, ValueError) as exc:
+            show_toast(str(exc), duration=2.5, kind=FeedbackKind.ERROR)
+            return
+
+        try:
+            import webbrowser
+
+            webbrowser.open(url)
+        except Exception as exc:
+            show_toast(
+                f"Failed to open browser: {exc}", duration=2.5, kind=FeedbackKind.ERROR
+            )
+            return
+
+        show_toast(f"Opened PR page for {head}", duration=1.5, kind=FeedbackKind.INFO)
+
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""
         if not self.branches:
