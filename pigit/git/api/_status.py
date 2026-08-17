@@ -157,3 +157,15 @@ class _StatusOps(_OpsBase):
         if code == 1:
             return True
         raise RepoError(f"git diff failed with exit code {code}")
+
+    def has_untracked_changes(self, path: str | None = None) -> bool:
+        """Return True if the working tree has untracked (non-ignored) files."""
+        path = path or self.path
+        code, _, out = self.executor.exec(
+            "git ls-files --others --exclude-standard",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code == 0:
+            return bool(out and out.strip())
+        raise RepoError(f"git ls-files failed with exit code {code}")

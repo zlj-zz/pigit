@@ -157,14 +157,6 @@ class CommitPanel(ItemList):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
-    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="View")
-    def toggle_view(self) -> None:
-        """Toggle between list and contribution graph view."""
-        if self._view_mode is CommitViewMode.LIST:
-            self._view_mode = CommitViewMode.HEATMAP
-        else:
-            self._view_mode = CommitViewMode.LIST
-
     @bind_action(
         "toggle_expanded", "z", desc="Toggle expanded commit details", tip="Expand"
     )
@@ -184,7 +176,7 @@ class CommitPanel(ItemList):
     def get_help_title(self) -> str:
         return "Commit"
 
-    @bind_action("copy_sha", "Y", desc="Copy commit SHA to clipboard", tip="Copy SHA")
+    @bind_action("copy_sha", "Y", desc="Copy commit SHA to clipboard")
     def copy_sha(self) -> None:
         """Copy the selected commit SHA to the clipboard."""
         commit = self._current_commit()
@@ -202,6 +194,14 @@ class CommitPanel(ItemList):
                 )
             ),
         )
+
+    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="Graph")
+    def toggle_view(self) -> None:
+        """Toggle between list and contribution graph view."""
+        if self._view_mode is CommitViewMode.LIST:
+            self._view_mode = CommitViewMode.HEATMAP
+        else:
+            self._view_mode = CommitViewMode.LIST
 
     @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
     def view_diff(self) -> None:

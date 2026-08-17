@@ -441,7 +441,7 @@ class StatusPanel(ItemList):
         "preview_down",
         "J",
         desc="Scroll preview down",
-        tip="Preview down",
+        tip="Preview Navigate",
         when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_down(self) -> None:
@@ -453,7 +453,7 @@ class StatusPanel(ItemList):
         "preview_up",
         "K",
         desc="Scroll preview up",
-        tip="Preview up",
+        tip="Preview Navigate",
         when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_up(self) -> None:
@@ -739,7 +739,7 @@ class StatusPanel(ItemList):
                 action_type=StatusAction.STAGE,
             )
 
-    @bind_action("ignore", "i", desc="Add file to .gitignore", tip="Ignore")
+    @bind_action("ignore", "i", desc="Add file to .gitignore")
     def ignore(self) -> None:
         if self._tree_mode and not self._visual_mode:
             row = self._row(self.curr_no)
@@ -902,7 +902,6 @@ class StatusPanel(ItemList):
         "copy_path",
         "Y",
         desc="Copy file path",
-        tip="Copy",
         when=lambda self: not self._visual_mode,
     )
     def copy_path(self) -> None:
@@ -926,7 +925,6 @@ class StatusPanel(ItemList):
         "toggle_tree",
         "T",
         desc="Toggle tree / flat file view",
-        tip="Tree",
         when=lambda self: not self._visual_mode,
     )
     def toggle_tree(self) -> None:
@@ -937,7 +935,6 @@ class StatusPanel(ItemList):
         "l",
         "right",
         desc="Expand directory (tree view)",
-        tip="Expand",
         when=lambda self: not self._visual_mode,
     )
     def expand_dir(self) -> None:
@@ -948,7 +945,6 @@ class StatusPanel(ItemList):
         "h",
         "left",
         desc="Collapse directory (tree view)",
-        tip="Collapse",
         when=lambda self: not self._visual_mode,
     )
     def collapse_dir(self) -> None:

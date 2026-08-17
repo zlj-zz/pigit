@@ -142,7 +142,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("I", "Inspector"), (";", "Palette"), ("Q", "Quit")])
+        footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
 
         self._inspector = InspectorPanel(id="inspector")
 
@@ -591,9 +591,18 @@ class PigitApplication(Application):
             )
             return
         if result.returncode == 0:
-            show_toast(
-                f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
-            )
+            if self._git.is_rebase_in_progress():
+                # --continue/--skip resumed into another paused stop (e.g. the
+                # next "edit" action) — report that, not a false "completed".
+                show_toast(
+                    "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
+                    duration=3.0,
+                    kind=FeedbackKind.WARNING,
+                )
+            else:
+                show_toast(
+                    f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
+                )
             # Refresh the VMs directly: _refresh_active_panel() early-returns
             # while the command-palette overlay is still open.
             self._branch_vm.refresh()
