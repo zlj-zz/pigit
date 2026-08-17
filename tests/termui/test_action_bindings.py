@@ -68,13 +68,14 @@ def test_parent_bindings_collected_before_subclass():
     assert [b.action for b in bindings] == ["next", "checkout", "delete", "rename"]
 
 
-def test_callable_desc_and_when():
+def test_callable_desc_and_tip_when():
     class _Dynamic(Component):
         @bind_action(
             "stash",
             "z",
             desc=lambda self: f"Stash ({self._scope})",
-            when=lambda self: self._enabled,
+            tip="Stash",
+            tip_when=lambda self: self._enabled,
         )
         def stash(self) -> str:
             return "stash"
@@ -84,7 +85,32 @@ def test_callable_desc_and_when():
     panel._scope = "local"
     panel._enabled = True
     assert binding.desc(panel) == "Stash (local)"
-    assert binding.when(panel) is True
+    assert binding.tip_when(panel) is True
+
+
+def test_tip_when_hides_footer_not_help():
+    class _Gated(Component):
+        def __init__(self) -> None:
+            self._show_tip = False
+            super().__init__()
+
+        @bind_action(
+            "stage",
+            "s",
+            desc="Stage file",
+            tip="Stage",
+            tip_when=lambda self: self._show_tip,
+        )
+        def stage(self) -> None:
+            pass
+
+    panel = _Gated()
+    help_entries = panel.get_help_entries()
+    assert any(desc == "Stage file" for _, desc in help_entries)
+    assert panel.get_footer_entries() == []
+
+    panel._show_tip = True
+    assert panel.get_footer_entries() == [("s", "Stage")]
 
 
 def test_application_resolves_bind_action():

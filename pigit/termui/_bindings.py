@@ -149,8 +149,8 @@ def resolve_key_handlers(
 class Binding:
     """One action binding: a stable action id mapped to default keys + help metadata.
 
-    Collected from ``@bind_action``-decorated methods. ``desc`` and ``when`` may
-    be callables taking the owning component (bound at resolution time).
+    Collected from ``@bind_action``-decorated methods. ``desc`` and ``tip_when``
+    may be callables taking the owning component (bound at resolution time).
     """
 
     action: str
@@ -158,7 +158,7 @@ class Binding:
     target: str = ""
     desc: str | Callable[[Any], str] | None = None
     tip: str | None = None
-    when: Callable[[Any], bool] | None = None
+    tip_when: Callable[[Any], bool] | None = None
     configurable: bool = True
 
 
@@ -167,7 +167,7 @@ def bind_action(
     *keys: str,
     desc: str | Callable[[Any], str] | None = None,
     tip: str | None = None,
-    when: Callable[[Any], bool] | None = None,
+    tip_when: Callable[[Any], bool] | None = None,
     configurable: bool = True,
 ) -> Callable[[Any], Any]:
     """Register an action binding on a method (collected with class bindings).
@@ -181,12 +181,15 @@ def bind_action(
         desc: Full help description; a callable receives the component.
         tip: Short footer hint; ``None`` means the action is not shown in the
             compact footer.
-        when: Optional callable returning False to hide the help entry.
+        tip_when: Optional callable returning False to hide the footer tip
+            only; help (``desc``) is always shown.
         configurable: Whether the user may remap this action's keys via config.
     """
 
     def decorator(fn: Any) -> Any:
-        setattr(fn, _ACTION_ATTR, (action, tuple(keys), desc, tip, when, configurable))
+        setattr(
+            fn, _ACTION_ATTR, (action, tuple(keys), desc, tip, tip_when, configurable)
+        )
         return fn
 
     return decorator
@@ -209,7 +212,7 @@ def collect_action_bindings(cls: type, namespace: str = "") -> list[Binding]:
             meta = getattr(obj, _ACTION_ATTR, None)
             if meta is None:
                 continue
-            action, keys, desc, tip, when, configurable = meta
+            action, keys, desc, tip, tip_when, configurable = meta
             full_action = f"{namespace}.{action}" if namespace else action
             out.append(
                 Binding(
@@ -218,7 +221,7 @@ def collect_action_bindings(cls: type, namespace: str = "") -> list[Binding]:
                     target=name,
                     desc=desc,
                     tip=tip,
-                    when=when,
+                    tip_when=tip_when,
                     configurable=configurable,
                 )
             )
@@ -273,13 +276,11 @@ def derive_help_entries(
 ) -> list[tuple[str, str]]:
     """Derive ``(keys, desc)`` help entries from ``@bind_action`` bindings.
 
-    Hides entries whose ``when`` predicate returns False; ``desc`` falls back to
-    the action id when callable or None.
+    Always includes every binding; ``desc`` falls back to the action id when
+    callable or None. Footer visibility is gated by ``tip_when`` separately.
     """
     entries: list[tuple[str, str]] = []
     for binding in bindings:
-        if binding.when is not None and not binding.when(owner):
-            continue
         desc = binding.desc(owner) if callable(binding.desc) else binding.desc
         if desc is None:
             desc = binding.action

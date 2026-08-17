@@ -298,7 +298,7 @@ class MyPanel(Component):
 - `action` — stable id (namespace-scoped via `keymap_namespace`), used for remapping.
 - `*keys` — default semantic keys triggering the method.
 - `desc` — full help text; `tip` — compact footer hint.
-- `when` — callable hiding the entry from help/footer when it returns False.
+- `tip_when` — callable hiding the footer tip when it returns False; help (`desc`) is always shown.
 - `configurable` — whether the user may remap via the `[keybindings]` config section.
 
 `BINDINGS` remains for simple `(key, target)` pairs that need no help/footer metadata.

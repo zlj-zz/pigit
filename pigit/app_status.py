@@ -442,7 +442,7 @@ class StatusPanel(ItemList):
         "J",
         desc="Scroll preview down",
         tip="Preview Navigate",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
@@ -454,7 +454,7 @@ class StatusPanel(ItemList):
         "K",
         desc="Scroll preview up",
         tip="Preview Navigate",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
@@ -484,7 +484,7 @@ class StatusPanel(ItemList):
         "s",
         desc="Toggle visual scroll mode",
         tip="V-scroll",
-        when=lambda self: self._visual_mode,
+        tip_when=lambda self: self._visual_mode,
     )
     def toggle_visual_scroll(self) -> None:
         """Toggle visual scroll mode (auto-select while navigating)."""
@@ -501,7 +501,7 @@ class StatusPanel(ItemList):
         " ",
         desc="Toggle selection of current row",
         tip="Select",
-        when=lambda self: self._visual_mode,
+        tip_when=lambda self: self._visual_mode,
     )
     def toggle_space_selection(self) -> None:
         """Toggle selection of current row in visual mode (source-index based)."""
@@ -688,7 +688,7 @@ class StatusPanel(ItemList):
         "enter",
         desc="Open diff for selected file",
         tip="Open",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def open_diff(self) -> None:
         if self._tree_mode:
@@ -780,7 +780,7 @@ class StatusPanel(ItemList):
         "c",
         desc="Open inline commit editor",
         tip="Commit",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def commit(self) -> None:
         if not self._vm.staged_files:
@@ -823,7 +823,7 @@ class StatusPanel(ItemList):
         "C",
         desc="Open external $EDITOR for commit",
         tip="Commit",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def commit_editor(self) -> None:
         if not any(f.has_staged_change for f in self.files):
@@ -854,7 +854,7 @@ class StatusPanel(ItemList):
         "E",
         desc="Open file in external $EDITOR",
         tip="Edit",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def open_editor(self) -> None:
         hit = self.file_at_cursor()
@@ -866,7 +866,7 @@ class StatusPanel(ItemList):
         "o",
         desc="Checkout ours (conflict; discards theirs)",
         tip="Ours",
-        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+        tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
     def checkout_ours(self) -> None:
         hit = self.file_at_cursor()
@@ -879,7 +879,7 @@ class StatusPanel(ItemList):
         "t",
         desc="Checkout theirs (conflict; discards ours)",
         tip="Theirs",
-        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+        tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
     def checkout_theirs(self) -> None:
         hit = self.file_at_cursor()
@@ -892,18 +892,13 @@ class StatusPanel(ItemList):
         "z",
         desc="Stash working tree changes",
         tip="Stash",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def stash(self) -> None:
         result = self._vm.stash_push()
         self._handle_result(result)
 
-    @bind_action(
-        "copy_path",
-        "Y",
-        desc="Copy file path",
-        when=lambda self: not self._visual_mode,
-    )
+    @bind_action("copy_path", "Y", desc="Copy file path")
     def copy_path(self) -> None:
         hit = self.file_at_cursor()
         if hit is not None:
@@ -921,32 +916,15 @@ class StatusPanel(ItemList):
                 ),
             )
 
-    @bind_action(
-        "toggle_tree",
-        "T",
-        desc="Toggle tree / flat file view",
-        when=lambda self: not self._visual_mode,
-    )
+    @bind_action("toggle_tree", "T", desc="Toggle tree / flat file view")
     def toggle_tree(self) -> None:
         self._toggle_tree_mode()
 
-    @bind_action(
-        "expand_dir",
-        "l",
-        "right",
-        desc="Expand directory (tree view)",
-        when=lambda self: not self._visual_mode,
-    )
+    @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
     def expand_dir(self) -> None:
         self._expand_current_dir()
 
-    @bind_action(
-        "collapse_dir",
-        "h",
-        "left",
-        desc="Collapse directory (tree view)",
-        when=lambda self: not self._visual_mode,
-    )
+    @bind_action("collapse_dir", "h", "left", desc="Collapse directory (tree view)")
     def collapse_dir(self) -> None:
         self._collapse_current_dir()
 
