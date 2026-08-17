@@ -115,6 +115,11 @@ class TestSessionSuspendResume:
             with mock.patch.dict("sys.modules", {"termios": fake_termios}):
                 session.suspend()
                 fake_termios.tcsetattr.assert_called_once()
+                # Child (nvim) must see a clean stdin; otherwise its DSR/OSC
+                # replies can be mixed with leftover TUI input bytes.
+                fake_termios.tcflush.assert_called_once_with(
+                    session._fd, fake_termios.TCIFLUSH
+                )
 
     def test_resume_sets_cbreak(self):
         stdin = FakeTTY()

@@ -194,3 +194,31 @@ class TestExecExternal:
             mock_run.return_value = MagicMock()
             with pytest.raises(RuntimeError, match="boom"):
                 exec_external(["echo", "hi"])
+
+    def test_stops_keyboard_reader_while_external_owns_tty(self):
+        """KeyboardInput must not read stdin while nvim queries DSR/OSC 11."""
+        from pigit.termui._runtime_context import set_overlay_host, set_session
+
+        runtime = RuntimeContext()
+        _runtime_ctx.set(runtime)
+        session = MagicMock()
+        set_session(session)
+
+        input_handle = MagicMock()
+        loop = MagicMock()
+        loop._input_handle = input_handle
+        host = MagicMock()
+        host._event_loop = loop
+        set_overlay_host(host)
+
+        order: list[str] = []
+        input_handle.stop.side_effect = lambda: order.append("stop")
+        session.suspend.side_effect = lambda: order.append("suspend")
+        session.resume.side_effect = lambda: order.append("resume")
+        input_handle.start.side_effect = lambda: order.append("start")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = lambda *a, **k: order.append("run") or MagicMock()
+            exec_external(["nvim", "file"])
+
+        assert order == ["stop", "suspend", "run", "resume", "start"]

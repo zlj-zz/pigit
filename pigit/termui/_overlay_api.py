@@ -61,6 +61,10 @@ def exec_external(
 
     Works from anywhere inside a Session context.
 
+    Stops the keyboard reader before handing the TTY to the child so OSC/DSR
+    replies (e.g. Neovim background-color detection) are not consumed by
+    pigit's input thread.
+
     Note: stdout and stderr are not captured because the command inherits
     the terminal directly. Use the return code to check success/failure.
 
@@ -74,6 +78,12 @@ def exec_external(
     if session is None:
         raise RuntimeError("No active TUI session; call only inside Session context.")
 
+    host = get_overlay_host()
+    loop = getattr(host, "_event_loop", None) if host is not None else None
+    input_handle = getattr(loop, "_input_handle", None) if loop is not None else None
+
+    if input_handle is not None:
+        input_handle.stop()
     session.suspend()
     try:
         result = subprocess.run(
@@ -86,6 +96,11 @@ def exec_external(
         except Exception as e:
             _logger.exception("Session.resume() failed; terminal may be in bad state")
             resume_error = e
+        if input_handle is not None:
+            try:
+                input_handle.start()
+            except Exception:
+                _logger.exception("Failed to restart keyboard input after external cmd")
         renderer = get_renderer()
         if renderer is not None:
             renderer.clear_cache()
