@@ -215,6 +215,7 @@ class BranchPanel(ItemList):
         "scope",
         "ctrl f",
         desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
+        tip="Scope",
     )
     def toggle_scope(self) -> None:
         """Cycle branch scope: local -> remote -> all -> local."""

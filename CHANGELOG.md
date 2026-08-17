@@ -1,5 +1,27 @@
 # Changelog of pigit
 
+## 1.11.1 (2026-08-17)
+
+### Features
+
+- **Create pull request**: Branch panel `p` opens the host create-PR page in the browser (GitHub/GitLab/Bitbucket/Gitea/Codeberg) from the selected branch.
+- **Amend from Status**: `A` amends HEAD with staged changes (`git commit --amend --no-edit`) after confirm.
+- **Stash includes untracked**: Status stash runs `git stash push -u` so `??` files are included.
+- **Help panel polish**: wider default width, right-aligned keys, `[Section]` headers, and mouse-wheel scrolling.
+
+### Improvements
+
+- **Keybinding tweaks**: Status `s` stashes / `V` visual-scroll; Branch `r` rebase / `R` rename / `ctrl f` scope.
+- **Help and footer order**: panel `@bind_action` declaration order is navigate → open → primary → mode → rare.
+- **Stash section chrome**: top rule `──── Stash ──` separates Status and Stash without panel backgrounds.
+- **Mode context in help**: mode-gated actions spell the constraint in `desc` (help always lists them; `tip_when` only hides footer tips).
+- **Search in help**: Status/Commit `/` search is a real `@bind_action` so it appears in Help.
+
+### Bug Fixes
+
+- **Empty Status Tab**: when the working tree is clean, `Tab` again moves focus to the Stash panel (was swallowed by `capture_key`).
+- **External editor / Neovim**: stop the keyboard reader before `exec_external` so DSR/OSC replies are not stolen (fixes E1568-class failures when opening `$EDITOR` with `E`).
+
 ## 1.11.0 (2026-08-17)
 
 ### Features
