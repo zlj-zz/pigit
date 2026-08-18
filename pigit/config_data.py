@@ -47,6 +47,8 @@ class TuiConfig:
     auto_refresh_interval: float = 10.0
     word_diff: bool = True
     status_view: Literal["flat", "tree"] = "tree"
+    diff_preview_default: bool = True
+    log_graph_default: bool = True
     show_footer: bool = True
 
 

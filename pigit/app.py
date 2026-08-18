@@ -123,6 +123,8 @@ class PigitApplication(Application):
         self._preview_panel: PreviewPanel | None = None
         self._log_graph_preview: LogGraphPreview | None = None
         self._is_large_screen = False
+        self._diff_preview_wanted = config.diff_preview_default
+        self._log_graph_wanted = config.log_graph_default
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
@@ -172,8 +174,13 @@ class PigitApplication(Application):
             vm=self._status_vm,
             id="status_panel",
             default_view=self._config.status_view,
+            on_toggle_preview=self.toggle_side_preview,
         )
-        self._stash_panel = StashPanel(vm=self._status_vm, id="stash")
+        self._stash_panel = StashPanel(
+            vm=self._status_vm,
+            id="stash",
+            on_toggle_preview=self.toggle_side_preview,
+        )
         self._status_stack = TabPanel(
             children=[self._status_panel, self._stash_panel],
             heights=["flex", 4],
@@ -187,6 +194,7 @@ class PigitApplication(Application):
             vm=self._branch_vm,
             branch_signal=self._branch_signal,
             id="branch",
+            on_toggle_preview=self.toggle_side_preview,
         )
 
         self._commit_panel = CommitPanel(vm=self._commit_vm, id="commit")
@@ -337,9 +345,9 @@ class PigitApplication(Application):
             return None
         active = resolve_presentation_leaf(self._tab_view.active)
         if isinstance(active, (StatusPanel, StashPanel)):
-            return self._preview_panel
+            return self._preview_panel if self._diff_preview_wanted else None
         if isinstance(active, BranchPanel):
-            return self._log_graph_preview
+            return self._log_graph_preview if self._log_graph_wanted else None
         return None
 
     def _sync_body_children(self, desired_children: list[Component]) -> None:
@@ -365,8 +373,9 @@ class PigitApplication(Application):
     def _apply_body_widths(self, cols: int) -> None:
         """Recompute body_row widths from screen size, active tab, and inspector.
 
-        At most one side preview is present: Status/Stash get the diff preview,
-        Branch gets the log-graph preview, Commit/Diff get none.
+        At most one side preview is present: Status/Stash get the diff preview
+        when wanted, Branch gets the log-graph preview when wanted, Commit/Diff
+        get none.
         """
         body_row = self._body_row
         tab_view = self._tab_view
@@ -517,6 +526,38 @@ class PigitApplication(Application):
         rows = terminal_size()[1]
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
+
+    def toggle_side_preview(self) -> None:
+        """Toggle the side preview that belongs to the focused panel."""
+        cols, _ = terminal_size()
+        if cols < self.LARGE_SCREEN_COLS:
+            show_toast(
+                f"Need at least {self.LARGE_SCREEN_COLS} columns for preview",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if isinstance(active, (StatusPanel, StashPanel)):
+            self._diff_preview_wanted = not self._diff_preview_wanted
+            showing = self._diff_preview_wanted
+            hidden = self._preview_panel
+        elif isinstance(active, BranchPanel):
+            self._log_graph_wanted = not self._log_graph_wanted
+            showing = self._log_graph_wanted
+            hidden = self._log_graph_preview
+        else:
+            return
+        self._apply_body_widths(cols)
+        if showing:
+            if self._tab_view.active is not None:
+                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+        elif hidden is not None:
+            hidden.clear()
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
+        request_render()
 
     @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
     def toggle_inspector(self):

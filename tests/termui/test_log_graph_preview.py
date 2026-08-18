@@ -190,10 +190,24 @@ def test_branch_jk_scrolls_preview(
 ) -> None:
     preview.resize((24, 10))
     preview.set_lines([f"* c{i}" for i in range(40)], title="feat")
+    preview.activate()
     monkeypatch.setattr("pigit.app_branch.by_id", lambda *_args, **_kwargs: preview)
     panel = _branch_panel(vm)
     panel._scroll_preview_down()
     assert preview._browser._i == LogGraphPreview.SCROLL_PAGE_SIZE
+    panel._scroll_preview_up()
+    assert preview._browser._i == 0
+
+
+def test_jk_does_not_scroll_detached_preview(
+    preview: LogGraphPreview, vm: Mock, monkeypatch
+) -> None:
+    """J/K is a no-op while the preview is detached (toggled off)."""
+    preview.resize((24, 10))
+    preview.set_lines([f"* c{i}" for i in range(40)], title="feat")
+    monkeypatch.setattr("pigit.app_branch.by_id", lambda *_args, **_kwargs: preview)
+    panel = _branch_panel(vm)
+    panel._scroll_preview_down()
     panel._scroll_preview_up()
     assert preview._browser._i == 0
 

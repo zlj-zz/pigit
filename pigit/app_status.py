@@ -36,8 +36,9 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
-from .app_types import FileInfo
 from .app_preview import PreviewPanel
+from .app_preview_toggle import invoke_preview_toggle
+from .app_types import FileInfo
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
@@ -283,6 +284,7 @@ class StatusPanel(ItemList):
         vm: IStatusViewModel,
         default_view: str = "tree",
         id: str | None = None,
+        on_toggle_preview: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -297,6 +299,7 @@ class StatusPanel(ItemList):
             id=id,
         )
         self._vm = vm
+        self._on_toggle_preview = on_toggle_preview
         self.files: list[File] = []
         self._all_files: list[File] = []
         self._filter = SearchFilter(self._apply_filter)
@@ -426,7 +429,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview is not None:
+        if preview.is_activated():
             preview.scroll_down(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -438,7 +441,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview is not None:
+        if preview.is_activated():
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -712,6 +715,11 @@ class StatusPanel(ItemList):
     def toggle_tree(self) -> None:
         self._toggle_tree_mode()
 
+    @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
+    def toggle_preview(self) -> None:
+        """Show or hide the Status side diff preview on a large screen."""
+        invoke_preview_toggle(self)
+
     @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
     def expand_dir(self) -> None:
         self._expand_current_dir()
@@ -915,6 +923,7 @@ class StatusPanel(ItemList):
             return left, main, right
 
         file = row.file
+        assert file is not None  # dir rows returned above; file rows always carry one
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         left = [
@@ -954,7 +963,7 @@ class StatusPanel(ItemList):
                 return self.files[self.curr_no], self._filter.source_index(self.curr_no)
             return None
         row = self._row(self.curr_no)
-        if row is None or row.kind == "dir":
+        if row is None or row.kind == "dir" or row.file is None:
             return None
         return row.file, row.source_index
 

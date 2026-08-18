@@ -67,6 +67,14 @@ word_diff = true
 # (str) Status panel default view. Supported: [flat, tree]
 status_view = "tree"
 
+# (bool) Show Status/Stash side diff preview on large screens (>= 120 cols).
+# Ctrl+p on Status/Stash toggles at runtime; this is the startup default only.
+diff_preview_default = true
+
+# (bool) Show Branch log-graph preview on large screens (>= 120 cols).
+# Ctrl+p on Branch toggles at runtime; this is the startup default only.
+log_graph_default = true
+
 # (bool) Show the footer key-hint bar.
 show_footer = true
 

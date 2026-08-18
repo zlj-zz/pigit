@@ -26,6 +26,7 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
+from .app_preview_toggle import invoke_preview_toggle
 from .app_types import BranchInfo
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
@@ -50,6 +51,7 @@ class BranchPanel(ItemList):
         branch_signal: Signal[str] | None = None,
         vm: IBranchViewModel,
         id: str | None = None,
+        on_toggle_preview: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -57,6 +59,7 @@ class BranchPanel(ItemList):
             id=id,
         )
         self._vm = vm
+        self._on_toggle_preview = on_toggle_preview
         self._branch_signal = branch_signal
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
@@ -138,10 +141,13 @@ class BranchPanel(ItemList):
         super().previous(step)
 
     def _log_graph_preview_panel(self):
-        """Return the registered log-graph preview, or raise if missing."""
+        """Return the registered log-graph preview, or None when unregistered."""
         from .app_log_graph_preview import LogGraphPreview
 
-        return by_id("log_graph_preview", LogGraphPreview)
+        try:
+            return by_id("log_graph_preview", LogGraphPreview)
+        except (RuntimeError, TypeError):
+            return None
 
     @bind_action(
         "preview_down",
@@ -151,7 +157,8 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = self._log_graph_preview_panel()
-        preview.scroll_down(preview.SCROLL_PAGE_SIZE)
+        if preview is not None and preview.is_activated():
+            preview.scroll_down(preview.SCROLL_PAGE_SIZE)
 
     @bind_action(
         "preview_up",
@@ -161,7 +168,8 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = self._log_graph_preview_panel()
-        preview.scroll_up(preview.SCROLL_PAGE_SIZE)
+        if preview is not None and preview.is_activated():
+            preview.scroll_up(preview.SCROLL_PAGE_SIZE)
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
     def checkout(self) -> None:
@@ -256,6 +264,11 @@ class BranchPanel(ItemList):
         self._r_start = 0
         self._vm.set_scope(scope)
         self._vm.refresh()
+
+    @bind_action("toggle_preview", "ctrl p", desc="Toggle log graph preview")
+    def toggle_preview(self) -> None:
+        """Show or hide the Branch log-graph preview on a large screen."""
+        invoke_preview_toggle(self)
 
     @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
     def rename(self) -> None:

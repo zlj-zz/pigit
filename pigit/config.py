@@ -112,6 +112,14 @@ class Config(metaclass=Singleton):
         # (str) Status panel default view. Supported: [flat, tree]
         status_view = "{tui_status_view}"
 
+        # (bool) Show Status/Stash side diff preview on large screens (>= 120 cols).
+        # Ctrl+p on Status/Stash toggles at runtime; this is the startup default only.
+        diff_preview_default = {tui_diff_preview_default}
+
+        # (bool) Show Branch log-graph preview on large screens (>= 120 cols).
+        # Ctrl+p on Branch toggles at runtime; this is the startup default only.
+        log_graph_default = {tui_log_graph_default}
+
         # (bool) Show the footer key-hint bar.
         show_footer = {tui_show_footer}
         {keybindings}
@@ -266,6 +274,8 @@ class Config(metaclass=Singleton):
             auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
             word_diff=tui_raw.get("word_diff", True),
             status_view=status_view,
+            diff_preview_default=tui_raw.get("diff_preview_default", True),
+            log_graph_default=tui_raw.get("log_graph_default", True),
             show_footer=tui_raw.get("show_footer", True),
         )
 
@@ -340,6 +350,10 @@ class Config(metaclass=Singleton):
                         tui_auto_refresh_interval=data.tui.auto_refresh_interval,
                         tui_word_diff=str(data.tui.word_diff).lower(),
                         tui_status_view=data.tui.status_view,
+                        tui_diff_preview_default=str(
+                            data.tui.diff_preview_default
+                        ).lower(),
+                        tui_log_graph_default=str(data.tui.log_graph_default).lower(),
                         tui_show_footer=str(data.tui.show_footer).lower(),
                         keybindings=keybindings_block,
                     )

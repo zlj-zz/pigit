@@ -25,9 +25,11 @@ def runtime():
     _runtime_ctx.reset(token)
 
 
-def _mount(runtime: RuntimeContext) -> tuple[PigitApplication, ComponentRoot]:
+def _mount(
+    runtime: RuntimeContext, *, config: TuiConfig | None = None
+) -> tuple[PigitApplication, ComponentRoot]:
     """Build the app tree and bind root key handlers without starting the loop."""
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=config or TuiConfig())
     body = app.build_root()
     root = ComponentRoot(
         body,
@@ -197,3 +199,145 @@ def test_status_to_branch_sizes_log_graph_preview(runtime, monkeypatch):
     assert preview._size[0] > 0
     assert preview._size[1] > 0
     assert preview._browser._size[0] > 0
+
+
+def test_diff_preview_default_false_hides_on_large_screen(runtime) -> None:
+    app, _root = _mount(runtime, config=TuiConfig(diff_preview_default=False))
+    app._is_large_screen = True
+    app._apply_body_widths(140)
+    assert "preview" not in _body_ids(app)
+
+
+def test_log_graph_default_false_hides_on_large_screen(runtime) -> None:
+    app, _root = _mount(runtime, config=TuiConfig(log_graph_default=False))
+    app._is_large_screen = True
+    app._tab_view.route_to("branch")
+    app._apply_body_widths(140)
+    assert "log_graph_preview" not in _body_ids(app)
+
+
+def test_ctrl_p_toggles_diff_preview_on_large_screen(runtime, monkeypatch) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    app._apply_body_widths(140)
+    assert "preview" in _body_ids(app)
+
+    root._handle_event("ctrl p")
+    assert "preview" not in _body_ids(app)
+
+    root._handle_event("ctrl p")
+    assert "preview" in _body_ids(app)
+
+
+def test_ctrl_p_on_stash_toggles_diff_preview(runtime, monkeypatch) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    root._handle_event("2")
+    app._apply_body_widths(140)
+    assert "preview" in _body_ids(app)
+
+    root._handle_event("ctrl p")
+    assert "preview" not in _body_ids(app)
+    assert app._diff_preview_wanted is False
+
+
+def test_ctrl_p_toggles_branch_log_graph_on_large_screen(runtime, monkeypatch) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    root._handle_event("3")
+    app._apply_body_widths(140)
+    assert "log_graph_preview" in _body_ids(app)
+    diff_wanted = app._diff_preview_wanted
+
+    root._handle_event("ctrl p")
+    assert "log_graph_preview" not in _body_ids(app)
+    assert app._diff_preview_wanted is diff_wanted
+
+    root._handle_event("ctrl p")
+    assert "log_graph_preview" in _body_ids(app)
+
+
+def test_ctrl_p_on_commit_does_not_toggle_previews(runtime, monkeypatch) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    app._apply_body_widths(140)
+    diff_wanted = app._diff_preview_wanted
+    log_graph_wanted = app._log_graph_wanted
+
+    root._handle_event("4")
+    app._apply_body_widths(140)
+    root._handle_event("ctrl p")
+
+    assert app._diff_preview_wanted is diff_wanted
+    assert app._log_graph_wanted is log_graph_wanted
+    assert "preview" not in _body_ids(app)
+    assert "log_graph_preview" not in _body_ids(app)
+
+
+def test_ctrl_p_on_narrow_terminal_toasts_and_keeps_hidden(
+    runtime, monkeypatch
+) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (80, 24))
+    toasts: list[str] = []
+    monkeypatch.setattr(
+        "pigit.app.show_toast", lambda msg, **_kwargs: toasts.append(msg)
+    )
+    app, root = _mount(runtime)
+    assert app._is_large_screen is False
+    assert "preview" not in _body_ids(app)
+    wanted = app._diff_preview_wanted
+
+    root._handle_event("ctrl p")
+
+    assert "preview" not in _body_ids(app)
+    assert app._diff_preview_wanted is wanted
+    assert toasts
+    assert "120" in toasts[0]
+
+
+def test_diff_and_log_graph_toggles_are_independent(runtime, monkeypatch) -> None:
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    app._apply_body_widths(140)
+
+    root._handle_event("ctrl p")
+    assert app._diff_preview_wanted is False
+
+    root._handle_event("3")
+    app._apply_body_widths(140)
+    assert "log_graph_preview" in _body_ids(app)
+
+    root._handle_event("ctrl p")
+    assert "log_graph_preview" not in _body_ids(app)
+    assert app._diff_preview_wanted is False
+
+    root._handle_event("1")
+    app._apply_body_widths(140)
+    assert "preview" not in _body_ids(app)
+
+
+def test_help_lists_ctrl_p_on_preview_panels_not_global(runtime) -> None:
+    app, _root = _mount(runtime)
+    global_keys = {key for key, _ in app.get_help_entries()}
+    assert "Ctrl+p" not in global_keys
+    assert "Ctrl+P" not in global_keys
+
+    status = {key: desc for key, desc in app._status_panel.get_help_entries()}
+    assert "Ctrl+p" in status
+    assert "preview" in status["Ctrl+p"].lower()
+
+    stash = {key: desc for key, desc in app._stash_panel.get_help_entries()}
+    assert "Ctrl+p" in stash
+    assert "preview" in stash["Ctrl+p"].lower()
+
+    branch = {key: desc for key, desc in app._branch_panel.get_help_entries()}
+    assert "Ctrl+p" in branch
+    assert "preview" in branch["Ctrl+p"].lower()
+
+    commit = {key for key, _ in app._commit_panel.get_help_entries()}
+    assert "Ctrl+p" not in commit
