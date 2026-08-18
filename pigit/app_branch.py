@@ -290,9 +290,13 @@ class BranchPanel(ItemList):
         if idx < len(self.branches):
             branch = self.branches[idx]
             if not branch.is_remote:
+                if branch.upstream_name:
+                    right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
                 ahead = branch.ahead if branch.ahead != "?" else ""
                 behind = branch.behind if branch.behind != "?" else ""
                 if ahead:
+                    if right:
+                        right.append(Segment(" ", fg=THEME.fg_muted))
                     right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
                 if behind:
                     if right:
