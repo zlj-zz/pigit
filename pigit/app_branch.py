@@ -134,6 +134,130 @@ class BranchPanel(ItemList):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
+    @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
+    def checkout(self) -> None:
+        if not self.branches:
+            return
+        local_branch = self.branches[self.curr_no]
+        if local_branch.is_head:
+            show_toast(
+                "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        if local_branch.is_remote:
+            show_toast(
+                "Cannot checkout remote branch directly.",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        result = self._vm.checkout(self.curr_no)
+        self._handle_result(result)
+        if result.success and self._branch_signal is not None:
+            self._branch_signal.set(local_branch.name)
+
+    @bind_action(
+        "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
+    )
+    def new_branch(self) -> None:
+        self._show_new_branch_sheet()
+
+    @bind_action(
+        "merge",
+        "m",
+        desc="Merge selected branch into current (requires clean worktree; may conflict)",
+        tip="Merge",
+    )
+    def merge(self) -> None:
+        self._trigger_merge()
+
+    @bind_action("create_pull_request", "p", desc="Create pull request page in browser")
+    def create_pull_request(self) -> None:
+        """Open the hosting provider create-PR URL for the selected branch."""
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        from pigit.git.hosting import (
+            RemoteParseError,
+            UnsupportedHostingError,
+            build_create_pr_url,
+            head_branch_for_pr,
+        )
+
+        remote_url = self._vm.get_remote_url()
+        if not remote_url:
+            show_toast("No remote URL found.", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+
+        head = head_branch_for_pr(name=branch.name, is_remote=branch.is_remote)
+        try:
+            url = build_create_pr_url(remote_url=remote_url, head_branch=head)
+        except UnsupportedHostingError as exc:
+            show_toast(str(exc), duration=2.5, kind=FeedbackKind.WARNING)
+            return
+        except (RemoteParseError, ValueError) as exc:
+            show_toast(str(exc), duration=2.5, kind=FeedbackKind.ERROR)
+            return
+
+        try:
+            import webbrowser
+
+            webbrowser.open(url)
+        except Exception as exc:
+            show_toast(
+                f"Failed to open browser: {exc}", duration=2.5, kind=FeedbackKind.ERROR
+            )
+            return
+
+        show_toast(f"Opened PR page for {head}", duration=1.5, kind=FeedbackKind.INFO)
+
+    @bind_action(
+        "scope",
+        "ctrl f",
+        desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
+        tip="Scope",
+    )
+    def toggle_scope(self) -> None:
+        """Cycle branch scope: local -> remote -> all -> local."""
+        self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
+        scope = self._SCOPES[self._scope_idx]
+        label = self._SCOPE_LABELS[scope]
+        show_toast(f"Branch scope: {label}", duration=2.0, kind=FeedbackKind.INFO)
+        self.curr_no = 0
+        self._r_start = 0
+        self._vm.set_scope(scope)
+        self._vm.refresh()
+
+    @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
+    def rename(self) -> None:
+        if not self.branches:
+            return
+        branch = self.branches[self.curr_no]
+        if branch.is_remote:
+            show_toast(
+                "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
+            )
+            return
+        self._show_rename_sheet(branch.name)
+
+    @bind_action(
+        "delete",
+        "d",
+        desc="Delete selected branch (fails if unmerged unless forced)",
+        tip="Delete",
+    )
+    def delete(self) -> None:
+        self._trigger_delete()
+
+    @bind_action(
+        "rebase",
+        "r",
+        desc="Interactive rebase onto selected branch (rewrites history)",
+        tip="Rebase",
+    )
+    def rebase(self) -> None:
+        self._trigger_rebase()
+
     def describe_row(
         self,
         idx: int,
@@ -176,90 +300,6 @@ class BranchPanel(ItemList):
                     right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
         return left, None, right
-
-    @bind_action(
-        "scope",
-        "R",
-        desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
-        tip="Scope",
-    )
-    def toggle_scope(self) -> None:
-        """Cycle branch scope: local -> remote -> all -> local."""
-        self._scope_idx = (self._scope_idx + 1) % len(self._SCOPES)
-        scope = self._SCOPES[self._scope_idx]
-        label = self._SCOPE_LABELS[scope]
-        show_toast(f"Branch scope: {label}", duration=2.0, kind=FeedbackKind.INFO)
-        self.curr_no = 0
-        self._r_start = 0
-        self._vm.set_scope(scope)
-        self._vm.refresh()
-
-    @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
-    def checkout(self) -> None:
-        if not self.branches:
-            return
-        local_branch = self.branches[self.curr_no]
-        if local_branch.is_head:
-            show_toast(
-                "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
-            )
-            return
-        if local_branch.is_remote:
-            show_toast(
-                "Cannot checkout remote branch directly.",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        result = self._vm.checkout(self.curr_no)
-        self._handle_result(result)
-        if result.success and self._branch_signal is not None:
-            self._branch_signal.set(local_branch.name)
-
-    @bind_action(
-        "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
-    )
-    def new_branch(self) -> None:
-        self._show_new_branch_sheet()
-
-    @bind_action("rename", "r", desc="Rename selected branch", tip="Rename")
-    def rename(self) -> None:
-        if not self.branches:
-            return
-        branch = self.branches[self.curr_no]
-        if branch.is_remote:
-            show_toast(
-                "Cannot rename remote branch.", duration=1.5, kind=FeedbackKind.WARNING
-            )
-            return
-        self._show_rename_sheet(branch.name)
-
-    @bind_action(
-        "delete",
-        "d",
-        desc="Delete selected branch (fails if unmerged unless forced)",
-        tip="Delete",
-    )
-    def delete(self) -> None:
-        self._trigger_delete()
-
-    @bind_action(
-        "merge",
-        "m",
-        desc="Merge selected branch into current (requires clean worktree; may conflict)",
-        tip="Merge",
-    )
-    def merge(self) -> None:
-        self._trigger_merge()
-
-    @bind_action(
-        "rebase",
-        "i",
-        desc="Interactive rebase onto selected branch (rewrites history)",
-        tip="Rebase",
-    )
-    def rebase(self) -> None:
-        self._trigger_rebase()
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""

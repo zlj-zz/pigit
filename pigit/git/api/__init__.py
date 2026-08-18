@@ -245,6 +245,9 @@ class GitApi:
     def commit_no_edit(self, path=None):
         return self._merge.commit_no_edit(path)
 
+    def amend_head(self, path=None):
+        return self._merge.amend_head(path)
+
     def commit(self, message, path=None):
         return self._merge.commit(message, path)
 

@@ -341,10 +341,16 @@ class KeyboardInput:
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the keyboard reader thread."""
+        """Stop the keyboard reader thread.
+
+        Joins longer than one ``read_keys`` timeout so stdin is free before
+        an external process (e.g. Neovim) starts reading DSR/OSC replies.
+        """
         self._running = False
         if self._thread is not None:
-            self._thread.join(timeout=0.125)
+            self._thread.join(timeout=0.5)
+            if self._thread.is_alive():
+                _logger.warning("KeyboardInput thread did not stop within 0.5s")
             self._thread = None
 
     def get_key(self) -> keys.SemanticEvent | None:

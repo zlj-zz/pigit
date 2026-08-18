@@ -56,6 +56,8 @@ class IStatusViewModel(IListViewModel["File"]):
 
     def commit(self, message: str) -> ActionResult: ...
 
+    def amend(self) -> ActionResult: ...
+
     def load_stashes(self) -> list[Stash]: ...
 
     def stash_push(self) -> ActionResult: ...
@@ -421,3 +423,13 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
                 )
             )
         return result
+
+    def amend(self) -> ActionResult:
+        """Amend HEAD with currently staged changes (``--amend --no-edit``)."""
+        try:
+            self._git.amend_head()
+            return ActionResult(
+                success=True, message="Amended HEAD", should_refresh=True
+            )
+        except Exception as e:
+            return ActionResult(success=False, message=str(e))

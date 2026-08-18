@@ -516,6 +516,77 @@ class TestHelpPanel:
         panel.scroll_up()
         assert panel._offset == 0
 
+    def test_help_panel_min_inner_width_floor(self):
+        """Short content still gets at least MIN_INNER_W on a wide terminal."""
+        panel = HelpPanel()
+        panel.set_entries([("?", "help"), ("q", "quit")])
+        panel.resize((200, 40))
+        assert panel._inner_w >= HelpPanel.MIN_INNER_W
+        assert HelpPanel.MIN_INNER_W == 88
+
+    def test_help_panel_keys_right_aligned_flat(self):
+        """Shorter keys are left-padded so the key column is right-aligned."""
+        panel = HelpPanel(inner_width=40)
+        panel.set_entries([("?", "Toggle help"), ("ctrl+r", "Refresh")])
+        panel.resize((80, 24))
+        first = panel._lines[0]
+        assert first.startswith(" ")
+        assert "?" in first
+        q_idx = first.index("?")
+        ctrl_line = next(line for line in panel._lines if line.lstrip().startswith("ctrl+r"))
+        ctrl_idx = ctrl_line.index("ctrl+r")
+        assert q_idx + 1 == ctrl_idx + len("ctrl+r")
+
+    def test_help_panel_keys_right_aligned_grouped(self):
+        """Grouped rows keep group_indent then right-aligned keys."""
+        panel = HelpPanel(inner_width=40)
+        panel.set_grouped_entries(
+            [
+                ("Global", [("?", "Toggle help"), ("ctrl+r", "Refresh")]),
+            ]
+        )
+        panel.resize((80, 24))
+        data_lines = [
+            ln for ln in panel._lines if ln.strip() and not ln.lstrip().startswith("[")
+        ]
+        short = next(ln for ln in data_lines if "?" in ln)
+        long = next(ln for ln in data_lines if "ctrl+r" in ln)
+        assert short.index("?") + 1 == long.index("ctrl+r") + len("ctrl+r")
+
+    def test_help_panel_group_title_brackets(self):
+        """Grouped section headers render as [Title]."""
+        panel = HelpPanel(inner_width=40)
+        panel.set_grouped_entries([("Global", [("?", "Toggle help")])])
+        panel.resize((80, 24))
+        assert panel._lines[0] == "[Global]"
+        assert panel._line_segments[0][0].text == "[Global]"
+
+    def test_help_panel_mouse_wheel_scrolls(self):
+        """Wheel events scroll the help list like keyboard j/k."""
+        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
+        panel = HelpPanel(inner_width=40, inner_height=6)
+        panel.set_entries([(str(i), f"desc {i}") for i in range(20)])
+        panel.resize((80, 24))
+        assert panel._offset == 0
+
+        down = MouseEvent(
+            button=MouseButton.WHEEL_DOWN, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(down) is True
+        assert panel._offset == 1
+
+        up = MouseEvent(
+            button=MouseButton.WHEEL_UP, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(up) is True
+        assert panel._offset == 0
+
+        left = MouseEvent(
+            button=MouseButton.LEFT, col=1, row=1, kind=MouseKind.PRESS
+        )
+        assert panel.handle_mouse(left) is False
+
 
 class TestPopup:
     def _with_host(self, host):

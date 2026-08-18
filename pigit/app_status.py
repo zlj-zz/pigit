@@ -26,6 +26,7 @@ from pigit.termui import (
     by_id,
     dismiss_sheet,
     exec_external,
+    keys,
     palette,
     Segment,
     show_badge,
@@ -417,32 +418,12 @@ class StatusPanel(ItemList):
         ):
             self._update_visual_selection()
 
-    def _update_visual_selection(self) -> None:
-        """Update selection based on visual anchor and cursor, in source indices."""
-        if self._visual_anchor is None:
-            return
-        start = min(self._visual_anchor, self.curr_no)
-        end = max(self._visual_anchor, self.curr_no)
-        if not self._tree_mode:
-            self._selected.update(
-                self._filter.source_index(i) for i in range(start, end + 1)
-            )
-            return
-        for idx in range(start, end + 1):
-            row = self._row(idx)
-            if row is None:
-                continue
-            if row.kind == "dir":
-                self._selected |= row.child_indices
-            elif row.source_index >= 0:
-                self._selected.add(row.source_index)
-
     @bind_action(
         "preview_down",
         "J",
-        desc="Scroll preview down",
+        desc="Scroll preview down (not in visual mode)",
         tip="Preview Navigate",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
@@ -452,14 +433,210 @@ class StatusPanel(ItemList):
     @bind_action(
         "preview_up",
         "K",
-        desc="Scroll preview up",
+        desc="Scroll preview up (not in visual mode)",
         tip="Preview Navigate",
-        when=lambda self: not self._visual_mode,
+        tip_when=lambda self: not self._visual_mode,
     )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
         if preview is not None:
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
+
+    @bind_action(
+        "open_diff",
+        "enter",
+        desc="Open diff for selected file (not in visual mode)",
+        tip="Open",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def open_diff(self) -> None:
+        if self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._toggle_collapse(row.path)
+                return
+        hit = self.file_at_cursor()
+        if hit is None:
+            return
+        f, source_idx = hit
+        diff = self._vm.load_diff(source_idx)
+        diff_type = (
+            DiffType.STAGED
+            if (f.has_staged_change and not f.has_unstaged_change)
+            else DiffType.UNSTAGED
+        )
+        self.emit(
+            EVT_GOTO,
+            target="diff",
+            source=self,
+            key=f.name,
+            content=diff,
+            repo_path=self._vm.repo_path,
+            diff_type=diff_type,
+        )
+
+    @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
+    def stage(self) -> None:
+        _logger.debug("[STATUS] stage")
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.STAGE, row)
+                return
+        hit = self.file_at_cursor()
+        if hit is None:
+            return
+        f = hit[0]
+        if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+            self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
+        else:
+            action = "Unstaged" if f.has_staged_change else "Staged"
+            self._run_action(
+                self._vm.stage,
+                single_msg=f"{action} {f.name}",
+                batch_msg="Updated {} file(s)",
+                action_type=StatusAction.STAGE,
+            )
+
+    @bind_action(
+        "commit",
+        "c",
+        desc="Open inline commit editor (not in visual mode)",
+        tip="Commit",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def commit(self) -> None:
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to commit",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_commit_editor import CommitEditor
+
+        def _do_commit(msg: str) -> None:
+            subject = msg.split("\n", 1)[0].strip()
+            result = self._vm.commit(msg)
+            if result.success:
+                dismiss_sheet()
+                self._vm.refresh()
+                show_badge(
+                    f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
+                )
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        editor = CommitEditor(
+            vm=self._vm,
+            staged_files=self._vm.staged_files,
+            on_submit=_do_commit,
+            on_cancel=dismiss_sheet,
+        )
+        rows = terminal_size()[1]
+        show_sheet(
+            editor,
+            height=min(rows - 2, max(10, int(rows * 0.35))),
+            show_border=True,
+        )
+        editor.activate()
+
+    @bind_action(
+        "amend",
+        "A",
+        desc="Amend last commit with staged changes (not in visual mode)",
+    )
+    def amend(self) -> None:
+        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
+        if self._visual_mode:
+            return
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to amend",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.amend()
+            if result.success:
+                self._vm.refresh()
+                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        self._alert_dialog.alert(
+            "Amend last commit with staged changes?",
+            on_result,
+            destructive=True,
+        )
+
+    @bind_action(
+        "commit_editor",
+        "C",
+        desc="Open external $EDITOR for commit (not in visual mode)",
+        tip="Commit",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def commit_editor(self) -> None:
+        if not any(f.has_staged_change for f in self.files):
+            show_toast(
+                "No staged changes to commit",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        try:
+            result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
+            if result.returncode == 0:
+                show_toast("Commit created", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(
+                    "Commit aborted or failed",
+                    duration=2.0,
+                    kind=FeedbackKind.ERROR,
+                )
+        except Exception:
+            show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
+            raise
+        finally:
+            self._vm.refresh()
+
+    @bind_action(
+        "discard",
+        "d",
+        desc="Discard changes irreversibly (confirm if modified)",
+        tip="Discard",
+    )
+    def discard(self) -> None:
+        _logger.debug("[STATUS] discard")
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.DISCARD, row)
+                return
+        self._run_action(
+            self._vm.discard,
+            single_msg="Discard file",
+            batch_msg="Discard {} file(s)",
+            action_type=StatusAction.DISCARD,
+            needs_confirm=True,
+            destructive=True,
+        )
+
+    @bind_action(
+        "stash",
+        "s",
+        desc="Stash working tree including untracked (not in visual mode)",
+        tip="Stash",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def stash(self) -> None:
+        result = self._vm.stash_push()
+        self._handle_result(result)
 
     @bind_action(
         "visual_mode", "v", desc="Toggle visual multi-select mode", tip="Visual"
@@ -481,10 +658,10 @@ class StatusPanel(ItemList):
 
     @bind_action(
         "visual_scroll",
-        "s",
-        desc="Toggle visual scroll mode",
+        "V",
+        desc="Toggle visual scroll mode (visual mode)",
         tip="V-scroll",
-        when=lambda self: self._visual_mode,
+        tip_when=lambda self: self._visual_mode,
     )
     def toggle_visual_scroll(self) -> None:
         """Toggle visual scroll mode (auto-select while navigating)."""
@@ -499,9 +676,9 @@ class StatusPanel(ItemList):
     @bind_action(
         "toggle_select",
         " ",
-        desc="Toggle selection of current row",
+        desc="Toggle selection of current row (visual mode)",
         tip="Select",
-        when=lambda self: self._visual_mode,
+        tip_when=lambda self: self._visual_mode,
     )
     def toggle_space_selection(self) -> None:
         """Toggle selection of current row in visual mode (source-index based)."""
@@ -526,6 +703,113 @@ class StatusPanel(ItemList):
             if row.source_index in self._selected:
                 self._selected.discard(row.source_index)
             else:
+                self._selected.add(row.source_index)
+
+    @bind_action("search", "/", desc="Filter file list by name")
+    def search(self) -> None:
+        """Activate the file-list search filter."""
+        self._filter.enter()
+
+    @bind_action("toggle_tree", "T", desc="Toggle tree / flat file view")
+    def toggle_tree(self) -> None:
+        self._toggle_tree_mode()
+
+    @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
+    def expand_dir(self) -> None:
+        self._expand_current_dir()
+
+    @bind_action("collapse_dir", "h", "left", desc="Collapse directory (tree view)")
+    def collapse_dir(self) -> None:
+        self._collapse_current_dir()
+
+    @bind_action(
+        "open_editor",
+        "E",
+        desc="Open file in external $EDITOR (not in visual mode)",
+        tip="Edit",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def open_editor(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            self._open_external_editor(hit[0])
+
+    @bind_action("ignore", "i", desc="Add file to .gitignore")
+    def ignore(self) -> None:
+        if self._tree_mode and not self._visual_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                self._dir_action(StatusAction.IGNORE, row)
+                return
+        self._run_action(
+            self._vm.ignore,
+            single_msg="Ignored",
+            batch_msg="Ignored {} file(s)",
+            action_type=StatusAction.IGNORE,
+        )
+
+    @bind_action(
+        "checkout_ours",
+        "o",
+        desc="Checkout ours on conflict (discards theirs; not in visual mode)",
+        tip="Ours",
+        tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+    )
+    def checkout_ours(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            result = self._vm.checkout_ours(hit[1])
+            self._handle_result(result)
+
+    @bind_action(
+        "checkout_theirs",
+        "t",
+        desc="Checkout theirs on conflict (discards ours; not in visual mode)",
+        tip="Theirs",
+        tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
+    )
+    def checkout_theirs(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            result = self._vm.checkout_theirs(hit[1])
+            self._handle_result(result)
+
+    @bind_action("copy_path", "Y", desc="Copy file path")
+    def copy_path(self) -> None:
+        hit = self.file_at_cursor()
+        if hit is not None:
+            path = hit[0].name
+            run_async(
+                lambda: copy_to_clipboard(path),
+                lambda ok, p=path: (
+                    show_toast(f"Copied: {p}", duration=1.0, kind=FeedbackKind.SUCCESS)
+                    if ok
+                    else show_toast(
+                        "Failed to copy to clipboard",
+                        duration=2.0,
+                        kind=FeedbackKind.ERROR,
+                    )
+                ),
+            )
+
+    def _update_visual_selection(self) -> None:
+        """Update selection based on visual anchor and cursor, in source indices."""
+        if self._visual_anchor is None:
+            return
+        start = min(self._visual_anchor, self.curr_no)
+        end = max(self._visual_anchor, self.curr_no)
+        if not self._tree_mode:
+            self._selected.update(
+                self._filter.source_index(i) for i in range(start, end + 1)
+            )
+            return
+        for idx in range(start, end + 1):
+            row = self._row(idx)
+            if row is None:
+                continue
+            if row.kind == "dir":
+                self._selected |= row.child_indices
+            elif row.source_index >= 0:
                 self._selected.add(row.source_index)
 
     def resize(self, size: tuple[int, int]) -> None:
@@ -679,276 +963,11 @@ class StatusPanel(ItemList):
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
             return True
+        # Clean tree: swallow panel actions, but let Tab bubble to the status
+        # Column so focus can move to StashPanel.
         if not self.files:
-            return True
+            return key != keys.KEY_TAB
         return False
-
-    @bind_action(
-        "open_diff",
-        "enter",
-        desc="Open diff for selected file",
-        tip="Open",
-        when=lambda self: not self._visual_mode,
-    )
-    def open_diff(self) -> None:
-        if self._tree_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._toggle_collapse(row.path)
-                return
-        hit = self.file_at_cursor()
-        if hit is None:
-            return
-        f, source_idx = hit
-        diff = self._vm.load_diff(source_idx)
-        diff_type = (
-            DiffType.STAGED
-            if (f.has_staged_change and not f.has_unstaged_change)
-            else DiffType.UNSTAGED
-        )
-        self.emit(
-            EVT_GOTO,
-            target="diff",
-            source=self,
-            key=f.name,
-            content=diff,
-            repo_path=self._vm.repo_path,
-            diff_type=diff_type,
-        )
-
-    @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
-    def stage(self) -> None:
-        _logger.debug("[STATUS] stage")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.STAGE, row)
-                return
-        hit = self.file_at_cursor()
-        if hit is None:
-            return
-        f = hit[0]
-        if f.has_merged_conflicts or f.has_inline_merged_conflicts:
-            self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
-        else:
-            action = "Unstaged" if f.has_staged_change else "Staged"
-            self._run_action(
-                self._vm.stage,
-                single_msg=f"{action} {f.name}",
-                batch_msg="Updated {} file(s)",
-                action_type=StatusAction.STAGE,
-            )
-
-    @bind_action("ignore", "i", desc="Add file to .gitignore")
-    def ignore(self) -> None:
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.IGNORE, row)
-                return
-        self._run_action(
-            self._vm.ignore,
-            single_msg="Ignored",
-            batch_msg="Ignored {} file(s)",
-            action_type=StatusAction.IGNORE,
-        )
-
-    @bind_action(
-        "discard",
-        "d",
-        desc="Discard changes irreversibly (confirm if modified)",
-        tip="Discard",
-    )
-    def discard(self) -> None:
-        _logger.debug("[STATUS] discard")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.DISCARD, row)
-                return
-        self._run_action(
-            self._vm.discard,
-            single_msg="Discard file",
-            batch_msg="Discard {} file(s)",
-            action_type=StatusAction.DISCARD,
-            needs_confirm=True,
-            destructive=True,
-        )
-
-    @bind_action(
-        "commit",
-        "c",
-        desc="Open inline commit editor",
-        tip="Commit",
-        when=lambda self: not self._visual_mode,
-    )
-    def commit(self) -> None:
-        if not self._vm.staged_files:
-            show_toast(
-                "No staged changes to commit",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        from .app_commit_editor import CommitEditor
-
-        def _do_commit(msg: str) -> None:
-            subject = msg.split("\n", 1)[0].strip()
-            result = self._vm.commit(msg)
-            if result.success:
-                dismiss_sheet()
-                self._vm.refresh()
-                show_badge(
-                    f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
-                )
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
-
-        editor = CommitEditor(
-            vm=self._vm,
-            staged_files=self._vm.staged_files,
-            on_submit=_do_commit,
-            on_cancel=dismiss_sheet,
-        )
-        rows = terminal_size()[1]
-        show_sheet(
-            editor,
-            height=min(rows - 2, max(10, int(rows * 0.35))),
-            show_border=True,
-        )
-        editor.activate()
-
-    @bind_action(
-        "commit_editor",
-        "C",
-        desc="Open external $EDITOR for commit",
-        tip="Commit",
-        when=lambda self: not self._visual_mode,
-    )
-    def commit_editor(self) -> None:
-        if not any(f.has_staged_change for f in self.files):
-            show_toast(
-                "No staged changes to commit",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        try:
-            result = exec_external(["git", "commit"], cwd=self._vm.repo_path)
-            if result.returncode == 0:
-                show_toast("Commit created", duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                show_toast(
-                    "Commit aborted or failed",
-                    duration=2.0,
-                    kind=FeedbackKind.ERROR,
-                )
-        except Exception:
-            show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
-            raise
-        finally:
-            self._vm.refresh()
-
-    @bind_action(
-        "open_editor",
-        "E",
-        desc="Open file in external $EDITOR",
-        tip="Edit",
-        when=lambda self: not self._visual_mode,
-    )
-    def open_editor(self) -> None:
-        hit = self.file_at_cursor()
-        if hit is not None:
-            self._open_external_editor(hit[0])
-
-    @bind_action(
-        "checkout_ours",
-        "o",
-        desc="Checkout ours (conflict; discards theirs)",
-        tip="Ours",
-        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
-    )
-    def checkout_ours(self) -> None:
-        hit = self.file_at_cursor()
-        if hit is not None:
-            result = self._vm.checkout_ours(hit[1])
-            self._handle_result(result)
-
-    @bind_action(
-        "checkout_theirs",
-        "t",
-        desc="Checkout theirs (conflict; discards ours)",
-        tip="Theirs",
-        when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
-    )
-    def checkout_theirs(self) -> None:
-        hit = self.file_at_cursor()
-        if hit is not None:
-            result = self._vm.checkout_theirs(hit[1])
-            self._handle_result(result)
-
-    @bind_action(
-        "stash",
-        "z",
-        desc="Stash working tree changes",
-        tip="Stash",
-        when=lambda self: not self._visual_mode,
-    )
-    def stash(self) -> None:
-        result = self._vm.stash_push()
-        self._handle_result(result)
-
-    @bind_action(
-        "copy_path",
-        "Y",
-        desc="Copy file path",
-        when=lambda self: not self._visual_mode,
-    )
-    def copy_path(self) -> None:
-        hit = self.file_at_cursor()
-        if hit is not None:
-            path = hit[0].name
-            run_async(
-                lambda: copy_to_clipboard(path),
-                lambda ok, p=path: (
-                    show_toast(f"Copied: {p}", duration=1.0, kind=FeedbackKind.SUCCESS)
-                    if ok
-                    else show_toast(
-                        "Failed to copy to clipboard",
-                        duration=2.0,
-                        kind=FeedbackKind.ERROR,
-                    )
-                ),
-            )
-
-    @bind_action(
-        "toggle_tree",
-        "T",
-        desc="Toggle tree / flat file view",
-        when=lambda self: not self._visual_mode,
-    )
-    def toggle_tree(self) -> None:
-        self._toggle_tree_mode()
-
-    @bind_action(
-        "expand_dir",
-        "l",
-        "right",
-        desc="Expand directory (tree view)",
-        when=lambda self: not self._visual_mode,
-    )
-    def expand_dir(self) -> None:
-        self._expand_current_dir()
-
-    @bind_action(
-        "collapse_dir",
-        "h",
-        "left",
-        desc="Collapse directory (tree view)",
-        when=lambda self: not self._visual_mode,
-    )
-    def collapse_dir(self) -> None:
-        self._collapse_current_dir()
 
     # --- Helpers ---
 
@@ -1062,7 +1081,7 @@ class StatusPanel(ItemList):
         if self._visual_mode:
             if self._visual_scroll:
                 show_toast(
-                    "Press s to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
+                    "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
                 )
                 return
             if not self._selected:

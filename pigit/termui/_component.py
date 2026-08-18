@@ -388,16 +388,17 @@ class Component(ABC):
 
         Bindings sharing the same ``tip`` are merged into one entry with their
         keys joined, saving horizontal space (e.g. ``j/k/down/up Navigate``).
-        State-dependent actions handled by ``capture_key``/``handle_key`` (not
-        ``@bind_action``) are intentionally absent — the footer shows the
-        always-available, high-frequency keys.
+        ``tip_when`` may hide a tip for the current state; help (``desc``) is
+        unaffected. State-dependent actions handled by ``capture_key``/
+        ``handle_key`` (not ``@bind_action``) are intentionally absent — the
+        footer shows the always-available, high-frequency keys.
         """
         grouped: dict[str, list[str]] = {}
         order: list[str] = []
         for binding in self._action_bindings:
             if binding.tip is None:
                 continue
-            if binding.when is not None and not binding.when(self):
+            if binding.tip_when is not None and not binding.tip_when(self):
                 continue
             keys = resolve_action_keys(binding)
             if binding.tip not in grouped:

@@ -13,6 +13,7 @@ from .. import keys, palette
 from .._component import Component
 from .._frame import BoxFrame
 from .._layout import Padding
+from .._mouse import MouseButton, MouseEvent, MouseKind
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
 from ..wcwidth_table import truncate_by_width, wcswidth
@@ -70,8 +71,9 @@ class HelpPanel(Component):
     cramped in narrow terminals nor wastefully wide in large ones.
     """
 
-    MIN_INNER_W = 58
-    MAX_INNER_W = 108
+    MIN_INNER_W = 88
+    MAX_INNER_W = 158
+    WHEEL_SCROLL_LINES = 1
 
     BINDINGS = [
         (keys.KEY_DOWN, "scroll_down"),
@@ -216,13 +218,15 @@ class HelpPanel(Component):
             for i, desc_line in enumerate(wrapped):
                 if i == 0:
                     pad = max_key_w - wcswidth(key_disp)
-                    line = f"{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                    line = f"{' ' * pad}{key_disp}{' ' * gap}{desc_line}"
                     seg: list[Segment] = []
+                    if pad:
+                        seg.append(Segment(" " * pad))
                     if self._key_fg is not None:
                         seg.append(Segment(key_disp, fg=self._key_fg))
-                        seg.append(Segment(" " * pad + " " * gap))
+                        seg.append(Segment(" " * gap))
                     else:
-                        seg.append(Segment(key_disp + " " * pad + " " * gap))
+                        seg.append(Segment(key_disp + " " * gap))
                     seg.append(Segment(desc_line))
                 else:
                     indent = max_key_w + gap
@@ -251,21 +255,27 @@ class HelpPanel(Component):
         for title, entries in groups:
             if not entries:
                 continue
-            lines.append(title)
-            segments.append([Segment(title, style_flags=palette.STYLE_BOLD)])
+            header = f"[{title}]"
+            lines.append(header)
+            segments.append([Segment(header, style_flags=palette.STYLE_BOLD)])
             for key_disp, desc in entries:
                 wrapped = _wrap_text(desc, desc_avail)
                 for i, desc_line in enumerate(wrapped):
                     if i == 0:
                         pad = max_key_w - wcswidth(key_disp)
-                        line = f"{' ' * group_indent}{key_disp}{' ' * pad}{' ' * gap}{desc_line}"
+                        line = (
+                            f"{' ' * group_indent}{' ' * pad}{key_disp}"
+                            f"{' ' * gap}{desc_line}"
+                        )
                         seg: list[Segment] = []
                         seg.append(Segment(" " * group_indent))
+                        if pad:
+                            seg.append(Segment(" " * pad))
                         if self._key_fg is not None:
                             seg.append(Segment(key_disp, fg=self._key_fg))
-                            seg.append(Segment(" " * pad + " " * gap))
+                            seg.append(Segment(" " * gap))
                         else:
-                            seg.append(Segment(key_disp + " " * pad + " " * gap))
+                            seg.append(Segment(key_disp + " " * gap))
                         seg.append(Segment(desc_line))
                     else:
                         indent = group_indent + max_key_w + gap
@@ -282,14 +292,26 @@ class HelpPanel(Component):
     # Scrolling
     # ------------------------------------------------------------------
 
-    def scroll_down(self) -> None:
-        """Scroll the help content down by one line."""
+    def scroll_down(self, line: int = 1) -> None:
+        """Scroll the help content down by *line* rows."""
         max_off = max(0, len(self._lines) - self._scroll_h)
-        self._offset = min(self._offset + 1, max_off)
+        self._offset = min(self._offset + max(1, line), max_off)
 
-    def scroll_up(self) -> None:
-        """Scroll the help content up by one line."""
-        self._offset = max(0, self._offset - 1)
+    def scroll_up(self, line: int = 1) -> None:
+        """Scroll the help content up by *line* rows."""
+        self._offset = max(0, self._offset - max(1, line))
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Scroll on wheel; one detent scrolls ``WHEEL_SCROLL_LINES`` lines."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button is MouseButton.WHEEL_UP:
+            self.scroll_up(self.WHEEL_SCROLL_LINES)
+            return True
+        if event.button is MouseButton.WHEEL_DOWN:
+            self.scroll_down(self.WHEEL_SCROLL_LINES)
+            return True
+        return False
 
     def set_on_toggle(self, cb: Callable[[], None] | None) -> None:
         """Set the callback invoked by :meth:`toggle`."""

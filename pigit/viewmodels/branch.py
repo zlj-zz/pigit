@@ -33,6 +33,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def current_branch(self) -> str: ...
     def can_merge(self) -> tuple[bool, str]: ...
     def can_rebase(self) -> tuple[bool, str]: ...
+    def get_remote_url(self) -> str: ...
 
 
 class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
@@ -188,3 +189,7 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
         except Exception:
             pass
         return True, ""
+
+    def get_remote_url(self) -> str:
+        """Return the primary remote URL string, or empty."""
+        return self._git.get_remote_url() or ""

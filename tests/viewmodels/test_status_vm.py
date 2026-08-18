@@ -141,3 +141,17 @@ def test_load_diff(status_vm):
     status_vm._git.load_file_diff.return_value = "+line1\n-line2"
     diff = status_vm.load_diff(0)
     assert diff == ["+line1", "-line2"]
+
+
+def test_amend_calls_git_amend_head(status_vm):
+    result = status_vm.amend()
+    assert result.success is True
+    assert result.should_refresh is True
+    status_vm._git.amend_head.assert_called_once_with()
+
+
+def test_amend_failure(status_vm):
+    status_vm._git.amend_head.side_effect = RuntimeError("amend failed")
+    result = status_vm.amend()
+    assert result.success is False
+    assert "amend failed" in result.message

@@ -386,55 +386,6 @@ class PigitApplication(Application):
             self._palette.open()
             self._root.show_sheet(self._palette, height=8)
 
-    def _dismiss_palette(self) -> None:
-        """Dismiss the palette sheet from the root."""
-        if self._root is not None:
-            self._root.dismiss_sheet()
-
-    def _inspector_width(self, total_width: int) -> int:
-        """Compute inspector width: 30% of total, capped at 45."""
-        return min(int(total_width * 0.3), 45)
-
-    def _sync_stash_height(self, rows: int) -> None:
-        """Set StashPanel height to 25% of rows, capped at 10, min 3."""
-        self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
-
-    @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
-    def toggle_inspector(self):
-        """Toggle inspector panel visibility."""
-        was_visible = self._inspector_visible
-        self._inspector_visible = not self._inspector_visible
-        cols, _ = terminal_size()
-        self._apply_body_widths(cols)
-        if self._inspector_visible:
-            active = resolve_presentation_leaf(self._tab_view.active)
-            if not was_visible and hasattr(self._inspector, "_last_key"):
-                delattr(self._inspector, "_last_key")
-            self._inspector.update_from(active or self._tab_view.active)
-        # Layout change invalidates the incremental-render cache so the
-        # old inspector columns are fully repainted instead of visually
-        # persisting as residue over the widened diff/status area.
-        renderer = get_renderer()
-        if renderer is not None:
-            renderer.clear_cache()
-        request_render()
-
-    def resize(self, size: tuple[int, int]) -> None:
-        """Recompute layout widths and stash height on terminal resize.
-
-        The event loop resizes the component tree after this returns.
-        """
-        cols, rows = size
-        was_large = self._is_large_screen
-        self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
-        self._sync_stash_height(rows)
-        self._apply_body_widths(cols)
-        if was_large and not self._is_large_screen and self._preview_panel is not None:
-            self._preview_panel.clear()
-        if not was_large and self._is_large_screen:
-            if self._tab_view.active is not None:
-                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
-
     @bind_action("goto_status", "1", desc="Switch to Status tab", tip="Status")
     def goto_status(self):
         self._tab_view.route_to("status")
@@ -446,27 +397,6 @@ class PigitApplication(Application):
     @bind_action("goto_commit", "3", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
         self._tab_view.route_to("commit")
-
-    def _refresh_active_panel(self) -> None:
-        """Auto-refresh callback: refresh the currently active panel's VM.
-
-        Skips when an overlay is open (user is in modal/sheet).
-        Does NOT call request_render(); vm.refresh() uses AsyncTask,
-        and Signal subscribers trigger rendering when data arrives.
-        """
-        active = resolve_presentation_leaf(self._tab_view.active)
-        if active is None:
-            return
-        # Skip refresh when an overlay is open
-        if self._root is not None and self._root.has_overlay_open():
-            return
-        # Prefer panel-level refresh (e.g. StashPanel.refresh reloads stashes)
-        if hasattr(active, "refresh") and callable(getattr(active, "refresh")):
-            active.refresh()
-        else:
-            vm = getattr(active, "_vm", None)
-            if vm is not None and hasattr(vm, "refresh"):
-                vm.refresh()
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
@@ -491,6 +421,80 @@ class PigitApplication(Application):
         rows = terminal_size()[1]
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
+
+    @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
+    def toggle_inspector(self):
+        """Toggle inspector panel visibility."""
+        was_visible = self._inspector_visible
+        self._inspector_visible = not self._inspector_visible
+        cols, _ = terminal_size()
+        self._apply_body_widths(cols)
+        if self._inspector_visible:
+            active = resolve_presentation_leaf(self._tab_view.active)
+            if not was_visible and hasattr(self._inspector, "_last_key"):
+                delattr(self._inspector, "_last_key")
+            self._inspector.update_from(active or self._tab_view.active)
+        # Layout change invalidates the incremental-render cache so the
+        # old inspector columns are fully repainted instead of visually
+        # persisting as residue over the widened diff/status area.
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
+        request_render()
+
+    @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
+    def quit(self, *, exit_code: int = 0, result_message: str | None = None):
+        raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
+
+    def _dismiss_palette(self) -> None:
+        """Dismiss the palette sheet from the root."""
+        if self._root is not None:
+            self._root.dismiss_sheet()
+
+    def _inspector_width(self, total_width: int) -> int:
+        """Compute inspector width: 30% of total, capped at 45."""
+        return min(int(total_width * 0.3), 45)
+
+    def _sync_stash_height(self, rows: int) -> None:
+        """Set StashPanel height to 25% of rows, capped at 10, min 3."""
+        self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
+
+    def resize(self, size: tuple[int, int]) -> None:
+        """Recompute layout widths and stash height on terminal resize.
+
+        The event loop resizes the component tree after this returns.
+        """
+        cols, rows = size
+        was_large = self._is_large_screen
+        self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
+        self._sync_stash_height(rows)
+        self._apply_body_widths(cols)
+        if was_large and not self._is_large_screen and self._preview_panel is not None:
+            self._preview_panel.clear()
+        if not was_large and self._is_large_screen:
+            if self._tab_view.active is not None:
+                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+
+    def _refresh_active_panel(self) -> None:
+        """Auto-refresh callback: refresh the currently active panel's VM.
+
+        Skips when an overlay is open (user is in modal/sheet).
+        Does NOT call request_render(); vm.refresh() uses AsyncTask,
+        and Signal subscribers trigger rendering when data arrives.
+        """
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if active is None:
+            return
+        # Skip refresh when an overlay is open
+        if self._root is not None and self._root.has_overlay_open():
+            return
+        # Prefer panel-level refresh (e.g. StashPanel.refresh reloads stashes)
+        if hasattr(active, "refresh") and callable(getattr(active, "refresh")):
+            active.refresh()
+        else:
+            vm = getattr(active, "_vm", None)
+            if vm is not None and hasattr(vm, "refresh"):
+                vm.refresh()
 
     def _on_rebase_request(self, target: str) -> None:
         """Open the interactive-rebase todo panel for ``target``."""
@@ -779,10 +783,6 @@ class PigitApplication(Application):
                 return
 
         self._confirm_push_and_finish(target, source)
-
-    @bind_action("quit", "Q", desc="Quit Pigit", tip="Quit")
-    def quit(self, *, exit_code: int = 0, result_message: str | None = None):
-        raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
     def run(self):
         if not self._repo_path:

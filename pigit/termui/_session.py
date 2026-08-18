@@ -73,6 +73,9 @@ class Session:
             import termios
 
             termios.tcsetattr(self._fd, termios.TCSADRAIN, self._old_termios)
+            # Drop any unread TUI input so the child starts with a clean
+            # stdin and can receive its own DSR/OSC replies.
+            termios.tcflush(self._fd, termios.TCIFLUSH)
 
     def resume(self) -> None:
         """Restore terminal back to TUI mode from normal state.

@@ -84,6 +84,18 @@ class _MergeOps(_OpsBase):
             msg = err or "Commit failed"
             raise GitError(msg)
 
+    def amend_head(self, path: str | None = None) -> None:
+        """Amend HEAD with staged changes, keeping the existing message."""
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            ["git", "commit", "--amend", "--no-edit"],
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            msg = err or "Amend failed"
+            raise GitError(msg)
+
     def commit(self, message: str, path: str | None = None) -> None:
         """Create a commit with the given message."""
         import tempfile
