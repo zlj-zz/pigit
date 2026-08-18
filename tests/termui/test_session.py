@@ -87,6 +87,7 @@ class TestSessionEnterExit:
                 session.__exit__(None, None, None)
                 fake_termios.tcsetattr.assert_called_once()
 
+
 class TestSessionSuspendResume:
     def test_suspend_restores_cursor(self):
         stdin = FakeTTY()

@@ -51,6 +51,7 @@ from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
+from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
@@ -120,6 +121,7 @@ class PigitApplication(Application):
         self._branch_vm: BranchViewModel
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
+        self._log_graph_preview: LogGraphPreview | None = None
         self._is_large_screen = False
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
@@ -154,11 +156,16 @@ class PigitApplication(Application):
         self._branch_vm = BranchViewModel(self._git, history=self._session_history)
         self._commit_vm = CommitViewModel(self._git)
 
-        # Preview is created at app level but only inserted into layout when
-        # Status tab is active on large screens.
+        # Side previews are created at app level but only inserted into the
+        # layout on large screens: Status/Stash use diff preview, Branch uses
+        # the log-graph preview. At most one is in body_row at a time.
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
+        )
+        self._log_graph_preview = LogGraphPreview(
+            id="log_graph_preview",
+            vm=self._branch_vm,
         )
 
         self._status_panel = StatusPanel(
@@ -324,23 +331,53 @@ class PigitApplication(Application):
         if self._tab_view.active is not None:
             self._on_tab_switch(self._tab_view.active)
 
-    def _apply_body_widths(self, cols: int) -> None:
-        """Recompute body_row widths based on screen size, active tab, and inspector state.
+    def _side_preview_for_active(self) -> Component | None:
+        """Return the one large-screen side panel for the current tab, or None."""
+        if not self._is_large_screen:
+            return None
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if isinstance(active, (StatusPanel, StashPanel)):
+            return self._preview_panel
+        if isinstance(active, BranchPanel):
+            return self._log_graph_preview
+        return None
 
-        PreviewPanel is only inserted into the layout when Status is active on
-        large screens; otherwise it is removed so it does not appear global.
+    def _sync_body_children(self, desired_children: list[Component]) -> None:
+        """Attach/detach the optional side preview so body_row matches *desired*."""
+        body_row = self._body_row
+        extras = {
+            panel
+            for panel in (self._preview_panel, self._log_graph_preview)
+            if panel is not None
+        }
+        for child in list(body_row.children):
+            if child in extras and child not in desired_children:
+                child.deactivate()
+                body_row.children.remove(child)
+                if child.parent is body_row:
+                    child.parent = None
+        for child in desired_children:
+            if child not in body_row.children:
+                body_row.children.append(child)
+                child.parent = body_row
+                child.activate()
+
+    def _apply_body_widths(self, cols: int) -> None:
+        """Recompute body_row widths from screen size, active tab, and inspector.
+
+        At most one side preview is present: Status/Stash get the diff preview,
+        Branch gets the log-graph preview, Commit/Diff get none.
         """
         body_row = self._body_row
         tab_view = self._tab_view
         inspector = self._inspector
-        active_presented = resolve_presentation_leaf(tab_view.active)
-        on_status = isinstance(active_presented, (StatusPanel, StashPanel))
+        side = self._side_preview_for_active()
 
-        if self._is_large_screen and on_status:
+        if side is not None:
             tab_w = max(50, int(cols * 0.35))
             preview_w = max(1, cols - tab_w)
             inspector_w = self._inspector_width(cols)
-            desired_children = [tab_view, inspector, self._preview_panel]
+            desired_children = [tab_view, inspector, side]
             if self._inspector_visible:
                 desired_widths = [tab_w, inspector_w, max(1, preview_w - inspector_w)]
             else:
@@ -352,25 +389,7 @@ class PigitApplication(Application):
             else:
                 desired_widths = ["flex", 0]
 
-        # Sync children list: preview is only present when Status is active.
-        if list(body_row.children) != desired_children:
-            # Detach preview if being removed
-            for child in list(body_row.children):
-                if child is self._preview_panel and child not in desired_children:
-                    child.deactivate()
-                    body_row.children.remove(child)
-                    if child.parent is body_row:
-                        child.parent = None
-            # Attach preview if being added
-            preview = self._preview_panel
-            if (
-                preview is not None
-                and preview in desired_children
-                and preview not in body_row.children
-            ):
-                body_row.children.append(preview)
-                preview.parent = body_row
-                preview.activate()
+        self._sync_body_children(desired_children)
         body_row.set_widths(desired_widths)
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
@@ -546,8 +565,10 @@ class PigitApplication(Application):
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
         self._sync_stash_height(rows)
         self._apply_body_widths(cols)
-        if was_large and not self._is_large_screen and self._preview_panel is not None:
-            self._preview_panel.clear()
+        if was_large and not self._is_large_screen:
+            for panel in (self._preview_panel, self._log_graph_preview):
+                if panel is not None:
+                    panel.clear()
         if not was_large and self._is_large_screen:
             if self._tab_view.active is not None:
                 self._tab_view.active.emit(EVT_SELECTION_CHANGED)

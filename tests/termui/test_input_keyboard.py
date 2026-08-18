@@ -137,6 +137,7 @@ class TestKeyboardInputConsume:
         assert key == "\xff"
         assert n == 1
 
+
 class TestKeyboardInputReadKeys:
     def test_read_with_timeout_returns_empty(self):
         ki = KeyboardInput()

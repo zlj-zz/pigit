@@ -310,9 +310,7 @@ def test_tui_handler_preprocess_unsupported_platform():
     with patch(
         "pigit.handlers.base_handler.get_console", return_value=MagicMock(echo=echo)
     ):
-        with patch(
-            "pigit.handlers.tui_handler.platform_supported", return_value=False
-        ):
+        with patch("pigit.handlers.tui_handler.platform_supported", return_value=False):
             h = TuiHandler(MagicMock())
             assert h.preprocess() is False
     echo.assert_called_once()

@@ -34,6 +34,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def can_merge(self) -> tuple[bool, str]: ...
     def can_rebase(self) -> tuple[bool, str]: ...
     def get_remote_url(self) -> str: ...
+    def load_log_graph(self, branch_name: str) -> list[str]: ...
 
 
 class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
@@ -193,3 +194,19 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
     def get_remote_url(self) -> str:
         """Return the primary remote URL string, or empty."""
         return self._git.get_remote_url() or ""
+
+    def load_log_graph(self, branch_name: str) -> list[str]:
+        """Return native ``git log --decorate --graph`` lines for ``branch_name``.
+
+        The commit cap comes from ``LOG_GRAPH_LIMIT`` (owned by GitApi).
+
+        Args:
+            branch_name: Ref to log (short name, e.g. ``origin/foo``).
+
+        Returns:
+            Graph lines with trailing empty lines stripped by GitApi.
+        """
+        text = self._git.load_log_graph(branch_name)
+        if not text:
+            return []
+        return text.splitlines()

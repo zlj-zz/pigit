@@ -15,7 +15,7 @@ from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
 from ._errors import GitError, RepoError
 from ._core import _CoreOps
 from ._branch import _BranchOps
-from ._commit import _CommitOps, _DEFAULT_LOG_FORMAT
+from ._commit import _CommitOps, _DEFAULT_LOG_FORMAT, LOG_GRAPH_LIMIT
 from ._status import _StatusOps
 from ._stash import _StashOps
 from ._diff import _DiffOps
@@ -126,6 +126,9 @@ class GitApi:
         path=None,
     ):
         return self._commit.load_log(branch_name, limit, filter_path, arg_str, path)
+
+    def load_log_graph(self, branch_name, limit=LOG_GRAPH_LIMIT, path=None):
+        return self._commit.load_log_graph(branch_name, limit, path)
 
     def iter_commits(
         self, branch_name, limit=True, max_commits=300, filter_path="", path=None

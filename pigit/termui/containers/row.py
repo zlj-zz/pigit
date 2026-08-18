@@ -41,12 +41,11 @@ class Row(Component):
         for child in self.children:
             child.parent = self
         self._widths = list(widths)
+        self._last_child_ids: tuple[int, ...] | None = None
 
     def set_widths(self, widths: Sequence[int | Literal["flex"]]) -> None:
-        """Update the width spec for each child and validate the length.
-
-        If this component already has a size, the layout is recalculated
-        automatically so callers do not need to call ``resize`` manually.
+        """Update the width spec and lay out children when the spec or the
+        child set changed (a newly attached child must still receive geometry).
         """
         if len(widths) != len(self.children):
             raise ValueError(
@@ -54,9 +53,11 @@ class Row(Component):
                 f"got {len(widths)}"
             )
         new_widths = list(widths)
-        if new_widths == self._widths:
+        child_ids = tuple(id(child) for child in self.children)
+        if new_widths == self._widths and child_ids == self._last_child_ids:
             return
         self._widths = new_widths
+        self._last_child_ids = child_ids
         if self._size is not None:
             self.resize(self._size)
 

@@ -15,6 +15,7 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     bind_signals,
+    by_id,
     dismiss_sheet,
     palette,
     Segment,
@@ -93,9 +94,11 @@ class BranchPanel(ItemList):
         if not branches:
             scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
+            self._notify_change()
             return
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
+        self._notify_change()
 
     def deactivate(self) -> None:
         super().deactivate()
@@ -133,6 +136,32 @@ class BranchPanel(ItemList):
     @bind_action("previous", "k", "up", desc="Navigate branch list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
+
+    def _log_graph_preview_panel(self):
+        """Return the registered log-graph preview, or raise if missing."""
+        from .app_log_graph_preview import LogGraphPreview
+
+        return by_id("log_graph_preview", LogGraphPreview)
+
+    @bind_action(
+        "preview_down",
+        "J",
+        desc="Scroll log graph preview down",
+        tip="Preview Navigate",
+    )
+    def _scroll_preview_down(self) -> None:
+        preview = self._log_graph_preview_panel()
+        preview.scroll_down(preview.SCROLL_PAGE_SIZE)
+
+    @bind_action(
+        "preview_up",
+        "K",
+        desc="Scroll log graph preview up",
+        tip="Preview Navigate",
+    )
+    def _scroll_preview_up(self) -> None:
+        preview = self._log_graph_preview_panel()
+        preview.scroll_up(preview.SCROLL_PAGE_SIZE)
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
     def checkout(self) -> None:

@@ -135,3 +135,65 @@ def test_filter_exit_restores_number_goto(runtime):
 
     root._handle_event("4")
     assert _leaf(root) is app._commit_panel
+
+
+def _body_ids(app: PigitApplication) -> list[str | None]:
+    return [child.id for child in app._body_row.children]
+
+
+def test_large_screen_status_inserts_diff_preview_not_log_graph(runtime):
+    app, _root = _mount(runtime)
+    app._is_large_screen = True
+    app._apply_body_widths(140)
+    ids = _body_ids(app)
+    assert "preview" in ids
+    assert "log_graph_preview" not in ids
+
+
+def test_large_screen_branch_inserts_log_graph_not_diff_preview(runtime):
+    app, _root = _mount(runtime)
+    app._is_large_screen = True
+    app._tab_view.route_to("branch")
+    app._apply_body_widths(140)
+    ids = _body_ids(app)
+    assert "log_graph_preview" in ids
+    assert "preview" not in ids
+
+
+def test_large_screen_commit_has_no_side_preview(runtime):
+    app, _root = _mount(runtime)
+    app._is_large_screen = True
+    app._tab_view.route_to("commit")
+    app._apply_body_widths(140)
+    ids = _body_ids(app)
+    assert "preview" not in ids
+    assert "log_graph_preview" not in ids
+
+
+def test_large_screen_stash_keeps_diff_preview(runtime):
+    app, _root = _mount(runtime)
+    app._is_large_screen = True
+    app._tab_view.route_to("status")
+    app._status_stack.set_focus_index(1)
+    app._apply_body_widths(140)
+    ids = _body_ids(app)
+    assert "preview" in ids
+    assert "log_graph_preview" not in ids
+
+
+def test_status_to_branch_sizes_log_graph_preview(runtime, monkeypatch):
+    """Status then Branch share the same width spec; the new panel must still be sized."""
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (140, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    root.resize((140, 24))
+    app._apply_body_widths(140)
+    assert app._preview_panel is not None
+    assert app._preview_panel._size[0] > 0
+
+    app._tab_view.route_to("branch")
+    preview = app._log_graph_preview
+    assert preview is not None
+    assert preview._size[0] > 0
+    assert preview._size[1] > 0
+    assert preview._browser._size[0] > 0

@@ -56,14 +56,18 @@ class TestCollectAllActionBindings:
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id == "keymap_namespace":
                         value = node.value
-                        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                        if isinstance(value, ast.Constant) and isinstance(
+                            value.value, str
+                        ):
                             declared.add(value.value)
         assert declared <= registered
 
 
 class TestRenderKeybindingsTemplate:
     def test_overridden_action_is_active_with_default(self):
-        bindings = [("branch", _binding("branch.checkout", "c", desc="Checkout branch"))]
+        bindings = [
+            ("branch", _binding("branch.checkout", "c", desc="Checkout branch"))
+        ]
         out = render_keybindings_template(bindings, {"branch.checkout": "C"})
         assert 'checkout = "C"' in out
         assert '# default: "c"' in out
@@ -75,8 +79,12 @@ class TestRenderKeybindingsTemplate:
         assert '# default: "C"' not in out
 
     def test_non_overridden_included_only_with_defaults(self):
-        bindings = [("branch", _binding("branch.checkout", "c", desc="Checkout branch"))]
-        assert 'checkout' in render_keybindings_template(bindings, {}, include_defaults=True)
+        bindings = [
+            ("branch", _binding("branch.checkout", "c", desc="Checkout branch"))
+        ]
+        assert "checkout" in render_keybindings_template(
+            bindings, {}, include_defaults=True
+        )
         assert render_keybindings_template(bindings, {}, include_defaults=False) == ""
 
     def test_configurable_false_skipped(self):
@@ -96,7 +104,9 @@ class TestRenderKeybindingsTemplate:
         assert '# act = "a"  # act' in out
 
     def test_namespace_header_and_short_action_name(self):
-        bindings = [("branch", _binding("branch.checkout", "c", desc="Checkout branch"))]
+        bindings = [
+            ("branch", _binding("branch.checkout", "c", desc="Checkout branch"))
+        ]
         out = render_keybindings_template(bindings, {}, include_defaults=True)
         assert "[keybindings.branch]" in out
         # short name only inside the nested table, not the dotted full id

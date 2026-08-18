@@ -23,6 +23,10 @@ _DEFAULT_LOG_FORMAT = (
     '--oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" --abbrev=20 --date=unix'
 )
 
+# Native `git log --decorate --graph` preview: bounded, no `--all`.
+LOG_GRAPH_LIMIT = 80
+_LOG_GRAPH_ARGS = "--decorate --graph --color=always"
+
 
 class _CommitOps(_OpsBase):
     """Commit listing, log, and metadata."""
@@ -50,6 +54,38 @@ class _CommitOps(_OpsBase):
             cwd=path,
         )
 
+        return "" if resp is None else cast(str, resp).strip()
+
+    def load_log_graph(
+        self,
+        branch_name: str,
+        limit: int = LOG_GRAPH_LIMIT,
+        path: str | None = None,
+    ) -> str:
+        """Return native ``git log --decorate --graph`` text for ``branch_name``.
+
+        Args:
+            branch_name: Ref to log (``%(refname:short)``, e.g. ``origin/foo``).
+            limit: Max commits (``git log -n``). Defaults to ``LOG_GRAPH_LIMIT``.
+            path: Repo root; defaults to :attr:`path`.
+
+        Returns:
+            Stripped graph text, or empty string when ``branch_name`` is empty.
+
+        Raises:
+            GitError: ``git log`` failed (e.g. the ref no longer exists).
+        """
+        if not branch_name:
+            return ""
+
+        path = path or self.path
+        code, err, resp = self.executor.exec(
+            f"git log {_LOG_GRAPH_ARGS} -n {limit} {shlex.quote(branch_name)}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0:
+            raise GitError(err or f"git log --graph failed for {branch_name}")
         return "" if resp is None else cast(str, resp).strip()
 
     def iter_commits(

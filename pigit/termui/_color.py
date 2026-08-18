@@ -46,6 +46,25 @@ _ANSI_16_PALETTE: list[tuple[int, int, int]] = [
     (255, 255, 255),  # 15 bright white
 ]
 
+_XTERM_CUBE_LEVELS = (0, 95, 135, 175, 215, 255)
+
+
+def xterm256_to_rgb(index: int) -> tuple[int, int, int]:
+    """Convert an xterm-256 color index (0-255) to RGB."""
+    n = max(0, min(255, int(index)))
+    if n < 16:
+        return _ANSI_16_PALETTE[n]
+    if n < 232:
+        n -= 16
+        red, green, blue = n // 36, (n // 6) % 6, n % 6
+        return (
+            _XTERM_CUBE_LEVELS[red],
+            _XTERM_CUBE_LEVELS[green],
+            _XTERM_CUBE_LEVELS[blue],
+        )
+    gray = 8 + (n - 232) * 10
+    return (gray, gray, gray)
+
 
 def _detect_color_mode() -> ColorMode:
     """Detect terminal color capability from environment variables."""
@@ -174,7 +193,7 @@ def _nearest_256(rgb: tuple[int, int, int]) -> int:
 
     # 6x6x6 color cube (codes 16-231)
     # Each dimension has 6 levels: 0, 95, 135, 175, 215, 255
-    cube_levels = [0, 95, 135, 175, 215, 255]
+    cube_levels = _XTERM_CUBE_LEVELS
     ri = _find_nearest_index(r, cube_levels)
     gi = _find_nearest_index(g, cube_levels)
     bi = _find_nearest_index(b, cube_levels)

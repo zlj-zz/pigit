@@ -70,8 +70,7 @@ class TestBuildCreatePrUrl:
             head_branch="feat/x",
         )
         assert (
-            url
-            == "https://gitlab.com/acme/app/-/merge_requests/new"
+            url == "https://gitlab.com/acme/app/-/merge_requests/new"
             "?merge_request%5Bsource_branch%5D=feat%2Fx"
         )
 
@@ -80,10 +79,7 @@ class TestBuildCreatePrUrl:
             remote_url="https://bitbucket.org/acme/app.git",
             head_branch="dev",
         )
-        assert (
-            url
-            == "https://bitbucket.org/acme/app/pull-requests/new?source=dev&t=1"
-        )
+        assert url == "https://bitbucket.org/acme/app/pull-requests/new?source=dev&t=1"
 
     def test_gitea(self):
         url = build_create_pr_url(
@@ -121,6 +117,4 @@ class TestHeadBranchForPr:
         from pigit.git.hosting import head_branch_for_pr
 
         assert head_branch_for_pr(name="origin/dev", is_remote=True) == "dev"
-        assert (
-            head_branch_for_pr(name="origin/feat/x", is_remote=True) == "feat/x"
-        )
+        assert head_branch_for_pr(name="origin/feat/x", is_remote=True) == "feat/x"

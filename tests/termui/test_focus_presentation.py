@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.termui._component import Component, resolve_focus_leaf, resolve_presentation_leaf
+from pigit.termui._component import (
+    Component,
+    resolve_focus_leaf,
+    resolve_presentation_leaf,
+)
 from pigit.termui.containers import Column, TabView
 from pigit.termui._root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult
