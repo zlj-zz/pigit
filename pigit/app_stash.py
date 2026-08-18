@@ -23,7 +23,7 @@ from pigit.termui import (
 from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui._surface import Surface, _Subsurface
 from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import AlertDialog, ItemList
 
 from .app_diff import DiffType
 from .app_preview_toggle import invoke_preview_toggle
@@ -59,6 +59,10 @@ class StashPanel(ItemList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
+        self._alert_dialog = AlertDialog(
+            inner_width=40,
+            on_result=lambda _: None,
+        )
         self.stashes: list[Stash] = []
 
     @property
@@ -184,11 +188,20 @@ class StashPanel(ItemList):
         "drop", "d", desc="Drop selected stash permanently (irreversible)", tip="Drop"
     )
     def drop(self) -> None:
+        """Drop the selected stash after confirmation (irreversible)."""
         if not self.stashes:
             return
         stash = self.stashes[self.curr_no]
-        result = self._vm.stash_drop(stash.ref)
-        self._handle_result(result)
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.stash_drop(stash.ref)
+            self._handle_result(result)
+
+        self._alert_dialog.alert(
+            f"Drop stash '{stash.ref}'?", on_result, destructive=True
+        )
 
     def describe_row(
         self,

@@ -8,7 +8,7 @@ Date: 2026-08-17
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from pigit.app_stash import StashPanel
 from pigit.git.model import Stash
@@ -50,3 +50,44 @@ def test_visible_row_count_excludes_header():
     panel = _panel_with_stashes(["a", "b", "c"])
     panel.resize((40, 5))
     assert panel.visible_row_count == 4
+
+
+def test_drop_requires_confirmation():
+    """Drop shows a destructive alert and only drops when confirmed."""
+    vm = Mock()
+    vm.items = Signal([])
+    vm.load_stashes.return_value = [
+        Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
+    ]
+    vm.stash_drop = Mock()
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    panel.curr_no = 0
+
+    with patch("pigit.app_stash.AlertDialog.alert") as alert:
+        panel.drop()
+        # No drop before the user confirms.
+        vm.stash_drop.assert_not_called()
+        alert.assert_called_once()
+        args, kwargs = alert.call_args
+        assert "stash@{0}" in args[0]
+        assert kwargs["destructive"] is True
+
+        # Confirming performs the drop; cancelling does not.
+        args[1](False)
+        vm.stash_drop.assert_not_called()
+        args[1](True)
+        vm.stash_drop.assert_called_once_with("stash@{0}")
+
+
+def test_drop_empty_list_is_noop():
+    vm = Mock()
+    vm.items = Signal([])
+    vm.load_stashes.return_value = []
+    vm.stash_drop = Mock()
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    with patch("pigit.app_stash.AlertDialog.alert") as alert:
+        panel.drop()
+        alert.assert_not_called()
+        vm.stash_drop.assert_not_called()
