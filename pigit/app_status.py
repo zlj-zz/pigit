@@ -477,25 +477,23 @@ class StatusPanel(ItemList):
     @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
     def stage(self) -> None:
         _logger.debug("[STATUS] stage")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.STAGE, row)
-                return
-        hit = self.file_at_cursor()
-        if hit is None:
+        indices = self._begin_target_action()
+        if indices is None:
             return
-        f = hit[0]
-        if f.has_merged_conflicts or f.has_inline_merged_conflicts:
-            self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
-        else:
-            action = "Unstaged" if f.has_staged_change else "Staged"
-            self._run_action(
-                self._vm.stage,
-                single_msg=f"{action} {f.name}",
-                batch_msg="Updated {} file(s)",
-                action_type=StatusAction.STAGE,
-            )
+        if len(indices) == 1:
+            hit = self.file_at_cursor()
+            if hit is not None:
+                f, source_idx = hit
+                if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+                    self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
+                    return
+                result = self._vm.stage(source_idx)
+                self._handle_result(result)
+                return
+        result = self._dispatch_batch(StatusAction.STAGE, indices)
+        self._handle_result(result)
+        if self._visual_mode:
+            self._clear_visual_mode()
 
     @bind_action(
         "commit",
@@ -612,19 +610,20 @@ class StatusPanel(ItemList):
     )
     def discard(self) -> None:
         _logger.debug("[STATUS] discard")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.DISCARD, row)
-                return
-        self._run_action(
-            self._vm.discard,
-            single_msg="Discard file",
-            batch_msg="Discard {} file(s)",
-            action_type=StatusAction.DISCARD,
-            needs_confirm=True,
-            destructive=True,
-        )
+        indices = self._begin_target_action()
+        if indices is None:
+            return
+        if len(indices) == 1 and not self._visual_mode:
+            self._run_action(
+                self._vm.discard,
+                single_msg="Discard file",
+                batch_msg="Discard {} file(s)",
+                action_type=StatusAction.DISCARD,
+                needs_confirm=True,
+                destructive=True,
+            )
+            return
+        self._confirm_batch("Discard", StatusAction.DISCARD, indices, destructive=True)
 
     @bind_action(
         "stash",
@@ -738,7 +737,16 @@ class StatusPanel(ItemList):
         if self._tree_mode and not self._visual_mode:
             row = self._row(self.curr_no)
             if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.IGNORE, row)
+                indices = set(row.child_indices)
+                if not indices:
+                    show_toast(
+                        "No files in directory",
+                        duration=1.5,
+                        kind=FeedbackKind.WARNING,
+                    )
+                    return
+                result = self._dispatch_batch(StatusAction.IGNORE, indices)
+                self._handle_result(result)
                 return
         self._run_action(
             self._vm.ignore,
@@ -950,6 +958,44 @@ class StatusPanel(ItemList):
             return None
         return row.file, row.source_index
 
+    def _target_indices(self) -> set[int]:
+        """Source indices for the current Status action.
+
+        Visual mode always wins (including an empty selection). Otherwise a
+        tree directory uses precomputed ``child_indices``; a file row uses
+        its source index.
+        """
+        if self._visual_mode:
+            return set(self._selected)
+        if self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                return set(row.child_indices)
+        hit = self.file_at_cursor()
+        if hit is None:
+            return set()
+        return {hit[1]}
+
+    def _begin_target_action(self) -> set[int] | None:
+        """Return indices to act on, or None if the action should abort."""
+        if self._visual_mode and self._visual_scroll:
+            show_toast(
+                "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
+            )
+            return None
+        indices = self._target_indices()
+        if indices:
+            return indices
+        if self._visual_mode:
+            self._toast_no_selection()
+        elif self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                show_toast(
+                    "No files in directory", duration=1.5, kind=FeedbackKind.WARNING
+                )
+        return None
+
     def _cursor_has_conflict(self) -> bool:
         """Return True if the file at cursor has an unresolved merge conflict."""
         hit = self.file_at_cursor()
@@ -995,18 +1041,6 @@ class StatusPanel(ItemList):
         if row is not None and row.kind == "dir":
             self._collapsed_dirs.add(row.path)
             self._apply_filter()
-
-    def _dir_action(self, action_type: StatusAction, row: StatusTreeRow) -> None:
-        """Run a batch action on a directory row (child_indices)."""
-        indices = set(row.child_indices)
-        if not indices:
-            show_toast("No files in directory", duration=1.5, kind=FeedbackKind.WARNING)
-            return
-        if action_type == StatusAction.DISCARD:
-            self._confirm_batch("Discard", action_type, indices, destructive=True)
-            return
-        result = self._dispatch_batch(action_type, indices)
-        self._handle_result(result)
 
     def _handle_result(self, result: ActionResult) -> None:
         """Handle a ViewModel action result: badge/toast and optional refresh."""

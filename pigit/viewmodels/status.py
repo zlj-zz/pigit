@@ -16,13 +16,23 @@ from collections.abc import Callable
 from .base import ActionResult, IListViewModel, ViewModelBase
 
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
+from pigit.git.model import File
 
 if TYPE_CHECKING:
     from pigit.app_types import FileInfo
     from pigit.git.api import GitApi
-    from pigit.git.model import File, Stash
+    from pigit.git.model import Stash
 
 _logger = logging.getLogger(__name__)
+
+
+def _needs_stage(file: File) -> bool:
+    """Return True when ``switch_file_status`` would ``git add`` this file."""
+    return (
+        file.has_merged_conflicts
+        or file.has_inline_merged_conflicts
+        or file.has_unstaged_change
+    )
 
 
 class IStatusViewModel(IListViewModel["File"]):
@@ -249,27 +259,40 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
 
     def stage_indices(self, indices: set[int]) -> ActionResult:
         items = self._items.value
+        chosen: list[File] = []
+        for idx in sorted(indices):
+            if 0 <= idx < len(items):
+                chosen.append(items[idx])
+        if not chosen:
+            return ActionResult(
+                success=True, message="Updated 0 file(s)", should_refresh=False
+            )
+        if any(_needs_stage(f) for f in chosen):
+            targets = [f for f in chosen if _needs_stage(f)]
+        else:
+            targets = chosen
         commands: list[ReverseCommand] = []
         count = 0
         try:
-            for idx in sorted(indices):
-                if 0 <= idx < len(items):
-                    f = items[idx]
-                    was_staged = f.has_staged_change
-                    self._git.switch_file_status(f)
-                    commands.append(
-                        ReverseCommand(
-                            op_type="unstage" if not was_staged else "stage",
-                            payload={"path": f.name},
-                        )
+            for f in targets:
+                was_staged = f.has_staged_change
+                self._git.switch_file_status(f)
+                commands.append(
+                    ReverseCommand(
+                        op_type="unstage" if not was_staged else "stage",
+                        payload={"path": f.name},
                     )
-                    count += 1
+                )
+                count += 1
         except Exception as e:
             return ActionResult(success=False, message=str(e))
         if count > 0 and self._history is not None:
             self._history.push(
                 HistoryRecord(
-                    description=f"{'Unstaged' if commands[0].op_type == 'stage' else 'Staged'} {count} file(s)",
+                    description=(
+                        f"{'Unstaged' if commands[0].op_type == 'stage' else 'Staged'}"
+                        f" {count} file(s)"
+                    ),
                     commands=commands,
                     timestamp=time.time(),
                     panel_hint="status",

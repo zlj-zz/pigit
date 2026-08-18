@@ -111,7 +111,42 @@ def test_get_inspector_data_invalid_index(status_vm):
     assert status_vm.get_inspector_data(99) is None
 
 
-def test_stage_indices(status_vm):
+def test_stage_indices_mixed_set_stages_only_unstaged(status_vm):
+    """Unstaged + fully staged → add the unstaged file only; do not reset the staged one."""
+    result = status_vm.stage_indices({0, 1})
+    assert result.success is True
+    assert "Updated 1 file(s)" in result.message
+    assert status_vm._git.switch_file_status.call_count == 1
+    staged = status_vm._git.switch_file_status.call_args[0][0]
+    assert staged.name == "a.py"
+
+
+def test_stage_indices_all_staged_unstages_all(status_vm):
+    result = status_vm.stage_indices({1})
+    assert result.success is True
+    assert "Updated 1 file(s)" in result.message
+    status_vm._git.switch_file_status.assert_called_once()
+    assert status_vm._git.switch_file_status.call_args[0][0].name == "b.py"
+
+
+def test_stage_indices_two_staged_unstages_both(status_vm):
+    status_vm._items.set(
+        [
+            status_vm._items.value[1],
+            File(
+                "d.py",
+                "d.py",
+                "M ",
+                True,
+                False,
+                True,
+                False,
+                False,
+                False,
+                False,
+            ),
+        ]
+    )
     result = status_vm.stage_indices({0, 1})
     assert result.success is True
     assert "Updated 2 file(s)" in result.message
