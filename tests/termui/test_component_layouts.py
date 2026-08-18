@@ -192,6 +192,18 @@ class TestRow:
         row.set_widths([5, "flex"])
         assert c1._size == (5, 10)
 
+    def test_set_widths_lays_out_replaced_child(self):
+        """Same width spec must still size a child that was swapped in."""
+        c1 = _make_component()
+        c2 = _make_component()
+        row = Row([c1, c2], widths=[3, 7])
+        row.resize((10, 5))
+        c3 = _make_component()
+        row.children[1] = c3
+        c3.parent = row
+        row.set_widths([3, 7])
+        assert c3._size == (7, 5)
+
     def test_render_skips_zero_size(self):
         from pigit.termui._surface import Surface
 

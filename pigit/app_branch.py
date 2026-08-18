@@ -15,6 +15,7 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     bind_signals,
+    by_id,
     dismiss_sheet,
     palette,
     Segment,
@@ -25,6 +26,7 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
+from .app_preview_toggle import invoke_preview_toggle
 from .app_types import BranchInfo
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
@@ -49,6 +51,7 @@ class BranchPanel(ItemList):
         branch_signal: Signal[str] | None = None,
         vm: IBranchViewModel,
         id: str | None = None,
+        on_toggle_preview: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -56,6 +59,7 @@ class BranchPanel(ItemList):
             id=id,
         )
         self._vm = vm
+        self._on_toggle_preview = on_toggle_preview
         self._branch_signal = branch_signal
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
@@ -93,9 +97,11 @@ class BranchPanel(ItemList):
         if not branches:
             scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
+            self._notify_change()
             return
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
+        self._notify_change()
 
     def deactivate(self) -> None:
         super().deactivate()
@@ -133,6 +139,37 @@ class BranchPanel(ItemList):
     @bind_action("previous", "k", "up", desc="Navigate branch list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
+
+    def _log_graph_preview_panel(self):
+        """Return the registered log-graph preview, or None when unregistered."""
+        from .app_log_graph_preview import LogGraphPreview
+
+        try:
+            return by_id("log_graph_preview", LogGraphPreview)
+        except (RuntimeError, TypeError):
+            return None
+
+    @bind_action(
+        "preview_down",
+        "J",
+        desc="Scroll log graph preview down",
+        tip="Preview Navigate",
+    )
+    def _scroll_preview_down(self) -> None:
+        preview = self._log_graph_preview_panel()
+        if preview is not None and preview.is_activated():
+            preview.scroll_down(preview.SCROLL_PAGE_SIZE)
+
+    @bind_action(
+        "preview_up",
+        "K",
+        desc="Scroll log graph preview up",
+        tip="Preview Navigate",
+    )
+    def _scroll_preview_up(self) -> None:
+        preview = self._log_graph_preview_panel()
+        if preview is not None and preview.is_activated():
+            preview.scroll_up(preview.SCROLL_PAGE_SIZE)
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
     def checkout(self) -> None:
@@ -228,6 +265,11 @@ class BranchPanel(ItemList):
         self._vm.set_scope(scope)
         self._vm.refresh()
 
+    @bind_action("toggle_preview", "ctrl p", desc="Toggle log graph preview")
+    def toggle_preview(self) -> None:
+        """Show or hide the Branch log-graph preview on a large screen."""
+        invoke_preview_toggle(self)
+
     @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
     def rename(self) -> None:
         if not self.branches:
@@ -290,9 +332,13 @@ class BranchPanel(ItemList):
         if idx < len(self.branches):
             branch = self.branches[idx]
             if not branch.is_remote:
+                if branch.upstream_name:
+                    right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
                 ahead = branch.ahead if branch.ahead != "?" else ""
                 behind = branch.behind if branch.behind != "?" else ""
                 if ahead:
+                    if right:
+                        right.append(Segment(" ", fg=THEME.fg_muted))
                     right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
                 if behind:
                     if right:

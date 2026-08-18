@@ -8,6 +8,7 @@ Date: 2026-05-27
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pigit.termui import (
     EVT_GOTO,
@@ -25,6 +26,7 @@ from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType
+from .app_preview_toggle import invoke_preview_toggle
 from .app_theme import THEME
 
 if TYPE_CHECKING:
@@ -46,6 +48,7 @@ class StashPanel(ItemList):
         *,
         vm: IStatusViewModel,
         id: str | None = None,
+        on_toggle_preview: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             empty_state=[
@@ -55,6 +58,7 @@ class StashPanel(ItemList):
             id=id,
         )
         self._vm = vm
+        self._on_toggle_preview = on_toggle_preview
         self.stashes: list[Stash] = []
 
     @property
@@ -162,6 +166,11 @@ class StashPanel(ItemList):
             repo_path=self._vm.repo_path,
             diff_type=DiffType.STASH,
         )
+
+    @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
+    def toggle_preview(self) -> None:
+        """Show or hide the Stash side diff preview on a large screen."""
+        invoke_preview_toggle(self)
 
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:

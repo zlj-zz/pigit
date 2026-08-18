@@ -7,8 +7,21 @@ Date: 2026-04-10
 
 from __future__ import annotations
 
+import subprocess
+
 from ._decorators import command, alias
 from ._models import CommandCategory, SecurityLevel
+
+
+def _current_branch_name() -> str:
+    """Return the current branch short name, or empty when HEAD is detached."""
+    proc = subprocess.run(
+        ["git", "symbolic-ref", "-q", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.stdout.strip()
 
 
 # Push commands
@@ -78,8 +91,13 @@ def push_upstream(args: list[str]) -> str:
     """Push with upstream."""
     if args:
         return f"git push -u {' '.join(args)}"
-    # Without args: push current branch to origin with upstream
-    return 'git push --set-upstream origin "$(git symbolic-ref -q --short HEAD 2> /dev/null)"'
+    # Name the branch so Git stores refs/remotes/origin/<branch>.
+    # ``git push -u origin HEAD`` sets branch.*.merge but often does not
+    # create the remote-tracking ref, so the TUI shows no upstream link.
+    branch = _current_branch_name()
+    if not branch:
+        return "git push -u origin HEAD"
+    return f"git push -u origin {branch}"
 
 
 @command(

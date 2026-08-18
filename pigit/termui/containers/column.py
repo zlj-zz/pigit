@@ -29,7 +29,8 @@ class Column(Component):
 
     When ``focus_index`` is set, Column exposes ``focus_child`` and
     ``presentation_child`` as the focused child so keys land on that child
-    (Tab bubbles here) and chrome queries penetrate. Tab cycles focus.
+    and chrome queries penetrate. The application switches ``focus_index``
+    (number keys, Tab cycle, mouse); Column itself does not bind Tab.
     """
 
     def __init__(
@@ -115,19 +116,6 @@ class Column(Component):
     def presentation_child(self) -> Component | None:
         """Return the focused child when ``focus_index`` is set."""
         return self._focused_child()
-
-    def handle_key(self, key: str) -> bool:
-        """Cycle focus on Tab when ``focus_index`` is set."""
-        if self._focus_index is not None and key == "tab":
-            self.focus_next()
-            return True
-        return False
-
-    def focus_next(self) -> None:
-        """Cycle focus to the next child panel."""
-        if self._focus_index is None or not self.children:
-            return
-        self.set_focus_index((self._focus_index + 1) % len(self.children))
 
     def set_focus_index(self, idx: int) -> None:
         """Set the focused child by index, handling activate/deactivate and notify."""

@@ -12,8 +12,11 @@ from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.git.model import File, Stash
 from pigit.termui import EVT_SELECTION_CHANGED, Component
+from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui._root import ComponentRoot
+from pigit.termui._surface import Surface
 from pigit.termui.event_bus import EventBus
+from pigit.termui.widgets.line_text_browser import LineTextBrowser
 
 
 class _FakeStatusVM:
@@ -82,8 +85,7 @@ def test_clears_when_active_is_not_status_or_stash(preview: PreviewPanel) -> Non
     preview.set_preview(["old"], title="Old", subtitle="sub")
     bus.publish(EVT_SELECTION_CHANGED, active=Component())
 
-    assert preview._title == "Preview"
-    assert preview._subtitle == ""
+    assert preview._diff_viewer._box_title == ""
     assert preview._diff_viewer._content == []
 
 
@@ -110,8 +112,8 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert vm.diff_calls == [7]
-    assert preview._title == "src/main.py"
-    assert preview._subtitle == "Staged"
+    assert "src/main.py" in preview._diff_viewer._box_title
+    assert "Staged" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STAGED
     assert preview._diff_viewer._content == ["diff line"]
 
@@ -128,8 +130,8 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
     assert vm.stash_diff_calls == ["stash@{0}"]
-    assert preview._title == "WIP"
-    assert preview._subtitle == "stash@{0}"
+    assert "WIP" in preview._diff_viewer._box_title
+    assert "stash@{0}" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STASH
     assert preview._diff_viewer._content == ["stash diff line"]
 
@@ -156,7 +158,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
     assert vm.diff_calls == [0]
-    assert preview._title == "a.py"
+    assert "a.py" in preview._diff_viewer._box_title
 
     preview.deactivate()
     del vm.diff_calls[:]
@@ -182,4 +184,45 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     bus.publish(EVT_SELECTION_CHANGED, active=other)
 
     assert vm.diff_calls == []
-    assert preview._title == "a.py"
+    assert "a.py" in preview._diff_viewer._box_title
+
+
+def test_inner_diff_fills_preview(preview: PreviewPanel) -> None:
+    preview.resize((20, 8))
+    assert preview._diff_viewer._size == (20, 8)
+    assert preview._diff_viewer.x == 1
+    assert preview._diff_viewer.y == 1
+
+
+def test_preview_title_is_on_diff_box(preview: PreviewPanel) -> None:
+    preview.resize((40, 8))
+    preview.set_preview(["+ added line"], title="src/main.py", subtitle="Staged")
+    surface = Surface(40, 8)
+    preview._render_surface(surface)
+    top = surface.lines()[0]
+    assert top.startswith("┌")
+    assert "src/main.py" in top
+    assert "Staged" in top
+    assert not hasattr(preview, "_title")
+
+
+def test_wheel_scrolls_preview_content(preview: PreviewPanel) -> None:
+    preview.resize((20, 8))
+    preview.set_preview([f"line {i}" for i in range(40)], "file.py")
+    assert preview._diff_viewer._i == 0
+    down = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
+    assert preview.handle_mouse(down) is True
+    assert preview._diff_viewer._i == LineTextBrowser.WHEEL_SCROLL_LINES
+    up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
+    assert preview.handle_mouse(up) is True
+    assert preview._diff_viewer._i == 0
+
+
+def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
+    preview.resize((20, 8))
+    preview.set_preview(["a", "b", "c"], "file.py")
+    click = MouseEvent(1, 5, MouseButton.LEFT, MouseKind.PRESS)
+    assert preview.handle_mouse(click) is False
+    release = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.RELEASE)
+    assert preview.handle_mouse(release) is False
+    assert preview._diff_viewer._i == 0

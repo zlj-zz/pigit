@@ -31,9 +31,7 @@ def app():
 def _run(app, flag: str, returncode: int = 0, in_progress: bool = False) -> tuple:
     """Run _do_rebase_control and return the captured show_toast call."""
     app._git.is_rebase_in_progress.return_value = in_progress
-    with patch("pigit.app.exec_external") as ex, patch(
-        "pigit.app.show_toast"
-    ) as toast:
+    with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast") as toast:
         ex.return_value.returncode = returncode
         app._do_rebase_control(flag)
     return toast.call_args

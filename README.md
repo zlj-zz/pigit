@@ -215,6 +215,8 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[tui]` | `auto_refresh_interval` | float | `10.0` | auto-refresh interval in seconds (`0` disables) |
 | `[tui]` | `word_diff` | bool | `True` | enable word-diff in the diff viewer |
 | `[tui]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
+| `[tui]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |
+| `[tui]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
 | `[tui]` | `show_footer` | bool | `True` | show the footer key-hint bar |
 
 ### Keybindings

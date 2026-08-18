@@ -29,6 +29,8 @@ def test_create(tmp_path):
     assert 'version = "test"' in content
     assert "[cmd]" in content
     assert "[counter]" in content
+    assert "diff_preview_default" in content
+    assert "log_graph_default" in content
 
 
 def test_load():
@@ -77,6 +79,8 @@ def test_default_values_when_no_config_file():
     assert data.repo.auto_append is True
     assert data.log.debug is False
     assert data.log.output is False
+    assert data.tui.diff_preview_default is True
+    assert data.tui.log_graph_default is True
 
 
 def test_invalid_format_falls_back_to_default(tmp_path):

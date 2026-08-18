@@ -188,3 +188,15 @@ def test_can_rebase_blocked_by_untracked(branch_vm):
     ok, msg = branch_vm.can_rebase()
     assert ok is False
     assert "Uncommitted changes" in msg
+
+
+def test_load_log_graph_splits_lines(branch_vm):
+    branch_vm._git.load_log_graph.return_value = "* a\n* b\n"
+    assert branch_vm.load_log_graph("feat") == ["* a", "* b"]
+    # The commit cap stays with GitApi (LOG_GRAPH_LIMIT); the VM forwards no limit.
+    branch_vm._git.load_log_graph.assert_called_once_with("feat")
+
+
+def test_load_log_graph_empty_text(branch_vm):
+    branch_vm._git.load_log_graph.return_value = ""
+    assert branch_vm.load_log_graph("feat") == []

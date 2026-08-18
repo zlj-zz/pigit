@@ -533,7 +533,9 @@ class TestHelpPanel:
         assert first.startswith(" ")
         assert "?" in first
         q_idx = first.index("?")
-        ctrl_line = next(line for line in panel._lines if line.lstrip().startswith("ctrl+r"))
+        ctrl_line = next(
+            line for line in panel._lines if line.lstrip().startswith("ctrl+r")
+        )
         ctrl_idx = ctrl_line.index("ctrl+r")
         assert q_idx + 1 == ctrl_idx + len("ctrl+r")
 
@@ -576,15 +578,11 @@ class TestHelpPanel:
         assert panel.handle_mouse(down) is True
         assert panel._offset == 1
 
-        up = MouseEvent(
-            button=MouseButton.WHEEL_UP, col=1, row=1, kind=MouseKind.PRESS
-        )
+        up = MouseEvent(button=MouseButton.WHEEL_UP, col=1, row=1, kind=MouseKind.PRESS)
         assert panel.handle_mouse(up) is True
         assert panel._offset == 0
 
-        left = MouseEvent(
-            button=MouseButton.LEFT, col=1, row=1, kind=MouseKind.PRESS
-        )
+        left = MouseEvent(button=MouseButton.LEFT, col=1, row=1, kind=MouseKind.PRESS)
         assert panel.handle_mouse(left) is False
 
 

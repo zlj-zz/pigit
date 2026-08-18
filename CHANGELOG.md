@@ -1,5 +1,24 @@
 # Changelog of pigit
 
+## 1.11.2 (2026-08-18)
+
+### Features
+
+- **Panel cycling with Tab**: `Tab`/`Shift+Tab` cycles Status → Stash → Branch → Commit; number keys `1`–`4` jump straight to a panel. A focused inline input (e.g. an active search filter) keeps its keys ahead of these app-global shortcuts.
+- **Branch log-graph preview**: on wide terminals the Branch tab shows a read-only native `git log --graph` preview with ANSI colors, `J`/`K` scrolling, and async loading so cursor moves never block the UI.
+- **Toggle side previews with `Ctrl+p`**: Status/Stash toggle their diff preview, Branch toggles its log-graph preview, at runtime. `diff_preview_default` / `log_graph_default` config keys set the startup state.
+
+### Bug Fixes
+
+- **`p.u` upstream tracking**: the push/pull shortcut sets `origin/<branch>` tracking and the Branch panel shows the upstream.
+- **Tree directory actions**: Status `a`/`d` on a directory row act on its whole file set.
+- **ANSI-16 colors**: termui re-emits ANSI-16 palette slots as indexed SGR so 8/16-color terminals render graph and status colors correctly.
+- **Picker selector header**: no longer has the dark background.
+
+### Refactors
+
+- **Preview chrome**: the side preview reuses the DiffViewer box instead of its own title chrome.
+
 ## 1.11.1 (2026-08-17)
 
 ### Features

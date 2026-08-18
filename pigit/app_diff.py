@@ -224,6 +224,7 @@ class DiffViewer(LineTextBrowser):
         self._cached_path_i = -1
         self._cached_path_hunks_id = -1
         self._cached_path: str | None = None
+        self._box_title: str = ""
 
     def _current_file_path(self) -> str | None:
         """Return the file path at the current cursor position in diff mode."""
@@ -521,6 +522,10 @@ class DiffViewer(LineTextBrowser):
     def set_diff_type(self, diff_type: DiffType) -> None:
         """Set the diff type (unstaged, staged, or commit)."""
         self._diff_type = diff_type
+
+    def set_box_title(self, title: str) -> None:
+        """Set the optional label drawn on the viewer's own box border."""
+        self._box_title = title
 
     def _parse_hunks(self) -> list[_Hunk]:
         """Parse hunk boundaries from diff content in a single pass."""
@@ -1443,7 +1448,7 @@ class DiffViewer(LineTextBrowser):
             self._render_surface_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
+        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, title=self._box_title or None)
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS

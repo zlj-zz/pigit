@@ -36,7 +36,7 @@ from pigit.termui import (
     ToastPosition,
 )
 from pigit.termui._component import resolve_presentation_leaf
-from pigit.termui._runtime_context import get_renderer
+from pigit.termui._runtime_context import get_focus_manager, get_renderer
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
@@ -51,6 +51,7 @@ from .app_diff import DiffViewer
 from .app_inspector import InspectorPanel
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
+from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
@@ -120,7 +121,10 @@ class PigitApplication(Application):
         self._branch_vm: BranchViewModel
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
+        self._log_graph_preview: LogGraphPreview | None = None
         self._is_large_screen = False
+        self._diff_preview_wanted = config.diff_preview_default
+        self._log_graph_wanted = config.log_graph_default
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
@@ -128,15 +132,19 @@ class PigitApplication(Application):
         self._inspector: InspectorPanel
         self._palette: CommandPalette
         self._status_stack: Column
+        self._status_panel: StatusPanel
+        self._stash_panel: StashPanel
         self._branch_panel: BranchPanel
+        self._commit_panel: CommitPanel
+        self._diff_panel: DiffViewer
 
     LARGE_SCREEN_COLS = 120
 
     _TAB_CONFIG: dict[type, tuple[str, str]] = {
         StatusPanel: ("Status", "1"),
-        StashPanel: ("Stash", "1"),
-        BranchPanel: ("Branch", "2"),
-        CommitPanel: ("Commit", "3"),
+        StashPanel: ("Stash", "2"),
+        BranchPanel: ("Branch", "3"),
+        CommitPanel: ("Commit", "4"),
         DiffViewer: ("Display", ""),
     }
 
@@ -150,19 +158,29 @@ class PigitApplication(Application):
         self._branch_vm = BranchViewModel(self._git, history=self._session_history)
         self._commit_vm = CommitViewModel(self._git)
 
-        # Preview is created at app level but only inserted into layout when
-        # Status tab is active on large screens.
+        # Side previews are created at app level but only inserted into the
+        # layout on large screens: Status/Stash use diff preview, Branch uses
+        # the log-graph preview. At most one is in body_row at a time.
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
+        )
+        self._log_graph_preview = LogGraphPreview(
+            id="log_graph_preview",
+            vm=self._branch_vm,
         )
 
         self._status_panel = StatusPanel(
             vm=self._status_vm,
             id="status_panel",
             default_view=self._config.status_view,
+            on_toggle_preview=self.toggle_side_preview,
         )
-        self._stash_panel = StashPanel(vm=self._status_vm, id="stash")
+        self._stash_panel = StashPanel(
+            vm=self._status_vm,
+            id="stash",
+            on_toggle_preview=self.toggle_side_preview,
+        )
         self._status_stack = TabPanel(
             children=[self._status_panel, self._stash_panel],
             heights=["flex", 4],
@@ -176,6 +194,7 @@ class PigitApplication(Application):
             vm=self._branch_vm,
             branch_signal=self._branch_signal,
             id="branch",
+            on_toggle_preview=self.toggle_side_preview,
         )
 
         self._commit_panel = CommitPanel(vm=self._commit_vm, id="commit")
@@ -320,23 +339,54 @@ class PigitApplication(Application):
         if self._tab_view.active is not None:
             self._on_tab_switch(self._tab_view.active)
 
-    def _apply_body_widths(self, cols: int) -> None:
-        """Recompute body_row widths based on screen size, active tab, and inspector state.
+    def _side_preview_for_active(self) -> Component | None:
+        """Return the one large-screen side panel for the current tab, or None."""
+        if not self._is_large_screen:
+            return None
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if isinstance(active, (StatusPanel, StashPanel)):
+            return self._preview_panel if self._diff_preview_wanted else None
+        if isinstance(active, BranchPanel):
+            return self._log_graph_preview if self._log_graph_wanted else None
+        return None
 
-        PreviewPanel is only inserted into the layout when Status is active on
-        large screens; otherwise it is removed so it does not appear global.
+    def _sync_body_children(self, desired_children: list[Component]) -> None:
+        """Attach/detach the optional side preview so body_row matches *desired*."""
+        body_row = self._body_row
+        extras = {
+            panel
+            for panel in (self._preview_panel, self._log_graph_preview)
+            if panel is not None
+        }
+        for child in list(body_row.children):
+            if child in extras and child not in desired_children:
+                child.deactivate()
+                body_row.children.remove(child)
+                if child.parent is body_row:
+                    child.parent = None
+        for child in desired_children:
+            if child not in body_row.children:
+                body_row.children.append(child)
+                child.parent = body_row
+                child.activate()
+
+    def _apply_body_widths(self, cols: int) -> None:
+        """Recompute body_row widths from screen size, active tab, and inspector.
+
+        At most one side preview is present: Status/Stash get the diff preview
+        when wanted, Branch gets the log-graph preview when wanted, Commit/Diff
+        get none.
         """
         body_row = self._body_row
         tab_view = self._tab_view
         inspector = self._inspector
-        active_presented = resolve_presentation_leaf(tab_view.active)
-        on_status = isinstance(active_presented, (StatusPanel, StashPanel))
+        side = self._side_preview_for_active()
 
-        if self._is_large_screen and on_status:
+        if side is not None:
             tab_w = max(50, int(cols * 0.35))
             preview_w = max(1, cols - tab_w)
             inspector_w = self._inspector_width(cols)
-            desired_children = [tab_view, inspector, self._preview_panel]
+            desired_children = [tab_view, inspector, side]
             if self._inspector_visible:
                 desired_widths = [tab_w, inspector_w, max(1, preview_w - inspector_w)]
             else:
@@ -348,25 +398,7 @@ class PigitApplication(Application):
             else:
                 desired_widths = ["flex", 0]
 
-        # Sync children list: preview is only present when Status is active.
-        if list(body_row.children) != desired_children:
-            # Detach preview if being removed
-            for child in list(body_row.children):
-                if child is self._preview_panel and child not in desired_children:
-                    child.deactivate()
-                    body_row.children.remove(child)
-                    if child.parent is body_row:
-                        child.parent = None
-            # Attach preview if being added
-            preview = self._preview_panel
-            if (
-                preview is not None
-                and preview in desired_children
-                and preview not in body_row.children
-            ):
-                body_row.children.append(preview)
-                preview.parent = body_row
-                preview.activate()
+        self._sync_body_children(desired_children)
         body_row.set_widths(desired_widths)
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
@@ -386,17 +418,90 @@ class PigitApplication(Application):
             self._palette.open()
             self._root.show_sheet(self._palette, height=8)
 
-    @bind_action("goto_status", "1", desc="Switch to Status tab", tip="Status")
+    @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
-        self._tab_view.route_to("status")
+        """Switch focus to the Status panel."""
+        self._focus_destination(self._status_panel)
 
-    @bind_action("goto_branch", "2", desc="Switch to Branch tab", tip="Branch")
+    @bind_action("goto_stash", "2", desc="Switch to Stash panel", tip="Stash")
+    def goto_stash(self):
+        """Switch focus to the Stash panel."""
+        self._focus_destination(self._stash_panel)
+
+    @bind_action("goto_branch", "3", desc="Switch to Branch tab", tip="Branch")
     def goto_branch(self):
-        self._tab_view.route_to("branch")
+        """Switch focus to the Branch panel."""
+        self._focus_destination(self._branch_panel)
 
-    @bind_action("goto_commit", "3", desc="Switch to Commit tab", tip="Commit")
+    @bind_action("goto_commit", "4", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
-        self._tab_view.route_to("commit")
+        """Switch focus to the Commit panel."""
+        self._focus_destination(self._commit_panel)
+
+    @bind_action(
+        "next_panel",
+        "tab",
+        desc="Cycle to next panel (Status, Stash, Branch, Commit)",
+    )
+    def next_panel(self) -> None:
+        """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        self._cycle_panel(1)
+
+    @bind_action(
+        "prev_panel",
+        "shift tab",
+        desc="Cycle to previous panel (Status, Stash, Branch, Commit)",
+    )
+    def prev_panel(self) -> None:
+        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        self._cycle_panel(-1)
+
+    def _panel_ring(self) -> tuple[Component, ...]:
+        """Return the four panels that Tab/Shift+Tab cycle through, in order."""
+        return (
+            self._status_panel,
+            self._stash_panel,
+            self._branch_panel,
+            self._commit_panel,
+        )
+
+    def _ring_index(self) -> int | None:
+        """Index in the panel ring, or None when Diff (or unknown) is focused."""
+        fm = get_focus_manager()
+        leaf = fm.get_focus_leaf() if fm is not None else None
+        if leaf is None:
+            leaf = resolve_presentation_leaf(self._tab_view.active)
+        for idx, panel in enumerate(self._panel_ring()):
+            if leaf is panel:
+                return idx
+        return None
+
+    def _focus_destination(self, panel: Component) -> None:
+        """Move TabView + Status/Stash column focus to *panel*."""
+        if panel is self._status_panel:
+            self._tab_view.route_to("status")
+            self._status_stack.set_focus_index(0)
+            return
+        if panel is self._stash_panel:
+            self._tab_view.route_to("status")
+            self._status_stack.set_focus_index(1)
+            return
+        if panel is self._branch_panel:
+            self._tab_view.route_to("branch")
+            return
+        if panel is self._commit_panel:
+            self._tab_view.route_to("commit")
+
+    def _cycle_panel(self, step: int) -> None:
+        """Move focus ``step`` positions around the panel ring.
+
+        No-op when the current focus is outside the ring (e.g. Diff view).
+        """
+        idx = self._ring_index()
+        if idx is None:
+            return
+        ring = self._panel_ring()
+        self._focus_destination(ring[(idx + step) % len(ring)])
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
@@ -421,6 +526,38 @@ class PigitApplication(Application):
         rows = terminal_size()[1]
         show_sheet(panel, height=min(12, rows // 3), show_border=True)
         panel.activate()
+
+    def toggle_side_preview(self) -> None:
+        """Toggle the side preview that belongs to the focused panel."""
+        cols, _ = terminal_size()
+        if cols < self.LARGE_SCREEN_COLS:
+            show_toast(
+                f"Need at least {self.LARGE_SCREEN_COLS} columns for preview",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if isinstance(active, (StatusPanel, StashPanel)):
+            self._diff_preview_wanted = not self._diff_preview_wanted
+            showing = self._diff_preview_wanted
+            hidden = self._preview_panel
+        elif isinstance(active, BranchPanel):
+            self._log_graph_wanted = not self._log_graph_wanted
+            showing = self._log_graph_wanted
+            hidden = self._log_graph_preview
+        else:
+            return
+        self._apply_body_widths(cols)
+        if showing:
+            if self._tab_view.active is not None:
+                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+        elif hidden is not None:
+            hidden.clear()
+        renderer = get_renderer()
+        if renderer is not None:
+            renderer.clear_cache()
+        request_render()
 
     @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
     def toggle_inspector(self):
@@ -469,8 +606,10 @@ class PigitApplication(Application):
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
         self._sync_stash_height(rows)
         self._apply_body_widths(cols)
-        if was_large and not self._is_large_screen and self._preview_panel is not None:
-            self._preview_panel.clear()
+        if was_large and not self._is_large_screen:
+            for panel in (self._preview_panel, self._log_graph_preview):
+                if panel is not None:
+                    panel.clear()
         if not was_large and self._is_large_screen:
             if self._tab_view.active is not None:
                 self._tab_view.active.emit(EVT_SELECTION_CHANGED)

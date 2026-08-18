@@ -11,10 +11,9 @@ from unittest.mock import MagicMock
 
 from pigit.termui._component import Component
 from pigit.termui import ToastPosition
-from pigit.termui.widgets import Toast
 from pigit.termui._layer import LayerKind
 from pigit.termui._root import ComponentRoot
-from pigit.termui.types import OverlayDispatchResult, EventType, EVT_GOTO
+from pigit.termui.types import OverlayDispatchResult, EVT_GOTO
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 
@@ -296,24 +295,29 @@ class TestComponentRootKeyDispatch:
         assert root._handle_event("x") is True
         assert body.is_focus_leaf
 
-    def test_root_handle_key_consumes_before_body(self):
-        body = _RecordingBody()
+    def test_root_handle_key_is_fallback_after_tree(self):
+        """Root handle_key fires only for keys the focus leaf declined."""
+
+        class _SelectiveBody(Component):
+            def _render_surface(self, surface) -> None:
+                pass
+
+            def handle_key(self, key: str) -> bool:
+                return key != "j"  # declines "j", consumes everything else
+
         seen: list[str] = []
+        root = ComponentRoot(
+            _SelectiveBody(),
+            handle_key=lambda key: seen.append(key) or True,
+        )
 
-        def handle_key(key: str) -> bool:
-            if key == "j":
-                seen.append(key)
-                return True
-            return False
-
-        root = ComponentRoot(body, handle_key=handle_key)
-
+        # "j" declined by the tree → root handle_key fires.
         assert root._handle_event("j") is True
         assert seen == ["j"]
-        assert body.received == []
 
+        # "k" consumed by the tree → root handle_key does not fire.
         assert root._handle_event("k") is True
-        assert body.received == ["k"]
+        assert seen == ["j"]
 
     def test_root_binding_precedes_handle_key(self):
         body = DummyBody()
@@ -356,7 +360,8 @@ class TestComponentRootKeyDispatch:
         assert root._handle_event("x") is True
         assert bound_called == [True]
 
-    def test_leaf_bubble_does_not_rerun_root_binding(self):
+    def test_root_binding_runs_once_as_fallback(self):
+        """A declined leaf bubbles and the root binding fires exactly once."""
         hits: list[str] = []
 
         class _BubblingBody(Component):
@@ -373,8 +378,9 @@ class TestComponentRootKeyDispatch:
             key_handlers={"z": lambda: hits.append("root")},
         )
 
+        # Leaf declines "z", bubbles, then the root binding fires once.
         assert root._handle_event("z") is True
-        assert hits == ["root"]
+        assert hits == ["body", "root"]
 
         hits.clear()
         assert root._handle_event("q") is False

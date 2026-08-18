@@ -86,6 +86,35 @@ class TestStashEdgeCases:
         assert ex.exec_calls[0][0] == "git stash push -u -m wip"
 
 
+class TestLogGraph:
+    def test_load_log_graph_command_shape(self):
+        ex = MockExecutor(default=(0, "", "* abc (feat) subject\n"))
+        git = GitApi(executor=ex, path="/repo")
+        out = git.load_log_graph("feature/x", limit=80)
+        assert "* abc (feat) subject" in out
+        cmd = ex.exec_calls[0][0]
+        assert cmd.startswith("git log --decorate --graph")
+        assert "--oneline" not in cmd
+        assert "--color=always" in cmd
+        assert "--color=never" not in cmd
+        assert "-n 80" in cmd
+        assert "feature/x" in cmd
+
+    def test_load_log_graph_empty_ref_skips_exec(self):
+        ex = MockExecutor(default=(0, "", "nope"))
+        git = GitApi(executor=ex, path="/repo")
+        assert git.load_log_graph("") == ""
+        assert ex.exec_calls == []
+
+    def test_load_log_graph_failure_raises(self):
+        ex = MockExecutor(
+            default=(128, "fatal: unknown revision 'gone'", ""),
+        )
+        git = GitApi(executor=ex, path="/repo")
+        with pytest.raises(GitError):
+            git.load_log_graph("gone")
+
+
 class TestDiffEdgeCases:
     def test_load_file_diff_error_returns_sentinel(self):
         git = GitApi(executor=MockExecutor(default=(1, "error", None)), path="/repo")

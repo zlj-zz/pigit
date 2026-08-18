@@ -331,18 +331,14 @@ class TestBranchPanelLifecycle:
         vm.items = Signal([])
         vm.get_remote_url.return_value = "git@github.com:zlj-zz/pigit.git"
         opened: list[str] = []
-        monkeypatch.setattr(
-            "webbrowser.open", lambda url: opened.append(url) or True
-        )
+        monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
 
         panel = BranchPanel(vm=vm)
         panel.activate()
         vm.items.set([Branch("dev", "0", "0", True)])
         panel.create_pull_request()
 
-        assert opened == [
-            "https://github.com/zlj-zz/pigit/compare/dev?expand=1"
-        ]
+        assert opened == ["https://github.com/zlj-zz/pigit/compare/dev?expand=1"]
 
 
 class TestCommitPanelLifecycle:

@@ -26,7 +26,6 @@ from pigit.termui import (
     by_id,
     dismiss_sheet,
     exec_external,
-    keys,
     palette,
     Segment,
     show_badge,
@@ -37,8 +36,9 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
-from .app_types import FileInfo
 from .app_preview import PreviewPanel
+from .app_preview_toggle import invoke_preview_toggle
+from .app_types import FileInfo
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
@@ -284,6 +284,7 @@ class StatusPanel(ItemList):
         vm: IStatusViewModel,
         default_view: str = "tree",
         id: str | None = None,
+        on_toggle_preview: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -298,6 +299,7 @@ class StatusPanel(ItemList):
             id=id,
         )
         self._vm = vm
+        self._on_toggle_preview = on_toggle_preview
         self.files: list[File] = []
         self._all_files: list[File] = []
         self._filter = SearchFilter(self._apply_filter)
@@ -427,7 +429,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview is not None:
+        if preview.is_activated():
             preview.scroll_down(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -439,7 +441,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview is not None:
+        if preview.is_activated():
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -478,25 +480,23 @@ class StatusPanel(ItemList):
     @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
     def stage(self) -> None:
         _logger.debug("[STATUS] stage")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.STAGE, row)
-                return
-        hit = self.file_at_cursor()
-        if hit is None:
+        indices = self._begin_target_action()
+        if indices is None:
             return
-        f = hit[0]
-        if f.has_merged_conflicts or f.has_inline_merged_conflicts:
-            self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
-        else:
-            action = "Unstaged" if f.has_staged_change else "Staged"
-            self._run_action(
-                self._vm.stage,
-                single_msg=f"{action} {f.name}",
-                batch_msg="Updated {} file(s)",
-                action_type=StatusAction.STAGE,
-            )
+        if len(indices) == 1:
+            hit = self.file_at_cursor()
+            if hit is not None:
+                f, source_idx = hit
+                if f.has_merged_conflicts or f.has_inline_merged_conflicts:
+                    self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
+                    return
+                result = self._vm.stage(source_idx)
+                self._handle_result(result)
+                return
+        result = self._dispatch_batch(StatusAction.STAGE, indices)
+        self._handle_result(result)
+        if self._visual_mode:
+            self._clear_visual_mode()
 
     @bind_action(
         "commit",
@@ -613,19 +613,20 @@ class StatusPanel(ItemList):
     )
     def discard(self) -> None:
         _logger.debug("[STATUS] discard")
-        if self._tree_mode and not self._visual_mode:
-            row = self._row(self.curr_no)
-            if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.DISCARD, row)
-                return
-        self._run_action(
-            self._vm.discard,
-            single_msg="Discard file",
-            batch_msg="Discard {} file(s)",
-            action_type=StatusAction.DISCARD,
-            needs_confirm=True,
-            destructive=True,
-        )
+        indices = self._begin_target_action()
+        if indices is None:
+            return
+        if len(indices) == 1 and not self._visual_mode:
+            self._run_action(
+                self._vm.discard,
+                single_msg="Discard file",
+                batch_msg="Discard {} file(s)",
+                action_type=StatusAction.DISCARD,
+                needs_confirm=True,
+                destructive=True,
+            )
+            return
+        self._confirm_batch("Discard", StatusAction.DISCARD, indices, destructive=True)
 
     @bind_action(
         "stash",
@@ -714,6 +715,11 @@ class StatusPanel(ItemList):
     def toggle_tree(self) -> None:
         self._toggle_tree_mode()
 
+    @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
+    def toggle_preview(self) -> None:
+        """Show or hide the Status side diff preview on a large screen."""
+        invoke_preview_toggle(self)
+
     @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
     def expand_dir(self) -> None:
         self._expand_current_dir()
@@ -739,7 +745,16 @@ class StatusPanel(ItemList):
         if self._tree_mode and not self._visual_mode:
             row = self._row(self.curr_no)
             if row is not None and row.kind == "dir":
-                self._dir_action(StatusAction.IGNORE, row)
+                indices = set(row.child_indices)
+                if not indices:
+                    show_toast(
+                        "No files in directory",
+                        duration=1.5,
+                        kind=FeedbackKind.WARNING,
+                    )
+                    return
+                result = self._dispatch_batch(StatusAction.IGNORE, indices)
+                self._handle_result(result)
                 return
         self._run_action(
             self._vm.ignore,
@@ -908,6 +923,7 @@ class StatusPanel(ItemList):
             return left, main, right
 
         file = row.file
+        assert file is not None  # dir rows returned above; file rows always carry one
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         left = [
@@ -947,9 +963,47 @@ class StatusPanel(ItemList):
                 return self.files[self.curr_no], self._filter.source_index(self.curr_no)
             return None
         row = self._row(self.curr_no)
-        if row is None or row.kind == "dir":
+        if row is None or row.kind == "dir" or row.file is None:
             return None
         return row.file, row.source_index
+
+    def _target_indices(self) -> set[int]:
+        """Source indices for the current Status action.
+
+        Visual mode always wins (including an empty selection). Otherwise a
+        tree directory uses precomputed ``child_indices``; a file row uses
+        its source index.
+        """
+        if self._visual_mode:
+            return set(self._selected)
+        if self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                return set(row.child_indices)
+        hit = self.file_at_cursor()
+        if hit is None:
+            return set()
+        return {hit[1]}
+
+    def _begin_target_action(self) -> set[int] | None:
+        """Return indices to act on, or None if the action should abort."""
+        if self._visual_mode and self._visual_scroll:
+            show_toast(
+                "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
+            )
+            return None
+        indices = self._target_indices()
+        if indices:
+            return indices
+        if self._visual_mode:
+            self._toast_no_selection()
+        elif self._tree_mode:
+            row = self._row(self.curr_no)
+            if row is not None and row.kind == "dir":
+                show_toast(
+                    "No files in directory", duration=1.5, kind=FeedbackKind.WARNING
+                )
+        return None
 
     def _cursor_has_conflict(self) -> bool:
         """Return True if the file at cursor has an unresolved merge conflict."""
@@ -963,10 +1017,9 @@ class StatusPanel(ItemList):
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
             return True
-        # Clean tree: swallow panel actions, but let Tab bubble to the status
-        # Column so focus can move to StashPanel.
-        if not self.files:
-            return key != keys.KEY_TAB
+        # Not capturing: keys fall through to bindings and, when unhandled,
+        # bubble to app-global shortcuts. An empty tree no-ops in its action
+        # handlers rather than swallowing every key here.
         return False
 
     # --- Helpers ---
@@ -997,18 +1050,6 @@ class StatusPanel(ItemList):
         if row is not None and row.kind == "dir":
             self._collapsed_dirs.add(row.path)
             self._apply_filter()
-
-    def _dir_action(self, action_type: StatusAction, row: StatusTreeRow) -> None:
-        """Run a batch action on a directory row (child_indices)."""
-        indices = set(row.child_indices)
-        if not indices:
-            show_toast("No files in directory", duration=1.5, kind=FeedbackKind.WARNING)
-            return
-        if action_type == StatusAction.DISCARD:
-            self._confirm_batch("Discard", action_type, indices, destructive=True)
-            return
-        result = self._dispatch_batch(action_type, indices)
-        self._handle_result(result)
 
     def _handle_result(self, result: ActionResult) -> None:
         """Handle a ViewModel action result: badge/toast and optional refresh."""
