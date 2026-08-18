@@ -11,6 +11,7 @@ import pytest
 from pigit.termui._color import (
     ColorAdapter,
     ColorMode,
+    _ANSI_16_PALETTE,
     _nearest_16,
     _nearest_256,
 )
@@ -27,13 +28,22 @@ class TestColorMode:
 class TestColorAdapter:
     def test_truecolor_fg_sequence(self):
         adapter = ColorAdapter(ColorMode.TRUECOLOR)
-        seq = adapter.fg_sequence((255, 0, 0))
-        assert seq == "\033[38;2;255;0;0m"
+        seq = adapter.fg_sequence((12, 34, 56))
+        assert seq == "\033[38;2;12;34;56m"
 
     def test_truecolor_bg_sequence(self):
         adapter = ColorAdapter(ColorMode.TRUECOLOR)
-        seq = adapter.bg_sequence((0, 0, 255))
-        assert seq == "\033[48;2;0;0;255m"
+        seq = adapter.bg_sequence((12, 34, 56))
+        assert seq == "\033[48;2;12;34;56m"
+
+    def test_truecolor_ansi16_slots_use_indexed_sgr(self):
+        adapter = ColorAdapter(ColorMode.TRUECOLOR)
+        assert adapter.fg_sequence(_ANSI_16_PALETTE[1]) == "\033[31m"
+        assert adapter.fg_sequence(_ANSI_16_PALETTE[3]) == "\033[33m"
+        assert adapter.fg_sequence(_ANSI_16_PALETTE[2]) == "\033[32m"
+        assert adapter.fg_sequence(_ANSI_16_PALETTE[6]) == "\033[36m"
+        assert adapter.fg_sequence(_ANSI_16_PALETTE[9]) == "\033[91m"
+        assert adapter.bg_sequence(_ANSI_16_PALETTE[1]) == "\033[41m"
 
     def test_style_sequence(self):
         from pigit.termui.palette import STYLE_BOLD, STYLE_DIM, STYLE_ITALIC
@@ -60,13 +70,19 @@ class TestColorAdapter:
 
     def test_256_mode_returns_38_5_code(self):
         adapter = ColorAdapter(ColorMode.COLOR_256)
-        seq = adapter.fg_sequence((255, 0, 0))
-        assert seq == "\033[38;5;9m"
+        seq = adapter.fg_sequence((100, 150, 200))
+        assert seq.startswith("\033[38;5;")
+        assert seq.endswith("m")
+        assert "38;2" not in seq
+
+    def test_256_mode_ansi16_slot_uses_indexed_sgr(self):
+        adapter = ColorAdapter(ColorMode.COLOR_256)
+        assert adapter.fg_sequence((255, 0, 0)) == "\033[91m"
 
     def test_256_mode_bg_sequence(self):
         adapter = ColorAdapter(ColorMode.COLOR_256)
-        seq = adapter.bg_sequence((255, 0, 0))
-        assert seq == "\033[48;5;9m"
+        seq = adapter.bg_sequence((100, 150, 200))
+        assert seq.startswith("\033[48;5;")
 
     def test_16_mode_returns_bright_red_code(self):
         adapter = ColorAdapter(ColorMode.COLOR_16)

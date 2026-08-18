@@ -47,6 +47,17 @@ _ANSI_16_PALETTE: list[tuple[int, int, int]] = [
 ]
 
 _XTERM_CUBE_LEVELS = (0, 95, 135, 175, 215, 255)
+_ANSI_16_INDEX = {rgb: index for index, rgb in enumerate(_ANSI_16_PALETTE)}
+
+
+def _fg_sgr_16(index: int) -> str:
+    """Foreground SGR for ANSI-16 index 0-15."""
+    return f"\033[{30 + index}m" if index < 8 else f"\033[{82 + index}m"
+
+
+def _bg_sgr_16(index: int) -> str:
+    """Background SGR for ANSI-16 index 0-15."""
+    return f"\033[{40 + index}m" if index < 8 else f"\033[{92 + index}m"
 
 
 def xterm256_to_rgb(index: int) -> tuple[int, int, int]:
@@ -102,28 +113,35 @@ class ColorAdapter:
     # ------------------------------------------------------------------ #
 
     def fg_sequence(self, rgb: tuple[int, int, int]) -> str:
-        """Return ANSI SGR sequence for foreground color."""
-        code = self._quantized_code(rgb)
-        if code is None:
+        """Return ANSI SGR sequence for foreground color.
+
+        RGB values that are exact ANSI-16 slots are emitted as indexed
+        SGR (``31m`` / ``91m``) so the terminal theme applies. Other RGB
+        values use truecolor or quantized fallbacks.
+        """
+        if self.mode == ColorMode.NONE:
             return ""
+        indexed = _ANSI_16_INDEX.get(rgb)
+        if indexed is not None:
+            return _fg_sgr_16(indexed)
         if self.mode == ColorMode.TRUECOLOR:
             return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
         if self.mode == ColorMode.COLOR_256:
-            return f"\033[38;5;{code}m"
-        # COLOR_16: map 0-7 to 30-37, 8-15 to 90-97
-        return f"\033[{30 + code}m" if code < 8 else f"\033[{82 + code}m"
+            return f"\033[38;5;{_nearest_256(rgb)}m"
+        return _fg_sgr_16(_nearest_16(rgb))
 
     def bg_sequence(self, rgb: tuple[int, int, int]) -> str:
         """Return ANSI SGR sequence for background color."""
-        code = self._quantized_code(rgb)
-        if code is None:
+        if self.mode == ColorMode.NONE:
             return ""
+        indexed = _ANSI_16_INDEX.get(rgb)
+        if indexed is not None:
+            return _bg_sgr_16(indexed)
         if self.mode == ColorMode.TRUECOLOR:
             return f"\033[48;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
         if self.mode == ColorMode.COLOR_256:
-            return f"\033[48;5;{code}m"
-        # COLOR_16: map 0-7 to 40-47, 8-15 to 100-107
-        return f"\033[{40 + code}m" if code < 8 else f"\033[{92 + code}m"
+            return f"\033[48;5;{_nearest_256(rgb)}m"
+        return _bg_sgr_16(_nearest_16(rgb))
 
     def style_sequence(self, flags: int) -> str:
         """Return combined ANSI SGR sequence for style flags."""
@@ -156,20 +174,6 @@ class ColorAdapter:
     def reset_sequence(self) -> str:
         """Return ANSI reset sequence."""
         return "\033[0m"
-
-    # ------------------------------------------------------------------ #
-    # Quantization
-    # ------------------------------------------------------------------ #
-
-    def _quantized_code(self, rgb: tuple[int, int, int]) -> int | None:
-        """Return ANSI color code for the given RGB, or None for NONE mode."""
-        if self.mode == ColorMode.NONE:
-            return None
-        if self.mode == ColorMode.TRUECOLOR:
-            return 0  # Unused for truecolor; caller builds 38;2;R;G;B
-        if self.mode == ColorMode.COLOR_256:
-            return _nearest_256(rgb)
-        return _nearest_16(rgb)
 
 
 # ------------------------------------------------------------------ #

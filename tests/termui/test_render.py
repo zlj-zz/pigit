@@ -90,10 +90,10 @@ class TestRenderSurface:
         r = Renderer(sess)
         r._color = ColorAdapter(ColorMode.TRUECOLOR)
         s = Surface(3, 1)
-        s.draw_text_rgb(0, 0, "AB", fg=(255, 0, 0), bg=DEFAULT_BG)
+        s.draw_text_rgb(0, 0, "AB", fg=(12, 34, 56), bg=DEFAULT_BG)
         r.render_surface(s)
         written = _capture_output(sess)
-        assert "\033[38;2;255;0;0m" in written
+        assert "\033[38;2;12;34;56m" in written
         # Trailing reset is omitted when the last cell returns to default
         assert "\033[39m" in written
 
@@ -153,19 +153,19 @@ class TestRowToStrRGB:
         r = Renderer(FakeSession())
         r._color = ColorAdapter(ColorMode.TRUECOLOR)
         row = [
-            FlatCell("A", fg=(255, 0, 0)),
-            FlatCell("B", fg=(255, 0, 0)),
+            FlatCell("A", fg=(12, 34, 56)),
+            FlatCell("B", fg=(12, 34, 56)),
         ]
         result = r._row_to_str(row)
-        assert result == "\033[38;2;255;0;0mAB\033[0m"
+        assert result == "\033[38;2;12;34;56mAB\033[0m"
 
     def test_rgb_fg_and_bg(self):
         r = Renderer(FakeSession())
         r._color = ColorAdapter(ColorMode.TRUECOLOR)
-        row = [FlatCell("X", fg=(255, 0, 0), bg=(0, 0, 255))]
+        row = [FlatCell("X", fg=(12, 34, 56), bg=(56, 34, 12))]
         result = r._row_to_str(row)
-        assert "\033[38;2;255;0;0m" in result
-        assert "\033[48;2;0;0;255m" in result
+        assert "\033[38;2;12;34;56m" in result
+        assert "\033[48;2;56;34;12m" in result
         assert result.endswith("\033[0m")
 
     def test_rgb_bold(self):
@@ -205,10 +205,10 @@ class TestRenderSurfaceRGB:
         r = Renderer(sess)
         r._color = ColorAdapter(ColorMode.TRUECOLOR)
         s = Surface(3, 1)
-        s.draw_text_rgb(0, 0, "AB", fg=(255, 0, 0))
+        s.draw_text_rgb(0, 0, "AB", fg=(12, 34, 56))
         r.render_surface(s)
         written = "".join(c[0][0] for c in sess.stdout.write.call_args_list)
-        assert "\033[38;2;255;0;0m" in written
+        assert "\033[38;2;12;34;56m" in written
         # Trailing reset is omitted when the last cell returns to default
         assert "\033[39m" in written
 
@@ -217,10 +217,10 @@ class TestRenderSurfaceRGB:
         r = Renderer(sess)
         r._color = ColorAdapter(ColorMode.COLOR_256)
         s = Surface(1, 1)
-        s.draw_text_rgb(0, 0, "X", fg=(255, 0, 0))
+        s.draw_text_rgb(0, 0, "X", fg=(100, 150, 200))
         r.render_surface(s)
         written = _capture_output(sess)
-        assert "\033[38;5;9m" in written
+        assert "\033[38;5;" in written
 
 
 class TestRenderSurfaceIncrementalWithRGB:
