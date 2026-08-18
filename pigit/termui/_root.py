@@ -205,10 +205,13 @@ class ComponentRoot(Component):
             self._focus_manager.sync_focus_to_overlay_or_leaf()
 
     def _handle_event(self, key: str) -> bool:
-        """Dispatch overlay, then root keys, then the focus leaf.
+        """Dispatch overlay, then the focus leaf, then root/app bindings.
 
-        Re-entry from a leaf bubble returns False: root bindings already
-        had their chance before the tree ran.
+        The focused component tree runs before app-global bindings so that a
+        modal inline input (``capture_key``) and the focus leaf's own bindings
+        win over universal shortcuts. Root bindings are the fallback for keys
+        the tree declined; re-entry from a leaf bubble returns False so those
+        fallbacks run exactly once.
         """
         if self._dispatch_depth:
             return False
@@ -220,6 +223,19 @@ class ComponentRoot(Component):
                 self._focus_manager.sync_focus_to_overlay_or_leaf()
                 return True
 
+            leaf = self._focus_manager.get_focus_leaf() or resolve_focus_leaf(
+                self._body
+            )
+            if leaf is not None:
+                consumed = leaf._handle_event(key)
+                self._focus_manager.sync_focus_to_overlay()
+                if consumed:
+                    return True
+            else:
+                self._focus_manager.sync_focus_to_overlay()
+                return False
+
+            # App-global shortcuts: the tree declined, so give them a turn.
             handler = self._key_handlers.get(key)
             if handler is not None:
                 handler()
@@ -229,15 +245,6 @@ class ComponentRoot(Component):
             if self._root_handle_key is not None and self._root_handle_key(key):
                 self._sync_focus_if_overlay_changed(overlay_was_open)
                 return True
-
-            leaf = self._focus_manager.get_focus_leaf() or resolve_focus_leaf(
-                self._body
-            )
-            if leaf is not None:
-                consumed = leaf._handle_event(key)
-                self._focus_manager.sync_focus_to_overlay()
-                return consumed
-            self._focus_manager.sync_focus_to_overlay()
             return False
         finally:
             self._dispatch_depth -= 1

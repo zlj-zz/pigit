@@ -82,8 +82,8 @@ class TestResolvePresentationLeaf:
 
 
 class TestColumnTabResync:
-    def test_tab_moves_focus_leaf_and_next_key(self):
-        """After Tab, get_focus_leaf is the new child and it receives the next key."""
+    def test_tab_does_not_cycle_column_focus(self):
+        """Tab is app policy, not Column.handle_key; focus stays on the leaf."""
         a = _KeyLeaf()
         b = _KeyLeaf()
         col = Column(children=[a, b], heights=[1, 1], focus_index=0)
@@ -91,19 +91,14 @@ class TestColumnTabResync:
         root.resize((20, 4))
         fm = root._focus_manager
         assert fm.get_focus_leaf() is a
-        assert a.is_focus_leaf
-        assert not b.is_focus_leaf
-        assert not col.is_focus_leaf
 
         root._handle_event("tab")
-        assert fm.get_focus_leaf() is b
-        assert b.is_focus_leaf
-        assert not a.is_focus_leaf
-        assert not col.is_focus_leaf
+        assert fm.get_focus_leaf() is a
+        assert a.received == ["tab"]
 
         root._handle_event("j")
-        assert a.received == ["tab"]
-        assert b.received == ["j"]
+        assert a.received == ["tab", "j"]
+        assert b.received == []
 
 
 class TestTabViewResolvesIntoColumn:
@@ -184,34 +179,3 @@ class TestCommitEditorHooks:
         assert editor.presentation_child is None
         editor._focus_index = 1
         assert editor.focus_child is editor._body
-
-
-class TestEmptyStatusTabToStash:
-    def test_tab_moves_focus_when_status_has_no_files(self):
-        """Empty StatusPanel must not swallow Tab; Column cycles to Stash."""
-        from unittest.mock import Mock
-
-        from pigit.app_stash import StashPanel
-        from pigit.app_status import StatusPanel
-        from pigit.termui.reactive import Signal
-        from pigit.viewmodels.status import IStatusViewModel
-
-        vm = Mock(spec=IStatusViewModel)
-        vm.items = Signal([])
-        vm.load_stashes.return_value = []
-        status = StatusPanel(vm=vm, id="status_panel")
-        status.files = []
-        stash = StashPanel(vm=vm, id="stash")
-        col = Column(
-            children=[status, stash],
-            heights=["flex", 4],
-            focus_index=0,
-            id="status",
-        )
-        root = _make_root(col)
-        root.resize((40, 20))
-        fm = root._focus_manager
-        assert fm.get_focus_leaf() is status
-
-        root._handle_event("tab")
-        assert fm.get_focus_leaf() is stash

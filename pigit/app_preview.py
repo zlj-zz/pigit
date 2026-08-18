@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from pigit.termui import EVT_SELECTION_CHANGED, Component, palette
 from pigit.termui._component import _render_child_to_surface
+from pigit.termui._mouse import MouseEvent
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_diff import DiffType, DiffViewer
@@ -136,6 +137,10 @@ class PreviewPanel(Component):
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the internal diff viewer up."""
         self._diff_viewer.scroll_up(step)
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Wheel-scroll the inner diff; clicks are ignored (preview is not focused)."""
+        return self._diff_viewer.handle_mouse(event)
 
     def _render_surface(self, surface) -> None:
         w = surface.width

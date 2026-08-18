@@ -12,8 +12,10 @@ from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.git.model import File, Stash
 from pigit.termui import EVT_SELECTION_CHANGED, Component
+from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui._root import ComponentRoot
 from pigit.termui.event_bus import EventBus
+from pigit.termui.widgets.line_text_browser import LineTextBrowser
 
 
 class _FakeStatusVM:
@@ -183,3 +185,25 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
 
     assert vm.diff_calls == []
     assert preview._title == "a.py"
+
+
+def test_wheel_scrolls_preview_content(preview: PreviewPanel) -> None:
+    preview.resize((20, 8))
+    preview.set_preview([f"line {i}" for i in range(40)], "file.py")
+    assert preview._diff_viewer._i == 0
+    down = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
+    assert preview.handle_mouse(down) is True
+    assert preview._diff_viewer._i == LineTextBrowser.WHEEL_SCROLL_LINES
+    up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
+    assert preview.handle_mouse(up) is True
+    assert preview._diff_viewer._i == 0
+
+
+def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
+    preview.resize((20, 8))
+    preview.set_preview(["a", "b", "c"], "file.py")
+    click = MouseEvent(1, 5, MouseButton.LEFT, MouseKind.PRESS)
+    assert preview.handle_mouse(click) is False
+    release = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.RELEASE)
+    assert preview.handle_mouse(release) is False
+    assert preview._diff_viewer._i == 0

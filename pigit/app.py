@@ -36,7 +36,7 @@ from pigit.termui import (
     ToastPosition,
 )
 from pigit.termui._component import resolve_presentation_leaf
-from pigit.termui._runtime_context import get_renderer
+from pigit.termui._runtime_context import get_focus_manager, get_renderer
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size
@@ -128,15 +128,19 @@ class PigitApplication(Application):
         self._inspector: InspectorPanel
         self._palette: CommandPalette
         self._status_stack: Column
+        self._status_panel: StatusPanel
+        self._stash_panel: StashPanel
         self._branch_panel: BranchPanel
+        self._commit_panel: CommitPanel
+        self._diff_panel: DiffViewer
 
     LARGE_SCREEN_COLS = 120
 
     _TAB_CONFIG: dict[type, tuple[str, str]] = {
         StatusPanel: ("Status", "1"),
-        StashPanel: ("Stash", "1"),
-        BranchPanel: ("Branch", "2"),
-        CommitPanel: ("Commit", "3"),
+        StashPanel: ("Stash", "2"),
+        BranchPanel: ("Branch", "3"),
+        CommitPanel: ("Commit", "4"),
         DiffViewer: ("Display", ""),
     }
 
@@ -386,17 +390,90 @@ class PigitApplication(Application):
             self._palette.open()
             self._root.show_sheet(self._palette, height=8)
 
-    @bind_action("goto_status", "1", desc="Switch to Status tab", tip="Status")
+    @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
-        self._tab_view.route_to("status")
+        """Switch focus to the Status panel."""
+        self._focus_destination(self._status_panel)
 
-    @bind_action("goto_branch", "2", desc="Switch to Branch tab", tip="Branch")
+    @bind_action("goto_stash", "2", desc="Switch to Stash panel", tip="Stash")
+    def goto_stash(self):
+        """Switch focus to the Stash panel."""
+        self._focus_destination(self._stash_panel)
+
+    @bind_action("goto_branch", "3", desc="Switch to Branch tab", tip="Branch")
     def goto_branch(self):
-        self._tab_view.route_to("branch")
+        """Switch focus to the Branch panel."""
+        self._focus_destination(self._branch_panel)
 
-    @bind_action("goto_commit", "3", desc="Switch to Commit tab", tip="Commit")
+    @bind_action("goto_commit", "4", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
-        self._tab_view.route_to("commit")
+        """Switch focus to the Commit panel."""
+        self._focus_destination(self._commit_panel)
+
+    @bind_action(
+        "next_panel",
+        "tab",
+        desc="Cycle to next panel (Status, Stash, Branch, Commit)",
+    )
+    def next_panel(self) -> None:
+        """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        self._cycle_panel(1)
+
+    @bind_action(
+        "prev_panel",
+        "shift tab",
+        desc="Cycle to previous panel (Status, Stash, Branch, Commit)",
+    )
+    def prev_panel(self) -> None:
+        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        self._cycle_panel(-1)
+
+    def _panel_ring(self) -> tuple[Component, ...]:
+        """Return the four panels that Tab/Shift+Tab cycle through, in order."""
+        return (
+            self._status_panel,
+            self._stash_panel,
+            self._branch_panel,
+            self._commit_panel,
+        )
+
+    def _ring_index(self) -> int | None:
+        """Index in the panel ring, or None when Diff (or unknown) is focused."""
+        fm = get_focus_manager()
+        leaf = fm.get_focus_leaf() if fm is not None else None
+        if leaf is None:
+            leaf = resolve_presentation_leaf(self._tab_view.active)
+        for idx, panel in enumerate(self._panel_ring()):
+            if leaf is panel:
+                return idx
+        return None
+
+    def _focus_destination(self, panel: Component) -> None:
+        """Move TabView + Status/Stash column focus to *panel*."""
+        if panel is self._status_panel:
+            self._tab_view.route_to("status")
+            self._status_stack.set_focus_index(0)
+            return
+        if panel is self._stash_panel:
+            self._tab_view.route_to("status")
+            self._status_stack.set_focus_index(1)
+            return
+        if panel is self._branch_panel:
+            self._tab_view.route_to("branch")
+            return
+        if panel is self._commit_panel:
+            self._tab_view.route_to("commit")
+
+    def _cycle_panel(self, step: int) -> None:
+        """Move focus ``step`` positions around the panel ring.
+
+        No-op when the current focus is outside the ring (e.g. Diff view).
+        """
+        idx = self._ring_index()
+        if idx is None:
+            return
+        ring = self._panel_ring()
+        self._focus_destination(ring[(idx + step) % len(ring)])
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
