@@ -61,10 +61,9 @@ class PickerHeader(Component):
             0,
             truncate_line(self._title, cols),
             fg=THEME.fg_primary,
-            bg=THEME.bg_base,
             style_flags=palette.STYLE_BOLD,
         )
-        surface.draw_text_rgb(1, 0, "─" * cols, fg=THEME.fg_dim, bg=THEME.bg_base)
+        surface.draw_text_rgb(1, 0, "─" * cols, fg=THEME.fg_dim)
 
     def refresh(self) -> None:
         """No-op refresh for the static header (subclasses may override)."""
