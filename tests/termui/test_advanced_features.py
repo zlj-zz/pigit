@@ -178,3 +178,68 @@ class TestContributionGraph:
         lines = s.lines()
         # Should draw something (month labels, day labels, cells, legend)
         assert any(c != " " for line in lines for c in line)
+
+    def test_horizontal_layout_16_rows(self):
+        """The report fits in 16 rows: heatmap left, line chart right."""
+        import datetime
+
+        from pigit.git.model import Commit
+
+        r = ContributionGraph()
+        now = int(datetime.datetime.now().timestamp())
+        commits = [
+            Commit(
+                sha=f"{i:08x}",
+                msg=f"c{i}",
+                author="zev" if i % 3 else "other",
+                unix_timestamp=now - i * 86400,
+                status="pushed",
+                extra_info="",
+                tag=[],
+            )
+            for i in range(400)
+        ]
+        r.set_commits(commits)
+        r.resize((120, 16))
+        s = Surface(120, 16)
+        r._render_surface(s)
+        rows = ["".join(c.char for c in row) for row in s._rows]
+        # Heatmap cells in the left region, line-chart glyphs on the right.
+        assert any("■" in row[:59] for row in rows)
+        assert any(("─" in row[57:] or "┼" in row[57:]) for row in rows)
+
+    def test_pan_graph_via_mouse(self):
+        """Horizontal wheel over the report pans the combined graph."""
+        import datetime
+
+        from pigit.git.model import Commit
+
+        r = ContributionGraph()
+        now = int(datetime.datetime.now().timestamp())
+        r.set_commits(
+            [
+                Commit(
+                    sha=f"{i:08x}",
+                    msg=f"c{i}",
+                    author="zev",
+                    unix_timestamp=now - i * 86400,
+                    status="pushed",
+                    extra_info="",
+                    tag=[],
+                )
+                for i in range(400)
+            ]
+        )
+        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+        from pigit.app_contribution_graph import _PAN_STEP
+
+        r.resize((80, 16))
+        right = MouseEvent(2, 3, MouseButton.WHEEL_RIGHT, MouseKind.PRESS)
+        assert r.handle_mouse(right) is True
+        assert r._pan_x == _PAN_STEP
+        left = MouseEvent(2, 3, MouseButton.WHEEL_LEFT, MouseKind.PRESS)
+        assert r.handle_mouse(left) is True
+        assert r._pan_x == 0
+        # Clamped at zero.
+        assert r.handle_mouse(left) is True
+        assert r._pan_x == 0

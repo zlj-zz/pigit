@@ -217,6 +217,7 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[tui]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
 | `[tui]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |
 | `[tui]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
+| `[tui]` | `commit_report_default` | bool | `True` | show the Commit contribution-graph report below the list when the panel is taller than 19 rows (Ctrl+r toggles) |
 | `[tui]` | `show_footer` | bool | `True` | show the footer key-hint bar |
 
 ### Keybindings

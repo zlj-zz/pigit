@@ -111,6 +111,27 @@ class _Subsurface:
             self._parent, self._row + row, self._col + col, width, height
         )
 
+    def blit(
+        self,
+        src: "Surface",
+        src_row: int,
+        src_col: int,
+        width: int,
+        height: int,
+        dst_row: int,
+        dst_col: int,
+    ) -> None:
+        """Copy a window from *src* at local (dst_row, dst_col), clipped."""
+        if dst_row < 0 or dst_row >= self.height or dst_col >= self.width:
+            return
+        w = min(width, self.width - dst_col)
+        h = min(height, self.height - dst_row)
+        if w <= 0 or h <= 0:
+            return
+        self._parent.blit(
+            src, src_row, src_col, w, h, self._row + dst_row, self._col + dst_col
+        )
+
     # --- RGB proxy methods ---
 
     def draw_text_rgb(
@@ -208,7 +229,7 @@ class _Subsurface:
         col: int,
         width: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = palette.DEFAULT_BG,
+        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a horizontal line at local (row, col), clipped to subsurface bounds."""
@@ -248,6 +269,29 @@ class Surface:
         for row in self._rows:
             for i in range(self.width):
                 row[i] = _BLANK_CELL
+
+    def blit(
+        self,
+        src: "Surface",
+        src_row: int,
+        src_col: int,
+        width: int,
+        height: int,
+        dst_row: int,
+        dst_col: int,
+    ) -> None:
+        """Copy a region from *src* into this surface, clipped to both bounds."""
+        for r in range(height):
+            srow = src_row + r
+            drow = dst_row + r
+            if not (0 <= srow < src.height and 0 <= drow < self.height):
+                continue
+            for c in range(width):
+                scol = src_col + c
+                dcol = dst_col + c
+                if not (0 <= scol < src.width and 0 <= dcol < self.width):
+                    continue
+                self._rows[drow][dcol] = src._rows[srow][scol]
 
     def subsurface(self, row: int, col: int, width: int, height: int) -> _Subsurface:
         """Return a proxy that translates local coordinates to this surface."""
@@ -447,7 +491,7 @@ class Surface:
         col: int,
         width: int,
         fg: tuple[int, int, int],
-        bg: tuple[int, int, int] = palette.DEFAULT_BG,
+        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
         style_flags: int = 0,
     ) -> None:
         """Draw a horizontal line with RGB colors."""

@@ -16,6 +16,13 @@ def _reset_config_singleton():
     Config._instances.clear()
 
 
+def test_commit_report_default_read_from_toml(tmp_path):
+    config_path = tmp_path / "pigit-report.toml"
+    config_path.write_text("[tui]\ncommit_report_default = false\n")
+    c = Config(str(config_path), version="test", auto_load=True)
+    assert c.get().tui.commit_report_default is False
+
+
 @patch("builtins.input", lambda _: "yes")
 def test_create(tmp_path):
     config_path = tmp_path / "pigit-create.toml"
@@ -31,6 +38,7 @@ def test_create(tmp_path):
     assert "[counter]" in content
     assert "diff_preview_default" in content
     assert "log_graph_default" in content
+    assert "commit_report_default" in content
 
 
 def test_load():
@@ -81,6 +89,7 @@ def test_default_values_when_no_config_file():
     assert data.log.output is False
     assert data.tui.diff_preview_default is True
     assert data.tui.log_graph_default is True
+    assert data.tui.commit_report_default is True
 
 
 def test_invalid_format_falls_back_to_default(tmp_path):

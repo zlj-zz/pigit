@@ -387,3 +387,98 @@ class TestCommitPanelLifecycle:
         vm.items.set([Commit("abc1234", "msg", "Zev", 0, "pushed", "", [])])
         assert len(panel.commits) == 1
         assert panel.commits[0].sha == "abc1234"
+
+
+class TestCommitReport:
+    """Bottom contribution-graph report strip on the Commit panel."""
+
+    def _panel(self, report_default: bool = True):
+        from unittest.mock import Mock
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_commit import CommitPanel
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        vm.graph_rows = []
+        panel = CommitPanel(vm=vm, report_default=report_default)
+        panel.activate()
+        return panel
+
+    def test_hidden_at_or_below_19_rows(self):
+        panel = self._panel()
+        panel.resize((80, 10))
+        assert panel._report_h == 0
+        panel.resize((80, 19))
+        assert panel._report_h == 0  # 19 is not > 19
+
+    def test_visible_above_19_rows(self):
+        panel = self._panel()
+        panel.resize((80, 50))
+        assert panel._report_h == 15
+
+    def test_hidden_when_default_off(self):
+        panel = self._panel(report_default=False)
+        panel.resize((80, 50))
+        assert panel._report_h == 0
+
+    def test_toggle_report_flips_strip(self):
+        panel = self._panel()
+        panel.resize((80, 50))
+        assert panel._report_h == 15
+        panel.toggle_report()
+        assert not panel._report_enabled
+        assert panel._report_h == 0
+        panel.toggle_report()
+        assert panel._report_enabled
+        assert panel._report_h == 15
+
+    def test_toggle_report_toasts_when_panel_too_short(self):
+        from unittest.mock import patch
+
+        panel = self._panel()
+        panel.resize((80, 15))  # below the > 19 gate
+        assert panel._report_h == 0
+        with patch("pigit.app_commit.show_toast") as toast:
+            panel.toggle_report()
+        toast.assert_called_once()
+        msg, _kwargs = toast.call_args
+        assert "rows" in msg[0].lower()
+
+    def test_render_splits_list_and_report(self):
+        import datetime
+
+        from unittest.mock import Mock
+        from pigit.git.model import Commit
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.termui._surface import Surface
+        from pigit.app_commit import CommitPanel
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        vm.graph_rows = []
+        panel = CommitPanel(vm=vm)
+        panel.activate()
+        now = int(datetime.datetime.now().timestamp())
+        commits = [
+            Commit(
+                f"{i:08x}",
+                f"msg {i}",
+                "Zev",
+                now - i * 86400,
+                "pushed",
+                "",
+                [],
+            )
+            for i in range(30)
+        ]
+        vm.items.set(commits)
+        panel.resize((80, 50))
+        assert panel._report_h == 15
+        surface = Surface(80, 50)
+        panel._render_surface(surface)
+        rows = ["".join(c.char for c in r) for r in surface._rows]
+        # List rows occupy the top 35; report cells fill the bottom 15.
+        assert any("msg" in row for row in rows[:35])
+        assert any("■" in row for row in rows[35:])

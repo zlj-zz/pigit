@@ -81,11 +81,6 @@ def _parse_decoration(
     return head_ref, local_refs, remote_refs
 
 
-class CommitViewMode(Enum):
-    LIST = auto()
-    HEATMAP = auto()
-
-
 class _SubRow(Enum):
     """Per-commit sub-row kinds emitted in expanded mode."""
 
@@ -113,6 +108,8 @@ class CommitPanel(ItemList):
         palette.BLUE,
         palette.RED,
     )
+    REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
+    REPORT_MIN_HEIGHT = 19
 
     def __init__(
         self,
@@ -120,6 +117,7 @@ class CommitPanel(ItemList):
         on_selection_changed: Callable | None = None,
         vm: ICommitViewModel,
         id: str | None = None,
+        report_default: bool = True,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -130,7 +128,8 @@ class CommitPanel(ItemList):
         self.commits: list[Commit] = []
         self._all_commits: list[Commit] = []
         self._filter = SearchFilter(self._apply_filter)
-        self._view_mode = CommitViewMode.LIST
+        self._report_enabled = report_default
+        self._report_h = 0
         self._contrib_graph = ContributionGraph()
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
@@ -149,6 +148,36 @@ class CommitPanel(ItemList):
 
     keymap_namespace = "commit"
 
+    def _compute_report_h(self, panel_h: int) -> int:
+        """Report strip height: ``REPORT_H`` when enabled and the panel is tall."""
+        if not self._report_enabled or panel_h <= self.REPORT_MIN_HEIGHT:
+            return 0
+        return self.REPORT_H
+
+    def _list_h(self) -> int:
+        """Height reserved for the commit list (panel minus the report strip)."""
+        return self._size[1] - self._report_h
+
+    @property
+    def visible_row_count(self) -> int:
+        """List rows visible above the report strip."""
+        return self._list_h()
+
+    def resize(self, size: tuple[int, int]) -> None:
+        """Size the panel; reserve the bottom report strip when enabled."""
+        w, h = size
+        self._report_h = self._compute_report_h(h)
+        if self._report_h:
+            self._contrib_graph.resize((w, self._report_h))
+        super().resize(size)
+
+    def _update_report_layout(self) -> None:
+        """Refit the report strip after a toggle (single layout path)."""
+        if self._size is not None:
+            self.resize(self._size)
+        self._scroll_into_view()
+        self._request_render()
+
     @bind_action("next", "j", "down", desc="Navigate commit list", tip="Navigate")
     def next(self, step: int = 1) -> None:
         super().next(step)
@@ -159,8 +188,6 @@ class CommitPanel(ItemList):
 
     @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
     def view_diff(self) -> None:
-        if self._view_mode is CommitViewMode.HEATMAP:
-            return
         if not self.commits:
             return
         source_idx = self._filter.source_index(self.curr_no)
@@ -180,8 +207,6 @@ class CommitPanel(ItemList):
     )
     def toggle_expanded(self) -> None:
         """Toggle compact (single-line) and expanded (git-log style) commit rows."""
-        if self._view_mode is not CommitViewMode.LIST:
-            return
         self._expanded = not self._expanded
         if self._expanded:
             self._ensure_bodies()
@@ -191,13 +216,20 @@ class CommitPanel(ItemList):
             self.curr_no = max(0, min(saved_idx, len(self.commits) - 1))
             self._scroll_into_view()
 
-    @bind_action("toggle_view", "g", desc="Toggle graph / flat view", tip="Graph")
-    def toggle_view(self) -> None:
-        """Toggle between list and contribution graph view."""
-        if self._view_mode is CommitViewMode.LIST:
-            self._view_mode = CommitViewMode.HEATMAP
-        else:
-            self._view_mode = CommitViewMode.LIST
+    @bind_action(
+        "toggle_report", "ctrl r", desc="Toggle commit report (contribution graph)"
+    )
+    def toggle_report(self) -> None:
+        """Toggle the bottom contribution-graph report strip."""
+        self._report_enabled = not self._report_enabled
+        h = self._size[1] if self._size else 0
+        if h <= self.REPORT_MIN_HEIGHT:
+            show_toast(
+                f"Need more than {self.REPORT_MIN_HEIGHT} rows for the commit report",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+        self._update_report_layout()
 
     @bind_action("search", "/", desc="Filter commit list by message or SHA")
     def search(self) -> None:
@@ -422,10 +454,29 @@ class CommitPanel(ItemList):
     def _render_surface(self, surface) -> None:
         if not self.content:
             return
-        super()._render_surface(surface)
-        if self._view_mode is CommitViewMode.HEATMAP:
-            self._render_heatmap_overlay(surface)
-        self._filter.render_bar(surface)
+        if self._report_h:
+            list_surface = surface.subsurface(0, 0, surface.width, self._list_h())
+            super()._render_surface(list_surface)
+            self._filter.render_bar(list_surface)
+            self._render_report(
+                surface.subsurface(self._list_h(), 0, surface.width, self._report_h)
+            )
+        else:
+            super()._render_surface(surface)
+            self._filter.render_bar(surface)
+
+    def _render_report(self, surface) -> None:
+        """Render the contribution-graph report into the bottom strip."""
+        self._contrib_graph.resize((surface.width, surface.height))
+        self._contrib_graph.render_into(surface)
+
+    def handle_mouse(self, event) -> bool:
+        """Horizontal wheel over the report pans it; everything else falls
+        through to the list (vertical wheel scrolls, clicks select)."""
+        if self._report_h and event.row - 1 >= self._list_h():
+            if self._contrib_graph.handle_mouse(event):
+                return True
+        return super().handle_mouse(event)
 
     def describe_row(
         self,
@@ -759,20 +810,7 @@ class CommitPanel(ItemList):
 
         return " ", THEME.fg_dim
 
-    def _render_heatmap_overlay(self, surface) -> None:
-        """Render contribution heatmap overlay on top of panel."""
-        w = surface.width
-        h = surface.height
-        if w <= 0 or h <= 0:
-            return
-
-        graph_h = min(self._contrib_graph.min_height(), h)
-        self._contrib_graph.resize((w, graph_h))
-        self._contrib_graph.render_into(surface)
-
     def capture_key(self, key: str) -> bool:
-        if self._view_mode is CommitViewMode.HEATMAP:
-            return False
         if self._filter.handle_key(key):
             return True
         return self._filter.active

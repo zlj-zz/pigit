@@ -49,6 +49,7 @@ class TuiConfig:
     status_view: Literal["flat", "tree"] = "tree"
     diff_preview_default: bool = True
     log_graph_default: bool = True
+    commit_report_default: bool = True
     show_footer: bool = True
 
 

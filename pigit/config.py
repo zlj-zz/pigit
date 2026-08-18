@@ -120,6 +120,10 @@ class Config(metaclass=Singleton):
         # Ctrl+p on Branch toggles at runtime; this is the startup default only.
         log_graph_default = {tui_log_graph_default}
 
+        # (bool) Show the Commit contribution-graph report below the list on
+        # tall screens (> 19 rows). Ctrl+r toggles at runtime.
+        commit_report_default = {tui_commit_report_default}
+
         # (bool) Show the footer key-hint bar.
         show_footer = {tui_show_footer}
         {keybindings}
@@ -276,6 +280,7 @@ class Config(metaclass=Singleton):
             status_view=status_view,
             diff_preview_default=tui_raw.get("diff_preview_default", True),
             log_graph_default=tui_raw.get("log_graph_default", True),
+            commit_report_default=tui_raw.get("commit_report_default", True),
             show_footer=tui_raw.get("show_footer", True),
         )
 
@@ -354,6 +359,9 @@ class Config(metaclass=Singleton):
                             data.tui.diff_preview_default
                         ).lower(),
                         tui_log_graph_default=str(data.tui.log_graph_default).lower(),
+                        tui_commit_report_default=str(
+                            data.tui.commit_report_default
+                        ).lower(),
                         tui_show_footer=str(data.tui.show_footer).lower(),
                         keybindings=keybindings_block,
                     )

@@ -197,7 +197,11 @@ class PigitApplication(Application):
             on_toggle_preview=self.toggle_side_preview,
         )
 
-        self._commit_panel = CommitPanel(vm=self._commit_vm, id="commit")
+        self._commit_panel = CommitPanel(
+            vm=self._commit_vm,
+            id="commit",
+            report_default=self._config.commit_report_default,
+        )
         self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
         self._tab_view = TabView(
             children=[

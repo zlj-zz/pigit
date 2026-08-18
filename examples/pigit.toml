@@ -75,6 +75,11 @@ diff_preview_default = true
 # Ctrl+p on Branch toggles at runtime; this is the startup default only.
 log_graph_default = true
 
+# (bool) Show the Commit contribution-graph report below the list when the
+# panel is taller than 19 rows. Ctrl+r toggles at runtime; this is the
+# startup default.
+commit_report_default = true
+
 # (bool) Show the footer key-hint bar.
 show_footer = true
 

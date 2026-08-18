@@ -99,6 +99,7 @@ _KEY_DISPLAY: dict[str, str] = {
     KEY_CTRL_ENTER: "Ctrl+Enter",
     "ctrl f": "Ctrl+f",
     "ctrl p": "Ctrl+p",
+    "ctrl r": "Ctrl+r",
 }
 
 
