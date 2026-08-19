@@ -22,16 +22,16 @@ from pigit.termui import (
     FeedbackKind,
     EVT_GOTO,
     AlertDialog,
+    AsyncTask,
     Component,
     SyntaxTokenizer,
     bind_action,
     palette,
+    plain,
     request_render,
     show_badge,
     show_toast,
 )
-from pigit.termui._async_task import AsyncTask
-from pigit.termui._text import plain
 from pigit.termui.widgets import LineTextBrowser
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.ext.utils import copy_to_clipboard, relative_time
-from pigit.termui._async_task import run_async
 from pigit.termui import (
     EVT_GOTO,
     EVT_SELECTION_CHANGED,
@@ -23,6 +22,7 @@ from pigit.termui import (
     bind_signals,
     dismiss_sheet,
     palette,
+    run_async,
     Segment,
     show_badge,
     show_sheet,

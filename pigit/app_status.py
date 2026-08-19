@@ -28,6 +28,7 @@ from pigit.termui import (
     exec_external,
     palette,
     Segment,
+    run_async,
     show_badge,
     show_sheet,
     show_toast,
@@ -42,7 +43,6 @@ from .app_types import FileSnapshot
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
-from pigit.termui._async_task import run_async
 from .git.model import File
 from .viewmodels.base import ActionResult
 

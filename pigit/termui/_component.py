@@ -55,9 +55,18 @@ class ComponentError(Exception):
     """Error class of ~Component."""
 
 
-def _render_child_to_surface(
-    component: Component, surface: Surface | _Subsurface, log_prefix: str
+def render_child(
+    component: Component,
+    surface: Surface,
+    log_prefix: str = "",
 ) -> None:
+    """Blit ``component`` into ``surface`` using the child's x/y/_size (1-based).
+
+    Args:
+        component: Child component to render into ``surface``.
+        surface: Target draw surface (1-based child coords are converted internally).
+        log_prefix: Prefix for invalid-coordinate warning logs.
+    """
     w, h = component._size
     if w <= 0 or h <= 0:
         return
@@ -71,6 +80,12 @@ def _render_child_to_surface(
         )
     sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
     component._render_surface(sub)
+
+
+def _render_child_to_surface(
+    component: Component, surface: Surface | _Subsurface, log_prefix: str
+) -> None:
+    render_child(component, surface, log_prefix)
 
 
 class Component(ABC):

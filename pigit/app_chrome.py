@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, palette
-from pigit.termui._component import resolve_presentation_leaf
+from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, palette, resolve_presentation_leaf
 from pigit.termui.containers import TabView
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 

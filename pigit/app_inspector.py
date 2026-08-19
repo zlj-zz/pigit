@@ -7,10 +7,7 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from pigit.termui import bind_action, Component, palette
-from pigit.termui._overlay_api import dismiss_sheet
-from pigit.termui._segment import Segment
-from pigit.termui._surface import Surface, _Subsurface
+from pigit.termui import bind_action, Component, dismiss_sheet, palette, Segment, Surface
 from pigit.termui.widgets.line_text_browser import LineTextBrowser
 
 from .app_theme import THEME
@@ -61,7 +58,7 @@ class InspectorSheet(Component):
         super().resize(size)
         self._browser.resize(size)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._browser._render_surface(surface)
 
     @bind_action("next", "j", "down", desc="Scroll down")

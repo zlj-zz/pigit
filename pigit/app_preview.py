@@ -11,9 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.termui import EVT_SELECTION_CHANGED, Component
-from pigit.termui._component import _render_child_to_surface
-from pigit.termui._mouse import MouseEvent
+from pigit.termui import EVT_SELECTION_CHANGED, Component, MouseEvent, render_child
 
 from .app_diff import DiffType, DiffViewer
 
@@ -137,4 +135,4 @@ class PreviewPanel(Component):
         return self._diff_viewer.handle_mouse(event)
 
     def _render_surface(self, surface) -> None:
-        _render_child_to_surface(self._diff_viewer, surface, "PreviewPanel")
+        render_child(self._diff_viewer, surface, "PreviewPanel")

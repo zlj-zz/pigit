@@ -15,13 +15,15 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
+    MouseButton,
+    MouseEvent,
+    MouseKind,
     palette,
     Segment,
     show_badge,
     show_toast,
+    Surface,
 )
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
-from pigit.termui._surface import Surface, _Subsurface
 from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import AlertDialog, ItemList
 
@@ -86,7 +88,7 @@ class StashPanel(ItemList):
     def refresh(self):
         self._load_stashes()
 
-    def _draw_section_header(self, surface: Surface | _Subsurface) -> None:
+    def _draw_section_header(self, surface: Surface) -> None:
         """Draw ``──── Stash ──`` across the top row."""
         w = surface.width
         if w <= 0 or surface.height <= 0:
@@ -111,7 +113,7 @@ class StashPanel(ItemList):
         col += wcswidth(label)
         surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=THEME.fg_dim)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Section header on row 0; stash rows in the remaining viewport."""
         w = surface.width
         h = surface.height

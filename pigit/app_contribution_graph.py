@@ -13,9 +13,7 @@ from __future__ import annotations
 import datetime
 from collections import defaultdict
 
-from pigit.termui import Component, palette
-from pigit.termui._mouse import MouseButton, MouseKind
-from pigit.termui._surface import Surface
+from pigit.termui import Component, MouseButton, MouseKind, palette, Surface
 from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 

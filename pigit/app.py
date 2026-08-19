@@ -24,19 +24,20 @@ from pigit.termui import (
     dismiss_sheet,
     exec_external,
     ExitEventLoop,
+    get_focus_manager,
+    get_renderer,
     HelpPanel,
     hide_spinner,
     keys,
     Popup,
     request_render,
+    resolve_presentation_leaf,
     show_badge,
     show_sheet,
     show_spinner,
     show_toast,
     ToastPosition,
 )
-from pigit.termui._component import resolve_presentation_leaf
-from pigit.termui._runtime_context import get_focus_manager, get_renderer
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.tty_io import terminal_size

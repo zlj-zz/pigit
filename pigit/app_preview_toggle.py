@@ -8,7 +8,7 @@ Date: 2026-08-18
 
 from __future__ import annotations
 
-from pigit.termui._component import Component
+from pigit.termui import Component
 
 
 def invoke_preview_toggle(panel: Component) -> None:

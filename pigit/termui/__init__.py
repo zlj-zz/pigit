@@ -20,7 +20,7 @@ from .types import (
 from ._feedback import FeedbackKind
 
 # Core components
-from ._component import Component, ComponentError, bind_signals
+from ._component import Component, ComponentError, bind_signals, render_child, resolve_presentation_leaf
 
 # Overlay components
 from .widgets import (
@@ -43,7 +43,9 @@ from ._application import Application
 # Runtime context — single source of truth for all context state
 from ._runtime_context import (
     by_id,
+    get_focus_manager,
     get_registry,
+    get_renderer,
     get_renderer_strict,
     request_render,
 )
@@ -77,6 +79,11 @@ from ._segment import Segment
 from . import palette
 
 from ._syntax import SyntaxTokenizer
+from ._mouse import MouseButton, MouseEvent, MouseKind
+from ._async_task import AsyncTask, run_async
+from ._text import plain
+from ._frame import BoxFrame
+from ._ansi import parse_ansi_line
 
 __all__ = [
     # Types
@@ -91,6 +98,8 @@ __all__ = [
     "Component",
     "ComponentError",
     "bind_signals",
+    "render_child",
+    "resolve_presentation_leaf",
     # Overlays
     "AlertDialog",
     "AlertDialogBody",
@@ -117,7 +126,17 @@ __all__ = [
     "Segment",
     "palette",
     "Renderer",
+    "get_renderer",
     "get_renderer_strict",
+    "get_focus_manager",
+    "MouseButton",
+    "MouseEvent",
+    "MouseKind",
+    "AsyncTask",
+    "run_async",
+    "plain",
+    "BoxFrame",
+    "parse_ansi_line",
     # Overlay context
     "show_toast",
     "show_sheet",
