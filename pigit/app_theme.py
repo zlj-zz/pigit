@@ -21,6 +21,10 @@ class PigitTheme(Theme):
     roles and syntax tokens live on :class:`Theme`.
     """
 
+    # Base widget roles (match legacy palette.DEFAULT_FG / DEFAULT_FG_DIM)
+    fg_primary: tuple[int, int, int] = palette.PEARL
+    fg_dim: tuple[int, int, int] = palette.SLATE
+
     # State backgrounds (full-row semantic colors)
     bg_success: tuple[int, int, int] = palette.FOREST
     bg_warning: tuple[int, int, int] = palette.OLIVE
