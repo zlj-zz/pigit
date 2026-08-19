@@ -55,7 +55,7 @@ def test_subscribe_before_mount_is_replayed() -> None:
 
 
 class _SubscribingLeaf(Component):
-    """Component that subscribes inside activate(), like AppFooter/InspectorPanel."""
+    """Component that subscribes inside activate(), like AppFooter."""
 
     def __init__(self) -> None:
         super().__init__()

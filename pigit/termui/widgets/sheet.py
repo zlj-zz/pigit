@@ -1,11 +1,13 @@
 """
 Module: pigit/termui/widgets/sheet.py
-Description: Bottom sheet panel (SHEET layer).
+Description: Edge sheet panel (top or bottom) on the SHEET layer.
 Author: Zev
 Date: 2026-05-18
 """
 
 from __future__ import annotations
+
+from typing import Literal
 
 from .. import palette
 from .._component import Component
@@ -14,10 +16,12 @@ from ..types import OverlayDispatchResult
 
 _BOX_CORNER_TL = "╭"
 _BOX_CORNER_TR = "╮"
+_BOX_CORNER_BL = "╰"
+_BOX_CORNER_BR = "╯"
 
 
 class Sheet(Component):
-    """Bottom sheet panel, similar to mobile bottom sheet (SHEET layer)."""
+    """Edge sheet panel (top or bottom) on the SHEET layer."""
 
     def __init__(
         self,
@@ -25,14 +29,33 @@ class Sheet(Component):
         height: int = 8,
         size: tuple[int, int] | None = None,
         show_border: bool = False,
+        *,
+        edge: Literal["top", "bottom"] = "bottom",
+        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
     ) -> None:
         super().__init__(size=size)
         self._child = child
         child.parent = self
         self._target_height = height
         self._show_border = show_border
+        self._edge = edge
+        self._bg = bg
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
         self.open = True
+
+    def _origin_row(self, term_h: int, sheet_h: int) -> int:
+        """Return 0-based row of the sheet's top edge on a terminal of *term_h*."""
+        if self._edge == "top":
+            return 0
+        return term_h - sheet_h
+
+    def _border_row(self, sheet_h: int) -> int | None:
+        """0-based row of the 1-line edge rule, or None when there is no border."""
+        if not self._show_border:
+            return None
+        if self._edge == "top":
+            return sheet_h - 1
+        return 0
 
     @property
     def focus_child(self) -> Component | None:
@@ -54,25 +77,34 @@ class Sheet(Component):
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
         if self._size[1] <= 0:
             return
-        y = surface.height - self._size[1]
+        y = self._origin_row(surface.height, self._size[1])
         sub = surface.subsurface(y, 0, self._size[0], self._size[1])
-        # Clear sheet background so underlying content does not bleed through.
-        sub.fill_rect_rgb(0, 0, sub.width, sub.height, palette.DEFAULT_BG)
-        border_h = 1 if self._show_border else 0
-        if self._show_border:
-            if sub.width >= 2:
-                fg, bg = palette.DEFAULT_FG_DIM, palette.DEFAULT_BG
-                sub.draw_text_rgb(0, 0, _BOX_CORNER_TL, fg=fg, bg=bg)
-                sub.draw_text_rgb(0, sub.width - 1, _BOX_CORNER_TR, fg=fg, bg=bg)
-                if sub.width > 2:
-                    sub.draw_hline_rgb(0, 1, sub.width - 2, fg=fg, bg=bg)
-            else:
-                sub.draw_hline_rgb(
-                    0, 0, sub.width, fg=palette.DEFAULT_FG_DIM, bg=palette.DEFAULT_BG
-                )
-        if self._size[1] > border_h:
-            child_sub = sub.subsurface(border_h, 0, sub.width, sub.height - border_h)
-            self._child._render_surface(child_sub)
+        sub.fill_rect_rgb(0, 0, sub.width, sub.height, self._bg)
+        border_row = self._border_row(self._size[1])
+        if border_row is not None:
+            self._draw_rule(sub, border_row)
+        child_h = self._size[1] - (1 if border_row is not None else 0)
+        if child_h <= 0:
+            return
+        child_y = 1 if border_row == 0 else 0
+        child_sub = sub.subsurface(child_y, 0, sub.width, child_h)
+        self._child._render_surface(child_sub)
+
+    def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
+        """Draw the facing-edge rule: ╭─╮ on the top of a bottom sheet, ╰─╯ on the bottom of a top sheet."""
+        fg, bg = palette.DEFAULT_FG_DIM, self._bg
+        left, right = (
+            (_BOX_CORNER_BL, _BOX_CORNER_BR)
+            if self._edge == "top"
+            else (_BOX_CORNER_TL, _BOX_CORNER_TR)
+        )
+        if sub.width >= 2:
+            sub.draw_text_rgb(row, 0, left, fg=fg, bg=bg)
+            sub.draw_text_rgb(row, sub.width - 1, right, fg=fg, bg=bg)
+            if sub.width > 2:
+                sub.draw_hline_rgb(row, 1, sub.width - 2, fg=fg, bg=bg)
+        else:
+            sub.draw_hline_rgb(row, 0, sub.width, fg=fg, bg=bg)
 
     def hide(self) -> None:
         """Close the sheet."""
@@ -85,26 +117,30 @@ class Sheet(Component):
         if getattr(self, "_size", None) == new_size:
             return
         self._size = new_size
-        # Position: bottom of the screen, full width (1-based x=row, y=col).
-        self.x = size[1] - sheet_h + 1
+        origin = self._origin_row(size[1], sheet_h)
+        self.x = origin + 1
         self.y = 1
         border_h = 1 if self._show_border else 0
         child_h = max(1, sheet_h - border_h)
         self._child.resize((size[0], child_h))
 
     def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
-        """Hit-test the sheet's bottom region, delegating to the wrapped child."""
+        """Hit-test the sheet region, delegating to the wrapped child."""
         w, h = self._size
         if w <= 0 or h <= 0:
             return None
         if not (self.y <= col < self.y + w and self.x <= row < self.x + h):
             return None
-        border_h = 1 if self._show_border else 0
         child = self._child
         cw, ch = child._size
         if cw <= 0 or ch <= 0:
             return self, col, row
         local_col = col - (self.y - 1)
-        local_row = row - (self.x - 1) - border_h
-        hit = child._hit_test(local_col, local_row)
+        local_row = row - (self.x - 1)
+        border_row = self._border_row(h)
+        # ``local_row`` is 1-based; ``border_row`` is 0-based within the sheet.
+        if border_row is not None and local_row == border_row + 1:
+            return self, col, row
+        child_row = local_row if border_row != 0 else local_row - 1
+        hit = child._hit_test(local_col, child_row)
         return hit if hit is not None else (self, col, row)

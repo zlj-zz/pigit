@@ -48,7 +48,8 @@ from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
-from .app_inspector import InspectorPanel
+from .app_inspector import InspectorSheet
+from .app_types import InspectorHost
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
@@ -95,7 +96,6 @@ class PigitApplication(Application):
         self._managed_repos = managed_repos
         self._repo_path, self._repo_conf = self._git_api.confirm_repo()
         self._git = self._git_api.bind_path(self._repo_path)
-        self._inspector_visible = False
         # Header state
         self._repo_name: str = ""
         self._header_state = HeaderState(THEME)
@@ -128,7 +128,6 @@ class PigitApplication(Application):
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
         self._body_row: Row
-        self._inspector: InspectorPanel
         self._palette: CommandPalette
         self._status_stack: Column
         self._status_panel: StatusPanel
@@ -150,8 +149,6 @@ class PigitApplication(Application):
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
-
-        self._inspector = InspectorPanel(id="inspector")
 
         self._status_vm = StatusViewModel(self._git, history=self._session_history)
         self._branch_vm = BranchViewModel(self._git, history=self._session_history)
@@ -218,11 +215,8 @@ class PigitApplication(Application):
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
         self._body_row = Row(
-            children=[
-                self._tab_view,
-                self._inspector,
-            ],
-            widths=["flex", 0],
+            children=[self._tab_view],
+            widths=["flex"],
             id="body_row",
         )
 
@@ -253,8 +247,8 @@ class PigitApplication(Application):
         """React to TabView switching to a new panel.
 
         Adjusts the adaptive layout on large screens and emits
-        ``selection_changed`` so bus subscribers (footer, inspector, header,
-        preview) can update themselves.
+        ``selection_changed`` so bus subscribers (footer, header, preview)
+        can update themselves.
         """
         if self._is_large_screen:
             cols, _ = terminal_size()
@@ -338,7 +332,7 @@ class PigitApplication(Application):
             )
 
         # Initial sync: all components are activated now, so subscribers receive
-        # the event and update header/footer/inspector/preview.
+        # the event and update header/footer/preview.
         if self._tab_view.active is not None:
             self._on_tab_switch(self._tab_view.active)
 
@@ -374,7 +368,7 @@ class PigitApplication(Application):
                 child.activate()
 
     def _apply_body_widths(self, cols: int) -> None:
-        """Recompute body_row widths from screen size, active tab, and inspector.
+        """Recompute body_row widths from screen size and the active tab.
 
         At most one side preview is present: Status/Stash get the diff preview
         when wanted, Branch gets the log-graph preview when wanted, Commit/Diff
@@ -382,24 +376,16 @@ class PigitApplication(Application):
         """
         body_row = self._body_row
         tab_view = self._tab_view
-        inspector = self._inspector
         side = self._side_preview_for_active()
 
         if side is not None:
             tab_w = max(50, int(cols * 0.35))
             preview_w = max(1, cols - tab_w)
-            inspector_w = self._inspector_width(cols)
-            desired_children = [tab_view, inspector, side]
-            if self._inspector_visible:
-                desired_widths = [tab_w, inspector_w, max(1, preview_w - inspector_w)]
-            else:
-                desired_widths = [tab_w, 0, preview_w]
+            desired_children = [tab_view, side]
+            desired_widths = [tab_w, preview_w]
         else:
-            desired_children = [tab_view, inspector]
-            if self._inspector_visible:
-                desired_widths = ["flex", self._inspector_width(cols)]
-            else:
-                desired_widths = ["flex", 0]
+            desired_children = [tab_view]
+            desired_widths = ["flex"]
 
         self._sync_body_children(desired_children)
         body_row.set_widths(desired_widths)
@@ -570,25 +556,31 @@ class PigitApplication(Application):
             renderer.clear_cache()
         request_render()
 
-    @bind_action("inspector", "I", desc="Toggle file inspector", tip="Inspector")
-    def toggle_inspector(self):
-        """Toggle inspector panel visibility."""
-        was_visible = self._inspector_visible
-        self._inspector_visible = not self._inspector_visible
-        cols, _ = terminal_size()
-        self._apply_body_widths(cols)
-        if self._inspector_visible:
-            active = resolve_presentation_leaf(self._tab_view.active)
-            if not was_visible and hasattr(self._inspector, "_last_key"):
-                delattr(self._inspector, "_last_key")
-            self._inspector.update_from(active or self._tab_view.active)
-        # Layout change invalidates the incremental-render cache so the
-        # old inspector columns are fully repainted instead of visually
-        # persisting as residue over the widened diff/status area.
-        renderer = get_renderer()
-        if renderer is not None:
-            renderer.clear_cache()
-        request_render()
+    @bind_action("inspector", "I", desc="Inspect selection", tip="Inspector")
+    def open_inspector(self) -> None:
+        """Open a frozen top-edge snapshot of the current selection."""
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if not isinstance(active, InspectorHost):
+            show_toast(
+                "No inspector for this view",
+                duration=1.5,
+                kind=FeedbackKind.INFO,
+            )
+            return
+        snapshot = active.get_inspector_snapshot()
+        if snapshot is None:
+            show_toast(
+                "Nothing to inspect",
+                duration=1.5,
+                kind=FeedbackKind.INFO,
+            )
+            return
+        lines = InspectorSheet.format(snapshot)
+        _, rows = terminal_size()
+        height = InspectorSheet.sheet_height(lines, rows, border=1)
+        sheet = InspectorSheet(lines)
+        show_sheet(sheet, height=height, show_border=True, edge="top", bg=None)
+        sheet.activate()
 
     @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
@@ -598,10 +590,6 @@ class PigitApplication(Application):
         """Dismiss the palette sheet from the root."""
         if self._root is not None:
             self._root.dismiss_sheet()
-
-    def _inspector_width(self, total_width: int) -> int:
-        """Compute inspector width: 30% of total, capped at 45."""
-        return min(int(total_width * 0.3), 45)
 
     def _sync_stash_height(self, rows: int) -> None:
         """Set StashPanel height to 25% of rows, capped at 10, min 3."""
@@ -663,7 +651,7 @@ class PigitApplication(Application):
         """Bridge bubbled events to the framework bus; enrich cross-cutting events.
 
         Application-level handlers (e.g. merge workflow) run after enrichment.
-        Header, footer, inspector, and preview updates are handled by their own
+        Header, footer, and preview updates are handled by their own
         bus subscribers.
         """
         if action in (EventType("mode_changed"), EVT_SELECTION_CHANGED):

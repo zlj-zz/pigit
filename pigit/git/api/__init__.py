@@ -113,11 +113,11 @@ class GitApi:
     def _branch_sha(self, branch_name, path=None):
         return self._branch._branch_sha(branch_name, path)
 
-    def get_branch_recent_commit(self, branch_name, path=None):
-        return self._branch.get_branch_recent_commit(branch_name, path)
-
     def get_branch_creation_time(self, branch_name, path=None):
         return self._branch.get_branch_creation_time(branch_name, path)
+
+    def get_branch_recent_commit(self, branch_name, path=None):
+        return self._branch.get_branch_recent_commit(branch_name, path)
 
     # ── _commit ──
     def load_log(
@@ -196,6 +196,12 @@ class GitApi:
 
     def stash_store(self, sha, path=None):
         return self._stash.stash_store(sha, path)
+
+    def stash_numstat(self, ref, path=None):
+        return self._stash.stash_numstat(ref, path)
+
+    def stash_meta(self, ref, path=None):
+        return self._stash.stash_meta(ref, path)
 
     # ── _diff ──
     def load_file_diff(self, file, tracked=True, cached=False, plain=False, path=None):
@@ -290,6 +296,15 @@ class GitApi:
 
     def get_file_info(self, file, path=None):
         return self._fileio.get_file_info(file, path)
+
+    def compare_index_worktree(self, relpath, path=None):
+        return self._fileio.compare_index_worktree(relpath, path)
+
+    def unmerged_stages(self, relpath, path=None):
+        return self._fileio.unmerged_stages(relpath, path)
+
+    def last_commit_for_path(self, relpath, path=None):
+        return self._fileio.last_commit_for_path(relpath, path)
 
     def _format_size(self, size):
         return self._fileio._format_size(size)

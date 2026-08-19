@@ -167,6 +167,68 @@ class TestComponentRoot:
         assert sheet._child is inner
         assert inner.parent is sheet
 
+    def test_sheet_mouse_miss_falls_through_to_body(self):
+        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
+        hits: list[tuple[int, int]] = []
+
+        class _Body(DummyBody):
+            def handle_mouse(self, event):
+                hits.append((event.col, event.row))
+                return True
+
+            def _hit_test(self, col, row):
+                return self, col, row
+
+        class _Inner(Component):
+            NAME = "inner"
+
+            def _render_surface(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+        body = _Body()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        root.show_sheet(_Inner(), height=4, edge="top")
+        ev = MouseEvent(col=10, row=20, button=MouseButton.LEFT, kind=MouseKind.PRESS)
+        # The top-edge sheet covers rows 1..4; a click at row 20 is outside it
+        # and must reach the body instead of being swallowed.
+        assert root._handle_mouse(ev) is True
+        assert hits == [(10, 20)]
+
+    def test_sheet_mouse_hit_does_not_reach_body(self):
+        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+
+        hits: list[tuple[int, int]] = []
+
+        class _Body(DummyBody):
+            def handle_mouse(self, event):
+                hits.append((event.col, event.row))
+                return True
+
+            def _hit_test(self, col, row):
+                return self, col, row
+
+        class _Inner(Component):
+            NAME = "inner"
+
+            def _render_surface(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+        body = _Body()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        root.show_sheet(_Inner(), height=4, edge="top")
+        ev = MouseEvent(col=10, row=2, button=MouseButton.LEFT, kind=MouseKind.PRESS)
+        assert root._handle_mouse(ev) is True
+        assert hits == []
+
     def test_toast_expires_on_render(self):
         from pigit.termui._runtime_context import (
             set_overlay_host,

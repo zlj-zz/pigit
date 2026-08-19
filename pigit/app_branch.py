@@ -27,7 +27,7 @@ from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
 from .app_preview_toggle import invoke_preview_toggle
-from .app_types import BranchInfo
+from .app_types import BranchSnapshot
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
@@ -121,9 +121,9 @@ class BranchPanel(ItemList):
     def get_help_title(self) -> str:
         return "Branch"
 
-    def get_inspector_data(self) -> BranchInfo | None:
-        """Return inspector data for the currently selected branch."""
-        return self._vm.get_inspector_data(self.curr_no)
+    def get_inspector_snapshot(self) -> BranchSnapshot | None:
+        """Return a frozen snapshot for the selected branch."""
+        return self._vm.get_inspector_snapshot(self.curr_no)
 
     def _format_branch(self, branch: Branch) -> str:
         """Format a branch for display."""

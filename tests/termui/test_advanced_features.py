@@ -6,7 +6,6 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_command_palette import CommandPalette
-from pigit.app_inspector import FileInfo, InspectorPanel
 from pigit.app_contribution_graph import ContributionGraph
 from pigit.termui._surface import Surface
 
@@ -71,55 +70,6 @@ class TestCommandPalette:
         # Should draw prompt
         lines = s.lines()
         assert ">" in lines[-1]
-
-
-class TestInspectorPanel:
-    def test_init(self):
-        i = InspectorPanel()
-        assert i._content == []
-
-    def test_show_file(self):
-        i = InspectorPanel()
-        from pigit.git.model import File
-
-        f = File(
-            name="test.py",
-            display_str="test.py",
-            short_status="M ",
-            has_staged_change=True,
-            has_unstaged_change=False,
-            tracked=True,
-            deleted=False,
-            added=False,
-            has_merged_conflicts=False,
-            has_inline_merged_conflicts=False,
-        )
-        i.show(FileInfo(file=f, size="?", mtime="?"))
-        assert "test.py" in i._content[0]
-        assert "staged" in i._content[2]
-
-    def test_render(self):
-        i = InspectorPanel()
-        from pigit.git.model import File
-
-        f = File(
-            name="test.py",
-            display_str="test.py",
-            short_status="M ",
-            has_staged_change=True,
-            has_unstaged_change=False,
-            tracked=True,
-            deleted=False,
-            added=False,
-            has_merged_conflicts=False,
-            has_inline_merged_conflicts=False,
-        )
-        i.show(FileInfo(file=f, size="?", mtime="?"))
-        s = Surface(20, 10)
-        i.resize((20, 10))
-        i._render_surface(s)
-        text = "\n".join(s.lines())
-        assert "test.py" in text
 
 
 class TestContributionGraph:

@@ -194,22 +194,6 @@ class _BranchOps(_OpsBase):
             return None
         return cast(str, out).strip()
 
-    def get_branch_recent_commit(
-        self, branch_name: str, path: str | None = None
-    ) -> tuple[str, str]:
-        """Get the most recent commit message and author for a branch."""
-        path = path or self.path
-        _, _, resp = self.executor.exec(
-            f"git log {shlex.quote(branch_name)} -1 --pretty=format:%s|%aN",
-            flags=REPLY | DECODE,
-            cwd=path,
-        )
-        if not resp:
-            return "?", "?"
-        resp_str = cast(str, resp)
-        parts = resp_str.split("|")
-        return parts[0], parts[1] if len(parts) > 1 else "?"
-
     def get_branch_creation_time(
         self, branch_name: str, path: str | None = None
     ) -> str:
@@ -228,3 +212,30 @@ class _BranchOps(_OpsBase):
             return time.strftime("%Y-%m-%d", time.localtime(ts))
         except ValueError:
             return "?"
+
+    def get_branch_recent_commit(
+        self, branch_name: str, path: str | None = None
+    ) -> tuple[str, str]:
+        """Return ``(subject, author)`` of the branch tip commit.
+
+        Both values are ``"?"`` when the branch has no commits.
+
+        Args:
+            branch_name: Branch or remote-tracking name to log.
+            path: Repo path; defaults to ``self.path``.
+
+        Returns:
+            ``(subject, author)``.
+        """
+        path = path or self.path
+        _code, _err, out = self.executor.exec(
+            f"git log {shlex.quote(branch_name)} -1 --pretty=format:%s%x00%aN",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        text = (out or "").strip()
+        if not text:
+            return "?", "?"
+        # NUL separates subject and author so a "|" in either cannot split them.
+        subject, _sep, author = text.partition("\x00")
+        return subject, author or "?"

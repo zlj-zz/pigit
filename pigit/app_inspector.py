@@ -1,194 +1,206 @@
 """
 Module: pigit/app_inspector.py
-Description: Right-side inspector panel for file/branch/commit details.
+Description: Frozen selection snapshot sheet (top edge).
 Author: Zev
 Date: 2026-04-23
 """
 
 from __future__ import annotations
 
-from pigit.ext.utils import relative_time
-from pigit.termui import EVT_SELECTION_CHANGED, Component, palette
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui import bind_action, Component, palette
+from pigit.termui._overlay_api import dismiss_sheet
+from pigit.termui._segment import Segment
+from pigit.termui._surface import Surface, _Subsurface
+from pigit.termui.widgets.line_text_browser import LineTextBrowser
 
 from .app_theme import THEME
-from .app_types import BranchInfo, CommitInfo, FileInfo, InspectorData
+from .app_types import (
+    BranchSnapshot,
+    CommitSnapshot,
+    FileSnapshot,
+    InspectorSnapshot,
+    StashSnapshot,
+)
+
+_LABEL_WIDTH = 8
 
 
-class InspectorPanel(Component):
-    """Right-side panel showing file/branch/commit details."""
+class InspectorSheet(Component):
+    """Read-only snapshot of the selection; keys stay on this sheet."""
 
-    def __init__(
-        self,
-        x: int = 1,
-        y: int = 1,
-        size: tuple[int, int] | None = None,
-        id: str | None = None,
-    ) -> None:
-        super().__init__(x, y, size, id=id)
-        self._content: list[str] = []
-        self._title = "Inspector"
+    keymap_namespace = "inspector"
 
-    def clear(self) -> None:
-        """Clear inspector content."""
-        self._content = []
-        self._title = "Inspector"
+    def __init__(self, rows: list[list[Segment]], **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._browser = LineTextBrowser(content=rows, bg=None)
+        self._browser.parent = self
 
-    def show(self, data: InspectorData) -> None:
-        """Display inspector content from a data object."""
-        self.clear()
-        match data:
-            case FileInfo():
-                self._show_file_impl(data)
-            case BranchInfo():
-                self._show_branch_impl(data)
-            case CommitInfo():
-                self._show_commit_impl(data)
+    @property
+    def focus_child(self) -> Component | None:
+        return self._browser
 
-    def activate(self) -> None:
-        super().activate()
-        self.subscribe(EVT_SELECTION_CHANGED, self._on_selection)
+    @staticmethod
+    def format(snapshot: InspectorSnapshot) -> list[list[Segment]]:
+        """Turn a snapshot into title + labeled body rows."""
+        match snapshot:
+            case FileSnapshot():
+                return _format_file(snapshot)
+            case BranchSnapshot():
+                return _format_branch(snapshot)
+            case CommitSnapshot():
+                return _format_commit(snapshot)
+            case StashSnapshot():
+                return _format_stash(snapshot)
 
-    def _stable_key(self, active: Component | None, idx: int) -> tuple[str, int]:
-        if active is None:
-            return ("", idx)
-        return (f"{type(active).__name__}:{id(active)}", idx)
+    @staticmethod
+    def sheet_height(rows: list, term_h: int, *, border: int = 1) -> int:
+        """Clamp sheet height to ``[3, term_h // 2]`` including border."""
+        return min(max(len(rows) + border, 3), max(3, term_h // 2))
 
-    def _on_selection(self, *, active: Component | None = None, **_) -> bool:
-        provider = getattr(active, "get_inspector_data", None) if active else None
-        if provider is None:
-            self.clear()
-            return True
-        idx = getattr(active, "curr_no", 0)
-        key = self._stable_key(active, idx)
-        if getattr(self, "_last_key", None) == key:
-            return True
-        self._last_key = key
-        self.show(provider())
-        return True
+    def resize(self, size: tuple[int, int]) -> None:
+        super().resize(size)
+        self._browser.resize(size)
 
-    def update_from(self, source) -> None:
-        """Refresh content from *source* if it provides inspector data.
+    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+        self._browser._render_surface(surface)
 
-        Caches by ``(type(source).__name__ + id(source), curr_no)`` to avoid
-        redundant git calls while remaining stable across object reuse.
-        """
-        provider = getattr(source, "get_inspector_data", None)
-        if provider is None:
-            return
-        idx = getattr(source, "curr_no", 0)
-        key = self._stable_key(source, idx)
-        if getattr(self, "_last_key", None) == key:
-            return
-        self._last_key = key
-        self.show(provider())
+    @bind_action("next", "j", "down", desc="Scroll down")
+    def scroll_down(self) -> None:
+        self._browser.scroll_down(1)
 
-    def _show_file_impl(self, data: FileInfo) -> None:
-        """Display file details."""
-        file = data.file
-        self._title = "File"
-        status = []
-        if file.has_staged_change:
-            status.append("staged")
-        if file.has_unstaged_change:
-            status.append("unstaged")
-        if file.deleted:
-            status.append("deleted")
-        if not file.tracked:
-            status.append("untracked")
-        if file.has_merged_conflicts:
-            status.append("conflict")
+    @bind_action("previous", "k", "up", desc="Scroll up")
+    def scroll_up(self) -> None:
+        self._browser.scroll_up(1)
 
-        self._content = [
-            file.name,
-            "─" * 20,
-            f"Status: {', '.join(status) if status else 'clean'}",
-            f"Size: {data.size}",
-            f"Modified: {data.mtime}",
-            f"Tracked: {'yes' if file.tracked else 'no'}",
-        ]
+    @bind_action("close", "esc", "I", desc="Close")
+    def close(self) -> None:
+        dismiss_sheet()
 
-    def _show_branch_impl(self, data: BranchInfo) -> None:
-        """Display branch details."""
-        branch = data.branch
-        self._title = "Branch"
-        upstream = branch.upstream_name or "none"
-        ahead = branch.ahead if branch.ahead != "?" else "0"
-        behind = branch.behind if branch.behind != "?" else "0"
 
-        self._content = [
-            branch.name,
-            "─" * 20,
-            f"Current: {'yes' if branch.is_head else 'no'}",
-            f"Upstream: {upstream}",
-            f"Ahead: {ahead}",
-            f"Behind: {behind}",
-        ]
-        if data.recent_msg != "?":
-            self._content.append(f"Recent: {data.recent_msg}")
-        if data.recent_author != "?":
-            self._content.append(f"By: {data.recent_author}")
-        if data.created != "?":
-            self._content.append(f"Created: {data.created}")
+def _title(kind: str, identity: str) -> list[Segment]:
+    return [
+        Segment(
+            "Inspector",
+            fg=THEME.fg_panel_title,
+            style_flags=palette.STYLE_BOLD,
+        ),
+        Segment(" · ", fg=THEME.fg_muted),
+        Segment(kind, fg=THEME.fg_info),
+        Segment(" · ", fg=THEME.fg_muted),
+        Segment(identity, fg=THEME.fg_primary),
+    ]
 
-    def _show_commit_impl(self, data: CommitInfo) -> None:
-        """Display commit details."""
-        commit = data.commit
-        self._title = "Commit"
-        tags = ", ".join(commit.tag) if commit.tag else "none"
-        rel_time = relative_time(commit.unix_timestamp)
 
-        self._content = [
-            commit.sha[:7],
-            "─" * 20,
-            commit.msg,
-            f"Author: {commit.author}",
-            f"Time: {rel_time}",
-            f"Status: {commit.status}",
-            f"Tags: {tags}",
-        ]
-        if data.total_add or data.total_del:
-            self._content.append(f"Changes: +{data.total_add} -{data.total_del}")
-        if data.changed_files:
-            self._content.append("─" * 20)
-            self._content.append("Files:")
-            for file_name, add, delete in data.changed_files[:8]:
-                self._content.append(f"  {file_name} +{add} -{delete}")
-            if len(data.changed_files) > 8:
-                self._content.append(f"  ... and {len(data.changed_files) - 8} more")
+def _labeled(label: str, values: list[Segment]) -> list[Segment]:
+    prefix = f"{label:<{_LABEL_WIDTH}}" if len(label) <= _LABEL_WIDTH else f"{label} "
+    return [Segment(prefix, fg=THEME.fg_muted), *values]
 
-    def _render_surface(self, surface) -> None:
-        w = surface.width
-        h = surface.height
-        if w <= 0 or h <= 0:
-            return
 
-        # Left border and separator (no explicit bg — inherit terminal default
-        # so they blend with the transparent title and content rows).
-        content_x = 2
-        surface.draw_vline_rgb(0, 0, h, fg=THEME.fg_dim)
-        if h > 1:
-            surface.draw_hline_rgb(1, content_x, w - content_x, fg=THEME.fg_dim)
+def _plain(text: str, fg: tuple[int, int, int] = THEME.fg_primary) -> list[Segment]:
+    return [Segment(text, fg=fg)]
 
-        # Title
-        title = f" {self._title} "
-        title_w = wcswidth(title)
-        if title_w < w - content_x:
-            surface.draw_text_rgb(
-                0,
-                content_x,
-                title,
-                fg=THEME.fg_branch_name,
-                style_flags=palette.STYLE_BOLD,
-            )
 
-        # Content lines
-        for i, line in enumerate(self._content):
-            row = i + 2
-            if row >= h:
-                break
-            text = line
-            avail = w - content_x
-            if wcswidth(text) > avail:
-                text = truncate_by_width(text, avail - 1) + "…"
-            surface.draw_text_rgb(row, content_x, text, fg=THEME.fg_primary)
+def _last_value(last: str) -> list[Segment]:
+    sha, sep, rest = last.partition(" ")
+    segs = [Segment(sha, fg=THEME.fg_dim)]
+    if sep:
+        segs.append(Segment(sep + rest, fg=THEME.fg_primary))
+    return segs
+
+
+def _numstat_rows(
+    files: list[tuple[str, int, int]], total_add: int, total_del: int
+) -> list[list[Segment]]:
+    rows = [
+        _labeled(
+            "changes",
+            [
+                Segment(f"+{total_add}", fg=THEME.fg_success),
+                Segment(" ", fg=THEME.fg_muted),
+                Segment(f"-{total_del}", fg=THEME.fg_danger),
+            ],
+        )
+    ]
+    for name, add, delete in files:
+        rows.append(
+            [
+                Segment("  ", fg=THEME.fg_dim),
+                Segment(name, fg=THEME.fg_primary),
+                Segment(" ", fg=THEME.fg_muted),
+                Segment(f"+{add}", fg=THEME.fg_success),
+                Segment(" ", fg=THEME.fg_muted),
+                Segment(f"-{delete}", fg=THEME.fg_danger),
+            ]
+        )
+    return rows
+
+
+def _format_file(data: FileSnapshot) -> list[list[Segment]]:
+    rows = [
+        _title("file", data.identity),
+        _labeled("path", _plain(data.path)),
+        _labeled("blobs", _plain(data.blobs)),
+    ]
+    if data.stages:
+        rows.append(_labeled("stages", _plain(data.stages)))
+    if data.size != "?":
+        rows.append(_labeled("size", _plain(data.size)))
+    if data.mode != "?":
+        rows.append(_labeled("mode", _plain(data.mode)))
+    if data.last:
+        rows.append(_labeled("last", _last_value(data.last)))
+    return rows
+
+
+def _format_branch(data: BranchSnapshot) -> list[list[Segment]]:
+    if data.contained is None:
+        contained, contained_fg = "?", THEME.fg_muted
+    else:
+        contained = "yes" if data.contained else "no"
+        contained_fg = THEME.fg_success if data.contained else THEME.fg_danger
+    current_fg = THEME.fg_success if data.current == "yes" else THEME.fg_primary
+    rows = [
+        _title("branch", data.identity),
+        _labeled("tip", _plain(data.tip, THEME.fg_dim)),
+    ]
+    if data.created:
+        rows.append(_labeled("created", _plain(data.created)))
+    rows.append(_labeled("current", _plain(data.current, current_fg)))
+    rows.append(_labeled("upstream", _plain(data.upstream)))
+    rows.append(_labeled("ahead", _plain(data.ahead)))
+    rows.append(_labeled("behind", _plain(data.behind)))
+    if data.recent_msg != "?":
+        rows.append(_labeled("recent", _plain(data.recent_msg)))
+    if data.recent_author != "?":
+        rows.append(_labeled("by", _plain(data.recent_author)))
+    rows.append(_labeled("contained", _plain(contained, contained_fg)))
+    return rows
+
+
+def _format_commit(data: CommitSnapshot) -> list[list[Segment]]:
+    parents = " ".join(data.parents) if data.parents else "(root)"
+    status_fg = THEME.fg_success if data.status == "pushed" else THEME.fg_warning
+    rows = [
+        _title("commit", data.identity),
+        _labeled("msg", _plain(data.msg)),
+        _labeled("author", _plain(data.author)),
+        _labeled("when", _plain(data.when)),
+        _labeled("status", _plain(data.status, status_fg)),
+        _labeled("tags", _plain(data.tags)),
+        _labeled("sha", _plain(data.sha, THEME.fg_dim)),
+        _labeled("parents", _plain(parents)),
+    ]
+    rows.extend(_numstat_rows(data.files, data.total_add, data.total_del))
+    return rows
+
+
+def _format_stash(data: StashSnapshot) -> list[list[Segment]]:
+    rows = [_title("stash", data.identity)]
+    if data.author:
+        rows.append(_labeled("author", _plain(data.author)))
+    if data.when:
+        rows.append(_labeled("when", _plain(data.when)))
+    if data.parents:
+        rows.append(_labeled("parents", _plain(" ".join(data.parents))))
+    rows.extend(_numstat_rows(data.files, data.total_add, data.total_del))
+    return rows

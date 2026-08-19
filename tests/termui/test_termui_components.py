@@ -309,6 +309,31 @@ class TestLineTextBrowser:
         browser.scroll_down(1)
         assert browser._i == 0
 
+    def test_render_transparent_bg_does_not_paint_cell_background(self):
+        from pigit.termui._surface import Surface
+
+        browser = MockLineTextBrowser(content=["hi"], size=(10, 2), bg=None)
+        surface = Surface(10, 2)
+        surface.draw_text_rgb(0, 0, "XXXX", bg=(9, 9, 9))
+        browser._render_surface(surface)
+        assert surface._rows[0][0].char == "h"
+        assert surface._rows[0][0].bg is None
+        assert surface._rows[0][2].char == "X"
+        assert surface._rows[0][2].bg == (9, 9, 9)
+
+    def test_render_segment_rows_keeps_fg(self):
+        from pigit.termui._segment import Segment
+        from pigit.termui._surface import Surface
+
+        fg = (1, 2, 3)
+        browser = MockLineTextBrowser(
+            content=[[Segment("ab", fg=fg)]], size=(10, 2), bg=None
+        )
+        surface = Surface(10, 2)
+        browser._render_surface(surface)
+        assert surface._rows[0][0].char == "a"
+        assert surface._rows[0][0].fg == fg
+
 
 class TestItemListFilter:
     def test_set_source_content(self):

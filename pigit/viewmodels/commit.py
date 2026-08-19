@@ -15,7 +15,7 @@ from pigit.git.api import GitError
 from .base import IListViewModel, ViewModelBase
 
 if TYPE_CHECKING:
-    from pigit.app_types import CommitInfo, GraphRow
+    from pigit.app_types import CommitSnapshot, GraphRow
     from pigit.git.api import GitApi
     from pigit.git.model import Commit
 
@@ -43,7 +43,7 @@ class ICommitViewModel(IListViewModel["Commit"]):
 
     def list_log_ref_names(self) -> list[str]: ...
 
-    def get_inspector_data(self, idx: int) -> CommitInfo | None: ...
+    def get_inspector_snapshot(self, idx: int) -> CommitSnapshot | None: ...
 
     def load_diff(self, idx: int) -> list[str]: ...
 
@@ -128,16 +128,29 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         self._bodies = None
         return commits
 
-    def get_inspector_data(self, idx: int) -> CommitInfo | None:
+    def get_inspector_snapshot(self, idx: int):
         c = self.item_at(idx)
         if c is None:
             return None
-        changed_files, total_add, total_del = self._git.get_commit_stats(c.sha)
-        from pigit.app_types import CommitInfo
+        return self._memo_inspector(
+            ("commit", c.sha), lambda: self._build_commit_snapshot(c)
+        )
 
-        return CommitInfo(
-            commit=c,
-            changed_files=changed_files,
+    def _build_commit_snapshot(self, c: Commit):
+        from pigit.app_types import CommitSnapshot
+        from pigit.ext.utils import relative_time
+
+        files, total_add, total_del = self._git.get_commit_stats(c.sha)
+        return CommitSnapshot(
+            identity=c.sha[:7],
+            sha=c.sha,
+            msg=c.msg,
+            author=c.author,
+            when=relative_time(c.unix_timestamp),
+            status=c.status,
+            tags=", ".join(c.tag) if c.tag else "none",
+            parents=list(c.parents),
+            files=files,
             total_add=total_add,
             total_del=total_del,
         )

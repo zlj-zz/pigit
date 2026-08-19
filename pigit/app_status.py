@@ -38,7 +38,7 @@ from pigit.termui.widgets import InputLine, ItemList
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
 from .app_preview_toggle import invoke_preview_toggle
-from .app_types import FileInfo
+from .app_types import FileSnapshot
 from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
@@ -1109,12 +1109,12 @@ class StatusPanel(ItemList):
     def get_help_title(self) -> str:
         return "Status"
 
-    def get_inspector_data(self) -> FileInfo | None:
-        """Return inspector data for the currently selected file."""
+    def get_inspector_snapshot(self) -> FileSnapshot | None:
+        """Return a frozen snapshot for the file at the cursor."""
         hit = self.file_at_cursor()
         if hit is None:
             return None
-        return self._vm.get_inspector_data(hit[1])
+        return self._vm.get_inspector_snapshot(hit[1])
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""

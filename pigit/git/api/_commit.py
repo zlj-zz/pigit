@@ -16,7 +16,7 @@ from pigit.ext.executor import REPLY, DECODE
 from ..model import Commit
 from ._base import _OpsBase
 from ._errors import GitError
-from ._util import _RE_COMMIT_TAG
+from ._util import _RE_COMMIT_TAG, parse_numstat
 
 # Default pretty format for git log output (shared with the facade).
 _DEFAULT_LOG_FORMAT = (
@@ -292,23 +292,4 @@ class _CommitOps(_OpsBase):
         )
         if not resp:
             return [], 0, 0
-
-        files: list[tuple[str, int, int]] = []
-        total_add = 0
-        total_del = 0
-
-        resp_str = cast(str, resp)
-        for line in resp_str.strip().splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split("\t")
-            if len(parts) >= 3:
-                add = int(parts[0]) if parts[0].isdigit() else 0
-                delete = int(parts[1]) if parts[1].isdigit() else 0
-                file_name = parts[2]
-                files.append((file_name, add, delete))
-                total_add += add
-                total_del += delete
-
-        return files, total_add, total_del
+        return parse_numstat(cast(str, resp))

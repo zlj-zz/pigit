@@ -27,7 +27,7 @@ def _binding(action: str, *keys: str, desc=None, configurable: bool = True) -> B
 
 
 class TestCollectAllActionBindings:
-    def test_enumerates_nine_namespaces(self):
+    def test_enumerates_namespaces(self):
         bindings = collect_all_action_bindings()
         namespaces = {ns for ns, _ in bindings}
         assert namespaces == {
@@ -40,6 +40,7 @@ class TestCollectAllActionBindings:
             "stash",
             "recent",
             "log_ref",
+            "inspector",
         }
 
     def test_ast_scan_finds_no_unregistered_keymaps(self):

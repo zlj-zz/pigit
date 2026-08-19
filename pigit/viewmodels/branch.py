@@ -14,7 +14,7 @@ from .base import ActionResult, IListViewModel, ViewModelBase
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 
 if TYPE_CHECKING:
-    from pigit.app_types import BranchInfo
+    from pigit.app_types import BranchSnapshot
     from pigit.git.api import GitApi
     from pigit.git.model import Branch
 
@@ -29,7 +29,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def create_branch(self, name: str) -> ActionResult: ...
     def rename_branch(self, idx: int, new_name: str) -> ActionResult: ...
     def delete_branch(self, idx: int, force: bool = False) -> ActionResult: ...
-    def get_inspector_data(self, idx: int) -> BranchInfo | None: ...
+    def get_inspector_snapshot(self, idx: int) -> BranchSnapshot | None: ...
     def current_branch(self) -> str: ...
     def can_merge(self) -> tuple[bool, str]: ...
     def can_rebase(self) -> tuple[bool, str]: ...
@@ -153,19 +153,43 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             )
         return result
 
-    def get_inspector_data(self, idx: int) -> BranchInfo | None:
+    def get_inspector_snapshot(self, idx: int):
         b = self.item_at(idx)
         if b is None:
             return None
-        recent_msg, recent_author = self._git.get_branch_recent_commit(b.name)
-        created = self._git.get_branch_creation_time(b.name)
-        from pigit.app_types import BranchInfo
+        return self._memo_inspector(
+            ("branch", b.name), lambda: self._build_branch_snapshot(b)
+        )
 
-        return BranchInfo(
-            branch=b,
+    def _build_branch_snapshot(self, b: Branch):
+        from pigit.app_types import BranchSnapshot
+        from pigit.git.api import GitError
+
+        tip = ""
+        contained: bool | None = None
+        try:
+            tip = self._git.verify_commitish(b.name)
+            contained = self._git.is_ancestor(tip)
+        except GitError:
+            # Stale/deleted ref or shallow-clone gap: keep identity and mark
+            # ancestry unknown instead of aborting the whole snapshot.
+            if not tip:
+                tip = self._git._branch_sha(b.name) or ""
+        created = self._git.get_branch_creation_time(b.name)
+        if created == "?":
+            created = None
+        recent_msg, recent_author = self._git.get_branch_recent_commit(b.name)
+        return BranchSnapshot(
+            identity=b.name,
+            tip=tip,
+            created=created,
+            contained=contained,
+            current="yes" if b.is_head else "no",
+            upstream=b.upstream_name or "none",
+            ahead=b.ahead if b.ahead != "?" else "0",
+            behind=b.behind if b.behind != "?" else "0",
             recent_msg=recent_msg,
             recent_author=recent_author,
-            created=created,
         )
 
     def current_branch(self) -> str:

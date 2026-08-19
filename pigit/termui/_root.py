@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
 from ._component import Component, resolve_focus_leaf
@@ -19,6 +19,7 @@ from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
 from ._overlay_api import get_badge_signal
+from . import palette
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
@@ -252,8 +253,9 @@ class ComponentRoot(Component):
     def _handle_mouse(self, event: MouseEvent) -> bool:
         """Route a mouse event: overlays first, then body with click-to-focus.
 
-        A MODAL swallows clicks outside it (mirroring ``LayerStack.dispatch``);
-        a SHEET passes through to the body when the click misses it.
+        MODAL swallows clicks that miss it (it is a centered dialog). A SHEET
+        is an edge overlay, so a click outside it falls through to the body —
+        the rest of the app stays clickable while the sheet is open.
         """
         modal = self._layer_stack.top(LayerKind.MODAL)
         if modal is not None and getattr(modal, "open", False):
@@ -262,8 +264,6 @@ class ComponentRoot(Component):
                 return True
             target, lcol, lrow = hit
             target.handle_mouse(replace(event, col=lcol, row=lrow))
-            # handle_mouse may close the modal (e.g. OK/Cancel); re-sync focus
-            # after, so a closed modal restores focus to the body.
             self._focus_manager.sync_focus_to_overlay_or_leaf()
             return True
 
@@ -324,12 +324,18 @@ class ComponentRoot(Component):
             self._pop_layer(LayerKind.TOAST)
 
     def show_sheet(
-        self, child: Component, height: int = 8, show_border: bool = False
+        self,
+        child: Component,
+        height: int = 8,
+        show_border: bool = False,
+        *,
+        edge: Literal["top", "bottom"] = "bottom",
+        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
     ) -> Sheet:
-        """Display a bottom sheet on the SHEET layer."""
+        """Display a sheet on the SHEET layer."""
         from .widgets import Sheet
 
-        sheet = Sheet(child, height, show_border=show_border)
+        sheet = Sheet(child, height, show_border=show_border, edge=edge, bg=bg)
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
         return sheet

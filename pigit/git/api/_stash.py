@@ -12,6 +12,7 @@ import shlex
 from pigit.ext.executor import WAITING, REPLY, DECODE
 
 from ..model import Stash
+from ._util import parse_numstat
 from ._base import _OpsBase
 from ._errors import GitError
 
@@ -152,3 +153,39 @@ class _StashOps(_OpsBase):
         )
         if code != 0:
             raise GitError(err or f"stash store failed: {sha}")
+
+    def stash_numstat(
+        self, ref: str, path: str | None = None
+    ) -> tuple[list[tuple[str, int, int]], int, int]:
+        """Return numstat for a stash entry."""
+        path = path or self.path
+        _code, _err, resp = self.executor.exec(
+            f"git stash show --numstat {shlex.quote(ref)}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not resp:
+            return [], 0, 0
+        return parse_numstat(str(resp))
+
+    def stash_meta(
+        self, ref: str, path: str | None = None
+    ) -> tuple[str, int, list[str]] | None:
+        """Return ``(author, unix_ts, parent_shas)`` for a stash commit."""
+        path = path or self.path
+        _code, _err, out = self.executor.exec(
+            f"git log -1 --format=%aN%x00%at%x00%P {shlex.quote(ref)}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        text = str(out or "").strip()
+        if not text:
+            return None
+        # NUL separators so a "|" in the author name cannot split them.
+        author, ts_raw, parents_raw = text.split("\x00", 2)
+        try:
+            ts = int(ts_raw)
+        except ValueError:
+            return None
+        parents = [p for p in parents_raw.split() if p]
+        return author, ts, parents

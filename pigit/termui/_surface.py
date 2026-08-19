@@ -416,13 +416,11 @@ class Surface:
         height: int,
         bg: tuple[int, int, int] | None = None,
     ) -> None:
-        """Fill a rectangular area with a solid background color.
+        """Fill a rectangular area with spaces.
 
-        Existing character content is replaced with spaces.
-        When ``bg`` is *None*, the fill is skipped (transparent).
+        Existing character content is replaced. ``bg`` is stored on each cell
+        and may be ``None`` (no background color).
         """
-        if bg is None:
-            return
         cell = FlatCell(" ", bg=bg)
         for r in range(row, min(row + height, self.height)):
             for c in range(col, min(col + width, self.width)):

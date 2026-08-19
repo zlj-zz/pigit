@@ -71,6 +71,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `Enter` | select / open | all |
 | `q` / `Esc` | back / quit | all |
 | `?` | help | all |
+| `I` | inspect selection (top sheet; `j`/`k` scroll, `Esc`/`I` close) | Status, Stash, Branch, Commit |
 | `a` / `d` / `i` | stage / discard / ignore | Status |
 | `c` | inline commit editor | Status |
 | `c` | cherry-pick onto HEAD | Commit |
@@ -284,6 +285,7 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 - **Auto refresh** — periodic background refresh of the active panel while the TUI is idle.
 - **Syntax highlighting** — diff and file-history views tokenize source code by language.
 - **Adaptive layout** — side-by-side preview panel on large terminals.
+- **Inspector sheet** — `I` opens a frozen selection snapshot as a top overlay (not a layout column).
 
 **CLI**
 

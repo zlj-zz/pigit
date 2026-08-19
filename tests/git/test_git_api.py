@@ -443,3 +443,221 @@ class TestIsAncestor:
         git = GitApi(executor=MockExecutor(default=(128, "fatal", "")), path="/repo")
         with pytest.raises(GitError):
             git.is_ancestor("abc")
+
+
+def _index_blob_cmd(rel: str) -> str:
+    return f"git rev-parse --verify --end-of-options :{shlex.quote(rel)}"
+
+
+def _diff_worktree_cmd(rel: str) -> str:
+    return f"git diff --quiet --no-ext-diff -- {shlex.quote(rel)}"
+
+
+def _ls_unmerged_cmd(rel: str) -> str:
+    return f"git ls-files -u -- {shlex.quote(rel)}"
+
+
+def _log_path_cmd(rel: str) -> str:
+    return f"git log -1 --format=%h%x00%s%x00%aN%x00%at -- {shlex.quote(rel)}"
+
+
+def _branch_recent_cmd(name: str) -> str:
+    return f"git log {shlex.quote(name)} -1 --pretty=format:%s%x00%aN"
+
+
+def _stash_numstat_cmd(ref: str) -> str:
+    return f"git stash show --numstat {shlex.quote(ref)}"
+
+
+def _stash_meta_cmd(ref: str) -> str:
+    return f"git log -1 --format=%aN%x00%at%x00%P {shlex.quote(ref)}"
+
+
+class TestInspectorGitReads:
+    def test_compare_index_worktree_equal(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (0, "", "abc123\n"),
+                    _diff_worktree_cmd(rel): (0, "", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "equal"
+
+    def test_compare_index_worktree_differ(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (0, "", "aaa\n"),
+                    _diff_worktree_cmd(rel): (1, "", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
+
+    def test_compare_index_worktree_untracked(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "worktree"
+
+    def test_unmerged_stages(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _ls_unmerged_cmd(rel): (
+                        0,
+                        "",
+                        "100644 abc 1\ta.py\n100644 def 2\ta.py\n100644 ghi 3\ta.py\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.unmerged_stages(rel) == [1, 2, 3]
+
+    def test_last_commit_for_path(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix layout\x00zev\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix layout",
+            "zev",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_pipe_in_subject(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix A | B\x00zev\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix A | B",
+            "zev",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_pipe_in_author(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix layout\x00Jane | Doe\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix layout",
+            "Jane | Doe",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_empty(self):
+        git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
+        assert git.last_commit_for_path("a.py") is None
+
+    def test_get_branch_recent_commit(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _branch_recent_cmd("feat"): (0, "", "Fix layout\x00Zev\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.get_branch_recent_commit("feat") == ("Fix layout", "Zev")
+
+    def test_get_branch_recent_commit_subject_with_pipe(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _branch_recent_cmd("feat"): (0, "", "Fix A | B\x00Zev\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.get_branch_recent_commit("feat") == ("Fix A | B", "Zev")
+
+    def test_get_branch_recent_commit_empty(self):
+        git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
+        assert git.get_branch_recent_commit("feat") == ("?", "?")
+
+    def test_stash_numstat(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={_stash_numstat_cmd(ref): (0, "", "10\t5\ta.py\n")}
+            ),
+            path="/repo",
+        )
+        files, add, delete = git.stash_numstat(ref)
+        assert files == [("a.py", 10, 5)]
+        assert add == 10
+        assert delete == 5
+
+    def test_stash_meta(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _stash_meta_cmd(ref): (0, "", "Zev\x001700000000\x00abc def\n")
+                }
+            ),
+            path="/repo",
+        )
+        assert git.stash_meta(ref) == ("Zev", 1700000000, ["abc", "def"])
+
+    def test_stash_meta_pipe_in_author(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _stash_meta_cmd(ref): (
+                        0,
+                        "",
+                        "Jane | Doe\x001700000000\x00abc def\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.stash_meta(ref) == ("Jane | Doe", 1700000000, ["abc", "def"])

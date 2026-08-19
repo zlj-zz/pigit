@@ -32,7 +32,7 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
-from .app_types import CommitInfo, GraphRow
+from .app_types import CommitSnapshot, GraphRow
 from .app_diff import DiffType
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
@@ -322,10 +322,10 @@ class CommitPanel(ItemList):
             return self.commits[self.curr_no]
         return None
 
-    def get_inspector_data(self) -> CommitInfo | None:
-        """Return inspector data for the currently selected commit."""
+    def get_inspector_snapshot(self) -> CommitSnapshot | None:
+        """Return a frozen snapshot for the selected commit."""
         source_idx = self._filter.source_index(self.curr_no)
-        return self._vm.get_inspector_data(source_idx)
+        return self._vm.get_inspector_snapshot(source_idx)
 
     def activate(self) -> None:
         super().activate()

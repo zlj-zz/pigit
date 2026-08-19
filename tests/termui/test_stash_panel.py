@@ -112,6 +112,29 @@ def test_apply_keeps_stash_without_confirmation():
     vm.stash_pop.assert_not_called()
 
 
+def test_get_inspector_snapshot_delegates_to_vm():
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.load_stashes.return_value = [
+        Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
+    ]
+    vm.get_stash_snapshot.return_value = object()
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    panel.curr_no = 0
+    assert panel.get_inspector_snapshot() is vm.get_stash_snapshot.return_value
+    vm.get_stash_snapshot.assert_called_once_with("stash@{0}")
+
+
+def test_get_inspector_snapshot_empty_is_none():
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.load_stashes.return_value = []
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    assert panel.get_inspector_snapshot() is None
+
+
 def test_apply_empty_list_is_noop():
     vm = Mock()
     vm.items = Signal([])

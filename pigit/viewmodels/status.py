@@ -19,7 +19,7 @@ from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 from pigit.git.model import File
 
 if TYPE_CHECKING:
-    from pigit.app_types import FileInfo
+    from pigit.app_types import FileSnapshot, StashSnapshot
     from pigit.git.api import GitApi
     from pigit.git.model import Stash
 
@@ -53,7 +53,9 @@ class IStatusViewModel(IListViewModel["File"]):
 
     def load_diff(self, idx: int, plain: bool = True) -> list[str]: ...
 
-    def get_inspector_data(self, idx: int) -> FileInfo | None: ...
+    def get_inspector_snapshot(self, idx: int) -> FileSnapshot | None: ...
+
+    def get_stash_snapshot(self, ref: str) -> StashSnapshot | None: ...
 
     def stage_indices(self, indices: set[int]) -> ActionResult: ...
 
@@ -250,14 +252,71 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         text = self._git.load_file_diff(f.name, f.tracked, cached, plain=plain)
         return text.splitlines()
 
-    def get_inspector_data(self, idx: int) -> FileInfo | None:
+    def get_inspector_snapshot(self, idx: int):
         f = self.item_at(idx)
         if f is None:
             return None
-        size, mtime = self._git.get_file_info(f)
-        from pigit.app_types import FileInfo
+        return self._memo_inspector(f.name, lambda: self._build_file_snapshot(f))
 
-        return FileInfo(file=f, size=size, mtime=mtime)
+    def _build_file_snapshot(self, f: File):
+        from pigit.app_types import FileSnapshot
+        from pigit.ext.utils import relative_time
+
+        rel = f.get_file_str()
+        raw_name = f.name
+        path = (
+            " → ".join(p.strip() for p in raw_name.split("->"))
+            if "->" in raw_name
+            else rel
+        )
+        blobs_kind = self._git.compare_index_worktree(rel)
+        blobs = {
+            "equal": "index = worktree",
+            "differ": "index ≠ worktree",
+            "worktree": "worktree",
+        }.get(blobs_kind, blobs_kind)
+        stages = self._git.unmerged_stages(rel)
+        size, mode = self._git.get_file_info(f)
+        last_row = self._git.last_commit_for_path(rel)
+        last = None
+        if last_row is not None:
+            sha, subject, author, ts = last_row
+            last = f"{sha} {subject}  ({author}, {relative_time(ts)})"
+        return FileSnapshot(
+            identity=rel,
+            path=path,
+            blobs=blobs,
+            stages=", ".join(str(s) for s in stages) if stages else None,
+            size=size,
+            mode=mode,
+            last=last,
+        )
+
+    def get_stash_snapshot(self, ref: str):
+        return self._memo_inspector(
+            ("stash", ref), lambda: self._build_stash_snapshot(ref)
+        )
+
+    def _build_stash_snapshot(self, ref: str):
+        from pigit.app_types import StashSnapshot
+        from pigit.ext.utils import relative_time
+
+        meta = self._git.stash_meta(ref)
+        files, total_add, total_del = self._git.stash_numstat(ref)
+        author = when = None
+        parents: list[str] = []
+        if meta is not None:
+            author, ts, parents = meta
+            when = relative_time(ts)
+        return StashSnapshot(
+            identity=ref,
+            author=author,
+            when=when,
+            parents=parents,
+            files=files,
+            total_add=total_add,
+            total_del=total_del,
+        )
 
     def stage_indices(self, indices: set[int]) -> ActionResult:
         items = self._items.value

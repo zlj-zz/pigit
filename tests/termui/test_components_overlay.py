@@ -408,6 +408,22 @@ class TestSheet:
         # With border: child height is sheet height minus 1
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (8, 0)
+        assert surface._rows[7][0].char == "╭"
+        assert surface._rows[7][19].char == "╮"
+
+    def test_sheet_top_edge_border_is_on_last_row(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, show_border=True, edge="top")
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet._render_surface(surface)
+        sub = child._render_surface.call_args[0][0]
+        assert sub.height == 2
+        assert sub._to_parent(0, 0) == (0, 0)
+        assert surface._rows[2][0].char == "╰"
+        assert surface._rows[2][19].char == "╯"
+        assert surface._rows[0][0].char != "╭"
 
     def test_sheet_render_surface_zero_height_skips(self):
         child = MagicMock()
@@ -462,12 +478,74 @@ class TestSheet:
         # With border: child height is sheet height minus 1
         child.resize.assert_called_once_with((40, 5))
 
+    def test_sheet_hit_test_top_edge_border_not_swallowed(self):
+        """The border is the last sheet row; the row above it must reach the child."""
+        child = MagicMock()
+        child._size = (20, 5)
+        child._hit_test.return_value = (child, 5, 5)
+        sheet = Sheet(child, height=6, show_border=True, edge="top")
+        sheet.resize((20, 20))
+        # Row 5 (1-based) is the last content row; it must hit the child.
+        hit = sheet._hit_test(3, 5)
+        assert hit[0] is child
+        child._hit_test.assert_called_once_with(3, 5)
+        child._hit_test.reset_mock()
+        # Row 6 (1-based) is the border; it belongs to the sheet itself.
+        hit = sheet._hit_test(3, 6)
+        assert hit[0] is sheet
+        child._hit_test.assert_not_called()
+
+    def test_sheet_hit_test_bottom_edge_border_first_row(self):
+        """For a bottom sheet the border is the first row; content rows offset by one."""
+        child = MagicMock()
+        child._size = (20, 5)
+        child._hit_test.return_value = (child, 5, 1)
+        sheet = Sheet(child, height=6, show_border=True)
+        sheet.resize((20, 20))
+        # Row 15 (1-based) is the border.
+        hit = sheet._hit_test(3, 15)
+        assert hit[0] is sheet
+        # Row 16 (1-based) is the first content row, mapped to child row 1.
+        hit = sheet._hit_test(3, 16)
+        assert hit[0] is child
+        child._hit_test.assert_called_once_with(3, 1)
+
     def test_sheet_hide_sets_open_false(self):
         child = _Leaf()
         sheet = Sheet(child, height=3)
         assert sheet.open is True
         sheet.hide()
         assert sheet.open is False
+
+    def test_sheet_top_edge_renders_at_row_zero(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, edge="top")
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet._render_surface(surface)
+        sub = child._render_surface.call_args[0][0]
+        assert sub._to_parent(0, 0) == (0, 0)
+
+    def test_sheet_top_edge_resize_origin(self):
+        child = MagicMock()
+        sheet = Sheet(child, height=6, edge="top")
+        sheet.resize((40, 20))
+        assert sheet._size == (40, 6)
+        assert sheet.x == 1
+        assert sheet.y == 1
+
+    def test_sheet_bg_none_still_clears_region(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, edge="top", bg=None)
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        surface.draw_text_rgb(0, 0, "HELLO", bg=(1, 2, 3))
+        sheet._render_surface(surface)
+        assert surface._rows[0][0].char == " "
+        assert surface._rows[0][0].bg is None
+        assert surface._rows[0][4].char == " "
 
 
 class TestHelpPanel:

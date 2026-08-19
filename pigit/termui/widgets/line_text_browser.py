@@ -10,6 +10,7 @@ from __future__ import annotations
 from .. import palette
 from .._component import Component
 from .._mouse import MouseButton, MouseKind, MouseEvent
+from .._segment import Segment
 from .._surface import Surface, _Subsurface
 
 
@@ -21,16 +22,25 @@ class LineTextBrowser(Component):
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
-        content: list[str] | None = None,
+        content: list[str] | list[list[Segment]] | None = None,
         id: str | None = None,
+        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
     ) -> None:
         super().__init__(x, y, size, id=id)
-        self._content = content
+        self._rows: list[list[Segment]] | None = None
+        self._content: list[str] | None
         self._max_line = self._size[1]
-
+        self._bg = bg
         self._i = 0
-
         self._r = [0, self._size[1]]
+        if content is None:
+            self._content = None
+        elif content and isinstance(content[0], list):
+            rows = content
+            self._rows = rows
+            self._content = ["".join(seg.text for seg in row) for row in rows]
+        else:
+            self._content = content
 
     def resize(self, size: tuple[int, int]):
         """Resize the browser and update the maximum visible lines."""
@@ -38,17 +48,20 @@ class LineTextBrowser(Component):
         super().resize(size)
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
-        if self._content is None:
+        rows = self._visible_rows()
+        if rows is None:
             return
-        end = min(self._i + self._max_line, len(self._content))
+        end = min(self._i + self._max_line, len(rows))
         for idx in range(self._i, end):
-            surface.draw_text_rgb(
-                idx - self._i,
-                0,
-                self._content[idx],
-                fg=palette.DEFAULT_FG,
-                bg=palette.DEFAULT_BG,
-            )
+            surface.draw_segments(idx - self._i, 0, rows[idx])
+
+    def _visible_rows(self) -> list[list[Segment]] | None:
+        if self._rows is not None:
+            return self._rows
+        if self._content is None:
+            return None
+        fg = palette.DEFAULT_FG
+        return [[Segment(line, fg=fg, bg=self._bg)] for line in self._content]
 
     def scroll_up(self, line: int = 1):
         """Scroll the view up by the given number of lines."""

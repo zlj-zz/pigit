@@ -256,5 +256,9 @@ class StashPanel(ItemList):
     def get_help_title(self) -> str:
         return "Stash"
 
-    def get_inspector_data(self):
-        return None
+    def get_inspector_snapshot(self):
+        """Return a frozen snapshot for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return None
+        return self._vm.get_stash_snapshot(stash.ref)

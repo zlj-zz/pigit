@@ -98,17 +98,55 @@ def test_checkout_theirs_success(status_vm):
     assert result.message == "Theirs"
 
 
-def test_get_inspector_data(status_vm):
-    status_vm._git.get_file_info.return_value = ("1.2 KB", "2 days ago")
-    info = status_vm.get_inspector_data(0)
+def test_get_inspector_snapshot(status_vm):
+    status_vm._git.get_file_info.return_value = ("1.2K", "644")
+    status_vm._git.compare_index_worktree.return_value = "differ"
+    status_vm._git.unmerged_stages.return_value = []
+    status_vm._git.last_commit_for_path.return_value = None
+    info = status_vm.get_inspector_snapshot(0)
     assert info is not None
-    assert info.file.name == "a.py"
-    assert info.size == "1.2 KB"
-    assert info.mtime == "2 days ago"
+    assert info.identity == "a.py"
+    assert info.size == "1.2K"
+    assert info.mode == "644"
+    assert info.blobs == "index ≠ worktree"
 
 
-def test_get_inspector_data_invalid_index(status_vm):
-    assert status_vm.get_inspector_data(99) is None
+def test_get_inspector_snapshot_invalid_index(status_vm):
+    assert status_vm.get_inspector_snapshot(99) is None
+
+
+def test_get_inspector_snapshot_memoizes_same_selection(status_vm):
+    status_vm._git.get_file_info.return_value = ("1.2K", "644")
+    status_vm._git.compare_index_worktree.return_value = "differ"
+    status_vm._git.unmerged_stages.return_value = []
+    status_vm._git.last_commit_for_path.return_value = None
+    first = status_vm.get_inspector_snapshot(0)
+    second = status_vm.get_inspector_snapshot(0)
+    assert first is second
+    assert status_vm._git.compare_index_worktree.call_count == 1
+    assert status_vm._git.last_commit_for_path.call_count == 1
+
+
+def test_get_stash_snapshot_memoizes_same_ref(status_vm):
+    status_vm._git.stash_meta.return_value = ("Zev", 1700000000, ["abc"])
+    status_vm._git.stash_numstat.return_value = ([("a.py", 1, 0)], 1, 0)
+    first = status_vm.get_stash_snapshot("stash@{0}")
+    second = status_vm.get_stash_snapshot("stash@{0}")
+    assert first is second
+    assert status_vm._git.stash_meta.call_count == 1
+    assert status_vm._git.stash_numstat.call_count == 1
+
+
+def test_get_inspector_snapshot_invalidated_on_refresh(status_vm):
+    status_vm._git.get_file_info.return_value = ("1.2K", "644")
+    status_vm._git.compare_index_worktree.return_value = "differ"
+    status_vm._git.unmerged_stages.return_value = []
+    status_vm._git.last_commit_for_path.return_value = None
+    first = status_vm.get_inspector_snapshot(0)
+    status_vm._on_loaded(status_vm._items.value)
+    second = status_vm.get_inspector_snapshot(0)
+    assert first is not second
+    assert status_vm._git.compare_index_worktree.call_count == 2
 
 
 def test_stage_indices_mixed_set_stages_only_unstaged(status_vm):

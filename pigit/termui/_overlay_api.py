@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 from collections.abc import Callable, Sequence
 
 _R = TypeVar("_R")
 
 from ._feedback import FeedbackKind, style_for
 from ._layer import LayerKind
+from . import palette
 from .reactive import Signal
 from .types import ToastPosition
 from ._runtime_context import (
@@ -152,10 +153,17 @@ def show_toast(
 
 
 def show_sheet(
-    child: Component, height: int = 8, show_border: bool = False
+    child: Component,
+    height: int = 8,
+    show_border: bool = False,
+    *,
+    edge: Literal["top", "bottom"] = "bottom",
+    bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
 ) -> Sheet | None:
-    """Display a bottom sheet via the current overlay host."""
-    sheet = _with_host(lambda h: h.show_sheet(child, height, show_border=show_border))
+    """Display a sheet via the current overlay host."""
+    sheet = _with_host(
+        lambda h: h.show_sheet(child, height, show_border=show_border, edge=edge, bg=bg)
+    )
     if sheet is not None:
         request_render()
     return sheet

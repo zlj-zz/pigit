@@ -44,18 +44,37 @@ def test_remotes_populated(commit_vm):
     assert commit_vm.remotes == ("origin",)
 
 
-def test_get_inspector_data(commit_vm):
+def test_get_inspector_snapshot(commit_vm):
     commit_vm._git.get_commit_stats.return_value = ([("a.py", 10, 5)], 10, 5)
-    info = commit_vm.get_inspector_data(0)
+    info = commit_vm.get_inspector_snapshot(0)
     assert info is not None
-    assert info.commit.sha == "abc1234"
-    assert info.changed_files == [("a.py", 10, 5)]
+    assert info.sha == "abc1234"
+    assert info.msg == "first"
+    assert info.author == "Zev"
+    assert info.status == "pushed"
+    assert info.tags == "none"
+    assert info.files == [("a.py", 10, 5)]
     assert info.total_add == 10
     assert info.total_del == 5
 
 
-def test_get_inspector_data_invalid_index(commit_vm):
-    assert commit_vm.get_inspector_data(99) is None
+def test_get_inspector_snapshot_joins_tags(commit_vm):
+    commit_vm._items.value[0].tag = ["v1.0", "latest"]
+    commit_vm._git.get_commit_stats.return_value = ([], 0, 0)
+    info = commit_vm.get_inspector_snapshot(0)
+    assert info.tags == "v1.0, latest"
+
+
+def test_get_inspector_snapshot_invalid_index(commit_vm):
+    assert commit_vm.get_inspector_snapshot(99) is None
+
+
+def test_get_inspector_snapshot_memoizes_same_selection(commit_vm):
+    commit_vm._git.get_commit_stats.return_value = ([("a.py", 10, 5)], 10, 5)
+    first = commit_vm.get_inspector_snapshot(0)
+    second = commit_vm.get_inspector_snapshot(0)
+    assert first is second
+    assert commit_vm._git.get_commit_stats.call_count == 1
 
 
 def test_load_diff(commit_vm):

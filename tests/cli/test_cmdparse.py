@@ -90,9 +90,10 @@ class TestCompletion:
         assert "b" in commands
         assert "i" in commands
         assert "_git_branches" in vars_["cmd_arg_cases"]
-        assert "_git_files" in vars_["cmd_arg_cases"] or "_git_files" in vars_[
-            "helper_functions"
-        ]
+        assert (
+            "_git_files" in vars_["cmd_arg_cases"]
+            or "_git_files" in vars_["helper_functions"]
+        )
 
     def test_error(self):
         # error complete_vars
