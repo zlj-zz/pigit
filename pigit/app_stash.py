@@ -28,6 +28,7 @@ from pigit.termui.widgets import AlertDialog, ItemList
 from .app_diff import DiffType
 from .app_preview_toggle import invoke_preview_toggle
 from .app_theme import THEME
+from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
     from pigit.git.model import Stash
@@ -145,6 +146,19 @@ class StashPanel(ItemList):
         )
         return ItemList.handle_mouse(self, adjusted)
 
+    def _current_stash(self) -> Stash | None:
+        """Return the stash under the cursor, or None if the list is empty."""
+        if not self.stashes:
+            return None
+        return self.stashes[self.curr_no]
+
+    def _run_on_current(self, op: Callable[[str], ActionResult]) -> None:
+        """Run a stash-ref operation on the current row."""
+        stash = self._current_stash()
+        if stash is None:
+            return
+        self._handle_result(op(stash.ref))
+
     @bind_action("next", "j", "down", desc="Navigate stash list", tip="Navigate")
     def next_item(self, step: int = 1) -> None:
         self.next(step)
@@ -157,9 +171,9 @@ class StashPanel(ItemList):
         "view_diff", "enter", desc="View diff for selected stash", tip="View diff"
     )
     def view_diff(self) -> None:
-        if not self.stashes:
+        stash = self._current_stash()
+        if stash is None:
             return
-        stash = self.stashes[self.curr_no]
         diff_lines = self._vm.load_stash_diff(stash.ref)
         self.emit(
             EVT_GOTO,
@@ -178,26 +192,30 @@ class StashPanel(ItemList):
 
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:
-        if not self.stashes:
-            return
-        stash = self.stashes[self.curr_no]
-        result = self._vm.stash_pop(stash.ref)
-        self._handle_result(result)
+        self._run_on_current(self._vm.stash_pop)
+
+    @bind_action(
+        "apply",
+        "a",
+        desc="Apply selected stash onto working tree (keep in list)",
+        tip="Apply",
+    )
+    def apply(self) -> None:
+        self._run_on_current(self._vm.stash_apply)
 
     @bind_action(
         "drop", "d", desc="Drop selected stash permanently (irreversible)", tip="Drop"
     )
     def drop(self) -> None:
         """Drop the selected stash after confirmation (irreversible)."""
-        if not self.stashes:
+        stash = self._current_stash()
+        if stash is None:
             return
-        stash = self.stashes[self.curr_no]
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 return
-            result = self._vm.stash_drop(stash.ref)
-            self._handle_result(result)
+            self._handle_result(self._vm.stash_drop(stash.ref))
 
         self._alert_dialog.alert(
             f"Drop stash '{stash.ref}'?", on_result, destructive=True

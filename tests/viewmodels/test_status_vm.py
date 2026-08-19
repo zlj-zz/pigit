@@ -190,3 +190,18 @@ def test_amend_failure(status_vm):
     result = status_vm.amend()
     assert result.success is False
     assert "amend failed" in result.message
+
+
+def test_stash_push_passes_message(status_vm):
+    result = status_vm.stash_push("wip")
+    assert result.success is True
+    assert result.message == "Stashed"
+    status_vm._git.stash_push.assert_called_once_with(message="wip")
+
+
+def test_stash_apply_keeps_entry(status_vm):
+    result = status_vm.stash_apply("stash@{0}")
+    assert result.success is True
+    assert result.message == "Applied stash"
+    status_vm._git.stash_apply.assert_called_once_with("stash@{0}")
+    status_vm._git.stash_pop.assert_not_called()

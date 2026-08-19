@@ -8,7 +8,7 @@ Date: 2026-08-18
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from pigit.app_status import StatusPanel
 from pigit.git.model import File
@@ -122,3 +122,41 @@ def test_discard_on_dir_confirms_then_discards_children() -> None:
     vm.discard_indices.assert_not_called()
     captured["on_result"](True)
     vm.discard_indices.assert_called_once_with({0, 1})
+
+
+def test_stash_opens_message_sheet_without_pushing() -> None:
+    files = [_file("a.py")]
+    panel, vm = _panel(files)
+    with patch("pigit.app_status.show_sheet") as sheet:
+        panel.stash()
+        sheet.assert_called_once()
+        vm.stash_push.assert_not_called()
+
+
+def test_stash_submit_strips_message_and_pushes() -> None:
+    files = [_file("a.py")]
+    panel, vm = _panel(files)
+    vm.stash_push.return_value = ActionResult(
+        success=True, message="Stashed", should_refresh=True
+    )
+    with (
+        patch("pigit.app_status.dismiss_sheet") as dismiss,
+        patch("pigit.app_status.show_badge"),
+    ):
+        panel._on_stash_submit("  wip  ")
+        dismiss.assert_called_once()
+        vm.stash_push.assert_called_once_with("wip")
+
+
+def test_stash_submit_empty_message_still_pushes() -> None:
+    files = [_file("a.py")]
+    panel, vm = _panel(files)
+    vm.stash_push.return_value = ActionResult(
+        success=True, message="Stashed", should_refresh=False
+    )
+    with (
+        patch("pigit.app_status.dismiss_sheet"),
+        patch("pigit.app_status.show_badge"),
+    ):
+        panel._on_stash_submit("   ")
+        vm.stash_push.assert_called_once_with("")

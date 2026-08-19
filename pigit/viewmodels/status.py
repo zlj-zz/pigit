@@ -70,9 +70,11 @@ class IStatusViewModel(IListViewModel["File"]):
 
     def load_stashes(self) -> list[Stash]: ...
 
-    def stash_push(self) -> ActionResult: ...
+    def stash_push(self, message: str = "") -> ActionResult: ...
 
     def stash_pop(self, ref: str = "stash@{0}") -> ActionResult: ...
+
+    def stash_apply(self, ref: str) -> ActionResult: ...
 
     def stash_drop(self, ref: str) -> ActionResult: ...
 
@@ -377,8 +379,10 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         except Exception as e:
             return ActionResult(success=False, message=str(e))
 
-    def stash_push(self) -> ActionResult:
-        result = self._stash_op(self._git.stash_push, "Stashed")
+    def stash_push(self, message: str = "") -> ActionResult:
+        result = self._stash_op(
+            lambda: self._git.stash_push(message=message), "Stashed"
+        )
         if result.success and self._history is not None:
             cmd = ReverseCommand(op_type="stash_push", payload={})
             self._history.push(
@@ -405,6 +409,9 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
                 )
             )
         return result
+
+    def stash_apply(self, ref: str) -> ActionResult:
+        return self._stash_op(lambda: self._git.stash_apply(ref), "Applied stash")
 
     def stash_drop(self, ref: str) -> ActionResult:
         return self._stash_op(lambda: self._git.stash_drop(ref), "Dropped stash")

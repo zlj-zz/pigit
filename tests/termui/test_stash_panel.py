@@ -15,6 +15,7 @@ from pigit.git.model import Stash
 from pigit.termui import palette
 from pigit.termui._surface import Surface
 from pigit.termui.reactive import Signal
+from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.status import IStatusViewModel
 
 
@@ -91,3 +92,32 @@ def test_drop_empty_list_is_noop():
         panel.drop()
         alert.assert_not_called()
         vm.stash_drop.assert_not_called()
+
+
+def test_apply_keeps_stash_without_confirmation():
+    vm = Mock()
+    vm.items = Signal([])
+    vm.load_stashes.return_value = [
+        Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
+    ]
+    vm.stash_apply = Mock(
+        return_value=ActionResult(success=True, message="Applied stash")
+    )
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    panel.curr_no = 0
+    with patch("pigit.app_stash.show_badge"):
+        panel.apply()
+    vm.stash_apply.assert_called_once_with("stash@{0}")
+    vm.stash_pop.assert_not_called()
+
+
+def test_apply_empty_list_is_noop():
+    vm = Mock()
+    vm.items = Signal([])
+    vm.load_stashes.return_value = []
+    vm.stash_apply = Mock()
+    panel = StashPanel(vm=vm)
+    panel.activate()
+    panel.apply()
+    vm.stash_apply.assert_not_called()

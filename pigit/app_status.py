@@ -33,7 +33,7 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import InputLine, ItemList
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
@@ -319,6 +319,13 @@ class StatusPanel(ItemList):
         self._visual_anchor: int | None = None
         self._selected: set[int] = set()
         self._visual_scroll = False  # auto-select while navigating
+        self._stash_input = InputLine(
+            prompt="Stash message: ",
+            placeholder="empty = git default",
+            on_submit=self._on_stash_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
+        )
 
     def activate(self) -> None:
         super().activate()
@@ -631,12 +638,19 @@ class StatusPanel(ItemList):
     @bind_action(
         "stash",
         "s",
-        desc="Stash working tree including untracked (not in visual mode)",
+        desc="Stash working tree including untracked; optional message (not in visual mode)",
         tip="Stash",
         tip_when=lambda self: not self._visual_mode,
     )
     def stash(self) -> None:
-        result = self._vm.stash_push()
+        if self._visual_mode:
+            return
+        self._stash_input.clear()
+        show_sheet(self._stash_input, height=3)
+
+    def _on_stash_submit(self, message: str) -> None:
+        dismiss_sheet()
+        result = self._vm.stash_push(message.strip())
         self._handle_result(result)
 
     @bind_action(

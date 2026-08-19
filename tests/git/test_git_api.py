@@ -87,6 +87,17 @@ class TestStashEdgeCases:
         git.stash_push(message="wip")
         assert ex.exec_calls[0][0] == "git stash push -u -m wip"
 
+    def test_stash_apply_quotes_ref(self):
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+        git.stash_apply("stash@{0}")
+        assert ex.exec_calls[0][0] == "git stash apply 'stash@{0}'"
+
+    def test_stash_apply_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "conflict", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.stash_apply("stash@{0}")
+
 
 class TestLogGraph:
     def test_load_log_graph_command_shape(self):

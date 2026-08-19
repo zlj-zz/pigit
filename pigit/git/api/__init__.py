@@ -185,6 +185,9 @@ class GitApi:
     def stash_pop(self, ref, path=None):
         return self._stash.stash_pop(ref, path)
 
+    def stash_apply(self, ref, path=None):
+        return self._stash.stash_apply(ref, path)
+
     def stash_drop(self, ref, path=None):
         return self._stash.stash_drop(ref, path)
 
