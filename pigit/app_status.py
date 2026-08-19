@@ -452,11 +452,7 @@ class StatusPanel(ItemList):
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
-        "open_diff",
-        "enter",
-        desc="Open diff for selected file (not in visual mode)",
-        tip="Open",
-        tip_when=lambda self: not self._visual_mode,
+        "open_diff", "enter", desc="Open diff for selected file (not in visual mode)"
     )
     def open_diff(self) -> None:
         if self._tree_mode:
@@ -506,6 +502,18 @@ class StatusPanel(ItemList):
             self._clear_visual_mode()
 
     @bind_action(
+        "stage_all",
+        "A",
+        desc="Toggle staging for all listed files",
+        tip="Stage",
+    )
+    def stage_all(self) -> None:
+        if not self.files:
+            return
+        result = self._vm.stage_indices(set(self._filter.map))
+        self._handle_result(result)
+
+    @bind_action(
         "commit",
         "c",
         desc="Open inline commit editor (not in visual mode)",
@@ -549,39 +557,6 @@ class StatusPanel(ItemList):
         editor.activate()
 
     @bind_action(
-        "amend",
-        "A",
-        desc="Amend last commit with staged changes (not in visual mode)",
-    )
-    def amend(self) -> None:
-        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
-        if self._visual_mode:
-            return
-        if not self._vm.staged_files:
-            show_toast(
-                "No staged changes to amend",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-
-        def on_result(confirmed: bool) -> None:
-            if not confirmed:
-                return
-            result = self._vm.amend()
-            if result.success:
-                self._vm.refresh()
-                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
-
-        self._alert_dialog.alert(
-            "Amend last commit with staged changes?",
-            on_result,
-            destructive=True,
-        )
-
-    @bind_action(
         "commit_editor",
         "C",
         desc="Open external $EDITOR for commit (not in visual mode)",
@@ -611,6 +586,41 @@ class StatusPanel(ItemList):
             raise
         finally:
             self._vm.refresh()
+
+    @bind_action(
+        "amend",
+        "m",
+        desc="Amend last commit with staged changes (not in visual mode)",
+        tip="Amend",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def amend(self) -> None:
+        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
+        if self._visual_mode:
+            return
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to amend",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.amend()
+            if result.success:
+                self._vm.refresh()
+                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        self._alert_dialog.alert(
+            "Amend last commit with staged changes?",
+            on_result,
+            destructive=True,
+        )
 
     @bind_action(
         "discard",
@@ -743,11 +753,7 @@ class StatusPanel(ItemList):
         self._collapse_current_dir()
 
     @bind_action(
-        "open_editor",
-        "E",
-        desc="Open file in external $EDITOR (not in visual mode)",
-        tip="Edit",
-        tip_when=lambda self: not self._visual_mode,
+        "open_editor", "E", desc="Open file in external $EDITOR (not in visual mode)"
     )
     def open_editor(self) -> None:
         hit = self.file_at_cursor()

@@ -124,6 +124,37 @@ def test_discard_on_dir_confirms_then_discards_children() -> None:
     vm.discard_indices.assert_called_once_with({0, 1})
 
 
+def test_stage_all_stages_every_listed_file() -> None:
+    files = [_file("a.py"), _file("b.py"), _file("c.py")]
+    panel, vm = _panel(files, tree=False)
+    panel.stage_all()
+    vm.stage_indices.assert_called_once_with({0, 1, 2})
+    vm.stage.assert_not_called()
+
+
+def test_stage_all_uses_filter_map() -> None:
+    files = [_file("src/a.py"), _file("src/b.py"), _file("README.md")]
+    panel, vm = _panel(files)
+    panel._filter.query = "src"
+    panel._apply_filter()
+    panel.stage_all()
+    vm.stage_indices.assert_called_once_with({0, 1})
+
+
+def test_stage_all_empty_is_noop() -> None:
+    panel, vm = _panel([])
+    panel.stage_all()
+    vm.stage_indices.assert_not_called()
+
+
+def test_help_stage_all_is_a_amend_is_m() -> None:
+    panel, _vm = _panel([_file("a.py")])
+    by_key = {k: d for k, d in panel.get_help_entries()}
+    assert "all listed" in by_key["A"].lower()
+    assert "amend" in by_key["m"].lower()
+    assert "amend" not in by_key["A"].lower()
+
+
 def test_stash_opens_message_sheet_without_pushing() -> None:
     files = [_file("a.py")]
     panel, vm = _panel(files)
