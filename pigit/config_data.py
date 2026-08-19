@@ -43,7 +43,9 @@ class LogConfig:
 
 
 @dataclass
-class TuiConfig:
+class AppConfig:
+    """Application UI settings (TOML ``[app]`` / ``[app.keybindings]``)."""
+
     auto_refresh_interval: float = 10.0
     word_diff: bool = True
     status_view: Literal["flat", "tree"] = "tree"
@@ -51,6 +53,7 @@ class TuiConfig:
     log_graph_default: bool = True
     commit_report_default: bool = True
     show_footer: bool = True
+    keybindings: dict[str, str | list[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -61,5 +64,4 @@ class ConfigData:
     info: InfoConfig = field(default_factory=InfoConfig)
     repo: RepoConfig = field(default_factory=RepoConfig)
     log: LogConfig = field(default_factory=LogConfig)
-    tui: TuiConfig = field(default_factory=TuiConfig)
-    keybindings: dict[str, str | list[str]] = field(default_factory=dict)
+    app: AppConfig = field(default_factory=AppConfig)

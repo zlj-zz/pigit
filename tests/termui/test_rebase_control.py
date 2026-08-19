@@ -13,14 +13,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pigit.app import PigitApplication
-from pigit.config_data import TuiConfig
+from pigit.config_data import AppConfig
 from pigit.termui import FeedbackKind
 
 
 @pytest.fixture
 def app():
     """Create a PigitApplication with mocked git/VMs for rebase control."""
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=AppConfig())
     app._git = MagicMock()
     app._branch_vm = MagicMock()
     app._commit_vm = MagicMock()

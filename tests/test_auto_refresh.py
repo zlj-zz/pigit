@@ -10,14 +10,14 @@ from pigit.config import Config
 
 
 class TestAutoRefreshConfig:
-    """Test parsing of [tui] configuration section."""
+    """Test parsing of [app] configuration section."""
 
     @pytest.mark.parametrize(
         "toml_content,expected",
         [
-            ("", 10.0),  # default when no [tui] section
-            ("[tui]\nauto_refresh_interval = 30.0\n", 30.0),
-            ("[tui]\nauto_refresh_interval = 0\n", 0.0),
+            ("", 10.0),  # default when no [app] section
+            ("[app]\nauto_refresh_interval = 30.0\n", 30.0),
+            ("[app]\nauto_refresh_interval = 0\n", 0.0),
         ],
     )
     def test_auto_refresh_interval(self, toml_content, expected):
@@ -29,7 +29,7 @@ class TestAutoRefreshConfig:
         try:
             cfg = Config(path=path, version="test", auto_load=False)
             cfg.load_config()
-            assert cfg.get().tui.auto_refresh_interval == expected
+            assert cfg.get().app.auto_refresh_interval == expected
         finally:
             os.unlink(path)
             Config._instances.clear()
@@ -39,9 +39,9 @@ class TestAutoRefreshConfig:
 def app():
     """Create a PigitApplication with mocked Config."""
     from pigit.app import PigitApplication
-    from pigit.config_data import TuiConfig
+    from pigit.config_data import AppConfig
 
-    yield PigitApplication(config=TuiConfig())
+    yield PigitApplication(config=AppConfig())
 
 
 @pytest.fixture

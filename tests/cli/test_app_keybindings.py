@@ -109,7 +109,8 @@ class TestRenderKeybindingsTemplate:
             ("branch", _binding("branch.checkout", "c", desc="Checkout branch"))
         ]
         out = render_keybindings_template(bindings, {}, include_defaults=True)
-        assert "[keybindings.branch]" in out
+        assert "[keybindings.branch]" not in out
+        assert "[app.keybindings.branch]" in out
         # short name only inside the nested table, not the dotted full id
         assert "# checkout =" in out
         assert "branch.checkout =" not in out

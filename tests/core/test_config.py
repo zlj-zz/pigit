@@ -18,9 +18,9 @@ def _reset_config_singleton():
 
 def test_commit_report_default_read_from_toml(tmp_path):
     config_path = tmp_path / "pigit-report.toml"
-    config_path.write_text("[tui]\ncommit_report_default = false\n")
+    config_path.write_text("[app]\ncommit_report_default = false\n")
     c = Config(str(config_path), version="test", auto_load=True)
-    assert c.get().tui.commit_report_default is False
+    assert c.get().app.commit_report_default is False
 
 
 @patch("builtins.input", lambda _: "yes")
@@ -36,6 +36,8 @@ def test_create(tmp_path):
     assert 'version = "test"' in content
     assert "[cmd]" in content
     assert "[counter]" in content
+    assert "[app]" in content
+    assert "[tui]" not in content
     assert "diff_preview_default" in content
     assert "log_graph_default" in content
     assert "commit_report_default" in content
@@ -87,9 +89,9 @@ def test_default_values_when_no_config_file():
     assert data.repo.auto_append is True
     assert data.log.debug is False
     assert data.log.output is False
-    assert data.tui.diff_preview_default is True
-    assert data.tui.log_graph_default is True
-    assert data.tui.commit_report_default is True
+    assert data.app.diff_preview_default is True
+    assert data.app.log_graph_default is True
+    assert data.app.commit_report_default is True
 
 
 def test_invalid_format_falls_back_to_default(tmp_path):
@@ -150,3 +152,49 @@ def test_toml_read_with_comments_and_inline_strings(tmp_path):
     assert data.cmd.display is True
     assert data.cmd.recommend is False
     assert data.info.repo_include == ["path#hash", "remote"]
+
+
+def test_app_keybindings_nested_tables(tmp_path):
+    config_path = tmp_path / "pigit-kb.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[app]",
+                "word_diff = false",
+                "",
+                "[app.keybindings.branch]",
+                'checkout = "C"',
+                "[app.keybindings.status]",
+                'stage = ["a", " "]',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    c = Config(str(config_path), version="test", auto_load=True)
+    data = c.get()
+    assert data.app.word_diff is False
+    assert data.app.keybindings["branch.checkout"] == "C"
+    assert data.app.keybindings["status.stage"] == ["a", " "]
+
+
+def test_legacy_tui_and_keybindings_sections_warn_and_are_ignored(tmp_path):
+    config_path = tmp_path / "pigit-legacy.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[tui]",
+                "commit_report_default = false",
+                "[keybindings.branch]",
+                'checkout = "C"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    c = Config(str(config_path), version="test", auto_load=True)
+    data = c.get()
+    assert data.app.commit_report_default is True
+    assert data.app.keybindings == {}
+    assert any("[tui]" in w for w in c._warnings)
+    assert any("[app.keybindings]" in w for w in c._warnings)

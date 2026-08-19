@@ -55,9 +55,9 @@ debug = false
 # (bool) Whether output log in terminal.
 output = false
 
-[tui]
+[app]
 
-# (float) Auto-refresh interval in seconds for the TUI.
+# (float) Auto-refresh interval in seconds for the app.
 # Set to 0 to disable auto-refresh.
 auto_refresh_interval = 10.0
 
@@ -83,9 +83,9 @@ commit_report_default = true
 # (bool) Show the footer key-hint bar.
 show_footer = true
 
-# Keybindings: remap TUI actions. Keys are semantic strings ("c", "down",
+# Keybindings: remap app actions. Keys are semantic strings ("c", "down",
 # "ctrl c", " " for space); use an array for multiple keys. Run
 # `pigit --create-config --with-keybindings` to list all actions and defaults.
 
-[keybindings.branch]
+[app.keybindings.branch]
 # checkout = "c"  # Checkout selected branch

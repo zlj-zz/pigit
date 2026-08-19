@@ -80,7 +80,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `u` / `U` | undo / undo stack | all |
 | `z` / `Z` | stash push / pop | Status |
 
-Press `?` for the full per-panel list. Every key is remappable via `[keybindings]` — see [Keybindings](#keybindings).
+Press `?` for the full per-panel list. Every key is remappable via `[app.keybindings]` — see [Keybindings](#keybindings).
 
 For operations that are cumbersome on the command line—such as staging individual hunks, browsing commit history with inline graphs, or resolving merge conflicts—the TUI is the recommended workflow.
 
@@ -215,17 +215,17 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[repo]` | `auto_append` | bool | `True` | auto-add current repo to managed list |
 | `[log]` | `debug` | bool | `False` | debug mode |
 | `[log]` | `output` | bool | `False` | print logs to terminal |
-| `[tui]` | `auto_refresh_interval` | float | `10.0` | auto-refresh interval in seconds (`0` disables) |
-| `[tui]` | `word_diff` | bool | `True` | enable word-diff in the diff viewer |
-| `[tui]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
-| `[tui]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |
-| `[tui]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
-| `[tui]` | `commit_report_default` | bool | `True` | show the Commit contribution-graph report below the list when the panel is taller than 19 rows (Ctrl+r toggles) |
-| `[tui]` | `show_footer` | bool | `True` | show the footer key-hint bar |
+| `[app]` | `auto_refresh_interval` | float | `10.0` | auto-refresh interval in seconds (`0` disables) |
+| `[app]` | `word_diff` | bool | `True` | enable word-diff in the diff viewer |
+| `[app]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
+| `[app]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |
+| `[app]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
+| `[app]` | `commit_report_default` | bool | `True` | show the Commit contribution-graph report below the list when the panel is taller than 19 rows (Ctrl+r toggles) |
+| `[app]` | `show_footer` | bool | `True` | show the footer key-hint bar |
 
 ### Keybindings
 
-Remap TUI actions with a `[keybindings]` section. Keys are semantic strings
+Remap app actions with an `[app.keybindings]` section. Keys are semantic strings
 (`"c"`, `"down"`, `"ctrl c"`, `" "` for space); use an array for multiple keys.
 
 To list every configurable action with its default key, regenerate the config with:
@@ -234,11 +234,11 @@ To list every configurable action with its default key, regenerate the config wi
 pigit --create-config --with-keybindings
 ```
 
-This appends a commented `[keybindings]` block to the generated file (existing
+This appends a commented `[app.keybindings]` block to the generated file (existing
 overrides are preserved as active lines). For example:
 
 ```toml
-[keybindings.branch]
+[app.keybindings.branch]
 checkout = "C"  # default: "c"
 # next = ["j", "down"]  # Navigate branch list
 ```
@@ -301,4 +301,4 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 
 **Customization**
 
-- **Custom keybindings** — remap any TUI action via `[keybindings]`; dump defaults with `--create-config --with-keybindings`.
+- **Custom keybindings** — remap any app action via `[app.keybindings]`; dump defaults with `--create-config --with-keybindings`.

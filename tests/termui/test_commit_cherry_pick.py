@@ -14,7 +14,7 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.app_commit import CommitPanel
-from pigit.config_data import TuiConfig
+from pigit.config_data import AppConfig
 from pigit.git.model import Commit
 from pigit.termui import EventType
 
@@ -22,7 +22,7 @@ from pigit.termui import EventType
 @pytest.fixture
 def app():
     """Create a PigitApplication with mocked git/VMs for cherry-pick."""
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=AppConfig())
     app._git = MagicMock()
     app._branch_vm = MagicMock()
     app._commit_vm = MagicMock()
@@ -161,7 +161,7 @@ def test_on_event_dispatches_cherry_pick(app):
 
 
 def test_help_lists_c_not_on_app():
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=AppConfig())
     app.build_root()
     assert "c" not in {k for k, _ in app.get_help_entries()}
     by_key = {k: d for k, d in app._commit_panel.get_help_entries()}

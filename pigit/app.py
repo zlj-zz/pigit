@@ -60,7 +60,7 @@ from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
-from .config_data import TuiConfig
+from .config_data import AppConfig
 
 
 class TabPanel(Column):
@@ -88,7 +88,7 @@ class PigitApplication(Application):
         *,
         git_api: GitApi | None = None,
         managed_repos: ManagedRepos | None = None,
-        config: TuiConfig,
+        config: AppConfig,
     ) -> None:
         super().__init__(input_takeover=True)
         self._git_api = git_api or GitApi()

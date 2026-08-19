@@ -16,7 +16,7 @@ from pigit.app import PigitApplication
 from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
 from pigit.app_log_ref import LogRefSheet
-from pigit.config_data import TuiConfig
+from pigit.config_data import AppConfig
 from pigit.git.model import Branch
 from pigit.termui import EventType, FeedbackKind
 from pigit.viewmodels.base import ActionResult
@@ -102,7 +102,7 @@ def test_describe_row_marks_cursor_and_current_ref():
 
 @pytest.fixture
 def app():
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=AppConfig())
     app._git = MagicMock()
     app._commit_vm = MagicMock()
     app._commit_panel = MagicMock()
@@ -172,7 +172,7 @@ def test_tab_name_tracks_help_title():
 
 
 def test_help_lists_o():
-    built = PigitApplication(config=TuiConfig())
+    built = PigitApplication(config=AppConfig())
     built.build_root()
     by_key = {k: d for k, d in built._commit_panel.get_help_entries()}
     assert "o" in by_key
@@ -274,7 +274,7 @@ def test_checkout_failure_no_follow_head():
 
 
 def test_branch_help_enter():
-    built = PigitApplication(config=TuiConfig())
+    built = PigitApplication(config=AppConfig())
     built.build_root()
     by_key = {k: d for k, d in built._branch_panel.get_help_entries()}
     assert "Enter" in by_key

@@ -1,6 +1,6 @@
 """
 Module: pigit/app_keybindings.py
-Description: Enumerate configurable keybindings and render the [keybindings] config template.
+Description: Enumerate configurable keybindings and render the [app.keybindings] config template.
 Author: Zev
 Date: 2026-08-16
 """
@@ -55,7 +55,7 @@ def warn_unmatched_keybindings(
     bindings: Sequence[tuple[str, Binding]],
     keybindings: dict[str, str | list[str]],
 ) -> None:
-    """Warn (stderr) about ``[keybindings]`` keys that match no known action."""
+    """Warn (stderr) about ``[app.keybindings]`` keys that match no known action."""
     if not keybindings:
         return
     known = {binding.action for _, binding in bindings if binding.configurable}
@@ -65,7 +65,7 @@ def warn_unmatched_keybindings(
     console = get_console()
     print(console.render("@bold(@yellow(Config Warning))"), file=sys.stderr)
     print(
-        "The following [keybindings] keys match no configurable action and are ignored:",
+        "The following [app.keybindings] keys match no configurable action and are ignored:",
         file=sys.stderr,
     )
     for key in orphans:
@@ -78,7 +78,7 @@ def render_keybindings_template(
     *,
     include_defaults: bool = False,
 ) -> str:
-    """Render the ``[keybindings]`` block.
+    """Render the ``[app.keybindings]`` block.
 
     Overridden actions are emitted as active lines (preserved); non-overridden
     actions are emitted as commented defaults only when ``include_defaults`` is
@@ -110,7 +110,7 @@ def render_keybindings_template(
     lines = [_KEY_SYNTAX_HINT]
     for namespace, group_lines in groups.items():
         lines.append("")
-        lines.append(f"[keybindings.{namespace}]")
+        lines.append(f"[app.keybindings.{namespace}]")
         lines.extend(group_lines)
     return "\n" + "\n".join(lines) + "\n"
 

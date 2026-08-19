@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.app import PigitApplication
-from pigit.config_data import TuiConfig
+from pigit.config_data import AppConfig
 from pigit.termui import keys
 from pigit.termui._root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
@@ -26,10 +26,10 @@ def runtime():
 
 
 def _mount(
-    runtime: RuntimeContext, *, config: TuiConfig | None = None
+    runtime: RuntimeContext, *, config: AppConfig | None = None
 ) -> tuple[PigitApplication, ComponentRoot]:
     """Build the app tree and bind root key handlers without starting the loop."""
-    app = PigitApplication(config=config or TuiConfig())
+    app = PigitApplication(config=config or AppConfig())
     body = app.build_root()
     root = ComponentRoot(
         body,
@@ -51,7 +51,7 @@ def _leaf(root: ComponentRoot):
 
 
 def test_help_lists_tab_cycle_and_numbered_goto():
-    app = PigitApplication(config=TuiConfig())
+    app = PigitApplication(config=AppConfig())
     entries = app.get_help_entries()
     by_key = {key: desc for key, desc in entries}
     assert "Tab" in by_key
@@ -202,14 +202,14 @@ def test_status_to_branch_sizes_log_graph_preview(runtime, monkeypatch):
 
 
 def test_diff_preview_default_false_hides_on_large_screen(runtime) -> None:
-    app, _root = _mount(runtime, config=TuiConfig(diff_preview_default=False))
+    app, _root = _mount(runtime, config=AppConfig(diff_preview_default=False))
     app._is_large_screen = True
     app._apply_body_widths(140)
     assert "preview" not in _body_ids(app)
 
 
 def test_log_graph_default_false_hides_on_large_screen(runtime) -> None:
-    app, _root = _mount(runtime, config=TuiConfig(log_graph_default=False))
+    app, _root = _mount(runtime, config=AppConfig(log_graph_default=False))
     app._is_large_screen = True
     app._tab_view.route_to("branch")
     app._apply_body_widths(140)

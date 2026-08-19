@@ -17,7 +17,7 @@ from .config_data import (
     InfoConfig,
     RepoConfig,
     LogConfig,
-    TuiConfig,
+    AppConfig,
 )
 from .ext.singleton import Singleton
 from .ext.utils import confirm, traceback_info
@@ -28,7 +28,7 @@ class ConfigError(Exception):
 
 
 def _flatten_keybindings(raw: dict, prefix: str = "") -> dict:
-    """Flatten a nested ``[keybindings]`` table into dotted ``"{ns}.{action}"`` keys."""
+    """Flatten a nested ``[app.keybindings]`` table into dotted ``"{ns}.{action}"`` keys."""
     out: dict = {}
     for key, value in raw.items():
         dotted = f"{prefix}.{key}" if prefix else key
@@ -100,32 +100,32 @@ class Config(metaclass=Singleton):
         # (bool) Whether output log in terminal.
         output = {log_output}
 
-        [tui]
+        [app]
 
-        # (float) Auto-refresh interval in seconds for the TUI.
+        # (float) Auto-refresh interval in seconds for the app.
         # Set to 0 to disable auto-refresh.
-        auto_refresh_interval = {tui_auto_refresh_interval}
+        auto_refresh_interval = {app_auto_refresh_interval}
 
         # (bool) Enable word-diff by default in the diff viewer.
-        word_diff = {tui_word_diff}
+        word_diff = {app_word_diff}
 
         # (str) Status panel default view. Supported: [flat, tree]
-        status_view = "{tui_status_view}"
+        status_view = "{app_status_view}"
 
         # (bool) Show Status/Stash side diff preview on large screens (>= 120 cols).
         # Ctrl+p on Status/Stash toggles at runtime; this is the startup default only.
-        diff_preview_default = {tui_diff_preview_default}
+        diff_preview_default = {app_diff_preview_default}
 
         # (bool) Show Branch log-graph preview on large screens (>= 120 cols).
         # Ctrl+p on Branch toggles at runtime; this is the startup default only.
-        log_graph_default = {tui_log_graph_default}
+        log_graph_default = {app_log_graph_default}
 
         # (bool) Show the Commit contribution-graph report below the list on
         # tall screens (> 19 rows). Ctrl+r toggles at runtime.
-        commit_report_default = {tui_commit_report_default}
+        commit_report_default = {app_commit_report_default}
 
         # (bool) Show the footer key-hint bar.
-        show_footer = {tui_show_footer}
+        show_footer = {app_show_footer}
         {keybindings}
         """)
 
@@ -264,28 +264,47 @@ class Config(metaclass=Singleton):
             output=log_raw.get("output", False),
         )
 
-        # Parse [tui] section
-        tui_raw = raw.get("tui", {})
-        status_view = tui_raw.get("status_view", "tree")
+        # Parse [app] (UI settings + nested [app.keybindings])
+        app_raw = raw.get("app", {})
+        if not isinstance(app_raw, dict):
+            app_raw = {}
+            self._warnings.append(
+                'Config section "app" should be a table, using defaults.'
+            )
+        if "tui" in raw:
+            self._warnings.append(
+                "Config section [tui] was renamed to [app]; [tui] is ignored. "
+                "Move those keys under [app]."
+            )
+        if "keybindings" in raw:
+            self._warnings.append(
+                "Config section [keybindings] moved to [app.keybindings]; "
+                "[keybindings] is ignored."
+            )
+        status_view = app_raw.get("status_view", "tree")
         if status_view not in self._status_view_candidate:
             status_view = "tree"
             self._warnings.append(
-                'Config key "tui.status_view" support must in {}'.format(
+                'Config key "app.status_view" support must in {}'.format(
                     self._status_view_candidate
                 )
             )
-        tui = TuiConfig(
-            auto_refresh_interval=tui_raw.get("auto_refresh_interval", 10.0),
-            word_diff=tui_raw.get("word_diff", True),
+        kb_raw = app_raw.get("keybindings", {})
+        if not isinstance(kb_raw, dict):
+            kb_raw = {}
+            self._warnings.append(
+                'Config key "app.keybindings" should be a table, using defaults.'
+            )
+        app = AppConfig(
+            auto_refresh_interval=app_raw.get("auto_refresh_interval", 10.0),
+            word_diff=app_raw.get("word_diff", True),
             status_view=status_view,
-            diff_preview_default=tui_raw.get("diff_preview_default", True),
-            log_graph_default=tui_raw.get("log_graph_default", True),
-            commit_report_default=tui_raw.get("commit_report_default", True),
-            show_footer=tui_raw.get("show_footer", True),
+            diff_preview_default=app_raw.get("diff_preview_default", True),
+            log_graph_default=app_raw.get("log_graph_default", True),
+            commit_report_default=app_raw.get("commit_report_default", True),
+            show_footer=app_raw.get("show_footer", True),
+            keybindings=_flatten_keybindings(kb_raw),
         )
-
-        # Parse [keybindings] section (nested tables flattened to dotted keys)
-        keybindings = _flatten_keybindings(raw.get("keybindings", {}))
 
         # Version check
         if not (
@@ -308,8 +327,7 @@ class Config(metaclass=Singleton):
             info=info,
             repo=repo,
             log=log,
-            tui=tui,
-            keybindings=keybindings,
+            app=app,
         )
 
     def load_config(self) -> None:
@@ -352,17 +370,17 @@ class Config(metaclass=Singleton):
                         repo_auto_append=str(data.repo.auto_append).lower(),
                         log_debug=str(data.log.debug).lower(),
                         log_output=str(data.log.output).lower(),
-                        tui_auto_refresh_interval=data.tui.auto_refresh_interval,
-                        tui_word_diff=str(data.tui.word_diff).lower(),
-                        tui_status_view=data.tui.status_view,
-                        tui_diff_preview_default=str(
-                            data.tui.diff_preview_default
+                        app_auto_refresh_interval=data.app.auto_refresh_interval,
+                        app_word_diff=str(data.app.word_diff).lower(),
+                        app_status_view=data.app.status_view,
+                        app_diff_preview_default=str(
+                            data.app.diff_preview_default
                         ).lower(),
-                        tui_log_graph_default=str(data.tui.log_graph_default).lower(),
-                        tui_commit_report_default=str(
-                            data.tui.commit_report_default
+                        app_log_graph_default=str(data.app.log_graph_default).lower(),
+                        app_commit_report_default=str(
+                            data.app.commit_report_default
                         ).lower(),
-                        tui_show_footer=str(data.tui.show_footer).lower(),
+                        app_show_footer=str(data.app.show_footer).lower(),
                         keybindings=keybindings_block,
                     )
                 )

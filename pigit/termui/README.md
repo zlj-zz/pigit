@@ -300,7 +300,7 @@ class MyPanel(Component):
 - `desc` — full help text; `tip` — compact footer hint.
 - `tip_when` — callable hiding the footer tip when it returns False; help (`desc`) is always shown.
 - Mode- or context-only actions should say so in ``desc`` (e.g. ``(visual mode)``, ``(hunk mode)``), since help lists them regardless of ``tip_when``.
-- `configurable` — whether the user may remap via the `[keybindings]` config section.
+- `configurable` — whether the user may remap via the `[app.keybindings]` config section.
 
 `BINDINGS` remains for simple `(key, target)` pairs that need no help/footer metadata.
 `Component.__init__` resolves both into `_key_handlers` (semantic key → callable) via

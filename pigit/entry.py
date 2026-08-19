@@ -34,7 +34,7 @@ def _bootstrap() -> Context:
     conf = Config(
         path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
     ).output_warnings()
-    set_key_overrides(conf.get().keybindings)
+    set_key_overrides(conf.get().app.keybindings)
     ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
     Context.install(ctx)
     before_hook(ctx)
@@ -125,7 +125,7 @@ def _color_index(count: int) -> str:
     action="store_true",
     dest="with_keybindings",
     group=_TOOLS_GROUP,
-    help="Dump commented default keys into the generated [keybindings] block."
+    help="Dump commented default keys into the generated [app.keybindings] block."
     " (requires --create-config)",
 )
 def pigit(args: Namespace, _) -> None:
@@ -143,7 +143,7 @@ def pigit(args: Namespace, _) -> None:
         )
 
         bindings = collect_all_action_bindings()
-        current = ctx.config.get().keybindings
+        current = ctx.config.get().app.keybindings
         warn_unmatched_keybindings(bindings, current)
         block = render_keybindings_template(
             bindings, current, include_defaults=args.with_keybindings
