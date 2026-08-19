@@ -37,6 +37,7 @@ from pigit.termui import (
     show_spinner,
     show_toast,
     ToastPosition,
+    set_theme,
 )
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, Row, TabView
@@ -93,6 +94,7 @@ class PigitApplication(Application):
         config: AppConfig,
     ) -> None:
         super().__init__(input_takeover=True)
+        set_theme(THEME)
         self._git_api = git_api or GitApi()
         self._managed_repos = managed_repos
         self._repo_path, self._repo_conf = self._git_api.confirm_repo()

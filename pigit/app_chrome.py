@@ -13,7 +13,7 @@ from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, pal
 from pigit.termui.containers import TabView
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
-from .app_theme import FlatTheme
+from .app_theme import PigitTheme
 
 
 class AppFooter(Component):
@@ -21,7 +21,7 @@ class AppFooter(Component):
 
     def __init__(
         self,
-        theme: FlatTheme,
+        theme: PigitTheme,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)

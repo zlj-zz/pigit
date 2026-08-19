@@ -12,6 +12,7 @@ from collections.abc import Callable, Sequence
 import logging
 
 from .. import palette
+from ..theme import get_theme
 from .._component import Component, ComponentError
 from .._mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
@@ -375,7 +376,7 @@ class ItemList(Component):
             and truncated as a group to fit between left and right;
             ``None`` means no main content.
         """
-        return ([Segment(self.content[idx], fg=palette.DEFAULT_FG)], None, [])
+        return ([Segment(self.content[idx], fg=get_theme().fg_primary)], None, [])
 
     # --- row-rendering helpers ---
 
@@ -429,7 +430,10 @@ class ItemList(Component):
                 row_bg = seg.bg
                 break
         if row_bg is not None:
-            surface.draw_text_rgb(row, 0, " " * w, fg=palette.DEFAULT_FG, bg=row_bg)
+            theme = get_theme()
+            surface.draw_text_rgb(
+                row, 0, " " * w, fg=theme.fg_primary, bg=row_bg
+            )
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2
@@ -511,7 +515,7 @@ class ItemList(Component):
                 w - text_w,
                 text,
                 fg=fg,
-                bg=palette.DEFAULT_BG,
+                bg=get_theme().bg_chrome,
                 style_flags=style_flags,
             )
             return True

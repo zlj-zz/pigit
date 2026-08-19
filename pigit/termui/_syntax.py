@@ -11,22 +11,27 @@ import functools
 import re
 
 from . import palette
+from .theme import get_theme
+
 from ._syntax_configs import _LANGUAGE_CONFIGS
 
-# ── Default syntax color mapping (uses palette constants) ──
-# Callers can override via set_color_map() on SyntaxTokenizer.
+# Token types mapped to Theme syntax slots; other keys stay on palette below.
+_THEME_SYNTAX_ATTRS: dict[str, str] = {
+    "keyword_control": "fg_syntax_keyword",
+    "keyword_operator": "fg_syntax_keyword",
+    "string": "fg_syntax_string",
+    "comment": "fg_syntax_comment",
+    "call": "fg_syntax_function",
+    "number": "fg_syntax_number",
+    "keyword_type": "fg_syntax_type",
+    "type": "fg_syntax_type",
+}
+
+# Palette-only syntax colors (no Theme slot yet).
 _DEFAULT_COLORS: dict[str, tuple[int, int, int]] = {
-    "keyword_control": palette.PURPLE,
     "keyword_decl": palette.BLUE,
     "keyword_storage": palette.YELLOW,
-    "keyword_type": palette.CYAN,
-    "keyword_operator": palette.PURPLE,
-    "string": palette.RED,
-    "number": palette.BLUE,
-    "comment": palette.GREEN,
-    "call": palette.PEARL,
     "builtin": palette.CYAN,
-    "type": palette.CYAN,
     "variable": palette.PEARL,
     "operator": palette.PEARL,
     "punct": palette.PEARL,
@@ -38,8 +43,16 @@ _DEFAULT_COLORS: dict[str, tuple[int, int, int]] = {
     "diff_count": palette.PURPLE,
 }
 
-# Public color table used by the tokenizer and tests.
+# Public color table used by tests for palette-only keys.
 SYNTAX_COLORS = _DEFAULT_COLORS
+
+
+def _resolve_base_syntax_color(token_type: str) -> tuple[int, int, int]:
+    """Return palette or Theme color for a syntax token type."""
+    attr = _THEME_SYNTAX_ATTRS.get(token_type)
+    if attr is not None:
+        return getattr(get_theme(), attr)
+    return _DEFAULT_COLORS.get(token_type, _DEFAULT_COLORS["variable"])
 
 
 # ── Static tokenize rules (language-agnostic, priority-ordered) ──
@@ -108,7 +121,6 @@ class SyntaxTokenizer:
         return "generic"
 
     @staticmethod
-    @functools.lru_cache(maxsize=256)
     def resolve_color(token_type: str, lang: str) -> tuple[int, int, int]:
         """Return the RGB color for a token type, respecting language overrides."""
         raw = _LANGUAGE_CONFIGS.get(lang, _LANGUAGE_CONFIGS["generic"])
@@ -119,7 +131,7 @@ class SyntaxTokenizer:
         if token_type in overrides:
             return overrides[token_type]
 
-        return SYNTAX_COLORS.get(token_type, SYNTAX_COLORS["variable"])
+        return _resolve_base_syntax_color(token_type)
 
     # ── regex compilation ──
 

@@ -77,6 +77,7 @@ from ._renderer import Renderer
 from ._surface import Surface
 from ._segment import Segment
 from . import palette
+from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from ._syntax import SyntaxTokenizer
 from ._mouse import MouseButton, MouseEvent, MouseKind
@@ -125,6 +126,10 @@ __all__ = [
     "Surface",
     "Segment",
     "palette",
+    "Theme",
+    "DEFAULT_THEME",
+    "get_theme",
+    "set_theme",
     "Renderer",
     "get_renderer",
     "get_renderer_strict",

@@ -7,11 +7,13 @@ Date: 2026-05-16
 
 from __future__ import annotations
 
-from .. import palette
 from .._component import Component
 from .._mouse import MouseButton, MouseKind, MouseEvent
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
+from ..theme import get_theme
+
+_USE_THEME_BG = object()
 
 
 class LineTextBrowser(Component):
@@ -24,7 +26,7 @@ class LineTextBrowser(Component):
         size: tuple[int, int] | None = None,
         content: list[str] | list[list[Segment]] | None = None,
         id: str | None = None,
-        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
+        bg: tuple[int, int, int] | None = _USE_THEME_BG,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._rows: list[list[Segment]] | None = None
@@ -60,8 +62,10 @@ class LineTextBrowser(Component):
             return self._rows
         if self._content is None:
             return None
-        fg = palette.DEFAULT_FG
-        return [[Segment(line, fg=fg, bg=self._bg)] for line in self._content]
+        theme = get_theme()
+        fg = theme.fg_primary
+        row_bg = theme.bg_chrome if self._bg is _USE_THEME_BG else self._bg
+        return [[Segment(line, fg=fg, bg=row_bg)] for line in self._content]
 
     def scroll_up(self, line: int = 1):
         """Scroll the view up by the given number of lines."""

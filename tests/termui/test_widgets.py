@@ -247,7 +247,7 @@ class TestInputLine:
 
     def test_render_with_candidates(self):
         from pigit.termui._surface import Surface
-        from pigit.termui.palette import DEFAULT_FG, DEFAULT_FG_DIM
+        from pigit.termui.theme import get_theme
 
         inp = InputLine(
             prompt="> ",
@@ -259,17 +259,19 @@ class TestInputLine:
         s = Surface(20, 1)
         inp._render_surface(s)
         assert s.lines()[0].startswith("> abc")
+        theme = get_theme()
         row_cells = s.rows()[0]
         # Matched part "> a" stays normal
-        assert row_cells[0].fg == DEFAULT_FG
-        assert row_cells[2].fg == DEFAULT_FG
+        assert row_cells[0].fg == theme.fg_primary
+        assert row_cells[2].fg == theme.fg_primary
         # Suffix "bc" is dim
-        assert row_cells[3].fg == DEFAULT_FG_DIM
-        assert row_cells[4].fg == DEFAULT_FG_DIM
+        assert row_cells[3].fg == theme.fg_dim
+        assert row_cells[4].fg == theme.fg_dim
 
     def test_render_draws_block_cursor(self, mocker):
-        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+        from pigit.termui.theme import get_theme
 
+        theme = get_theme()
         mock_surface = mocker.Mock()
         mock_surface.width = 10
         mock_surface.height = 1
@@ -282,12 +284,13 @@ class TestInputLine:
         assert mock_surface.draw_text_rgb.call_count == 2
         # First call: text row; second call: block cursor
         mock_surface.draw_text_rgb.assert_called_with(
-            0, 4, " ", fg=DEFAULT_BG, bg=DEFAULT_FG
+            0, 4, " ", fg=theme.bg_chrome, bg=theme.fg_primary
         )
 
     def test_render_block_cursor_in_candidate_mode(self, mocker):
-        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+        from pigit.termui.theme import get_theme
 
+        theme = get_theme()
         mock_surface = mocker.Mock()
         mock_surface.width = 12
         mock_surface.height = 1
@@ -310,7 +313,7 @@ class TestInputLine:
                     3,
                     " ",
                 ),
-                {"fg": DEFAULT_BG, "bg": DEFAULT_FG},
+                {"fg": theme.bg_chrome, "bg": theme.fg_primary},
             )
             or calls[-1] == ((0, 3, " ", "DEFAULT_BG", "DEFAULT_FG"),)
             or calls[-1].args
@@ -319,7 +322,7 @@ class TestInputLine:
                 3,
                 " ",
             )
-            and calls[-1].kwargs == {"fg": DEFAULT_BG, "bg": DEFAULT_FG}
+            and calls[-1].kwargs == {"fg": theme.bg_chrome, "bg": theme.fg_primary}
         )
 
     def test_on_key_plain_text_editing(self):

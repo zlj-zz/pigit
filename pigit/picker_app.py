@@ -17,6 +17,7 @@ from pigit.termui import (
     HelpPanel,
     keys,
     palette,
+    set_theme,
 )
 from pigit.app_theme import THEME
 from pigit.termui._component import Component
@@ -94,6 +95,7 @@ class BasePickerApp(Application):
 
     def __init__(self, *, initial_filter: str = "", alt: bool = True) -> None:
         super().__init__(input_takeover=True, alt=alt)
+        set_theme(THEME)
         self._initial_filter = initial_filter
 
     # --- Abstract methods: subclasses must override ---

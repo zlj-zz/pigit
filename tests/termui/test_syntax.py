@@ -193,9 +193,11 @@ class TestTokenizeMarkdown:
 
 class TestResolveColor:
     def test_global_keyword_control(self):
+        from pigit.termui.theme import get_theme
+
         assert (
             SyntaxTokenizer.resolve_color("keyword_control", "py")
-            == SYNTAX_COLORS["keyword_control"]
+            == get_theme().fg_syntax_keyword
         )
 
     def test_rust_override(self):

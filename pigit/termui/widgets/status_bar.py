@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .. import palette
+from ..theme import get_theme
 from .._component import Component, bind_signals
 from .._surface import Surface, _Subsurface
 from ..reactive import Computed, Signal, ValueRef
@@ -55,6 +55,9 @@ class StatusBar(Component):
         super().destroy()
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
+        theme = get_theme()
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
-        surface.draw_text_rgb(0, 0, text, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG)
+        surface.draw_text_rgb(
+            0, 0, text, fg=theme.fg_primary, bg=theme.bg_chrome
+        )

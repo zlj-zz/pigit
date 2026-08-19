@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .. import keys, palette
+from .. import keys
+from ..theme import get_theme
 from .._component import Component
 from .._runtime_context import get_focus_manager, request_render
 from .._surface import Surface, _Subsurface
@@ -406,6 +407,7 @@ class InputLine(Component):
             return
 
         # ── Multi-line text rendering ────────────────────────────────────
+        theme = get_theme()
         for row in range(visible_rows):
             line_idx = start_line + row
             if line_idx >= len(lines):
@@ -414,8 +416,8 @@ class InputLine(Component):
                     row,
                     0,
                     " " * surface.width,
-                    fg=palette.DEFAULT_FG,
-                    bg=palette.DEFAULT_BG,
+                    fg=theme.fg_primary,
+                    bg=theme.bg_chrome,
                 )
                 continue
 
@@ -429,15 +431,15 @@ class InputLine(Component):
                     avail = max(0, surface.width - prefix_wc)
                     ph = truncate_by_width(self._placeholder, avail)
                     surface.draw_text_rgb(
-                        row, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+                        row, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome
                     )
                     if ph:
                         surface.draw_text_rgb(
                             row,
                             prefix_wc,
                             ph,
-                            fg=palette.DEFAULT_FG_DIM,
-                            bg=palette.DEFAULT_BG,
+                            fg=theme.fg_dim,
+                            bg=theme.bg_chrome,
                         )
                     # Pad rest of row
                     pad = surface.width - prefix_wc - wcswidth(ph)
@@ -446,8 +448,8 @@ class InputLine(Component):
                             row,
                             surface.width - pad,
                             " " * pad,
-                            fg=palette.DEFAULT_FG,
-                            bg=palette.DEFAULT_BG,
+                            fg=theme.fg_primary,
+                            bg=theme.bg_chrome,
                         )
                 else:
                     text = prefix + line
@@ -457,8 +459,8 @@ class InputLine(Component):
                         row,
                         0,
                         text,
-                        fg=palette.DEFAULT_FG,
-                        bg=palette.DEFAULT_BG,
+                        fg=theme.fg_primary,
+                        bg=theme.bg_chrome,
                     )
                 if self.is_focus_leaf and cursor_line == 0:
                     self._draw_block_cursor(
@@ -476,8 +478,8 @@ class InputLine(Component):
                     row,
                     0,
                     text,
-                    fg=palette.DEFAULT_FG,
-                    bg=palette.DEFAULT_BG,
+                    fg=theme.fg_primary,
+                    bg=theme.bg_chrome,
                 )
                 if self.is_focus_leaf and cursor_line == line_idx:
                     self._draw_block_cursor(
@@ -486,6 +488,7 @@ class InputLine(Component):
 
     def _render_candidates(self, surface: Surface | _Subsurface, value: str) -> None:
         """Render inline completion candidate (single-line mode)."""
+        theme = get_theme()
         match_len = len(self._original_value)
         matched = value[:match_len]
         suffix = value[match_len:]
@@ -497,15 +500,15 @@ class InputLine(Component):
         elif len(suffix) > avail:
             suffix = suffix[:avail]
         surface.draw_text_rgb(
-            0, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            0, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome
         )
         if suffix:
             surface.draw_text_rgb(
                 0,
                 len(prefix),
                 suffix,
-                fg=palette.DEFAULT_FG_DIM,
-                bg=palette.DEFAULT_BG,
+                fg=theme.fg_dim,
+                bg=theme.bg_chrome,
             )
         if self.is_focus_leaf:
             cursor_abs = len(prefix) + len(suffix)
@@ -514,8 +517,8 @@ class InputLine(Component):
                     0,
                     cursor_abs,
                     " ",
-                    fg=palette.DEFAULT_BG,
-                    bg=palette.DEFAULT_FG,
+                    fg=theme.bg_chrome,
+                    bg=theme.fg_primary,
                 )
 
     def _draw_block_cursor(
@@ -530,8 +533,9 @@ class InputLine(Component):
         if cursor_x >= surface.width:
             return
         ch = line[cursor_col] if cursor_col < len(line) else " "
+        theme = get_theme()
         surface.draw_text_rgb(
-            row, cursor_x, ch, fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+            row, cursor_x, ch, fg=theme.bg_chrome, bg=theme.fg_primary
         )
 
     def _enter_overlay_mode(self) -> None:

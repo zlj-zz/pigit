@@ -26,6 +26,10 @@ def test_app_facing_public_exports_are_importable():
         "resolve_presentation_leaf",
         "get_focus_manager",
         "get_renderer",
+        "Theme",
+        "DEFAULT_THEME",
+        "get_theme",
+        "set_theme",
     )
     for name in names:
         assert hasattr(termui, name), f"missing export: {name}"

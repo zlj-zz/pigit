@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from .. import palette
 from .._component import Component
 from .._surface import Surface, _Subsurface
+from ..theme import get_theme
 from ..types import OverlayDispatchResult
+
+_USE_THEME_BG = object()
 
 _BOX_CORNER_TL = "╭"
 _BOX_CORNER_TR = "╮"
@@ -31,7 +33,7 @@ class Sheet(Component):
         show_border: bool = False,
         *,
         edge: Literal["top", "bottom"] = "bottom",
-        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
+        bg: tuple[int, int, int] | None = _USE_THEME_BG,
     ) -> None:
         super().__init__(size=size)
         self._child = child
@@ -79,7 +81,7 @@ class Sheet(Component):
             return
         y = self._origin_row(surface.height, self._size[1])
         sub = surface.subsurface(y, 0, self._size[0], self._size[1])
-        sub.fill_rect_rgb(0, 0, sub.width, sub.height, self._bg)
+        sub.fill_rect_rgb(0, 0, sub.width, sub.height, self._sheet_bg())
         border_row = self._border_row(self._size[1])
         if border_row is not None:
             self._draw_rule(sub, border_row)
@@ -90,9 +92,16 @@ class Sheet(Component):
         child_sub = sub.subsurface(child_y, 0, sub.width, child_h)
         self._child._render_surface(child_sub)
 
+    def _sheet_bg(self) -> tuple[int, int, int] | None:
+        """Resolve background color at draw time."""
+        if self._bg is _USE_THEME_BG:
+            return get_theme().bg_chrome
+        return self._bg
+
     def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
         """Draw the facing-edge rule: ╭─╮ on the top of a bottom sheet, ╰─╯ on the bottom of a top sheet."""
-        fg, bg = palette.DEFAULT_FG_DIM, self._bg
+        theme = get_theme()
+        fg, bg = theme.fg_dim, self._sheet_bg()
         left, right = (
             (_BOX_CORNER_BL, _BOX_CORNER_BR)
             if self._edge == "top"
