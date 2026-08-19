@@ -40,7 +40,6 @@ from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
 from .app_preview_toggle import invoke_preview_toggle
 from .app_types import FileSnapshot
-from .app_search_filter import SearchFilter
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
 from .git.model import File
@@ -297,12 +296,13 @@ class StatusPanel(ItemList):
             ],
             lazy_load=True,
             id=id,
+            on_search_changed=lambda: self._apply_filter(),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
         self.files: list[File] = []
         self._all_files: list[File] = []
-        self._filter = SearchFilter(self._apply_filter)
+        self._source_map: list[int] = []
         self._alert_dialog = AlertDialog(
             inner_width=alert_inner_width,
             on_result=lambda _: None,
@@ -360,10 +360,10 @@ class StatusPanel(ItemList):
 
     def _apply_filter(self) -> None:
         """Filter files by query and rebuild display state."""
-        query = self._filter.query.lower()
+        query = self.search_query.lower()
         if not query:
             self.files = list(self._all_files)
-            self._filter.map = list(range(len(self._all_files)))
+            self._source_map = list(range(len(self._all_files)))
         else:
             filtered: list[File] = []
             mapping: list[int] = []
@@ -372,7 +372,7 @@ class StatusPanel(ItemList):
                     filtered.append(f)
                     mapping.append(i)
             self.files = filtered
-            self._filter.map = mapping
+            self._source_map = mapping
         if not self.files:
             self._tree_rows = []
             self.set_content([])
@@ -381,7 +381,7 @@ class StatusPanel(ItemList):
         if self._tree_mode:
             self._auto_expand_matches()
             self._prune_collapsed_dirs()
-            items = list(zip(self.files, self._filter.map))
+            items = list(zip(self.files, self._source_map))
             self._tree_rows = build_status_tree(items, self._collapsed_dirs)
             self.set_content([row.name for row in self._tree_rows])
         else:
@@ -391,7 +391,7 @@ class StatusPanel(ItemList):
 
     def _auto_expand_matches(self) -> None:
         """Expand parent dirs of filter matches so they stay visible."""
-        if not self._filter.query:
+        if not self.search_query:
             return
         for f in self.files:
             parts = f.get_file_str().replace("\\", "/").split("/")[:-1]
@@ -510,7 +510,7 @@ class StatusPanel(ItemList):
     def stage_all(self) -> None:
         if not self.files:
             return
-        result = self._vm.stage_indices(set(self._filter.map))
+        result = self._vm.stage_indices(set(self._source_map))
         self._handle_result(result)
 
     @bind_action(
@@ -710,7 +710,7 @@ class StatusPanel(ItemList):
         if not self._visual_mode:
             return
         if not self._tree_mode:
-            idx = self._filter.source_index(self.curr_no)
+            idx = self._source_index(self.curr_no)
             if idx in self._selected:
                 self._selected.discard(idx)
             else:
@@ -733,7 +733,7 @@ class StatusPanel(ItemList):
     @bind_action("search", "/", desc="Filter file list by name")
     def search(self) -> None:
         """Activate the file-list search filter."""
-        self._filter.enter()
+        self.enter_search()
 
     @bind_action("toggle_tree", "T", desc="Toggle tree / flat file view")
     def toggle_tree(self) -> None:
@@ -835,7 +835,7 @@ class StatusPanel(ItemList):
         end = max(self._visual_anchor, self.curr_no)
         if not self._tree_mode:
             self._selected.update(
-                self._filter.source_index(i) for i in range(start, end + 1)
+                self._source_index(i) for i in range(start, end + 1)
             )
             return
         for idx in range(start, end + 1):
@@ -854,9 +854,16 @@ class StatusPanel(ItemList):
             self._tree_rows = []
             self.set_content([])
 
-    def _render_surface(self, surface) -> None:
-        super()._render_surface(surface)
-        self._filter.render_bar(surface)
+    def _source_index(self, visible_idx: int) -> int:
+        """Map a visible row index to the source index in ``_all_files``."""
+        if self._tree_mode:
+            row = self._row(visible_idx)
+            if row is not None and row.source_index >= 0:
+                return row.source_index
+            return visible_idx
+        if visible_idx < len(self._source_map):
+            return self._source_map[visible_idx]
+        return visible_idx
 
     def describe_row(
         self,
@@ -899,7 +906,7 @@ class StatusPanel(ItemList):
             Segment(" ", fg=fg_primary),
         ]
 
-        is_selected = self._filter.source_index(idx) in self._selected
+        is_selected = self._source_index(idx) in self._selected
         if is_selected:
             filename_fg = THEME.fg_staged_renamed if focused else THEME.fg_dim
         else:
@@ -980,7 +987,7 @@ class StatusPanel(ItemList):
         """Return (file, source_index) at cursor; None on dir row or no file."""
         if not self._tree_mode:
             if self.files and 0 <= self.curr_no < len(self.files):
-                return self.files[self.curr_no], self._filter.source_index(self.curr_no)
+                return self.files[self.curr_no], self._source_index(self.curr_no)
             return None
         row = self._row(self.curr_no)
         if row is None or row.kind == "dir" or row.file is None:
@@ -1031,9 +1038,9 @@ class StatusPanel(ItemList):
         return hit is not None and hit[0].has_merged_conflicts
 
     def capture_key(self, key: str) -> bool:
-        if self._filter.handle_key(key):
+        if self.search_handle_key(key):
             return True
-        if self._filter.active:
+        if self.search_active:
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
             return True

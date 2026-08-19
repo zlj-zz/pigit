@@ -8,10 +8,11 @@ Date: 2026-05-16
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import logging
 
-from .. import palette
+from .. import keys, palette
 from ..theme import get_theme
 from .._component import Component, ComponentError
 from .._mouse import MouseButton, MouseKind, MouseEvent
@@ -40,6 +41,7 @@ class ItemList(Component):
         *,
         empty_state: list[Segment] | None = None,
         lazy_load: bool = False,
+        on_search_changed: Callable[[], None] | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
@@ -68,6 +70,11 @@ class ItemList(Component):
         self._filter_fn: Callable[[str, str], bool] | None = None
         self._filter_needle: str = ""
         self._visible_to_source: list[int] = []
+        self._search_active: bool = False
+        self._search_query: str = ""
+        self._on_search_changed = on_search_changed
+        self._source_items: list[Any] = []
+        self._text_of: Callable[[Any], str] | None = None
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -116,6 +123,85 @@ class ItemList(Component):
         self.curr_no = min(self.curr_no, len(content) - 1)
         self._scroll_into_view()
         self._request_render()
+
+    def set_source_items(
+        self,
+        items: Sequence[Any],
+        *,
+        text_of: Callable[[Any], str],
+    ) -> None:
+        """Keep ``items``; then ``set_source_content([text_of(x) for x in items])``."""
+        self._source_items = list(items)
+        self._text_of = text_of
+        self.set_source_content([text_of(item) for item in items])
+
+    @property
+    def search_active(self) -> bool:
+        """True while incremental search mode is active."""
+        return self._search_active
+
+    @property
+    def search_query(self) -> str:
+        """Current search query (may remain after search mode deactivates)."""
+        return self._search_query
+
+    def enter_search(self) -> None:
+        """Activate search mode, clear the query, and notify listeners."""
+        self._search_active = True
+        self._search_query = ""
+        self._notify_search_changed()
+
+    def search_handle_key(self, key: str) -> bool:
+        """Handle search-related key input.
+
+        Returns ``True`` if the key was consumed. When search is inactive,
+        always returns ``False`` so ``/`` stays bound via ``@bind_action``.
+        """
+        if not self._search_active:
+            return False
+        if key == keys.KEY_ESC:
+            self._search_active = False
+            self._search_query = ""
+            self._notify_search_changed()
+            return True
+        if key == keys.KEY_ENTER:
+            self._search_active = False
+            self._notify_search_changed()
+            return True
+        if key == keys.KEY_BACKSPACE:
+            self._search_query = self._search_query[:-1]
+            self._notify_search_changed()
+            return True
+        if len(key) == 1 and key.isprintable():
+            self._search_query += key
+            self._notify_search_changed()
+            return True
+        return False
+
+    def _notify_search_changed(self) -> None:
+        """Invoke the optional callback and schedule a render."""
+        if self._on_search_changed is not None:
+            self._on_search_changed()
+        self._request_render()
+
+    def _draw_search_bar(self, surface: Surface | _Subsurface) -> None:
+        """Draw the search/filter bar on the bottom row of ``surface``."""
+        if not self._search_query and not self._search_active:
+            return
+        row = surface.height - 1
+        if row < 0:
+            return
+        theme = get_theme()
+        if self._search_active:
+            text = f"/{self._search_query}"
+            fg = theme.fg_primary
+            flags = palette.STYLE_BOLD
+        else:
+            text = f"filter: {self._search_query}"
+            fg = theme.fg_muted
+            flags = 0
+        text = text.ljust(surface.width)[: surface.width]
+        surface.draw_text_rgb(row, 0, text, fg=fg, style_flags=flags)
 
     def set_source_content(self, content: list[str]) -> None:
         """Set the original unfiltered content.
@@ -306,6 +392,8 @@ class ItemList(Component):
         if not self.content:
             if self.empty_state is not None:
                 self._render_empty_state(surface)
+            if self._search_query or self._search_active:
+                self._draw_search_bar(surface)
             return
         end = min(self._r_start + self.visible_row_count, len(self.content))
         if self._item_starts is None:
@@ -314,16 +402,18 @@ class ItemList(Component):
                 is_cursor = idx == self.curr_no
                 left, main, right = self.describe_row(idx, is_cursor)
                 self._draw_row_layout(surface, row, left, main, right)
-            return
-        cursor_r = self.cursor_row()
-        for idx in range(self._r_start, end):
-            row = idx - self._r_start
-            is_cursor = idx == cursor_r
-            item_idx, sub_row = self.row_to_item(idx)
-            left, main, right = self.describe_row(
-                idx, is_cursor, item_idx=item_idx, sub_row=sub_row
-            )
-            self._draw_row_layout(surface, row, left, main, right)
+        else:
+            cursor_r = self.cursor_row()
+            for idx in range(self._r_start, end):
+                row = idx - self._r_start
+                is_cursor = idx == cursor_r
+                item_idx, sub_row = self.row_to_item(idx)
+                left, main, right = self.describe_row(
+                    idx, is_cursor, item_idx=item_idx, sub_row=sub_row
+                )
+                self._draw_row_layout(surface, row, left, main, right)
+        if self._search_query or self._search_active:
+            self._draw_search_bar(surface)
 
     def _render_empty_state(self, surface: Surface | _Subsurface) -> None:
         """Render empty-state segments centered on the surface."""

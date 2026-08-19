@@ -74,7 +74,7 @@ def test_target_indices_collapsed_dir_still_has_children() -> None:
 def test_target_indices_filter_limits_dir_children() -> None:
     files = [_file("src/a.py"), _file("src/b.py")]
     panel, _vm = _panel(files)
-    panel._filter.query = "a.py"
+    panel._search_query = "a.py"
     panel._apply_filter()
     panel.curr_no = 0
     assert panel._target_indices() == {0}
@@ -135,7 +135,7 @@ def test_stage_all_stages_every_listed_file() -> None:
 def test_stage_all_uses_filter_map() -> None:
     files = [_file("src/a.py"), _file("src/b.py"), _file("README.md")]
     panel, vm = _panel(files)
-    panel._filter.query = "src"
+    panel._search_query = "src"
     panel._apply_filter()
     panel.stage_all()
     vm.stage_indices.assert_called_once_with({0, 1})

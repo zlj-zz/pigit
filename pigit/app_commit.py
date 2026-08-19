@@ -36,7 +36,6 @@ from .app_types import CommitSnapshot, GraphRow
 from .app_diff import DiffType
 from .app_theme import THEME
 from .app_contribution_graph import ContributionGraph
-from .app_search_filter import SearchFilter
 from .viewmodels.base import ActionResult
 from .viewmodels.commit import ICommitViewModel
 
@@ -128,11 +127,12 @@ class CommitPanel(ItemList):
             on_selection_changed=on_selection_changed,
             lazy_load=True,
             id=id,
+            on_search_changed=lambda: self._apply_filter(),
         )
         self._vm = vm
         self.commits: list[Commit] = []
         self._all_commits: list[Commit] = []
-        self._filter = SearchFilter(self._apply_filter)
+        self._source_map: list[int] = []
         self._report_enabled = report_default
         self._report_h = 0
         self._contrib_graph = ContributionGraph()
@@ -204,7 +204,7 @@ class CommitPanel(ItemList):
     def view_diff(self) -> None:
         if not self.commits:
             return
-        source_idx = self._filter.source_index(self.curr_no)
+        source_idx = self._source_index(self.curr_no)
         content = self._vm.load_diff(source_idx)
         self.emit(
             EVT_GOTO,
@@ -288,7 +288,13 @@ class CommitPanel(ItemList):
     @bind_action("search", "/", desc="Filter commit list by message or SHA")
     def search(self) -> None:
         """Activate the commit-list search filter."""
-        self._filter.enter()
+        self.enter_search()
+
+    def _source_index(self, item_idx: int) -> int:
+        """Map a visible item index to the source index in ``_all_commits``."""
+        if item_idx < len(self._source_map):
+            return self._source_map[item_idx]
+        return item_idx
 
     @bind_action("copy_sha", "Y", desc="Copy commit SHA to clipboard")
     def copy_sha(self) -> None:
@@ -324,7 +330,7 @@ class CommitPanel(ItemList):
 
     def get_inspector_snapshot(self) -> CommitSnapshot | None:
         """Return a frozen snapshot for the selected commit."""
-        source_idx = self._filter.source_index(self.curr_no)
+        source_idx = self._source_index(self.curr_no)
         return self._vm.get_inspector_snapshot(source_idx)
 
     def activate(self) -> None:
@@ -357,10 +363,10 @@ class CommitPanel(ItemList):
 
     def _apply_filter(self) -> None:
         """Filter commits by query and rebuild display state."""
-        query = self._filter.query.lower()
+        query = self.search_query.lower()
         if not query:
             self.commits = list(self._all_commits)
-            self._filter.map = list(range(len(self._all_commits)))
+            self._source_map = list(range(len(self._all_commits)))
         else:
             filtered: list[Commit] = []
             mapping: list[int] = []
@@ -373,7 +379,7 @@ class CommitPanel(ItemList):
                     filtered.append(c)
                     mapping.append(i)
             self.commits = filtered
-            self._filter.map = mapping
+            self._source_map = mapping
         if not self.commits:
             self.set_content(["No matching commits."])
             self._max_meta_w = 0
@@ -513,13 +519,11 @@ class CommitPanel(ItemList):
         if self._report_h:
             list_surface = surface.subsurface(0, 0, surface.width, self._list_h())
             super()._render_surface(list_surface)
-            self._filter.render_bar(list_surface)
             self._render_report(
                 surface.subsurface(self._list_h(), 0, surface.width, self._report_h)
             )
         else:
             super()._render_surface(surface)
-            self._filter.render_bar(surface)
 
     def _render_report(self, surface) -> None:
         """Render the contribution-graph report into the bottom strip."""
@@ -639,7 +643,7 @@ class CommitPanel(ItemList):
         else:
             left = [Segment("  ", fg=THEME.fg_primary)]
 
-        source_idx = self._filter.source_index(item_idx)
+        source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
@@ -700,7 +704,7 @@ class CommitPanel(ItemList):
         styled bold and we omit ``cursor_flags`` entirely.
         """
         left: list[Segment] = [Segment("  ", fg=THEME.fg_primary)]
-        source_idx = self._filter.source_index(item_idx)
+        source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
             left.extend(
                 self._render_rails(
@@ -867,6 +871,6 @@ class CommitPanel(ItemList):
         return " ", THEME.fg_dim
 
     def capture_key(self, key: str) -> bool:
-        if self._filter.handle_key(key):
+        if self.search_handle_key(key):
             return True
-        return self._filter.active
+        return self.search_active

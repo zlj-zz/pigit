@@ -6,6 +6,7 @@ Author: Zev
 Date: 2026-04-20
 """
 
+from pigit.termui import keys
 from pigit.termui.widgets import (
     CheckList,
     InputLine,
@@ -17,6 +18,7 @@ from pigit.termui.reactive import Signal
 
 from pigit.termui._segment import Segment
 from pigit.termui._surface import Surface
+from pigit.termui.theme import get_theme
 
 
 class TestItemList:
@@ -62,6 +64,67 @@ class TestItemList:
         # All rows should be empty
         for row in surface._rows:
             assert all(c.char == " " for c in row)
+
+
+class TestItemListSearch:
+    def test_idle_slash_not_consumed(self):
+        """``/`` is a panel bind_action; search_handle_key must not swallow it."""
+        sel = ItemList(content=["a", "b"])
+        assert sel.search_handle_key("/") is False
+        assert sel.search_active is False
+
+    def test_enter_search_and_typing(self):
+        changes = []
+        sel = ItemList(content=["alpha", "beta"], on_search_changed=lambda: changes.append(True))
+        sel.enter_search()
+        assert sel.search_active is True
+        assert sel.search_query == ""
+        assert changes == [True]
+        assert sel.search_handle_key("a") is True
+        assert sel.search_handle_key("l") is True
+        assert sel.search_query == "al"
+        assert sel.search_handle_key(keys.KEY_BACKSPACE) is True
+        assert sel.search_query == "a"
+
+    def test_esc_exits_and_clears_query(self):
+        sel = ItemList(content=["a"])
+        sel.enter_search()
+        sel.search_handle_key("x")
+        assert sel.search_handle_key(keys.KEY_ESC) is True
+        assert sel.search_active is False
+        assert sel.search_query == ""
+
+    def test_enter_deactivates_but_keeps_query(self):
+        sel = ItemList(content=["a"])
+        sel.enter_search()
+        sel.search_handle_key("a")
+        sel.search_handle_key("b")
+        assert sel.search_handle_key(keys.KEY_ENTER) is True
+        assert sel.search_active is False
+        assert sel.search_query == "ab"
+
+    def test_set_source_items_and_filter_mapping(self):
+        items = ["alpha", "beta", "other"]
+        sel = ItemList(size=(20, 5))
+        sel.set_source_items(items, text_of=lambda x: x)
+        sel.set_filter("a")
+        assert sel.content == ["alpha", "beta"]
+        assert sel.visible_to_source(0) == 0
+        assert sel.visible_to_source(1) == 1
+        sel.set_filter("al")
+        assert sel.content == ["alpha"]
+        assert sel.visible_to_source(0) == 0
+
+    def test_search_bar_drawn_when_active(self):
+        sel = ItemList(content=["item"], size=(20, 5))
+        sel.enter_search()
+        sel.search_handle_key("q")
+        surface = Surface(20, 5)
+        sel._render_surface(surface)
+        bottom = "".join(c.char for c in surface._rows[4])
+        assert "/q" in bottom
+        theme = get_theme()
+        assert surface._rows[4][0].fg == theme.fg_primary
 
 
 class TestStatusBar:

@@ -34,7 +34,7 @@ def _sheet(names=None, current="HEAD", on_pick=None, on_done=None):
 def test_activate_puts_head_first_and_cursors_current():
     panel = _sheet(current="origin/foo")
     panel.activate()
-    assert panel._rows == ["HEAD", "main", "origin/foo"]
+    assert panel.content == ["HEAD", "main", "origin/foo"]
     assert panel.curr_no == 2
 
 
@@ -43,8 +43,8 @@ def test_filter_narrows_and_enter_picks_mapped():
     done = MagicMock()
     panel = _sheet(on_pick=pick, on_done=done)
     panel.activate()
-    panel._filter.query = "foo"
-    panel._apply_filter()
+    panel._search_query = "foo"
+    panel._sync_filter()
     panel.curr_no = 0
     panel.confirm()
     pick.assert_called_once_with("origin/foo")
@@ -55,8 +55,8 @@ def test_enter_noop_when_filter_empty():
     pick = MagicMock()
     panel = _sheet(on_pick=pick)
     panel.activate()
-    panel._filter.query = "zzzz"
-    panel._apply_filter()
+    panel._search_query = "zzzz"
+    panel._sync_filter()
     panel.confirm()
     pick.assert_not_called()
 
@@ -79,9 +79,9 @@ def test_enter_confirms_even_with_filter_active():
     done = MagicMock()
     panel = _sheet(on_pick=pick, on_done=done)
     panel.activate()
-    panel._filter.enter()
-    panel._filter.query = "foo"
-    panel._apply_filter()
+    panel.enter_search()
+    panel._search_query = "foo"
+    panel._sync_filter()
     panel.curr_no = 0
     assert panel.capture_key(keys.KEY_ENTER) is True
     pick.assert_called_once_with("origin/foo")

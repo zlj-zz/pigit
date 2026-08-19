@@ -113,10 +113,10 @@ def test_filter_consumes_digit_before_panel_goto(runtime):
     """An active search filter gets digits before the app-level goto bindings."""
     app, root = _mount(runtime)
     app._status_panel.search()  # activate the filter
-    assert app._status_panel._filter.active
+    assert app._status_panel.search_active
 
     root._handle_event("4")
-    assert app._status_panel._filter.query == "4"
+    assert app._status_panel.search_query == "4"
     assert _leaf(root) is app._status_panel  # focus did not jump to Commit
 
 
@@ -133,7 +133,7 @@ def test_filter_exit_restores_number_goto(runtime):
     app, root = _mount(runtime)
     app._status_panel.search()
     root._handle_event(keys.KEY_ESC)
-    assert not app._status_panel._filter.active
+    assert not app._status_panel.search_active
 
     root._handle_event("4")
     assert _leaf(root) is app._commit_panel
