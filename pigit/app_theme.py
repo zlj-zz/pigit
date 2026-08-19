@@ -77,6 +77,8 @@ class FlatTheme:
     bg_chrome: tuple[int, int, int] = palette.INK
     fg_chrome_active: tuple[int, int, int] = palette.ALMOST_WHITE
     fg_chrome_inactive: tuple[int, int, int] = palette.SLATE
+    fg_header_repo: tuple[int, int, int] = palette.AMBER
+    fg_header_branch: tuple[int, int, int] = palette.CYAN
 
     # ── Borders ──
     border: tuple[int, int, int] = palette.GUNMETAL

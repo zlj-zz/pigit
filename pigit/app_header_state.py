@@ -108,9 +108,13 @@ class HeaderState:
             )
         segs.extend(
             [
-                Segment(self.repo, fg=self._theme.fg_primary),
+                Segment(self.repo, fg=self._theme.fg_header_repo),
                 Segment("  ", fg=self._theme.fg_dim),
-                Segment(self.branch, fg=self._theme.fg_branch_name),
+                Segment(
+                    self.branch,
+                    fg=self._theme.fg_header_branch,
+                    style_flags=palette.STYLE_BOLD,
+                ),
             ]
         )
         return segs
