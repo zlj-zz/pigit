@@ -43,7 +43,7 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
-from .git.api import GitError
+from .git.api import GitApi, GitError, RepoError
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -55,7 +55,6 @@ from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
-from .git.api import GitApi
 from .git.managed_repos import ManagedRepos
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
@@ -667,6 +666,9 @@ class PigitApplication(Application):
         if action is EventType("action_requested") and data.get("cmd") == "rebase":
             self._on_rebase_request(data["target"])
             return True
+        if action is EventType("action_requested") and data.get("cmd") == "cherry-pick":
+            self._on_cherry_pick(data["sha"], bool(data.get("is_merge")))
+            return True
         return self._event_bus.publish(action, **data)
 
     def _resolve_active_panel(self) -> Component | None:
@@ -690,6 +692,14 @@ class PigitApplication(Application):
             return
         if lower in ("rebase-continue", "rebase-abort", "rebase-skip"):
             self._run_rebase_control(lower)
+            return
+        if lower in (
+            "cherry-pick-continue",
+            "cherry-pick-abort",
+            "cherry-pick-skip",
+        ):
+            self._run_cherry_pick_control(lower)
+            return
 
     def _run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""
@@ -728,6 +738,46 @@ class PigitApplication(Application):
             return
         self._do_rebase_control(flag)
 
+    def _refresh_git_vms(self) -> None:
+        """Refresh Status, Branch, and Commit VMs (safe while a palette overlay is open)."""
+        self._status_vm.refresh()
+        self._branch_vm.refresh()
+        self._commit_vm.refresh()
+
+    _SEQUENCER_PAUSED = {
+        "rebase": "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
+        "cherry-pick": "Cherry-pick paused. Resolve, then ';' → cherry-pick-continue/abort/skip",
+        "revert": "Revert paused. Resolve, then ';' → cherry-pick-continue/abort/skip",
+    }
+
+    def _after_external_git(
+        self,
+        result,
+        *,
+        flag: str,
+        done_msg: str,
+        failed_msg: str,
+    ) -> None:
+        """Toast and refresh after an exec_external sequencer command.
+
+        git's sequencer is shared, so a revert is resumed via
+        ``cherry-pick-continue``; the paused state is labeled by the actual
+        sequencer kind, not the command that was run.
+        """
+        still = self._git.sequencer_in_progress()
+        if result.returncode == 0:
+            if still is not None:
+                show_toast(
+                    self._SEQUENCER_PAUSED.get(still, f"{still} paused"),
+                    duration=3.0,
+                    kind=FeedbackKind.WARNING,
+                )
+            else:
+                show_toast(done_msg, duration=1.5, kind=FeedbackKind.SUCCESS)
+            self._refresh_git_vms()
+            return
+        show_toast(failed_msg, duration=2.0, kind=FeedbackKind.ERROR)
+
     def _do_rebase_control(self, flag: str) -> None:
         """Execute ``git rebase --<flag>`` via exec_external and refresh panels."""
         try:
@@ -737,26 +787,119 @@ class PigitApplication(Application):
                 f"Rebase {flag} error: {e}", duration=3.0, kind=FeedbackKind.ERROR
             )
             return
-        if result.returncode == 0:
-            if self._git.is_rebase_in_progress():
-                # --continue/--skip resumed into another paused stop (e.g. the
-                # next "edit" action) — report that, not a false "completed".
+        self._after_external_git(
+            result,
+            flag=flag,
+            done_msg=f"Rebase {flag} completed",
+            failed_msg=f"Rebase {flag} failed",
+        )
+
+    def _run_cherry_pick_control(self, action: str) -> None:
+        """Run a cherry-pick control flag (--continue/--abort/--skip)."""
+        flag = action[len("cherry-pick-") :]
+        if flag == "abort":
+
+            def on_confirm(confirmed: bool) -> None:
+                if confirmed:
+                    self._do_cherry_pick_control(flag)
+
+            self._alert_dialog.alert(
+                "Abort cherry-pick? All progress will be lost.",
+                on_confirm,
+                destructive=True,
+            )
+            return
+        self._do_cherry_pick_control(flag)
+
+    def _do_cherry_pick_control(self, flag: str) -> None:
+        """Execute ``git cherry-pick --<flag>`` via exec_external."""
+        argv = ["git", "cherry-pick", f"--{flag}"]
+        if flag == "continue":
+            argv.append("--no-edit")
+        try:
+            result = exec_external(argv, cwd=self._repo_path)
+        except Exception as e:
+            show_toast(
+                f"Cherry-pick {flag} error: {e}",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._after_external_git(
+            result,
+            flag=flag,
+            done_msg=f"Cherry-pick {flag} completed",
+            failed_msg=f"Cherry-pick {flag} failed",
+        )
+
+    def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
+        """Copy ``sha`` onto HEAD via a suspended external git run."""
+        try:
+            # The sequencer check comes first: during a paused operation HEAD
+            # is still the base commit, so "already at this commit" would mask
+            # the in-progress state.
+            kind = self._git.sequencer_in_progress()
+            if kind is not None:
                 show_toast(
-                    "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
-                    duration=3.0,
+                    f"A {kind} is already in progress",
+                    duration=2.0,
                     kind=FeedbackKind.WARNING,
                 )
-            else:
+                return
+            if sha == self._git.resolve_head_sha():
                 show_toast(
-                    f"Rebase {flag} completed", duration=1.5, kind=FeedbackKind.SUCCESS
+                    "Already at this commit", duration=2.0, kind=FeedbackKind.WARNING
                 )
-            # Refresh the VMs directly: _refresh_active_panel() early-returns
-            # while the command-palette overlay is still open.
-            self._branch_vm.refresh()
-            self._commit_vm.refresh()
-            self._status_vm.refresh()
-        else:
-            show_toast(f"Rebase {flag} failed", duration=3.0, kind=FeedbackKind.ERROR)
+                return
+            if is_merge:
+                show_toast(
+                    "Cannot cherry-pick a merge commit",
+                    duration=2.0,
+                    kind=FeedbackKind.WARNING,
+                )
+                return
+        except (GitError, RepoError) as e:
+            show_toast(str(e), duration=2.0, kind=FeedbackKind.ERROR)
+            return
+
+        # Run through exec_external so the pick is visible and interruptible,
+        # matching rebase; git itself rejects a pick that would overwrite
+        # unrelated local changes, so no dirty-tree pre-guard is needed.
+        try:
+            result = exec_external(["git", "cherry-pick", sha], cwd=self._repo_path)
+        except Exception as e:
+            show_toast(f"Cherry-pick error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
+            return
+        self._finish_cherry_pick(result, sha)
+
+    def _finish_cherry_pick(self, result, sha: str) -> None:
+        """Toast or badge the outcome of a just-run cherry-pick."""
+        try:
+            kind = self._git.sequencer_in_progress()
+            if result.returncode == 0:
+                show_badge(f"Cherry-picked {sha[:7]}")
+                self._refresh_git_vms()
+                return
+            if kind == "cherry-pick":
+                if self._git.has_unmerged_paths():
+                    show_toast(
+                        "Conflict! Resolve in Status, then ';' → cherry-pick-continue/abort",
+                        duration=3.0,
+                        kind=FeedbackKind.WARNING,
+                    )
+                    self._tab_view.route_to("status")
+                else:
+                    show_toast(
+                        "Cherry-pick is empty. ';' → cherry-pick-skip or cherry-pick-abort",
+                        duration=3.0,
+                        kind=FeedbackKind.WARNING,
+                    )
+                return
+        except (GitError, RepoError) as e:
+            show_toast(str(e), duration=2.0, kind=FeedbackKind.ERROR)
+            return
+        show_toast("Cherry-pick failed", duration=2.0, kind=FeedbackKind.ERROR)
+        self._refresh_git_vms()
 
     def _merge_state_path(self) -> str:
         """Return the path to the persistent merge state file."""
@@ -809,6 +952,14 @@ class PigitApplication(Application):
 
     def _on_merge_request(self, source: str, target: str) -> None:
         """Callback from BranchPanel: confirm then execute merge workflow."""
+        kind = self._git.sequencer_in_progress()
+        if kind is not None:
+            show_toast(
+                f"A {kind} is already in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
 
         def on_confirm(confirmed: bool) -> None:
             if not confirmed:

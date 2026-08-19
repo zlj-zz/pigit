@@ -12,7 +12,7 @@ import logging
 from pigit.ext.executor import Executor
 from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
 
-from ._errors import GitError, RepoError
+from ._errors import GitError, RepoError, SequencerPaused
 from ._core import _CoreOps
 from ._branch import _BranchOps
 from ._commit import _CommitOps, _DEFAULT_LOG_FORMAT, LOG_GRAPH_LIMIT
@@ -24,7 +24,7 @@ from ._merge import _MergeOps
 from ._fileio import _FileioOps
 from ._display import _DisplayOps
 
-__all__ = ("GitApi", "GitError", "RepoError")
+__all__ = ("GitApi", "GitError", "RepoError", "SequencerPaused")
 
 
 class GitApi:
@@ -244,6 +244,18 @@ class GitApi:
 
     def is_rebase_in_progress(self, path=None):
         return self._merge.is_rebase_in_progress(path)
+
+    def sequencer_in_progress(self, path=None):
+        return self._merge.sequencer_in_progress(path)
+
+    def resolve_head_sha(self, path=None):
+        return self._merge.resolve_head_sha(path)
+
+    def has_unmerged_paths(self, path=None):
+        return self._merge.has_unmerged_paths(path)
+
+    def cherry_pick(self, sha, path=None):
+        return self._merge.cherry_pick(sha, path)
 
     def commit_no_edit(self, path=None):
         return self._merge.commit_no_edit(path)

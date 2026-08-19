@@ -91,9 +91,10 @@ class RebasePanel(ItemList):
 
     def activate(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
-        if self._git.is_rebase_in_progress() or self._git.is_merge_in_progress():
+        kind = self._git.sequencer_in_progress()
+        if kind is not None:
             show_toast(
-                "A rebase or merge is already in progress",
+                f"A {kind} is already in progress",
                 duration=2.0,
                 kind=FeedbackKind.WARNING,
             )

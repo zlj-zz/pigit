@@ -32,6 +32,7 @@ def _panel(
 ) -> tuple[RebasePanel, MagicMock]:
     git = MagicMock()
     git.list_commits_in_range.return_value = commits
+    git.sequencer_in_progress.return_value = "rebase" if in_progress else None
     git.is_rebase_in_progress.return_value = in_progress
     git.is_merge_in_progress.return_value = False
     git.path = "/repo"
@@ -140,3 +141,12 @@ class TestRebasePanel:
         panel._render_surface(surface)
         last_row = "".join(c.char for c in surface._rows[4])
         assert "pick" in last_row and "squash" in last_row
+
+    def test_activate_blocks_when_cherry_pick_in_progress(self):
+        panel, git = _panel([_commit("a")])
+        git.sequencer_in_progress.return_value = "cherry-pick"
+        with patch("pigit.app_rebase.show_toast") as toast:
+            panel.activate()
+        toast.assert_called()
+        panel._on_done.assert_called()
+        git.list_commits_in_range.assert_not_called()

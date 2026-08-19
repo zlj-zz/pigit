@@ -73,6 +73,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `?` | help | all |
 | `a` / `d` / `i` | stage / discard / ignore | Status |
 | `c` | inline commit editor | Status |
+| `c` | cherry-pick onto HEAD | Commit |
 | `H` | toggle hunk staging | Diff |
 | `u` / `U` | undo / undo stack | all |
 | `z` / `Z` | stash push / pop | Status |

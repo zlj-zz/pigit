@@ -4,7 +4,7 @@ from pigit.ext.executor import REPLY, DECODE
 from pigit.ext.executor_factory import ExecutorFactory
 
 from .ignore import get_ignore_source, create_gitignore
-from .api import GitApi, GitError, RepoError
+from .api import GitApi, GitError, RepoError, SequencerPaused
 from .managed_repos import ManagedRepos
 
 __all__ = (
@@ -14,6 +14,7 @@ __all__ = (
     "GitApi",
     "GitError",
     "RepoError",
+    "SequencerPaused",
     "ManagedRepos",
 )
 

@@ -39,6 +39,9 @@ DEFAULT_COMMANDS: list[str] = [
     "rebase-continue",
     "rebase-abort",
     "rebase-skip",
+    "cherry-pick-continue",
+    "cherry-pick-abort",
+    "cherry-pick-skip",
 ]
 
 

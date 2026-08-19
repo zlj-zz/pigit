@@ -31,6 +31,7 @@ def app():
 def _run(app, flag: str, returncode: int = 0, in_progress: bool = False) -> tuple:
     """Run _do_rebase_control and return the captured show_toast call."""
     app._git.is_rebase_in_progress.return_value = in_progress
+    app._git.sequencer_in_progress.return_value = "rebase" if in_progress else None
     with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast") as toast:
         ex.return_value.returncode = returncode
         app._do_rebase_control(flag)
@@ -63,3 +64,50 @@ class TestRebaseControl:
         args, kwargs = _run(app, "continue", returncode=1, in_progress=False)
         assert "failed" in args[0]
         assert kwargs["kind"] is FeedbackKind.ERROR
+
+    def test_continue_argv_is_git_rebase(self, app):
+        app._git.sequencer_in_progress.return_value = None
+        app._git.is_rebase_in_progress.return_value = False
+        with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast"):
+            ex.return_value.returncode = 0
+            app._do_rebase_control("continue")
+        assert ex.call_args.args[0] == ["git", "rebase", "--continue"]
+
+
+def test_palette_lists_cherry_pick_controls():
+    from pigit.app_command_palette import DEFAULT_COMMANDS
+
+    for name in (
+        "cherry-pick-continue",
+        "cherry-pick-abort",
+        "cherry-pick-skip",
+    ):
+        assert name in DEFAULT_COMMANDS
+
+
+class TestCherryPickControl:
+    def test_continue_uses_no_edit(self, app):
+        app._git.sequencer_in_progress.return_value = None
+        with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast"):
+            ex.return_value.returncode = 0
+            app._do_cherry_pick_control("continue")
+        assert ex.call_args.args[0] == [
+            "git",
+            "cherry-pick",
+            "--continue",
+            "--no-edit",
+        ]
+
+    def test_skip_argv(self, app):
+        app._git.sequencer_in_progress.return_value = None
+        with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast"):
+            ex.return_value.returncode = 0
+            app._do_cherry_pick_control("skip")
+        assert ex.call_args.args[0] == ["git", "cherry-pick", "--skip"]
+
+    def test_abort_argv(self, app):
+        app._git.sequencer_in_progress.return_value = None
+        with patch("pigit.app.exec_external") as ex, patch("pigit.app.show_toast"):
+            ex.return_value.returncode = 0
+            app._do_cherry_pick_control("abort")
+        assert ex.call_args.args[0] == ["git", "cherry-pick", "--abort"]

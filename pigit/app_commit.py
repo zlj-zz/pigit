@@ -16,6 +16,7 @@ from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui._async_task import run_async
 from pigit.termui import (
     EVT_GOTO,
+    EventType,
     FeedbackKind,
     bind_action,
     bind_signals,
@@ -200,6 +201,24 @@ class CommitPanel(ItemList):
             content=content,
             repo_path=self._vm.repo_path,
             diff_type=DiffType.COMMIT,
+        )
+
+    @bind_action(
+        "cherry_pick",
+        "c",
+        desc="Cherry-pick onto current HEAD",
+        tip="Cherry-pick",
+    )
+    def cherry_pick(self) -> None:
+        """Ask the app to copy the selected commit onto HEAD."""
+        commit = self._current_commit()
+        if commit is None:
+            return
+        self.emit(
+            EventType("action_requested"),
+            cmd="cherry-pick",
+            sha=commit.sha,
+            is_merge=commit.is_merge,
         )
 
     @bind_action(
