@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argparse import (
+    Action,
     ArgumentParser,
     HelpFormatter,
     Namespace,
@@ -19,7 +20,7 @@ from collections.abc import Callable, Iterable, Sequence
 from ..termui.cli_output import styled
 
 if TYPE_CHECKING:
-    from argparse import Action, FileType
+    from argparse import FileType
 
 
 class ParserOptions(TypedDict, total=False):
@@ -235,7 +236,7 @@ class Parser(ArgumentParser):
 
             # Declaration-ordered arguments (positional and optional).
             for action in parser._declared_actions:
-                option_string = " ".join(action.option_strings)
+                option_string = Parser._argument_key(action)
                 args[option_string] = {}
                 for name in argument_names:
                     args[option_string][name] = getattr(action, name, None)
@@ -254,6 +255,17 @@ class Parser(ArgumentParser):
             return result
 
         return _process(self)
+
+    @staticmethod
+    def _argument_key(action: Action) -> str:
+        """Return the to_dict key for an argparse action.
+
+        Options keep their flag string. Positionals use ``dest`` so they are
+        never stored under an empty key.
+        """
+        if action.option_strings:
+            return " ".join(action.option_strings)
+        return action.dest
 
     # ===============================
     # quick add sub-parser decorator

@@ -58,6 +58,42 @@ class TestCompletion:
         cls.complete_vars = pigit.to_dict()
         _inject_registry_commands(cls.complete_vars)
 
+    def test_to_dict_keys_cmd_positional_by_dest(self):
+        """The cmd catch-all positional is dest ``command``, not an empty key."""
+        from pigit.entry import pigit
+
+        cmd_args = pigit.to_dict()["args"]["cmd"]["args"]
+        assert "" not in cmd_args
+        assert cmd_args["command"]["dest"] == "command"
+        assert cmd_args["command"]["nargs"] == "*"
+
+    def test_promote_does_not_lift_nested_command_completion(self):
+        """Parent ``cmd`` must not inherit ``b.d``'s branch completer."""
+        cmd = self.complete_vars["args"]["cmd"]
+        assert ShellCompletion._promote_arg_completion(cmd) == ""
+        assert ShellCompletion._promote_arg_completion(cmd["args"]["b.d"]) == "branch"
+        rm = self.complete_vars["args"]["repo"]["args"]["rm"]
+        assert ShellCompletion._promote_arg_completion(rm) == "repos"
+
+    def test_zsh_cmd_tab_lists_shorts_not_branches(self):
+        src = ZshCompletion("pigit", self.complete_vars).generate_resource()
+        assert "cmd) _git_branches ;;" not in src
+        assert "cmd) __cmd_values ;;" in src
+        assert "b.d) _git_branches ;;" in src
+        assert "i) _path_files -/" in src
+
+    def test_bash_cmd_commands_are_shorts_not_the_positional(self):
+        vars_ = BashCompletion("pigit", self.complete_vars).generate_content()
+        commands = vars_["cmd_commands"].split()
+        assert "command" not in commands
+        assert "" not in commands
+        assert "b" in commands
+        assert "i" in commands
+        assert "_git_branches" in vars_["cmd_arg_cases"]
+        assert "_git_files" in vars_["cmd_arg_cases"] or "_git_files" in vars_[
+            "helper_functions"
+        ]
+
     def test_error(self):
         # error complete_vars
         with pytest.raises(TypeError):

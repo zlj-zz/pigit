@@ -192,14 +192,19 @@ class BashCompletion(ShellCompletion):
         commands = []
         cases = []
         for cmd_name, cmd_info in sub_args.items():
-            if not cmd_name.startswith("-") and cmd_name != "args":
-                commands.append(cmd_name)
-                arg_comp = ShellCompletion._promote_arg_completion(cmd_info)
-                if arg_comp and arg_comp in self.GIT_COMPLETION_FUNCS:
-                    used_completions.add(arg_comp)
-                    helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
-                    escaped_pattern = self._escape_case_pattern(cmd_name)
-                    cases.append(f"""                    {escaped_pattern})
+            if cmd_name.startswith("-") or cmd_name == "args":
+                continue
+            if not isinstance(cmd_info, dict):
+                continue
+            if not ShellCompletion._is_command_node(cmd_info):
+                continue
+            commands.append(cmd_name)
+            arg_comp = ShellCompletion._promote_arg_completion(cmd_info)
+            if arg_comp and arg_comp in self.GIT_COMPLETION_FUNCS:
+                used_completions.add(arg_comp)
+                helper_func = self.GIT_COMPLETION_FUNCS[arg_comp]
+                escaped_pattern = self._escape_case_pattern(cmd_name)
+                cases.append(f"""                    {escaped_pattern})
                         COMPREPLY=($({helper_func} | grep -i "^$cur" 2>/dev/null))
                         ;;""")
         return commands, cases
