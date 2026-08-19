@@ -6,9 +6,10 @@ from __future__ import annotations
 from pigit.app_chrome import AppFooter
 from pigit.app_theme import THEME
 from pigit.termui import Segment
-from pigit.termui.widgets import Header
+from pigit.termui.widgets import Footer, Header
 from pigit.termui.palette import STYLE_BOLD
 from pigit.termui._surface import Surface
+from pigit.termui.theme import get_theme
 
 
 class TestHeader:
@@ -73,6 +74,26 @@ class TestHeader:
         assert h.left == [Segment("repo", fg=THEME.fg_primary)]
         assert h.center == [Segment("center", fg=THEME.fg_dim)]
         assert h.right == [Segment("right", fg=THEME.fg_muted, style_flags=STYLE_BOLD)]
+
+
+class TestFooter:
+    def test_render_context_and_help(self):
+        theme = get_theme()
+        f = Footer()
+        f.set_context("src/main.py")
+        f.set_global_help([("Q", "Quit")])
+        f.set_help_provider(lambda: [("Enter", "Open")])
+        s = Surface(50, 2)
+        f.resize((50, 2))
+        f._render_surface(s)
+        assert "─" in s.lines()[0]
+        content = s.lines()[1]
+        assert "main.py" in content
+        assert "Enter" in content
+        row_cells = s.rows()[1]
+        key_cell = next(c for c in row_cells if c.char == "E")
+        assert key_cell.fg == theme.fg_primary
+        assert key_cell.style_flags & STYLE_BOLD
 
 
 class TestAppFooter:

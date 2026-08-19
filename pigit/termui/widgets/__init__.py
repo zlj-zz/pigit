@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 from .check_list import CheckList
+from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
 from .header import Header
 from .help_panel import HelpEntry, HelpPanel
@@ -25,6 +26,7 @@ __all__ = [
     "AlertDialog",
     "AlertDialogBody",
     "CheckList",
+    "Footer",
     "HeatmapGrid",
     "Header",
     "HelpEntry",
