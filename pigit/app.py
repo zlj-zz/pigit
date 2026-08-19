@@ -406,8 +406,8 @@ class PigitApplication(Application):
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
-        """Toggle help popup visibility. Entries are refreshed automatically
-        via HelpPanel.on_before_show before opening."""
+        """Toggle help popup visibility. Rebuild groups so Commit's title tracks log_ref."""
+        self._help_panel.set_grouped_entries(self._build_help_groups())
         self._help_popup.toggle()
 
     @bind_action("palette", ";", desc="Open command palette", tip="Palette")
@@ -509,9 +509,17 @@ class PigitApplication(Application):
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
         """Reverse the most recent session action."""
+        recent = self._session_history.peek(1)
+        was_checkout = bool(
+            recent
+            and any(cmd.op_type == "checkout_branch" for cmd in recent[0].commands)
+        )
         result = self._session_history.reverse(self._git)
         if result.success:
             show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
+            if was_checkout:
+                # Undoing a checkout moved HEAD; point the commit list at it.
+                self._on_follow_head(self._git.get_head() or "HEAD")
             self._refresh_active_panel()
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
@@ -669,6 +677,12 @@ class PigitApplication(Application):
         if action is EventType("action_requested") and data.get("cmd") == "cherry-pick":
             self._on_cherry_pick(data["sha"], bool(data.get("is_merge")))
             return True
+        if action is EventType("action_requested") and data.get("cmd") == "show-log":
+            self._on_show_log(data["ref"])
+            return True
+        if action is EventType("action_requested") and data.get("cmd") == "follow-head":
+            self._on_follow_head(data["ref"])
+            return True
         return self._event_bus.publish(action, **data)
 
     def _resolve_active_panel(self) -> Component | None:
@@ -676,6 +690,30 @@ class PigitApplication(Application):
         if self._root is None:
             return None
         return resolve_presentation_leaf(self._tab_view.active)
+
+    def _pin_log_ref(self, ref: str, *, announce: bool = True) -> None:
+        """Pin the Commit log to ``ref``; announce unless it is the checkout."""
+        self._commit_vm.set_log_ref(ref)
+        if announce and not self._commit_vm.viewing_checkout_log():
+            show_toast(f"Showing log: {ref}", duration=1.5, kind=FeedbackKind.INFO)
+
+    def _on_show_log(self, ref: str) -> None:
+        """Pin Commit log to ``ref`` and open the Commit tab."""
+        self._pin_log_ref(ref)
+        if self._tab_view.route_to("commit") is None:
+            # Already on the Commit tab; refresh the title directly.
+            self._commit_panel._publish_tab_title()
+
+    def _on_follow_head(self, ref: str) -> None:
+        """After a HEAD move, point the commit list at the new checkout."""
+        reset = self._commit_vm.follow_head(ref)
+        if reset:
+            show_toast(
+                f"Log pin reset to {ref}",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+        self._commit_panel._publish_tab_title()
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
@@ -833,11 +871,8 @@ class PigitApplication(Application):
         )
 
     def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
-        """Copy ``sha`` onto HEAD via a suspended external git run."""
+        """Guard, confirm, then copy ``sha`` onto HEAD via exec_external."""
         try:
-            # The sequencer check comes first: during a paused operation HEAD
-            # is still the base commit, so "already at this commit" would mask
-            # the in-progress state.
             kind = self._git.sequencer_in_progress()
             if kind is not None:
                 show_toast(
@@ -848,7 +883,9 @@ class PigitApplication(Application):
                 return
             if sha == self._git.resolve_head_sha():
                 show_toast(
-                    "Already at this commit", duration=2.0, kind=FeedbackKind.WARNING
+                    "Already at this commit",
+                    duration=2.0,
+                    kind=FeedbackKind.WARNING,
                 )
                 return
             if is_merge:
@@ -862,9 +899,17 @@ class PigitApplication(Application):
             show_toast(str(e), duration=2.0, kind=FeedbackKind.ERROR)
             return
 
-        # Run through exec_external so the pick is visible and interruptible,
-        # matching rebase; git itself rejects a pick that would overwrite
-        # unrelated local changes, so no dirty-tree pre-guard is needed.
+        def on_confirm(confirmed: bool) -> None:
+            if confirmed:
+                self._exec_cherry_pick(sha)
+
+        self._alert_dialog.alert(
+            f"Cherry-pick {sha[:7]} onto current HEAD?",
+            on_confirm,
+        )
+
+    def _exec_cherry_pick(self, sha: str) -> None:
+        """Run ``git cherry-pick`` after the user confirmed."""
         try:
             result = exec_external(["git", "cherry-pick", sha], cwd=self._repo_path)
         except Exception as e:

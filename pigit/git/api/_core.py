@@ -12,7 +12,7 @@ import shlex
 from pathlib import Path
 from typing import cast
 
-from pigit.ext.executor import REPLY, DECODE
+from pigit.ext.executor import WAITING, REPLY, DECODE
 
 from ._base import _OpsBase
 from ._errors import GitError
@@ -231,3 +231,27 @@ class _CoreOps(_OpsBase):
             return str(Path(git_dir_raw).resolve())
         repo_root, _ = self.confirm_repo(path)
         return str((Path(repo_root) / git_dir_raw).resolve())
+
+    def verify_commitish(self, ref: str, path: str | None = None) -> str:
+        """Return the full SHA of ``ref`` if it names a commit.
+
+        Args:
+            ref: Commit-ish (branch, remote-tracking name, ``HEAD``, SHA).
+            path: Repo path; defaults to ``self.path``.
+
+        Returns:
+            Stripped full SHA.
+
+        Raises:
+            GitError: When git cannot resolve ``ref`` to a commit.
+        """
+        path = path or self.path
+        spec = shlex.quote(f"{ref}^{{commit}}")
+        code, err, out = self.executor.exec(
+            f"git rev-parse --verify --end-of-options {spec}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0 or not out:
+            raise GitError(err or f"Not a commit: {ref}")
+        return cast(str, out).strip()

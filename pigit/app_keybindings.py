@@ -14,6 +14,7 @@ from pigit.app import PigitApplication
 from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
 from pigit.app_diff import DiffViewer
+from pigit.app_log_ref import LogRefSheet
 from pigit.app_rebase import RebasePanel
 from pigit.app_recent_actions import RecentActionsPanel
 from pigit.app_stash import StashPanel
@@ -32,6 +33,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     DiffViewer,
     RebasePanel,
     RecentActionsPanel,
+    LogRefSheet,
 )
 
 _KEY_SYNTAX_HINT = (

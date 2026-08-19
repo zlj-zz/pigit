@@ -85,6 +85,9 @@ class GitApi:
     def get_git_dir(self, path=None):
         return self._core.get_git_dir(path)
 
+    def verify_commitish(self, ref, path=None):
+        return self._core.verify_commitish(ref, path)
+
     # ── _branch ──
     def get_branches(self, path=None, include_remote=False, plain=True):
         return self._branch.get_branches(path, include_remote, plain)
@@ -250,6 +253,9 @@ class GitApi:
 
     def resolve_head_sha(self, path=None):
         return self._merge.resolve_head_sha(path)
+
+    def is_ancestor(self, commit, of_ref="HEAD", path=None):
+        return self._merge.is_ancestor(commit, of_ref, path)
 
     def has_unmerged_paths(self, path=None):
         return self._merge.has_unmerged_paths(path)

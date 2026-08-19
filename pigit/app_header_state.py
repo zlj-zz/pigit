@@ -188,7 +188,14 @@ class HeaderState:
             tab_name = getattr(active, "tab_name", None)
             tab_key = getattr(active, "tab_key", None)
             if tab_name is not None:
-                self.tab, self.tab_key = tab_name, tab_key or ""
+                # A panel may supply only the dynamic name; the tab key stays
+                # in tab_config so the number never has two sources of truth.
+                key = (
+                    tab_key
+                    if tab_key is not None
+                    else tab_config.get(type(active), ("", ""))[1]
+                )
+                self.tab, self.tab_key = tab_name, key
             else:
                 self.tab, self.tab_key = tab_config.get(type(active), ("", ""))
             return True

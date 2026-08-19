@@ -11,7 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from pigit.git.model import Commit
+from pigit.git.api import GitError
+from pigit.git.model import Branch, Commit
 from pigit.viewmodels.commit import CommitViewModel
 
 
@@ -75,3 +76,103 @@ def test_get_bodies_caches_result(commit_vm):
     assert bodies1 is bodies2
     assert bodies1 == {"abc1234": "subject\n\nbody"}
     commit_vm._git.get_commit_bodies.assert_called_once()
+
+
+def test_init_log_ref_follows_head(commit_vm):
+    assert commit_vm.log_ref == "main"
+
+
+def test_init_detached_uses_HEAD():
+    git = Mock()
+    git.get_head.return_value = None
+    vm = CommitViewModel(git)
+    assert vm.log_ref == "HEAD"
+
+
+def test_do_load_uses_log_ref_not_head(commit_vm):
+    commit_vm._log_ref = "origin/foo"
+    commit_vm._git.load_commits.return_value = []
+    commit_vm._git.get_remotes.return_value = []
+    commit_vm._do_load()
+    commit_vm._git.load_commits.assert_called_with("origin/foo")
+
+
+def test_get_bodies_uses_log_ref(commit_vm):
+    commit_vm._log_ref = "feat"
+    commit_vm._git.get_commit_bodies.return_value = {}
+    commit_vm.get_bodies()
+    commit_vm._git.get_commit_bodies.assert_called_with("feat")
+
+
+def test_set_log_ref_assigns_and_refresh_without_verify(commit_vm):
+    """Validation moved to the async load; set_log_ref only assigns."""
+    refreshed = []
+    commit_vm.refresh = lambda: refreshed.append(True)
+    commit_vm.set_log_ref("  origin/foo  ")
+    assert commit_vm.log_ref == "origin/foo"
+    assert refreshed == [True]
+    commit_vm._git.verify_commitish.assert_not_called()
+
+
+def test_set_log_ref_empty_is_noop(commit_vm):
+    commit_vm.set_log_ref("   ")
+    assert commit_vm.log_ref == "main"
+
+
+def test_follow_head_updates_head_and_log_ref(commit_vm):
+    refreshed = []
+    commit_vm.refresh = lambda: refreshed.append(True)
+    # Pinned to a non-checkout ref first.
+    commit_vm.set_log_ref("origin/release-1")
+    assert commit_vm.follow_head("feat") is True
+    assert commit_vm.log_ref == "feat"
+    assert commit_vm.viewing_checkout_log() is True
+    assert len(refreshed) == 2  # set_log_ref + follow_head
+
+
+def test_follow_head_without_pin_is_not_reset(commit_vm):
+    assert commit_vm.follow_head("main") is False
+    assert commit_vm.log_ref == "main"
+
+
+def test_do_load_falls_back_when_pinned_ref_dangles(commit_vm):
+    commit_vm._git.verify_commitish.side_effect = GitError("bad ref")
+    commit_vm.set_log_ref("feature")
+    from unittest.mock import Mock as _Mock
+
+    commit_vm._git.load_commits = _Mock(return_value=[])
+    commit_vm._do_load()
+    # Fell back to the cached checkout; the list is HEAD's, not stale.
+    assert commit_vm.log_ref == "main"
+
+
+def test_dispose_does_not_clear_log_ref(commit_vm):
+    commit_vm._log_ref = "feat"
+    commit_vm.dispose()
+    assert commit_vm.log_ref == "feat"
+
+
+def test_viewing_checkout_log_HEAD_token(commit_vm):
+    commit_vm._log_ref = "HEAD"
+    assert commit_vm.viewing_checkout_log() is True
+
+
+def test_viewing_checkout_log_same_branch(commit_vm):
+    commit_vm._log_ref = "main"
+    commit_vm._git.get_head.return_value = "main"
+    assert commit_vm.viewing_checkout_log() is True
+
+
+def test_viewing_checkout_log_pinned(commit_vm):
+    commit_vm._log_ref = "origin/foo"
+    commit_vm._git.get_head.return_value = "main"
+    assert commit_vm.viewing_checkout_log() is False
+
+
+def test_list_log_ref_names_head_first(commit_vm):
+    commit_vm._git.load_branches.return_value = [
+        Branch("HEAD", "?", "?", False),
+        Branch("main", "?", "?", True),
+        Branch("origin/foo", "?", "?", False, is_remote=True),
+    ]
+    assert commit_vm.list_log_ref_names() == ["HEAD", "main", "origin/foo"]

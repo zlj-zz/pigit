@@ -140,6 +140,17 @@ class BranchPanel(ItemList):
     def previous(self, step: int = 1) -> None:
         super().previous(step)
 
+    @bind_action("show_log", "enter", desc="Show commits (no checkout)")
+    def show_log(self) -> None:
+        """Open the Commit panel on this branch's log without checkout."""
+        if not self.branches:
+            return
+        self.emit(
+            EventType("action_requested"),
+            cmd="show-log",
+            ref=self.branches[self.curr_no].name,
+        )
+
     def _log_graph_preview_panel(self):
         """Return the registered log-graph preview, or None when unregistered."""
         from .app_log_graph_preview import LogGraphPreview
@@ -192,6 +203,12 @@ class BranchPanel(ItemList):
         self._handle_result(result)
         if result.success and self._branch_signal is not None:
             self._branch_signal.set(local_branch.name)
+        if result.success:
+            self.emit(
+                EventType("action_requested"),
+                cmd="follow-head",
+                ref=local_branch.name,
+            )
 
     @bind_action(
         "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
@@ -252,7 +269,6 @@ class BranchPanel(ItemList):
         "scope",
         "ctrl f",
         desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
-        tip="Scope",
     )
     def toggle_scope(self) -> None:
         """Cycle branch scope: local -> remote -> all -> local."""
@@ -433,6 +449,12 @@ class BranchPanel(ItemList):
             dismiss_sheet()
             if self._branch_signal is not None:
                 self._branch_signal.set(name)
+            # HEAD moved to the new branch (git checkout -b).
+            self.emit(
+                EventType("action_requested"),
+                cmd="follow-head",
+                ref=name,
+            )
 
     def _show_rename_sheet(self, branch_name: str) -> None:
         self._rename_branch_name = branch_name
@@ -452,3 +474,9 @@ class BranchPanel(ItemList):
             if self._branch_signal is not None:
                 if self._branch_signal.value == self._rename_branch_name:
                     self._branch_signal.set(new_name)
+                    # Renaming the current branch moves the HEAD ref name.
+                    self.emit(
+                        EventType("action_requested"),
+                        cmd="follow-head",
+                        ref=new_name,
+                    )

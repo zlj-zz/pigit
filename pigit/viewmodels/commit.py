@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pigit.termui.reactive import Signal
+from pigit.git.api import GitError
 
 from .base import IListViewModel, ViewModelBase
 
@@ -31,6 +32,17 @@ class ICommitViewModel(IListViewModel["Commit"]):
     @property
     def remotes(self) -> tuple[str, ...]: ...
 
+    @property
+    def log_ref(self) -> str: ...
+
+    def set_log_ref(self, ref: str) -> None: ...
+
+    def follow_head(self, ref: str) -> bool: ...
+
+    def viewing_checkout_log(self) -> bool: ...
+
+    def list_log_ref_names(self) -> list[str]: ...
+
     def get_inspector_data(self, idx: int) -> CommitInfo | None: ...
 
     def load_diff(self, idx: int) -> list[str]: ...
@@ -44,6 +56,9 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     def __init__(self, git: GitApi) -> None:
         super().__init__()
         self._git = git
+        head = git.get_head() or "HEAD"
+        self._head: str = head
+        self._log_ref: str = head
         self._graph_rows: Signal[list[GraphRow]] = Signal([])
         self._remotes: Signal[tuple[str, ...]] = Signal(())
         self._bodies: dict[str, str] | None = None
@@ -60,9 +75,50 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     def remotes(self) -> tuple[str, ...]:
         return self._remotes.value
 
+    @property
+    def log_ref(self) -> str:
+        return self._log_ref
+
+    def set_log_ref(self, ref: str) -> None:
+        """Pin the commit list to ``ref`` (validated asynchronously on load)."""
+        ref = ref.strip()
+        if not ref:
+            return
+        self._log_ref = ref
+        self._bodies = None
+        self.refresh()
+
+    def follow_head(self, ref: str) -> bool:
+        """Point the list at the current checkout; True when it overrode a pin.
+
+        Called after every HEAD-moving operation (checkout, create, rename,
+        undo) so ``_log_ref`` never goes stale.
+        """
+        was_pinned = self._log_ref not in ("HEAD", self._head)
+        self._head = ref
+        self.set_log_ref(ref)
+        return was_pinned
+
+    def viewing_checkout_log(self) -> bool:
+        """True when the list is the current checkout (no subprocess)."""
+        return self._log_ref == "HEAD" or self._log_ref == self._head
+
+    def list_log_ref_names(self) -> list[str]:
+        """Return ``HEAD`` plus ``load_branches(scope='all')`` short names."""
+        names = ["HEAD"]
+        for branch in self._git.load_branches(scope="all"):
+            if branch.name != "HEAD":
+                names.append(branch.name)
+        return names
+
     def _do_load(self) -> list[Commit]:
-        branch_name = self._git.get_head() or ""
-        commits = self._git.load_commits(branch_name)
+        try:
+            self._git.verify_commitish(self._log_ref)
+        except GitError:
+            # The pinned ref dangled (deleted/renamed); fall back to the
+            # current checkout so the list and title stay correct.
+            self._log_ref = self._head
+        commits = self._git.load_commits(self._log_ref)
         remotes = tuple(self._git.get_remotes())
         from pigit.app_commit_graph import compute_graph_rows
 
@@ -98,6 +154,5 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
             return self._bodies
         if not self._items.value:
             return None
-        branch_name = self._git.get_head() or ""
-        self._bodies = self._git.get_commit_bodies(branch_name)
+        self._bodies = self._git.get_commit_bodies(self._log_ref)
         return self._bodies

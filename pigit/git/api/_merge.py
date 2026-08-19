@@ -93,6 +93,23 @@ class _MergeOps(_OpsBase):
             raise GitError(err or "Failed to resolve HEAD")
         return cast(str, out).strip()
 
+    def is_ancestor(
+        self, commit: str, of_ref: str = "HEAD", path: str | None = None
+    ) -> bool:
+        """Return True if ``commit`` is an ancestor of ``of_ref`` (inclusive)."""
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            "git merge-base --is-ancestor "
+            f"{shlex.quote(commit)} {shlex.quote(of_ref)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code == 0:
+            return True
+        if code == 1:
+            return False
+        raise GitError(err or "Failed to test ancestry")
+
     def has_unmerged_paths(self, path: str | None = None) -> bool:
         """Return True if ``git diff`` lists unmerged (conflicted) paths."""
         path = path or self.path

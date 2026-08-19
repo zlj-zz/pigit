@@ -6,6 +6,8 @@ Author: Zev
 Date: 2026-08-13
 """
 
+import shlex
+
 import pytest
 
 from pigit.ext.executor_factory import MockExecutor
@@ -376,3 +378,57 @@ class TestCherryPick:
         with pytest.raises(GitError) as exc:
             git.cherry_pick("abc")
         assert "already in progress" in str(exc.value)
+
+
+def _verify_commitish_cmd(ref: str) -> str:
+    spec = shlex.quote(f"{ref}^{{commit}}")
+    return f"git rev-parse --verify --end-of-options {spec}"
+
+
+class TestVerifyCommitish:
+    def test_returns_stripped_sha(self):
+        cmd = _verify_commitish_cmd("origin/foo")
+        git = GitApi(
+            executor=MockExecutor(responses={cmd: (0, "", "deadbeefcafebabe\n")}),
+            path="/repo",
+        )
+        assert git.verify_commitish("origin/foo") == "deadbeefcafebabe"
+
+    def test_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.verify_commitish("no-such-ref")
+
+    def test_empty_output_raises(self):
+        cmd = _verify_commitish_cmd("HEAD")
+        git = GitApi(
+            executor=MockExecutor(responses={cmd: (0, "", "")}),
+            path="/repo",
+        )
+        with pytest.raises(GitError):
+            git.verify_commitish("HEAD")
+
+
+class TestIsAncestor:
+    def test_true_on_exit_zero(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git merge-base --is-ancestor abc HEAD": (0, "", "")}
+            ),
+            path="/repo",
+        )
+        assert git.is_ancestor("abc") is True
+
+    def test_false_on_exit_one(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git merge-base --is-ancestor abc HEAD": (1, "", "")}
+            ),
+            path="/repo",
+        )
+        assert git.is_ancestor("abc") is False
+
+    def test_other_exit_raises(self):
+        git = GitApi(executor=MockExecutor(default=(128, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.is_ancestor("abc")

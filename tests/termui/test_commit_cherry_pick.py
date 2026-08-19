@@ -31,9 +31,19 @@ def app():
     return app
 
 
-def test_rejects_head_sha(app):
-    app._git.resolve_head_sha.return_value = "abc"
+def _auto_confirm(app, *, confirmed: bool = True) -> None:
+    """Drive AlertDialog.alert by immediately invoking on_result."""
+
+    def fake_alert(message, on_result, destructive=False):
+        on_result(confirmed)
+        return True
+
+    app._alert_dialog.alert = fake_alert
+
+
+def test_rejects_commit_already_at_head(app):
     app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "abc"
     with patch("pigit.app.show_toast") as toast, patch("pigit.app.exec_external") as ex:
         app._on_cherry_pick("abc", is_merge=False)
     ex.assert_not_called()
@@ -41,8 +51,8 @@ def test_rejects_head_sha(app):
 
 
 def test_rejects_merge_commit(app):
-    app._git.resolve_head_sha.return_value = "head"
     app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "head"
     with patch("pigit.app.show_toast") as toast, patch("pigit.app.exec_external") as ex:
         app._on_cherry_pick("other", is_merge=True)
     ex.assert_not_called()
@@ -50,19 +60,44 @@ def test_rejects_merge_commit(app):
 
 
 def test_rejects_revert_in_progress(app):
-    app._git.resolve_head_sha.return_value = "head"
     app._git.sequencer_in_progress.return_value = "revert"
     with patch("pigit.app.show_toast") as toast, patch("pigit.app.exec_external") as ex:
         app._on_cherry_pick("other", is_merge=False)
     ex.assert_not_called()
+    app._git.resolve_head_sha.assert_not_called()
     assert "revert" in toast.call_args.args[0]
+
+
+def test_cancel_confirm_does_not_run_git(app):
+    app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "head"
+    _auto_confirm(app, confirmed=False)
+    with patch("pigit.app.exec_external") as ex:
+        app._on_cherry_pick("deadbeefcafebabe", is_merge=False)
+    ex.assert_not_called()
+
+
+def test_confirm_prompt_uses_short_sha(app):
+    app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "head"
+    seen = {}
+
+    def fake_alert(message, on_result, destructive=False):
+        seen["message"] = message
+        return True
+
+    app._alert_dialog.alert = fake_alert
+    with patch("pigit.app.exec_external"):
+        app._on_cherry_pick("deadbeefcafebabe", is_merge=False)
+    assert seen["message"] == "Cherry-pick deadbee onto current HEAD?"
 
 
 def test_success_refreshes_three_vms(app):
     from types import SimpleNamespace
 
-    app._git.resolve_head_sha.return_value = "head"
     app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "head"
+    _auto_confirm(app, confirmed=True)
     ok = SimpleNamespace(returncode=0)
     with (
         patch("pigit.app.show_badge") as badge,
@@ -76,6 +111,7 @@ def test_success_refreshes_three_vms(app):
     app._status_vm.refresh.assert_called_once()
     app._branch_vm.refresh.assert_called_once()
     app._commit_vm.refresh.assert_called_once()
+    app._commit_vm.set_log_ref.assert_not_called()
 
 
 def test_conflict_routes_to_status(app):
@@ -83,8 +119,10 @@ def test_conflict_routes_to_status(app):
 
     app._git.resolve_head_sha.return_value = "head"
     app._git.sequencer_in_progress.side_effect = [None, "cherry-pick"]
+    app._git.resolve_head_sha.return_value = "head"
     app._git.has_unmerged_paths.return_value = True
     failed = SimpleNamespace(returncode=1)
+    _auto_confirm(app, confirmed=True)
     with (
         patch("pigit.app.show_toast"),
         patch("pigit.app.exec_external", return_value=failed),
@@ -98,8 +136,10 @@ def test_empty_does_not_route_status(app):
 
     app._git.resolve_head_sha.return_value = "head"
     app._git.sequencer_in_progress.side_effect = [None, "cherry-pick"]
+    app._git.resolve_head_sha.return_value = "head"
     app._git.has_unmerged_paths.return_value = False
     failed = SimpleNamespace(returncode=1)
+    _auto_confirm(app, confirmed=True)
     with (
         patch("pigit.app.show_toast") as toast,
         patch("pigit.app.exec_external", return_value=failed),

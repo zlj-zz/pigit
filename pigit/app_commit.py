@@ -16,15 +16,19 @@ from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui._async_task import run_async
 from pigit.termui import (
     EVT_GOTO,
+    EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
     bind_action,
     bind_signals,
+    dismiss_sheet,
     palette,
     Segment,
     show_badge,
+    show_sheet,
     show_toast,
 )
+from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
@@ -149,6 +153,15 @@ class CommitPanel(ItemList):
 
     keymap_namespace = "commit"
 
+    @property
+    def tab_name(self) -> str:
+        """Header tab label; includes the pinned log ref when browsing away from HEAD."""
+        return self.get_help_title()
+
+    def _publish_tab_title(self) -> None:
+        """Ask the header to reread ``tab_name`` after ``log_ref`` changes."""
+        self.emit(EVT_SELECTION_CHANGED)
+
     def _compute_report_h(self, panel_h: int) -> int:
         """Report strip height: ``REPORT_H`` when enabled and the panel is tall."""
         if not self._report_enabled or panel_h <= self.REPORT_MIN_HEIGHT:
@@ -221,6 +234,28 @@ class CommitPanel(ItemList):
             is_merge=commit.is_merge,
         )
 
+    @bind_action("open_log_ref", "o", desc="Show log of another ref")
+    def open_log_ref(self) -> None:
+        """Open a sheet to choose which ref the commit list shows."""
+        from .app_log_ref import LogRefSheet
+
+        rows = terminal_size()[1]
+        sheet = LogRefSheet(
+            names=self._vm.list_log_ref_names(),
+            current_ref=self._vm.log_ref,
+            on_pick=self._on_log_ref_picked,
+            on_done=dismiss_sheet,
+        )
+        show_sheet(sheet, height=min(16, max(rows - 4, 8)), show_border=True)
+        sheet.activate()
+
+    def _on_log_ref_picked(self, name: str) -> None:
+        """Apply a ref chosen in the log-ref sheet."""
+        self._vm.set_log_ref(name)
+        if not self._vm.viewing_checkout_log():
+            show_toast(f"Showing log: {name}", duration=1.5, kind=FeedbackKind.INFO)
+        self._publish_tab_title()
+
     @bind_action(
         "toggle_expanded", "z", desc="Toggle expanded commit details", tip="Expand"
     )
@@ -275,7 +310,9 @@ class CommitPanel(ItemList):
         )
 
     def get_help_title(self) -> str:
-        return "Commit"
+        if self._vm.viewing_checkout_log():
+            return "Commit"
+        return f"Commit · {self._vm.log_ref}"
 
     def _current_commit(self) -> Commit | None:
         """Return the commit at ``curr_no`` (item index in either mode)."""
