@@ -299,6 +299,10 @@ class InputLine(Component):
             # on_submit (Enter only, not Shift+Enter)
             if not is_shift and self._on_submit:
                 self._on_submit(self._value_sig.value)
+                if self._overlay_mode:
+                    # End grab without cancel — value already accepted.
+                    # Do not gate on _visible: on_submit may already hide for layout.
+                    self._dismiss_overlay(invoke_cancel=False)
                 return True
             # Insert newline if allowed
             if self._allow_newline:
@@ -314,7 +318,7 @@ class InputLine(Component):
                 self._candidates = []
                 return True
             if self._overlay_mode and self._visible:
-                self._exit_overlay_mode()
+                self._dismiss_overlay(invoke_cancel=True)
                 return True
             if self._on_cancel:
                 self._on_cancel()
@@ -546,11 +550,20 @@ class InputLine(Component):
         if self._on_activate:
             self._on_activate()
 
-    def _exit_overlay_mode(self) -> None:
-        """Exit overlay mode: hide input and release focus."""
+    def _dismiss_overlay(self, *, invoke_cancel: bool) -> None:
+        """Hide overlay input and release focus grab.
+
+        Args:
+            invoke_cancel: When True, call ``on_cancel`` (Esc path).
+                Submit path passes False so accepted input is not cancelled.
+        """
         self._visible = False
         fm = get_focus_manager()
         if fm is not None:
             fm.focus_release()
-        if self._on_cancel:
+        if invoke_cancel and self._on_cancel:
             self._on_cancel()
+
+    def _exit_overlay_mode(self) -> None:
+        """Exit overlay mode via cancel (Esc): hide, release focus, notify."""
+        self._dismiss_overlay(invoke_cancel=True)

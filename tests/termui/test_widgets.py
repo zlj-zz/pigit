@@ -204,6 +204,51 @@ class TestInputLine:
         inp.handle_key("enter")
         assert called == ["x"]
 
+    def test_overlay_submit_releases_focus_without_cancel(self, mocker):
+        """Enter must end overlay editing (focus_release), not leave grab stuck."""
+        submitted: list[str] = []
+        cancelled: list[str] = []
+        fm = mocker.Mock()
+        mocker.patch(
+            "pigit.termui.widgets.input_line.get_focus_manager",
+            return_value=fm,
+        )
+        inp = InputLine(
+            overlay_mode=True,
+            visible=False,
+            on_submit=lambda v: submitted.append(v),
+            on_cancel=lambda: cancelled.append("cancel"),
+        )
+        inp._enter_overlay_mode()
+        fm.focus_grab.assert_called_once_with(inp)
+        assert inp.is_visible is True
+
+        inp.insert("foo")
+        inp.handle_key("enter")
+
+        assert submitted == ["foo"]
+        assert cancelled == []
+        assert inp.is_visible is False
+        fm.focus_release.assert_called_once()
+
+    def test_overlay_esc_cancels_and_releases_focus(self, mocker):
+        cancelled: list[str] = []
+        fm = mocker.Mock()
+        mocker.patch(
+            "pigit.termui.widgets.input_line.get_focus_manager",
+            return_value=fm,
+        )
+        inp = InputLine(
+            overlay_mode=True,
+            visible=False,
+            on_cancel=lambda: cancelled.append("cancel"),
+        )
+        inp._enter_overlay_mode()
+        inp.handle_key("esc")
+        assert cancelled == ["cancel"]
+        assert inp.is_visible is False
+        fm.focus_release.assert_called_once()
+
     def test_on_cancel(self):
         called = []
         inp = InputLine(on_cancel=lambda: called.append("cancel"))
