@@ -32,9 +32,8 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog
+from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import InputLine, ItemList
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
@@ -836,9 +835,7 @@ class StatusPanel(ItemList):
         start = min(self._visual_anchor, self.curr_no)
         end = max(self._visual_anchor, self.curr_no)
         if not self._tree_mode:
-            self._selected.update(
-                self._source_index(i) for i in range(start, end + 1)
-            )
+            self._selected.update(self._source_index(i) for i in range(start, end + 1))
             return
         for idx in range(start, end + 1):
             row = self._row(idx)

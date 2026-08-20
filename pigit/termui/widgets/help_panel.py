@@ -354,6 +354,4 @@ class HelpPanel(Component):
                 )
                 x += wcswidth(text)
             if x < content_col + cw:
-                surface.fill_rect_rgb(
-                    row, x, content_col + cw - x, 1, theme.bg_chrome
-                )
+                surface.fill_rect_rgb(row, x, content_col + cw - x, 1, theme.bg_chrome)

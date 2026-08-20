@@ -7,7 +7,13 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from pigit.termui import EventType, EVT_SELECTION_CHANGED, by_id, Component, resolve_presentation_leaf
+from pigit.termui import (
+    EventType,
+    EVT_SELECTION_CHANGED,
+    by_id,
+    Component,
+    resolve_presentation_leaf,
+)
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import Footer
 

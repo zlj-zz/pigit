@@ -112,4 +112,6 @@ class TestApplication:
             with patch("pigit.termui.tty_io.terminal_size", return_value=(64, 10)):
                 with pytest.raises(ExitEventLoop) as exc_info:
                     on_after_start()
-                assert exc_info.value.result_message == "Terminal too small (need 65x10)"
+                assert (
+                    exc_info.value.result_message == "Terminal too small (need 65x10)"
+                )

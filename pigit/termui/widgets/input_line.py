@@ -499,9 +499,7 @@ class InputLine(Component):
             suffix = ""
         elif len(suffix) > avail:
             suffix = suffix[:avail]
-        surface.draw_text_rgb(
-            0, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome
-        )
+        surface.draw_text_rgb(0, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome)
         if suffix:
             surface.draw_text_rgb(
                 0,

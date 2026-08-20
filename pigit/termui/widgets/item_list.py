@@ -521,9 +521,7 @@ class ItemList(Component):
                 break
         if row_bg is not None:
             theme = get_theme()
-            surface.draw_text_rgb(
-                row, 0, " " * w, fg=theme.fg_primary, bg=row_bg
-            )
+            surface.draw_text_rgb(row, 0, " " * w, fg=theme.fg_primary, bg=row_bg)
 
         # Determine how much room main has; drop right if necessary.
         main_avail = w - left_w - right_w - min_gap * 2

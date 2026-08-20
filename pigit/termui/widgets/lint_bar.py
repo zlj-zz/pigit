@@ -61,14 +61,10 @@ class LintBar(Component):
         theme = get_theme()
         subj_len = len(subject)
         if subj_len > 50:
-            segments.append(
-                Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim)
-            )
+            segments.append(Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim))
             segments.append(Segment("✗", fg=palette.RED))
         else:
-            segments.append(
-                Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim)
-            )
+            segments.append(Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim))
             segments.append(Segment("✓", fg=palette.GREEN))
 
         if subject.endswith("."):

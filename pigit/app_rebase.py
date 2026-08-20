@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.app_theme import THEME
 from pigit.termui import (
     Segment,
     FeedbackKind,
@@ -27,6 +26,7 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import AlertDialog, Footer, ItemList
 
+from .app_theme import THEME
 from .git.api import GitError
 
 if TYPE_CHECKING:
@@ -43,6 +43,7 @@ _ACTION_FG = {
 }
 # Actions that merge into the previous commit and therefore cannot be first.
 _MERGE_ACTIONS = ("squash", "fixup")
+
 
 @dataclass
 class _TodoItem:

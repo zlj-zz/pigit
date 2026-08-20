@@ -75,7 +75,9 @@ class TestItemListSearch:
 
     def test_enter_search_and_typing(self):
         changes = []
-        sel = ItemList(content=["alpha", "beta"], on_search_changed=lambda: changes.append(True))
+        sel = ItemList(
+            content=["alpha", "beta"], on_search_changed=lambda: changes.append(True)
+        )
         sel.enter_search()
         assert sel.search_active is True
         assert sel.search_query == ""

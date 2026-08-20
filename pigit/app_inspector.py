@@ -7,9 +7,15 @@ Date: 2026-04-23
 
 from __future__ import annotations
 
-from pigit.termui import bind_action, Component, dismiss_sheet, palette, Segment, Surface
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
-from pigit.termui.widgets.sheet import Sheet
+from pigit.termui import (
+    bind_action,
+    Component,
+    dismiss_sheet,
+    palette,
+    Segment,
+    Surface,
+)
+from pigit.termui.widgets import LineTextBrowser, Sheet
 
 from .app_theme import THEME
 from .app_types import (

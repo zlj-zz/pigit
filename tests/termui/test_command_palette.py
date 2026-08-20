@@ -90,9 +90,7 @@ class TestCommandPalette:
         palette = CommandPalette(items=_ITEMS)
         surface = Surface(20, 5)
         palette._render_surface(surface)
-        assert all(
-            c.char == " " for row in surface._rows for c in row
-        )
+        assert all(c.char == " " for row in surface._rows for c in row)
 
     def test_render_active(self):
         palette = CommandPalette(items=_ITEMS)

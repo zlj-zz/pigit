@@ -113,9 +113,9 @@ class CommandPalette(Component):
             self._candidates = []
             self._selected = 0
             return
-        self._candidates = [
-            item for item in self._items if self._match(needle, item)
-        ][:MAX_CANDIDATES]
+        self._candidates = [item for item in self._items if self._match(needle, item)][
+            :MAX_CANDIDATES
+        ]
         self._selected = 0
 
     def _render_surface(self, surface) -> None:

@@ -1,10 +1,12 @@
 """
 Package: pigit.termui
-Description: Unified lightweight terminal UI framework.
+Description: Lightweight terminal UI framework (tiered public API).
 
 Usage:
     from pigit.termui import Application, Component, show_toast, set_theme
     from pigit.termui.widgets import ItemList, Footer, Sheet
+    from pigit.termui.containers import Column, TabView
+    from pigit.termui.primitives import plain, tokenize_with_positions
 """
 
 from __future__ import annotations
@@ -21,7 +23,13 @@ from .types import (
 from .feedback import FeedbackKind
 
 # Core components
-from .component import Component, ComponentError, bind_signals, render_child, resolve_presentation_leaf
+from .component import (
+    Component,
+    ComponentError,
+    bind_signals,
+    render_child,
+    resolve_presentation_leaf,
+)
 
 # Event loop
 from .event_loop import ExitEventLoop

@@ -92,6 +92,12 @@ def test_required_root_exports_present():
         assert name in termui.__all__, f"{name} not in __all__"
 
 
+def test_root_all_matches_required_exactly():
+    from pigit import termui
+
+    assert set(termui.__all__) == REQUIRED_ROOT
+
+
 def test_forbidden_root_exports_still_documented():
     """Phase 0: constant must stay disjoint from REQUIRED_ROOT."""
     assert REQUIRED_ROOT.isdisjoint(FORBIDDEN_ON_ROOT)

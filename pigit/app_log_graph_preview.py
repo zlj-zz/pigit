@@ -48,7 +48,9 @@ class LogGraphPreview(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._vm = vm
-        self._frame_browser = BorderedBrowser(title=_EMPTY_TITLE, id="log_graph_browser")
+        self._frame_browser = BorderedBrowser(
+            title=_EMPTY_TITLE, id="log_graph_browser"
+        )
         self._unsubs: list[Callable[[], None]] = []
         self._load_task: AsyncTask[list[str]] | None = None
         self._requested_branch: str | None = None

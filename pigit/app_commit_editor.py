@@ -10,11 +10,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.app_theme import THEME
 from pigit.termui import FeedbackKind, keys, show_toast, Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.widgets import InputLine, LintBar
 from pigit.termui.types import OverlayDispatchResult
+from .app_theme import THEME
 
 if TYPE_CHECKING:
     from pigit.git.model import File

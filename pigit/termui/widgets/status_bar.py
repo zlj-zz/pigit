@@ -58,6 +58,4 @@ class StatusBar(Component):
         theme = get_theme()
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)
-        surface.draw_text_rgb(
-            0, 0, text, fg=theme.fg_primary, bg=theme.bg_chrome
-        )
+        surface.draw_text_rgb(0, 0, text, fg=theme.fg_primary, bg=theme.bg_chrome)

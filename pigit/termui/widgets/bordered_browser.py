@@ -45,7 +45,9 @@ class BorderedBrowser(Component):
         if rows and isinstance(rows[0], list):
             styled: list[list[Segment]] = rows
             self._browser._rows = styled
-            self._browser._content = ["".join(seg.text for seg in row) for row in styled]
+            self._browser._content = [
+                "".join(seg.text for seg in row) for row in styled
+            ]
         else:
             self._browser._rows = None
             self._browser._content = list(rows) if rows else []
