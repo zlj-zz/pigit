@@ -11,7 +11,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, Sequence
 
-from .paths import expand_watch_roots_to_paths
+from .paths import (
+    expand_metadata_paths,
+    expand_worktree_paths,
+    metadata_roots_signature,
+    roots_signature,
+    worktree_roots_signature,
+)
 from .types import BackendHealth, PathSignal, WatchRoot
 
 
@@ -45,38 +51,66 @@ class StatMtimeBackend:
 
     def __init__(self, paths: Sequence[str] | None = None) -> None:
         self._explicit_paths = [str(Path(p).resolve()) for p in (paths or ())]
+        self._meta_paths: list[str] = []
+        self._worktree_paths: list[str] = []
         self._paths: list[str] = list(self._explicit_paths)
         self._last_mtime: dict[str, int | None] = {}
-        self._dir_paths: set[str] = set()
+        self._meta_dir_paths: set[str] = set()
         self._roots: list[WatchRoot] = []
+        self._roots_sig: frozenset[tuple[str, str]] = frozenset()
+        self._meta_sig: frozenset[tuple[str, str]] = frozenset()
+        self._worktree_sig: frozenset[tuple[str, str]] = frozenset()
         self._started = False
         self._health = BackendHealth.OK
 
     def start(self, roots: Sequence[WatchRoot]) -> None:
         """Reset baseline mtimes for explicit paths plus paths from ``roots``."""
         self._roots = list(roots)
-        from_roots, truncated = expand_watch_roots_to_paths(roots)
-        self._apply_expanded_paths(from_roots, reset_baseline=True, truncated=truncated)
+        self._roots_sig = roots_signature(roots)
+        self._meta_sig = metadata_roots_signature(roots)
+        self._worktree_sig = worktree_roots_signature(roots)
+        self._meta_paths = expand_metadata_paths(roots)
+        self._worktree_paths, truncated = expand_worktree_paths(roots)
+        self._apply_merged_paths(reset_baseline=True, truncated=truncated)
         self._started = True
 
     def update_roots(self, roots: Sequence[WatchRoot]) -> None:
-        """Update observed paths, keeping baselines for paths that remain."""
-        self._roots = list(roots)
+        """Update observed paths, keeping baselines for paths that remain.
+
+        No-op when the root set is unchanged. Status file list changes only
+        rebuild the worktree half; git metadata is left alone.
+        """
         if not self._started:
             self.start(roots)
             return
-        from_roots, truncated = expand_watch_roots_to_paths(roots)
-        self._apply_expanded_paths(
-            from_roots, reset_baseline=False, truncated=truncated
-        )
+        new_sig = roots_signature(roots)
+        if new_sig == self._roots_sig:
+            return
+        new_meta_sig = metadata_roots_signature(roots)
+        new_wt_sig = worktree_roots_signature(roots)
+        self._roots = list(roots)
+        self._roots_sig = new_sig
+        truncated = False
+        if new_meta_sig != self._meta_sig:
+            self._meta_sig = new_meta_sig
+            self._meta_paths = expand_metadata_paths(roots)
+        if new_wt_sig != self._worktree_sig:
+            self._worktree_sig = new_wt_sig
+            self._worktree_paths, truncated = expand_worktree_paths(roots)
+        self._apply_merged_paths(reset_baseline=False, truncated=truncated)
 
     def stop(self) -> None:
         """Clear path state."""
         self._started = False
         self._paths = []
+        self._meta_paths = []
+        self._worktree_paths = []
         self._last_mtime.clear()
-        self._dir_paths.clear()
+        self._meta_dir_paths.clear()
         self._roots = []
+        self._roots_sig = frozenset()
+        self._meta_sig = frozenset()
+        self._worktree_sig = frozenset()
 
     def health(self) -> BackendHealth:
         """Return backend health."""
@@ -96,25 +130,21 @@ class StatMtimeBackend:
             if current != previous:
                 self._last_mtime[path] = current
                 out.append(PathSignal(path=path, mtime_ns=current))
-        if out and self._roots and any(s.path in self._dir_paths for s in out):
-            # New files under discovery dirs enter the poll set for next tip edits.
-            from_roots, truncated = expand_watch_roots_to_paths(self._roots)
-            self._apply_expanded_paths(
-                from_roots, reset_baseline=False, truncated=truncated
-            )
+        if out and self._roots and any(s.path in self._meta_dir_paths for s in out):
+            # New local tips under discovery dirs enter the poll set.
+            self._meta_paths = expand_metadata_paths(self._roots)
+            self._apply_merged_paths(reset_baseline=False, truncated=False)
         return out
 
-    def _apply_expanded_paths(
-        self,
-        from_roots: Sequence[str],
-        *,
-        reset_baseline: bool,
-        truncated: bool,
-    ) -> None:
-        """Merge explicit + expanded paths and update mtime baselines."""
-        merged = list(dict.fromkeys([*self._explicit_paths, *from_roots]))
+    def _apply_merged_paths(self, *, reset_baseline: bool, truncated: bool) -> None:
+        """Merge explicit + metadata + worktree paths and update baselines."""
+        merged = list(
+            dict.fromkeys(
+                [*self._explicit_paths, *self._meta_paths, *self._worktree_paths]
+            )
+        )
         self._health = BackendHealth.DEGRADED if truncated else BackendHealth.OK
-        self._dir_paths = {p for p in merged if Path(p).is_dir()}
+        self._meta_dir_paths = {p for p in self._meta_paths if Path(p).is_dir()}
         if reset_baseline:
             self._paths = merged
             self._last_mtime = {p: _read_mtime_ns(p) for p in self._paths}

@@ -62,30 +62,111 @@ def test_build_git_metadata_paths_skips_objects(tmp_path: Path):
     git_dir.mkdir()
     (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
     (git_dir / "index").write_bytes(b"")
+    (git_dir / "FETCH_HEAD").write_text("deadbeef\n")
     (git_dir / "objects" / "ab").mkdir(parents=True)
     (git_dir / "objects" / "ab" / "cd").write_bytes(b"x")
     (git_dir / "refs" / "heads").mkdir(parents=True)
     (git_dir / "refs" / "heads" / "main").write_text("deadbeef\n")
+    (git_dir / "refs" / "remotes" / "origin").mkdir(parents=True)
+    (git_dir / "refs" / "remotes" / "origin" / "main").write_text("cafe\n")
     (git_dir / "logs").mkdir()
     (git_dir / "logs" / "HEAD").write_text("log\n")
     (git_dir / "logs" / "refs").mkdir(parents=True)
 
     paths = build_git_metadata_paths(str(git_dir), str(git_dir))
+    resolved = {Path(p).resolve().as_posix() for p in paths}
     joined = "\n".join(paths)
     assert "objects" not in joined
     assert any(p.endswith("HEAD") and "/logs/" not in p for p in paths)
     assert any(p.endswith("index") for p in paths)
+    assert any(p.endswith("FETCH_HEAD") for p in paths)
     assert any(p.endswith("refs/heads/main") for p in paths)
+    # Remote-tracking tips are not polled (FETCH_HEAD + remotes dir cover fetch).
+    assert (git_dir / "refs" / "remotes" / "origin" / "main").resolve().as_posix() not in resolved
+    remotes_dir = (git_dir / "refs" / "remotes").resolve().as_posix()
+    assert remotes_dir in resolved
     # Discovery dirs so newly created refs bump a watched mtime.
-    assert (git_dir / "refs").resolve().as_posix() in {
-        Path(p).resolve().as_posix() for p in paths
+    assert (git_dir / "refs").resolve().as_posix() in resolved
+    assert (git_dir / "refs" / "heads").resolve().as_posix() in resolved
+    assert (git_dir / "logs" / "refs").resolve().as_posix() in resolved
+
+
+def test_update_roots_noop_when_roots_unchanged(tmp_path: Path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "refs" / "heads").mkdir(parents=True)
+    (git_dir / "refs" / "heads" / "main").write_text("aaa\n")
+    remotes = git_dir / "refs" / "remotes" / "origin"
+    remotes.mkdir(parents=True)
+    for i in range(50):
+        (remotes / f"b{i}").write_text(f"{i}\n")
+
+    roots = [
+        WatchRoot(kind="git_dir", path=str(git_dir)),
+        WatchRoot(kind="common_dir", path=str(git_dir)),
+    ]
+    backend = StatMtimeBackend()
+    backend.start(roots)
+    paths_before = list(backend._paths)
+    assert not any("/refs/remotes/origin/b" in p for p in paths_before)
+
+    backend.update_roots(roots)
+    assert backend._paths == paths_before
+
+
+def test_update_roots_worktree_only_skips_metadata_rebuild(tmp_path: Path):
+    """Status file list changes must not re-rglob git metadata."""
+    repo = tmp_path
+    git_dir = repo / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "refs" / "heads").mkdir(parents=True)
+    (git_dir / "refs" / "heads" / "main").write_text("aaa\n")
+    nested = repo / "src"
+    nested.mkdir()
+    (nested / "a.py").write_text("a\n")
+    (nested / "b.py").write_text("b\n")
+
+    backend = StatMtimeBackend()
+    backend.start(
+        [
+            WatchRoot(kind="git_dir", path=str(git_dir)),
+            WatchRoot(kind="common_dir", path=str(git_dir)),
+            WatchRoot(kind="worktree", path=str(repo)),
+            WatchRoot(kind="file", path=str(nested / "a.py")),
+        ]
+    )
+    meta_set_before = {
+        Path(p).resolve().relative_to(git_dir.resolve()).as_posix()
+        for p in backend._paths
+        if _is_under(Path(p), git_dir)
     }
-    assert (git_dir / "refs" / "heads").resolve().as_posix() in {
-        Path(p).resolve().as_posix() for p in paths
+
+    backend.update_roots(
+        [
+            WatchRoot(kind="git_dir", path=str(git_dir)),
+            WatchRoot(kind="common_dir", path=str(git_dir)),
+            WatchRoot(kind="worktree", path=str(repo)),
+            WatchRoot(kind="file", path=str(nested / "b.py")),
+        ]
+    )
+    meta_set_after = {
+        Path(p).resolve().relative_to(git_dir.resolve()).as_posix()
+        for p in backend._paths
+        if _is_under(Path(p), git_dir)
     }
-    assert (git_dir / "logs" / "refs").resolve().as_posix() in {
-        Path(p).resolve().as_posix() for p in paths
-    }
+    assert meta_set_after == meta_set_before
+    assert any(p.endswith("src/b.py") for p in backend._paths)
+    assert not any(p.endswith("src/a.py") for p in backend._paths)
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def test_new_branch_ref_emits_via_heads_dir_then_tracks_file(tmp_path: Path):

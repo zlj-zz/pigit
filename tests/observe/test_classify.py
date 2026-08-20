@@ -82,6 +82,14 @@ def test_packed_refs_maps_to_refs():
     assert ChangeKind.REFS in kinds
 
 
+def test_fetch_head_maps_to_refs():
+    kinds, _ = classify_path_signal(
+        PathSignal(path="/repo/.git/FETCH_HEAD", mtime_ns=1),
+        _ctx(),
+    )
+    assert ChangeKind.REFS in kinds
+
+
 def test_logs_refs_maps_to_refs():
     kinds, _ = classify_path_signal(
         PathSignal(path="/repo/.git/logs/refs/heads/main", mtime_ns=1),

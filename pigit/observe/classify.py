@@ -91,7 +91,7 @@ def _kinds_for_git_rel(rel: str) -> set[ChangeKind]:
         kinds.add(ChangeKind.INDEX)
         return kinds
 
-    if rel == "packed-refs":
+    if rel == "packed-refs" or rel == "FETCH_HEAD":
         kinds.add(ChangeKind.REFS)
         return kinds
 
