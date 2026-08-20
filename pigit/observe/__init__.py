@@ -11,6 +11,9 @@ from __future__ import annotations
 from .backend import FakeBackend, StatMtimeBackend
 from .classify import classify_path_signal
 from .clock import FakeClock, SystemClock
+from .coordinator import RefreshCoordinator
+from .observer import RepoObserver
+from .overlay import should_defer_repo_refresh
 from .paths import build_git_metadata_paths
 from .types import (
     BackendHealth,
@@ -29,9 +32,12 @@ __all__ = [
     "FakeClock",
     "ObserveContext",
     "PathSignal",
+    "RefreshCoordinator",
+    "RepoObserver",
     "StatMtimeBackend",
     "SystemClock",
     "WatchRoot",
     "build_git_metadata_paths",
     "classify_path_signal",
+    "should_defer_repo_refresh",
 ]
