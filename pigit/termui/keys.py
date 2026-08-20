@@ -100,6 +100,7 @@ _KEY_DISPLAY: dict[str, str] = {
     "ctrl f": "Ctrl+f",
     "ctrl p": "Ctrl+p",
     "ctrl r": "Ctrl+r",
+    "ctrl t": "Ctrl+t",
 }
 
 

@@ -735,7 +735,7 @@ class StatusPanel(ItemList):
         """Activate the file-list search filter."""
         self.enter_search()
 
-    @bind_action("toggle_tree", "T", desc="Toggle tree / flat file view")
+    @bind_action("toggle_tree", "ctrl t", desc="Toggle tree / flat file view")
     def toggle_tree(self) -> None:
         self._toggle_tree_mode()
 
