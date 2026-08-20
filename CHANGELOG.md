@@ -1,5 +1,43 @@
 # Changelog of pigit
 
+## 2.0.0 (2026-08-20)
+
+### Breaking Changes
+
+- **Python 3.11+ required** (dropped 3.10). Install with a 3.11+ interpreter (Ubuntu 22.04 system Python is 3.10).
+- **`app.auto_refresh_interval` removed**: replaced by repo observation (`app.repo_observe`, `app.observe_worktree`). Legacy keys are ignored with a warning.
+- **UI config under `[app]`**: nest former top-level TUI / keybinding tables under `[app]` (legacy sections warn and are ignored).
+
+### Features
+
+- **Repo observation**: StatMtime-based watch of `.git` metadata and (optionally) the worktree; panels refresh on real changes instead of a blind timer.
+- **Inspector (`I`)**: frozen top-edge snapshot of the current selection (async load).
+- **Cherry-pick (`c`)** from the Commit panel onto current HEAD.
+- **Log another ref (`o`)** from Branch / Commit to browse that ref’s history.
+- **Stash message prompt** on Status `s`; apply without dropping; confirm before drop.
+- **Status `A` stages all**; amend moved to `m`.
+- **Status tree toggle** with `Ctrl+t`.
+- **Header** colors the repo name and current branch.
+- **Commit contribution-graph** report strip.
+- **termui Theme**: semantic color roles; widgets stop treating `palette.DEFAULT_*` as UI roles.
+- **termui widgets**: Footer, CommandPalette, ItemList `/` search, SplitPane / BorderedBrowser, Sheet footer chrome, primitives (word-diff, gutter, calendar layout).
+- **Grouped help** and tab metadata; `min_terminal_size` for Pigit.
+
+### Bug Fixes
+
+- Sheet open/dismiss syncs focus so the body dims on the first frame.
+- Overlay `InputLine` releases focus grab on Enter submit (picker `/` filter).
+- Observe: dir mtime discovers new refs/files; porcelain digest wakes Status on clean→Modified; metadata poll bounded.
+- Status preview loads diffs by path (not stale `source_idx`).
+- Commit panel clears refs cache before row rebuild; graph rows publish before items on load.
+- Inspector snapshot build no longer blocks the UI thread.
+- Cmd Tab completion no longer inherits branch completers incorrectly.
+
+### Refactors / Tests
+
+- Slimmer termui public façade and `primitives` package; app import ratchets.
+- App-layer tests live under `tests/app/`.
+
 ## 1.11.2 (2026-08-18)
 
 ### Features
