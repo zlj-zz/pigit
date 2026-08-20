@@ -167,6 +167,39 @@ class TestComponentRoot:
         assert sheet._child is inner
         assert inner.parent is sheet
 
+    def test_show_sheet_syncs_focus_without_key(self):
+        """Body dim depends on is_focus_leaf; sheet open must move focus immediately."""
+        body = DummyBody()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        assert body.is_focus_leaf is True
+
+        class _Inner(Component):
+            def _render_surface(self, surface):
+                pass
+
+        inner = _Inner()
+        root.show_sheet(inner, height=4)
+        assert inner.is_focus_leaf is True
+        assert body.is_focus_leaf is False
+        assert root._focus_manager.get_focus_leaf() is inner
+
+    def test_dismiss_sheet_restores_body_focus(self):
+        body = DummyBody()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+
+        class _Inner(Component):
+            def _render_surface(self, surface):
+                pass
+
+        root.show_sheet(_Inner(), height=4)
+        assert body.is_focus_leaf is False
+        root.dismiss_sheet()
+        assert body.is_focus_leaf is True
+        assert root._focus_manager.get_focus_leaf() is body
+        assert not root.has_overlay_open()
+
     def test_sheet_mouse_miss_falls_through_to_body(self):
         from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 

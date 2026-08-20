@@ -332,17 +332,21 @@ class ComponentRoot(Component):
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
     ) -> Sheet:
-        """Display a sheet on the SHEET layer."""
+        """Display a sheet on the SHEET layer and move focus to its leaf."""
         from .widgets import Sheet
 
         sheet = Sheet(child, height, show_border=show_border, edge=edge, bg=bg)
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
+        # Focus must track the stack here so body panels dim on the first frame
+        # (is_focus_leaf), including AsyncTask / non-key open paths.
+        self._focus_manager.sync_focus_to_overlay_or_leaf()
         return sheet
 
     def dismiss_sheet(self) -> None:
-        """Dismiss the current sheet, if any."""
+        """Dismiss the current sheet, if any, and restore body focus."""
         self._pop_layer(LayerKind.SHEET)
+        self._focus_manager.sync_focus_to_overlay_or_leaf()
 
     def _pop_layer(self, kind: LayerKind) -> None:
         overlay = self._layer_stack.pop(kind)

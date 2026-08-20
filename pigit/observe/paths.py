@@ -215,9 +215,7 @@ def expand_watch_roots_to_paths(
 
 def roots_signature(roots: Sequence[WatchRoot]) -> frozenset[tuple[str, str]]:
     """Stable identity of a roots list for no-op update detection."""
-    return frozenset(
-        (root.kind, str(Path(root.path).resolve())) for root in roots
-    )
+    return frozenset((root.kind, str(Path(root.path).resolve())) for root in roots)
 
 
 def metadata_roots_signature(
