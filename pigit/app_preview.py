@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.termui import EVT_SELECTION_CHANGED, Component, MouseEvent, render_child
+from pigit.termui.types import PreviewPayload
 
 from .app_diff import DiffType, DiffViewer
 
@@ -59,43 +60,20 @@ class PreviewPanel(Component):
         super().deactivate()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
-        """Update the inner DiffViewer for the active Status or Stash panel."""
-        from .app_status import StatusPanel, _status_label
-        from .app_stash import StashPanel
-
-        if not isinstance(active, (StatusPanel, StashPanel)):
+        """Update the inner DiffViewer from the active PreviewPayload panel."""
+        if not isinstance(active, PreviewPayload):
             self.clear()
             return True
-        if self._status_vm is None:
+        title = active.preview_title()
+        lines = active.preview_lines()
+        if not title or not lines:
             self.clear()
             return True
-
-        if isinstance(active, StatusPanel):
-            hit = active.file_at_cursor()
-            if hit is None:
-                self.clear()
-                return True
-            f, source_idx = hit
-            diff_lines = self._status_vm.load_diff(source_idx)
-            diff_type = (
-                DiffType.STAGED
-                if (f.has_staged_change and not f.has_unstaged_change)
-                else DiffType.UNSTAGED
-            )
-            self.set_diff_type(diff_type)
-            self.set_preview(diff_lines, title=f.name, subtitle=_status_label(f))
-        elif isinstance(active, StashPanel):
-            if (
-                not active.stashes
-                or active.curr_no < 0
-                or active.curr_no >= len(active.stashes)
-            ):
-                self.clear()
-                return True
-            stash = active.stashes[active.curr_no]
-            diff_lines = self._status_vm.load_stash_diff(stash.ref)
-            self.set_diff_type(DiffType.STASH)
-            self.set_preview(diff_lines, title=stash.msg, subtitle=stash.ref)
+        diff_type_fn = getattr(active, "preview_diff_type", None)
+        if diff_type_fn is not None:
+            self.set_diff_type(diff_type_fn())
+        self._diff_viewer.set_box_title(title)
+        self._diff_viewer.set_content(lines)
         return True
 
     def set_preview(

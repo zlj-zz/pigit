@@ -26,7 +26,6 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
-from .app_preview_toggle import invoke_preview_toggle
 from .app_types import BranchSnapshot
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
@@ -284,7 +283,8 @@ class BranchPanel(ItemList):
     @bind_action("toggle_preview", "ctrl p", desc="Toggle log graph preview")
     def toggle_preview(self) -> None:
         """Show or hide the Branch log-graph preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
 
     @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
     def rename(self) -> None:

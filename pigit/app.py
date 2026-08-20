@@ -40,7 +40,7 @@ from pigit.termui import (
     set_theme,
 )
 from pigit.termui.cli_output import Console
-from pigit.termui.containers import Column, Row, TabView
+from pigit.termui.containers import Column, SplitPane, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import Header
 from pigit.termui.reactive import Signal
@@ -130,7 +130,7 @@ class PigitApplication(Application):
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
-        self._body_row: Row
+        self._body_row: SplitPane
         self._palette: CommandPalette
         self._status_stack: Column
         self._status_panel: StatusPanel
@@ -217,9 +217,9 @@ class PigitApplication(Application):
         cols, _ = terminal_size()
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
-        self._body_row = Row(
-            children=[self._tab_view],
-            widths=["flex"],
+        self._body_row = SplitPane(
+            master=self._tab_view,
+            breakpoint_cols=self.LARGE_SCREEN_COLS,
             id="body_row",
         )
 
@@ -350,48 +350,23 @@ class PigitApplication(Application):
             return self._log_graph_preview if self._log_graph_wanted else None
         return None
 
-    def _sync_body_children(self, desired_children: list[Component]) -> None:
-        """Attach/detach the optional side preview so body_row matches *desired*."""
-        body_row = self._body_row
-        extras = {
-            panel
-            for panel in (self._preview_panel, self._log_graph_preview)
-            if panel is not None
-        }
-        for child in list(body_row.children):
-            if child in extras and child not in desired_children:
-                child.deactivate()
-                body_row.children.remove(child)
-                if child.parent is body_row:
-                    child.parent = None
-        for child in desired_children:
-            if child not in body_row.children:
-                body_row.children.append(child)
-                child.parent = body_row
-                child.activate()
-
     def _apply_body_widths(self, cols: int) -> None:
-        """Recompute body_row widths from screen size and the active tab.
-
-        At most one side preview is present: Status/Stash get the diff preview
-        when wanted, Branch gets the log-graph preview when wanted, Commit/Diff
-        get none.
-        """
-        body_row = self._body_row
-        tab_view = self._tab_view
-        side = self._side_preview_for_active()
-
-        if side is not None:
-            tab_w = max(50, int(cols * 0.35))
-            preview_w = max(1, cols - tab_w)
-            desired_children = [tab_view, side]
-            desired_widths = [tab_w, preview_w]
+        """Update SplitPane detail and widths for the active tab."""
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if isinstance(active, (StatusPanel, StashPanel)):
+            self._body_row.set_detail(self._preview_panel)
+            self._body_row.set_detail_wanted(
+                self._is_large_screen and self._diff_preview_wanted
+            )
+        elif isinstance(active, BranchPanel):
+            self._body_row.set_detail(self._log_graph_preview)
+            self._body_row.set_detail_wanted(
+                self._is_large_screen and self._log_graph_wanted
+            )
         else:
-            desired_children = [tab_view]
-            desired_widths = ["flex"]
-
-        self._sync_body_children(desired_children)
-        body_row.set_widths(desired_widths)
+            self._body_row.set_detail(None)
+            self._body_row.set_detail_wanted(False)
+        self._body_row.apply_terminal_width(cols)
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):

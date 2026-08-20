@@ -28,7 +28,6 @@ from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import AlertDialog, ItemList
 
 from .app_diff import DiffType
-from .app_preview_toggle import invoke_preview_toggle
 from .app_theme import THEME
 from .viewmodels.base import ActionResult
 
@@ -190,7 +189,26 @@ class StashPanel(ItemList):
     @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
     def toggle_preview(self) -> None:
         """Show or hide the Stash side diff preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
+
+    def preview_title(self) -> str:
+        """Return the diff preview box title for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return ""
+        return f"{stash.msg}  {stash.ref}"
+
+    def preview_lines(self) -> list[str]:
+        """Return diff lines for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return []
+        return self._vm.load_stash_diff(stash.ref)
+
+    def preview_diff_type(self) -> DiffType:
+        """Return stash diff type for the side preview."""
+        return DiffType.STASH
 
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:

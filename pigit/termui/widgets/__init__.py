@@ -8,6 +8,7 @@ Usage:
 
 from __future__ import annotations
 
+from .bordered_browser import BorderedBrowser
 from .check_list import CheckList
 from .command_palette import CommandPalette
 from .footer import Footer
@@ -24,6 +25,7 @@ from .status_bar import StatusBar
 from .toast import Toast
 
 __all__ = [
+    "BorderedBrowser",
     "AlertDialog",
     "AlertDialogBody",
     "CheckList",

@@ -41,13 +41,16 @@ class _FakeStatusPanel(StatusPanel):
     tab_name = "Status"
     tab_key = "1"
 
-    def __init__(self, files: list[File], curr_no: int, source_index: int) -> None:
+    def __init__(
+        self, files: list[File], curr_no: int, source_index: int, vm: _FakeStatusVM
+    ) -> None:
         from pigit.termui.reactive import Signal
 
         self._curr_no_sig = Signal(curr_no)
         self._r_start_sig = Signal(0)
         self.files = files
         self._source_index = source_index
+        self._vm = vm
 
     def file_at_cursor(self):
         if self.files and 0 <= self.curr_no < len(self.files):
@@ -59,12 +62,13 @@ class _FakeStashPanel(StashPanel):
     tab_name = "Stash"
     tab_key = "3"
 
-    def __init__(self, stashes: list[Stash], curr_no: int) -> None:
+    def __init__(self, stashes: list[Stash], curr_no: int, vm: _FakeStatusVM) -> None:
         from pigit.termui.reactive import Signal
 
         self._curr_no_sig = Signal(curr_no)
         self._r_start_sig = Signal(0)
         self.stashes = stashes
+        self._vm = vm
 
 
 @pytest.fixture
@@ -107,7 +111,7 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
         has_merged_conflicts=False,
         has_inline_merged_conflicts=False,
     )
-    active = _FakeStatusPanel([file], curr_no=0, source_index=7)
+    active = _FakeStatusPanel([file], curr_no=0, source_index=7, vm=vm)
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
@@ -125,7 +129,7 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     assert isinstance(vm, _FakeStatusVM)
 
     stash = Stash(ref="stash@{0}", sha="abc123", msg="WIP")
-    active = _FakeStashPanel([stash], curr_no=0)
+    active = _FakeStashPanel([stash], curr_no=0, vm=vm)
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
@@ -154,7 +158,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
         has_merged_conflicts=False,
         has_inline_merged_conflicts=False,
     )
-    active = _FakeStatusPanel([file], curr_no=0, source_index=0)
+    active = _FakeStatusPanel([file], curr_no=0, source_index=0, vm=vm)
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
     assert vm.diff_calls == [0]
@@ -180,6 +184,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
         ],
         curr_no=0,
         source_index=0,
+        vm=vm,
     )
     bus.publish(EVT_SELECTION_CHANGED, active=other)
 

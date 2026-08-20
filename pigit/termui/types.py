@@ -115,6 +115,15 @@ class OverlaySurface(Protocol):
 
 
 @runtime_checkable
+class PreviewPayload(Protocol):
+    """Side-preview data source for Status/Stash-style panels."""
+
+    def preview_title(self) -> str: ...
+
+    def preview_lines(self) -> list[str]: ...
+
+
+@runtime_checkable
 class SurfaceProtocol(Protocol):
     """Surface protocol for type checking."""
 

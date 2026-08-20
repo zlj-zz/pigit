@@ -38,7 +38,6 @@ from pigit.termui.widgets import InputLine, ItemList
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
-from .app_preview_toggle import invoke_preview_toggle
 from .app_types import FileSnapshot
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
@@ -742,7 +741,8 @@ class StatusPanel(ItemList):
     @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
     def toggle_preview(self) -> None:
         """Show or hide the Status side diff preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
 
     @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
     def expand_dir(self) -> None:
@@ -993,6 +993,33 @@ class StatusPanel(ItemList):
         if row is None or row.kind == "dir" or row.file is None:
             return None
         return row.file, row.source_index
+
+    def preview_title(self) -> str:
+        """Return the diff preview box title for the current file selection."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return ""
+        file, _ = hit
+        label = _status_label(file)
+        return file.name if not label else f"{file.name}  {label}"
+
+    def preview_lines(self) -> list[str]:
+        """Return diff lines for the current file selection."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return []
+        _, source_idx = hit
+        return self._vm.load_diff(source_idx)
+
+    def preview_diff_type(self) -> DiffType:
+        """Return staged vs unstaged diff type for the current file."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return DiffType.UNSTAGED
+        file, _ = hit
+        if file.has_staged_change and not file.has_unstaged_change:
+            return DiffType.STAGED
+        return DiffType.UNSTAGED
 
     def _target_indices(self) -> set[int]:
         """Source indices for the current Status action.

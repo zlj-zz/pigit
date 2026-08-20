@@ -10,5 +10,6 @@ from __future__ import annotations
 from .tab_view import TabView
 from .column import Column
 from .row import Row
+from .split_pane import SplitPane
 
-__all__ = ["TabView", "Column", "Row"]
+__all__ = ["TabView", "Column", "Row", "SplitPane"]
