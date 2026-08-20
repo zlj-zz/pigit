@@ -20,16 +20,30 @@ _GIT_DIR_FILES = ("HEAD", "index", "logs/HEAD")
 # Files always watched under the common dir when present.
 _COMMON_DIR_FILES = ("packed-refs",)
 
+# Directories whose mtime reveals newly created refs (not present at expand).
+_GIT_DISCOVERY_DIRS = (
+    "refs",
+    "refs/heads",
+    "refs/tags",
+    "refs/remotes",
+    "logs",
+    "logs/refs",
+)
+
 # Cap on worktree / dirty-file paths polled per Status-focused attach.
 MAX_WORKTREE_STAT_PATHS = 400
 
 
 def build_git_metadata_paths(git_dir: str, common_dir: str) -> list[str]:
-    """Return absolute paths to git metadata files that should be polled.
+    """Return absolute paths to git metadata files/dirs that should be polled.
 
-    Under ``common_dir``: ``packed-refs``, files under ``refs/`` and
-    ``logs/refs/``. Under ``git_dir``: ``HEAD``, ``index``, ``logs/HEAD``.
-    Missing paths are skipped. ``objects/`` is never included.
+    Under ``common_dir``: discovery directories under ``refs/`` and
+    ``logs/refs/``, ``packed-refs``, and existing ref files. Under
+    ``git_dir``: ``HEAD``, ``index``, ``logs/HEAD``. Missing paths are
+    skipped. ``objects/`` is never included.
+
+    Directory entries detect create/delete of refs that were absent when
+    the path set was last expanded.
 
     Args:
         git_dir: Absolute per-worktree git directory.
@@ -52,6 +66,11 @@ def build_git_metadata_paths(git_dir: str, common_dir: str) -> list[str]:
         if path.is_file():
             found.append(str(path.resolve()))
 
+    for rel in _GIT_DISCOVERY_DIRS:
+        path = common / rel
+        if path.is_dir():
+            found.append(str(path.resolve()))
+
     found.extend(_walk_files(common / "refs"))
     found.extend(_walk_files(common / "logs" / "refs"))
 
@@ -65,11 +84,12 @@ def build_worktree_observe_paths(
     *,
     max_paths: int = MAX_WORKTREE_STAT_PATHS,
 ) -> tuple[list[str], bool]:
-    """Build worktree paths: top-level entries plus known status files.
+    """Build worktree paths: nested dirs, top-level files, status files.
 
-    Top-level files and directories are included (directory mtime catches
-    add/remove). Denied names are skipped. Status-relative paths that are
-    not denied are added so content edits are visible to StatMtime.
+    Nested directories are polled so a deep create (e.g. ``src/deep/new.py``)
+    bumps a watched mtime. Top-level files catch content edits without a
+    prior status row. Denied names are skipped. Status-relative paths that
+    are not denied are added so dirty-file content edits are visible.
 
     Args:
         repo_root: Absolute repository working tree.
@@ -84,12 +104,13 @@ def build_worktree_observe_paths(
     found: list[str] = []
 
     if root.is_dir():
+        found.extend(_walk_worktree_dirs(root, max_paths=max_paths))
         try:
             children = sorted(root.iterdir(), key=lambda p: p.name)
         except OSError:
             children = []
         for child in children:
-            if is_denied_name(child.name):
+            if is_denied_name(child.name) or child.is_dir():
                 continue
             try:
                 found.append(str(child.resolve()))
@@ -182,4 +203,28 @@ def _walk_files(root: Path) -> list[str]:
     for path in root.rglob("*"):
         if path.is_file():
             out.append(str(path.resolve()))
+    return out
+
+
+def _walk_worktree_dirs(root: Path, *, max_paths: int) -> list[str]:
+    """BFS directory paths under ``root``, skipping denied names."""
+    out: list[str] = []
+    queue: list[Path] = [root]
+    while queue and len(out) < max_paths:
+        current = queue.pop(0)
+        try:
+            children = sorted(current.iterdir(), key=lambda p: p.name)
+        except OSError:
+            continue
+        for child in children:
+            if not child.is_dir() or is_denied_name(child.name):
+                continue
+            try:
+                resolved = str(child.resolve())
+            except OSError:
+                continue
+            out.append(resolved)
+            if len(out) >= max_paths:
+                break
+            queue.append(child)
     return out

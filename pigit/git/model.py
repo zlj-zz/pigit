@@ -11,9 +11,9 @@ from collections.abc import Callable
 class File:
     """Model class of git file."""
 
-    # File path relative to Git.
+    # Worktree-relative path (rename destination when porcelain has ``->``).
     name: str
-    # Display string, may has color.
+    # Porcelain display string (may include ``old -> new``).
     display_str: str
 
     # status string, like: 'MM'
@@ -40,14 +40,20 @@ class File:
     # file whether has inline merged conflict.
     has_inline_merged_conflicts: bool
 
+    @staticmethod
+    def resolve_status_path(porcelain_name: str) -> str:
+        """Return the worktree-relative path from a porcelain status name.
+
+        Rename entries look like ``old -> new``; the destination is the path
+        used for disk I/O and observation.
+        """
+        if "->" in porcelain_name:
+            return porcelain_name.split("->")[-1].strip()
+        return porcelain_name
+
     def get_file_str(self) -> str:
-        """Get the right file path str."""
-        file_name = self.name
-
-        if "->" in file_name:
-            file_name = file_name.split("->")[-1].strip()
-
-        return file_name
+        """Return the worktree-relative path (never a rename display string)."""
+        return self.resolve_status_path(self.name)
 
     def __str__(self) -> str:
         return self.get_file_str()

@@ -68,6 +68,7 @@ def test_build_git_metadata_paths_skips_objects(tmp_path: Path):
     (git_dir / "refs" / "heads" / "main").write_text("deadbeef\n")
     (git_dir / "logs").mkdir()
     (git_dir / "logs" / "HEAD").write_text("log\n")
+    (git_dir / "logs" / "refs").mkdir(parents=True)
 
     paths = build_git_metadata_paths(str(git_dir), str(git_dir))
     joined = "\n".join(paths)
@@ -75,3 +76,44 @@ def test_build_git_metadata_paths_skips_objects(tmp_path: Path):
     assert any(p.endswith("HEAD") and "/logs/" not in p for p in paths)
     assert any(p.endswith("index") for p in paths)
     assert any(p.endswith("refs/heads/main") for p in paths)
+    # Discovery dirs so newly created refs bump a watched mtime.
+    assert (git_dir / "refs").resolve().as_posix() in {
+        Path(p).resolve().as_posix() for p in paths
+    }
+    assert (git_dir / "refs" / "heads").resolve().as_posix() in {
+        Path(p).resolve().as_posix() for p in paths
+    }
+    assert (git_dir / "logs" / "refs").resolve().as_posix() in {
+        Path(p).resolve().as_posix() for p in paths
+    }
+
+
+def test_new_branch_ref_emits_via_heads_dir_then_tracks_file(tmp_path: Path):
+    """Creating refs/heads/feature must signal; later tip edits must too."""
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    heads = git_dir / "refs" / "heads"
+    heads.mkdir(parents=True)
+    (heads / "main").write_text("aaa\n")
+
+    backend = StatMtimeBackend()
+    backend.start(
+        [
+            WatchRoot(kind="git_dir", path=str(git_dir)),
+            WatchRoot(kind="common_dir", path=str(git_dir)),
+        ]
+    )
+    assert backend.poll() == []
+
+    (heads / "feature").write_text("bbb\n")
+    first = backend.poll()
+    assert first, "expected signal from refs/heads directory mtime"
+    assert any(
+        Path(s.path).resolve() in {heads.resolve(), (git_dir / "refs").resolve()}
+        for s in first
+    )
+
+    (heads / "feature").write_text("ccc\n")
+    second = backend.poll()
+    assert any(Path(s.path).name == "feature" for s in second)

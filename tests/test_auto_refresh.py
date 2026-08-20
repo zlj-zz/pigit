@@ -210,6 +210,40 @@ class TestObserveBatchSinks:
             roots = app._build_observe_roots()
         assert all(r.kind != "worktree" for r in roots)
 
+    def test_build_observe_roots_uses_rename_destination_path(self, app):
+        """Rename porcelain must not become a WatchRoot path with '->'."""
+        from pigit.app_status import StatusPanel
+        from pigit.git.model import File
+
+        app._observe_ctx = ObserveContext(
+            repo_root="/repo",
+            git_dir="/repo/.git",
+            common_dir="/repo/.git",
+        )
+        app._config.observe_worktree = True
+        renamed = File(
+            name="src/renamed.txt",
+            display_str="src/orig.txt -> src/renamed.txt",
+            short_status="R ",
+            has_staged_change=True,
+            has_unstaged_change=False,
+            tracked=True,
+            deleted=False,
+            added=False,
+            has_merged_conflicts=False,
+            has_inline_merged_conflicts=False,
+        )
+        app._status_vm = MagicMock()
+        app._status_vm.items.value = [renamed]
+        status = object.__new__(StatusPanel)
+        app._tab_view = MagicMock()
+
+        with patch("pigit.app.resolve_presentation_leaf", return_value=status):
+            roots = app._build_observe_roots()
+        file_roots = [r.path for r in roots if r.kind == "file"]
+        assert any(p.endswith("src/renamed.txt") for p in file_roots)
+        assert all("->" not in p for p in file_roots)
+
     def test_preview_file_batch_reloads_status_preview(self, app):
         """PREVIEW_FILE on Status with large-screen preview calls reload()."""
         from pigit.app_status import StatusPanel

@@ -15,6 +15,7 @@ from pigit.observe.denylist import (
     is_denied_name,
     rel_path_is_denied,
 )
+from pigit.observe.backend import StatMtimeBackend
 from pigit.observe.paths import (
     MAX_WORKTREE_STAT_PATHS,
     build_worktree_observe_paths,
@@ -56,6 +57,44 @@ def test_build_worktree_paths_skips_deny_and_includes_status(tmp_path: Path):
     assert (tmp_path / "src" / "b.py").resolve() in resolved
     assert (tmp_path / "node_modules").resolve() not in resolved
     assert (tmp_path / "node_modules" / "x").resolve() not in resolved
+
+
+def test_build_worktree_paths_includes_nested_dirs_for_discovery(tmp_path: Path):
+    """Deep new files only bump nested dir mtime; those dirs must be polled."""
+    deep = tmp_path / "src" / "deep"
+    deep.mkdir(parents=True)
+    (deep / "existing.py").write_text("x\n")
+
+    paths, truncated = build_worktree_observe_paths(
+        str(tmp_path),
+        status_rel_paths=[],
+    )
+    assert truncated is False
+    resolved = {Path(p).resolve() for p in paths}
+    assert (tmp_path / "src").resolve() in resolved
+    assert deep.resolve() in resolved
+
+
+def test_nested_dir_mtime_emits_worktree_signal(tmp_path: Path):
+    deep = tmp_path / "src" / "deep"
+    deep.mkdir(parents=True)
+    git = tmp_path / ".git"
+    git.mkdir()
+    (git / "HEAD").write_text("ref: refs/heads/main\n")
+
+    backend = StatMtimeBackend()
+    backend.start(
+        [
+            WatchRoot(kind="git_dir", path=str(git)),
+            WatchRoot(kind="common_dir", path=str(git)),
+            WatchRoot(kind="worktree", path=str(tmp_path)),
+        ]
+    )
+    assert backend.poll() == []
+
+    (deep / "brand_new.py").write_text("new\n")
+    signals = backend.poll()
+    assert any(Path(s.path).resolve() == deep.resolve() for s in signals)
 
 
 def test_build_worktree_paths_respects_budget(tmp_path: Path):

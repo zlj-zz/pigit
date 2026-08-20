@@ -100,10 +100,11 @@ class _StatusOps(_OpsBase):
             change = file[:2]
             staged_change = file[:1]
             unstaged_change = file[1:2]
-            name = file[3:]
-            if name.endswith('"'):
+            porcelain_name = file[3:]
+            if porcelain_name.endswith('"'):
                 # may is chinese char code.
-                name = byte_str2str(name[1:-1])
+                porcelain_name = byte_str2str(porcelain_name[1:-1])
+            name = File.resolve_status_path(porcelain_name)
             untracked = change == "??"
             has_no_staged_change = staged_change in [" ", "U", "?"]
             has_merged_conflicts = change in ["DD", "AA", "UU", "AU", "UA", "UD", "DU"]
@@ -111,7 +112,7 @@ class _StatusOps(_OpsBase):
 
             file_ = File(
                 name=name,
-                display_str=name,
+                display_str=porcelain_name,
                 short_status=change,
                 has_staged_change=not has_no_staged_change,
                 has_unstaged_change=unstaged_change != " ",

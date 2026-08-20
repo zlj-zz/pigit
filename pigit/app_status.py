@@ -910,7 +910,7 @@ class StatusPanel(ItemList):
             filename_fg = THEME.fg_staged_renamed if focused else THEME.fg_dim
         else:
             filename_fg = fg_primary
-        main = [Segment(file.name, fg=filename_fg, style_flags=cursor_flags)]
+        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -1000,7 +1000,7 @@ class StatusPanel(ItemList):
             return ""
         file, _ = hit
         label = _status_label(file)
-        return file.name if not label else f"{file.name}  {label}"
+        return file.display_str if not label else f"{file.display_str}  {label}"
 
     def preview_lines(self) -> list[str]:
         """Return diff lines for the current file selection."""
@@ -1123,7 +1123,7 @@ class StatusPanel(ItemList):
         """Open file in external editor, suspending TUI."""
         editor = os.environ.get("EDITOR", "vim")
         try:
-            exec_external([editor, file.name], cwd=self._vm.repo_path)
+            exec_external([editor, file.get_file_str()], cwd=self._vm.repo_path)
         except Exception:
             show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
         finally:

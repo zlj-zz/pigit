@@ -56,6 +56,15 @@ def test_refs_heads_maps_to_refs():
     assert ChangeKind.REFS in kinds
 
 
+def test_refs_directory_maps_to_refs():
+    """Directory discovery signals (new branch/tag) must classify as REFS."""
+    kinds, _ = classify_path_signal(
+        PathSignal(path="/repo/.git/refs/heads", mtime_ns=1),
+        _ctx(),
+    )
+    assert ChangeKind.REFS in kinds
+
+
 def test_stash_ref_maps_to_stash_and_refs():
     kinds, _ = classify_path_signal(
         PathSignal(path="/repo/.git/refs/stash", mtime_ns=1),

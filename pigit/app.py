@@ -394,7 +394,7 @@ class PigitApplication(Application):
         roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
         repo = Path(ctx.repo_root)
         for file_item in self._status_vm.items.value:
-            rel = file_item.name
+            rel = file_item.get_file_str()
             if not rel or rel_path_is_denied(rel):
                 continue
             roots.append(WatchRoot(kind="file", path=str(repo / rel)))

@@ -147,7 +147,7 @@ class PreviewPanel(Component):
                 diff_type = active.preview_diff_type()
             return _PreviewRequest(
                 kind="status",
-                key=file.name,
+                key=file.get_file_str(),
                 title=title,
                 diff_type=diff_type,
                 source_idx=source_idx,
