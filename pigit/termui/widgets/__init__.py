@@ -8,7 +8,10 @@ Usage:
 
 from __future__ import annotations
 
+from .bordered_browser import BorderedBrowser
 from .check_list import CheckList
+from .command_palette import CommandPalette
+from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
 from .header import Header
 from .help_panel import HelpEntry, HelpPanel
@@ -22,9 +25,12 @@ from .status_bar import StatusBar
 from .toast import Toast
 
 __all__ = [
+    "BorderedBrowser",
     "AlertDialog",
     "AlertDialogBody",
     "CheckList",
+    "CommandPalette",
+    "Footer",
     "HeatmapGrid",
     "Header",
     "HelpEntry",

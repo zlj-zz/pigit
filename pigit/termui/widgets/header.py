@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from .._component import Component, bind_signals
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..component import Component, bind_signals
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..reactive import Computed, Signal, ValueRef
 from ..wcwidth_table import truncate_by_width, wcswidth
 

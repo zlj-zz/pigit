@@ -14,10 +14,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui._layer import LayerKind
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind, parse_sgr_mouse
-from pigit.termui._root import ComponentRoot
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind, parse_sgr_mouse
+from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.input import KeyboardInput

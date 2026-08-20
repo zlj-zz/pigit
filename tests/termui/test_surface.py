@@ -5,7 +5,7 @@ Tests for pigit.termui.surface.
 
 from __future__ import annotations
 
-from pigit.termui._surface import FlatCell, Surface
+from pigit.termui.surface import FlatCell, Surface
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 
@@ -211,6 +211,12 @@ class TestSurfaceRGB:
         assert s.rows()[1][2].bg == (0, 0, 255)
         assert s.rows()[2][1].bg == (0, 0, 255)
         assert s.rows()[2][2].bg == (0, 0, 255)
+
+    def test_fill_rect_rgb_none_bg_clears_characters(self):
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "abcd", bg=(1, 2, 3))
+        s.fill_rect_rgb(0, 0, 4, 1, bg=None)
+        assert all(c.char == " " and c.bg is None for c in s.rows()[0])
 
     def test_subsurface_with_margin(self):
         s = Surface(10, 10)

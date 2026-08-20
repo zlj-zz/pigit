@@ -1,6 +1,6 @@
 """
 Module: pigit/app_keybindings.py
-Description: Enumerate configurable keybindings and render the [keybindings] config template.
+Description: Enumerate configurable keybindings and render the [app.keybindings] config template.
 Author: Zev
 Date: 2026-08-16
 """
@@ -10,16 +10,18 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from pigit.app import PigitApplication
-from pigit.app_branch import BranchPanel
-from pigit.app_commit import CommitPanel
-from pigit.app_diff import DiffViewer
-from pigit.app_rebase import RebasePanel
-from pigit.app_recent_actions import RecentActionsPanel
-from pigit.app_stash import StashPanel
-from pigit.app_status import StatusPanel
 from pigit.termui import Binding, collect_action_bindings
 from pigit.termui.cli_output import get_console
+from .app import PigitApplication
+from .app_branch import BranchPanel
+from .app_commit import CommitPanel
+from .app_diff import DiffViewer
+from .app_inspector import InspectorSheet
+from .app_log_ref import LogRefSheet
+from .app_rebase import RebasePanel
+from .app_recent_actions import RecentActionsPanel
+from .app_stash import StashPanel
+from .app_status import StatusPanel
 
 # The classes that declare a ``keymap_namespace``; the namespace itself is read
 # from each class (single source) rather than duplicated here.
@@ -32,6 +34,8 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     DiffViewer,
     RebasePanel,
     RecentActionsPanel,
+    LogRefSheet,
+    InspectorSheet,
 )
 
 _KEY_SYNTAX_HINT = (
@@ -53,7 +57,7 @@ def warn_unmatched_keybindings(
     bindings: Sequence[tuple[str, Binding]],
     keybindings: dict[str, str | list[str]],
 ) -> None:
-    """Warn (stderr) about ``[keybindings]`` keys that match no known action."""
+    """Warn (stderr) about ``[app.keybindings]`` keys that match no known action."""
     if not keybindings:
         return
     known = {binding.action for _, binding in bindings if binding.configurable}
@@ -63,7 +67,7 @@ def warn_unmatched_keybindings(
     console = get_console()
     print(console.render("@bold(@yellow(Config Warning))"), file=sys.stderr)
     print(
-        "The following [keybindings] keys match no configurable action and are ignored:",
+        "The following [app.keybindings] keys match no configurable action and are ignored:",
         file=sys.stderr,
     )
     for key in orphans:
@@ -76,7 +80,7 @@ def render_keybindings_template(
     *,
     include_defaults: bool = False,
 ) -> str:
-    """Render the ``[keybindings]`` block.
+    """Render the ``[app.keybindings]`` block.
 
     Overridden actions are emitted as active lines (preserved); non-overridden
     actions are emitted as commented defaults only when ``include_defaults`` is
@@ -108,7 +112,7 @@ def render_keybindings_template(
     lines = [_KEY_SYNTAX_HINT]
     for namespace, group_lines in groups.items():
         lines.append("")
-        lines.append(f"[keybindings.{namespace}]")
+        lines.append(f"[app.keybindings.{namespace}]")
         lines.extend(group_lines)
     return "\n" + "\n".join(lines) + "\n"
 

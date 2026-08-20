@@ -8,8 +8,13 @@ Date: 2026-04-17
 
 from unittest.mock import MagicMock, patch
 
-from pigit.termui._application import Application
-from pigit.termui._component import Component
+import pytest
+
+from pigit.termui import bind_action
+from pigit.termui.application import Application
+from pigit.termui.component import Component
+from pigit.termui.event_loop import ExitEventLoop
+from pigit.termui.root import ComponentRoot
 
 
 class DummyRoot(Component):
@@ -30,7 +35,7 @@ class DummyApp(Application):
 class TestApplication:
     def test_run_uses_app_event_loop(self):
         app = DummyApp()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             mock_loop = MagicMock()
             MockLoop.return_value = mock_loop
             app.run()
@@ -50,7 +55,7 @@ class TestApplication:
                 return False
 
         app = _App()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             root = MockLoop.call_args.args[0]
@@ -66,7 +71,7 @@ class TestApplication:
                 self.hooked = True
 
         app = Hooked()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             MockLoop.call_args.kwargs["on_after_start"]()
@@ -75,7 +80,61 @@ class TestApplication:
     def test_destroy_called_after_loop_exit(self):
         """root.destroy() must be called in finally block after loop exits."""
         app = DummyApp()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             assert app._root is None
+
+    def test_on_exit_called_before_destroy(self):
+        """on_exit runs in finally before root.destroy()."""
+        order: list[str] = []
+
+        class Hooked(DummyApp):
+            def on_exit(self):
+                order.append("on_exit")
+                assert self._root is not None
+
+        app = Hooked()
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
+            with patch.object(
+                ComponentRoot,
+                "destroy",
+                autospec=True,
+                side_effect=lambda self: order.append("destroy"),
+            ):
+                app.run()
+        assert order == ["on_exit", "destroy"]
+        assert app._root is None
+
+    def test_get_help_groups_default_global(self):
+        class _App(DummyApp):
+            @bind_action("help", "?", desc="Toggle help")
+            def help(self):
+                pass
+
+        app = _App()
+        groups = app.get_help_groups()
+        assert len(groups) == 1
+        assert groups[0][0] == "Global"
+        assert groups[0][1]
+
+    def test_get_help_groups_empty_when_no_bindings(self):
+        app = DummyApp()
+        assert app.get_help_groups() == []
+
+    def test_min_terminal_size_quits_after_after_start(self):
+        class SizedApp(DummyApp):
+            min_terminal_size = (65, 10)
+
+        app = SizedApp()
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
+            app.run()
+            on_after_start = MockLoop.call_args.kwargs["on_after_start"]
+            with patch("pigit.termui.tty_io.terminal_size", return_value=(64, 10)):
+                with pytest.raises(ExitEventLoop) as exc_info:
+                    on_after_start()
+                assert (
+                    exc_info.value.result_message == "Terminal too small (need 65x10)"
+                )

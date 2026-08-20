@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pigit"
 description = "Simple terminal tool of Git."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
@@ -14,9 +14,10 @@ authors = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Shells",
     "Topic :: Software Development",
     "Intended Audience :: Developers",
@@ -61,7 +62,7 @@ where = ["."]
 # Coverage: omit thin entrypoints and full-screen TUI wiring / raw terminal input
 # (tested manually or via focused component tests; measuring them dominates line count).
 [tool.basedpyright]
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 typeCheckingMode = "standard"
 reportUnusedVariable = false
 reportUnusedParameter = false

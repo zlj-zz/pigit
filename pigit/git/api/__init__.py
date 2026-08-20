@@ -85,6 +85,15 @@ class GitApi:
     def get_git_dir(self, path=None):
         return self._core.get_git_dir(path)
 
+    def get_git_common_dir(self, path=None):
+        return self._core.get_git_common_dir(path)
+
+    def get_head_tracking(self, path=None):
+        return self._core.get_head_tracking(path)
+
+    def verify_commitish(self, ref, path=None):
+        return self._core.verify_commitish(ref, path)
+
     # ── _branch ──
     def get_branches(self, path=None, include_remote=False, plain=True):
         return self._branch.get_branches(path, include_remote, plain)
@@ -110,11 +119,11 @@ class GitApi:
     def _branch_sha(self, branch_name, path=None):
         return self._branch._branch_sha(branch_name, path)
 
-    def get_branch_recent_commit(self, branch_name, path=None):
-        return self._branch.get_branch_recent_commit(branch_name, path)
-
     def get_branch_creation_time(self, branch_name, path=None):
         return self._branch.get_branch_creation_time(branch_name, path)
+
+    def get_branch_recent_commit(self, branch_name, path=None):
+        return self._branch.get_branch_recent_commit(branch_name, path)
 
     # ── _commit ──
     def load_log(
@@ -160,6 +169,9 @@ class GitApi:
     def load_status(self, path=None, use_cache=True):
         return self._status.load_status(path, use_cache)
 
+    def status_porcelain(self, path=None):
+        return self._status.status_porcelain(path)
+
     def _load_status_cache_signature(self, cwd):
         return self._status._load_status_cache_signature(cwd)
 
@@ -182,6 +194,9 @@ class GitApi:
     def stash_pop(self, ref, path=None):
         return self._stash.stash_pop(ref, path)
 
+    def stash_apply(self, ref, path=None):
+        return self._stash.stash_apply(ref, path)
+
     def stash_drop(self, ref, path=None):
         return self._stash.stash_drop(ref, path)
 
@@ -190,6 +205,12 @@ class GitApi:
 
     def stash_store(self, sha, path=None):
         return self._stash.stash_store(sha, path)
+
+    def stash_numstat(self, ref, path=None):
+        return self._stash.stash_numstat(ref, path)
+
+    def stash_meta(self, ref, path=None):
+        return self._stash.stash_meta(ref, path)
 
     # ── _diff ──
     def load_file_diff(self, file, tracked=True, cached=False, plain=False, path=None):
@@ -245,6 +266,18 @@ class GitApi:
     def is_rebase_in_progress(self, path=None):
         return self._merge.is_rebase_in_progress(path)
 
+    def sequencer_in_progress(self, path=None):
+        return self._merge.sequencer_in_progress(path)
+
+    def resolve_head_sha(self, path=None):
+        return self._merge.resolve_head_sha(path)
+
+    def is_ancestor(self, commit, of_ref="HEAD", path=None):
+        return self._merge.is_ancestor(commit, of_ref, path)
+
+    def has_unmerged_paths(self, path=None):
+        return self._merge.has_unmerged_paths(path)
+
     def commit_no_edit(self, path=None):
         return self._merge.commit_no_edit(path)
 
@@ -269,6 +302,15 @@ class GitApi:
 
     def get_file_info(self, file, path=None):
         return self._fileio.get_file_info(file, path)
+
+    def compare_index_worktree(self, relpath, path=None):
+        return self._fileio.compare_index_worktree(relpath, path)
+
+    def unmerged_stages(self, relpath, path=None):
+        return self._fileio.unmerged_stages(relpath, path)
+
+    def last_commit_for_path(self, relpath, path=None):
+        return self._fileio.last_commit_for_path(relpath, path)
 
     def _format_size(self, size):
         return self._fileio._format_size(size)

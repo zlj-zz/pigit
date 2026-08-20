@@ -1,6 +1,6 @@
 """
 Module: pigit/git/api/_merge.py
-Description: Merge, pull, and commit operations.
+Description: Merge, pull, commit, and cherry-pick sequencer operations.
 Author: Zev
 Date: 2026-08-13
 """
@@ -54,23 +54,73 @@ class _MergeOps(_OpsBase):
                 raise GitError(f"Merge conflict: {msg}")
             raise GitError(msg)
 
+    def sequencer_in_progress(self, path: str | None = None) -> str | None:
+        """Return the active sequencer kind, or None if the tree is clean.
+
+        Order: merge, rebase, cherry-pick, revert.
+        """
+        try:
+            git_dir = Path(self._core.get_git_dir(path))
+        except GitError:
+            return None
+        if (git_dir / "MERGE_HEAD").exists():
+            return "merge"
+        if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
+            return "rebase"
+        if (git_dir / "CHERRY_PICK_HEAD").exists():
+            return "cherry-pick"
+        if (git_dir / "REVERT_HEAD").exists():
+            return "revert"
+        return None
+
     def is_merge_in_progress(self, path: str | None = None) -> bool:
         """Return True if MERGE_HEAD exists in the git directory."""
-        try:
-            git_dir = self._core.get_git_dir(path)
-        except GitError:
-            return False
-        return (Path(git_dir) / "MERGE_HEAD").exists()
+        return self.sequencer_in_progress(path) == "merge"
 
     def is_rebase_in_progress(self, path: str | None = None) -> bool:
         """Return True if a rebase is in progress (rebase-merge or rebase-apply dir)."""
-        try:
-            git_dir = self._core.get_git_dir(path)
-        except GitError:
+        return self.sequencer_in_progress(path) == "rebase"
+
+    def resolve_head_sha(self, path: str | None = None) -> str:
+        """Return the full SHA of HEAD via ``git rev-parse HEAD``."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            "git rev-parse HEAD",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0 or not out:
+            raise GitError(err or "Failed to resolve HEAD")
+        return cast(str, out).strip()
+
+    def is_ancestor(
+        self, commit: str, of_ref: str = "HEAD", path: str | None = None
+    ) -> bool:
+        """Return True if ``commit`` is an ancestor of ``of_ref`` (inclusive)."""
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            "git merge-base --is-ancestor "
+            f"{shlex.quote(commit)} {shlex.quote(of_ref)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code == 0:
+            return True
+        if code == 1:
             return False
-        return (Path(git_dir) / "rebase-merge").exists() or (
-            Path(git_dir) / "rebase-apply"
-        ).exists()
+        raise GitError(err or "Failed to test ancestry")
+
+    def has_unmerged_paths(self, path: str | None = None) -> bool:
+        """Return True if ``git diff`` lists unmerged (conflicted) paths."""
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            "git diff --name-only --diff-filter=U",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or "Failed to list unmerged paths")
+        return bool(cast(str, out or "").strip())
 
     def commit_no_edit(self, path: str | None = None) -> None:
         """Complete a merge with the default message (``git commit --no-edit``)."""

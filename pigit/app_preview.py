@@ -1,19 +1,26 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/app_preview.py
-Description: 大屏 Status/Stash 侧栏：把选中项的 diff 交给 DiffViewer。
+Description: Large-screen Status/Stash side panel hosting DiffViewer with async loads.
 Author: Zev
 Date: 2026-05-26
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 from collections.abc import Callable
 
-from pigit.termui import EVT_SELECTION_CHANGED, Component
-from pigit.termui._component import _render_child_to_surface
-from pigit.termui._mouse import MouseEvent
+from pigit.termui import (
+    AsyncTask,
+    EVT_SELECTION_CHANGED,
+    Component,
+    MouseEvent,
+    render_child,
+    run_async,
+)
+from pigit.termui.types import PreviewPayload
 
 from .app_diff import DiffType, DiffViewer
 
@@ -21,16 +28,33 @@ if TYPE_CHECKING:
     from .viewmodels.status import IStatusViewModel
 
 
+@dataclass(frozen=True)
+class _PreviewRequest:
+    """Captured UI-thread selection for an async diff load.
+
+    Status previews are keyed by worktree path (``key``), never by a list
+    index that can drift when ``StatusViewModel`` refreshes.
+    """
+
+    kind: Literal["status", "stash"]
+    key: str
+    title: str
+    diff_type: DiffType
+    stash_ref: str | None = None
+
+
 class PreviewPanel(Component):
     """Host that loads Status/Stash diffs into a full-size DiffViewer.
 
-    Chrome is DiffViewer's own box; this panel only wires selection to content.
+    Chrome is DiffViewer's own box; this panel wires selection to content via
+    async ``load_diff`` / ``load_stash_diff`` with a stale-guard key.
     """
 
     def __init__(
         self,
         *,
         status_vm: IStatusViewModel | None = None,
+        on_preview_target: Callable[[str | None], None] | None = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -38,6 +62,7 @@ class PreviewPanel(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._status_vm = status_vm
+        self._on_preview_target = on_preview_target
         self._diff_viewer = DiffViewer(
             x=1,
             y=1,
@@ -45,6 +70,8 @@ class PreviewPanel(Component):
             word_diff=True,
         )
         self._unsubs: list[Callable[[], None]] = []
+        self._load_task: AsyncTask[list[str]] | None = None
+        self._request: _PreviewRequest | None = None
 
     def activate(self) -> None:
         """Activate the inner diff viewer and subscribe to selection changes."""
@@ -53,7 +80,9 @@ class PreviewPanel(Component):
         self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
     def deactivate(self) -> None:
-        """Unsubscribe and deactivate the inner diff viewer."""
+        """Cancel loads, unsubscribe, and deactivate the inner diff viewer."""
+        self._cancel_load()
+        self._set_preview_target(None)
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -61,44 +90,119 @@ class PreviewPanel(Component):
         super().deactivate()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
-        """Update the inner DiffViewer for the active Status or Stash panel."""
-        from .app_status import StatusPanel, _status_label
-        from .app_stash import StashPanel
+        """Start an async diff load for the active PreviewPayload panel."""
+        self._cancel_load()
+        if not isinstance(active, PreviewPayload):
+            self._request = None
+            self._set_preview_target(None)
+            self.clear()
+            return True
 
-        if not isinstance(active, (StatusPanel, StashPanel)):
+        request = self._capture_request(active)
+        if request is None:
+            self._request = None
+            self._set_preview_target(None)
             self.clear()
             return True
-        if self._status_vm is None:
-            self.clear()
-            return True
+
+        self._request = request
+        if request.kind == "status":
+            self._set_preview_target(request.key)
+        else:
+            self._set_preview_target(None)
+
+        self._load_task = run_async(
+            lambda: self._load_lines(request),
+            lambda lines: self._on_loaded(request, lines),
+        )
+        return True
+
+    def reload(self) -> None:
+        """Re-fetch the last Status/Stash preview (observe ``PREVIEW_FILE`` sink)."""
+        request = self._request
+        if request is None or self._status_vm is None:
+            return
+        if self._load_task is not None:
+            self._load_task.cancel()
+            self._load_task = None
+        self._request = request
+        self._load_task = run_async(
+            lambda: self._load_lines(request),
+            lambda lines: self._on_loaded(request, lines),
+        )
+
+    def _capture_request(self, active: PreviewPayload) -> _PreviewRequest | None:
+        """Snapshot selection on the UI thread before background work."""
+        from .app_stash import StashPanel
+        from .app_status import StatusPanel
+
+        title = active.preview_title()
+        if not title:
+            return None
 
         if isinstance(active, StatusPanel):
             hit = active.file_at_cursor()
             if hit is None:
-                self.clear()
-                return True
-            f, source_idx = hit
-            diff_lines = self._status_vm.load_diff(source_idx)
-            diff_type = (
-                DiffType.STAGED
-                if (f.has_staged_change and not f.has_unstaged_change)
-                else DiffType.UNSTAGED
+                return None
+            file, _ = hit
+            diff_type = DiffType.STAGED
+            if hasattr(active, "preview_diff_type"):
+                diff_type = active.preview_diff_type()
+            return _PreviewRequest(
+                kind="status",
+                key=file.get_file_str(),
+                title=title,
+                diff_type=diff_type,
             )
-            self.set_diff_type(diff_type)
-            self.set_preview(diff_lines, title=f.name, subtitle=_status_label(f))
-        elif isinstance(active, StashPanel):
-            if (
-                not active.stashes
-                or active.curr_no < 0
-                or active.curr_no >= len(active.stashes)
-            ):
-                self.clear()
-                return True
-            stash = active.stashes[active.curr_no]
-            diff_lines = self._status_vm.load_stash_diff(stash.ref)
-            self.set_diff_type(DiffType.STASH)
-            self.set_preview(diff_lines, title=stash.msg, subtitle=stash.ref)
-        return True
+
+        if isinstance(active, StashPanel):
+            stash = active._current_stash()
+            if stash is None:
+                return None
+            return _PreviewRequest(
+                kind="stash",
+                key=stash.ref,
+                title=title,
+                diff_type=DiffType.STASH,
+                stash_ref=stash.ref,
+            )
+
+        return None
+
+    def _load_lines(self, request: _PreviewRequest) -> list[str]:
+        """Background: load diff lines for a captured request."""
+        vm = self._status_vm
+        if vm is None:
+            return []
+        if request.kind == "status":
+            return vm.load_diff_by_path(request.key)
+        if request.kind == "stash" and request.stash_ref is not None:
+            return vm.load_stash_diff(request.stash_ref)
+        return []
+
+    def _on_loaded(self, request: _PreviewRequest, lines: list[str]) -> None:
+        """Apply a completed load if the selection key is still current."""
+        if not self.is_activated():
+            return
+        if self._request is None or self._request.key != request.key:
+            return
+        if not lines:
+            self.clear()
+            return
+        self.set_diff_type(request.diff_type)
+        self._diff_viewer.set_box_title(request.title)
+        self._diff_viewer.set_content(lines)
+
+    def _cancel_load(self) -> None:
+        """Invalidate any in-flight load so its result is dropped."""
+        if self._load_task is not None:
+            self._load_task.cancel()
+            self._load_task = None
+
+    def _set_preview_target(self, rel: str | None) -> None:
+        """Notify the app of the Status file path used for observe classify."""
+        if self._on_preview_target is not None:
+            self._on_preview_target(rel)
 
     def set_preview(
         self, diff_lines: list[str], title: str, subtitle: str = ""
@@ -137,4 +241,4 @@ class PreviewPanel(Component):
         return self._diff_viewer.handle_mouse(event)
 
     def _render_surface(self, surface) -> None:
-        _render_child_to_surface(self._diff_viewer, surface, "PreviewPanel")
+        render_child(self._diff_viewer, surface, "PreviewPanel")

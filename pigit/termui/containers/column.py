@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Sequence
 
-from .._component import Component, resolve_focus_leaf
+from ..component import Component, resolve_focus_leaf
 from .._layout import layout_flex
 from .._runtime_context import get_focus_manager, request_render
 from ..types import EventType, EVT_SELECTION_CHANGED
@@ -19,7 +19,7 @@ from ..types import EventType, EVT_SELECTION_CHANGED
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class Column(Component):

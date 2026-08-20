@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .. import keys, palette
-from .._component import Component
+from .. import keys
+from ..theme import get_theme
+from ..component import Component
 from .._runtime_context import get_focus_manager, request_render
-from .._surface import Surface, _Subsurface
+from ..surface import Surface, _Subsurface
 from ..reactive import Signal
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
@@ -298,6 +299,10 @@ class InputLine(Component):
             # on_submit (Enter only, not Shift+Enter)
             if not is_shift and self._on_submit:
                 self._on_submit(self._value_sig.value)
+                if self._overlay_mode:
+                    # End grab without cancel — value already accepted.
+                    # Do not gate on _visible: on_submit may already hide for layout.
+                    self._dismiss_overlay(invoke_cancel=False)
                 return True
             # Insert newline if allowed
             if self._allow_newline:
@@ -313,7 +318,7 @@ class InputLine(Component):
                 self._candidates = []
                 return True
             if self._overlay_mode and self._visible:
-                self._exit_overlay_mode()
+                self._dismiss_overlay(invoke_cancel=True)
                 return True
             if self._on_cancel:
                 self._on_cancel()
@@ -406,6 +411,7 @@ class InputLine(Component):
             return
 
         # ── Multi-line text rendering ────────────────────────────────────
+        theme = get_theme()
         for row in range(visible_rows):
             line_idx = start_line + row
             if line_idx >= len(lines):
@@ -414,8 +420,8 @@ class InputLine(Component):
                     row,
                     0,
                     " " * surface.width,
-                    fg=palette.DEFAULT_FG,
-                    bg=palette.DEFAULT_BG,
+                    fg=theme.fg_primary,
+                    bg=theme.bg_chrome,
                 )
                 continue
 
@@ -429,15 +435,15 @@ class InputLine(Component):
                     avail = max(0, surface.width - prefix_wc)
                     ph = truncate_by_width(self._placeholder, avail)
                     surface.draw_text_rgb(
-                        row, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+                        row, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome
                     )
                     if ph:
                         surface.draw_text_rgb(
                             row,
                             prefix_wc,
                             ph,
-                            fg=palette.DEFAULT_FG_DIM,
-                            bg=palette.DEFAULT_BG,
+                            fg=theme.fg_dim,
+                            bg=theme.bg_chrome,
                         )
                     # Pad rest of row
                     pad = surface.width - prefix_wc - wcswidth(ph)
@@ -446,8 +452,8 @@ class InputLine(Component):
                             row,
                             surface.width - pad,
                             " " * pad,
-                            fg=palette.DEFAULT_FG,
-                            bg=palette.DEFAULT_BG,
+                            fg=theme.fg_primary,
+                            bg=theme.bg_chrome,
                         )
                 else:
                     text = prefix + line
@@ -457,8 +463,8 @@ class InputLine(Component):
                         row,
                         0,
                         text,
-                        fg=palette.DEFAULT_FG,
-                        bg=palette.DEFAULT_BG,
+                        fg=theme.fg_primary,
+                        bg=theme.bg_chrome,
                     )
                 if self.is_focus_leaf and cursor_line == 0:
                     self._draw_block_cursor(
@@ -476,8 +482,8 @@ class InputLine(Component):
                     row,
                     0,
                     text,
-                    fg=palette.DEFAULT_FG,
-                    bg=palette.DEFAULT_BG,
+                    fg=theme.fg_primary,
+                    bg=theme.bg_chrome,
                 )
                 if self.is_focus_leaf and cursor_line == line_idx:
                     self._draw_block_cursor(
@@ -486,6 +492,7 @@ class InputLine(Component):
 
     def _render_candidates(self, surface: Surface | _Subsurface, value: str) -> None:
         """Render inline completion candidate (single-line mode)."""
+        theme = get_theme()
         match_len = len(self._original_value)
         matched = value[:match_len]
         suffix = value[match_len:]
@@ -496,16 +503,14 @@ class InputLine(Component):
             suffix = ""
         elif len(suffix) > avail:
             suffix = suffix[:avail]
-        surface.draw_text_rgb(
-            0, 0, prefix, fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
-        )
+        surface.draw_text_rgb(0, 0, prefix, fg=theme.fg_primary, bg=theme.bg_chrome)
         if suffix:
             surface.draw_text_rgb(
                 0,
                 len(prefix),
                 suffix,
-                fg=palette.DEFAULT_FG_DIM,
-                bg=palette.DEFAULT_BG,
+                fg=theme.fg_dim,
+                bg=theme.bg_chrome,
             )
         if self.is_focus_leaf:
             cursor_abs = len(prefix) + len(suffix)
@@ -514,8 +519,8 @@ class InputLine(Component):
                     0,
                     cursor_abs,
                     " ",
-                    fg=palette.DEFAULT_BG,
-                    bg=palette.DEFAULT_FG,
+                    fg=theme.bg_chrome,
+                    bg=theme.fg_primary,
                 )
 
     def _draw_block_cursor(
@@ -530,8 +535,9 @@ class InputLine(Component):
         if cursor_x >= surface.width:
             return
         ch = line[cursor_col] if cursor_col < len(line) else " "
+        theme = get_theme()
         surface.draw_text_rgb(
-            row, cursor_x, ch, fg=palette.DEFAULT_BG, bg=palette.DEFAULT_FG
+            row, cursor_x, ch, fg=theme.bg_chrome, bg=theme.fg_primary
         )
 
     def _enter_overlay_mode(self) -> None:
@@ -544,11 +550,20 @@ class InputLine(Component):
         if self._on_activate:
             self._on_activate()
 
-    def _exit_overlay_mode(self) -> None:
-        """Exit overlay mode: hide input and release focus."""
+    def _dismiss_overlay(self, *, invoke_cancel: bool) -> None:
+        """Hide overlay input and release focus grab.
+
+        Args:
+            invoke_cancel: When True, call ``on_cancel`` (Esc path).
+                Submit path passes False so accepted input is not cancelled.
+        """
         self._visible = False
         fm = get_focus_manager()
         if fm is not None:
             fm.focus_release()
-        if self._on_cancel:
+        if invoke_cancel and self._on_cancel:
             self._on_cancel()
+
+    def _exit_overlay_mode(self) -> None:
+        """Exit overlay mode via cancel (Esc): hide, release focus, notify."""
+        self._dismiss_overlay(invoke_cancel=True)

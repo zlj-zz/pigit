@@ -10,10 +10,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.app_theme import THEME
 from pigit.ext.utils import relative_time
 from pigit.termui import FeedbackKind, Segment, bind_action, show_badge, show_toast
 from pigit.termui.widgets import ItemList
+
+from .app_theme import THEME
 
 if TYPE_CHECKING:
     from pigit.git.api import GitApi

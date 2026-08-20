@@ -20,7 +20,6 @@ from pigit.termui import (
     EventType,
     FeedbackKind,
     EVT_GOTO,
-    AlertDialog,
     bind_action,
     bind_signals,
     by_id,
@@ -28,21 +27,19 @@ from pigit.termui import (
     exec_external,
     palette,
     Segment,
+    run_async,
     show_badge,
     show_sheet,
     show_toast,
 )
+from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import ItemList
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
-from .app_preview_toggle import invoke_preview_toggle
-from .app_types import FileInfo
-from .app_search_filter import SearchFilter
+from .app_types import FileSnapshot
 from .app_theme import THEME
 from .ext.utils import copy_to_clipboard
-from pigit.termui._async_task import run_async
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -275,6 +272,8 @@ class StatusPanel(ItemList):
 
     CURSOR = "●"  # filled circle
     keymap_namespace = "status"
+    tab_name = "Status"
+    tab_key = "1"
 
     def __init__(
         self,
@@ -297,12 +296,13 @@ class StatusPanel(ItemList):
             ],
             lazy_load=True,
             id=id,
+            on_search_changed=lambda: self._apply_filter(),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
         self.files: list[File] = []
         self._all_files: list[File] = []
-        self._filter = SearchFilter(self._apply_filter)
+        self._source_map: list[int] = []
         self._alert_dialog = AlertDialog(
             inner_width=alert_inner_width,
             on_result=lambda _: None,
@@ -319,6 +319,13 @@ class StatusPanel(ItemList):
         self._visual_anchor: int | None = None
         self._selected: set[int] = set()
         self._visual_scroll = False  # auto-select while navigating
+        self._stash_input = InputLine(
+            prompt="Stash message: ",
+            placeholder="empty = git default",
+            on_submit=self._on_stash_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
+        )
 
     def activate(self) -> None:
         super().activate()
@@ -353,10 +360,10 @@ class StatusPanel(ItemList):
 
     def _apply_filter(self) -> None:
         """Filter files by query and rebuild display state."""
-        query = self._filter.query.lower()
+        query = self.search_query.lower()
         if not query:
             self.files = list(self._all_files)
-            self._filter.map = list(range(len(self._all_files)))
+            self._source_map = list(range(len(self._all_files)))
         else:
             filtered: list[File] = []
             mapping: list[int] = []
@@ -365,7 +372,7 @@ class StatusPanel(ItemList):
                     filtered.append(f)
                     mapping.append(i)
             self.files = filtered
-            self._filter.map = mapping
+            self._source_map = mapping
         if not self.files:
             self._tree_rows = []
             self.set_content([])
@@ -374,7 +381,7 @@ class StatusPanel(ItemList):
         if self._tree_mode:
             self._auto_expand_matches()
             self._prune_collapsed_dirs()
-            items = list(zip(self.files, self._filter.map))
+            items = list(zip(self.files, self._source_map))
             self._tree_rows = build_status_tree(items, self._collapsed_dirs)
             self.set_content([row.name for row in self._tree_rows])
         else:
@@ -384,7 +391,7 @@ class StatusPanel(ItemList):
 
     def _auto_expand_matches(self) -> None:
         """Expand parent dirs of filter matches so they stay visible."""
-        if not self._filter.query:
+        if not self.search_query:
             return
         for f in self.files:
             parts = f.get_file_str().replace("\\", "/").split("/")[:-1]
@@ -445,11 +452,7 @@ class StatusPanel(ItemList):
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
-        "open_diff",
-        "enter",
-        desc="Open diff for selected file (not in visual mode)",
-        tip="Open",
-        tip_when=lambda self: not self._visual_mode,
+        "open_diff", "enter", desc="Open diff for selected file (not in visual mode)"
     )
     def open_diff(self) -> None:
         if self._tree_mode:
@@ -499,6 +502,18 @@ class StatusPanel(ItemList):
             self._clear_visual_mode()
 
     @bind_action(
+        "stage_all",
+        "A",
+        desc="Toggle staging for all listed files",
+        tip="Stage",
+    )
+    def stage_all(self) -> None:
+        if not self.files:
+            return
+        result = self._vm.stage_indices(set(self._source_map))
+        self._handle_result(result)
+
+    @bind_action(
         "commit",
         "c",
         desc="Open inline commit editor (not in visual mode)",
@@ -542,39 +557,6 @@ class StatusPanel(ItemList):
         editor.activate()
 
     @bind_action(
-        "amend",
-        "A",
-        desc="Amend last commit with staged changes (not in visual mode)",
-    )
-    def amend(self) -> None:
-        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
-        if self._visual_mode:
-            return
-        if not self._vm.staged_files:
-            show_toast(
-                "No staged changes to amend",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-
-        def on_result(confirmed: bool) -> None:
-            if not confirmed:
-                return
-            result = self._vm.amend()
-            if result.success:
-                self._vm.refresh()
-                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
-
-        self._alert_dialog.alert(
-            "Amend last commit with staged changes?",
-            on_result,
-            destructive=True,
-        )
-
-    @bind_action(
         "commit_editor",
         "C",
         desc="Open external $EDITOR for commit (not in visual mode)",
@@ -606,6 +588,41 @@ class StatusPanel(ItemList):
             self._vm.refresh()
 
     @bind_action(
+        "amend",
+        "m",
+        desc="Amend last commit with staged changes (not in visual mode)",
+        tip="Amend",
+        tip_when=lambda self: not self._visual_mode,
+    )
+    def amend(self) -> None:
+        """Confirm, then amend HEAD with staged changes (``--amend --no-edit``)."""
+        if self._visual_mode:
+            return
+        if not self._vm.staged_files:
+            show_toast(
+                "No staged changes to amend",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            result = self._vm.amend()
+            if result.success:
+                self._vm.refresh()
+                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
+            else:
+                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+        self._alert_dialog.alert(
+            "Amend last commit with staged changes?",
+            on_result,
+            destructive=True,
+        )
+
+    @bind_action(
         "discard",
         "d",
         desc="Discard changes irreversibly (confirm if modified)",
@@ -631,12 +648,19 @@ class StatusPanel(ItemList):
     @bind_action(
         "stash",
         "s",
-        desc="Stash working tree including untracked (not in visual mode)",
+        desc="Stash working tree including untracked; optional message (not in visual mode)",
         tip="Stash",
         tip_when=lambda self: not self._visual_mode,
     )
     def stash(self) -> None:
-        result = self._vm.stash_push()
+        if self._visual_mode:
+            return
+        self._stash_input.clear()
+        show_sheet(self._stash_input, height=3)
+
+    def _on_stash_submit(self, message: str) -> None:
+        dismiss_sheet()
+        result = self._vm.stash_push(message.strip())
         self._handle_result(result)
 
     @bind_action(
@@ -686,7 +710,7 @@ class StatusPanel(ItemList):
         if not self._visual_mode:
             return
         if not self._tree_mode:
-            idx = self._filter.source_index(self.curr_no)
+            idx = self._source_index(self.curr_no)
             if idx in self._selected:
                 self._selected.discard(idx)
             else:
@@ -709,16 +733,17 @@ class StatusPanel(ItemList):
     @bind_action("search", "/", desc="Filter file list by name")
     def search(self) -> None:
         """Activate the file-list search filter."""
-        self._filter.enter()
+        self.enter_search()
 
-    @bind_action("toggle_tree", "T", desc="Toggle tree / flat file view")
+    @bind_action("toggle_tree", "ctrl t", desc="Toggle tree / flat file view")
     def toggle_tree(self) -> None:
         self._toggle_tree_mode()
 
     @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
     def toggle_preview(self) -> None:
         """Show or hide the Status side diff preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
 
     @bind_action("expand_dir", "l", "right", desc="Expand directory (tree view)")
     def expand_dir(self) -> None:
@@ -729,11 +754,7 @@ class StatusPanel(ItemList):
         self._collapse_current_dir()
 
     @bind_action(
-        "open_editor",
-        "E",
-        desc="Open file in external $EDITOR (not in visual mode)",
-        tip="Edit",
-        tip_when=lambda self: not self._visual_mode,
+        "open_editor", "E", desc="Open file in external $EDITOR (not in visual mode)"
     )
     def open_editor(self) -> None:
         hit = self.file_at_cursor()
@@ -814,9 +835,7 @@ class StatusPanel(ItemList):
         start = min(self._visual_anchor, self.curr_no)
         end = max(self._visual_anchor, self.curr_no)
         if not self._tree_mode:
-            self._selected.update(
-                self._filter.source_index(i) for i in range(start, end + 1)
-            )
+            self._selected.update(self._source_index(i) for i in range(start, end + 1))
             return
         for idx in range(start, end + 1):
             row = self._row(idx)
@@ -834,9 +853,16 @@ class StatusPanel(ItemList):
             self._tree_rows = []
             self.set_content([])
 
-    def _render_surface(self, surface) -> None:
-        super()._render_surface(surface)
-        self._filter.render_bar(surface)
+    def _source_index(self, visible_idx: int) -> int:
+        """Map a visible row index to the source index in ``_all_files``."""
+        if self._tree_mode:
+            row = self._row(visible_idx)
+            if row is not None and row.source_index >= 0:
+                return row.source_index
+            return visible_idx
+        if visible_idx < len(self._source_map):
+            return self._source_map[visible_idx]
+        return visible_idx
 
     def describe_row(
         self,
@@ -879,12 +905,12 @@ class StatusPanel(ItemList):
             Segment(" ", fg=fg_primary),
         ]
 
-        is_selected = self._filter.source_index(idx) in self._selected
+        is_selected = self._source_index(idx) in self._selected
         if is_selected:
             filename_fg = THEME.fg_staged_renamed if focused else THEME.fg_dim
         else:
             filename_fg = fg_primary
-        main = [Segment(file.name, fg=filename_fg, style_flags=cursor_flags)]
+        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -960,12 +986,39 @@ class StatusPanel(ItemList):
         """Return (file, source_index) at cursor; None on dir row or no file."""
         if not self._tree_mode:
             if self.files and 0 <= self.curr_no < len(self.files):
-                return self.files[self.curr_no], self._filter.source_index(self.curr_no)
+                return self.files[self.curr_no], self._source_index(self.curr_no)
             return None
         row = self._row(self.curr_no)
         if row is None or row.kind == "dir" or row.file is None:
             return None
         return row.file, row.source_index
+
+    def preview_title(self) -> str:
+        """Return the diff preview box title for the current file selection."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return ""
+        file, _ = hit
+        label = _status_label(file)
+        return file.display_str if not label else f"{file.display_str}  {label}"
+
+    def preview_lines(self) -> list[str]:
+        """Return diff lines for the current file selection."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return []
+        _, source_idx = hit
+        return self._vm.load_diff(source_idx)
+
+    def preview_diff_type(self) -> DiffType:
+        """Return staged vs unstaged diff type for the current file."""
+        hit = self.file_at_cursor()
+        if hit is None:
+            return DiffType.UNSTAGED
+        file, _ = hit
+        if file.has_staged_change and not file.has_unstaged_change:
+            return DiffType.STAGED
+        return DiffType.UNSTAGED
 
     def _target_indices(self) -> set[int]:
         """Source indices for the current Status action.
@@ -1011,9 +1064,9 @@ class StatusPanel(ItemList):
         return hit is not None and hit[0].has_merged_conflicts
 
     def capture_key(self, key: str) -> bool:
-        if self._filter.handle_key(key):
+        if self.search_handle_key(key):
             return True
-        if self._filter.active:
+        if self.search_active:
             # While typing in the filter bar, ignore keys the filter did not
             # consume (e.g. arrow keys) so they don't trigger panel actions.
             return True
@@ -1070,7 +1123,7 @@ class StatusPanel(ItemList):
         """Open file in external editor, suspending TUI."""
         editor = os.environ.get("EDITOR", "vim")
         try:
-            exec_external([editor, file.name], cwd=self._vm.repo_path)
+            exec_external([editor, file.get_file_str()], cwd=self._vm.repo_path)
         except Exception:
             show_toast("Failed to open editor", duration=2.0, kind=FeedbackKind.ERROR)
         finally:
@@ -1089,12 +1142,12 @@ class StatusPanel(ItemList):
     def get_help_title(self) -> str:
         return "Status"
 
-    def get_inspector_data(self) -> FileInfo | None:
-        """Return inspector data for the currently selected file."""
+    def get_inspector_snapshot(self) -> FileSnapshot | None:
+        """Return a frozen snapshot for the file at the cursor."""
         hit = self.file_at_cursor()
         if hit is None:
             return None
-        return self._vm.get_inspector_data(hit[1])
+        return self._vm.get_inspector_snapshot(hit[1])
 
     def _toast_no_selection(self) -> None:
         """Show toast when no files are selected in visual mode."""

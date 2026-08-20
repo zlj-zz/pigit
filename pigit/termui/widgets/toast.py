@@ -12,11 +12,12 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
 from .. import palette
-from .._component import Component
-from .._feedback import FeedbackKind, style_for
-from .._frame import BoxFrame
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..theme import get_theme
+from ..component import Component
+from ..feedback import FeedbackKind, style_for
+from ..primitives.frame import BoxFrame
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..types import ToastPosition, OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 
@@ -138,7 +139,7 @@ class Toast(Component):
         self._line_segments = truncated
         inner_h = len(self._line_segments)
 
-        frame_fg = self._kind_fg or palette.DEFAULT_FG
+        frame_fg = self._kind_fg or get_theme().fg_primary
         if self._frame is None:
             self._frame = BoxFrame(inner_w, inner_h, fg=frame_fg)
         else:

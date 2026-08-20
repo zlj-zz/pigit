@@ -55,11 +55,13 @@ debug = false
 # (bool) Whether output log in terminal.
 output = false
 
-[tui]
+[app]
 
-# (float) Auto-refresh interval in seconds for the TUI.
-# Set to 0 to disable auto-refresh.
-auto_refresh_interval = 10.0
+# (bool) Observe git metadata and refresh panels when the repo changes.
+repo_observe = true
+
+# (bool) Also observe worktree files for Status list updates.
+observe_worktree = true
 
 # (bool) Enable word-diff by default in the diff viewer.
 word_diff = true
@@ -75,12 +77,17 @@ diff_preview_default = true
 # Ctrl+p on Branch toggles at runtime; this is the startup default only.
 log_graph_default = true
 
+# (bool) Show the Commit contribution-graph report below the list when the
+# panel is taller than 19 rows. Ctrl+r toggles at runtime; this is the
+# startup default.
+commit_report_default = true
+
 # (bool) Show the footer key-hint bar.
 show_footer = true
 
-# Keybindings: remap TUI actions. Keys are semantic strings ("c", "down",
+# Keybindings: remap app actions. Keys are semantic strings ("c", "down",
 # "ctrl c", " " for space); use an array for multiple keys. Run
 # `pigit --create-config --with-keybindings` to list all actions and defaults.
 
-[keybindings.branch]
+[app.keybindings.branch]
 # checkout = "c"  # Checkout selected branch

@@ -26,8 +26,7 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
 from pigit.termui.reactive import Signal
 
-from .app_preview_toggle import invoke_preview_toggle
-from .app_types import BranchInfo
+from .app_types import BranchSnapshot
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
@@ -41,6 +40,8 @@ class BranchPanel(ItemList):
 
     CURSOR = "\u25cf"
     keymap_namespace = "branch"
+    tab_name = "Branch"
+    tab_key = "3"
     _SCOPES = ["local", "remote", "all"]
     _SCOPE_LABELS = {"local": "Local", "remote": "Remote", "all": "All"}
 
@@ -121,9 +122,9 @@ class BranchPanel(ItemList):
     def get_help_title(self) -> str:
         return "Branch"
 
-    def get_inspector_data(self) -> BranchInfo | None:
-        """Return inspector data for the currently selected branch."""
-        return self._vm.get_inspector_data(self.curr_no)
+    def get_inspector_snapshot(self) -> BranchSnapshot | None:
+        """Return a frozen snapshot for the selected branch."""
+        return self._vm.get_inspector_snapshot(self.curr_no)
 
     def _format_branch(self, branch: Branch) -> str:
         """Format a branch for display."""
@@ -139,6 +140,17 @@ class BranchPanel(ItemList):
     @bind_action("previous", "k", "up", desc="Navigate branch list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
+
+    @bind_action("show_log", "enter", desc="Show commits (no checkout)")
+    def show_log(self) -> None:
+        """Open the Commit panel on this branch's log without checkout."""
+        if not self.branches:
+            return
+        self.emit(
+            EventType("action_requested"),
+            cmd="show-log",
+            ref=self.branches[self.curr_no].name,
+        )
 
     def _log_graph_preview_panel(self):
         """Return the registered log-graph preview, or None when unregistered."""
@@ -192,6 +204,12 @@ class BranchPanel(ItemList):
         self._handle_result(result)
         if result.success and self._branch_signal is not None:
             self._branch_signal.set(local_branch.name)
+        if result.success:
+            self.emit(
+                EventType("action_requested"),
+                cmd="follow-head",
+                ref=local_branch.name,
+            )
 
     @bind_action(
         "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
@@ -252,7 +270,6 @@ class BranchPanel(ItemList):
         "scope",
         "ctrl f",
         desc=lambda self: f"Scope ({self._SCOPE_LABELS[self._SCOPES[self._scope_idx]]})",
-        tip="Scope",
     )
     def toggle_scope(self) -> None:
         """Cycle branch scope: local -> remote -> all -> local."""
@@ -268,7 +285,8 @@ class BranchPanel(ItemList):
     @bind_action("toggle_preview", "ctrl p", desc="Toggle log graph preview")
     def toggle_preview(self) -> None:
         """Show or hide the Branch log-graph preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
 
     @bind_action("rename", "R", desc="Rename selected branch", tip="Rename")
     def rename(self) -> None:
@@ -433,6 +451,12 @@ class BranchPanel(ItemList):
             dismiss_sheet()
             if self._branch_signal is not None:
                 self._branch_signal.set(name)
+            # HEAD moved to the new branch (git checkout -b).
+            self.emit(
+                EventType("action_requested"),
+                cmd="follow-head",
+                ref=name,
+            )
 
     def _show_rename_sheet(self, branch_name: str) -> None:
         self._rename_branch_name = branch_name
@@ -452,3 +476,9 @@ class BranchPanel(ItemList):
             if self._branch_signal is not None:
                 if self._branch_signal.value == self._rename_branch_name:
                     self._branch_signal.set(new_name)
+                    # Renaming the current branch moves the HEAD ref name.
+                    self.emit(
+                        EventType("action_requested"),
+                        cmd="follow-head",
+                        ref=new_name,
+                    )

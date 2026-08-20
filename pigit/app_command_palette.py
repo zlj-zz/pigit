@@ -1,6 +1,6 @@
 """
-Module: pigit/app_palette.py
-Description: Command palette with InputLine and candidate list.
+Module: pigit/app_command_palette.py
+Description: Pigit command palette wiring with default Git command names.
 Author: Zev
 Date: 2026-04-23
 """
@@ -9,11 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import Component, keys, OverlayDispatchResult
-from pigit.termui.widgets import InputLine
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-
-from .app_theme import THEME
+from pigit.termui import widgets as termui_widgets
 
 # Default command palette commands
 DEFAULT_COMMANDS: list[str] = [
@@ -39,148 +35,25 @@ DEFAULT_COMMANDS: list[str] = [
     "rebase-continue",
     "rebase-abort",
     "rebase-skip",
+    "cherry-pick-continue",
+    "cherry-pick-abort",
+    "cherry-pick-skip",
 ]
 
 
-class CommandPalette(Component):
-    """Bottom-anchored command palette using InputLine + candidate list."""
+class CommandPalette(termui_widgets.CommandPalette):
+    """Pigit-specific command palette backed by :data:`DEFAULT_COMMANDS`."""
 
     def __init__(
         self,
         on_execute: Callable[[str], None] | None = None,
         on_dismiss: Callable[[], None] | None = None,
         commands: list[str] | None = None,
-        x: int = 1,
-        y: int = 1,
-        size: tuple[int, int] | None = None,
-        id: str | None = None,
+        **kwargs,
     ) -> None:
-        super().__init__(x, y, size, id=id)
-        self._on_execute = on_execute
-        self._on_dismiss = on_dismiss
-        self._commands = commands or list(DEFAULT_COMMANDS)
-        self._input_line = InputLine(
-            prompt="> ",
-            on_value_changed=self._on_input_changed,
-            allow_newline=False,
+        super().__init__(
+            items=list(commands) if commands is not None else list(DEFAULT_COMMANDS),
+            on_execute=on_execute,
+            on_dismiss=on_dismiss,
+            **kwargs,
         )
-        self._candidates: list[str] = []
-        self._selected = 0
-        self._active = False
-
-    @property
-    def is_active(self) -> bool:
-        return self._active
-
-    def open(self) -> None:
-        """Activate the palette."""
-        self._active = True
-        self._input_line.clear()
-        self._candidates = []
-        self._selected = 0
-
-    def close(self) -> None:
-        """Deactivate the palette."""
-        self._active = False
-        self._input_line.clear()
-        self._candidates = []
-        self._selected = 0
-        if self._on_dismiss is not None:
-            self._on_dismiss()
-
-    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
-        """Route key to palette while active on a sheet layer."""
-        self.handle_key(key)
-        return OverlayDispatchResult.HANDLED_EXPLICIT
-
-    def handle_key(self, key: str) -> bool:
-        """Process keyboard input."""
-        match key:
-            case keys.KEY_ESC:
-                self.close()
-            case keys.KEY_ENTER:
-                if self._candidates and self._selected < len(self._candidates):
-                    cmd = self._candidates[self._selected]
-                else:
-                    cmd = self._input_line.value.strip()
-                if cmd and self._on_execute:
-                    self._on_execute(cmd)
-                self.close()
-            case keys.KEY_UP:
-                if self._candidates:
-                    self._selected = max(0, self._selected - 1)
-            case keys.KEY_DOWN:
-                if self._candidates:
-                    self._selected = min(len(self._candidates) - 1, self._selected + 1)
-            case _:
-                # Delegate all editing keys to InputLine.
-                self._input_line.handle_key(key)
-        return True
-
-    def _on_input_changed(self, value: str) -> None:
-        """Callback fired by InputLine when value changes."""
-        self._update_candidates()
-
-    def _update_candidates(self) -> None:
-        """Update candidate list based on current input."""
-        value = self._input_line.value.strip().lower()
-        if not value:
-            self._candidates = []
-            self._selected = 0
-            return
-        self._candidates = [cmd for cmd in self._commands if value in cmd.lower()][:10]
-        self._selected = 0
-
-    def _render_surface(self, surface) -> None:
-        if not self._active:
-            return
-        w = surface.width
-        h = surface.height
-        if w <= 0 or h <= 0:
-            return
-
-        # Background
-        surface.fill_rect_rgb(0, 0, w, h, THEME.bg_overlay)
-
-        # Top border
-        surface.draw_text_rgb(0, 0, "─" * w, fg=THEME.fg_dim, bg=THEME.bg_overlay)
-
-        # Input line at bottom
-        input_row = h - 1
-        prompt = self._input_line.prompt
-        core = f"{prompt}{self._input_line.value}"
-        cursor_abs = len(prompt) + self._input_line.cursor
-
-        # Draw input text
-        if wcswidth(core) > w:
-            core = truncate_by_width(core, w - 1) + "…"
-        surface.draw_text_rgb(
-            input_row, 0, core, fg=THEME.fg_primary, bg=THEME.bg_overlay
-        )
-
-        # Block cursor
-        if cursor_abs < w:
-            ch = (
-                self._input_line.value[self._input_line.cursor]
-                if self._input_line.cursor < len(self._input_line.value)
-                else " "
-            )
-            surface.draw_text_rgb(
-                input_row, cursor_abs, ch, fg=THEME.bg_overlay, bg=THEME.fg_primary
-            )
-
-        # Candidate list above input
-        if self._candidates:
-            max_candidates = min(len(self._candidates), h - 2)
-            start_row = input_row - max_candidates
-            for i, candidate in enumerate(self._candidates[:max_candidates]):
-                row = start_row + i
-                if row < 0:
-                    continue
-                is_selected = i == self._selected
-                fg = THEME.fg_primary if is_selected else THEME.fg_muted
-                bg = THEME.bg_active if is_selected else THEME.bg_overlay
-                text = f"  {candidate}"
-                if wcswidth(text) > w:
-                    text = truncate_by_width(text, w - 1) + "…"
-                surface.draw_text_rgb(row, 0, text, fg=fg, bg=bg)

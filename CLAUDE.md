@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Pigit is a Python terminal UI (TUI) for Git, plus CLI short-commands and multi-repo management. It targets Python 3.10+ and is distributed on PyPI.
+Pigit is a Python terminal UI (TUI) for Git, plus CLI short-commands and multi-repo management. It targets Python 3.11+ and is distributed on PyPI.
 
 ## Common development commands
 
@@ -63,10 +63,11 @@ CI runs on `main` and `dev` branches and on version tags `v*.*.*`. It installs w
 
 - **Entry points**: `pigit/console_scripts.py` defines `pigit` / `g` entry points → `pigit/entry.py` dispatches to TUI or CLI sub-commands. `pigit/const.py` holds version metadata.
 - **CLI**: `pigit/cmdparse/` (short git command aliases), `pigit/repo/` (multi-repo management), `pigit/open/` (browser URLs), `pigit/ext/` (utility extensions).
-- **Git**: `pigit/git/git_api.py` (`GitApi`) wraps `git` CLI calls — intentionally omitted from coverage, tested through integration/QA. `pigit/git/managed_repos.py` tracks the multi-repo list; `pigit/git/cmds/` is the `pigit cmd` short-command DSL.
-- **TUI framework** (`pigit/termui/`): Custom lightweight framework. Key concepts — `Component` base class owns tree, geometry, bindings, lifecycle; `ComponentRoot` wraps body + `LayerStack` (toasts, sheets, modals) + `FocusManager` and is the single keyboard entry (overlay → app bindings/`handle_key` → focus leaf); `AppEventLoop` runs input polling, `AsyncTask` results, timers, render scheduling; `KeyboardInput` is a daemon-thread stdin reader feeding semantic keys into a queue; `ContextVar`-based runtime context exposes renderer, focus manager, overlay host; `EventBus` for panel pub/sub; `_overlay_api.py` provides `show_toast` / `show_sheet` / `exec_external`; `AsyncTask` wraps `ThreadPoolExecutor`; reusable widgets and containers (Row, Column, TabView) in `widgets/` and `containers/`.
+- **Git**: `pigit/git/api/` (`GitApi`) wraps `git` CLI calls — intentionally omitted from coverage, tested through integration/QA. `pigit/git/managed_repos.py` tracks the multi-repo list; `pigit/git/cmds/` is the `pigit cmd` short-command DSL.
+- **TUI framework** (`pigit/termui/`): Custom lightweight framework. Key concepts — `Component` base class owns tree, geometry, bindings, lifecycle; `ComponentRoot` wraps body + `LayerStack` (toasts, sheets, modals) + `FocusManager` and is the single keyboard entry (overlay → app bindings/`handle_key` → focus leaf); `AppEventLoop` runs input polling, `AsyncTask` results, timers, render scheduling; `KeyboardInput` is a daemon-thread stdin reader feeding semantic keys into a queue; `ContextVar`-based runtime context exposes renderer, focus manager, overlay host; `EventBus` for panel pub/sub; `overlay.py` provides `show_toast` / `show_sheet` / `exec_external`; `AsyncTask` wraps `ThreadPoolExecutor`; reusable widgets and containers (Row, Column, TabView) in `widgets/` and `containers/`. Drawing helpers live in `primitives/`; public module names are unprefixed (`component.py`, `root.py`, `segment.py`, …) with engines kept as `_runtime_context` / `_layer` / etc.
 - **Application**: `PigitApplication.build_root()` constructs header/body/footer, wires `TabView`, injects `ViewModel` instances. Panels at `pigit/app_*.py`; ViewModels at `pigit/viewmodels/`; `pigit/session_history.py` records undoable actions for `u` / `U`.
 - **Config**: `pigit/config_data.py` (dataclasses) and `pigit/config.py` (loading/defaults).
+- **Observation**: `pigit/observe/` — StatMtime backends, classify, queue + `RefreshCoordinator`; wired from `PigitApplication` when `repo_observe` is true.
 
 ## Style and conventions
 

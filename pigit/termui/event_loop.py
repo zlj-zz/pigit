@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
-from ._async_task import AsyncTask
-from ._bindings import BindingsList, resolve_key_handlers
-from ._component import Component
-from ._mouse import MouseEvent
+from .async_task import AsyncTask
+from .bindings import BindingsList, resolve_key_handlers
+from .component import Component
+from .mouse import MouseEvent
 from ._runtime_context import get_renderer
 from ._session import Session
 from .tty_io import terminal_size
@@ -171,7 +171,7 @@ class AppEventLoop:
 
     def render(self) -> None:
         """Render the component tree to the terminal."""
-        from ._surface import Surface
+        from .surface import Surface
 
         cols, rows = self._size
         surface = self._surface

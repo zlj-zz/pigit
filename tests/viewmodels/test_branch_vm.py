@@ -111,19 +111,66 @@ def test_delete_branch_failure(branch_vm):
     assert "not fully merged" in result.message
 
 
-def test_get_inspector_data(branch_vm):
-    branch_vm._git.get_branch_recent_commit.return_value = ("msg", "Zev")
-    branch_vm._git.get_branch_creation_time.return_value = "2 days ago"
-    info = branch_vm.get_inspector_data(1)
+def test_get_inspector_snapshot(branch_vm):
+    branch_vm._git.verify_commitish.return_value = "abc1234deadbeef"
+    branch_vm._git.get_branch_creation_time.return_value = "2026-01-01"
+    branch_vm._git.is_ancestor.return_value = True
+    branch_vm._git.get_branch_recent_commit.return_value = ("Add thing", "Zev")
+    info = branch_vm.get_inspector_snapshot(1)
     assert info is not None
-    assert info.branch.name == "feat"
-    assert info.recent_msg == "msg"
+    assert info.identity == "feat"
+    assert info.tip == "abc1234deadbeef"
+    assert info.created == "2026-01-01"
+    assert info.contained is True
+    assert info.current == "no"
+    assert info.upstream == "none"
+    assert info.ahead == "2"
+    assert info.behind == "1"
+    assert info.recent_msg == "Add thing"
     assert info.recent_author == "Zev"
-    assert info.created == "2 days ago"
 
 
-def test_get_inspector_data_invalid_index(branch_vm):
-    assert branch_vm.get_inspector_data(99) is None
+def test_get_inspector_snapshot_invalid_index(branch_vm):
+    assert branch_vm.get_inspector_snapshot(99) is None
+
+
+def test_get_inspector_snapshot_memoizes_same_selection(branch_vm):
+    branch_vm._git.verify_commitish.return_value = "abc1234deadbeef"
+    branch_vm._git.is_ancestor.return_value = True
+    branch_vm._git.get_branch_creation_time.return_value = "2026-01-01"
+    branch_vm._git.get_branch_recent_commit.return_value = ("Add thing", "Zev")
+    first = branch_vm.get_inspector_snapshot(1)
+    second = branch_vm.get_inspector_snapshot(1)
+    assert first is second
+    assert branch_vm._git.verify_commitish.call_count == 1
+    assert branch_vm._git.get_branch_recent_commit.call_count == 1
+
+
+def test_get_inspector_snapshot_dangling_ref_marks_contained_unknown(branch_vm):
+    """A ref that fails ancestry resolution must not abort the whole snapshot."""
+    from pigit.git.api import GitError
+
+    branch_vm._git.verify_commitish.side_effect = GitError("stale")
+    branch_vm._git._branch_sha.return_value = "deadbeef"
+    branch_vm._git.get_branch_creation_time.return_value = "?"
+    branch_vm._git.get_branch_recent_commit.return_value = ("?", "?")
+    info = branch_vm.get_inspector_snapshot(1)
+    assert info is not None
+    assert info.identity == "feat"
+    assert info.tip == "deadbeef"
+    assert info.contained is None
+
+
+def test_get_inspector_snapshot_is_ancestor_failure_marks_unknown(branch_vm):
+    from pigit.git.api import GitError
+
+    branch_vm._git.verify_commitish.return_value = "abc1234deadbeef"
+    branch_vm._git.is_ancestor.side_effect = GitError("merge-base failed")
+    branch_vm._git.get_branch_recent_commit.return_value = ("?", "?")
+    info = branch_vm.get_inspector_snapshot(1)
+    assert info is not None
+    assert info.tip == "abc1234deadbeef"
+    assert info.contained is None
 
 
 def test_current_branch(branch_vm):

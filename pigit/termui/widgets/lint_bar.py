@@ -10,12 +10,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pigit.termui import palette
-from pigit.termui._component import Component, bind_signals
+from pigit.termui.theme import get_theme
+from pigit.termui.component import Component, bind_signals
 from pigit.termui._runtime_context import request_render
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 
 if TYPE_CHECKING:
-    from pigit.termui._surface import Surface, _Subsurface
+    from pigit.termui.surface import Surface, _Subsurface
     from pigit.termui.widgets import InputLine
 
 
@@ -57,16 +58,13 @@ class LintBar(Component):
         segments: list[Segment] = []
 
         # Subject lint
+        theme = get_theme()
         subj_len = len(subject)
         if subj_len > 50:
-            segments.append(
-                Segment(f"Subject {subj_len}/50 ", fg=palette.DEFAULT_FG_DIM)
-            )
+            segments.append(Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim))
             segments.append(Segment("✗", fg=palette.RED))
         else:
-            segments.append(
-                Segment(f"Subject {subj_len}/50 ", fg=palette.DEFAULT_FG_DIM)
-            )
+            segments.append(Segment(f"Subject {subj_len}/50 ", fg=theme.fg_dim))
             segments.append(Segment("✓", fg=palette.GREEN))
 
         if subject.endswith("."):

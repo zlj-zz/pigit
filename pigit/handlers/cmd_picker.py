@@ -21,7 +21,7 @@ from pigit.termui import (
     palette,
 )
 from pigit.app_theme import THEME
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 from pigit.termui.containers import Column
 from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import InputLine, ItemList, StatusBar

@@ -12,7 +12,7 @@ ComponentRoot exposes the same backward-compatible interface.
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.input import TermuiInputBridge
 from pigit.termui.event_loop import AppEventLoop, ExitEventLoop
 from pigit.termui.input import InputTerminal
@@ -309,7 +309,7 @@ def test_resize_calls_renderer_clear_cache():
 
 
 def test_render_surface_path(mock_renderer):
-    from pigit.termui._surface import Surface
+    from pigit.termui.surface import Surface
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
@@ -475,7 +475,7 @@ def test_context_manager_start_stop():
 
 
 def test_loop_mouse_event_is_handled(mock_renderer):
-    from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+    from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:
@@ -502,7 +502,7 @@ def test_loop_mouse_event_is_handled(mock_renderer):
 
 
 def test_loop_mouse_event_requests_render(mock_renderer):
-    from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+    from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
     class _Hooked(AppEventLoop):
         def __init__(self) -> None:

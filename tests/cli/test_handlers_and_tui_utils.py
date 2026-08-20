@@ -384,7 +384,7 @@ def test_open_handler_no_remote(mock_ctx):
 
 
 def test_tui_utils_get_width_and_plain():
-    from pigit.termui._text import plain
+    from pigit.termui.primitives.text import plain
     from pigit.termui.wcwidth_table import get_width
 
     assert get_width(0xE) == 0

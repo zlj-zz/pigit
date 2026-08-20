@@ -11,16 +11,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from pigit.termui import EVT_SELECTION_CHANGED, Component
-from pigit.termui._ansi import parse_ansi_line
-from pigit.termui._async_task import AsyncTask, run_async
-from pigit.termui._frame import BoxFrame
-from pigit.termui._mouse import MouseEvent
-from pigit.termui._segment import Segment
+from pigit.termui import (
+    AsyncTask,
+    EVT_SELECTION_CHANGED,
+    Component,
+    MouseEvent,
+    run_async,
+    Segment,
+)
+from pigit.termui.primitives import parse_ansi_line
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets import BorderedBrowser
 
-from .app_theme import THEME
 from .git.api import GitError
 
 if TYPE_CHECKING:
@@ -46,23 +48,26 @@ class LogGraphPreview(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._vm = vm
-        self._title = _EMPTY_TITLE
-        self._frame = BoxFrame(0, 0, title=self._title, fg=THEME.fg_dim)
-        self._browser = LineTextBrowser(
-            x=2,
-            y=2,
-            content=[],
-            id="log_graph_browser",
+        self._frame_browser = BorderedBrowser(
+            title=_EMPTY_TITLE, id="log_graph_browser"
         )
-        self._styled: list[list[Segment]] = []
         self._unsubs: list[Callable[[], None]] = []
         self._load_task: AsyncTask[list[str]] | None = None
         self._requested_branch: str | None = None
 
+    @property
+    def _browser(self):
+        """Inner LineTextBrowser (test and scroll helpers)."""
+        return self._frame_browser._browser
+
+    @property
+    def _title(self) -> str:
+        return self._frame_browser._title
+
     def activate(self) -> None:
         """Activate the graph browser and subscribe to selection changes."""
         super().activate()
-        self._browser.activate()
+        self._frame_browser.activate()
         self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
     def deactivate(self) -> None:
@@ -71,7 +76,7 @@ class LogGraphPreview(Component):
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
-        self._browser.deactivate()
+        self._frame_browser.deactivate()
         super().deactivate()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
@@ -117,69 +122,59 @@ class LogGraphPreview(Component):
             return
         self.set_lines(lines, title=name)
 
-    def set_lines(self, lines: list[str], title: str) -> None:
-        """Replace graph content and reset scroll to the top.
+    def reload(self) -> None:
+        """Re-fetch the graph for the last requested branch (observe sink)."""
+        name = self._requested_branch
+        if not name:
+            return
+        if self._load_task is not None:
+            self._load_task.cancel()
+            self._load_task = None
+        self._requested_branch = name
+        self._load_task = run_async(
+            lambda: self._load_graph(name),
+            lambda lines: self._on_graph_loaded(name, lines),
+        )
 
-        ANSI in ``lines`` is parsed once into segments for drawing; the
-        inner browser keeps the stripped text for scroll metrics.
-        """
-        self._title = title
-        self._frame.title = title
-        self._styled = [parse_ansi_line(line) for line in lines]
-        self._browser._content = [
-            "".join(seg.text for seg in row) for row in self._styled
-        ]
-        self._browser._i = 0
+    def set_lines(self, lines: list[str], title: str) -> None:
+        """Replace graph content and reset scroll to the top."""
+        self._frame_browser.set_title(title)
+        styled = [parse_ansi_line(line) for line in lines]
+        width = self._size[0] if self._size else 0
+        if width > 2:
+            inner_w = width - 2
+            styled = [self._clip_segments(row, inner_w) for row in styled]
+        self._frame_browser.set_content(styled)
 
     def clear(self) -> None:
         """Clear graph content and restore the empty title."""
         self.set_lines([], title=_EMPTY_TITLE)
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Size the border frame and inner browser to ``size``."""
+        """Size the bordered browser to ``size``."""
         self._size = size
-        inner_w = max(1, size[0] - 2)
-        inner_h = max(1, size[1] - 2)
-        self._frame.set_inner_size(inner_w, inner_h)
-        self._browser.x = 2
-        self._browser.y = 2
-        self._browser.resize((inner_w, inner_h))
+        self._frame_browser.x = 1
+        self._frame_browser.y = 1
+        self._frame_browser.resize(size)
 
     def scroll_down(self, step: int = 1) -> None:
         """Scroll the graph down by ``step`` lines."""
-        self._browser.scroll_down(step)
+        self._frame_browser.scroll_down(step)
 
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the graph up by ``step`` lines."""
-        self._browser.scroll_up(step)
+        self._frame_browser.scroll_up(step)
 
     def handle_mouse(self, event: MouseEvent) -> bool:
         """Wheel-scroll the inner browser; clicks are ignored."""
-        return self._browser.handle_mouse(event)
+        return self._frame_browser.handle_mouse(event)
 
     def _render_surface(self, surface) -> None:
-        """Draw the dim border, then the parsed graph segments inside it."""
-        w = surface.width
-        h = surface.height
-        if w < 2 or h < 2:
-            return
-        inner_h = max(1, h - 2)
-        inner_w = max(1, w - 2)
-        self._frame.set_inner_size(inner_w, inner_h)
-        self._frame.title = self._title
-        self._frame.draw(surface, 0, 0)
-        start = self._browser._i
-        visible = self._styled[start : start + inner_h]
-        for idx, segs in enumerate(visible):
-            surface.draw_segments(1 + idx, 1, self._clip_segments(segs, inner_w))
+        self._frame_browser._render_surface(surface)
 
     @staticmethod
     def _clip_segments(segs: list[Segment], max_width: int) -> list[Segment]:
-        """Clip styled segments to *max_width* display columns.
-
-        The trailing segment is truncated so content never overwrites the
-        right-hand frame border.
-        """
+        """Clip styled segments to *max_width* display columns."""
         out: list[Segment] = []
         used = 0
         for seg in segs:

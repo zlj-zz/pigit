@@ -14,19 +14,19 @@ from typing import TYPE_CHECKING
 from pigit.termui import (
     Application,
     ExitEventLoop,
-    HelpPanel,
     keys,
     palette,
+    set_theme,
 )
 from pigit.app_theme import THEME
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.containers import Column
 from pigit.termui.reactive import Signal
 from pigit.termui.tty_io import terminal_size, truncate_line
-from pigit.termui.widgets import InputLine, ItemList, StatusBar
+from pigit.termui.widgets import HelpPanel, InputLine, ItemList, StatusBar
 
 if TYPE_CHECKING:
-    from pigit.termui._surface import Surface, _Subsurface
+    from pigit.termui.surface import Surface, _Subsurface
 
 PICK_EXIT_CTRL_C = 130
 
@@ -94,6 +94,7 @@ class BasePickerApp(Application):
 
     def __init__(self, *, initial_filter: str = "", alt: bool = True) -> None:
         super().__init__(input_takeover=True, alt=alt)
+        set_theme(THEME)
         self._initial_filter = initial_filter
 
     # --- Abstract methods: subclasses must override ---

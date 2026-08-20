@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import logging
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,18 +53,8 @@ class UserCommandConfig:
 
         try:
             with open(path, "rb") as f:
-                try:
-                    import tomllib
-
-                    data = tomllib.load(f)
-                except ImportError:
-                    import tomli
-
-                    data = tomli.load(f)
+                data = tomllib.load(f)
         except FileNotFoundError:
-            return cls()
-        except ImportError:
-            # No TOML support
             return cls()
         except Exception:
             # TOML parse error

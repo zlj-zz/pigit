@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from ._mouse import MouseEvent
+from .mouse import MouseEvent
 
 # A semantic input token: a keyboard string or a structured mouse event.
 SemanticEvent = str | MouseEvent
@@ -99,6 +99,8 @@ _KEY_DISPLAY: dict[str, str] = {
     KEY_CTRL_ENTER: "Ctrl+Enter",
     "ctrl f": "Ctrl+f",
     "ctrl p": "Ctrl+p",
+    "ctrl r": "Ctrl+r",
+    "ctrl t": "Ctrl+t",
 }
 
 

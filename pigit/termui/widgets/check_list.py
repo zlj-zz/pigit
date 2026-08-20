@@ -8,8 +8,9 @@ Date: 2026-05-16
 from __future__ import annotations
 
 from .. import palette
+from ..theme import get_theme
 from ..reactive import Signal
-from .._segment import Segment
+from ..segment import Segment
 from .item_list import ItemList
 
 
@@ -84,13 +85,14 @@ class CheckList(ItemList):
         list[Segment],
     ]:
         """Render compact checkbox with bg_active for selected rows."""
+        theme = get_theme()
         is_checked = idx in self._checked
         if is_checked:
             bg = palette.BG_ACTIVE
         elif is_cursor:
-            bg = palette.BG_HOVER
+            bg = theme.bg_hover
         else:
-            bg = palette.DEFAULT_BG
+            bg = theme.bg_chrome
         marker = (
             Segment(
                 self.CHECKED, fg=palette.GREEN, bg=bg, style_flags=palette.STYLE_BOLD
@@ -98,5 +100,9 @@ class CheckList(ItemList):
             if is_checked
             else Segment(self.UNCHECKED, fg=palette.DIM, bg=bg)
         )
-        text = Segment(self.content[idx], fg=palette.DEFAULT_FG, bg=bg)
-        return ([marker, Segment(" ", fg=palette.DEFAULT_FG, bg=bg)], [text], [])
+        text = Segment(self.content[idx], fg=theme.fg_primary, bg=bg)
+        return (
+            [marker, Segment(" ", fg=theme.fg_primary, bg=bg)],
+            [text],
+            [],
+        )

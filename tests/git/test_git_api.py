@@ -6,6 +6,8 @@ Author: Zev
 Date: 2026-08-13
 """
 
+import shlex
+
 import pytest
 
 from pigit.ext.executor_factory import MockExecutor
@@ -49,6 +51,56 @@ class TestCoreEdgeCases:
         with pytest.raises(GitError):
             git.get_git_dir()
 
+    def test_get_git_common_dir_absolute(self):
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-common-dir": (0, "", "/repo/.git\n"),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_git_common_dir() == "/repo/.git"
+
+    def test_get_git_common_dir_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.get_git_common_dir()
+
+    def test_get_head_tracking_with_upstream(self):
+        ex = MockExecutor(
+            responses={
+                "git symbolic-ref -q --short HEAD || git describe --tags --exact-match": (
+                    0,
+                    "",
+                    "main\n",
+                ),
+                "git rev-list --left-right --count @{upstream}...HEAD": (
+                    0,
+                    "",
+                    "2\t3\n",
+                ),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_head_tracking() == ("main", 3, 2)
+
+    def test_get_head_tracking_without_upstream(self):
+        ex = MockExecutor(
+            responses={
+                "git symbolic-ref -q --short HEAD || git describe --tags --exact-match": (
+                    0,
+                    "",
+                    "main\n",
+                ),
+                "git rev-list --left-right --count @{upstream}...HEAD": (
+                    128,
+                    "no upstream",
+                    "",
+                ),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_head_tracking() == ("main", 0, 0)
+
 
 class TestBranchEdgeCases:
     def test_checkout_failure_raises(self):
@@ -84,6 +136,17 @@ class TestStashEdgeCases:
         git = GitApi(executor=ex, path="/repo")
         git.stash_push(message="wip")
         assert ex.exec_calls[0][0] == "git stash push -u -m wip"
+
+    def test_stash_apply_quotes_ref(self):
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+        git.stash_apply("stash@{0}")
+        assert ex.exec_calls[0][0] == "git stash apply 'stash@{0}'"
+
+    def test_stash_apply_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "conflict", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.stash_apply("stash@{0}")
 
 
 class TestLogGraph:
@@ -211,3 +274,388 @@ class TestUntrackedChanges:
         )
         git = GitApi(executor=ex, path="/repo")
         assert git.has_untracked_changes() is False
+
+
+class TestSequencerDetect:
+    def _git(self, tmp_path, *names: str) -> GitApi:
+        git_dir = tmp_path / "gitdir"
+        git_dir.mkdir()
+        for name in names:
+            p = git_dir / name
+            if name in ("rebase-merge", "rebase-apply"):
+                p.mkdir()
+            else:
+                p.write_text("x\n")
+        ex = MockExecutor(
+            responses={"git rev-parse --git-dir": (0, "", str(git_dir) + "\n")}
+        )
+        return GitApi(executor=ex, path=str(tmp_path))
+
+    def test_none_when_clean(self, tmp_path):
+        assert self._git(tmp_path).sequencer_in_progress() is None
+
+    def test_merge(self, tmp_path):
+        assert self._git(tmp_path, "MERGE_HEAD").sequencer_in_progress() == "merge"
+
+    def test_rebase_merge_dir(self, tmp_path):
+        assert self._git(tmp_path, "rebase-merge").sequencer_in_progress() == "rebase"
+
+    def test_cherry_pick(self, tmp_path):
+        assert (
+            self._git(tmp_path, "CHERRY_PICK_HEAD").sequencer_in_progress()
+            == "cherry-pick"
+        )
+
+    def test_revert(self, tmp_path):
+        assert self._git(tmp_path, "REVERT_HEAD").sequencer_in_progress() == "revert"
+
+    def test_merge_wins_if_multiple(self, tmp_path):
+        assert (
+            self._git(
+                tmp_path, "MERGE_HEAD", "CHERRY_PICK_HEAD"
+            ).sequencer_in_progress()
+            == "merge"
+        )
+
+
+class TestResolveHeadSha:
+    def test_strips_newline(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git rev-parse HEAD": (0, "", "abc123def\n")}
+            ),
+            path="/repo",
+        )
+        assert git.resolve_head_sha() == "abc123def"
+
+    def test_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.resolve_head_sha()
+
+
+class TestHasUnmergedPaths:
+    def test_true_when_output(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git diff --name-only --diff-filter=U": (0, "", "foo.c\n")}
+            ),
+            path="/repo",
+        )
+        assert git.has_unmerged_paths() is True
+
+    def test_false_when_empty(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git diff --name-only --diff-filter=U": (0, "", "")}
+            ),
+            path="/repo",
+        )
+        assert git.has_unmerged_paths() is False
+
+
+def _verify_commitish_cmd(ref: str) -> str:
+    spec = shlex.quote(f"{ref}^{{commit}}")
+    return f"git rev-parse --verify --end-of-options {spec}"
+
+
+class TestVerifyCommitish:
+    def test_returns_stripped_sha(self):
+        cmd = _verify_commitish_cmd("origin/foo")
+        git = GitApi(
+            executor=MockExecutor(responses={cmd: (0, "", "deadbeefcafebabe\n")}),
+            path="/repo",
+        )
+        assert git.verify_commitish("origin/foo") == "deadbeefcafebabe"
+
+    def test_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.verify_commitish("no-such-ref")
+
+    def test_empty_output_raises(self):
+        cmd = _verify_commitish_cmd("HEAD")
+        git = GitApi(
+            executor=MockExecutor(responses={cmd: (0, "", "")}),
+            path="/repo",
+        )
+        with pytest.raises(GitError):
+            git.verify_commitish("HEAD")
+
+
+class TestIsAncestor:
+    def test_true_on_exit_zero(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git merge-base --is-ancestor abc HEAD": (0, "", "")}
+            ),
+            path="/repo",
+        )
+        assert git.is_ancestor("abc") is True
+
+    def test_false_on_exit_one(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={"git merge-base --is-ancestor abc HEAD": (1, "", "")}
+            ),
+            path="/repo",
+        )
+        assert git.is_ancestor("abc") is False
+
+    def test_other_exit_raises(self):
+        git = GitApi(executor=MockExecutor(default=(128, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.is_ancestor("abc")
+
+
+def _index_blob_cmd(rel: str) -> str:
+    return f"git rev-parse --verify --end-of-options :{shlex.quote(rel)}"
+
+
+def _diff_worktree_cmd(rel: str) -> str:
+    return f"git diff --quiet --no-ext-diff -- {shlex.quote(rel)}"
+
+
+def _head_blob_cmd(rel: str) -> str:
+    return f"git rev-parse --verify --end-of-options HEAD:{shlex.quote(rel)}"
+
+
+def _ls_unmerged_cmd(rel: str) -> str:
+    return f"git ls-files -u -- {shlex.quote(rel)}"
+
+
+def _log_path_cmd(rel: str) -> str:
+    return f"git log -1 --format=%h%x00%s%x00%aN%x00%at -- {shlex.quote(rel)}"
+
+
+def _branch_recent_cmd(name: str) -> str:
+    return f"git log {shlex.quote(name)} -1 --pretty=format:%s%x00%aN"
+
+
+def _stash_numstat_cmd(ref: str) -> str:
+    return f"git stash show --numstat {shlex.quote(ref)}"
+
+
+def _stash_meta_cmd(ref: str) -> str:
+    return f"git log -1 --format=%aN%x00%at%x00%P {shlex.quote(ref)}"
+
+
+class TestInspectorGitReads:
+    def test_compare_index_worktree_equal(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (0, "", "abc123\n"),
+                    _diff_worktree_cmd(rel): (0, "", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "equal"
+
+    def test_compare_index_worktree_differ(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (0, "", "aaa\n"),
+                    _diff_worktree_cmd(rel): (1, "", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
+
+    def test_compare_index_worktree_untracked(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", ""),
+                    _head_blob_cmd(rel): (1, "exists", ""),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "worktree"
+
+    def test_compare_index_worktree_staged_deletion(self):
+        """A file staged for deletion is tracked, not an untracked worktree file."""
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", ""),
+                    _head_blob_cmd(rel): (0, "", "abc123\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
+
+    def test_compare_index_worktree_unmerged(self):
+        """A conflicted path has no stage-0 blob but is not untracked."""
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", "100644 abc 1\ta.py\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
+
+    def test_unmerged_stages(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _ls_unmerged_cmd(rel): (
+                        0,
+                        "",
+                        "100644 abc 1\ta.py\n100644 def 2\ta.py\n100644 ghi 3\ta.py\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.unmerged_stages(rel) == [1, 2, 3]
+
+    def test_last_commit_for_path(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix layout\x00zev\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix layout",
+            "zev",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_pipe_in_subject(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix A | B\x00zev\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix A | B",
+            "zev",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_pipe_in_author(self):
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _log_path_cmd(rel): (
+                        0,
+                        "",
+                        "deadbee\x00Fix layout\x00Jane | Doe\x001700000000\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.last_commit_for_path(rel) == (
+            "deadbee",
+            "Fix layout",
+            "Jane | Doe",
+            1700000000,
+        )
+
+    def test_last_commit_for_path_empty(self):
+        git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
+        assert git.last_commit_for_path("a.py") is None
+
+    def test_get_branch_recent_commit(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _branch_recent_cmd("feat"): (0, "", "Fix layout\x00Zev\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.get_branch_recent_commit("feat") == ("Fix layout", "Zev")
+
+    def test_get_branch_recent_commit_subject_with_pipe(self):
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _branch_recent_cmd("feat"): (0, "", "Fix A | B\x00Zev\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.get_branch_recent_commit("feat") == ("Fix A | B", "Zev")
+
+    def test_get_branch_recent_commit_empty(self):
+        git = GitApi(executor=MockExecutor(default=(0, "", "")), path="/repo")
+        assert git.get_branch_recent_commit("feat") == ("?", "?")
+
+    def test_stash_numstat(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={_stash_numstat_cmd(ref): (0, "", "10\t5\ta.py\n")}
+            ),
+            path="/repo",
+        )
+        files, add, delete = git.stash_numstat(ref)
+        assert files == [("a.py", 10, 5)]
+        assert add == 10
+        assert delete == 5
+
+    def test_stash_meta(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _stash_meta_cmd(ref): (0, "", "Zev\x001700000000\x00abc def\n")
+                }
+            ),
+            path="/repo",
+        )
+        assert git.stash_meta(ref) == ("Zev", 1700000000, ["abc", "def"])
+
+    def test_stash_meta_pipe_in_author(self):
+        ref = "stash@{0}"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _stash_meta_cmd(ref): (
+                        0,
+                        "",
+                        "Jane | Doe\x001700000000\x00abc def\n",
+                    )
+                }
+            ),
+            path="/repo",
+        )
+        assert git.stash_meta(ref) == ("Jane | Doe", 1700000000, ["abc", "def"])

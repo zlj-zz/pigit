@@ -11,9 +11,9 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock, patch
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui._layer import LayerKind
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import (
     ComponentRegistry,
     RuntimeContext,
@@ -267,7 +267,7 @@ class TestComponentRegistry:
 
 class TestById:
     def test_found(self):
-        from pigit.termui._component import Component
+        from pigit.termui.component import Component
 
         class _C(Component):
             NAME = "c"
@@ -290,7 +290,7 @@ class TestById:
             by_id("nope")
 
     def test_type_mismatch_raises(self):
-        from pigit.termui._component import Component
+        from pigit.termui.component import Component
 
         class _A(Component):
             NAME = "a"

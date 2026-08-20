@@ -11,13 +11,13 @@ import logging
 from collections.abc import Callable
 
 from .. import _runtime_context, keys, palette
-from .._feedback import FeedbackKind, style_for
-from .._component import Component
-from .._frame import BoxFrame
-from .._mouse import MouseButton, MouseEvent, MouseKind
+from ..feedback import FeedbackKind, style_for
+from ..component import Component
+from ..primitives.frame import BoxFrame
+from ..mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
-from .._surface import Surface, _Subsurface
-from .._text import sanitize_for_display
+from ..surface import Surface, _Subsurface
+from ..primitives.text import sanitize_for_display
 from ..wcwidth_table import pad_by_width, truncate_by_width
 from ..types import LayerKind, OverlayDispatchResult
 
@@ -26,7 +26,7 @@ _logger = logging.getLogger(__name__)
 
 class Popup(Component):
     """
-    Modal shell around one inner :class:`~pigit.termui._component.Component`.
+    Modal shell around one inner :class:`~pigit.termui.component.Component`.
 
     :meth:`toggle` and ``exit_key`` coordinate modal session lifecycle through
     the runtime context (push/pop on the ``MODAL`` layer).

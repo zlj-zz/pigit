@@ -8,11 +8,10 @@ Date: 2026-08-13
 from __future__ import annotations
 
 import shlex
-import time
 from pathlib import Path
 from typing import cast
 
-from pigit.ext.executor import REPLY, DECODE
+from pigit.ext.executor import WAITING, REPLY, DECODE
 
 from ._base import _OpsBase
 from ._errors import GitError
@@ -72,10 +71,10 @@ class _FileioOps(_OpsBase):
         file_path.write_bytes(data)
 
     def get_file_info(self, file, path: str | None = None) -> tuple[str, str]:
-        """Get file size and last modification time as formatted strings.
+        """Get file size and permission mode as formatted strings.
 
         Returns:
-            (size_str, mtime_str) like ("12.5K", "2026-04-24 10:30").
+            (size_str, mode_str) like ("12.5K", "644"). Missing files are ("?", "?").
         """
         path = path or self.path
         if path is None:
@@ -85,10 +84,83 @@ class _FileioOps(_OpsBase):
         try:
             st = file_path.stat()
             size = self._format_size(st.st_size)
-            mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime))
-            return size, mtime
+            mode = f"{st.st_mode & 0o777:o}"
+            return size, mode
         except OSError:
             return "?", "?"
+
+    def compare_index_worktree(self, relpath: str, path: str | None = None) -> str:
+        """Return ``equal``, ``differ``, or ``worktree`` (untracked)."""
+        path = path or self.path
+        quoted = shlex.quote(relpath)
+        code, _err, _out = self.executor.exec(
+            f"git rev-parse --verify --end-of-options :{quoted}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            # No stage-0 entry: the path is untracked, staged for deletion,
+            # or in conflict. Only a genuinely untracked file is "worktree";
+            # the others still have tracked/conflict state worth reporting.
+            _ucode, _uerr, uout = self.executor.exec(
+                f"git ls-files -u -- {quoted}",
+                cwd=path,
+                flags=REPLY | DECODE,
+            )
+            if (uout or "").strip():
+                return "differ"  # unmerged
+            hcode, _herr, _hout = self.executor.exec(
+                f"git rev-parse --verify --end-of-options HEAD:{quoted}",
+                cwd=path,
+                flags=WAITING | REPLY | DECODE,
+            )
+            return "differ" if hcode == 0 else "worktree"
+        # ``git diff --quiet`` applies the clean filter (EOL normalization,
+        # ident, .gitattributes) to the worktree side, so it agrees with
+        # ``git status`` where hashing the raw worktree bytes would not.
+        code, _err, _out = self.executor.exec(
+            f"git diff --quiet --no-ext-diff -- {quoted}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        return "equal" if code == 0 else "differ"
+
+    def unmerged_stages(self, relpath: str, path: str | None = None) -> list[int]:
+        """Return unique sorted index stages for an unmerged path."""
+        path = path or self.path
+        _code, _err, out = self.executor.exec(
+            f"git ls-files -u -- {shlex.quote(relpath)}",
+            cwd=path,
+            flags=REPLY | DECODE,
+        )
+        stages: set[int] = set()
+        for line in cast(str, out or "").splitlines():
+            meta, _sep, _name = line.partition("\t")
+            parts = meta.split()
+            if len(parts) >= 3 and parts[2].isdigit():
+                stages.add(int(parts[2]))
+        return sorted(stages)
+
+    def last_commit_for_path(
+        self, relpath: str, path: str | None = None
+    ) -> tuple[str, str, str, int] | None:
+        """Return ``(short_sha, subject, author, unix_ts)`` for the last commit on *relpath*."""
+        path = path or self.path
+        _code, _err, out = self.executor.exec(
+            f"git log -1 --format=%h%x00%s%x00%aN%x00%at -- {shlex.quote(relpath)}",
+            cwd=path,
+            flags=REPLY | DECODE,
+        )
+        text = cast(str, out or "").strip()
+        if not text:
+            return None
+        # NUL separators so a "|" in the subject or author cannot split them.
+        sha, subject, author, ts_raw = text.split("\x00", 3)
+        try:
+            ts = int(ts_raw)
+        except ValueError:
+            return None
+        return sha, subject, author, ts
 
     @staticmethod
     def _format_size(size: int) -> str:

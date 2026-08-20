@@ -39,6 +39,28 @@ def byte_str2str(text: str) -> str:
         return text
 
 
+def parse_numstat(
+    text: str,
+) -> tuple[list[tuple[str, int, int]], int, int]:
+    """Parse ``git show/stash --numstat`` output into files and totals."""
+    files: list[tuple[str, int, int]] = []
+    total_add = 0
+    total_del = 0
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        add = int(parts[0]) if parts[0].isdigit() else 0
+        delete = int(parts[1]) if parts[1].isdigit() else 0
+        files.append((parts[2], add, delete))
+        total_add += add
+        total_del += delete
+    return files, total_add, total_del
+
+
 def _file_path_for_cmd(file: File | str) -> str:
     if isinstance(file, File):
         return file.get_file_str()

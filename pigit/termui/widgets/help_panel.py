@@ -10,12 +10,13 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .. import keys, palette
-from .._component import Component
-from .._frame import BoxFrame
+from ..theme import get_theme
+from ..component import Component
+from ..primitives.frame import BoxFrame
 from .._layout import Padding
-from .._mouse import MouseButton, MouseEvent, MouseKind
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..mouse import MouseButton, MouseEvent, MouseKind
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..wcwidth_table import truncate_by_width, wcswidth
 
 HelpEntry = tuple[str, str]
@@ -105,8 +106,9 @@ class HelpPanel(Component):
         self._scroll_h = 6
         self._outer_w = 42
         self.outer_row_count = 10
+        theme = get_theme()
         self._frame = BoxFrame(
-            0, 0, title="Help   esc close", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            0, 0, title="Help   esc close", fg=theme.fg_primary, bg=theme.bg_chrome
         )
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         self._line_segments: list[list[Segment]] = []
@@ -323,8 +325,11 @@ class HelpPanel(Component):
             self._on_toggle()
 
     def _render_surface(self, surface: Surface | _Subsurface) -> None:
+        theme = get_theme()
+        self._frame.fg = theme.fg_primary
+        self._frame.bg = theme.bg_chrome
         surface.fill_rect_rgb(
-            0, 0, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
+            0, 0, self._outer_w, self.outer_row_count, theme.bg_chrome
         )
         self._frame.draw(surface, 0, 0)
 
@@ -349,6 +354,4 @@ class HelpPanel(Component):
                 )
                 x += wcswidth(text)
             if x < content_col + cw:
-                surface.fill_rect_rgb(
-                    row, x, content_col + cw - x, 1, palette.DEFAULT_BG
-                )
+                surface.fill_rect_rgb(row, x, content_col + cw - x, 1, theme.bg_chrome)

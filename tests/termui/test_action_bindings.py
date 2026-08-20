@@ -114,7 +114,7 @@ def test_tip_when_hides_footer_not_help():
 
 
 def test_application_resolves_bind_action():
-    from pigit.termui._application import Application
+    from pigit.termui.application import Application
 
     class _App(Application):
         keymap_namespace = "universal"

@@ -17,9 +17,9 @@ from collections.abc import Callable
 from ._layer import LayerKind
 
 if TYPE_CHECKING:
-    from ._component import Component
-    from ._renderer import Renderer
-    from ._root import ComponentRoot
+    from .component import Component
+    from .renderer import Renderer
+    from .root import ComponentRoot
     from ._session import Session
 
 _logger = logging.getLogger(__name__)
@@ -129,13 +129,13 @@ class FocusManager:
 
     def _resolve_overlay_target(self, overlay: Component) -> Component:
         """Walk focus_child to the resolved overlay leaf."""
-        from ._component import resolve_focus_leaf
+        from .component import resolve_focus_leaf
 
         return resolve_focus_leaf(overlay)
 
     def sync_focus_to_overlay_or_leaf(self) -> None:
         """Set focus to the top open overlay, or body leaf if none."""
-        from ._component import resolve_focus_leaf
+        from .component import resolve_focus_leaf
 
         top = self._root._top_open_overlay()
         if top is not None:
@@ -151,7 +151,7 @@ class FocusManager:
 
     def sync_focus_if_overlay_closed(self, was_open: bool, now_open: bool) -> None:
         """Restore focus to body leaf when an overlay closes."""
-        from ._component import resolve_focus_leaf
+        from .component import resolve_focus_leaf
 
         if was_open and not now_open:
             self.set_focus_chain(resolve_focus_leaf(self._root.body))
@@ -163,7 +163,7 @@ class FocusManager:
 
         Use :meth:`focus_release` to restore the previous focus chain.
         """
-        from ._component import resolve_focus_leaf
+        from .component import resolve_focus_leaf
 
         if len(self._focus_stack) >= self._MAX_FOCUS_STACK:
             _logger.warning("Focus stack overflow; dropping oldest entry")

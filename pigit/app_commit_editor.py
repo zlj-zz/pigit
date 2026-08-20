@@ -10,17 +10,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.app_theme import THEME
-from pigit.termui import FeedbackKind, keys, show_toast
-from pigit.termui._component import Component
+from pigit.termui import FeedbackKind, keys, show_toast, Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.widgets import InputLine, LintBar
 from pigit.termui.types import OverlayDispatchResult
+from .app_theme import THEME
 
 if TYPE_CHECKING:
     from pigit.git.model import File
     from pigit.viewmodels.status import IStatusViewModel
-    from pigit.termui._surface import Surface, _Subsurface
+    from pigit.termui import Surface
 
 
 _HANDLED = OverlayDispatchResult.HANDLED_EXPLICIT
@@ -33,7 +32,7 @@ class _StagedHeader(Component):
         super().__init__()
         self._count = count
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         surface.fill_rect_rgb(0, 0, surface.width, surface.height, THEME.bg_base)
         text = f"Staged ({self._count})"
         surface.draw_text_rgb(0, 0, text, fg=THEME.fg_dim)
@@ -51,7 +50,7 @@ class _StagedList(Component):
         super().__init__(id=id)
         self.files = files
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         surface.fill_rect_rgb(0, 0, surface.width, surface.height, THEME.bg_base)
 
         if not self.files:
@@ -136,7 +135,7 @@ class CommitEditor(Component):
         """Return the currently focused input."""
         return self._current_input()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._root._render_surface(surface)
 
     def resize(self, size: tuple[int, int]) -> None:

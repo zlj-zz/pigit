@@ -108,9 +108,13 @@ class HeaderState:
             )
         segs.extend(
             [
-                Segment(self.repo, fg=self._theme.fg_primary),
+                Segment(self.repo, fg=self._theme.fg_header_repo),
                 Segment("  ", fg=self._theme.fg_dim),
-                Segment(self.branch, fg=self._theme.fg_branch_name),
+                Segment(
+                    self.branch,
+                    fg=self._theme.fg_header_branch,
+                    style_flags=palette.STYLE_BOLD,
+                ),
             ]
         )
         return segs
@@ -163,16 +167,11 @@ class HeaderState:
         """Expose the underlying branch signal for external writers."""
         return self._branch
 
-    def bind_to_bus(
-        self,
-        bus: EventBus,
-        tab_config: dict[type, tuple[str, str]],
-    ) -> Callable[[], None]:
+    def bind_to_bus(self, bus: EventBus) -> Callable[[], None]:
         """Subscribe to framework events and update header state.
 
         Args:
             bus: Framework event bus.
-            tab_config: Fallback mapping from panel type to (tab_name, tab_key).
 
         Returns:
             Unsubscribe callback that removes both handlers.
@@ -185,12 +184,8 @@ class HeaderState:
         def on_selection_changed(*, active: Component | None = None, **_) -> bool:
             if active is None:
                 return True
-            tab_name = getattr(active, "tab_name", None)
-            tab_key = getattr(active, "tab_key", None)
-            if tab_name is not None:
-                self.tab, self.tab_key = tab_name, tab_key or ""
-            else:
-                self.tab, self.tab_key = tab_config.get(type(active), ("", ""))
+            self.tab = active.tab_name or ""
+            self.tab_key = active.tab_key or ""
             return True
 
         unsub_mode = bus.subscribe(EventType("mode_changed"), on_mode_changed)

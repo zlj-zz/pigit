@@ -12,8 +12,9 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from pigit.termui._layer import LayerKind
+from pigit.termui import palette
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
-from pigit.termui._overlay_api import (
+from pigit.termui.overlay import (
     dismiss_sheet,
     dismiss_toast,
     exec_external,
@@ -78,8 +79,37 @@ class TestOverlayHelpers:
         set_overlay_host(host)
         child = MagicMock()
         result = show_sheet(child, height=4)
-        host.show_sheet.assert_called_once_with(child, 4, show_border=False)
+        host.show_sheet.assert_called_once_with(
+            child, 4, show_border=False, edge="bottom", bg=palette.DEFAULT_BG
+        )
         assert result is host.show_sheet.return_value
+
+    def test_show_sheet_top_edge(self):
+        from pigit.termui._runtime_context import set_overlay_host
+
+        runtime = RuntimeContext()
+        _runtime_ctx.set(runtime)
+        host = self._make_host()
+        set_overlay_host(host)
+        child = MagicMock()
+        result = show_sheet(child, height=4, edge="top")
+        host.show_sheet.assert_called_once_with(
+            child, 4, show_border=False, edge="top", bg=palette.DEFAULT_BG
+        )
+        assert result is host.show_sheet.return_value
+
+    def test_show_sheet_bg_none(self):
+        from pigit.termui._runtime_context import set_overlay_host
+
+        runtime = RuntimeContext()
+        _runtime_ctx.set(runtime)
+        host = self._make_host()
+        set_overlay_host(host)
+        child = MagicMock()
+        show_sheet(child, height=4, edge="top", bg=None)
+        host.show_sheet.assert_called_once_with(
+            child, 4, show_border=False, edge="top", bg=None
+        )
 
     def test_dismiss_sheet(self):
         from pigit.termui._runtime_context import set_overlay_host

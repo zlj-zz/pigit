@@ -20,7 +20,7 @@ from collections.abc import Callable
 from shutil import get_terminal_size
 
 from . import keys
-from ._mouse import parse_sgr_mouse
+from .mouse import parse_sgr_mouse
 
 _logger = logging.getLogger(__name__)
 

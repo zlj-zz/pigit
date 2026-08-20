@@ -13,16 +13,18 @@ from __future__ import annotations
 import datetime
 from collections import defaultdict
 
-from pigit.termui import Component, palette
+from pigit.termui import Component, MouseButton, MouseKind, palette, Surface
+from pigit.termui.primitives import (
+    build_contribution_calendar,
+    calendar_day_values,
+)
 from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
 
-_GRAPH_BG = (45, 45, 50)
-
 # GitHub-style green heatmap palette (0 → 5)
-# Level 0 is intentionally lighter than _GRAPH_BG so empty cells pop.
+# Level 0 is intentionally lighter so empty cells pop on the panel background.
 _HEATMAP_COLORS: list[tuple[int, int, int]] = [
     (100, 100, 110),  # 0 commits (muted, not dim)
     (155, 233, 168),  # level 1 (lightest green)
@@ -47,6 +49,12 @@ _EMPTY_CHAR = "·"
 _LEFT_MARGIN = 4
 _TOP_MARGIN = 1
 _PADDING_LEFT = 2
+# Graph-area spacing: a separator on the first row, two blank rows on top,
+# one blank row at the bottom.
+_TOP_PAD = 2
+_BOTTOM_PAD = 1
+# Columns scrolled per mouse-wheel tick when the combined graph is panned.
+_PAN_STEP = 5
 
 # Width of the cell character in terminal columns (1 for half-width, 2 for full-width)
 _CELL_CHAR_W = wcswidth(_CELL_CHAR)
@@ -73,7 +81,7 @@ class ContributionGraph(Component):
             rows=7,
             cols=53,
             colors=_HEATMAP_COLORS,
-            bg=_GRAPH_BG,
+            bg=None,
             cell_char=_CELL_CHAR,
             empty_char=_EMPTY_CHAR,
             margin_left=_LEFT_MARGIN,
@@ -83,7 +91,7 @@ class ContributionGraph(Component):
             plot_w=55,
             plot_h=7,
             colors=_AUTHOR_COLORS,
-            bg=_GRAPH_BG,
+            bg=None,
             title="Commits per Day",
             title_fg=THEME.fg_primary,
             label_fg=THEME.fg_muted,
@@ -99,13 +107,7 @@ class ContributionGraph(Component):
         self._line_chart_series: dict[str, list[int]] = {}
         self._line_chart_labels: list[tuple[int, str]] = []
         self._max_count = 0
-
-    def min_height(self) -> int:
-        """Return minimum rows needed to render heatmap + line chart."""
-        # heatmap: month labels + 7 days + legend = 10
-        # gap: 1
-        # line chart: title(1) + plot(7) + x-axis(2) + legend(2) = 12
-        return _TOP_MARGIN + 7 + 2 + 1 + 12
+        self._pan_x = 0
 
     def set_commits(self, commits: list) -> None:
         """Build daily commit counts and per-author counts from the given commit list."""
@@ -128,29 +130,13 @@ class ContributionGraph(Component):
     def _recompute_derived_data(self) -> None:
         """Pre-compute all derived data that depends on commit counts and current date."""
         today = datetime.date.today()
-        start = today - datetime.timedelta(days=365)
-        # Align to the previous Monday so weeks line up nicely.
-        first_monday = start - datetime.timedelta(days=start.weekday())
-        days = (today - first_monday).days + 1
-        num_weeks = (days + 6) // 7
+        calendar = build_contribution_calendar(today)
 
-        self._today = today
-        self._first_monday = first_monday
-        self._num_weeks = num_weeks
-
-        # Pre-compute heatmap values
-        self._heatmap_values = {}
-        for week in range(num_weeks):
-            for day in range(7):
-                date = first_monday + datetime.timedelta(weeks=week, days=day)
-                if date > today:
-                    continue
-                self._heatmap_values[(week, day)] = self._day_counts.get(date, 0)
-
-        # Pre-compute stats
-        self._stats = self._calc_stats(first_monday, today)
-
-        # Pre-compute line chart data
+        self._today = calendar.today
+        self._first_monday = calendar.first_monday
+        self._num_weeks = calendar.num_weeks
+        self._heatmap_values = calendar_day_values(self._day_counts, calendar)
+        self._stats = self._calc_stats(calendar.first_monday, calendar.today)
         self._recompute_line_chart_data(today)
 
     def _recompute_line_chart_data(self, today: datetime.date) -> None:
@@ -237,41 +223,34 @@ class ContributionGraph(Component):
             "max_daily": max_daily,
         }
 
-    def _draw_stats(
+    def _draw_stats_horizontal(
         self,
         surface,
         stats: dict[str, int],
-        start_col: int,
-        start_row: int,
-        max_h: int,
+        row: int,
     ) -> None:
-        """Render summary stats to the right of the heatmap."""
+        """Render summary stats spread side by side on one row."""
         items = [
             ("Commits", str(stats["total"])),
-            ("Active", f"{stats['active']} days"),
+            ("Active", f"{stats['active']}d"),
             ("Streak", str(stats["current_streak"])),
             ("Best", str(stats["longest_streak"])),
             ("Peak", str(stats["max_daily"])),
         ]
-        for i, (label, value) in enumerate(items):
-            row = start_row + i
-            if row >= max_h:
-                break
-            surface.draw_text_rgb(
-                row, start_col, label, fg=THEME.fg_muted, bg=_GRAPH_BG
-            )
-            surface.draw_text_rgb(
-                row, start_col + 10, value, fg=THEME.fg_primary, bg=_GRAPH_BG
-            )
+        x = _PADDING_LEFT
+        for label, value in items:
+            text = f"{label} {value}"
+            surface.draw_text_rgb(row, x, text, fg=THEME.fg_muted, bg=None)
+            x += wcswidth(text) + 3
 
     def _render_line_chart(
         self,
         surface,
-        start_row: int,
+        start_col: int,
         width: int,
         height: int,
     ) -> None:
-        """Render author commit line chart via StepLineChart."""
+        """Render the author commit line chart into the right region."""
         if height < self._line_chart.min_size[1]:
             return
         if not self._line_chart_series:
@@ -280,7 +259,7 @@ class ContributionGraph(Component):
         self._line_chart.set_series(
             self._line_chart_series, x_labels=self._line_chart_labels
         )
-        chart_surface = surface.subsurface(start_row, 0, width, height)
+        chart_surface = surface.subsurface(0, start_col, width, height)
         self._line_chart._render_surface(chart_surface)
 
     def render_into(self, surface) -> None:
@@ -293,7 +272,11 @@ class ContributionGraph(Component):
         if w <= 0 or h <= 0:
             return
 
-        surface.fill_rect_rgb(0, 0, w, h, _GRAPH_BG)
+        # No background fill: the graph renders on the panel's own background.
+
+        # Top separator + two blank rows; one blank row reserved at the bottom.
+        surface.draw_hline_rgb(0, 0, w, fg=THEME.fg_dim, bg=None)
+        content_h = max(1, h - _TOP_PAD - _BOTTOM_PAD)
 
         today = datetime.date.today()
         if today != self._today:
@@ -302,9 +285,25 @@ class ContributionGraph(Component):
         first_monday = self._first_monday
         num_weeks = self._num_weeks
 
-        # Tight layout: no gaps between columns.
         cell_w = _CELL_CHAR_W
         cell_h = 1
+
+        # Natural layout: the heatmap keeps its full week width and the line
+        # chart its minimum width. The chart also needs room for its x-axis
+        # labels, which extend past the plot's right edge. The report shows a
+        # pannable horizontal window of the combined content instead of
+        # compressing either graph.
+        chart_w = self._line_chart.min_size[0] + max(
+            (len(label) for _, label in self._line_chart_labels), default=0
+        )
+        gap = 2
+        heatmap_w = _PADDING_LEFT + _LEFT_MARGIN + num_weeks * cell_w
+        content_w = heatmap_w + gap + chart_w
+        max_pan = max(0, content_w - w)
+        self._pan_x = max(0, min(self._pan_x, max_pan))
+        pan = self._pan_x
+
+        canvas = Surface(content_w, content_h)
 
         # --- Month labels (row 0) ---
         last_label_end = -1
@@ -312,57 +311,76 @@ class ContributionGraph(Component):
             week_start = first_monday + datetime.timedelta(weeks=week)
             if week_start.day <= 7:  # first week of the month
                 col = _PADDING_LEFT + _LEFT_MARGIN + week * cell_w
-                if col >= last_label_end and col < w:
+                if col >= last_label_end and col < heatmap_w:
                     label = week_start.strftime("%b")
-                    surface.draw_text_rgb(
-                        0, col, label, fg=THEME.fg_muted, bg=_GRAPH_BG
-                    )
+                    canvas.draw_text_rgb(0, col, label, fg=THEME.fg_muted, bg=None)
                     last_label_end = col + wcswidth(label) + 1
 
         # --- Day-of-week labels (Mon/Wed/Fri) ---
         day_labels = {0: "Mon", 2: "Wed", 4: "Fri"}
         for day, label in day_labels.items():
             row = _TOP_MARGIN + day * cell_h
-            if row < h:
-                surface.draw_text_rgb(
-                    row, _PADDING_LEFT, label, fg=THEME.fg_muted, bg=_GRAPH_BG
+            if row < content_h:
+                canvas.draw_text_rgb(
+                    row, _PADDING_LEFT, label, fg=THEME.fg_muted, bg=None
                 )
 
-        # --- Heatmap cells ---
-        self._heatmap.set_values(
-            self._heatmap_values,
-            max_value=self._max_count,
-        )
+        # --- Heatmap cells (up to today) ---
+        # Cells after today in the final partial week are left out so they
+        # render as blank panel background instead of the empty glyph.
+        window: dict[tuple[int, int], int] = {}
+        for week in range(num_weeks):
+            for day in range(7):
+                date = first_monday + datetime.timedelta(weeks=week, days=day)
+                if date > today:
+                    continue
+                window[(week, day)] = self._heatmap_values.get((week, day), 0)
+        self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)
-        self._heatmap._render_surface(surface)
+        self._heatmap._render_surface(canvas)
 
-        # --- Legend (Less → More) ---
-        legend_row = _TOP_MARGIN + 7 * cell_h + 1
-        if legend_row < h:
+        # --- Legend (Less → More) near the bottom, stats below it ---
+        # Anchored to the content height so a taller report spreads the spacer
+        # between the cells and the legend instead of leaving a gap below the
+        # stats; the report's bottom blank row is the only empty space.
+        legend_row = content_h - 2
+        stats_row = content_h - 1
+        if legend_row < content_h:
             x = _PADDING_LEFT
-            surface.draw_text_rgb(legend_row, x, "Less", fg=THEME.fg_dim, bg=_GRAPH_BG)
+            canvas.draw_text_rgb(legend_row, x, "Less", fg=THEME.fg_dim, bg=None)
             x += 5
             for level in range(6):
                 ch = _EMPTY_CHAR if level == 0 else _CELL_CHAR
-                surface.draw_text_rgb(
+                canvas.draw_text_rgb(
                     legend_row,
                     x,
                     ch,
                     fg=_HEATMAP_COLORS[level],
-                    bg=_GRAPH_BG,
+                    bg=None,
                 )
                 x += 2
-            surface.draw_text_rgb(legend_row, x, "More", fg=THEME.fg_dim, bg=_GRAPH_BG)
+            canvas.draw_text_rgb(legend_row, x, "More", fg=THEME.fg_dim, bg=None)
 
-        # --- Stats (right of heatmap) ---
-        stats_col = _PADDING_LEFT + _LEFT_MARGIN + num_weeks * cell_w + 3
-        if stats_col + 16 < w:
-            self._draw_stats(
-                surface, self._stats, stats_col, _TOP_MARGIN, _TOP_MARGIN + 7
-            )
+        # --- Stats (one row below the legend, spread horizontally) ---
+        if stats_row < content_h:
+            self._draw_stats_horizontal(canvas, self._stats, stats_row)
 
-        # --- Author line chart ---
-        chart_start_row = _TOP_MARGIN + 7 + 2 + 1  # after heatmap + legend + gap
-        chart_h = h - chart_start_row
-        if chart_h >= 12:
-            self._render_line_chart(surface, chart_start_row, w, chart_h)
+        # --- Author line chart (right region, full content height) ---
+        chart_x = heatmap_w + gap
+        if content_h >= self._line_chart.min_size[1]:
+            self._render_line_chart(canvas, chart_x, chart_w, content_h)
+
+        # --- Show the pannable window ---
+        surface.blit(canvas, 0, pan, w, content_h, _TOP_PAD, 0)
+
+    def handle_mouse(self, event) -> bool:
+        """Horizontal wheel over the report pans the combined graph."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button is MouseButton.WHEEL_LEFT:
+            self._pan_x = max(0, self._pan_x - _PAN_STEP)
+            return True
+        if event.button is MouseButton.WHEEL_RIGHT:
+            self._pan_x += _PAN_STEP
+            return True
+        return False

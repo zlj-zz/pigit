@@ -80,20 +80,32 @@ class ShellCompletion:
         return f"_{safe_name}_completion"
 
     @staticmethod
+    def _is_command_node(prop: dict) -> bool:
+        """Return True if *prop* is a subcommand, not a positional argument."""
+        if prop.get("type") == "sub":
+            return True
+        return "args" in prop
+
+    @staticmethod
     def _promote_arg_completion(prop: dict) -> str:
-        """Return arg_completion from prop or its first positional arg."""
+        """Return this command's arg_completion, or that of its positionals.
+
+        Nested subcommands keep their own completers; they are not lifted
+        onto the parent (``cmd`` must not inherit ``b.d``'s branch list).
+        """
         arg_completion = prop.get("arg_completion", "")
         if arg_completion:
             return arg_completion
         for arg_name, arg_prop in prop.get("args", {}).items():
-            if (
-                isinstance(arg_prop, dict)
-                and not arg_name.startswith("-")
-                and arg_name != "args"
-            ):
-                arg_completion = arg_prop.get("arg_completion", "")
-                if arg_completion:
-                    return arg_completion
+            if not isinstance(arg_prop, dict):
+                continue
+            if arg_name.startswith("-") or arg_name == "args":
+                continue
+            if ShellCompletion._is_command_node(arg_prop):
+                continue
+            nested = arg_prop.get("arg_completion", "")
+            if nested:
+                return nested
         return ""
 
     def _parse(self, args: dict) -> tuple:

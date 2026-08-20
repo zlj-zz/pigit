@@ -9,10 +9,10 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui import ToastPosition
 from pigit.termui._layer import LayerKind
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult, EVT_GOTO
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
@@ -105,7 +105,7 @@ class TestComponentRoot:
 
     def test_show_toast(self):
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -120,7 +120,7 @@ class TestComponentRoot:
     def test_show_toast_with_position(self):
         """验证 show_toast 支持 position 参数"""
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -132,7 +132,7 @@ class TestComponentRoot:
     def test_show_toast_singleton_replaces_existing(self):
         """验证新 Toast 替换旧 Toast（单例模式）"""
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -148,7 +148,7 @@ class TestComponentRoot:
         assert toast1.open is False  # 旧 Toast 被关闭
 
     def test_show_sheet(self):
-        from pigit.termui._component import Component
+        from pigit.termui.component import Component
 
         class _Inner(Component):
             NAME = "inner"
@@ -167,12 +167,107 @@ class TestComponentRoot:
         assert sheet._child is inner
         assert inner.parent is sheet
 
+    def test_show_sheet_syncs_focus_without_key(self):
+        """Body dim depends on is_focus_leaf; sheet open must move focus immediately."""
+        body = DummyBody()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        assert body.is_focus_leaf is True
+
+        class _Inner(Component):
+            def _render_surface(self, surface):
+                pass
+
+        inner = _Inner()
+        root.show_sheet(inner, height=4)
+        assert inner.is_focus_leaf is True
+        assert body.is_focus_leaf is False
+        assert root._focus_manager.get_focus_leaf() is inner
+
+    def test_dismiss_sheet_restores_body_focus(self):
+        body = DummyBody()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+
+        class _Inner(Component):
+            def _render_surface(self, surface):
+                pass
+
+        root.show_sheet(_Inner(), height=4)
+        assert body.is_focus_leaf is False
+        root.dismiss_sheet()
+        assert body.is_focus_leaf is True
+        assert root._focus_manager.get_focus_leaf() is body
+        assert not root.has_overlay_open()
+
+    def test_sheet_mouse_miss_falls_through_to_body(self):
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+        hits: list[tuple[int, int]] = []
+
+        class _Body(DummyBody):
+            def handle_mouse(self, event):
+                hits.append((event.col, event.row))
+                return True
+
+            def _hit_test(self, col, row):
+                return self, col, row
+
+        class _Inner(Component):
+            NAME = "inner"
+
+            def _render_surface(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+        body = _Body()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        root.show_sheet(_Inner(), height=4, edge="top")
+        ev = MouseEvent(col=10, row=20, button=MouseButton.LEFT, kind=MouseKind.PRESS)
+        # The top-edge sheet covers rows 1..4; a click at row 20 is outside it
+        # and must reach the body instead of being swallowed.
+        assert root._handle_mouse(ev) is True
+        assert hits == [(10, 20)]
+
+    def test_sheet_mouse_hit_does_not_reach_body(self):
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+        hits: list[tuple[int, int]] = []
+
+        class _Body(DummyBody):
+            def handle_mouse(self, event):
+                hits.append((event.col, event.row))
+                return True
+
+            def _hit_test(self, col, row):
+                return self, col, row
+
+        class _Inner(Component):
+            NAME = "inner"
+
+            def _render_surface(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+        body = _Body()
+        root = ComponentRoot(body)
+        root.resize((80, 24))
+        root.show_sheet(_Inner(), height=4, edge="top")
+        ev = MouseEvent(col=10, row=2, button=MouseButton.LEFT, kind=MouseKind.PRESS)
+        assert root._handle_mouse(ev) is True
+        assert hits == []
+
     def test_toast_expires_on_render(self):
         from pigit.termui._runtime_context import (
             set_overlay_host,
             reset_overlay_host,
         )
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         set_overlay_host(root)
@@ -180,7 +275,7 @@ class TestComponentRoot:
             toast = show_toast("expiring", duration=0.0)
             assert toast is not None
             assert root._layer_stack.top(LayerKind.TOAST) is toast
-            from pigit.termui._surface import Surface
+            from pigit.termui.surface import Surface
 
             surface = Surface(10, 5)
             root._render_surface(surface)

@@ -6,6 +6,7 @@ Author: Zev
 Date: 2026-04-20
 """
 
+from pigit.termui import keys
 from pigit.termui.widgets import (
     CheckList,
     InputLine,
@@ -15,8 +16,9 @@ from pigit.termui.widgets import (
 from pigit.termui.reactive import Signal
 
 
-from pigit.termui._segment import Segment
-from pigit.termui._surface import Surface
+from pigit.termui.segment import Segment
+from pigit.termui.surface import Surface
+from pigit.termui.theme import get_theme
 
 
 class TestItemList:
@@ -62,6 +64,69 @@ class TestItemList:
         # All rows should be empty
         for row in surface._rows:
             assert all(c.char == " " for c in row)
+
+
+class TestItemListSearch:
+    def test_idle_slash_not_consumed(self):
+        """``/`` is a panel bind_action; search_handle_key must not swallow it."""
+        sel = ItemList(content=["a", "b"])
+        assert sel.search_handle_key("/") is False
+        assert sel.search_active is False
+
+    def test_enter_search_and_typing(self):
+        changes = []
+        sel = ItemList(
+            content=["alpha", "beta"], on_search_changed=lambda: changes.append(True)
+        )
+        sel.enter_search()
+        assert sel.search_active is True
+        assert sel.search_query == ""
+        assert changes == [True]
+        assert sel.search_handle_key("a") is True
+        assert sel.search_handle_key("l") is True
+        assert sel.search_query == "al"
+        assert sel.search_handle_key(keys.KEY_BACKSPACE) is True
+        assert sel.search_query == "a"
+
+    def test_esc_exits_and_clears_query(self):
+        sel = ItemList(content=["a"])
+        sel.enter_search()
+        sel.search_handle_key("x")
+        assert sel.search_handle_key(keys.KEY_ESC) is True
+        assert sel.search_active is False
+        assert sel.search_query == ""
+
+    def test_enter_deactivates_but_keeps_query(self):
+        sel = ItemList(content=["a"])
+        sel.enter_search()
+        sel.search_handle_key("a")
+        sel.search_handle_key("b")
+        assert sel.search_handle_key(keys.KEY_ENTER) is True
+        assert sel.search_active is False
+        assert sel.search_query == "ab"
+
+    def test_set_source_items_and_filter_mapping(self):
+        items = ["alpha", "beta", "other"]
+        sel = ItemList(size=(20, 5))
+        sel.set_source_items(items, text_of=lambda x: x)
+        sel.set_filter("a")
+        assert sel.content == ["alpha", "beta"]
+        assert sel.visible_to_source(0) == 0
+        assert sel.visible_to_source(1) == 1
+        sel.set_filter("al")
+        assert sel.content == ["alpha"]
+        assert sel.visible_to_source(0) == 0
+
+    def test_search_bar_drawn_when_active(self):
+        sel = ItemList(content=["item"], size=(20, 5))
+        sel.enter_search()
+        sel.search_handle_key("q")
+        surface = Surface(20, 5)
+        sel._render_surface(surface)
+        bottom = "".join(c.char for c in surface._rows[4])
+        assert "/q" in bottom
+        theme = get_theme()
+        assert surface._rows[4][0].fg == theme.fg_primary
 
 
 class TestStatusBar:
@@ -138,6 +203,51 @@ class TestInputLine:
         inp.insert("x")
         inp.handle_key("enter")
         assert called == ["x"]
+
+    def test_overlay_submit_releases_focus_without_cancel(self, mocker):
+        """Enter must end overlay editing (focus_release), not leave grab stuck."""
+        submitted: list[str] = []
+        cancelled: list[str] = []
+        fm = mocker.Mock()
+        mocker.patch(
+            "pigit.termui.widgets.input_line.get_focus_manager",
+            return_value=fm,
+        )
+        inp = InputLine(
+            overlay_mode=True,
+            visible=False,
+            on_submit=lambda v: submitted.append(v),
+            on_cancel=lambda: cancelled.append("cancel"),
+        )
+        inp._enter_overlay_mode()
+        fm.focus_grab.assert_called_once_with(inp)
+        assert inp.is_visible is True
+
+        inp.insert("foo")
+        inp.handle_key("enter")
+
+        assert submitted == ["foo"]
+        assert cancelled == []
+        assert inp.is_visible is False
+        fm.focus_release.assert_called_once()
+
+    def test_overlay_esc_cancels_and_releases_focus(self, mocker):
+        cancelled: list[str] = []
+        fm = mocker.Mock()
+        mocker.patch(
+            "pigit.termui.widgets.input_line.get_focus_manager",
+            return_value=fm,
+        )
+        inp = InputLine(
+            overlay_mode=True,
+            visible=False,
+            on_cancel=lambda: cancelled.append("cancel"),
+        )
+        inp._enter_overlay_mode()
+        inp.handle_key("esc")
+        assert cancelled == ["cancel"]
+        assert inp.is_visible is False
+        fm.focus_release.assert_called_once()
 
     def test_on_cancel(self):
         called = []
@@ -246,8 +356,8 @@ class TestInputLine:
         assert not inp._showing_candidates
 
     def test_render_with_candidates(self):
-        from pigit.termui._surface import Surface
-        from pigit.termui.palette import DEFAULT_FG, DEFAULT_FG_DIM
+        from pigit.termui.surface import Surface
+        from pigit.termui.theme import get_theme
 
         inp = InputLine(
             prompt="> ",
@@ -259,17 +369,19 @@ class TestInputLine:
         s = Surface(20, 1)
         inp._render_surface(s)
         assert s.lines()[0].startswith("> abc")
+        theme = get_theme()
         row_cells = s.rows()[0]
         # Matched part "> a" stays normal
-        assert row_cells[0].fg == DEFAULT_FG
-        assert row_cells[2].fg == DEFAULT_FG
+        assert row_cells[0].fg == theme.fg_primary
+        assert row_cells[2].fg == theme.fg_primary
         # Suffix "bc" is dim
-        assert row_cells[3].fg == DEFAULT_FG_DIM
-        assert row_cells[4].fg == DEFAULT_FG_DIM
+        assert row_cells[3].fg == theme.fg_dim
+        assert row_cells[4].fg == theme.fg_dim
 
     def test_render_draws_block_cursor(self, mocker):
-        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+        from pigit.termui.theme import get_theme
 
+        theme = get_theme()
         mock_surface = mocker.Mock()
         mock_surface.width = 10
         mock_surface.height = 1
@@ -282,12 +394,13 @@ class TestInputLine:
         assert mock_surface.draw_text_rgb.call_count == 2
         # First call: text row; second call: block cursor
         mock_surface.draw_text_rgb.assert_called_with(
-            0, 4, " ", fg=DEFAULT_BG, bg=DEFAULT_FG
+            0, 4, " ", fg=theme.bg_chrome, bg=theme.fg_primary
         )
 
     def test_render_block_cursor_in_candidate_mode(self, mocker):
-        from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG
+        from pigit.termui.theme import get_theme
 
+        theme = get_theme()
         mock_surface = mocker.Mock()
         mock_surface.width = 12
         mock_surface.height = 1
@@ -310,7 +423,7 @@ class TestInputLine:
                     3,
                     " ",
                 ),
-                {"fg": DEFAULT_BG, "bg": DEFAULT_FG},
+                {"fg": theme.bg_chrome, "bg": theme.fg_primary},
             )
             or calls[-1] == ((0, 3, " ", "DEFAULT_BG", "DEFAULT_FG"),)
             or calls[-1].args
@@ -319,7 +432,7 @@ class TestInputLine:
                 3,
                 " ",
             )
-            and calls[-1].kwargs == {"fg": DEFAULT_BG, "bg": DEFAULT_FG}
+            and calls[-1].kwargs == {"fg": theme.bg_chrome, "bg": theme.fg_primary}
         )
 
     def test_on_key_plain_text_editing(self):

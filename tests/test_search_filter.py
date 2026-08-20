@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/test_search_filter.py
-Description: Tests for SearchFilter and panel search help bindings.
+Description: Tests for ItemList search mode and panel search help bindings.
 Author: Zev
 Date: 2026-08-17
 """
@@ -10,38 +10,38 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-from pigit.app_search_filter import SearchFilter
 from pigit.termui import keys
+from pigit.termui.widgets import ItemList
 
 
 def test_inactive_slash_not_captured():
-    """``/`` is a panel bind_action; SearchFilter must not swallow it when idle."""
+    """``/`` is a panel bind_action; search_handle_key must not swallow it when idle."""
     applied = []
-    filt = SearchFilter(lambda: applied.append(True))
-    assert filt.handle_key("/") is False
-    assert filt.active is False
+    sel = ItemList(content=["a"], on_search_changed=lambda: applied.append(True))
+    assert sel.search_handle_key("/") is False
+    assert sel.search_active is False
     assert applied == []
 
 
 def test_enter_activates_search():
     applied = []
-    filt = SearchFilter(lambda: applied.append(True))
-    filt.enter()
-    assert filt.active is True
-    assert filt.query == ""
+    sel = ItemList(content=["a"], on_search_changed=lambda: applied.append(True))
+    sel.enter_search()
+    assert sel.search_active is True
+    assert sel.search_query == ""
     assert applied == [True]
 
 
 def test_active_typing_updates_query():
-    filt = SearchFilter(lambda: None)
-    filt.enter()
-    assert filt.handle_key("a") is True
-    assert filt.handle_key("b") is True
-    assert filt.query == "ab"
-    assert filt.handle_key(keys.KEY_BACKSPACE) is True
-    assert filt.query == "a"
-    assert filt.handle_key(keys.KEY_ESC) is True
-    assert filt.active is False
+    sel = ItemList(content=["a"])
+    sel.enter_search()
+    assert sel.search_handle_key("a") is True
+    assert sel.search_handle_key("b") is True
+    assert sel.search_query == "ab"
+    assert sel.search_handle_key(keys.KEY_BACKSPACE) is True
+    assert sel.search_query == "a"
+    assert sel.search_handle_key(keys.KEY_ESC) is True
+    assert sel.search_active is False
 
 
 def test_status_help_includes_search():

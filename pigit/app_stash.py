@@ -15,19 +15,21 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
+    MouseButton,
+    MouseEvent,
+    MouseKind,
     palette,
     Segment,
     show_badge,
     show_toast,
+    Surface,
 )
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
-from pigit.termui._surface import Surface, _Subsurface
 from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import AlertDialog, ItemList
 
 from .app_diff import DiffType
-from .app_preview_toggle import invoke_preview_toggle
 from .app_theme import THEME
+from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
     from pigit.git.model import Stash
@@ -39,6 +41,8 @@ class StashPanel(ItemList):
 
     CURSOR = "●"
     keymap_namespace = "stash"
+    tab_name = "Stash"
+    tab_key = "2"
     HEADER_ROWS = 1
     _SECTION_LABEL = "Stash"
     _SECTION_TAIL = "──"
@@ -59,6 +63,10 @@ class StashPanel(ItemList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
+        self._alert_dialog = AlertDialog(
+            inner_width=40,
+            on_result=lambda _: None,
+        )
         self.stashes: list[Stash] = []
 
     @property
@@ -81,7 +89,7 @@ class StashPanel(ItemList):
     def refresh(self):
         self._load_stashes()
 
-    def _draw_section_header(self, surface: Surface | _Subsurface) -> None:
+    def _draw_section_header(self, surface: Surface) -> None:
         """Draw ``──── Stash ──`` across the top row."""
         w = surface.width
         if w <= 0 or surface.height <= 0:
@@ -106,7 +114,7 @@ class StashPanel(ItemList):
         col += wcswidth(label)
         surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=THEME.fg_dim)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Section header on row 0; stash rows in the remaining viewport."""
         w = surface.width
         h = surface.height
@@ -141,6 +149,19 @@ class StashPanel(ItemList):
         )
         return ItemList.handle_mouse(self, adjusted)
 
+    def _current_stash(self) -> Stash | None:
+        """Return the stash under the cursor, or None if the list is empty."""
+        if not self.stashes:
+            return None
+        return self.stashes[self.curr_no]
+
+    def _run_on_current(self, op: Callable[[str], ActionResult]) -> None:
+        """Run a stash-ref operation on the current row."""
+        stash = self._current_stash()
+        if stash is None:
+            return
+        self._handle_result(op(stash.ref))
+
     @bind_action("next", "j", "down", desc="Navigate stash list", tip="Navigate")
     def next_item(self, step: int = 1) -> None:
         self.next(step)
@@ -153,9 +174,9 @@ class StashPanel(ItemList):
         "view_diff", "enter", desc="View diff for selected stash", tip="View diff"
     )
     def view_diff(self) -> None:
-        if not self.stashes:
+        stash = self._current_stash()
+        if stash is None:
             return
-        stash = self.stashes[self.curr_no]
         diff_lines = self._vm.load_stash_diff(stash.ref)
         self.emit(
             EVT_GOTO,
@@ -170,25 +191,57 @@ class StashPanel(ItemList):
     @bind_action("toggle_preview", "ctrl p", desc="Toggle diff preview")
     def toggle_preview(self) -> None:
         """Show or hide the Stash side diff preview on a large screen."""
-        invoke_preview_toggle(self)
+        if self._on_toggle_preview is not None:
+            self._on_toggle_preview()
+
+    def preview_title(self) -> str:
+        """Return the diff preview box title for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return ""
+        return f"{stash.msg}  {stash.ref}"
+
+    def preview_lines(self) -> list[str]:
+        """Return diff lines for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return []
+        return self._vm.load_stash_diff(stash.ref)
+
+    def preview_diff_type(self) -> DiffType:
+        """Return stash diff type for the side preview."""
+        return DiffType.STASH
 
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:
-        if not self.stashes:
-            return
-        stash = self.stashes[self.curr_no]
-        result = self._vm.stash_pop(stash.ref)
-        self._handle_result(result)
+        self._run_on_current(self._vm.stash_pop)
+
+    @bind_action(
+        "apply",
+        "a",
+        desc="Apply selected stash onto working tree (keep in list)",
+        tip="Apply",
+    )
+    def apply(self) -> None:
+        self._run_on_current(self._vm.stash_apply)
 
     @bind_action(
         "drop", "d", desc="Drop selected stash permanently (irreversible)", tip="Drop"
     )
     def drop(self) -> None:
-        if not self.stashes:
+        """Drop the selected stash after confirmation (irreversible)."""
+        stash = self._current_stash()
+        if stash is None:
             return
-        stash = self.stashes[self.curr_no]
-        result = self._vm.stash_drop(stash.ref)
-        self._handle_result(result)
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            self._handle_result(self._vm.stash_drop(stash.ref))
+
+        self._alert_dialog.alert(
+            f"Drop stash '{stash.ref}'?", on_result, destructive=True
+        )
 
     def describe_row(
         self,
@@ -225,5 +278,9 @@ class StashPanel(ItemList):
     def get_help_title(self) -> str:
         return "Stash"
 
-    def get_inspector_data(self):
-        return None
+    def get_inspector_snapshot(self):
+        """Return a frozen snapshot for the selected stash."""
+        stash = self._current_stash()
+        if stash is None:
+            return None
+        return self._vm.get_stash_snapshot(stash.ref)

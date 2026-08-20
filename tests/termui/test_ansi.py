@@ -9,7 +9,7 @@ Date: 2026-08-18
 from __future__ import annotations
 
 from pigit.termui import palette
-from pigit.termui._ansi import parse_ansi_line
+from pigit.termui.primitives.ansi import parse_ansi_line
 from pigit.termui._color import ColorAdapter, ColorMode, _ANSI_16_PALETTE
 
 

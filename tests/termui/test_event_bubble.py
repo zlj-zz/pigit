@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.containers import TabView
 from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
 

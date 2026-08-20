@@ -14,20 +14,19 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from pigit.app_theme import THEME
 from pigit.termui import (
     Segment,
     FeedbackKind,
     bind_action,
     exec_external,
-    palette,
+    render_child,
     request_render,
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, ItemList
-from pigit.termui.wcwidth_table import wcswidth
+from pigit.termui.widgets import AlertDialog, Footer, ItemList
 
+from .app_theme import THEME
 from .git.api import GitError
 
 if TYPE_CHECKING:
@@ -44,21 +43,6 @@ _ACTION_FG = {
 }
 # Actions that merge into the previous commit and therefore cannot be first.
 _MERGE_ACTIONS = ("squash", "fixup")
-
-# One-line key hint rendered at the bottom of the panel (the sheet covers the
-# global footer, so the panel owns its own hint). Styled like the footer:
-# key bright + bold, description dim.
-_HINT_PAIRS = [
-    ("p", "pick"),
-    ("s", "squash"),
-    ("f", "fixup"),
-    ("d", "drop"),
-    ("r", "reword"),
-    ("e", "edit"),
-    ("J/K", "move"),
-    ("Enter", "confirm"),
-    ("Esc", "cancel"),
-]
 
 
 @dataclass
@@ -88,12 +72,15 @@ class RebasePanel(ItemList):
         self._on_done = on_done
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
+        self._footer = Footer()
+        self._footer.set_help_provider(self.get_footer_entries)
 
     def activate(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
-        if self._git.is_rebase_in_progress() or self._git.is_merge_in_progress():
+        kind = self._git.sequencer_in_progress()
+        if kind is not None:
             show_toast(
-                "A rebase or merge is already in progress",
+                f"A {kind} is already in progress",
                 duration=2.0,
                 kind=FeedbackKind.WARNING,
             )
@@ -210,7 +197,7 @@ class RebasePanel(ItemList):
         return left, main, []
 
     def _render_surface(self, surface) -> None:
-        """Render the list, reserving the last row for the key hint."""
+        """Render the list, reserving the last row for shortcut hints."""
         height = self._size[1]
         if height <= 1:
             super()._render_surface(surface)
@@ -221,25 +208,10 @@ class RebasePanel(ItemList):
             super()._render_surface(surface)
         finally:
             self._size = (width, height)
-        self._draw_hint(surface, height - 1)
-
-    def _draw_hint(self, surface, row: int) -> None:
-        """Draw the key hints in the footer style (key bold, description dim)."""
-        x = 0
-        for key, desc in _HINT_PAIRS:
-            pair_w = wcswidth(key) + 1 + wcswidth(desc)
-            if x + pair_w > surface.width:
-                if surface.width - x > 1:
-                    surface.draw_text_rgb(row, x, "…", fg=THEME.fg_muted)
-                break
-            key_w = wcswidth(key)
-            surface.draw_text_rgb(
-                row, x, key, fg=THEME.fg_primary, style_flags=palette.STYLE_BOLD
-            )
-            x += key_w
-            rest = f" {desc}  "
-            surface.draw_text_rgb(row, x, rest, fg=THEME.fg_muted)
-            x += wcswidth(rest)
+        self._footer.x = height
+        self._footer.y = 1
+        self._footer.resize((width, 1))
+        render_child(self._footer, surface, "RebasePanel")
 
     # ── editing ──
 
