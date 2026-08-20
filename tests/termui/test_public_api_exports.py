@@ -63,7 +63,7 @@ REQUIRED_ROOT: frozenset[str] = frozenset(
     }
 )
 
-# Must leave root by end of Phase 1 (drawing) / Phase 2 (widgets) / Phase 3 (syntax/renderer).
+# Must leave root by end of Phase 1 (primitives) / Phase 2 (widgets) / Phase 3 (syntax/renderer).
 FORBIDDEN_ON_ROOT: frozenset[str] = frozenset(
     {
         "Toast",
@@ -95,3 +95,22 @@ def test_required_root_exports_present():
 def test_forbidden_root_exports_still_documented():
     """Phase 0: constant must stay disjoint from REQUIRED_ROOT."""
     assert REQUIRED_ROOT.isdisjoint(FORBIDDEN_ON_ROOT)
+
+
+PRIMITIVES_LEFT_ROOT = frozenset(
+    {
+        "plain",
+        "BoxFrame",
+        "parse_ansi_line",
+        "tokenize_with_positions",
+        "merge_ranges",
+    }
+)
+
+
+def test_primitives_symbols_not_on_root():
+    from pigit import termui
+
+    for name in sorted(PRIMITIVES_LEFT_ROOT):
+        assert name not in termui.__all__
+        assert not hasattr(termui, name)

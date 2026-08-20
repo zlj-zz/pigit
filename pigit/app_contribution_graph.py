@@ -14,11 +14,11 @@ import datetime
 from collections import defaultdict
 
 from pigit.termui import Component, MouseButton, MouseKind, palette, Surface
-from pigit.termui.widgets import HeatmapGrid, StepLineChart
-from pigit.termui.widgets.calendar_layout import (
+from pigit.termui.primitives import (
     build_contribution_calendar,
     calendar_day_values,
 )
+from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME

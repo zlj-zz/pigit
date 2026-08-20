@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 
-from pigit.termui.widgets.calendar_layout import (
+from pigit.termui.primitives import (
     build_contribution_calendar,
     calendar_day_values,
 )

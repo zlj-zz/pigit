@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/widgets/gutter.py
+Module: pigit/termui/primitives/gutter.py
 Description: Minimal line-number gutter formatting for diff viewers.
 Author: Zev
 Date: 2026-08-20

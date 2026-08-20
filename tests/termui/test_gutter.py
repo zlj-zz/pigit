@@ -7,7 +7,7 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
-from pigit.termui.widgets.gutter import format_line_number
+from pigit.termui.primitives import format_line_number
 
 
 def test_format_line_number_right_justifies_int():

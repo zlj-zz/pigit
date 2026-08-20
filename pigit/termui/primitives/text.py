@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_text.py
+Module: pigit/termui/primitives/text.py
 Description: Text sanitization — ANSI stripping and control-character filtering.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations

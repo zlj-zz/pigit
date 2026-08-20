@@ -9,16 +9,10 @@ Usage:
 from __future__ import annotations
 
 from .bordered_browser import BorderedBrowser
-from .calendar_layout import (
-    ContributionCalendar,
-    build_contribution_calendar,
-    calendar_day_values,
-)
 from .check_list import CheckList
 from .command_palette import CommandPalette
 from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
-from .gutter import format_line_number
 from .header import Header
 from .help_panel import HelpEntry, HelpPanel
 from .input_line import InputLine
@@ -32,15 +26,11 @@ from .toast import Toast
 
 __all__ = [
     "BorderedBrowser",
-    "ContributionCalendar",
-    "build_contribution_calendar",
-    "calendar_day_values",
     "AlertDialog",
     "AlertDialogBody",
     "CheckList",
     "CommandPalette",
     "Footer",
-    "format_line_number",
     "HeatmapGrid",
     "Header",
     "HelpEntry",

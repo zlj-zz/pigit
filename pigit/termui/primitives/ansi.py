@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/termui/_ansi.py
+Module: pigit/termui/primitives/ansi.py
 Description: Parse ANSI SGR sequences into styled Segments for Surface drawing.
 Author: Zev
-Date: 2026-08-18
+Date: 2026-08-20
 """
 
 from __future__ import annotations
 
 import re
 
-from . import palette
-from ._color import _ANSI_16_PALETTE, xterm256_to_rgb
-from ._segment import Segment
+from .. import palette
+from .._color import _ANSI_16_PALETTE, xterm256_to_rgb
+from .._segment import Segment
 
 _OSC_RE = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 _CSI_FINAL_MIN = 0x40

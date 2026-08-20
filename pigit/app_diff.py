@@ -26,16 +26,18 @@ from pigit.termui import (
     Component,
     SyntaxTokenizer,
     bind_action,
-    merge_ranges,
     palette,
-    plain,
     request_render,
     show_badge,
     show_toast,
+)
+from pigit.termui.primitives import (
+    format_line_number,
+    merge_ranges,
+    plain,
     tokenize_with_positions,
 )
 from pigit.termui.widgets import LineTextBrowser
-from pigit.termui.widgets.gutter import format_line_number
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME

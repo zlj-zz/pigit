@@ -13,11 +13,11 @@ from collections.abc import Callable
 from .. import _runtime_context, keys, palette
 from .._feedback import FeedbackKind, style_for
 from .._component import Component
-from .._frame import BoxFrame
+from ..primitives.frame import BoxFrame
 from .._mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
 from .._surface import Surface, _Subsurface
-from .._text import sanitize_for_display
+from ..primitives.text import sanitize_for_display
 from ..wcwidth_table import pad_by_width, truncate_by_width
 from ..types import LayerKind, OverlayDispatchResult
 

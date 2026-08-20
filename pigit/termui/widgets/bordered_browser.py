@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .._component import Component, render_child
-from .._frame import BoxFrame
+from ..primitives.frame import BoxFrame
 from .._mouse import MouseEvent
 from .._segment import Segment
 from ..theme import get_theme

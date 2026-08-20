@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pigit.termui._surface import Surface
-from pigit.termui._frame import BoxFrame
+from pigit.termui.primitives.frame import BoxFrame
 
 
 class TestBoxFrame:

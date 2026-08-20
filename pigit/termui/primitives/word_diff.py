@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_word_diff.py
+Module: pigit/termui/primitives/word_diff.py
 Description: Word-level diff tokenization and range merging for highlight segments.
 Author: Zev
 Date: 2026-08-20

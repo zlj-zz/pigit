@@ -1,18 +1,18 @@
 """
-Module: pigit/termui/_frame.py
+Module: pigit/termui/primitives/frame.py
 Description: Reusable bordered frame layout helpers for declarative terminal drawing.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from . import palette
+from .. import palette
 
 if TYPE_CHECKING:
-    from ._surface import Surface, _Subsurface
+    from .._surface import Surface, _Subsurface
 
 
 class BoxFrame:

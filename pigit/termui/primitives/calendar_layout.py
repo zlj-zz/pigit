@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/widgets/calendar_layout.py
+Module: pigit/termui/primitives/calendar_layout.py
 Description: Week-grid layout helpers for contribution heatmaps.
 Author: Zev
 Date: 2026-08-20

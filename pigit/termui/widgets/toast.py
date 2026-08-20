@@ -15,7 +15,7 @@ from .. import palette
 from ..theme import get_theme
 from .._component import Component
 from .._feedback import FeedbackKind, style_for
-from .._frame import BoxFrame
+from ..primitives.frame import BoxFrame
 from .._segment import Segment
 from .._surface import Surface, _Subsurface
 from ..types import ToastPosition, OverlayDispatchResult

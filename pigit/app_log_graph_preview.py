@@ -16,10 +16,10 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     Component,
     MouseEvent,
-    parse_ansi_line,
     run_async,
     Segment,
 )
+from pigit.termui.primitives import parse_ansi_line
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui.widgets import BorderedBrowser
 

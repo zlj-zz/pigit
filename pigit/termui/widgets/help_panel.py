@@ -12,7 +12,7 @@ from collections.abc import Callable
 from .. import keys, palette
 from ..theme import get_theme
 from .._component import Component
-from .._frame import BoxFrame
+from ..primitives.frame import BoxFrame
 from .._layout import Padding
 from .._mouse import MouseButton, MouseEvent, MouseKind
 from .._segment import Segment
