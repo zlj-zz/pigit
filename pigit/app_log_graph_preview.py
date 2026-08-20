@@ -122,6 +122,20 @@ class LogGraphPreview(Component):
             return
         self.set_lines(lines, title=name)
 
+    def reload(self) -> None:
+        """Re-fetch the graph for the last requested branch (observe sink)."""
+        name = self._requested_branch
+        if not name:
+            return
+        if self._load_task is not None:
+            self._load_task.cancel()
+            self._load_task = None
+        self._requested_branch = name
+        self._load_task = run_async(
+            lambda: self._load_graph(name),
+            lambda lines: self._on_graph_loaded(name, lines),
+        )
+
     def set_lines(self, lines: list[str], title: str) -> None:
         """Replace graph content and reset scroll to the top."""
         self._frame_browser.set_title(title)

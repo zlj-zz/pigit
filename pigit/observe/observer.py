@@ -34,7 +34,9 @@ class RepoObserver:
         maxsize: int = DEFAULT_QUEUE_MAXSIZE,
     ) -> None:
         self._backend = backend
-        self._queue = out_queue if out_queue is not None else queue.Queue(maxsize=maxsize)
+        self._queue = (
+            out_queue if out_queue is not None else queue.Queue(maxsize=maxsize)
+        )
         self._ctx_provider = ctx_provider
 
     @property
@@ -45,6 +47,14 @@ class RepoObserver:
     def start(self, roots: list[WatchRoot]) -> None:
         """Start the underlying backend with ``roots``."""
         self._backend.start(roots)
+
+    def update_roots(self, roots: list[WatchRoot]) -> None:
+        """Update backend roots without a full stop (keeps mtime baselines)."""
+        update = getattr(self._backend, "update_roots", None)
+        if callable(update):
+            update(roots)
+        else:
+            self._backend.start(roots)
 
     def stop(self) -> None:
         """Stop the underlying backend."""

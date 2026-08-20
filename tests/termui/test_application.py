@@ -14,6 +14,7 @@ from pigit.termui import bind_action
 from pigit.termui.application import Application
 from pigit.termui.component import Component
 from pigit.termui.event_loop import ExitEventLoop
+from pigit.termui.root import ComponentRoot
 
 
 class DummyRoot(Component):
@@ -83,6 +84,28 @@ class TestApplication:
             MockLoop.return_value = MagicMock()
             app.run()
             assert app._root is None
+
+    def test_on_exit_called_before_destroy(self):
+        """on_exit runs in finally before root.destroy()."""
+        order: list[str] = []
+
+        class Hooked(DummyApp):
+            def on_exit(self):
+                order.append("on_exit")
+                assert self._root is not None
+
+        app = Hooked()
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
+            with patch.object(
+                ComponentRoot,
+                "destroy",
+                autospec=True,
+                side_effect=lambda self: order.append("destroy"),
+            ):
+                app.run()
+        assert order == ["on_exit", "destroy"]
+        assert app._root is None
 
     def test_get_help_groups_default_global(self):
         class _App(DummyApp):

@@ -11,6 +11,8 @@ import json
 import logging
 import os
 from collections.abc import Callable
+from dataclasses import replace
+from pathlib import Path
 
 from pigit.termui import (
     EventType,
@@ -59,11 +61,27 @@ from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
+from .observe import (
+    ChangeBatch,
+    ChangeKind,
+    ObserveContext,
+    RefreshCoordinator,
+    RepoObserver,
+    StatMtimeBackend,
+    WatchRoot,
+    should_defer_repo_refresh,
+)
+from .observe.denylist import rel_path_is_denied
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
 from .config_data import AppConfig
+
+# FS mtime poll cadence for StatMtimeBackend.
+_OBSERVE_POLL_INTERVAL_S = 1.0
+# UI queue drain / debounce flush retry cadence.
+_OBSERVE_DRAIN_INTERVAL_S = 0.15
 
 
 class PigitApplication(Application):
@@ -98,9 +116,15 @@ class PigitApplication(Application):
         )
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
-        # Auto-refresh
         self._config = config
-        self._refresh_timer_id: int | None = None
+        # Repo observation (change-driven refresh)
+        self._observer: RepoObserver | None = None
+        self._coordinator: RefreshCoordinator | None = None
+        self._observe_ctx: ObserveContext | None = None
+        self._observe_poll_id: int | None = None
+        self._observe_drain_id: int | None = None
+        self._observe_status_unsub: Callable[[], None] | None = None
+        self._header_reload_token: object | None = None
         # ViewModels (assigned in build_root, same lifetime as panels)
         self._status_vm: StatusViewModel
         self._commit_vm: CommitViewModel
@@ -142,6 +166,7 @@ class PigitApplication(Application):
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
+            on_preview_target=self._set_observe_preview_target,
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
@@ -234,6 +259,7 @@ class PigitApplication(Application):
             cols, _ = terminal_size()
             self._apply_body_widths(cols)
         panel.emit(EVT_SELECTION_CHANGED)
+        self._resync_observe_roots()
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
@@ -277,6 +303,7 @@ class PigitApplication(Application):
             )
             self._header_state.repo = self._repo_name
             self._header_state.branch = head
+            self._schedule_reload_header()
         except Exception:
             logging.warning("Failed to initialize repo info", exc_info=True)
             show_toast(
@@ -294,19 +321,181 @@ class PigitApplication(Application):
         )
         self._try_restore_merge_state()
 
-        # Register auto-refresh timer
-        if self._loop is not None and self._config.auto_refresh_interval > 0:
-            if self._refresh_timer_id is not None:
-                self._loop.remove_interval(self._refresh_timer_id)
-            self._refresh_timer_id = self._loop.add_interval(
-                self._config.auto_refresh_interval,
-                self._refresh_active_panel,
-            )
+        if self._config.repo_observe:
+            self._start_repo_observe()
 
         # Initial sync: all components are activated now, so subscribers receive
         # the event and update header/footer/preview.
         if self._tab_view.active is not None:
             self._on_tab_switch(self._tab_view.active)
+
+    def on_exit(self) -> None:
+        """Stop repo observation timers and backend before root destroy."""
+        self._stop_repo_observe()
+
+    def _start_repo_observe(self) -> None:
+        """Start StatMtime observation of git metadata (and Status worktree)."""
+        try:
+            git_dir = self._git.get_git_dir()
+            common_dir = self._git.get_git_common_dir()
+        except GitError:
+            logging.warning(
+                "Repo observe disabled: cannot resolve git dirs", exc_info=True
+            )
+            return
+        repo_root = self._repo_path or ""
+        self._observe_ctx = ObserveContext(
+            repo_root=repo_root,
+            git_dir=git_dir,
+            common_dir=common_dir,
+        )
+        backend = StatMtimeBackend()
+        observer = RepoObserver(backend=backend)
+        self._observer = observer
+        self._coordinator = RefreshCoordinator(
+            observer.queue,
+            defer_fn=lambda: should_defer_repo_refresh(self._root),
+            on_batch=self._on_observe_batch,
+            ctx_provider=self._observe_context,
+        )
+        self._resync_observe_roots(reset=True)
+        if self._observe_status_unsub is None:
+            self._observe_status_unsub = self._status_vm.items.subscribe(
+                self._on_status_items_for_observe
+            )
+        if self._loop is not None:
+            self._observe_poll_id = self._loop.add_interval(
+                _OBSERVE_POLL_INTERVAL_S,
+                observer.poll_into_queue,
+            )
+            self._observe_drain_id = self._loop.add_interval(
+                _OBSERVE_DRAIN_INTERVAL_S,
+                self._coordinator.drain,
+            )
+
+    def _on_status_items_for_observe(self, _items: list) -> None:
+        """Refresh worktree path set when the Status list changes."""
+        self._resync_observe_roots()
+
+    def _build_observe_roots(self) -> list[WatchRoot]:
+        """Build watch roots; attach worktree only when Status is focused."""
+        ctx = self._observe_ctx
+        if ctx is None:
+            return []
+        roots: list[WatchRoot] = [
+            WatchRoot(kind="git_dir", path=ctx.git_dir),
+            WatchRoot(kind="common_dir", path=ctx.common_dir),
+        ]
+        if not self._config.observe_worktree:
+            return roots
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if not isinstance(active, StatusPanel):
+            return roots
+        roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
+        repo = Path(ctx.repo_root)
+        for file_item in self._status_vm.items.value:
+            rel = file_item.name
+            if not rel or rel_path_is_denied(rel):
+                continue
+            roots.append(WatchRoot(kind="file", path=str(repo / rel)))
+        return roots
+
+    def _resync_observe_roots(self, *, reset: bool = False) -> None:
+        """Start or update backend roots for the current tab / status files."""
+        if self._observer is None or self._observe_ctx is None:
+            return
+        roots = self._build_observe_roots()
+        if reset:
+            self._observer.start(roots)
+        else:
+            self._observer.update_roots(roots)
+
+    def _stop_repo_observe(self) -> None:
+        """Remove observe intervals and stop the backend."""
+        if self._observe_status_unsub is not None:
+            self._observe_status_unsub()
+            self._observe_status_unsub = None
+        if self._loop is not None:
+            if self._observe_poll_id is not None:
+                self._loop.remove_interval(self._observe_poll_id)
+                self._observe_poll_id = None
+            if self._observe_drain_id is not None:
+                self._loop.remove_interval(self._observe_drain_id)
+                self._observe_drain_id = None
+        if self._observer is not None:
+            self._observer.stop()
+            self._observer = None
+        self._coordinator = None
+
+    def _observe_context(self) -> ObserveContext:
+        """Return the current ObserveContext (must be started)."""
+        if self._observe_ctx is None:
+            raise RuntimeError("ObserveContext not initialized")
+        return self._observe_ctx
+
+    def _set_observe_preview_target(self, rel: str | None) -> None:
+        """Update ObserveContext.preview_target for PREVIEW_FILE classification."""
+        if self._observe_ctx is None:
+            return
+        self._observe_ctx = replace(self._observe_ctx, preview_target=rel)
+
+    def _on_observe_batch(self, batch: ChangeBatch) -> None:
+        """Apply a debounced ChangeBatch to header and the active panel."""
+        kinds = batch.kinds
+        if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
+            self._schedule_reload_header()
+
+        active = resolve_presentation_leaf(self._tab_view.active)
+        if active is None:
+            return
+
+        if isinstance(active, StatusPanel):
+            if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
+                self._refresh_list_panel(active)
+            if ChangeKind.PREVIEW_FILE in kinds:
+                if (
+                    self._diff_preview_wanted
+                    and self._preview_panel is not None
+                    and self._is_large_screen
+                ):
+                    self._preview_panel.reload()
+            return
+
+        if isinstance(active, BranchPanel):
+            if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
+                self._refresh_list_panel(active)
+                if (
+                    self._log_graph_wanted
+                    and self._log_graph_preview is not None
+                    and self._is_large_screen
+                ):
+                    self._log_graph_preview.reload()
+            return
+
+        if isinstance(active, CommitPanel):
+            # Refresh keeps the pinned log_ref; never silently unpin.
+            if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
+                self._refresh_list_panel(active)
+            return
+
+        if isinstance(active, StashPanel):
+            if ChangeKind.STASH in kinds or ChangeKind.REFS in kinds:
+                self._refresh_list_panel(active)
+
+    def _schedule_reload_header(self) -> None:
+        """Async-load branch + ahead/behind into HeaderState with stale-guard."""
+        token = object()
+        self._header_reload_token = token
+
+        def apply(result: tuple[str, int, int]) -> None:
+            if token is not self._header_reload_token:
+                return
+            branch, ahead, behind = result
+            self._header_state.branch = branch
+            self._header_state.ahead = ahead
+            self._header_state.behind = behind
+
+        run_async(self._git.get_head_tracking, apply)
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""
@@ -590,26 +779,30 @@ class PigitApplication(Application):
             if self._tab_view.active is not None:
                 self._tab_view.active.emit(EVT_SELECTION_CHANGED)
 
-    def _refresh_active_panel(self) -> None:
-        """Auto-refresh callback: refresh the currently active panel's VM.
+    def _refresh_list_panel(self, panel: Component) -> None:
+        """Refresh a list panel via an overridden ``refresh`` or its ViewModel."""
+        from pigit.termui.component import Component as ComponentBase
 
-        Skips when an overlay is open (user is in modal/sheet).
-        Does NOT call request_render(); vm.refresh() uses AsyncTask,
-        and Signal subscribers trigger rendering when data arrives.
+        if type(panel).refresh is not ComponentBase.refresh:
+            panel.refresh()
+            return
+        vm = getattr(panel, "_vm", None)
+        if vm is not None and hasattr(vm, "refresh"):
+            vm.refresh()
+
+    def _refresh_active_panel(self) -> None:
+        """Imperative refresh of the currently active panel.
+
+        Used after actions (rebase/merge done, etc.). Skips when a MODAL or
+        SHEET is open (toasts do not block). Does not call ``request_render``;
+        ViewModel refresh uses AsyncTask and Signal subscribers render.
         """
         active = resolve_presentation_leaf(self._tab_view.active)
         if active is None:
             return
-        # Skip refresh when an overlay is open
-        if self._root is not None and self._root.has_overlay_open():
+        if self._root is not None and should_defer_repo_refresh(self._root):
             return
-        # Prefer panel-level refresh (e.g. StashPanel.refresh reloads stashes)
-        if hasattr(active, "refresh") and callable(getattr(active, "refresh")):
-            active.refresh()
-        else:
-            vm = getattr(active, "_vm", None)
-            if vm is not None and hasattr(vm, "refresh"):
-                vm.refresh()
+        self._refresh_list_panel(active)
 
     def _on_rebase_request(self, target: str) -> None:
         """Open the interactive-rebase todo panel for ``target``."""

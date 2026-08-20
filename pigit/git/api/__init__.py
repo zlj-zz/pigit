@@ -85,6 +85,12 @@ class GitApi:
     def get_git_dir(self, path=None):
         return self._core.get_git_dir(path)
 
+    def get_git_common_dir(self, path=None):
+        return self._core.get_git_common_dir(path)
+
+    def get_head_tracking(self, path=None):
+        return self._core.get_head_tracking(path)
+
     def verify_commitish(self, ref, path=None):
         return self._core.verify_commitish(ref, path)
 

@@ -51,6 +51,56 @@ class TestCoreEdgeCases:
         with pytest.raises(GitError):
             git.get_git_dir()
 
+    def test_get_git_common_dir_absolute(self):
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --git-common-dir": (0, "", "/repo/.git\n"),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_git_common_dir() == "/repo/.git"
+
+    def test_get_git_common_dir_failure_raises(self):
+        git = GitApi(executor=MockExecutor(default=(1, "fatal", "")), path="/repo")
+        with pytest.raises(GitError):
+            git.get_git_common_dir()
+
+    def test_get_head_tracking_with_upstream(self):
+        ex = MockExecutor(
+            responses={
+                "git symbolic-ref -q --short HEAD || git describe --tags --exact-match": (
+                    0,
+                    "",
+                    "main\n",
+                ),
+                "git rev-list --left-right --count @{upstream}...HEAD": (
+                    0,
+                    "",
+                    "2\t3\n",
+                ),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_head_tracking() == ("main", 3, 2)
+
+    def test_get_head_tracking_without_upstream(self):
+        ex = MockExecutor(
+            responses={
+                "git symbolic-ref -q --short HEAD || git describe --tags --exact-match": (
+                    0,
+                    "",
+                    "main\n",
+                ),
+                "git rev-list --left-right --count @{upstream}...HEAD": (
+                    128,
+                    "no upstream",
+                    "",
+                ),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_head_tracking() == ("main", 0, 0)
+
 
 class TestBranchEdgeCases:
     def test_checkout_failure_raises(self):

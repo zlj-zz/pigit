@@ -102,9 +102,11 @@ class Config(metaclass=Singleton):
 
         [app]
 
-        # (float) Auto-refresh interval in seconds for the app.
-        # Set to 0 to disable auto-refresh.
-        auto_refresh_interval = {app_auto_refresh_interval}
+        # (bool) Observe git metadata and refresh panels when the repo changes.
+        repo_observe = {app_repo_observe}
+
+        # (bool) Also observe worktree files for Status list updates.
+        observe_worktree = {app_observe_worktree}
 
         # (bool) Enable word-diff by default in the diff viewer.
         word_diff = {app_word_diff}
@@ -295,8 +297,14 @@ class Config(metaclass=Singleton):
             self._warnings.append(
                 'Config key "app.keybindings" should be a table, using defaults.'
             )
+        if "auto_refresh_interval" in app_raw:
+            self._warnings.append(
+                'Config key "app.auto_refresh_interval" is ignored; '
+                "use app.repo_observe instead."
+            )
         app = AppConfig(
-            auto_refresh_interval=app_raw.get("auto_refresh_interval", 10.0),
+            repo_observe=app_raw.get("repo_observe", True),
+            observe_worktree=app_raw.get("observe_worktree", True),
             word_diff=app_raw.get("word_diff", True),
             status_view=status_view,
             diff_preview_default=app_raw.get("diff_preview_default", True),
@@ -370,7 +378,8 @@ class Config(metaclass=Singleton):
                         repo_auto_append=str(data.repo.auto_append).lower(),
                         log_debug=str(data.log.debug).lower(),
                         log_output=str(data.log.output).lower(),
-                        app_auto_refresh_interval=data.app.auto_refresh_interval,
+                        app_repo_observe=str(data.app.repo_observe).lower(),
+                        app_observe_worktree=str(data.app.observe_worktree).lower(),
                         app_word_diff=str(data.app.word_diff).lower(),
                         app_status_view=data.app.status_view,
                         app_diff_preview_default=str(

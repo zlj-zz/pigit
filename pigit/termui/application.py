@@ -90,6 +90,13 @@ class Application:
     def after_start(self) -> None:
         """Lifecycle hook invoked after the loop is ready."""
 
+    def on_exit(self) -> None:
+        """Lifecycle hook invoked before ``root.destroy()`` on teardown.
+
+        Override to stop observers, cancel timers, or release app resources.
+        The root is still available as ``self._root`` when this runs.
+        """
+
     def resize(self, size: tuple[int, int]) -> None:
         """Adjust layout before the loop resizes the component tree.
 
@@ -165,10 +172,14 @@ class Application:
             root.activate()
             self._loop.run()
         finally:
-            if self._root is not None:
-                self._root.destroy()
-                self._root = None
-            _runtime_ctx.reset(token)
+            try:
+                if self._root is not None:
+                    self.on_exit()
+            finally:
+                if self._root is not None:
+                    self._root.destroy()
+                    self._root = None
+                _runtime_ctx.reset(token)
 
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.

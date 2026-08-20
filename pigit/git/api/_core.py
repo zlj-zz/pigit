@@ -232,6 +232,50 @@ class _CoreOps(_OpsBase):
         repo_root, _ = self.confirm_repo(path)
         return str((Path(repo_root) / git_dir_raw).resolve())
 
+    def get_git_common_dir(self, path: str | None = None) -> str:
+        """Return the common git directory via ``git rev-parse --git-common-dir``.
+
+        Equals ``get_git_dir`` for a normal repo; differs for linked worktrees.
+        """
+        path = path or self.path
+        code, err, out = self.executor.exec(
+            "git rev-parse --git-common-dir",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0 or not out:
+            raise GitError(err or "Failed to get git common directory")
+        raw = cast(str, out).strip()
+        if Path(raw).is_absolute():
+            return str(Path(raw).resolve())
+        repo_root, _ = self.confirm_repo(path)
+        return str((Path(repo_root) / raw).resolve())
+
+    def get_head_tracking(self, path: str | None = None) -> tuple[str, int, int]:
+        """Return ``(branch_or_label, ahead, behind)`` for the current HEAD.
+
+        ``ahead``/``behind`` are relative to ``@{upstream}`` when configured;
+        otherwise both are ``0``.
+        """
+        path = path or self.path
+        head = self.get_head(path) or ""
+        code, _err, out = self.executor.exec(
+            "git rev-list --left-right --count @{upstream}...HEAD",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0 or not out:
+            return head, 0, 0
+        parts = cast(str, out).strip().split()
+        if len(parts) != 2:
+            return head, 0, 0
+        try:
+            behind = int(parts[0])
+            ahead = int(parts[1])
+        except ValueError:
+            return head, 0, 0
+        return head, ahead, behind
+
     def verify_commitish(self, ref: str, path: str | None = None) -> str:
         """Return the full SHA of ``ref`` if it names a commit.
 

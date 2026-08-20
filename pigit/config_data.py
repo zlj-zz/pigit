@@ -46,7 +46,8 @@ class LogConfig:
 class AppConfig:
     """Application UI settings (TOML ``[app]`` / ``[app.keybindings]``)."""
 
-    auto_refresh_interval: float = 10.0
+    repo_observe: bool = True
+    observe_worktree: bool = True
     word_diff: bool = True
     status_view: Literal["flat", "tree"] = "tree"
     diff_preview_default: bool = True

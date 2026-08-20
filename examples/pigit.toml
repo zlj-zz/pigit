@@ -57,9 +57,11 @@ output = false
 
 [app]
 
-# (float) Auto-refresh interval in seconds for the app.
-# Set to 0 to disable auto-refresh.
-auto_refresh_interval = 10.0
+# (bool) Observe git metadata and refresh panels when the repo changes.
+repo_observe = true
+
+# (bool) Also observe worktree files for Status list updates.
+observe_worktree = true
 
 # (bool) Enable word-diff by default in the diff viewer.
 word_diff = true

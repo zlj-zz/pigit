@@ -14,7 +14,7 @@ from .clock import FakeClock, SystemClock
 from .coordinator import RefreshCoordinator
 from .observer import RepoObserver
 from .overlay import should_defer_repo_refresh
-from .paths import build_git_metadata_paths
+from .paths import build_git_metadata_paths, build_worktree_observe_paths
 from .types import (
     BackendHealth,
     ChangeBatch,
@@ -38,6 +38,7 @@ __all__ = [
     "SystemClock",
     "WatchRoot",
     "build_git_metadata_paths",
+    "build_worktree_observe_paths",
     "classify_path_signal",
     "should_defer_repo_refresh",
 ]

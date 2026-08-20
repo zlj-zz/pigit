@@ -216,7 +216,8 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[repo]` | `auto_append` | bool | `True` | auto-add current repo to managed list |
 | `[log]` | `debug` | bool | `False` | debug mode |
 | `[log]` | `output` | bool | `False` | print logs to terminal |
-| `[app]` | `auto_refresh_interval` | float | `10.0` | auto-refresh interval in seconds (`0` disables) |
+| `[app]` | `repo_observe` | bool | `True` | observe git metadata and refresh panels when the repo changes |
+| `[app]` | `observe_worktree` | bool | `True` | also observe worktree files for Status list updates |
 | `[app]` | `word_diff` | bool | `True` | enable word-diff in the diff viewer |
 | `[app]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
 | `[app]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |

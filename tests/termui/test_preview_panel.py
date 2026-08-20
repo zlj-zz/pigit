@@ -71,6 +71,21 @@ class _FakeStashPanel(StashPanel):
         self._vm = vm
 
 
+class _FakeTask:
+    def cancel(self) -> None:
+        pass
+
+
+def _run_sync(work, callback):
+    callback(work())
+    return _FakeTask()
+
+
+@pytest.fixture(autouse=True)
+def _sync_async(monkeypatch):
+    monkeypatch.setattr("pigit.app_preview.run_async", _run_sync)
+
+
 @pytest.fixture
 def preview() -> PreviewPanel:
     return PreviewPanel(status_vm=_FakeStatusVM(), id="preview")
@@ -138,6 +153,101 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     assert "stash@{0}" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STASH
     assert preview._diff_viewer._content == ["stash diff line"]
+
+
+def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
+    """A superseded async load must not overwrite a newer selection."""
+    targets: list[str | None] = []
+    vm = _FakeStatusVM()
+    preview = PreviewPanel(
+        status_vm=vm,
+        on_preview_target=targets.append,
+        id="preview",
+    )
+    bus = EventBus()
+    _mount(bus, preview)
+
+    pending: list[tuple] = []
+
+    def _defer(work, callback):
+        pending.append((work, callback))
+        return _FakeTask()
+
+    monkeypatch.setattr("pigit.app_preview.run_async", _defer)
+
+    file_a = File(
+        name="a.py",
+        display_str="a.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    file_b = File(
+        name="b.py",
+        display_str="b.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file_a], curr_no=0, source_index=0, vm=vm),
+    )
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file_b], curr_no=0, source_index=1, vm=vm),
+    )
+    assert len(pending) == 2
+    assert targets[-1] == "b.py"
+
+    vm.diff_return = ["from a"]
+    work_a, cb_a = pending[0]
+    cb_a(work_a())
+    assert preview._diff_viewer._content == []
+
+    vm.diff_return = ["from b"]
+    work_b, cb_b = pending[1]
+    cb_b(work_b())
+    assert preview._diff_viewer._content == ["from b"]
+    assert "b.py" in preview._diff_viewer._box_title
+
+
+def test_reload_refetches_current_status_preview(preview: PreviewPanel) -> None:
+    bus = EventBus()
+    _mount(bus, preview)
+    vm = preview._status_vm
+    assert isinstance(vm, _FakeStatusVM)
+    file = File(
+        name="src/main.py",
+        display_str="src/main.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file], curr_no=0, source_index=3, vm=vm),
+    )
+    assert vm.diff_calls == [3]
+    vm.diff_return = ["updated"]
+    preview.reload()
+    assert vm.diff_calls == [3, 3]
+    assert preview._diff_viewer._content == ["updated"]
 
 
 def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:

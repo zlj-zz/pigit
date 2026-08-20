@@ -52,12 +52,19 @@ class StatMtimeBackend:
 
     def start(self, roots: Sequence[WatchRoot]) -> None:
         """Reset baseline mtimes for explicit paths plus paths from ``roots``."""
-        from_roots = expand_watch_roots_to_paths(roots)
-        merged = list(dict.fromkeys([*self._explicit_paths, *from_roots]))
-        self._paths = merged
-        self._last_mtime = {p: _read_mtime_ns(p) for p in self._paths}
+        from_roots, truncated = expand_watch_roots_to_paths(roots)
+        self._apply_expanded_paths(from_roots, reset_baseline=True, truncated=truncated)
         self._started = True
-        self._health = BackendHealth.OK
+
+    def update_roots(self, roots: Sequence[WatchRoot]) -> None:
+        """Update observed paths, keeping baselines for paths that remain."""
+        if not self._started:
+            self.start(roots)
+            return
+        from_roots, truncated = expand_watch_roots_to_paths(roots)
+        self._apply_expanded_paths(
+            from_roots, reset_baseline=False, truncated=truncated
+        )
 
     def stop(self) -> None:
         """Clear path state."""
@@ -84,6 +91,29 @@ class StatMtimeBackend:
                 self._last_mtime[path] = current
                 out.append(PathSignal(path=path, mtime_ns=current))
         return out
+
+    def _apply_expanded_paths(
+        self,
+        from_roots: Sequence[str],
+        *,
+        reset_baseline: bool,
+        truncated: bool,
+    ) -> None:
+        """Merge explicit + expanded paths and update mtime baselines."""
+        merged = list(dict.fromkeys([*self._explicit_paths, *from_roots]))
+        self._health = BackendHealth.DEGRADED if truncated else BackendHealth.OK
+        if reset_baseline:
+            self._paths = merged
+            self._last_mtime = {p: _read_mtime_ns(p) for p in self._paths}
+            return
+        new_mtime: dict[str, int | None] = {}
+        for path in merged:
+            if path in self._last_mtime:
+                new_mtime[path] = self._last_mtime[path]
+            else:
+                new_mtime[path] = _read_mtime_ns(path)
+        self._paths = merged
+        self._last_mtime = new_mtime
 
 
 class FakeBackend:

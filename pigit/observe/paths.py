@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/observe/paths.py
-Description: Build git metadata path lists for StatMtime observation.
+Description: Build git metadata and worktree path lists for StatMtime.
 Author: Zev
 Date: 2026-08-20
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
+from .denylist import is_denied_name, rel_path_is_denied
 from .types import WatchRoot
 
 # Filenames always watched under the per-worktree git dir when present.
@@ -18,6 +19,9 @@ _GIT_DIR_FILES = ("HEAD", "index", "logs/HEAD")
 
 # Files always watched under the common dir when present.
 _COMMON_DIR_FILES = ("packed-refs",)
+
+# Cap on worktree / dirty-file paths polled per Status-focused attach.
+MAX_WORKTREE_STAT_PATHS = 400
 
 
 def build_git_metadata_paths(git_dir: str, common_dir: str) -> list[str]:
@@ -55,18 +59,78 @@ def build_git_metadata_paths(git_dir: str, common_dir: str) -> list[str]:
     return list(dict.fromkeys(found))
 
 
-def expand_watch_roots_to_paths(roots: Sequence[WatchRoot]) -> list[str]:
-    """Expand watch roots into concrete file paths for StatMtime.
+def build_worktree_observe_paths(
+    repo_root: str,
+    status_rel_paths: Sequence[str] = (),
+    *,
+    max_paths: int = MAX_WORKTREE_STAT_PATHS,
+) -> tuple[list[str], bool]:
+    """Build worktree paths: top-level entries plus known status files.
+
+    Top-level files and directories are included (directory mtime catches
+    add/remove). Denied names are skipped. Status-relative paths that are
+    not denied are added so content edits are visible to StatMtime.
+
+    Args:
+        repo_root: Absolute repository working tree.
+        status_rel_paths: Repo-relative paths from the last status load.
+        max_paths: Soft budget; excess paths are dropped.
+
+    Returns:
+        ``(paths, truncated)`` where ``truncated`` is True if the budget cut
+        paths.
+    """
+    root = Path(repo_root).resolve()
+    found: list[str] = []
+
+    if root.is_dir():
+        try:
+            children = sorted(root.iterdir(), key=lambda p: p.name)
+        except OSError:
+            children = []
+        for child in children:
+            if is_denied_name(child.name):
+                continue
+            try:
+                found.append(str(child.resolve()))
+            except OSError:
+                continue
+
+    for rel in status_rel_paths:
+        if not rel or rel_path_is_denied(rel):
+            continue
+        path = root / rel
+        try:
+            if path.exists():
+                found.append(str(path.resolve()))
+        except OSError:
+            continue
+
+    deduped = list(dict.fromkeys(found))
+    if len(deduped) > max_paths:
+        return deduped[:max_paths], True
+    return deduped, False
+
+
+def expand_watch_roots_to_paths(
+    roots: Sequence[WatchRoot],
+) -> tuple[list[str], bool]:
+    """Expand watch roots into concrete file/dir paths for StatMtime.
 
     Args:
         roots: Declared observation roots.
 
     Returns:
-        Absolute file paths to poll.
+        ``(paths, truncated)`` — absolute paths to poll (git metadata first),
+        and whether the worktree budget dropped paths.
     """
-    paths: list[str] = []
+    meta: list[str] = []
+    worktree_extra: list[str] = []
     git_dir: str | None = None
     common_dir: str | None = None
+    status_files: list[str] = []
+    worktree_root: str | None = None
+    truncated = False
 
     for root in roots:
         abs_path = str(Path(root.path).resolve())
@@ -75,17 +139,39 @@ def expand_watch_roots_to_paths(roots: Sequence[WatchRoot]) -> list[str]:
         elif root.kind == "common_dir":
             common_dir = abs_path
         elif root.kind == "file":
-            if Path(abs_path).is_file():
-                paths.append(abs_path)
+            status_files.append(abs_path)
         elif root.kind == "worktree":
-            # Phase 5 expands worktree; Phase 1 ignores.
-            continue
+            worktree_root = abs_path
 
     if git_dir is not None:
         common = common_dir or git_dir
-        paths.extend(build_git_metadata_paths(git_dir, common))
+        meta.extend(build_git_metadata_paths(git_dir, common))
 
-    return list(dict.fromkeys(paths))
+    if worktree_root is not None:
+        root_path = Path(worktree_root)
+        status_rels: list[str] = []
+        for abs_file in status_files:
+            try:
+                rel = Path(abs_file).resolve().relative_to(root_path).as_posix()
+            except ValueError:
+                worktree_extra.append(abs_file)
+                continue
+            status_rels.append(rel)
+        built, wt_truncated = build_worktree_observe_paths(
+            worktree_root,
+            status_rel_paths=status_rels,
+        )
+        truncated = truncated or wt_truncated
+        worktree_extra.extend(built)
+    else:
+        for abs_file in status_files:
+            if Path(abs_file).exists():
+                worktree_extra.append(abs_file)
+        if len(worktree_extra) > MAX_WORKTREE_STAT_PATHS:
+            worktree_extra = worktree_extra[:MAX_WORKTREE_STAT_PATHS]
+            truncated = True
+
+    return list(dict.fromkeys([*meta, *worktree_extra])), truncated
 
 
 def _walk_files(root: Path) -> list[str]:
