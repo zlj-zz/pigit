@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_commit_cherry_pick.py
+Module: tests/app/test_commit_cherry_pick.py
 Description: Tests for Commit panel cherry-pick emit, help, and app guards.
 Author: Zev
 Date: 2026-08-19

@@ -1,5 +1,5 @@
 """
-Module: tests/cli/test_app_keybindings.py
+Module: tests/app/test_app_keybindings.py
 Description: Tests for pigit.app_keybindings (enumerate + render keybinding template).
 Author: Zev
 Date: 2026-08-16

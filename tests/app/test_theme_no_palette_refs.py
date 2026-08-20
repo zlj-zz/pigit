@@ -21,7 +21,7 @@ _ALLOWED_ATTR_PREFIXES = ("STYLE_",)
 
 # Directories to scan
 _APP_DIRS = [
-    Path(__file__).parent.parent / "pigit",
+    Path(__file__).resolve().parents[2] / "pigit",
 ]
 
 

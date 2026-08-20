@@ -1,5 +1,5 @@
 """
-Module: tests/termui/test_inspector_sheet.py
+Module: tests/app/test_inspector_sheet.py
 Description: Tests for InspectorSheet formatting, height, and open/close.
 Author: Zev
 Date: 2026-08-19

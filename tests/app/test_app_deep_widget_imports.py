@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_app_deep_widget_imports.py
+Module: tests/app/test_app_deep_widget_imports.py
 Description: Forbid pigit.termui.widgets.<leaf> imports in app*.py.
 Author: Zev
 Date: 2026-08-20

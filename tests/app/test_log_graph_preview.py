@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_log_graph_preview.py
+Module: tests/app/test_log_graph_preview.py
 Description: Tests for the Branch-only git log --graph preview panel.
 Author: Zev
 Date: 2026-08-18

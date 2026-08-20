@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_panel_cycle.py
+Module: tests/app/test_panel_cycle.py
 Description: App-level Status → Stash → Branch → Commit focus cycle.
 Author: Zev
 Date: 2026-08-18

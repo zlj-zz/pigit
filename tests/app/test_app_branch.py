@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/test_app_branch.py
+Module: tests/app/test_app_branch.py
 Description: Tests for BranchPanel row rendering, including upstream tracking.
 Author: Zev
 Date: 2026-08-18

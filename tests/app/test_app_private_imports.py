@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_app_private_imports.py
+Module: tests/app/test_app_private_imports.py
 Description: Ratchet test for private pigit.termui._* imports in app*.py modules.
 Author: Zev
 Date: 2026-08-19

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_rebase.py
+Module: tests/app/test_rebase.py
 Description: Tests for the interactive rebase todo panel.
 Author: Zev
 Date: 2026-08-14

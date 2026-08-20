@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_rebase_control.py
+Module: tests/app/test_rebase_control.py
 Description: Tests for app-level rebase --continue/--abort/--skip control.
 Author: Zev
 Date: 2026-08-17

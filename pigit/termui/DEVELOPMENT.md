@@ -183,8 +183,8 @@ from pigit.termui import Component
 
 | Test | Rule |
 |------|------|
-| `tests/termui/test_app_private_imports.py` | `app*.py` must not import `pigit.termui._*` (`ALLOWED` empty) |
-| `tests/termui/test_app_deep_widget_imports.py` | `app*.py` must not import `pigit.termui.widgets.<leaf>` |
+| `tests/app/test_app_private_imports.py` | `app*.py` must not import `pigit.termui._*` (`ALLOWED` empty) |
+| `tests/app/test_app_deep_widget_imports.py` | `app*.py` must not import `pigit.termui.widgets.<leaf>` |
 | `tests/termui/test_public_api_exports.py` | Root `__all__` == `REQUIRED_ROOT`; forbidden symbols stay off root |
 | `tests/termui/test_primitives_api.py` | `primitives` façade exports |
 
@@ -212,6 +212,7 @@ coverage; application modules must not.
 
 ```bash
 python3 -m pytest tests/termui -q
+python3 -m pytest tests/app -q
 python3 -m pytest ./tests -q
 ```
 
@@ -221,6 +222,6 @@ Contract tests to run when touching exports or app imports:
 python3 -m pytest \
   tests/termui/test_public_api_exports.py \
   tests/termui/test_primitives_api.py \
-  tests/termui/test_app_private_imports.py \
-  tests/termui/test_app_deep_widget_imports.py -q
+  tests/app/test_app_private_imports.py \
+  tests/app/test_app_deep_widget_imports.py -q
 ```

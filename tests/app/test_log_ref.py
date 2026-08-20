@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_log_ref.py
+Module: tests/app/test_log_ref.py
 Description: LogRefSheet and commit log-ref app wiring.
 Author: Zev
 Date: 2026-08-19

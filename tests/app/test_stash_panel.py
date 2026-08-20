@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_stash_panel.py
+Module: tests/app/test_stash_panel.py
 Description: Tests for StashPanel section header and list rendering.
 Author: Zev
 Date: 2026-08-17

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_status_panel_actions.py
+Module: tests/app/test_status_panel_actions.py
 Description: StatusPanel a/d target resolution in tree view.
 Author: Zev
 Date: 2026-08-18
