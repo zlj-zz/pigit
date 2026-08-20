@@ -41,6 +41,8 @@ class StashPanel(ItemList):
 
     CURSOR = "●"
     keymap_namespace = "stash"
+    tab_name = "Stash"
+    tab_key = "2"
     HEADER_ROWS = 1
     _SECTION_LABEL = "Stash"
     _SECTION_TAIL = "──"

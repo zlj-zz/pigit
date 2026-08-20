@@ -18,14 +18,9 @@ def header_state() -> HeaderState:
     return HeaderState(THEME)
 
 
-@pytest.fixture
-def tab_config() -> dict[type, tuple[str, str]]:
-    return {int: ("Fallback", "9")}
-
-
 def test_bind_to_bus_updates_mode(header_state: HeaderState) -> None:
     bus = EventBus()
-    header_state.bind_to_bus(bus, {})
+    header_state.bind_to_bus(bus)
 
     bus.publish(EventType("mode_changed"), mode="visual")
 
@@ -36,7 +31,7 @@ def test_bind_to_bus_updates_tab_from_active_metadata(
     header_state: HeaderState,
 ) -> None:
     bus = EventBus()
-    header_state.bind_to_bus(bus, {})
+    header_state.bind_to_bus(bus)
 
     active = type("Active", (), {"tab_name": "Status", "tab_key": "1"})()
     bus.publish(EVT_SELECTION_CHANGED, active=active)
@@ -45,24 +40,24 @@ def test_bind_to_bus_updates_tab_from_active_metadata(
     assert header_state.tab_key == "1"
 
 
-def test_bind_to_bus_falls_back_to_tab_config(
-    header_state: HeaderState, tab_config: dict[type, tuple[str, str]]
+def test_bind_to_bus_empty_tab_when_no_metadata(
+    header_state: HeaderState,
 ) -> None:
     bus = EventBus()
-    header_state.bind_to_bus(bus, tab_config)
+    header_state.bind_to_bus(bus)
 
-    active = 42
+    active = type("Active", (), {"tab_name": "", "tab_key": ""})()
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
-    assert header_state.tab == "Fallback"
-    assert header_state.tab_key == "9"
+    assert header_state.tab == ""
+    assert header_state.tab_key == ""
 
 
 def test_bind_to_bus_unsubscribe_stops_updates(
     header_state: HeaderState,
 ) -> None:
     bus = EventBus()
-    unsub = header_state.bind_to_bus(bus, {})
+    unsub = header_state.bind_to_bus(bus)
 
     bus.publish(EventType("mode_changed"), mode="visual")
     assert header_state.mode == "visual"

@@ -66,25 +66,11 @@ from .session_history import SessionHistory
 from .config_data import AppConfig
 
 
-class TabPanel(Column):
-    """Column with tab metadata for TabView routing."""
-
-    def __init__(
-        self,
-        *,
-        tab_name: str,
-        tab_key: str,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        self.tab_name = tab_name
-        self.tab_key = tab_key
-
-
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
     keymap_namespace = "universal"
+    min_terminal_size = (65, 10)
 
     def __init__(
         self,
@@ -103,9 +89,7 @@ class PigitApplication(Application):
         self._repo_name: str = ""
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
-        self._header_unsub = self._header_state.bind_to_bus(
-            self._event_bus, self._TAB_CONFIG
-        )
+        self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
         # Merge workflow state
         self._merge_state: dict | None = None
         self._alert_dialog = AlertDialog(
@@ -141,14 +125,6 @@ class PigitApplication(Application):
 
     LARGE_SCREEN_COLS = 120
 
-    _TAB_CONFIG: dict[type, tuple[str, str]] = {
-        StatusPanel: ("Status", "1"),
-        StashPanel: ("Stash", "2"),
-        BranchPanel: ("Branch", "3"),
-        CommitPanel: ("Commit", "4"),
-        DiffViewer: ("Display", ""),
-    }
-
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
@@ -180,13 +156,11 @@ class PigitApplication(Application):
             id="stash",
             on_toggle_preview=self.toggle_side_preview,
         )
-        self._status_stack = TabPanel(
+        self._status_stack = Column(
             children=[self._status_panel, self._stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
-            tab_name="Status",
-            tab_key="1",
         )
 
         self._branch_panel = BranchPanel(
@@ -262,13 +236,13 @@ class PigitApplication(Application):
         self._help_panel = HelpPanel(
             key_fg=THEME.fg_info,
         )
-        self._help_panel.set_grouped_entries(self._build_help_groups())
+        self._help_panel.set_grouped_entries(self.get_help_groups())
         self._help_popup = Popup(
             self._help_panel,
             exit_key=keys.KEY_ESC,
         )
 
-    def _build_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+    def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
         """Aggregate full-help groups from app + panel action bindings."""
         groups: list[tuple[str, list[tuple[str, str]]]] = []
         universal = self.get_help_entries()
@@ -288,14 +262,6 @@ class PigitApplication(Application):
 
     def after_start(self):
         cols, rows = terminal_size()
-        if cols < 65 or rows < 10:
-            assert self._loop is not None
-            self._loop.quit(
-                f"Terminal too small ({cols}x{rows}, need at least 65x10).",
-                exit_code=1,
-            )
-
-        # Initialize layout for large screen (inserts preview only if Status is active)
         self._sync_stash_height(rows)
         if self._is_large_screen:
             self._apply_body_widths(cols)
@@ -371,7 +337,7 @@ class PigitApplication(Application):
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
         """Toggle help popup visibility. Rebuild groups so Commit's title tracks log_ref."""
-        self._help_panel.set_grouped_entries(self._build_help_groups())
+        self._help_panel.set_grouped_entries(self.get_help_groups())
         self._help_popup.toggle()
 
     @bind_action("palette", ";", desc="Open command palette", tip="Palette")

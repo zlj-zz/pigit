@@ -145,6 +145,8 @@ class DiffViewer(LineTextBrowser):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
 
     keymap_namespace = "diff"
+    tab_name = "Display"
+    tab_key = ""
     _CACHE_MAX = 64
     LINE_NO_WIDTH = 5
     LINE_NO_STR_WIDTH = 4  # LINE_NO_WIDTH - 1

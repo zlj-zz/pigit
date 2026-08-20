@@ -64,6 +64,19 @@ class Application:
         """Derive app-level (universal) help entries from ``@bind_action``."""
         return derive_help_entries(self._action_bindings, self)
 
+    def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+        """Return grouped help entries for the help popup.
+
+        Default: a single ``Global`` group when universal entries exist.
+
+        Returns:
+            List of ``(group_title, entries)`` tuples.
+        """
+        universal = self.get_help_entries()
+        if universal:
+            return [("Global", universal)]
+        return []
+
     def build_root(self) -> Component:
         """Return the user body component (usually a TabView)."""
         raise NotImplementedError("Subclasses must implement build_root().")

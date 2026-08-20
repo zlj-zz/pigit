@@ -152,6 +152,7 @@ class CommitPanel(ItemList):
         ] = []
 
     keymap_namespace = "commit"
+    tab_key = "4"
 
     @property
     def tab_name(self) -> str:

@@ -8,8 +8,12 @@ Date: 2026-04-17
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from pigit.termui import bind_action
 from pigit.termui._application import Application
 from pigit.termui._component import Component
+from pigit.termui.event_loop import ExitEventLoop
 
 
 class DummyRoot(Component):
@@ -79,3 +83,33 @@ class TestApplication:
             MockLoop.return_value = MagicMock()
             app.run()
             assert app._root is None
+
+    def test_get_help_groups_default_global(self):
+        class _App(DummyApp):
+            @bind_action("help", "?", desc="Toggle help")
+            def help(self):
+                pass
+
+        app = _App()
+        groups = app.get_help_groups()
+        assert len(groups) == 1
+        assert groups[0][0] == "Global"
+        assert groups[0][1]
+
+    def test_get_help_groups_empty_when_no_bindings(self):
+        app = DummyApp()
+        assert app.get_help_groups() == []
+
+    def test_min_terminal_size_quits_after_after_start(self):
+        class SizedApp(DummyApp):
+            min_terminal_size = (65, 10)
+
+        app = SizedApp()
+        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+            MockLoop.return_value = MagicMock()
+            app.run()
+            on_after_start = MockLoop.call_args.kwargs["on_after_start"]
+            with patch("pigit.termui.tty_io.terminal_size", return_value=(64, 10)):
+                with pytest.raises(ExitEventLoop) as exc_info:
+                    on_after_start()
+                assert exc_info.value.result_message == "Terminal too small (need 65x10)"

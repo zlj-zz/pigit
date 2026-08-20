@@ -167,8 +167,7 @@ def test_tab_name_tracks_help_title():
     vm.log_ref = "origin/foo"
     panel = CommitPanel(vm=vm)
     assert panel.tab_name == "Commit · origin/foo"
-    # The tab key lives only in the header's _TAB_CONFIG, not on the panel.
-    assert not hasattr(panel, "tab_key")
+    assert panel.tab_key == "4"
 
 
 def test_help_lists_o():

@@ -273,6 +273,8 @@ class StatusPanel(ItemList):
 
     CURSOR = "●"  # filled circle
     keymap_namespace = "status"
+    tab_name = "Status"
+    tab_key = "1"
 
     def __init__(
         self,

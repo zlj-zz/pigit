@@ -97,6 +97,8 @@ class Component(ABC):
     """
 
     BINDINGS: BindingsList | None = None
+    tab_name: str = ""
+    tab_key: str = ""
 
     def __init__(
         self,
