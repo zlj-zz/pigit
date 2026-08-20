@@ -30,13 +30,16 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class _PreviewRequest:
-    """Captured UI-thread selection for an async diff load."""
+    """Captured UI-thread selection for an async diff load.
+
+    Status previews are keyed by worktree path (``key``), never by a list
+    index that can drift when ``StatusViewModel`` refreshes.
+    """
 
     kind: Literal["status", "stash"]
     key: str
     title: str
     diff_type: DiffType
-    source_idx: int | None = None
     stash_ref: str | None = None
 
 
@@ -141,7 +144,7 @@ class PreviewPanel(Component):
             hit = active.file_at_cursor()
             if hit is None:
                 return None
-            file, source_idx = hit
+            file, _ = hit
             diff_type = DiffType.STAGED
             if hasattr(active, "preview_diff_type"):
                 diff_type = active.preview_diff_type()
@@ -150,7 +153,6 @@ class PreviewPanel(Component):
                 key=file.get_file_str(),
                 title=title,
                 diff_type=diff_type,
-                source_idx=source_idx,
             )
 
         if isinstance(active, StashPanel):
@@ -172,8 +174,8 @@ class PreviewPanel(Component):
         vm = self._status_vm
         if vm is None:
             return []
-        if request.kind == "status" and request.source_idx is not None:
-            return vm.load_diff(request.source_idx)
+        if request.kind == "status":
+            return vm.load_diff_by_path(request.key)
         if request.kind == "stash" and request.stash_ref is not None:
             return vm.load_stash_diff(request.stash_ref)
         return []

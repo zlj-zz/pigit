@@ -22,6 +22,7 @@ from pigit.termui.widgets.line_text_browser import LineTextBrowser
 class _FakeStatusVM:
     def __init__(self) -> None:
         self.diff_calls: list[int] = []
+        self.diff_path_calls: list[str] = []
         self.stash_diff_calls: list[str] = []
         self.diff_return: list[str] = ["diff line"]
         self.stash_diff_return: list[str] = ["stash diff line"]
@@ -30,6 +31,12 @@ class _FakeStatusVM:
         self, idx: int, plain: bool = True, word_diff: bool = False
     ) -> list[str]:
         self.diff_calls.append(idx)
+        return list(self.diff_return)
+
+    def load_diff_by_path(
+        self, rel: str, plain: bool = True, word_diff: bool = False
+    ) -> list[str]:
+        self.diff_path_calls.append(rel)
         return list(self.diff_return)
 
     def load_stash_diff(self, ref: str, word_diff: bool = False) -> list[str]:
@@ -130,7 +137,8 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
 
-    assert vm.diff_calls == [7]
+    assert vm.diff_path_calls == ["src/main.py"]
+    assert vm.diff_calls == []
     assert "src/main.py" in preview._diff_viewer._box_title
     assert "Staged" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STAGED
@@ -243,11 +251,45 @@ def test_reload_refetches_current_status_preview(preview: PreviewPanel) -> None:
         EVT_SELECTION_CHANGED,
         active=_FakeStatusPanel([file], curr_no=0, source_index=3, vm=vm),
     )
-    assert vm.diff_calls == [3]
+    assert vm.diff_path_calls == ["src/main.py"]
     vm.diff_return = ["updated"]
     preview.reload()
-    assert vm.diff_calls == [3, 3]
+    assert vm.diff_path_calls == ["src/main.py", "src/main.py"]
+    assert vm.diff_calls == []
     assert preview._diff_viewer._content == ["updated"]
+
+
+def test_reload_uses_path_not_captured_source_index(preview: PreviewPanel) -> None:
+    """After status reorder, reload must not load_diff(stale source_idx)."""
+    bus = EventBus()
+    _mount(bus, preview)
+    vm = preview._status_vm
+    assert isinstance(vm, _FakeStatusVM)
+    file = File(
+        name="a.py",
+        display_str="a.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    # Capture with source_index 0; a later list refresh would move a.py.
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file], curr_no=0, source_index=0, vm=vm),
+    )
+    assert preview._request is not None
+    assert preview._request.key == "a.py"
+    assert not hasattr(preview._request, "source_idx")
+    vm.diff_return = ["still a"]
+    preview.reload()
+    assert vm.diff_path_calls == ["a.py", "a.py"]
+    assert vm.diff_calls == []
+    assert preview._diff_viewer._content == ["still a"]
 
 
 def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
@@ -271,11 +313,11 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     active = _FakeStatusPanel([file], curr_no=0, source_index=0, vm=vm)
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
-    assert vm.diff_calls == [0]
+    assert vm.diff_path_calls == ["a.py"]
     assert "a.py" in preview._diff_viewer._box_title
 
     preview.deactivate()
-    del vm.diff_calls[:]
+    del vm.diff_path_calls[:]
 
     other = _FakeStatusPanel(
         [
@@ -298,7 +340,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     )
     bus.publish(EVT_SELECTION_CHANGED, active=other)
 
-    assert vm.diff_calls == []
+    assert vm.diff_path_calls == []
     assert "a.py" in preview._diff_viewer._box_title
 
 

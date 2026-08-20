@@ -216,6 +216,49 @@ def test_load_diff(status_vm):
     assert diff == ["+line1", "-line2"]
 
 
+def test_load_diff_by_path_finds_file_after_reorder(status_vm):
+    """Preview identity is path; index may drift after status refresh."""
+    from pigit.git.model import File
+
+    status_vm._git.load_file_diff.return_value = "diff a\n"
+    # Reorder so a.py is no longer at index 0.
+    status_vm._items.set(
+        [
+            File(
+                "b.py",
+                "b.py",
+                " M",
+                False,
+                True,
+                True,
+                False,
+                False,
+                False,
+                False,
+            ),
+            File(
+                "a.py",
+                "a.py",
+                " M",
+                False,
+                True,
+                True,
+                False,
+                False,
+                False,
+                False,
+            ),
+        ]
+    )
+    diff = status_vm.load_diff_by_path("a.py")
+    assert diff == ["diff a"]
+    status_vm._git.load_file_diff.assert_called_with("a.py", True, False, plain=True)
+
+
+def test_load_diff_by_path_missing_returns_empty(status_vm):
+    assert status_vm.load_diff_by_path("nope.py") == []
+
+
 def test_amend_calls_git_amend_head(status_vm):
     result = status_vm.amend()
     assert result.success is True

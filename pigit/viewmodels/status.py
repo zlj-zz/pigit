@@ -53,6 +53,8 @@ class IStatusViewModel(IListViewModel["File"]):
 
     def load_diff(self, idx: int, plain: bool = True) -> list[str]: ...
 
+    def load_diff_by_path(self, rel: str, plain: bool = True) -> list[str]: ...
+
     def get_inspector_snapshot(self, idx: int) -> FileSnapshot | None: ...
 
     def get_stash_snapshot(self, ref: str) -> StashSnapshot | None: ...
@@ -251,6 +253,13 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         cached = f.has_staged_change and not f.has_unstaged_change
         text = self._git.load_file_diff(f.name, f.tracked, cached, plain=plain)
         return text.splitlines()
+
+    def load_diff_by_path(self, rel: str, plain: bool = True) -> list[str]:
+        """Load a file diff by worktree-relative path (stable across refresh)."""
+        for idx, item in enumerate(self.items.value):
+            if item.get_file_str() == rel:
+                return self.load_diff(idx, plain=plain)
+        return []
 
     def get_inspector_snapshot(self, idx: int):
         f = self.item_at(idx)
