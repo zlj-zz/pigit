@@ -157,16 +157,16 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         """Apply a load result on the UI thread, unless superseded.
 
         ``_load_commits`` runs on the AsyncTask worker; it never writes shared
-        state. Here we apply the resolved ref and derived signals, guarded so
-        a stale load (the user re-pinned meanwhile) is dropped.
+        state. Derived ``graph_rows`` / ``remotes`` must be published before
+        ``items`` so list subscribers rebuild row caches with rails ready.
         """
         if result.requested != self._log_ref:
             return
-        super()._on_loaded(result.commits)
         self._log_ref = result.resolved
         self._graph_rows.set(result.graph_rows)
         self._remotes.set(result.remotes)
         self._bodies = None
+        super()._on_loaded(result.commits)
 
     def get_inspector_snapshot(self, idx: int):
         c = self.item_at(idx)

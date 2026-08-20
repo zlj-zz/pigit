@@ -179,6 +179,34 @@ def test_apply_load_drops_stale_result(commit_vm):
     assert commit_vm.log_ref == "origin/bar"
 
 
+def test_apply_load_publishes_graph_before_items():
+    """items subscribers must see graph_rows already updated (row-cache rails)."""
+    git = Mock()
+    git.get_head.return_value = "main"
+    commits = [
+        Commit("c", "tip", "Zev", 1, "pushed", "", [], ["b"]),
+        Commit("b", "mid", "Zev", 0, "pushed", "", [], ["a"]),
+        Commit("a", "root", "Zev", 0, "pushed", "", [], []),
+    ]
+    git.load_commits.return_value = commits
+    git.get_remotes.return_value = ["origin"]
+    vm = CommitViewModel(git)
+    seen: list[tuple[int, int]] = []
+
+    class _Watcher:
+        def on_items(self, _value):
+            seen.append((len(vm.items.value), len(vm.graph_rows)))
+
+    watcher = _Watcher()
+    vm.items.subscribe(watcher.on_items)
+    result = vm._load_commits()
+    vm._apply_load(result)
+
+    assert seen == [(3, 3)]
+    assert vm.graph_rows[0].lanes_after == ["b"]
+    assert vm.remotes == ("origin",)
+
+
 def test_load_skips_verify_when_commits_present(commit_vm):
     """Auto-refresh must not pay a rev-parse when the ref already resolves."""
     commit_vm._log_ref = "origin/foo"
