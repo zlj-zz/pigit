@@ -15,6 +15,10 @@ from collections import defaultdict
 
 from pigit.termui import Component, MouseButton, MouseKind, palette, Surface
 from pigit.termui.widgets import HeatmapGrid, StepLineChart
+from pigit.termui.widgets.calendar_layout import (
+    build_contribution_calendar,
+    calendar_day_values,
+)
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
@@ -126,29 +130,13 @@ class ContributionGraph(Component):
     def _recompute_derived_data(self) -> None:
         """Pre-compute all derived data that depends on commit counts and current date."""
         today = datetime.date.today()
-        start = today - datetime.timedelta(days=365)
-        # Align to the previous Monday so weeks line up nicely.
-        first_monday = start - datetime.timedelta(days=start.weekday())
-        days = (today - first_monday).days + 1
-        num_weeks = (days + 6) // 7
+        calendar = build_contribution_calendar(today)
 
-        self._today = today
-        self._first_monday = first_monday
-        self._num_weeks = num_weeks
-
-        # Pre-compute heatmap values
-        self._heatmap_values = {}
-        for week in range(num_weeks):
-            for day in range(7):
-                date = first_monday + datetime.timedelta(weeks=week, days=day)
-                if date > today:
-                    continue
-                self._heatmap_values[(week, day)] = self._day_counts.get(date, 0)
-
-        # Pre-compute stats
-        self._stats = self._calc_stats(first_monday, today)
-
-        # Pre-compute line chart data
+        self._today = calendar.today
+        self._first_monday = calendar.first_monday
+        self._num_weeks = calendar.num_weeks
+        self._heatmap_values = calendar_day_values(self._day_counts, calendar)
+        self._stats = self._calc_stats(calendar.first_monday, calendar.today)
         self._recompute_line_chart_data(today)
 
     def _recompute_line_chart_data(self, today: datetime.date) -> None:

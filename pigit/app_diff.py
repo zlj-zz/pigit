@@ -26,13 +26,16 @@ from pigit.termui import (
     Component,
     SyntaxTokenizer,
     bind_action,
+    merge_ranges,
     palette,
     plain,
     request_render,
     show_badge,
     show_toast,
+    tokenize_with_positions,
 )
 from pigit.termui.widgets import LineTextBrowser
+from pigit.termui.widgets.gutter import format_line_number
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -71,69 +74,6 @@ class _Hunk:
     new_start: int
     new_count: int
     file_header_start: int  # index of 'diff --git' line for this file
-
-
-def _tokenize_with_positions(
-    text: str,
-) -> tuple[list[str], list[tuple[int, int]]]:
-    """Split ``text`` into tokens at whitespace and word-boundary points.
-
-    A word character is ``[a-zA-Z0-9_]`` (``str.isalnum()`` plus underscore);
-    transitions between word and non-word characters produce a split.  This
-    matches GitHub's ``diff-highlight`` tokenisation so that e.g.
-    ``foo.bar`` → ``["foo", ".", "bar"]`` and only the truly changed
-    sub-tokens are highlighted.
-
-    Returns ``(tokens, positions)`` where each position is ``(start, end)``
-    in the original string.
-    """
-
-    def _is_word(c: str) -> bool:
-        return c.isalnum() or c == "_"
-
-    tokens: list[str] = []
-    positions: list[tuple[int, int]] = []
-    i = 0
-    n = len(text)
-    while i < n:
-        # ── whitespace runs ──
-        if text[i].isspace():
-            start = i
-            while i < n and text[i].isspace():
-                i += 1
-            tokens.append(text[start:i])
-            positions.append((start, i))
-            continue
-
-        # ── non-whitespace: split at word/non-word transitions ──
-        start = i
-        if _is_word(text[i]):
-            while i < n and _is_word(text[i]):
-                i += 1
-        else:
-            while i < n and not text[i].isspace() and not _is_word(text[i]):
-                i += 1
-        tokens.append(text[start:i])
-        positions.append((start, i))
-    return tokens, positions
-
-
-def _merge_ranges(
-    ranges: list[tuple[int, int]],
-) -> list[tuple[int, int]]:
-    """Merge adjacent or overlapping ranges in sorted order."""
-    if not ranges:
-        return []
-    result: list[tuple[int, int]] = []
-    cur_start, cur_end = ranges[0]
-    for start, end in ranges[1:]:
-        if start <= cur_end:
-            cur_end = max(cur_end, end)
-        else:
-            result.append((cur_start, cur_end))
-            cur_start, cur_end = start, end
-    result.append((cur_start, cur_end))
-    return result
 
 
 # A render token is (text, fg_rgb, display_width, word_diff_bg_or_None).
@@ -270,7 +210,8 @@ class DiffViewer(LineTextBrowser):
 
         # Plain 1-based sequential line numbers
         self._line_numbers = [
-            str(i + 1).rjust(self.LINE_NO_STR_WIDTH) for i in range(len(self._content))
+            format_line_number(i + 1, self.LINE_NO_STR_WIDTH)
+            for i in range(len(self._content))
         ]
 
         # Detect language from file path
@@ -478,8 +419,8 @@ class DiffViewer(LineTextBrowser):
         (whitespace-separated), then ``SequenceMatcher`` finds matching token
         blocks.  Token-level changes are mapped back to character ranges.
         """
-        old_tokens, old_positions = _tokenize_with_positions(old)
-        new_tokens, new_positions = _tokenize_with_positions(new)
+        old_tokens, old_positions = tokenize_with_positions(old)
+        new_tokens, new_positions = tokenize_with_positions(new)
 
         matcher = difflib.SequenceMatcher(None, old_tokens, new_tokens, autojunk=False)
         matches = matcher.get_matching_blocks()
@@ -501,8 +442,8 @@ class DiffViewer(LineTextBrowser):
             new_tok = m.b + m.size
 
         # Merge adjacent ranges to minimise segment count.
-        del_ranges = _merge_ranges(del_ranges)
-        add_ranges = _merge_ranges(add_ranges)
+        del_ranges = merge_ranges(del_ranges)
+        add_ranges = merge_ranges(add_ranges)
         return del_ranges, add_ranges
 
     @staticmethod
@@ -1194,16 +1135,22 @@ class DiffViewer(LineTextBrowser):
             elif self._is_file_header(line):
                 self._line_numbers.append("")
             elif self._is_add_line(line):
-                self._line_numbers.append(str(new_line).rjust(self.LINE_NO_STR_WIDTH))
+                self._line_numbers.append(
+                    format_line_number(new_line, self.LINE_NO_STR_WIDTH)
+                )
                 new_line += 1
             elif self._is_del_line(line):
-                self._line_numbers.append(str(old_line).rjust(self.LINE_NO_STR_WIDTH))
+                self._line_numbers.append(
+                    format_line_number(old_line, self.LINE_NO_STR_WIDTH)
+                )
                 old_line += 1
             elif line.startswith("\\"):
                 self._line_numbers.append("")
             else:
                 # Context line
-                self._line_numbers.append(str(new_line).rjust(self.LINE_NO_STR_WIDTH))
+                self._line_numbers.append(
+                    format_line_number(new_line, self.LINE_NO_STR_WIDTH)
+                )
                 old_line += 1
                 new_line += 1
 

@@ -25,6 +25,20 @@ _BOX_CORNER_BR = "╯"
 class Sheet(Component):
     """Edge sheet panel (top or bottom) on the SHEET layer."""
 
+    @staticmethod
+    def clamp_height(rows: list, term_h: int, *, border: int = 1) -> int:
+        """Clamp sheet height to ``[3, term_h // 2]`` including border.
+
+        Args:
+            rows: Content rows displayed inside the sheet.
+            term_h: Terminal height in rows.
+            border: Extra rows reserved for chrome above/below content.
+
+        Returns:
+            Clamped sheet height in terminal rows.
+        """
+        return min(max(len(rows) + border, 3), max(3, term_h // 2))
+
     def __init__(
         self,
         child: Component,

@@ -80,6 +80,7 @@ from . import palette
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from ._syntax import SyntaxTokenizer
+from ._word_diff import merge_ranges, tokenize_with_positions
 from ._mouse import MouseButton, MouseEvent, MouseKind
 from ._async_task import AsyncTask, run_async
 from ._text import plain
@@ -157,4 +158,6 @@ __all__ = [
     "exec_external",
     # Syntax highlighting
     "SyntaxTokenizer",
+    "tokenize_with_positions",
+    "merge_ranges",
 ]

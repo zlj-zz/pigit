@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pigit.termui import bind_action, Component, dismiss_sheet, palette, Segment, Surface
 from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.sheet import Sheet
 
 from .app_theme import THEME
 from .app_types import (
@@ -52,7 +53,7 @@ class InspectorSheet(Component):
     @staticmethod
     def sheet_height(rows: list, term_h: int, *, border: int = 1) -> int:
         """Clamp sheet height to ``[3, term_h // 2]`` including border."""
-        return min(max(len(rows) + border, 3), max(3, term_h // 2))
+        return Sheet.clamp_height(rows, term_h, border=border)
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
