@@ -3,7 +3,8 @@ Package: pigit.termui
 Description: Unified lightweight terminal UI framework.
 
 Usage:
-    from pigit.termui import Component, Toast, ComponentRoot
+    from pigit.termui import Application, Component, show_toast, set_theme
+    from pigit.termui.widgets import ItemList, Footer, Sheet
 """
 
 from __future__ import annotations
@@ -17,28 +18,17 @@ from .types import (
     OverlayDispatchResult,
     ToastPosition,
 )
-from ._feedback import FeedbackKind
+from .feedback import FeedbackKind
 
 # Core components
-from ._component import Component, ComponentError, bind_signals, render_child, resolve_presentation_leaf
-
-# Overlay components
-from .widgets import (
-    AlertDialog,
-    AlertDialogBody,
-    HelpEntry,
-    HelpPanel,
-    Popup,
-    Sheet,
-    Toast,
-)
+from .component import Component, ComponentError, bind_signals, render_child, resolve_presentation_leaf
 
 # Event loop
 from .event_loop import ExitEventLoop
 
 # Root and application
-from ._root import ComponentRoot
-from ._application import Application
+from .root import ComponentRoot
+from .application import Application
 
 # Runtime context — single source of truth for all context state
 from ._runtime_context import (
@@ -51,7 +41,7 @@ from ._runtime_context import (
 )
 
 # Overlay and convenience APIs
-from ._overlay_api import (
+from .overlay import (
     dismiss_sheet,
     dismiss_toast,
     exec_external,
@@ -65,7 +55,7 @@ from ._overlay_api import (
 )
 
 # Other utilities
-from ._bindings import (
+from .bindings import (
     Binding,
     bind_action,
     BindingError,
@@ -73,15 +63,13 @@ from ._bindings import (
     set_key_overrides,
 )
 from . import keys
-from ._renderer import Renderer
-from ._surface import Surface
-from ._segment import Segment
+from .surface import Surface
+from .segment import Segment
 from . import palette
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
-from ._syntax import SyntaxTokenizer
-from ._mouse import MouseButton, MouseEvent, MouseKind
-from ._async_task import AsyncTask, run_async
+from .mouse import MouseButton, MouseEvent, MouseKind
+from .async_task import AsyncTask, run_async
 
 __all__ = [
     # Types
@@ -98,14 +86,6 @@ __all__ = [
     "bind_signals",
     "render_child",
     "resolve_presentation_leaf",
-    # Overlays
-    "AlertDialog",
-    "AlertDialogBody",
-    "HelpEntry",
-    "HelpPanel",
-    "Popup",
-    "Sheet",
-    "Toast",
     # Root & App
     "ComponentRoot",
     "Application",
@@ -127,7 +107,6 @@ __all__ = [
     "DEFAULT_THEME",
     "get_theme",
     "set_theme",
-    "Renderer",
     "get_renderer",
     "get_renderer_strict",
     "get_focus_manager",
@@ -149,6 +128,4 @@ __all__ = [
     "request_render",
     # Session context
     "exec_external",
-    # Syntax highlighting
-    "SyntaxTokenizer",
 ]

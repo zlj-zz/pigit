@@ -10,8 +10,8 @@ from __future__ import annotations
 import threading
 import time
 
-from pigit.termui._async_task import AsyncTask
-from pigit.termui._component import Component
+from pigit.termui.async_task import AsyncTask
+from pigit.termui.component import Component
 from pigit.termui.event_loop import AppEventLoop
 
 
@@ -224,7 +224,7 @@ def test_async_task_race_new_start_drops_old_result():
 def test_run_async_clipboard_callback(mocker):
     """run_async with copy_to_clipboard delivers result via callback."""
     import pigit.ext.utils
-    from pigit.termui._async_task import run_async
+    from pigit.termui.async_task import run_async
 
     mocker.patch("pigit.ext.utils.copy_to_clipboard", return_value=True)
     received = []
@@ -247,7 +247,7 @@ def test_run_async_clipboard_callback(mocker):
 def test_run_async_dedup(mocker):
     """Rapid run_async calls cancel the old task when caller manages the handle."""
     import pigit.ext.utils
-    from pigit.termui._async_task import run_async
+    from pigit.termui.async_task import run_async
 
     old_started = threading.Event()
     old_can_finish = threading.Event()

@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_async_task.py
+Module: pigit/termui/async_task.py
 Description: Cancellable async task runner for non-blocking data loading.
     Results are delivered back to the main thread via a global queue
     polled by AppEventLoop each frame.

@@ -11,7 +11,7 @@ import math
 from collections.abc import Callable
 
 from .. import palette
-from .._component import Component
+from ..component import Component
 from ..wcwidth_table import wcswidth
 
 # Box-drawing characters

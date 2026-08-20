@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_mouse.py
+Module: pigit/termui/mouse.py
 Description: Mouse event model and xterm SGR mouse parser.
 Author: Zev
 Date: 2026-08-13
@@ -36,7 +36,7 @@ class MouseEvent:
     """A parsed terminal mouse event.
 
     ``col`` and ``row`` are 1-based, matching xterm SGR coordinates and
-    :class:`~pigit.termui._component.Component` ``x``/``y`` positions.
+    :class:`~pigit.termui.component.Component` ``x``/``y`` positions.
     """
 
     col: int

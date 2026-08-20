@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from .._component import Component
-from .._surface import Surface, _Subsurface
+from ..component import Component
+from ..surface import Surface, _Subsurface
 from ..theme import get_theme
 from ..types import OverlayDispatchResult
 

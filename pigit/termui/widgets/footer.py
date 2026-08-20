@@ -10,8 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .. import palette
-from .._component import Component
-from .._surface import Surface
+from ..component import Component
+from ..surface import Surface
 from ..theme import get_theme
 from ..wcwidth_table import truncate_by_width, wcswidth
 

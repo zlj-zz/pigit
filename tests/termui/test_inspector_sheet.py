@@ -15,7 +15,7 @@ from pigit.app import PigitApplication
 from pigit.app_inspector import InspectorSheet
 from pigit.config_data import AppConfig
 from pigit.termui._layer import LayerKind
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.app_theme import THEME
 from pigit.app_types import (
@@ -25,7 +25,7 @@ from pigit.app_types import (
     StashSnapshot,
 )
 from pigit.termui import palette
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 
 
 def _plain(rows: list[list[Segment]]) -> list[str]:

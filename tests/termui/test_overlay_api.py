@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 from pigit.termui._layer import LayerKind
 from pigit.termui import palette
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
-from pigit.termui._overlay_api import (
+from pigit.termui.overlay import (
     dismiss_sheet,
     dismiss_toast,
     exec_external,

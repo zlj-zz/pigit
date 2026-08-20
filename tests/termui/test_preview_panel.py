@@ -12,9 +12,9 @@ from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.git.model import File, Stash
 from pigit.termui import EVT_SELECTION_CHANGED, Component
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
-from pigit.termui._root import ComponentRoot
-from pigit.termui._surface import Surface
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+from pigit.termui.root import ComponentRoot
+from pigit.termui.surface import Surface
 from pigit.termui.event_bus import EventBus
 from pigit.termui.widgets.line_text_browser import LineTextBrowser
 

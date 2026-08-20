@@ -1,5 +1,5 @@
 """
-Module: pigit/termui/_feedback.py
+Module: pigit/termui/feedback.py
 Description: Feedback semantic levels (kind) and their visual style mapping.
 Author: Zev
 Date: 2026-08-14

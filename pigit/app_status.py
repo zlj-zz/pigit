@@ -20,7 +20,6 @@ from pigit.termui import (
     EventType,
     FeedbackKind,
     EVT_GOTO,
-    AlertDialog,
     bind_action,
     bind_signals,
     by_id,
@@ -33,6 +32,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
+from pigit.termui.widgets import AlertDialog
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import InputLine, ItemList
 

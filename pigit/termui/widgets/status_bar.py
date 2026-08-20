@@ -10,8 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..theme import get_theme
-from .._component import Component, bind_signals
-from .._surface import Surface, _Subsurface
+from ..component import Component, bind_signals
+from ..surface import Surface, _Subsurface
 from ..reactive import Computed, Signal, ValueRef
 from ..tty_io import truncate_line
 from ..wcwidth_table import pad_by_width

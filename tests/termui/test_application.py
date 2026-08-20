@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pigit.termui import bind_action
-from pigit.termui._application import Application
-from pigit.termui._component import Component
+from pigit.termui.application import Application
+from pigit.termui.component import Component
 from pigit.termui.event_loop import ExitEventLoop
 
 
@@ -34,7 +34,7 @@ class DummyApp(Application):
 class TestApplication:
     def test_run_uses_app_event_loop(self):
         app = DummyApp()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             mock_loop = MagicMock()
             MockLoop.return_value = mock_loop
             app.run()
@@ -54,7 +54,7 @@ class TestApplication:
                 return False
 
         app = _App()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             root = MockLoop.call_args.args[0]
@@ -70,7 +70,7 @@ class TestApplication:
                 self.hooked = True
 
         app = Hooked()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             MockLoop.call_args.kwargs["on_after_start"]()
@@ -79,7 +79,7 @@ class TestApplication:
     def test_destroy_called_after_loop_exit(self):
         """root.destroy() must be called in finally block after loop exits."""
         app = DummyApp()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             assert app._root is None
@@ -105,7 +105,7 @@ class TestApplication:
             min_terminal_size = (65, 10)
 
         app = SizedApp()
-        with patch("pigit.termui._application.AppEventLoop") as MockLoop:
+        with patch("pigit.termui.application.AppEventLoop") as MockLoop:
             MockLoop.return_value = MagicMock()
             app.run()
             on_after_start = MockLoop.call_args.kwargs["on_after_start"]

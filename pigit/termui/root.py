@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_root.py
+Module: pigit/termui/root.py
 Description: Internal framework root that wraps body + LayerStack.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations
@@ -12,18 +12,18 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
-from ._component import Component, resolve_focus_leaf
+from .component import Component, resolve_focus_leaf
 from ._layer import LayerKind, LayerStack
-from ._mouse import MouseEvent
+from .mouse import MouseEvent
 from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
-from ._overlay_api import get_badge_signal
+from .overlay import get_badge_signal
 from . import palette
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
-    from ._surface import Surface, _Subsurface
+    from .surface import Surface, _Subsurface
     from .widgets import Sheet
 
 

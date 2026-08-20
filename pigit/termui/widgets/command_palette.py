@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 
 from .. import keys
 from ..theme import get_theme
-from .._component import Component
+from ..component import Component
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 from .input_line import InputLine

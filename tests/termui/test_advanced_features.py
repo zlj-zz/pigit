@@ -7,7 +7,7 @@ import pytest
 
 from pigit.app_command_palette import CommandPalette
 from pigit.app_contribution_graph import ContributionGraph
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 
 
 class TestCommandPalette:
@@ -180,7 +180,7 @@ class TestContributionGraph:
                 for i in range(400)
             ]
         )
-        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
         from pigit.app_contribution_graph import _PAN_STEP
 
         r.resize((80, 16))

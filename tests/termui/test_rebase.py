@@ -132,7 +132,7 @@ class TestRebasePanel:
         assert panel._items[0].action == "drop"
 
     def test_render_reserves_last_row_for_hint(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         panel, _ = _panel([_commit("a1"), _commit("b1")])
         panel.activate()

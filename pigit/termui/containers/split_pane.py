@@ -10,13 +10,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
-from .._component import Component
+from ..component import Component
 from .._layout import layout_flex
 
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class SplitPane(Component):

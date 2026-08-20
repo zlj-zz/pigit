@@ -159,7 +159,7 @@ class TestPreTokenizeWithWordDiff:
 
     def test_word_diff_segments_get_background(self):
         from pigit.app_theme import THEME
-        from pigit.termui import SyntaxTokenizer
+        from pigit.termui.syntax import SyntaxTokenizer
 
         tokenizer = SyntaxTokenizer()
         content = ["+foo bar baz"]
@@ -182,7 +182,7 @@ class TestPreTokenizeWithWordDiff:
 
     def test_del_segment_gets_delete_background(self):
         from pigit.app_theme import THEME
-        from pigit.termui import SyntaxTokenizer
+        from pigit.termui.syntax import SyntaxTokenizer
 
         tokenizer = SyntaxTokenizer()
         content = ["-foo bar"]
@@ -202,7 +202,7 @@ class TestDrawTokensWithPerTokenBackground:
     """_draw_tokens honours per-token background override."""
 
     def test_token_background_overrides_line_background(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
         from pigit.app_theme import THEME
 
         dv = DiffViewer()

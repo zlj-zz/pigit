@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.termui._component import Component
-from pigit.termui._surface import Surface
+from pigit.termui.component import Component
+from pigit.termui.surface import Surface
 from pigit.termui.containers.split_pane import SplitPane
 
 

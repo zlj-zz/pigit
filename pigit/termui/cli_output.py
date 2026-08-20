@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from . import palette
 from ._color import ColorAdapter
 from ._markup import _resolve_color, parse_markup
-from ._segment import Segment
+from .segment import Segment
 
 if TYPE_CHECKING:
     RGB = tuple[int, int, int]

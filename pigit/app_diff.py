@@ -21,23 +21,22 @@ from pigit.termui import (
     EventType,
     FeedbackKind,
     EVT_GOTO,
-    AlertDialog,
     AsyncTask,
     Component,
-    SyntaxTokenizer,
     bind_action,
     palette,
     request_render,
     show_badge,
     show_toast,
 )
+from pigit.termui.syntax import SyntaxTokenizer
 from pigit.termui.primitives import (
     format_line_number,
     merge_ranges,
     plain,
     tokenize_with_positions,
 )
-from pigit.termui.widgets import LineTextBrowser
+from pigit.termui.widgets import AlertDialog, LineTextBrowser
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME

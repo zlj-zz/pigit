@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.termui._syntax import (
+from pigit.termui.syntax import (
     SyntaxTokenizer,
     SYNTAX_COLORS,
 )

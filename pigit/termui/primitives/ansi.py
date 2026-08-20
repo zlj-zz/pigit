@@ -12,7 +12,7 @@ import re
 
 from .. import palette
 from .._color import _ANSI_16_PALETTE, xterm256_to_rgb
-from .._segment import Segment
+from ..segment import Segment
 
 _OSC_RE = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 _CSI_FINAL_MIN = 0x40

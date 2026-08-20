@@ -1,9 +1,9 @@
 """
-Module: pigit/termui/_overlay_api.py
+Module: pigit/termui/overlay.py
 Description: High-level overlay and convenience APIs that operate implicitly
     within the current RuntimeContext.
 Author: Zev
-Date: 2026-06-10
+Date: 2026-08-20
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 
 _R = TypeVar("_R")
 
-from ._feedback import FeedbackKind, style_for
+from .feedback import FeedbackKind, style_for
 from ._layer import LayerKind
 from . import palette
 from .reactive import Signal
@@ -31,8 +31,8 @@ from ._runtime_context import (
 )
 
 if TYPE_CHECKING:
-    from ._component import Component
-    from ._segment import Segment
+    from .component import Component
+    from .segment import Segment
     from .widgets import Sheet, Toast
 
 _logger = logging.getLogger(__name__)
@@ -227,7 +227,7 @@ def show_spinner(message: str) -> Toast | None:
 
     The message is prefixed with ``»`` and suffixed with ``…`` automatically.
     """
-    from ._segment import Segment
+    from .segment import Segment
 
     return show_toast(
         "",

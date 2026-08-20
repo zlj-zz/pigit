@@ -9,7 +9,7 @@ Date: 2026-04-18
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui import ToastPosition
 from pigit.termui.widgets import (
     AlertDialogBody,
@@ -20,7 +20,7 @@ from pigit.termui.widgets import (
     Toast,
 )
 from pigit.termui.types import OverlayDispatchResult
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 
@@ -55,7 +55,7 @@ class DummyBody(Component):
 
 def _make_root(body):
     """Create a ComponentRoot and wire it into the current RuntimeContext."""
-    from pigit.termui._root import ComponentRoot
+    from pigit.termui.root import ComponentRoot
 
     root = ComponentRoot(body)
     runtime = RuntimeContext.current()
@@ -68,8 +68,8 @@ def _make_root(body):
 class TestOverlayContext:
     def test_show_toast_with_host(self):
         """验证 show_toast 在 overlay host context 下能工作"""
-        from pigit.termui._overlay_api import show_toast
-        from pigit.termui._root import ComponentRoot
+        from pigit.termui.overlay import show_toast
+        from pigit.termui.root import ComponentRoot
 
         root = _make_root(DummyBody())
         root.resize((80, 24))
@@ -86,7 +86,7 @@ class TestOverlayContext:
             get_overlay_host,
             reset_overlay_host,
         )
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         # 清除 overlay host
         reset_overlay_host()
@@ -96,8 +96,8 @@ class TestOverlayContext:
 
     def test_show_sheet_with_host(self):
         """验证 show_sheet 在 overlay host context 下能工作"""
-        from pigit.termui._overlay_api import show_sheet
-        from pigit.termui._root import ComponentRoot
+        from pigit.termui.overlay import show_sheet
+        from pigit.termui.root import ComponentRoot
 
         root = _make_root(DummyBody())
         root.resize((80, 24))
@@ -109,8 +109,8 @@ class TestOverlayContext:
 
     def test_show_toast_position_parameter(self):
         """验证 show_toast 支持传递 position 参数"""
-        from pigit.termui._overlay_api import show_toast
-        from pigit.termui._root import ComponentRoot
+        from pigit.termui.overlay import show_toast
+        from pigit.termui.root import ComponentRoot
 
         root = _make_root(DummyBody())
         root.resize((80, 24))
@@ -643,7 +643,7 @@ class TestHelpPanel:
 
     def test_help_panel_mouse_wheel_scrolls(self):
         """Wheel events scroll the help list like keyboard j/k."""
-        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
         panel = HelpPanel(inner_width=40, inner_height=6)
         panel.set_entries([(str(i), f"desc {i}") for i in range(20)])
@@ -821,7 +821,7 @@ class TestAlertDialogBody:
         shell._finish_alert.assert_called_once_with(True)
 
     def test_prepare_destructive_uses_error_style_border(self):
-        from pigit.termui._feedback import FeedbackKind, style_for
+        from pigit.termui.feedback import FeedbackKind, style_for
 
         body = AlertDialogBody(
             shell=MagicMock(),

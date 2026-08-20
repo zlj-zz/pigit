@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from pigit.app_stash import StashPanel
 from pigit.git.model import Stash
 from pigit.termui import palette
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 from pigit.termui.reactive import Signal
 from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.status import IStatusViewModel

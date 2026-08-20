@@ -13,11 +13,11 @@ from collections.abc import Callable, Sequence
 
 from .. import palette
 from ..theme import get_theme
-from .._component import Component
-from .._feedback import FeedbackKind, style_for
+from ..component import Component
+from ..feedback import FeedbackKind, style_for
 from ..primitives.frame import BoxFrame
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..types import ToastPosition, OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 

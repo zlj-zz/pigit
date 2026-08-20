@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.reactive import Signal
 from pigit.termui._runtime_context import (
     RuntimeContext,

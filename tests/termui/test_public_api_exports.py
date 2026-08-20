@@ -114,3 +114,36 @@ def test_primitives_symbols_not_on_root():
     for name in sorted(PRIMITIVES_LEFT_ROOT):
         assert name not in termui.__all__
         assert not hasattr(termui, name)
+
+
+WIDGET_LEFT_ROOT = frozenset(
+    {
+        "Toast",
+        "Sheet",
+        "Popup",
+        "AlertDialog",
+        "AlertDialogBody",
+        "HelpPanel",
+        "HelpEntry",
+    }
+)
+
+
+def test_widget_classes_not_on_root():
+    from pigit import termui
+
+    for name in sorted(WIDGET_LEFT_ROOT):
+        assert name not in termui.__all__
+        assert not hasattr(termui, name)
+
+
+def test_syntax_and_renderer_not_on_root():
+    from pigit import termui
+
+    assert "SyntaxTokenizer" not in termui.__all__
+    assert "Renderer" not in termui.__all__
+    from pigit.termui.syntax import SyntaxTokenizer
+    from pigit.termui.renderer import Renderer
+
+    assert SyntaxTokenizer is not None
+    assert Renderer is not None

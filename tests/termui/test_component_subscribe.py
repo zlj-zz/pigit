@@ -5,7 +5,7 @@ Integration tests for Component.subscribe() wired through ComponentRoot.
 from __future__ import annotations
 
 from pigit.termui import Component
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui.event_bus import EventBus
 from pigit.termui.types import EventType, EVT_SELECTION_CHANGED
 

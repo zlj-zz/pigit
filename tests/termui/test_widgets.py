@@ -16,8 +16,8 @@ from pigit.termui.widgets import (
 from pigit.termui.reactive import Signal
 
 
-from pigit.termui._segment import Segment
-from pigit.termui._surface import Surface
+from pigit.termui.segment import Segment
+from pigit.termui.surface import Surface
 from pigit.termui.theme import get_theme
 
 
@@ -309,7 +309,7 @@ class TestInputLine:
         assert not inp._showing_candidates
 
     def test_render_with_candidates(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
         from pigit.termui.theme import get_theme
 
         inp = InputLine(

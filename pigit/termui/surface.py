@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_surface.py
+Module: pigit/termui/surface.py
 Description: 2-D character buffer for declarative terminal drawing.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .wcwidth_table import (
 )
 
 if TYPE_CHECKING:
-    from ._segment import Segment
+    from .segment import Segment
 
 # Box-drawing (UTF-8).
 _BOX_H = "\u2500"

@@ -6,8 +6,8 @@ from __future__ import annotations
 from unittest import mock
 
 from pigit.termui._color import ColorAdapter, ColorMode
-from pigit.termui._surface import FlatCell, Surface
-from pigit.termui._renderer import Renderer
+from pigit.termui.surface import FlatCell, Surface
+from pigit.termui.renderer import Renderer
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 

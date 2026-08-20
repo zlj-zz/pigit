@@ -8,9 +8,9 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
-from pigit.termui._segment import Segment
-from pigit.termui._surface import Surface
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+from pigit.termui.segment import Segment
+from pigit.termui.surface import Surface
 from pigit.termui.widgets.bordered_browser import BorderedBrowser
 from pigit.termui.widgets.line_text_browser import LineTextBrowser
 

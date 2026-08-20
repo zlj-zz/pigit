@@ -11,14 +11,14 @@ import logging
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Sequence
 
-from .._component import Component
+from ..component import Component
 from .._layout import layout_flex
 from ..types import EventType
 
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class Row(Component):

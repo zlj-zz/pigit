@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar, cast, runtime_checkable
 from collections.abc import Callable
 
-from pigit.termui._async_task import AsyncTask
+from pigit.termui.async_task import AsyncTask
 from pigit.termui.reactive import Signal
 
 T = TypeVar("T")

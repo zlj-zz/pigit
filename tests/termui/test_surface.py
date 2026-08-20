@@ -5,7 +5,7 @@ Tests for pigit.termui.surface.
 
 from __future__ import annotations
 
-from pigit.termui._surface import FlatCell, Surface
+from pigit.termui.surface import FlatCell, Surface
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
 
 

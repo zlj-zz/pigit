@@ -16,9 +16,9 @@ from pigit.app_branch import BranchPanel
 from pigit.app_log_graph_preview import LogGraphPreview
 from pigit.git.model import Branch
 from pigit.termui import EVT_SELECTION_CHANGED, Component
-from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
-from pigit.termui._root import ComponentRoot
-from pigit.termui._surface import Surface
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+from pigit.termui.root import ComponentRoot
+from pigit.termui.surface import Surface
 from pigit.termui._color import _ANSI_16_PALETTE
 from pigit.termui.event_bus import EventBus
 from pigit.termui.reactive import Signal

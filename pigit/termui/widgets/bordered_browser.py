@@ -9,15 +9,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .._component import Component, render_child
+from ..component import Component, render_child
 from ..primitives.frame import BoxFrame
-from .._mouse import MouseEvent
-from .._segment import Segment
+from ..mouse import MouseEvent
+from ..segment import Segment
 from ..theme import get_theme
 from .line_text_browser import LineTextBrowser
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class BorderedBrowser(Component):

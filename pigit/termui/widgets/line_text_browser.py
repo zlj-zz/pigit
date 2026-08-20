@@ -7,10 +7,10 @@ Date: 2026-05-16
 
 from __future__ import annotations
 
-from .._component import Component
-from .._mouse import MouseButton, MouseKind, MouseEvent
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..component import Component
+from ..mouse import MouseButton, MouseKind, MouseEvent
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..theme import get_theme
 
 _USE_THEME_BG = object()

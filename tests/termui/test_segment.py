@@ -7,7 +7,7 @@ Date: 2026-05-20
 
 from __future__ import annotations
 
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 from pigit.termui.palette import (
     STYLE_BOLD,
     STYLE_DIM,

@@ -9,10 +9,10 @@ Date: 2026-04-17
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui import ToastPosition
 from pigit.termui._layer import LayerKind
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult, EVT_GOTO
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
@@ -105,7 +105,7 @@ class TestComponentRoot:
 
     def test_show_toast(self):
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -120,7 +120,7 @@ class TestComponentRoot:
     def test_show_toast_with_position(self):
         """验证 show_toast 支持 position 参数"""
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -132,7 +132,7 @@ class TestComponentRoot:
     def test_show_toast_singleton_replaces_existing(self):
         """验证新 Toast 替换旧 Toast（单例模式）"""
         from pigit.termui._runtime_context import set_overlay_host
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         root.resize((80, 24))
@@ -148,7 +148,7 @@ class TestComponentRoot:
         assert toast1.open is False  # 旧 Toast 被关闭
 
     def test_show_sheet(self):
-        from pigit.termui._component import Component
+        from pigit.termui.component import Component
 
         class _Inner(Component):
             NAME = "inner"
@@ -168,7 +168,7 @@ class TestComponentRoot:
         assert inner.parent is sheet
 
     def test_sheet_mouse_miss_falls_through_to_body(self):
-        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
         hits: list[tuple[int, int]] = []
 
@@ -200,7 +200,7 @@ class TestComponentRoot:
         assert hits == [(10, 20)]
 
     def test_sheet_mouse_hit_does_not_reach_body(self):
-        from pigit.termui._mouse import MouseButton, MouseEvent, MouseKind
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
         hits: list[tuple[int, int]] = []
 
@@ -234,7 +234,7 @@ class TestComponentRoot:
             set_overlay_host,
             reset_overlay_host,
         )
-        from pigit.termui._overlay_api import show_toast
+        from pigit.termui.overlay import show_toast
 
         root = ComponentRoot(DummyBody())
         set_overlay_host(root)
@@ -242,7 +242,7 @@ class TestComponentRoot:
             toast = show_toast("expiring", duration=0.0)
             assert toast is not None
             assert root._layer_stack.top(LayerKind.TOAST) is toast
-            from pigit.termui._surface import Surface
+            from pigit.termui.surface import Surface
 
             surface = Surface(10, 5)
             root._render_surface(surface)

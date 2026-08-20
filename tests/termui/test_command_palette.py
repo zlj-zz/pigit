@@ -9,7 +9,7 @@ Date: 2026-08-20
 from __future__ import annotations
 
 from pigit.termui import keys
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 from pigit.termui.widgets import CommandPalette
 
 _ITEMS = ["alpha", "beta", "gamma"]

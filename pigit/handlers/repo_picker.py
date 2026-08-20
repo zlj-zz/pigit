@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pigit.termui import ExitEventLoop, palette
 from pigit.app_theme import THEME
 from pigit.picker_app import BasePickerApp, PickerRow
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 from pigit.termui.widgets import CheckList, ItemList
 from pigit.termui.tty_io import UNSUPPORTED_PLATFORM_MSG, platform_supported, tty_ok
 

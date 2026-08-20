@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from .types import LayerKind, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from ._surface import Surface, _Subsurface
+    from .surface import Surface, _Subsurface
 
 _VISIBLE_LAYER_KINDS = (LayerKind.TOAST, LayerKind.SHEET, LayerKind.MODAL)
 

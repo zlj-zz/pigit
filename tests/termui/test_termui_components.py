@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from pigit.termui._component import Component, ComponentError
+from pigit.termui.component import Component, ComponentError
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import ItemList, LineTextBrowser
 from pigit.termui.types import (
@@ -228,7 +228,7 @@ class TestLineTextBrowser:
         assert browser.x == expected_position[0]
         assert browser.y == expected_position[1]
         if content:
-            from pigit.termui._surface import Surface
+            from pigit.termui.surface import Surface
 
             # Components render at local (0,0) coordinates into the surface.
             s = Surface(size[0], size[1])
@@ -298,7 +298,7 @@ class TestLineTextBrowser:
         assert browser._i == expected_index
 
     def test_render_no_content(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         browser = MockLineTextBrowser(size=(10, 2))
         s = Surface(10, 2)
@@ -310,7 +310,7 @@ class TestLineTextBrowser:
         assert browser._i == 0
 
     def test_render_transparent_bg_does_not_paint_cell_background(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         browser = MockLineTextBrowser(content=["hi"], size=(10, 2), bg=None)
         surface = Surface(10, 2)
@@ -322,8 +322,8 @@ class TestLineTextBrowser:
         assert surface._rows[0][2].bg == (9, 9, 9)
 
     def test_render_segment_rows_keeps_fg(self):
-        from pigit.termui._segment import Segment
-        from pigit.termui._surface import Surface
+        from pigit.termui.segment import Segment
+        from pigit.termui.surface import Surface
 
         fg = (1, 2, 3)
         browser = MockLineTextBrowser(
@@ -492,7 +492,7 @@ class TestItemListSkipIndices:
 
 class TestItemListDrawHelpers:
     def test_draw_right_aligned_draws_when_fits(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         sel = MockItemList(size=(20, 1))
         surface = Surface(20, 1)
@@ -503,7 +503,7 @@ class TestItemListDrawHelpers:
         assert "ok" in row_text
 
     def test_draw_right_aligned_skips_when_too_wide(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         sel = MockItemList(size=(5, 1))
         surface = Surface(5, 1)
@@ -513,8 +513,8 @@ class TestItemListDrawHelpers:
         assert result is False
 
     def test_draw_row_layout_with_row_bg(self):
-        from pigit.termui._surface import Surface
-        from pigit.termui._segment import Segment
+        from pigit.termui.surface import Surface
+        from pigit.termui.segment import Segment
 
         sel = MockItemList(size=(10, 1))
         surface = Surface(10, 1)

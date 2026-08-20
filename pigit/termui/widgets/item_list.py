@@ -14,11 +14,11 @@ import logging
 
 from .. import keys, palette
 from ..theme import get_theme
-from .._component import Component, ComponentError
-from .._mouse import MouseButton, MouseKind, MouseEvent
+from ..component import Component, ComponentError
+from ..mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..reactive import Signal
 from ..types import EVT_SELECTION_CHANGED
 from ..wcwidth_table import truncate_by_width, wcswidth

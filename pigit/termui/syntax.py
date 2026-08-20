@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_syntax.py
+Module: pigit/termui/syntax.py
 Description: Lightweight syntax tokenizer for diff code highlighting.
 Author: Zev
-Date: 2026-04-27
+Date: 2026-08-20
 """
 
 from __future__ import annotations

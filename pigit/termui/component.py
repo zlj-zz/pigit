@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_component.py
+Module: pigit/termui/component.py
 Description: Base Component class and related utilities for the TUI framework.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from ._bindings import (
+from .bindings import (
     BindingsList,
     derive_help_entries,
     resolve_action_keys,
     resolve_instance_bindings,
 )
-from ._mouse import MouseEvent
+from .mouse import MouseEvent
 from .keys import display_key
 from ._runtime_context import (
     get_renderer,
@@ -29,8 +29,8 @@ from .reactive import Computed, Signal
 from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from ._renderer import Renderer
-    from ._surface import Surface, _Subsurface
+    from .renderer import Renderer
+    from .surface import Surface, _Subsurface
 
 _logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class Component(ABC):
         If the component is not yet mounted, the subscription is queued and
         replayed on activation. The returned callback unsubscribes the handler.
         """
-        from ._root import ComponentRoot
+        from .root import ComponentRoot
 
         root = self._root_component()
         bus = root.event_bus if isinstance(root, ComponentRoot) else None
@@ -178,7 +178,7 @@ class Component(ABC):
         return delayed_unsub
 
     def _replay_pending_subscriptions(self) -> None:
-        from ._root import ComponentRoot
+        from .root import ComponentRoot
 
         root = self._root_component()
         bus = root.event_bus if isinstance(root, ComponentRoot) else None
@@ -198,7 +198,7 @@ class Component(ABC):
 
     def _root_component(self) -> Any:
         """Walk parent chain to find the ComponentRoot, if mounted."""
-        from ._root import ComponentRoot
+        from .root import ComponentRoot
 
         node = self.parent
         while node is not None:

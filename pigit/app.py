@@ -16,7 +16,6 @@ from pigit.termui import (
     EventType,
     EVT_SELECTION_CHANGED,
     FeedbackKind,
-    AlertDialog,
     bind_action,
     Application,
     Component,
@@ -26,10 +25,8 @@ from pigit.termui import (
     ExitEventLoop,
     get_focus_manager,
     get_renderer,
-    HelpPanel,
     hide_spinner,
     keys,
-    Popup,
     request_render,
     resolve_presentation_leaf,
     show_badge,
@@ -42,7 +39,7 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import Header
+from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
 from .git.api import GitApi, GitError, RepoError

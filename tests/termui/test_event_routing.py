@@ -11,9 +11,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.containers import Column, Row, TabView
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui.types import OverlayDispatchResult
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
@@ -32,7 +32,7 @@ def _runtime_context():
 
 def _make_root(body):
     """Create a ComponentRoot and wire it into the current RuntimeContext."""
-    from pigit.termui._root import ComponentRoot
+    from pigit.termui.root import ComponentRoot
 
     root = ComponentRoot(body)
     runtime = RuntimeContext.current()

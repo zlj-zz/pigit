@@ -11,12 +11,12 @@ from collections.abc import Callable
 
 from .. import keys, palette
 from ..theme import get_theme
-from .._component import Component
+from ..component import Component
 from ..primitives.frame import BoxFrame
 from .._layout import Padding
-from .._mouse import MouseButton, MouseEvent, MouseKind
-from .._segment import Segment
-from .._surface import Surface, _Subsurface
+from ..mouse import MouseButton, MouseEvent, MouseKind
+from ..segment import Segment
+from ..surface import Surface, _Subsurface
 from ..wcwidth_table import truncate_by_width, wcswidth
 
 HelpEntry = tuple[str, str]

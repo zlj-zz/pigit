@@ -11,12 +11,12 @@ from typing import TYPE_CHECKING
 
 from pigit.termui import palette
 from pigit.termui.theme import get_theme
-from pigit.termui._component import Component, bind_signals
+from pigit.termui.component import Component, bind_signals
 from pigit.termui._runtime_context import request_render
-from pigit.termui._segment import Segment
+from pigit.termui.segment import Segment
 
 if TYPE_CHECKING:
-    from pigit.termui._surface import Surface, _Subsurface
+    from pigit.termui.surface import Surface, _Subsurface
     from pigit.termui.widgets import InputLine
 
 

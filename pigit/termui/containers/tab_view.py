@@ -11,14 +11,14 @@ import logging
 from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from .._component import Component, _render_child_to_surface, resolve_focus_leaf
+from ..component import Component, _render_child_to_surface, resolve_focus_leaf
 from .._runtime_context import get_focus_manager
 from ..types import EventType, EVT_GOTO
 
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class TabView(Component):

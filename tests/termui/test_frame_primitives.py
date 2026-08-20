@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 from pigit.termui.primitives.frame import BoxFrame
 
 

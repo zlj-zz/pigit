@@ -8,7 +8,7 @@ from pigit.app_theme import THEME
 from pigit.termui import Segment
 from pigit.termui.widgets import Footer, Header
 from pigit.termui.palette import STYLE_BOLD
-from pigit.termui._surface import Surface
+from pigit.termui.surface import Surface
 from pigit.termui.theme import get_theme
 
 

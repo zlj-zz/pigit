@@ -8,7 +8,7 @@ Date: 2026-04-20
 
 import pytest
 
-from pigit.termui._component import Component
+from pigit.termui.component import Component
 from pigit.termui.containers import Column, Row
 from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
 
@@ -95,7 +95,7 @@ class TestColumn:
         assert c1._size == (10, 5)
 
     def test_render_skips_zero_size(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         c1 = _make_component()
         c2 = _make_component()
@@ -105,7 +105,7 @@ class TestColumn:
         col._render_surface(s)
 
     def test_render_skips_negative_position(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         c1 = _make_component()
         col = Column([c1], heights=[1])
@@ -205,7 +205,7 @@ class TestRow:
         assert c3._size == (7, 5)
 
     def test_render_skips_zero_size(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         c1 = _make_component()
         c2 = _make_component()
@@ -215,7 +215,7 @@ class TestRow:
         row._render_surface(s)
 
     def test_render_skips_negative_position(self):
-        from pigit.termui._surface import Surface
+        from pigit.termui.surface import Surface
 
         c1 = _make_component()
         row = Row([c1], widths=[1])

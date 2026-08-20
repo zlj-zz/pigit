@@ -10,7 +10,7 @@ from __future__ import annotations
 from .. import palette
 from ..theme import get_theme
 from ..reactive import Signal
-from .._segment import Segment
+from ..segment import Segment
 from .item_list import ItemList
 
 

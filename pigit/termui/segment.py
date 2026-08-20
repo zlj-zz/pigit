@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_segment.py
+Module: pigit/termui/segment.py
 Description: Styled text fragment for terminal rendering.
 Author: Zev
-Date: 2026-04-30
+Date: 2026-08-20
 """
 
 from __future__ import annotations

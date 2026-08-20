@@ -13,7 +13,7 @@ import pytest
 from pigit.app import PigitApplication
 from pigit.config_data import AppConfig
 from pigit.termui import keys
-from pigit.termui._root import ComponentRoot
+from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 

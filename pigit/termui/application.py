@@ -1,8 +1,8 @@
 """
-Module: pigit/termui/_application.py
+Module: pigit/termui/application.py
 Description: Application facade that composes a root component tree and an event loop.
 Author: Zev
-Date: 2026-04-19
+Date: 2026-08-20
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING, Any, TypedDict
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-from ._bindings import (
+from .bindings import (
     BindingsList,
     derive_help_entries,
     resolve_instance_bindings,
 )
-from ._component import Component
-from ._root import ComponentRoot
+from .component import Component
+from .root import ComponentRoot
 from .event_bus import EventBus
 from .event_loop import AppEventLoop, ExitEventLoop
 from .types import EventType

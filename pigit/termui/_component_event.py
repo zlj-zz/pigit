@@ -21,7 +21,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ._component import Component
+    from .component import Component
     from .types import EventType
 
 _logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ def _maybe_reestablish_focus(component: Component) -> None:
     If *component* is the current leaf or an ancestor of it, set the chain
     to ``resolve_focus_leaf(component)``. Same-leaf is a no-op.
     """
-    from ._component import resolve_focus_leaf
+    from .component import resolve_focus_leaf
     from ._runtime_context import get_focus_manager
 
     fm = get_focus_manager()

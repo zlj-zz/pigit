@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from ._mouse import MouseEvent
+from .mouse import MouseEvent
 
 # A semantic input token: a keyboard string or a structured mouse event.
 SemanticEvent = str | MouseEvent

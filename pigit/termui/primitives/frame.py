@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from .. import palette
 
 if TYPE_CHECKING:
-    from .._surface import Surface, _Subsurface
+    from ..surface import Surface, _Subsurface
 
 
 class BoxFrame:

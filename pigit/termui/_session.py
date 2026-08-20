@@ -11,7 +11,7 @@ import sys
 from types import TracebackType
 from typing import TextIO
 
-from ._renderer import Renderer
+from .renderer import Renderer
 
 # xterm mouse reporting: button-event tracking (1002) + SGR extended
 # coordinates (1006). Enabled on POSIX terminals.
