@@ -90,7 +90,7 @@ class _FileioOps(_OpsBase):
             return "?", "?"
 
     def compare_index_worktree(self, relpath: str, path: str | None = None) -> str:
-        """Return ``equal``, ``differ``, or ``worktree`` (index missing)."""
+        """Return ``equal``, ``differ``, or ``worktree`` (untracked)."""
         path = path or self.path
         quoted = shlex.quote(relpath)
         code, _err, _out = self.executor.exec(
@@ -99,7 +99,22 @@ class _FileioOps(_OpsBase):
             flags=WAITING | REPLY | DECODE,
         )
         if code != 0:
-            return "worktree"
+            # No stage-0 entry: the path is untracked, staged for deletion,
+            # or in conflict. Only a genuinely untracked file is "worktree";
+            # the others still have tracked/conflict state worth reporting.
+            _ucode, _uerr, uout = self.executor.exec(
+                f"git ls-files -u -- {quoted}",
+                cwd=path,
+                flags=REPLY | DECODE,
+            )
+            if (uout or "").strip():
+                return "differ"  # unmerged
+            hcode, _herr, _hout = self.executor.exec(
+                f"git rev-parse --verify --end-of-options HEAD:{quoted}",
+                cwd=path,
+                flags=WAITING | REPLY | DECODE,
+            )
+            return "differ" if hcode == 0 else "worktree"
         # ``git diff --quiet`` applies the clean filter (EOL normalization,
         # ident, .gitattributes) to the worktree side, so it agrees with
         # ``git status`` where hashing the raw worktree bytes would not.

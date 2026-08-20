@@ -7,6 +7,7 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar, cast, runtime_checkable
 from collections.abc import Callable
@@ -60,6 +61,9 @@ class ViewModelBase(Generic[T]):
         self._unsubs: list[Callable[[], None]] = []
         self._inspector_key: object = self._NO_SNAPSHOT
         self._inspector_value: object | None = None
+        # Snapshot builds may run on an AsyncTask worker thread while a
+        # refresh invalidates the cache on the UI thread.
+        self._inspector_lock = threading.Lock()
 
     @property
     def items(self) -> Signal[list[T]]:
@@ -76,8 +80,9 @@ class ViewModelBase(Generic[T]):
         self._items.set(data)
         # A fresh load may have changed the underlying git state, so any
         # memoized inspector snapshot is stale.
-        self._inspector_key = self._NO_SNAPSHOT
-        self._inspector_value = None
+        with self._inspector_lock:
+            self._inspector_key = self._NO_SNAPSHOT
+            self._inspector_value = None
 
     def _memo_inspector(self, key: object, build: Callable[[], _S | None]) -> _S | None:
         """Return a memoized inspector snapshot for *key*.
@@ -85,12 +90,20 @@ class ViewModelBase(Generic[T]):
         Reopening the inspector on an unchanged selection reuses the previous
         snapshot instead of re-running git reads. Any refresh invalidates it
         via :meth:`_on_loaded`.
+
+        ``build`` runs outside the lock (it spawns git subprocesses); the
+        result is cached only if a refresh did not invalidate the slot while
+        it was running.
         """
-        if self._inspector_key == key:
-            return cast(_S | None, self._inspector_value)
+        with self._inspector_lock:
+            if self._inspector_key == key:
+                return cast(_S | None, self._inspector_value)
+            previous = self._inspector_key
         value = build()
-        self._inspector_key = key
-        self._inspector_value = value
+        with self._inspector_lock:
+            if self._inspector_key == previous:
+                self._inspector_key = key
+                self._inspector_value = value
         return value
 
     def item_at(self, idx: int) -> T | None:

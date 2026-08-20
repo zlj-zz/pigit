@@ -7,7 +7,7 @@ Date: 2026-08-19
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -222,8 +222,11 @@ def _tall_commit() -> CommitSnapshot:
 
 def test_open_inspector_is_top_sheet_not_body_child(runtime):
     app, root = _mount(runtime)
-    with patch.object(
-        app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+    with (
+        patch.object(
+            app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+        ),
+        patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
     ids = [child.id for child in app._body_row.children]
@@ -238,8 +241,11 @@ def test_open_inspector_is_top_sheet_not_body_child(runtime):
 def test_j_scrolls_sheet_not_status_list(runtime):
     app, root = _mount(runtime)
     before = app._status_panel.curr_no
-    with patch.object(
-        app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+    with (
+        patch.object(
+            app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+        ),
+        patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
     sheet = root._layer_stack.top(LayerKind.SHEET)
@@ -253,19 +259,52 @@ def test_j_scrolls_sheet_not_status_list(runtime):
 
 def test_esc_and_i_dismiss_inspector(runtime):
     app, root = _mount(runtime)
-    with patch.object(
-        app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+    with (
+        patch.object(
+            app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+        ),
+        patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
     assert root._layer_stack.top(LayerKind.SHEET) is not None
     root._layer_stack.dispatch("esc")
     assert root._layer_stack.top(LayerKind.SHEET) is None
 
-    with patch.object(
-        app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+    with (
+        patch.object(
+            app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+        ),
+        patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
     root._layer_stack.dispatch("I")
+    assert root._layer_stack.top(LayerKind.SHEET) is None
+
+
+def test_open_inspector_shows_placeholder_while_loading(runtime):
+    app, root = _mount(runtime)
+    with patch("pigit.app.run_async", return_value=MagicMock()) as ra:
+        app.open_inspector()
+    sheet = root._layer_stack.top(LayerKind.SHEET)
+    assert sheet is not None
+    assert isinstance(sheet._child, InspectorSheet)
+    text = "".join(s.text for row in sheet._child._browser._rows for s in row)
+    assert "Inspecting" in text
+    ra.assert_called_once()
+
+
+def test_inspector_load_dropped_when_placeholder_closed(runtime):
+    app, root = _mount(runtime)
+    captured: dict[str, object] = {}
+
+    def fake_run_async(work, cb):
+        captured["cb"] = cb
+        return MagicMock()
+
+    with patch("pigit.app.run_async", side_effect=fake_run_async):
+        app.open_inspector()
+    root._layer_stack.dispatch("esc")  # close the placeholder
+    captured["cb"](_tall_commit())  # a late result must not re-open the sheet
     assert root._layer_stack.top(LayerKind.SHEET) is None
 
 

@@ -108,11 +108,11 @@ def test_init_detached_uses_HEAD():
     assert vm.log_ref == "HEAD"
 
 
-def test_do_load_uses_log_ref_not_head(commit_vm):
+def test_load_commits_uses_log_ref_not_head(commit_vm):
     commit_vm._log_ref = "origin/foo"
     commit_vm._git.load_commits.return_value = []
     commit_vm._git.get_remotes.return_value = []
-    commit_vm._do_load()
+    commit_vm._load_commits()
     commit_vm._git.load_commits.assert_called_with("origin/foo")
 
 
@@ -154,15 +154,29 @@ def test_follow_head_without_pin_is_not_reset(commit_vm):
     assert commit_vm.log_ref == "main"
 
 
-def test_do_load_falls_back_when_pinned_ref_dangles(commit_vm):
+def test_load_falls_back_when_pinned_ref_dangles(commit_vm):
     commit_vm._git.verify_commitish.side_effect = GitError("bad ref")
     commit_vm.set_log_ref("feature")
     from unittest.mock import Mock as _Mock
 
     commit_vm._git.load_commits = _Mock(return_value=[])
-    commit_vm._do_load()
+    result = commit_vm._load_commits()
     # Fell back to the cached checkout; the list is HEAD's, not stale.
+    assert result.requested == "feature"
+    assert result.resolved == "main"
+    assert commit_vm.log_ref == "feature"  # worker never mutates _log_ref
+    commit_vm._apply_load(result)
     assert commit_vm.log_ref == "main"
+
+
+def test_apply_load_drops_stale_result(commit_vm):
+    """A load for an old ref must not clobber a newer pin."""
+    commit_vm._log_ref = "origin/foo"
+    stale = commit_vm._load_commits()
+    assert stale.requested == "origin/foo"
+    commit_vm._log_ref = "origin/bar"  # user re-pins before load lands
+    commit_vm._apply_load(stale)
+    assert commit_vm.log_ref == "origin/bar"
 
 
 def test_dispose_does_not_clear_log_ref(commit_vm):

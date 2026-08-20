@@ -453,6 +453,10 @@ def _diff_worktree_cmd(rel: str) -> str:
     return f"git diff --quiet --no-ext-diff -- {shlex.quote(rel)}"
 
 
+def _head_blob_cmd(rel: str) -> str:
+    return f"git rev-parse --verify --end-of-options HEAD:{shlex.quote(rel)}"
+
+
 def _ls_unmerged_cmd(rel: str) -> str:
     return f"git ls-files -u -- {shlex.quote(rel)}"
 
@@ -506,11 +510,42 @@ class TestInspectorGitReads:
             executor=MockExecutor(
                 responses={
                     _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", ""),
+                    _head_blob_cmd(rel): (1, "exists", ""),
                 }
             ),
             path="/repo",
         )
         assert git.compare_index_worktree(rel) == "worktree"
+
+    def test_compare_index_worktree_staged_deletion(self):
+        """A file staged for deletion is tracked, not an untracked worktree file."""
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", ""),
+                    _head_blob_cmd(rel): (0, "", "abc123\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
+
+    def test_compare_index_worktree_unmerged(self):
+        """A conflicted path has no stage-0 blob but is not untracked."""
+        rel = "a.py"
+        git = GitApi(
+            executor=MockExecutor(
+                responses={
+                    _index_blob_cmd(rel): (1, "exists", ""),
+                    _ls_unmerged_cmd(rel): (0, "", "100644 abc 1\ta.py\n"),
+                }
+            ),
+            path="/repo",
+        )
+        assert git.compare_index_worktree(rel) == "differ"
 
     def test_unmerged_stages(self):
         rel = "a.py"

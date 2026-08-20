@@ -7,6 +7,7 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pigit.termui.reactive import Signal
@@ -18,6 +19,17 @@ if TYPE_CHECKING:
     from pigit.app_types import CommitSnapshot, GraphRow
     from pigit.git.api import GitApi
     from pigit.git.model import Commit
+
+
+@dataclass
+class _CommitLoad:
+    """Result of a background commit-log load, applied on the UI thread."""
+
+    commits: list[Commit]
+    requested: str
+    resolved: str
+    graph_rows: list[GraphRow]
+    remotes: tuple[str, ...]
 
 
 class ICommitViewModel(IListViewModel["Commit"]):
@@ -111,22 +123,46 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
                 names.append(branch.name)
         return names
 
-    def _do_load(self) -> list[Commit]:
+    def refresh(self) -> None:
+        """Start a background load; the result is applied on the UI thread."""
+        self._loader.start(self._load_commits, self._apply_load)
+
+    def _load_commits(self) -> _CommitLoad:
+        requested = self._log_ref
+        ref = requested
         try:
-            self._git.verify_commitish(self._log_ref)
+            self._git.verify_commitish(ref)
         except GitError:
             # The pinned ref dangled (deleted/renamed); fall back to the
             # current checkout so the list and title stay correct.
-            self._log_ref = self._head
-        commits = self._git.load_commits(self._log_ref)
+            ref = self._head
+        commits = self._git.load_commits(ref)
         remotes = tuple(self._git.get_remotes())
         from pigit.app_commit_graph import compute_graph_rows
 
         graph_rows = compute_graph_rows(commits) if commits else []
-        self._graph_rows.set(graph_rows)
-        self._remotes.set(remotes)
+        return _CommitLoad(
+            commits=commits,
+            requested=requested,
+            resolved=ref,
+            graph_rows=graph_rows,
+            remotes=remotes,
+        )
+
+    def _apply_load(self, result: _CommitLoad) -> None:
+        """Apply a load result on the UI thread, unless superseded.
+
+        ``_load_commits`` runs on the AsyncTask worker; it never writes shared
+        state. Here we apply the resolved ref and derived signals, guarded so
+        a stale load (the user re-pinned meanwhile) is dropped.
+        """
+        if result.requested != self._log_ref:
+            return
+        super()._on_loaded(result.commits)
+        self._log_ref = result.resolved
+        self._graph_rows.set(result.graph_rows)
+        self._remotes.set(result.remotes)
         self._bodies = None
-        return commits
 
     def get_inspector_snapshot(self, idx: int):
         c = self.item_at(idx)

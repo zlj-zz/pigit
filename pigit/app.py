@@ -27,8 +27,11 @@ from pigit.termui import (
     get_renderer,
     hide_spinner,
     keys,
+    AsyncTask,
     request_render,
     resolve_presentation_leaf,
+    run_async,
+    Segment,
     show_badge,
     show_sheet,
     show_spinner,
@@ -48,7 +51,7 @@ from .app_chrome import AppFooter
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorSheet
-from .app_types import InspectorHost
+from .app_types import InspectorHost, InspectorSnapshot
 from .app_command_palette import CommandPalette
 from .app_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
@@ -102,6 +105,9 @@ class PigitApplication(Application):
         self._status_vm: StatusViewModel
         self._commit_vm: CommitViewModel
         self._branch_vm: BranchViewModel
+        # Inspector async-load state
+        self._inspector_task: AsyncTask | None = None
+        self._inspector_token: object = None
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._log_graph_preview: LogGraphPreview | None = None
@@ -499,7 +505,11 @@ class PigitApplication(Application):
 
     @bind_action("inspector", "I", desc="Inspect selection", tip="Inspector")
     def open_inspector(self) -> None:
-        """Open a frozen top-edge snapshot of the current selection."""
+        """Open a frozen top-edge snapshot of the current selection.
+
+        The snapshot build spawns several git subprocesses, so it runs on an
+        AsyncTask worker; the sheet appears immediately with a loading hint.
+        """
         active = resolve_presentation_leaf(self._tab_view.active)
         if not isinstance(active, InspectorHost):
             show_toast(
@@ -508,20 +518,46 @@ class PigitApplication(Application):
                 kind=FeedbackKind.INFO,
             )
             return
-        snapshot = active.get_inspector_snapshot()
-        if snapshot is None:
-            show_toast(
-                "Nothing to inspect",
-                duration=1.5,
-                kind=FeedbackKind.INFO,
-            )
-            return
-        lines = InspectorSheet.format(snapshot)
-        _, rows = terminal_size()
-        height = InspectorSheet.sheet_height(lines, rows, border=1)
-        sheet = InspectorSheet(lines)
-        show_sheet(sheet, height=height, show_border=True, edge="top", bg=None)
-        sheet.activate()
+        self._cancel_inspector_load()
+        token = object()
+        self._inspector_token = token
+        placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
+        placeholder_sheet = show_sheet(
+            placeholder, height=3, show_border=True, edge="top", bg=None
+        )
+        placeholder.activate()
+
+        def load() -> InspectorSnapshot | None:
+            return active.get_inspector_snapshot()
+
+        def apply(snapshot: InspectorSnapshot | None) -> None:
+            if token != self._inspector_token:
+                return  # superseded by a newer I press
+            if placeholder_sheet is None or not placeholder_sheet.open:
+                return  # user closed the inspector while it was loading
+            dismiss_sheet()
+            if snapshot is None:
+                show_toast(
+                    "Nothing to inspect",
+                    duration=1.5,
+                    kind=FeedbackKind.INFO,
+                )
+                return
+            lines = InspectorSheet.format(snapshot)
+            _, rows = terminal_size()
+            height = InspectorSheet.sheet_height(lines, rows, border=1)
+            sheet = InspectorSheet(lines)
+            show_sheet(sheet, height=height, show_border=True, edge="top", bg=None)
+            sheet.activate()
+
+        self._inspector_task = run_async(load, apply)
+
+    def _cancel_inspector_load(self) -> None:
+        """Invalidate any in-flight inspector load so its result is dropped."""
+        self._inspector_token = None
+        if self._inspector_task is not None:
+            self._inspector_task.cancel()
+            self._inspector_task = None
 
     @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
