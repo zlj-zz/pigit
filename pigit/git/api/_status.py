@@ -134,6 +134,27 @@ class _StatusOps(_OpsBase):
             }
         return file_items
 
+    def status_porcelain(self, path: str | None = None) -> str:
+        """Return raw ``git status --porcelain`` text for observation digests.
+
+        Args:
+            path: Repo root; defaults to :attr:`path`.
+
+        Returns:
+            Porcelain status text (may be empty). On error, empty string.
+        """
+        path = path or self.path
+        if path is None or path == "":
+            workdir = str(Path(".").resolve())
+        else:
+            workdir = str(Path(path).resolve())
+        _, err, files = self.executor.exec(
+            "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=workdir
+        )
+        if err or files is None:
+            return ""
+        return cast(str, files)
+
     def has_staged_changes(self, path: str | None = None) -> bool:
         """Return True if index has staged changes."""
         path = path or self.path

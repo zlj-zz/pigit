@@ -216,6 +216,12 @@ def test_load_diff(status_vm):
     assert diff == ["+line1", "-line2"]
 
 
+def test_do_load_bypasses_status_cache(status_vm):
+    """Observe-driven refresh must not reuse index/HEAD-keyed status cache."""
+    status_vm._do_load()
+    status_vm._git.load_status.assert_called_with(use_cache=False)
+
+
 def test_load_diff_by_path_finds_file_after_reorder(status_vm):
     """Preview identity is path; index may drift after status refresh."""
     from pigit.git.model import File

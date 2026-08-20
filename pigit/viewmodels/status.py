@@ -98,7 +98,9 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return self._git.path or ""
 
     def _do_load(self) -> list[File]:
-        return self._git.load_status()
+        # Observe already decided the worktree changed; index/HEAD cache would
+        # hide clean→Modified and new untracked rows.
+        return self._git.load_status(use_cache=False)
 
     def _run_single(
         self,

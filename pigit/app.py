@@ -72,6 +72,7 @@ from .observe import (
     should_defer_repo_refresh,
 )
 from .observe.denylist import rel_path_is_denied
+from .observe.digest import hash_porcelain
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
@@ -349,7 +350,7 @@ class PigitApplication(Application):
             git_dir=git_dir,
             common_dir=common_dir,
         )
-        backend = StatMtimeBackend()
+        backend = StatMtimeBackend(worktree_digest=self._observe_worktree_digest)
         observer = RepoObserver(backend=backend)
         self._observer = observer
         self._coordinator = RefreshCoordinator(
@@ -372,6 +373,14 @@ class PigitApplication(Application):
                 _OBSERVE_DRAIN_INTERVAL_S,
                 self._coordinator.drain,
             )
+
+    def _observe_worktree_digest(self) -> str | None:
+        """Return a porcelain digest while Status worktree observe is active."""
+        try:
+            return hash_porcelain(self._git.status_porcelain())
+        except Exception:
+            logging.debug("Worktree digest failed", exc_info=True)
+            return None
 
     def _on_status_items_for_observe(self, _items: list) -> None:
         """Refresh worktree path set when the Status list changes."""

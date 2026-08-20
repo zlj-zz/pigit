@@ -9,7 +9,7 @@ Date: 2026-08-20
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
 from .paths import (
     expand_metadata_paths,
@@ -47,9 +47,19 @@ class ObservationBackend(Protocol):
 
 
 class StatMtimeBackend:
-    """Poll selected paths and emit signals when ``st_mtime_ns`` changes."""
+    """Poll selected paths and emit signals when ``st_mtime_ns`` changes.
 
-    def __init__(self, paths: Sequence[str] | None = None) -> None:
+    When a worktree root is attached and ``worktree_digest`` is provided,
+    each poll also compares that digest so clean→Modified content edits
+    (file mtime only) still produce a ``WORKTREE_META`` wake-up.
+    """
+
+    def __init__(
+        self,
+        paths: Sequence[str] | None = None,
+        *,
+        worktree_digest: Callable[[], str | None] | None = None,
+    ) -> None:
         self._explicit_paths = [str(Path(p).resolve()) for p in (paths or ())]
         self._meta_paths: list[str] = []
         self._worktree_paths: list[str] = []
@@ -60,6 +70,9 @@ class StatMtimeBackend:
         self._roots_sig: frozenset[tuple[str, str]] = frozenset()
         self._meta_sig: frozenset[tuple[str, str]] = frozenset()
         self._worktree_sig: frozenset[tuple[str, str]] = frozenset()
+        self._worktree_digest = worktree_digest
+        self._worktree_root: str | None = None
+        self._last_digest: str | None = None
         self._started = False
         self._health = BackendHealth.OK
 
@@ -72,6 +85,7 @@ class StatMtimeBackend:
         self._meta_paths = expand_metadata_paths(roots)
         self._worktree_paths, truncated = expand_worktree_paths(roots)
         self._apply_merged_paths(reset_baseline=True, truncated=truncated)
+        self._baseline_worktree_digest(roots)
         self._started = True
 
     def update_roots(self, roots: Sequence[WatchRoot]) -> None:
@@ -88,6 +102,7 @@ class StatMtimeBackend:
             return
         new_meta_sig = metadata_roots_signature(roots)
         new_wt_sig = worktree_roots_signature(roots)
+        prev_wt = self._worktree_root
         self._roots = list(roots)
         self._roots_sig = new_sig
         truncated = False
@@ -98,6 +113,7 @@ class StatMtimeBackend:
             self._worktree_sig = new_wt_sig
             self._worktree_paths, truncated = expand_worktree_paths(roots)
         self._apply_merged_paths(reset_baseline=False, truncated=truncated)
+        self._baseline_worktree_digest(roots, previous_root=prev_wt)
 
     def stop(self) -> None:
         """Clear path state."""
@@ -111,6 +127,8 @@ class StatMtimeBackend:
         self._roots_sig = frozenset()
         self._meta_sig = frozenset()
         self._worktree_sig = frozenset()
+        self._worktree_root = None
+        self._last_digest = None
 
     def health(self) -> BackendHealth:
         """Return backend health."""
@@ -134,7 +152,49 @@ class StatMtimeBackend:
             # New local tips under discovery dirs enter the poll set.
             self._meta_paths = expand_metadata_paths(self._roots)
             self._apply_merged_paths(reset_baseline=False, truncated=False)
+        digest_signal = self._poll_worktree_digest()
+        if digest_signal is not None:
+            out.append(digest_signal)
         return out
+
+    def _baseline_worktree_digest(
+        self,
+        roots: Sequence[WatchRoot],
+        *,
+        previous_root: str | None = None,
+    ) -> None:
+        """Attach or clear porcelain digest tracking for the worktree root."""
+        root = _worktree_root_path(roots)
+        self._worktree_root = root
+        if root is None or self._worktree_digest is None:
+            self._last_digest = None
+            return
+        if root != previous_root or self._last_digest is None:
+            self._last_digest = self._read_digest()
+
+    def _poll_worktree_digest(self) -> PathSignal | None:
+        """Emit worktree-root signal when porcelain digest changes."""
+        if self._worktree_root is None or self._worktree_digest is None:
+            return None
+        current = self._read_digest()
+        if current is None:
+            return None
+        if self._last_digest is None:
+            self._last_digest = current
+            return None
+        if current == self._last_digest:
+            return None
+        self._last_digest = current
+        return PathSignal(path=self._worktree_root, mtime_ns=None)
+
+    def _read_digest(self) -> str | None:
+        """Invoke the digest provider; treat failures as no reading."""
+        if self._worktree_digest is None:
+            return None
+        try:
+            return self._worktree_digest()
+        except Exception:
+            return None
 
     def _apply_merged_paths(self, *, reset_baseline: bool, truncated: bool) -> None:
         """Merge explicit + metadata + worktree paths and update baselines."""
@@ -157,6 +217,14 @@ class StatMtimeBackend:
                 new_mtime[path] = _read_mtime_ns(path)
         self._paths = merged
         self._last_mtime = new_mtime
+
+
+def _worktree_root_path(roots: Sequence[WatchRoot]) -> str | None:
+    """Return resolved worktree root path from roots, if any."""
+    for root in roots:
+        if root.kind == "worktree":
+            return str(Path(root.path).resolve())
+    return None
 
 
 class FakeBackend:

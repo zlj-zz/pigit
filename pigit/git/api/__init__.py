@@ -169,6 +169,9 @@ class GitApi:
     def load_status(self, path=None, use_cache=True):
         return self._status.load_status(path, use_cache)
 
+    def status_porcelain(self, path=None):
+        return self._status.status_porcelain(path)
+
     def _load_status_cache_signature(self, cwd):
         return self._status._load_status_cache_signature(cwd)
 

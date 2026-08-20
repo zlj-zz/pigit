@@ -12,6 +12,7 @@ from .backend import FakeBackend, StatMtimeBackend
 from .classify import classify_path_signal
 from .clock import FakeClock, SystemClock
 from .coordinator import RefreshCoordinator
+from .digest import hash_porcelain
 from .observer import RepoObserver
 from .overlay import should_defer_repo_refresh
 from .paths import build_git_metadata_paths, build_worktree_observe_paths
@@ -40,5 +41,6 @@ __all__ = [
     "build_git_metadata_paths",
     "build_worktree_observe_paths",
     "classify_path_signal",
+    "hash_porcelain",
     "should_defer_repo_refresh",
 ]
