@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Pigit is a Python terminal UI (TUI) for Git, plus CLI short-commands and multi-repo management. It targets Python 3.10+ and is distributed on PyPI.
+Pigit is a Python terminal UI (TUI) for Git, plus CLI short-commands and multi-repo management. It targets Python 3.11+ and is distributed on PyPI.
 
 ## Common development commands
 

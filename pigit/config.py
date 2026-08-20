@@ -5,10 +5,7 @@ import os
 import textwrap
 from typing import Any
 
-try:
-    import tomllib  # type: ignore
-except ImportError:
-    import tomli as tomllib  # type: ignore
+import tomllib
 
 from .config_data import (
     ConfigData,

@@ -7,10 +7,7 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypedDict
-
-if TYPE_CHECKING:
-    from typing_extensions import Unpack
+from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from .bindings import (
     BindingsList,

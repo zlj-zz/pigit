@@ -8,7 +8,7 @@
 |_|  |___\____|___| |_|
 </pre>
 
-![Python 3](https://img.shields.io/badge/Python-v3.10%5E-green?logo=python)
+![Python 3](https://img.shields.io/badge/Python-v3.11%5E-green?logo=python)
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)

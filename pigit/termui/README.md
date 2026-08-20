@@ -2,7 +2,7 @@
 
 Lightweight, keyboard-first terminal UI for full-screen apps and modal overlays.
 
-**Requires Python 3.10+.**
+**Requires Python 3.11+.**
 
 For architecture, export rules, and contribution guidance, see
 [`DEVELOPMENT.md`](DEVELOPMENT.md).
