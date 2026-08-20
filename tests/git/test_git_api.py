@@ -11,7 +11,7 @@ import shlex
 import pytest
 
 from pigit.ext.executor_factory import MockExecutor
-from pigit.git import GitApi, GitError, RepoError, SequencerPaused
+from pigit.git import GitApi, GitError, RepoError
 
 
 class TestBindPath:
@@ -226,10 +226,6 @@ class TestUntrackedChanges:
         assert git.has_untracked_changes() is False
 
 
-def test_sequencer_paused_is_git_error():
-    assert issubclass(SequencerPaused, GitError)
-
-
 class TestSequencerDetect:
     def _git(self, tmp_path, *names: str) -> GitApi:
         git_dir = tmp_path / "gitdir"
@@ -306,89 +302,6 @@ class TestHasUnmergedPaths:
             path="/repo",
         )
         assert git.has_unmerged_paths() is False
-
-
-class TestCherryPick:
-    def test_success_is_silent(self):
-        git = GitApi(
-            executor=MockExecutor(responses={"git cherry-pick abc": (0, "", "")}),
-            path="/repo",
-        )
-        git.cherry_pick("abc")
-
-    def test_nonzero_without_head_raises_git_error(self, tmp_path):
-        git_dir = tmp_path / "g"
-        git_dir.mkdir()
-        git = GitApi(
-            executor=MockExecutor(
-                responses={
-                    "git cherry-pick abc": (1, "fatal: bad object", ""),
-                    "git rev-parse --git-dir": (0, "", str(git_dir) + "\n"),
-                }
-            ),
-            path=str(tmp_path),
-        )
-        with pytest.raises(GitError) as exc:
-            git.cherry_pick("abc")
-        assert not isinstance(exc.value, SequencerPaused)
-
-    def test_paused_conflict(self, tmp_path):
-        git_dir = tmp_path / "g"
-        git_dir.mkdir()
-        (git_dir / "CHERRY_PICK_HEAD").write_text("abc\n")
-        git = GitApi(
-            executor=MockExecutor(
-                responses={
-                    "git cherry-pick abc": (1, "", "CONFLICT"),
-                    "git rev-parse --git-dir": (0, "", str(git_dir) + "\n"),
-                    "git diff --name-only --diff-filter=U": (0, "", "a.c\n"),
-                }
-            ),
-            path=str(tmp_path),
-        )
-        with pytest.raises(SequencerPaused) as exc:
-            git.cherry_pick("abc")
-        assert exc.value.reason == "conflict"
-
-    def test_paused_empty(self, tmp_path):
-        git_dir = tmp_path / "g"
-        git_dir.mkdir()
-        (git_dir / "CHERRY_PICK_HEAD").write_text("abc\n")
-        git = GitApi(
-            executor=MockExecutor(
-                responses={
-                    "git cherry-pick abc": (1, "empty", ""),
-                    "git rev-parse --git-dir": (0, "", str(git_dir) + "\n"),
-                    "git diff --name-only --diff-filter=U": (0, "", ""),
-                }
-            ),
-            path=str(tmp_path),
-        )
-        with pytest.raises(SequencerPaused) as exc:
-            git.cherry_pick("abc")
-        assert exc.value.reason == "empty"
-
-    def test_nested_pick_raises_git_error_not_empty(self, tmp_path):
-        """An 'already in progress' stop is not misclassified as an empty pick."""
-        git_dir = tmp_path / "g"
-        git_dir.mkdir()
-        (git_dir / "CHERRY_PICK_HEAD").write_text("abc\n")
-        git = GitApi(
-            executor=MockExecutor(
-                responses={
-                    "git cherry-pick abc": (
-                        1,
-                        "error: cherry-pick is already in progress",
-                        "",
-                    ),
-                    "git rev-parse --git-dir": (0, "", str(git_dir) + "\n"),
-                }
-            ),
-            path=str(tmp_path),
-        )
-        with pytest.raises(GitError) as exc:
-            git.cherry_pick("abc")
-        assert "already in progress" in str(exc.value)
 
 
 def _verify_commitish_cmd(ref: str) -> str:

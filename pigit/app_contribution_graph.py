@@ -325,10 +325,15 @@ class ContributionGraph(Component):
                     row, _PADDING_LEFT, label, fg=THEME.fg_muted, bg=None
                 )
 
-        # --- Heatmap cells (full week window) ---
+        # --- Heatmap cells (up to today) ---
+        # Cells after today in the final partial week are left out so they
+        # render as blank panel background instead of the empty glyph.
         window: dict[tuple[int, int], int] = {}
         for week in range(num_weeks):
             for day in range(7):
+                date = first_monday + datetime.timedelta(weeks=week, days=day)
+                if date > today:
+                    continue
                 window[(week, day)] = self._heatmap_values.get((week, day), 0)
         self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)

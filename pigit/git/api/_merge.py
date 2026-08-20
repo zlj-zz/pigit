@@ -15,7 +15,7 @@ from typing import cast
 from pigit.ext.executor import WAITING, REPLY, DECODE
 
 from ._base import _OpsBase
-from ._errors import GitError, SequencerPaused
+from ._errors import GitError
 
 
 class _MergeOps(_OpsBase):
@@ -121,32 +121,6 @@ class _MergeOps(_OpsBase):
         if code != 0:
             raise GitError(err or "Failed to list unmerged paths")
         return bool(cast(str, out or "").strip())
-
-    def cherry_pick(self, sha: str, path: str | None = None) -> None:
-        """Apply ``sha`` onto HEAD. Raises SequencerPaused if CHERRY_PICK_HEAD remains."""
-        path = path or self.path
-        code, err, out = self.executor.exec(
-            f"git cherry-pick {shlex.quote(sha)}",
-            cwd=path,
-            flags=WAITING | REPLY | DECODE,
-        )
-        if code == 0:
-            return
-        if self.sequencer_in_progress(path) == "cherry-pick":
-            # A nested pick errors before touching the tree; do not confuse
-            # it with a genuine empty-result pause.
-            if "already in progress" in (err or "").lower():
-                raise GitError(err or "cherry-pick is already in progress")
-            if self.has_unmerged_paths(path):
-                raise SequencerPaused(
-                    err or out or "Cherry-pick conflict",
-                    reason="conflict",
-                )
-            raise SequencerPaused(
-                err or out or "Cherry-pick empty",
-                reason="empty",
-            )
-        raise GitError(err or out or f"Cherry-pick failed: {sha}")
 
     def commit_no_edit(self, path: str | None = None) -> None:
         """Complete a merge with the default message (``git commit --no-edit``)."""

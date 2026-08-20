@@ -179,6 +179,14 @@ def test_apply_load_drops_stale_result(commit_vm):
     assert commit_vm.log_ref == "origin/bar"
 
 
+def test_load_skips_verify_when_commits_present(commit_vm):
+    """Auto-refresh must not pay a rev-parse when the ref already resolves."""
+    commit_vm._log_ref = "origin/foo"
+    commit_vm._git.load_commits.return_value = [commit_vm._items.value[0]]  # non-empty
+    commit_vm._load_commits()
+    commit_vm._git.verify_commitish.assert_not_called()
+
+
 def test_dispose_does_not_clear_log_ref(commit_vm):
     commit_vm._log_ref = "feat"
     commit_vm.dispose()

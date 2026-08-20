@@ -130,13 +130,17 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     def _load_commits(self) -> _CommitLoad:
         requested = self._log_ref
         ref = requested
-        try:
-            self._git.verify_commitish(ref)
-        except GitError:
-            # The pinned ref dangled (deleted/renamed); fall back to the
-            # current checkout so the list and title stay correct.
-            ref = self._head
         commits = self._git.load_commits(ref)
+        if not commits and not self.viewing_checkout_log():
+            # An empty pinned log is either an unborn/empty branch or a
+            # dangling ref (deleted/renamed). Verify only then, so the
+            # common auto-refresh path (ref unchanged, commits present)
+            # never pays for an extra rev-parse.
+            try:
+                self._git.verify_commitish(ref)
+            except GitError:
+                ref = self._head
+                commits = self._git.load_commits(ref)
         remotes = tuple(self._git.get_remotes())
         from pigit.app_commit_graph import compute_graph_rows
 

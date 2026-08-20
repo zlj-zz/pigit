@@ -35,6 +35,11 @@ class LineTextBrowser(Component):
         self._bg = bg
         self._i = 0
         self._r = [0, self._size[1]]
+        # Cached segment form of string content (rebuilt only when the theme
+        # colors change), so each render does not re-allocate a Segment per line.
+        self._cache_fg: tuple[int, int, int] | None = None
+        self._cache_bg: tuple[int, int, int] | None = None
+        self._cache_rows: list[list[Segment]] | None = None
         if content is None:
             self._content = None
         elif content and isinstance(content[0], list):
@@ -65,7 +70,12 @@ class LineTextBrowser(Component):
         theme = get_theme()
         fg = theme.fg_primary
         row_bg = theme.bg_chrome if self._bg is _USE_THEME_BG else self._bg
-        return [[Segment(line, fg=fg, bg=row_bg)] for line in self._content]
+        if self._cache_rows is None or (self._cache_fg, self._cache_bg) != (fg, row_bg):
+            self._cache_fg, self._cache_bg = fg, row_bg
+            self._cache_rows = [
+                [Segment(line, fg=fg, bg=row_bg)] for line in self._content
+            ]
+        return self._cache_rows
 
     def scroll_up(self, line: int = 1):
         """Scroll the view up by the given number of lines."""

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from pigit.termui.component import Component, ComponentError
 from pigit.termui.containers import TabView
+from pigit.termui.theme import Theme, get_theme, set_theme
 from pigit.termui.widgets import ItemList, LineTextBrowser
 from pigit.termui.types import (
     EventType,
@@ -196,6 +197,24 @@ class MockLineTextBrowser(LineTextBrowser):
 
 
 class TestLineTextBrowser:
+    def test_visible_rows_caches_segment_rows(self):
+        browser = LineTextBrowser(content=["a", "b"], size=(10, 2), bg=None)
+        first = browser._visible_rows()
+        second = browser._visible_rows()
+        assert first is second
+        assert first[0][0].text == "a"
+
+    def test_visible_rows_rebuilds_when_theme_changes(self):
+        browser = LineTextBrowser(content=["a"], size=(10, 1), bg=None)
+        before = browser._visible_rows()
+        old = get_theme()
+        set_theme(Theme(fg_primary=(1, 2, 3), bg_chrome=(4, 5, 6)))
+        try:
+            after = browser._visible_rows()
+            assert after is not before
+        finally:
+            set_theme(old)
+
     @pytest.mark.parametrize(
         "x, y, size, content, expected_position, expected_content",
         [

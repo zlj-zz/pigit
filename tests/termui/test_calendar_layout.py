@@ -13,6 +13,20 @@ from pigit.termui.primitives import (
     build_contribution_calendar,
     calendar_day_values,
 )
+from pigit.termui.surface import Surface
+from pigit.app_contribution_graph import ContributionGraph
+
+
+def test_contribution_graph_excludes_future_cells():
+    """Days after today in the final partial week render as blank, not '·'."""
+    graph = ContributionGraph(size=(100, 24))
+    graph.set_commits([])
+    first_monday = graph._first_monday
+    today = datetime.date.today()
+    graph._render_surface(Surface(100, 24))
+    for week, day in graph._heatmap._values:
+        date = first_monday + datetime.timedelta(weeks=week, days=day)
+        assert date <= today
 
 
 def test_build_contribution_calendar_aligns_start_to_monday():
