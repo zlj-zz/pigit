@@ -380,6 +380,7 @@ class TestCommitPanelLifecycle:
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
         vm.graph_rows = []
+        vm.remotes = ()
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
@@ -387,6 +388,66 @@ class TestCommitPanelLifecycle:
         vm.items.set([Commit("abc1234", "msg", "Zev", 0, "pushed", "", [])])
         assert len(panel.commits) == 1
         assert panel.commits[0].sha == "abc1234"
+
+    def test_items_refresh_drops_stale_head_decoration(self):
+        """Refs cache must invalidate before row rebuild, not after.
+
+        After a new tip commit, the previous tip keeps its sha; a leftover
+        ``_refs_cache`` entry would bake ``HEAD -> branch`` into the row cache.
+        """
+        from unittest.mock import Mock
+        from pigit.git.model import Commit
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_commit import CommitPanel
+
+        vm = Mock(spec=ICommitViewModel)
+        vm.items = Signal([])
+        vm.graph_rows = []
+        vm.remotes = ()
+        panel = CommitPanel(vm=vm)
+        panel.activate()
+
+        old_tip = Commit(
+            "7ae8c9792406ac728a9",
+            "old tip",
+            "Zev",
+            1,
+            "unpushed",
+            "(HEAD -> dev)",
+            [],
+        )
+        vm.items.set([old_tip])
+        # Simulate a render that re-seeds refs_cache after items-changed cleared it.
+        panel._ref_segments(old_tip, focused=True, cursor_flags=0)
+
+        new_tip = Commit(
+            "4a3ad3bbec2801cbee7",
+            "new tip",
+            "Zev",
+            2,
+            "unpushed",
+            "(HEAD -> dev)",
+            [],
+            ["7ae8c9792406ac728a9"],
+        )
+        former_tip = Commit(
+            "7ae8c9792406ac728a9",
+            "old tip",
+            "Zev",
+            1,
+            "unpushed",
+            "",
+            [],
+        )
+        vm.items.set([new_tip, former_tip])
+
+        def _main_text(row_idx: int) -> str:
+            _left, main = panel._row_cache_focused[row_idx]
+            return "".join(seg.text for seg in main)
+
+        assert "HEAD" in _main_text(0)
+        assert "HEAD" not in _main_text(1)
 
 
 class TestCommitReport:
