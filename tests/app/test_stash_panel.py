@@ -54,7 +54,7 @@ def test_visible_row_count_excludes_header():
 
 
 def test_drop_requires_confirmation():
-    """Drop shows a destructive alert and only drops when confirmed."""
+    """Drop shows an ERROR-kind alert and only drops when confirmed."""
     vm = Mock()
     vm.items = Signal([])
     vm.load_stashes.return_value = [
@@ -72,7 +72,9 @@ def test_drop_requires_confirmation():
         alert.assert_called_once()
         args, kwargs = alert.call_args
         assert "stash@{0}" in args[0]
-        assert kwargs["destructive"] is True
+        from pigit.termui import FeedbackKind
+
+        assert kwargs["kind"] is FeedbackKind.ERROR
 
         # Confirming performs the drop; cancelling does not.
         args[1](False)

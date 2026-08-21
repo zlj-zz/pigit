@@ -29,8 +29,7 @@ def _file(name: str, display_str: str | None = None) -> File:
 
 def test_resolve_status_path_takes_rename_destination():
     assert (
-        File.resolve_status_path("src/orig.txt -> src/renamed.txt")
-        == "src/renamed.txt"
+        File.resolve_status_path("src/orig.txt -> src/renamed.txt") == "src/renamed.txt"
     )
 
 

@@ -935,7 +935,7 @@ class PigitApplication(Application):
             self._alert_dialog.alert(
                 "Abort rebase? All progress will be lost.",
                 on_confirm,
-                destructive=True,
+                kind=FeedbackKind.WARNING,
             )
             return
         self._do_rebase_control(flag)
@@ -1008,7 +1008,7 @@ class PigitApplication(Application):
             self._alert_dialog.alert(
                 "Abort cherry-pick? All progress will be lost.",
                 on_confirm,
-                destructive=True,
+                kind=FeedbackKind.WARNING,
             )
             return
         self._do_cherry_pick_control(flag)

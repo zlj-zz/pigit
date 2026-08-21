@@ -619,7 +619,7 @@ class StatusPanel(ItemList):
         self._alert_dialog.alert(
             "Amend last commit with staged changes?",
             on_result,
-            destructive=True,
+            kind=FeedbackKind.WARNING,
         )
 
     @bind_action(
@@ -640,10 +640,12 @@ class StatusPanel(ItemList):
                 batch_msg="Discard {} file(s)",
                 action_type=StatusAction.DISCARD,
                 needs_confirm=True,
-                destructive=True,
+                kind=FeedbackKind.ERROR,
             )
             return
-        self._confirm_batch("Discard", StatusAction.DISCARD, indices, destructive=True)
+        self._confirm_batch(
+            "Discard", StatusAction.DISCARD, indices, kind=FeedbackKind.ERROR
+        )
 
     @bind_action(
         "stash",
@@ -1169,7 +1171,7 @@ class StatusPanel(ItemList):
         batch_msg: str = "",
         action_type: StatusAction,
         needs_confirm: bool = False,
-        destructive: bool = False,
+        kind: FeedbackKind | None = None,
     ) -> None:
         """Unified handler for single / visual mode actions."""
         if self._visual_mode:
@@ -1182,7 +1184,7 @@ class StatusPanel(ItemList):
                 self._toast_no_selection()
                 return
             if needs_confirm:
-                self._confirm_batch(batch_msg, action_type, destructive=destructive)
+                self._confirm_batch(batch_msg, action_type, kind=kind)
                 return
             result = self._dispatch_batch(action_type, self._selected)
             self._handle_result(result)
@@ -1194,7 +1196,7 @@ class StatusPanel(ItemList):
             return
         _, source_idx = hit
         if needs_confirm:
-            if self._check_via_alert(callee, msg=single_msg, destructive=destructive):
+            if self._check_via_alert(callee, msg=single_msg, kind=kind):
                 return
         else:
             result = callee(source_idx)
@@ -1218,7 +1220,7 @@ class StatusPanel(ItemList):
         callee: Callable[[int], ActionResult],
         msg: str = "",
         *,
-        destructive: bool = False,
+        kind: FeedbackKind | None = None,
     ) -> bool:
         hit = self.file_at_cursor()
         if hit is None:
@@ -1236,7 +1238,7 @@ class StatusPanel(ItemList):
             if n_rows:
                 self.curr_no = min(max(self.curr_no, 0), n_rows - 1)
 
-        return self._alert_dialog.alert(text, on_result, destructive=destructive)
+        return self._alert_dialog.alert(text, on_result, kind=kind)
 
     def _confirm_batch(
         self,
@@ -1244,7 +1246,7 @@ class StatusPanel(ItemList):
         action_type: StatusAction,
         indices: set[int] | None = None,
         *,
-        destructive: bool = False,
+        kind: FeedbackKind | None = None,
     ) -> None:
         """Confirm a batch operation on the given source indices (or selection)."""
         target = self._selected if indices is None else indices
@@ -1260,4 +1262,4 @@ class StatusPanel(ItemList):
             self._visual_mode = False
             self._visual_anchor = None
 
-        self._alert_dialog.alert(text, on_result, destructive=destructive)
+        self._alert_dialog.alert(text, on_result, kind=kind)

@@ -240,7 +240,7 @@ class StashPanel(ItemList):
             self._handle_result(self._vm.stash_drop(stash.ref))
 
         self._alert_dialog.alert(
-            f"Drop stash '{stash.ref}'?", on_result, destructive=True
+            f"Drop stash '{stash.ref}'?", on_result, kind=FeedbackKind.ERROR
         )
 
     def describe_row(

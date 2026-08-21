@@ -270,7 +270,7 @@ class RebasePanel(ItemList):
         self._alert.alert(
             f"Rewrite {n} commits? This rewrites history.",
             self._on_confirm_result,
-            destructive=True,
+            kind=FeedbackKind.ERROR,
         )
 
     def _validate(self) -> str | None:

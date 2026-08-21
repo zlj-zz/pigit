@@ -34,7 +34,7 @@ def app():
 def _auto_confirm(app, *, confirmed: bool = True) -> None:
     """Drive AlertDialog.alert by immediately invoking on_result."""
 
-    def fake_alert(message, on_result, destructive=False):
+    def fake_alert(message, on_result, kind=None):
         on_result(confirmed)
         return True
 
@@ -82,7 +82,7 @@ def test_confirm_prompt_uses_short_sha(app):
     app._git.resolve_head_sha.return_value = "head"
     seen = {}
 
-    def fake_alert(message, on_result, destructive=False):
+    def fake_alert(message, on_result, kind=None):
         seen["message"] = message
         return True
 

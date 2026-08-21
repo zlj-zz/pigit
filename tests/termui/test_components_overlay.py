@@ -803,12 +803,11 @@ class TestAlertDialogBody:
         )
         body.resize((60, 20))  # large width so footer stays on one line
         body._rebuild_frame()
-        lines = body._build_content_lines()
+        plain = [" ".join(seg.text for seg in row) for row in body._content_rows]
 
-        assert any("Test message" in line for line in lines)
-        # Footer should include both OK and Cancel
-        assert any("OK" in line for line in lines)
-        assert any("Cancel" in line for line in lines)
+        assert any("Test message" in line for line in plain)
+        assert any("OK" in line for line in plain)
+        assert any("Cancel" in line for line in plain)
 
     def test_alert_body_confirm_calls_shell_finish(self):
         shell = MagicMock()
@@ -820,7 +819,7 @@ class TestAlertDialogBody:
         body._confirm()
         shell._finish_alert.assert_called_once_with(True)
 
-    def test_prepare_destructive_uses_error_style_border(self):
+    def test_prepare_error_kind_uses_error_border(self):
         from pigit.termui.feedback import FeedbackKind, style_for
 
         body = AlertDialogBody(
@@ -828,17 +827,34 @@ class TestAlertDialogBody:
             message="m",
             on_result=lambda x: None,
         )
-        body.prepare("Discard?", lambda x: None, destructive=True)
+        body.prepare("Discard?", lambda x: None, kind=FeedbackKind.ERROR)
         assert body._frame.fg == style_for(FeedbackKind.ERROR).fg
 
-    def test_prepare_resets_border_after_destructive(self):
-        from pigit.termui import palette
+    def test_prepare_neutral_kind_uses_theme_primary(self):
+        from pigit.termui.feedback import FeedbackKind
+        from pigit.termui.theme import get_theme
 
         body = AlertDialogBody(
             shell=MagicMock(),
             message="m",
             on_result=lambda x: None,
         )
-        body.prepare("Discard?", lambda x: None, destructive=True)
-        body.prepare("Merge?", lambda x: None, destructive=False)
-        assert body._frame.fg == palette.DEFAULT_FG
+        body.prepare("Discard?", lambda x: None, kind=FeedbackKind.ERROR)
+        body.prepare("Merge?", lambda x: None, kind=None)
+        assert body._frame.fg == get_theme().fg_primary
+
+    def test_footer_ok_uses_danger_color_for_error_kind(self):
+        from pigit.termui.feedback import FeedbackKind
+        from pigit.termui.theme import get_theme
+
+        body = AlertDialogBody(
+            shell=MagicMock(),
+            message="m",
+            on_result=lambda x: None,
+        )
+        body.prepare("Drop?", lambda x: None, kind=FeedbackKind.ERROR)
+        body.resize((60, 20))
+        body._rebuild_frame()
+        footer = body._content_rows[-1]
+        ok = next(seg for seg in footer if seg.text == "OK")
+        assert ok.fg == get_theme().fg_danger

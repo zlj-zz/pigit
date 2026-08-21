@@ -111,7 +111,7 @@ def test_discard_on_dir_confirms_then_discards_children() -> None:
     panel.curr_no = 0
     captured: dict = {}
 
-    def fake_alert(text, on_result, destructive=False):
+    def fake_alert(text, on_result, kind=None):
         captured["text"] = text
         captured["on_result"] = on_result
         return True
