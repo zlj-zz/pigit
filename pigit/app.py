@@ -273,21 +273,18 @@ class PigitApplication(Application):
         )
 
     def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
-        """Aggregate full-help groups from app + panel action bindings."""
+        """Help for the active presentation panel, then Global app bindings."""
         groups: list[tuple[str, list[tuple[str, str]]]] = []
+        active = self._resolve_active_panel()
+        if active is not None:
+            entries = active.get_help_entries()
+            if entries:
+                title_fn = getattr(active, "get_help_title", None)
+                title = title_fn() if callable(title_fn) else type(active).__name__
+                groups.append((title, entries))
         universal = self.get_help_entries()
         if universal:
             groups.append(("Global", universal))
-        for panel in (
-            self._status_panel,
-            self._stash_panel,
-            self._branch_panel,
-            self._commit_panel,
-            self._diff_panel,
-        ):
-            entries = panel.get_help_entries()
-            if entries:
-                groups.append((panel.get_help_title(), entries))
         return groups
 
     def after_start(self):
