@@ -117,12 +117,15 @@ def show_toast(
     duration: float = 2.0,
     position: ToastPosition | None = None,
     kind: FeedbackKind | None = None,
+    spin: bool = False,
 ) -> Toast | None:
     """Display a transient toast notification via the current overlay host.
 
     ``kind`` selects the semantic level (info/success/warning/error); ``None``
     is the neutral level with no glyph or semantic color. ``segments``, when
-    given, overrides ``kind`` (the glyph/color are skipped)."""
+    given, overrides ``kind`` (the glyph/color are skipped). ``spin`` cycles a
+    frame glyph using the toast animation timer.
+    """
     from .widgets import Toast
 
     host = get_overlay_host()
@@ -138,12 +141,20 @@ def show_toast(
     if position is None:
         position = ToastPosition.TOP_RIGHT
 
-    # segments (e.g. show_spinner) render verbatim; suppress kind glyph/color.
+    # segments (e.g. custom Segment lists) render verbatim; suppress kind.
+    # spin applies INFO chrome inside Toast and does not use a kind glyph.
     if segments is not None:
         kind = None
 
     toast = Toast(
-        message, segments=segments, duration=duration, position=position, kind=kind
+        message,
+        segments=segments,
+        duration=duration,
+        position=position,
+        kind=kind,
+        spin=spin,
+        enter_duration=0.0 if spin else 0.5,
+        exit_duration=0.0 if spin else 0.5,
     )
     toast._event_loop = getattr(host, "_event_loop", None)
     toast.resize(host.size)
@@ -222,18 +233,21 @@ def get_badge() -> tuple[
     return host.badge_text, host.badge_bg, host.badge_fg
 
 
-def show_spinner(message: str) -> Toast | None:
-    """Display a persistent spinner toast (duration=3600s), replacing any current toast.
+def show_spinner(
+    message: str,
+    *,
+    position: ToastPosition = ToastPosition.BOTTOM_LEFT,
+) -> Toast | None:
+    """Display a persistent spinning toast, replacing any current toast.
 
-    The message is prefixed with ``»`` and suffixed with ``…`` automatically.
+    The message is shown as ``{frame} {message}…`` with frames advanced on the
+    toast animation timer.
     """
-    from .segment import Segment
-
     return show_toast(
-        "",
-        segments=[Segment(f"» {message}…")],
+        message,
         duration=3600.0,
-        position=ToastPosition.BOTTOM_LEFT,
+        position=position,
+        spin=True,
     )
 
 

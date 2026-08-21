@@ -82,7 +82,9 @@ def test_build_git_metadata_paths_skips_objects(tmp_path: Path):
     assert any(p.endswith("FETCH_HEAD") for p in paths)
     assert any(p.endswith("refs/heads/main") for p in paths)
     # Remote-tracking tips are not polled (FETCH_HEAD + remotes dir cover fetch).
-    assert (git_dir / "refs" / "remotes" / "origin" / "main").resolve().as_posix() not in resolved
+    assert (
+        git_dir / "refs" / "remotes" / "origin" / "main"
+    ).resolve().as_posix() not in resolved
     remotes_dir = (git_dir / "refs" / "remotes").resolve().as_posix()
     assert remotes_dir in resolved
     # Discovery dirs so newly created refs bump a watched mtime.

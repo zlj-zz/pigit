@@ -257,6 +257,9 @@ class GitApi:
     def pull(self, path=None):
         return self._merge.pull(path)
 
+    def push(self, path=None):
+        return self._merge.push(path)
+
     def merge(self, source, path=None):
         return self._merge.merge(source, path)
 

@@ -78,3 +78,14 @@ def test_left_repo_and_branch_styles(header_state: HeaderState) -> None:
     assert branch.text == "dev"
     assert branch.fg == THEME.fg_header_branch
     assert branch.style_flags & STYLE_BOLD
+
+
+def test_left_appends_ahead_behind_after_branch(header_state: HeaderState) -> None:
+    header_state.repo = "pigit"
+    header_state.branch = "dev"
+    header_state.ahead = 1
+    header_state.behind = 2
+    texts = [seg.text for seg in header_state.left.value]
+    assert texts[-3:] == ["dev", " ↑1", " ↓2"]
+    assert header_state.left.value[-2].fg == THEME.fg_success
+    assert header_state.left.value[-1].fg == THEME.fg_warning

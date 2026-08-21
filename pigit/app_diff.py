@@ -986,7 +986,9 @@ class DiffViewer(LineTextBrowser):
                 if confirmed:
                     self._apply_patch(patch, action=action)
 
-            self._alert_dialog.alert("Discard hunk?", on_confirm, destructive=True)
+            self._alert_dialog.alert(
+                "Discard hunk?", on_confirm, kind=FeedbackKind.ERROR
+            )
         else:
             self._apply_patch(patch, action=action)
 

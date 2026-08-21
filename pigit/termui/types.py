@@ -67,6 +67,7 @@ class ToastPosition(Enum):
     TOP_RIGHT = auto()
     BOTTOM_LEFT = auto()
     BOTTOM_RIGHT = auto()
+    CENTER = auto()
 
 
 # ---------------------------------------------------------------------------

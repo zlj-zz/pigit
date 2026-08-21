@@ -16,9 +16,11 @@ from ..component import Component
 from ..primitives.frame import BoxFrame
 from ..mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
+from ..segment import Segment
 from ..surface import Surface, _Subsurface
 from ..primitives.text import sanitize_for_display
-from ..wcwidth_table import pad_by_width, truncate_by_width
+from ..theme import get_theme
+from ..wcwidth_table import wcswidth
 from ..types import LayerKind, OverlayDispatchResult
 
 _logger = logging.getLogger(__name__)
@@ -214,10 +216,12 @@ class AlertDialogBody(Component):
         self._inner_w = 40
         self._outer_w = 42
         self.outer_row_count = 8
-        self._content_lines: list[str] = []
+        self._kind: FeedbackKind | None = None
+        self._content_rows: list[list[Segment]] = []
         self._needs_rebuild = True
+        theme = get_theme()
         self._frame = BoxFrame(
-            0, 0, title="Alert", fg=palette.DEFAULT_FG, bg=palette.DEFAULT_BG
+            0, 0, title="Confirm", fg=theme.fg_primary, bg=theme.bg_chrome
         )
         self.BINDINGS = [(self._confirm_key, "_confirm")]
         super().__init__(x=x, y=y, size=size)
@@ -233,19 +237,32 @@ class AlertDialogBody(Component):
         message: str,
         on_result: Callable[[bool], None],
         *,
-        destructive: bool = False,
+        kind: FeedbackKind | None = None,
     ) -> None:
-        """Configure message and callback, then open the alert.
+        """Configure message, semantic kind, and callback, then open the alert.
 
-        ``destructive`` tints the border with the error-style foreground
-        (irreversible confirm). Ordinary confirms stay the default border.
+        ``kind`` colors the border and OK action (``ERROR`` for irreversible
+        confirms). ``None`` keeps the neutral chrome.
         """
         self._message = sanitize_for_display(message)
         self._on_result = on_result
-        style = style_for(FeedbackKind.ERROR) if destructive else None
-        self._frame.fg = style.fg if style is not None else palette.DEFAULT_FG
+        self._kind = kind
+        self._apply_chrome()
         self.open_alert()
         self._needs_rebuild = True
+
+    def _apply_chrome(self) -> None:
+        """Set border/title colors from theme and optional feedback kind."""
+        theme = get_theme()
+        self._frame.title = "Confirm"
+        self._frame.bg = theme.bg_chrome
+        style = style_for(self._kind)
+        if style is not None:
+            self._frame.fg = style.fg
+            self._frame.style_flags = style.style_flags
+        else:
+            self._frame.fg = theme.fg_primary
+            self._frame.style_flags = 0
 
     def reset_state(self) -> None:
         """Close the alert dialog body."""
@@ -266,8 +283,8 @@ class AlertDialogBody(Component):
         )
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
-        self._content_lines = self._build_content_lines()
-        self._frame.set_inner_size(self._inner_w, len(self._content_lines))
+        self._content_rows = self._build_content_rows()
+        self._frame.set_inner_size(self._inner_w, len(self._content_rows))
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
@@ -284,10 +301,10 @@ class AlertDialogBody(Component):
         if self._needs_rebuild:
             self._rebuild_frame()
         cr, cc, _cw, ch = self._frame.content_rect(0, 0)
-        footer_row0 = cr + min(ch, len(self._content_lines)) - 1
+        footer_row0 = cr + min(ch, len(self._content_rows)) - 1
         if event.row - 1 != footer_row0:
             return False
-        footer = self._footer_text()
+        footer = self._footer_plain()
         col0 = event.col - 1
         ok_col = cc + footer.index("OK")
         cancel_col = cc + footer.index("Cancel")
@@ -304,50 +321,99 @@ class AlertDialogBody(Component):
             return
         if self._needs_rebuild:
             self._rebuild_frame()
+        theme = get_theme()
         surface.fill_rect_rgb(
-            0, 0, self._outer_w, self.outer_row_count, palette.DEFAULT_BG
+            0, 0, self._outer_w, self.outer_row_count, theme.bg_chrome
         )
         self._frame.draw(surface, 0, 0)
         cr, cc, cw, ch = self._frame.content_rect(0, 0)
-        for i, line in enumerate(self._content_lines[:ch]):
-            text = pad_by_width(truncate_by_width(line, cw), cw)
-            surface.draw_text_rgb(
-                cr + i,
-                cc,
-                text,
-                fg=palette.DEFAULT_FG,
-                bg=self._frame.bg,
-                style_flags=self._frame.style_flags,
-            )
+        for i, row in enumerate(self._content_rows[:ch]):
+            surface.draw_segments(cr + i, cc, row)
+            used = sum(max(0, wcswidth(seg.text)) for seg in row)
+            if used < cw:
+                surface.draw_text_rgb(
+                    cr + i,
+                    cc + used,
+                    " " * (cw - used),
+                    fg=theme.fg_primary,
+                    bg=theme.bg_chrome,
+                )
 
-    def _build_content_lines(self) -> list[str]:
+    def _build_content_rows(self) -> list[list[Segment]]:
+        """Build message and footer rows as styled segments."""
+        theme = get_theme()
         inner = self._inner_w
         body = sanitize_for_display(self._message)
         wrapped: list[str] = []
         for raw in body.splitlines() or [body]:
-            seg = raw
-            while seg:
-                wrapped.append(seg[:inner])
-                seg = seg[inner:]
+            chunk = raw
+            while chunk:
+                wrapped.append(chunk[:inner])
+                chunk = chunk[inner:]
         if not wrapped:
             wrapped = [""]
-        footer = self._footer_text()
-        footer_lines: list[str] = []
-        rest = footer
-        while rest:
-            footer_lines.append(rest[:inner])
-            rest = rest[inner:]
-        lines: list[str] = []
-        for line in wrapped:
-            lines.append(line[:inner].ljust(inner))
-        lines.append(" " * inner)
-        for fl in footer_lines:
-            lines.append(fl[:inner].ljust(inner))
-        return lines
 
-    def _footer_text(self) -> str:
-        """Return the footer label rendered on the last content line."""
-        return f"[{self._confirm_key}] OK  [{self._cancel_key}] Cancel"
+        rows: list[list[Segment]] = []
+        for line in wrapped:
+            rows.append(
+                [
+                    Segment(
+                        line[:inner].ljust(inner),
+                        fg=theme.fg_primary,
+                        bg=theme.bg_chrome,
+                    )
+                ]
+            )
+        rows.append([Segment(" " * inner, fg=theme.fg_primary, bg=theme.bg_chrome)])
+        footer = self._footer_segments()
+        plain = "".join(seg.text for seg in footer)
+        if len(plain) > inner:
+            # Keep hit-testing stable: prefer a single clipped footer row.
+            rows.append(
+                [
+                    Segment(
+                        plain[:inner].ljust(inner),
+                        fg=theme.fg_muted,
+                        bg=theme.bg_chrome,
+                    )
+                ]
+            )
+        else:
+            pad = inner - len(plain)
+            if pad:
+                footer = footer + [
+                    Segment(" " * pad, fg=theme.fg_muted, bg=theme.bg_chrome)
+                ]
+            rows.append(footer)
+        return rows
+
+    def _footer_plain(self) -> str:
+        """Return the footer as plain text for mouse hit-testing."""
+        return "".join(seg.text for seg in self._footer_segments())
+
+    def _footer_segments(self) -> list[Segment]:
+        """Return styled OK / Cancel footer segments."""
+        theme = get_theme()
+        confirm = keys.display_key(self._confirm_key)
+        cancel = keys.display_key(self._cancel_key)
+        ok_fg = (
+            theme.fg_danger if self._kind is FeedbackKind.ERROR else theme.fg_primary
+        )
+        return [
+            Segment("[", fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment(confirm, fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment("] ", fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment(
+                "OK",
+                fg=ok_fg,
+                bg=theme.bg_chrome,
+                style_flags=palette.STYLE_BOLD,
+            ),
+            Segment("  [", fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment(cancel, fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment("] ", fg=theme.fg_muted, bg=theme.bg_chrome),
+            Segment("Cancel", fg=theme.fg_muted, bg=theme.bg_chrome),
+        ]
 
 
 class AlertDialog(Popup):
@@ -396,7 +462,7 @@ class AlertDialog(Popup):
         message: str,
         on_result: Callable[[bool], None],
         *,
-        destructive: bool = False,
+        kind: FeedbackKind | None = None,
     ) -> bool:
         """
         Prepare content, show this popup, and register the overlay host alert session.
@@ -404,14 +470,15 @@ class AlertDialog(Popup):
         Args:
             message: Confirmation prompt.
             on_result: Callback receiving the user's True/False choice.
-            destructive: If True, use the irreversible (danger) border color.
+            kind: Semantic feedback kind for chrome / OK styling.
+                Use ``FeedbackKind.ERROR`` for irreversible confirms.
 
         Returns:
             True if the dialog was shown; False if another modal is already open.
         """
         if _runtime_context.is_modal_open():
             return False
-        self._pane.prepare(message, on_result, destructive=destructive)
+        self._pane.prepare(message, on_result, kind=kind)
         self.relayout_content()
         self.show()
         self.begin_session()

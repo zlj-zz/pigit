@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from pigit.termui._layer import LayerKind
 from pigit.termui import palette
+from pigit.termui.types import ToastPosition
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.overlay import (
     dismiss_sheet,
@@ -156,12 +157,17 @@ class TestOverlayHelpers:
         _runtime_ctx.set(runtime)
         host = self._make_host()
         set_overlay_host(host)
-        show_spinner("loading")
+        toast = show_spinner("loading")
         host._layer_stack.push.assert_called_once()
         call = host._layer_stack.push.call_args
         assert isinstance(call.args[1], Toast)
         assert call.args[1].duration == 3600.0
+        assert call.args[1]._position == ToastPosition.BOTTOM_LEFT
+        assert call.args[1]._spin is True
         assert any("loading" in s.text for s in call.args[1]._segments)
+        centered = show_spinner("x", position=ToastPosition.CENTER)
+        assert centered is not None
+        assert centered._position == ToastPosition.CENTER
 
     def test_dismiss_toast(self):
         from pigit.termui._runtime_context import set_overlay_host

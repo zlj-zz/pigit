@@ -18,6 +18,13 @@ from ._base import _OpsBase
 from ._errors import GitError
 
 
+def _noninteractive_env() -> dict[str, str]:
+    """Return os.environ with GIT_TERMINAL_PROMPT disabled for background git."""
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return env
+
+
 class _MergeOps(_OpsBase):
     """Merge, pull, and commit operations."""
 
@@ -32,9 +39,25 @@ class _MergeOps(_OpsBase):
             "git pull",
             cwd=path,
             flags=WAITING | REPLY | DECODE,
+            env=_noninteractive_env(),
         )
         if code != 0:
-            raise GitError(err or "Pull failed")
+            msg = cast(str, err) if err else "Pull failed"
+            if "conflict" in msg.lower():
+                raise GitError(f"Merge conflict: {msg}")
+            raise GitError(msg)
+
+    def push(self, path: str | None = None) -> None:
+        """Push the current branch to its upstream. Raises GitError on failure."""
+        path = path or self.path
+        code, err, _out = self.executor.exec(
+            "git push",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+            env=_noninteractive_env(),
+        )
+        if code != 0:
+            raise GitError(err or "Push failed")
 
     def merge(self, source: str, path: str | None = None) -> None:
         """Merge ``source`` into the current branch. Raises GitError on failure.
