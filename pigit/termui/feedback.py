@@ -16,8 +16,8 @@ from . import palette
 class FeedbackKind(str, Enum):
     """Semantic level of a transient feedback message.
 
-    ``None`` is the neutral level: no glyph, no semantic color (used by
-    ``show_spinner`` and as the backward-compatible default).
+    ``None`` is the neutral level: no glyph, no semantic color (default for
+    plain toasts). Spinners apply INFO chrome without the kind glyph.
     """
 
     INFO = "info"

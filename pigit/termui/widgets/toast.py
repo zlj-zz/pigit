@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     from ..event_loop import AppEventLoop
 
 MAX_TOAST_LINES = 100
+_SPIN_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+# Keep spinning toasts from looking like a tiny sticker when the label is short.
+_MIN_SPIN_INNER_W = 32
 
 
 class Toast(Component):
@@ -42,22 +45,31 @@ class Toast(Component):
         kind: FeedbackKind | None = None,
         enter_duration: float = 0.5,
         exit_duration: float = 0.5,
+        spin: bool = False,
     ) -> None:
         super().__init__(size=size)
-        self._segments: list[Segment] = (
-            list(segments) if segments else [Segment(message)]
-        )
+        self._spin = spin
+        self._spin_frame_i = 0
+        self._spin_message = message if spin else ""
         self.duration = duration
         self._clock = clock
         self._position = position
 
         # Semantic level: None means neutral (no glyph, no semantic color).
+        # Spinners use INFO chrome (border + braille) without the kind glyph.
+        if spin:
+            kind = FeedbackKind.INFO
         self._kind = kind
         _style = style_for(kind)
         self._kind_fg = _style.fg if _style else None
-        self._kind_glyph = _style.glyph if _style else None
-        self._kind_style = _style.style_flags if _style else 0
+        self._kind_glyph = None if spin else (_style.glyph if _style else None)
+        self._kind_style = 0 if spin else (_style.style_flags if _style else 0)
         self._prefix_w = (wcswidth(self._kind_glyph) + 1) if self._kind_glyph else 0
+        self._segments = (
+            self._spin_segments()
+            if spin
+            else (list(segments) if segments else [Segment(message)])
+        )
 
         if enter_duration + exit_duration > duration:
             enter_duration = 0.0
@@ -77,6 +89,25 @@ class Toast(Component):
 
         self._event_loop: AppEventLoop | None = None
         self._timer_id: int | None = None
+
+    def _spin_segments(self) -> list[Segment]:
+        """Build spinner line: INFO-colored frame + primary message."""
+        theme = get_theme()
+        info = style_for(FeedbackKind.INFO)
+        frame = _SPIN_FRAMES[self._spin_frame_i % len(_SPIN_FRAMES)]
+        info_fg = info.fg if info is not None else theme.fg_info
+        return [
+            Segment(frame, fg=info_fg, style_flags=palette.STYLE_BOLD),
+            Segment(f" {self._spin_message}…", fg=theme.fg_primary),
+        ]
+
+    def _advance_spin_frame(self) -> None:
+        """Advance the spinner glyph and mark the toast for rebuild."""
+        if not self._spin:
+            return
+        self._spin_frame_i += 1
+        self._segments = self._spin_segments()
+        self._needs_rebuild = True
 
     def is_expired(self) -> bool:
         """Return True if the toast has exceeded its display duration."""
@@ -136,6 +167,9 @@ class Toast(Component):
             truncated.append(new_line)
             inner_w = max(inner_w, self._prefix_w + line_w)
 
+        if self._spin:
+            inner_w = max(inner_w, min(_MIN_SPIN_INNER_W, max_inner_w))
+
         self._line_segments = truncated
         inner_h = len(self._line_segments)
 
@@ -151,6 +185,8 @@ class Toast(Component):
 
     def _compute_slide_offset(self, elapsed: float) -> int:
         """Compute horizontal animation offset."""
+        if self._position is ToastPosition.CENTER:
+            return 0
         total = self.duration
         enter = self._enter_duration
         exit = self._exit_duration
@@ -172,6 +208,10 @@ class Toast(Component):
 
     def _compute_base_position(self, surface) -> tuple[int, int]:
         """Compute the target (row, col) without animation offset."""
+        if self._position is ToastPosition.CENTER:
+            base_row = max(0, (surface.height - self.outer_row_count) // 2)
+            base_col = max(0, (surface.width - self._outer_w) // 2)
+            return base_row, base_col
         if self._position in (ToastPosition.TOP_LEFT, ToastPosition.TOP_RIGHT):
             base_row = 1
         else:
@@ -198,6 +238,8 @@ class Toast(Component):
             if not self.open or self.is_expired():
                 self._stop_animation_timer()
                 return
+            if self._spin:
+                self._advance_spin_frame()
             loop.request_render()
 
         self._timer_id = loop.add_interval(0.05, _tick)

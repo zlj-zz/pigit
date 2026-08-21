@@ -214,6 +214,69 @@ class TestToast:
         else:
             assert base_col > surface.width // 2
 
+    def test_toast_position_center(self):
+        toast = Toast("Hi", duration=5.0, position=ToastPosition.CENTER)
+        toast._rebuild_frame()
+        surface = Surface(80, 24)
+        row, col = toast._compute_base_position(surface)
+        assert abs(row - (24 - toast.outer_row_count) // 2) <= 1
+        assert abs(col - (80 - toast._outer_w) // 2) <= 1
+        assert toast._compute_slide_offset(0.0) == 0
+        assert toast._compute_slide_offset(0.1) == 0
+
+    def test_toast_spin_uses_info_chrome(self):
+        from pigit.termui.feedback import FeedbackKind, style_for
+        from pigit.termui.theme import get_theme
+
+        toast = Toast(
+            "Pulling",
+            duration=3600.0,
+            position=ToastPosition.CENTER,
+            spin=True,
+            enter_duration=0.0,
+            exit_duration=0.0,
+        )
+        toast.resize((80, 24))
+        toast._rebuild_frame()
+        assert toast._frame is not None
+        assert toast._frame.fg == style_for(FeedbackKind.INFO).fg
+        glyph, text = toast._line_segments[0]
+        assert glyph.fg == style_for(FeedbackKind.INFO).fg
+        assert text.fg == get_theme().fg_primary
+        assert "Pulling" in text.text
+
+    def test_toast_spin_enforces_minimum_inner_width(self):
+        toast = Toast(
+            "x",
+            duration=3600.0,
+            position=ToastPosition.CENTER,
+            spin=True,
+            enter_duration=0.0,
+            exit_duration=0.0,
+        )
+        toast.resize((80, 24))
+        toast._rebuild_frame()
+        assert toast._frame is not None
+        assert toast._frame.inner_width >= 32
+
+    def test_toast_spin_advances_frame_on_timer_tick(self):
+        toast = Toast(
+            "Pushing",
+            duration=3600.0,
+            position=ToastPosition.CENTER,
+            spin=True,
+            enter_duration=0.0,
+            exit_duration=0.0,
+        )
+        toast.resize((80, 24))
+        toast._rebuild_frame()
+        first = "".join(s.text for s in toast._line_segments[0])
+        toast._advance_spin_frame()
+        toast._rebuild_frame()
+        second = "".join(s.text for s in toast._line_segments[0])
+        assert first != second
+        assert "Pushing" in second
+
     def test_toast_slide_in_animation_left(self):
         """验证左侧位置的滑入动画偏移方向正确（水平方向）"""
         clock = MagicMock(return_value=0.0)

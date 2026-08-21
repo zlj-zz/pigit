@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pigit.termui import (
@@ -85,6 +85,15 @@ _OBSERVE_POLL_INTERVAL_S = 1.0
 _OBSERVE_DRAIN_INTERVAL_S = 0.15
 
 
+@dataclass(frozen=True)
+class _NetworkGitOutcome:
+    """Result of a background push/pull (AsyncTask cannot deliver exceptions)."""
+
+    ok: bool
+    message: str = ""
+    conflict: bool = False
+
+
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
@@ -133,6 +142,9 @@ class PigitApplication(Application):
         # Inspector async-load state
         self._inspector_task: AsyncTask | None = None
         self._inspector_token: object = None
+        # Background push/pull (must not use exec_external on the worker)
+        self._network_sync_busy = False
+        self._network_sync_task: AsyncTask[_NetworkGitOutcome] = AsyncTask()
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._log_graph_preview: LogGraphPreview | None = None
@@ -757,6 +769,16 @@ class PigitApplication(Application):
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
+    @bind_action("push", "P", desc="Push current branch to upstream", tip="Push")
+    def push_upstream(self) -> None:
+        """Push HEAD to its configured upstream (non-interactive)."""
+        self._run_network_git("push")
+
+    @bind_action("pull", "F", desc="Pull current branch from upstream", tip="Pull")
+    def pull_upstream(self) -> None:
+        """Pull into HEAD from its configured upstream (non-interactive)."""
+        self._run_network_git("pull")
+
     def _dismiss_palette(self) -> None:
         """Dismiss the palette sheet from the root."""
         if self._root is not None:
@@ -885,8 +907,11 @@ class PigitApplication(Application):
             self.quit()
         elif self._tab_view.route_to(lower) is not None:
             return
-        if lower in ("pull", "push", "fetch"):
-            self._run_git_action(lower)
+        if lower in ("pull", "push"):
+            self._run_network_git(lower)
+            return
+        if lower == "fetch":
+            self._run_git_action("fetch")
             return
         if lower == "continue-merge":
             self._continue_merge()
@@ -901,6 +926,106 @@ class PigitApplication(Application):
         ):
             self._run_cherry_pick_control(lower)
             return
+
+    def _run_network_git(
+        self,
+        action: str,
+        *,
+        on_complete: Callable[[], None] | None = None,
+    ) -> None:
+        """Run push/pull on a worker with a center spinner; never use exec_external.
+
+        ``on_complete`` runs after the attempt finishes (success or failure), not when
+        the busy-guard rejects a second sync. Merge finish uses this to always
+        checkout back to ``source``.
+        """
+        if action not in ("push", "pull"):
+            raise ValueError(f"Unsupported network git action: {action}")
+        if self._network_sync_busy:
+            show_toast(
+                "Push/Pull already in progress",
+                duration=1.5,
+                kind=FeedbackKind.INFO,
+            )
+            return
+
+        # Palette SHEET paints above TOAST; drop it before showing the spinner.
+        dismiss_sheet()
+
+        self._network_sync_busy = True
+        label = "Pushing to upstream" if action == "push" else "Pulling from upstream"
+        show_spinner(label, position=ToastPosition.CENTER)
+
+        def work() -> _NetworkGitOutcome:
+            # AsyncTask drops uncaught exceptions without invoking done(); never raise.
+            try:
+                if action == "push":
+                    self._git.push()
+                else:
+                    self._git.pull()
+                return _NetworkGitOutcome(ok=True)
+            except GitError as e:
+                msg = str(e)
+                return _NetworkGitOutcome(
+                    ok=False,
+                    message=msg,
+                    conflict="conflict" in msg.lower(),
+                )
+            except Exception as e:
+                return _NetworkGitOutcome(
+                    ok=False,
+                    message=f"Git {action} error: {e}",
+                )
+
+        def done(outcome: _NetworkGitOutcome) -> None:
+            self._network_sync_busy = False
+            hide_spinner()
+            try:
+                if outcome.conflict:
+                    self._handle_pull_conflict(outcome.message)
+                    return
+                if not outcome.ok:
+                    show_toast(
+                        outcome.message or f"Git {action} failed",
+                        duration=3.0,
+                        kind=FeedbackKind.ERROR,
+                    )
+                    return
+                show_toast(
+                    f"Git {action} completed",
+                    duration=1.5,
+                    kind=FeedbackKind.SUCCESS,
+                )
+                self._refresh_git_vms()
+                self._schedule_reload_header()
+            finally:
+                # Always settle (e.g. merge checkout-back), matching pre-async behavior.
+                if on_complete is not None:
+                    on_complete()
+
+        self._network_sync_task.start(work, done)
+
+    def _handle_pull_conflict(self, message: str) -> None:
+        """Persist pull-merge state, show git detail, and route to Status."""
+        branch = ""
+        try:
+            branch = self._git.get_head() or ""
+        except (GitError, RepoError):
+            branch = ""
+        target = branch or "HEAD"
+        state = {"source": "@{upstream}", "target": target, "mode": "pull"}
+        self._merge_state = state
+        self._header_state.merge_target = target
+        self._save_merge_state(state["source"], target, mode="pull")
+
+        detail = (message or "").strip() or "Merge conflict during pull"
+        show_toast(
+            f"{detail}\nResolve in Status, then ';' → continue-merge",
+            duration=4.0,
+            kind=FeedbackKind.WARNING,
+        )
+        self._tab_view.route_to("status")
+        self._refresh_git_vms()
 
     def _run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""
@@ -1114,19 +1239,26 @@ class PigitApplication(Application):
         git_dir = self._git.get_git_dir()
         return os.path.join(git_dir, "pigit_merge_state")
 
-    def _save_merge_state(self, source: str, target: str) -> None:
+    def _save_merge_state(
+        self, source: str, target: str, *, mode: str = "branch"
+    ) -> None:
         try:
             with open(self._merge_state_path(), "w") as f:
-                json.dump({"source": source, "target": target}, f)
+                json.dump({"source": source, "target": target, "mode": mode}, f)
         except Exception:
             pass
 
     def _load_merge_state(self) -> dict | None:
         try:
             with open(self._merge_state_path()) as f:
-                return json.load(f)
+                data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             return None
+        if not isinstance(data, dict):
+            return None
+        # Older files omit mode; treat as branch-merge workflow.
+        data.setdefault("mode", "branch")
+        return data
 
     def _clear_merge_state(self) -> None:
         try:
@@ -1137,7 +1269,7 @@ class PigitApplication(Application):
     def _try_restore_merge_state(self) -> None:
         """On startup: recover pending merge state if merge is still in progress.
 
-        Swallows GitError (e.g. not a git repo) \u2014 merge state restoration is
+        Swallows GitError (e.g. not a git repo) — merge state restoration is
         best-effort and should never prevent the TUI from starting.
         """
         try:
@@ -1149,11 +1281,19 @@ class PigitApplication(Application):
         if self._git.is_merge_in_progress():
             self._merge_state = state
             self._header_state.merge_target = state.get("target", "")
-            show_toast(
-                f"Resume merge: {state['source']} \u2192 {state['target']} (continue-merge)",
-                duration=3.0,
-                kind=FeedbackKind.INFO,
-            )
+            mode = state.get("mode", "branch")
+            if mode == "pull":
+                show_toast(
+                    "Resume pull merge (continue-merge)",
+                    duration=3.0,
+                    kind=FeedbackKind.INFO,
+                )
+            else:
+                show_toast(
+                    f"Resume merge: {state['source']} → {state['target']} (continue-merge)",
+                    duration=3.0,
+                    kind=FeedbackKind.INFO,
+                )
         else:
             self._clear_merge_state()
             self._header_state.merge_target = ""
@@ -1230,40 +1370,60 @@ class PigitApplication(Application):
             pass
 
     def _confirm_push_and_finish(self, target: str, source: str) -> None:
-        """Alert confirm push, then checkout back to source branch."""
+        """Alert confirm push, then checkout back to source branch after push completes."""
 
         def on_push_confirmed(confirmed: bool) -> None:
-            if confirmed:
-                show_spinner(f"Pushing {target}")
-                try:
-                    self._run_git_action("push")
-                finally:
-                    hide_spinner()
-            try:
-                self._git.checkout_branch(source)
-            except GitError as e:
-                show_toast(
-                    f"Checkout back failed: {e}", duration=3.0, kind=FeedbackKind.ERROR
-                )
+            if not confirmed:
+                self._finish_merge_checkout(target, source)
                 return
-            self._merge_state = None
-            self._header_state.merge_target = ""
-            self._clear_merge_state()
-            self._tab_view.route_to("branch")
-            self._branch_panel.refresh()
-            show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
+
+            def after_push() -> None:
+                self._finish_merge_checkout(target, source)
+
+            self._run_network_git("push", on_complete=after_push)
 
         self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)
+
+    def _finish_merge_checkout(self, target: str, source: str) -> None:
+        """Checkout back to source and clear merge state after merge push step."""
+        try:
+            self._git.checkout_branch(source)
+        except GitError as e:
+            show_toast(
+                f"Checkout back failed: {e}", duration=3.0, kind=FeedbackKind.ERROR
+            )
+            return
+        self._merge_state = None
+        self._header_state.merge_target = ""
+        self._clear_merge_state()
+        self._tab_view.route_to("branch")
+        self._branch_panel.refresh()
+        show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
 
     def _continue_merge(self) -> None:
         """Resume a pending merge after conflicts have been resolved."""
         state = self._merge_state
+        if state is None and self._git.is_merge_in_progress():
+            # Pull/merge left MERGE_HEAD without pigit state (e.g. older session).
+            branch = ""
+            try:
+                branch = self._git.get_head() or ""
+            except (GitError, RepoError):
+                branch = ""
+            state = {
+                "source": "@{upstream}",
+                "target": branch or "HEAD",
+                "mode": "pull",
+            }
+            self._merge_state = state
+
         if not state:
             show_toast("No pending merge", duration=2.0, kind=FeedbackKind.WARNING)
             return
 
         target = state["target"]
         source = state["source"]
+        mode = state.get("mode", "branch")
 
         if self._git.is_merge_in_progress():
             try:
@@ -1283,6 +1443,15 @@ class PigitApplication(Application):
                         kind=FeedbackKind.ERROR,
                     )
                 return
+
+        if mode == "pull":
+            self._merge_state = None
+            self._header_state.merge_target = ""
+            self._clear_merge_state()
+            self._refresh_git_vms()
+            self._schedule_reload_header()
+            show_toast("Pull completed", duration=2.0, kind=FeedbackKind.SUCCESS)
+            return
 
         self._confirm_push_and_finish(target, source)
 
