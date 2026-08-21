@@ -235,7 +235,6 @@ class PigitApplication(Application):
         children = [
             Header(
                 left=self._header_state.left,
-                center=self._header_state.center,
                 right=self._header_state.right,
                 separator=True,
                 sep_fg=THEME.fg_dim,

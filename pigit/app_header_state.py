@@ -61,9 +61,15 @@ class HeaderState:
         # Derived: segment groups (auto-recalculate)
         self._badge_signal = get_badge_signal()
         self._left = Computed(
-            self._make_left, deps=[self._repo, self._branch, self._badge_signal]
+            self._make_left,
+            deps=[
+                self._repo,
+                self._branch,
+                self._ahead,
+                self._behind,
+                self._badge_signal,
+            ],
         )
-        self._center = Computed(self._make_center, deps=[self._ahead, self._behind])
         self._right = Computed(
             self._make_right,
             deps=[self._merge_target, self._mode, self._tab, self._tab_key],
@@ -84,10 +90,6 @@ class HeaderState:
     @property
     def left(self) -> Computed[list[Segment]]:
         return self._left
-
-    @property
-    def center(self) -> Computed[list[Segment]]:
-        return self._center
 
     @property
     def right(self) -> Computed[list[Segment]]:
@@ -117,14 +119,10 @@ class HeaderState:
                 ),
             ]
         )
-        return segs
-
-    def _make_center(self) -> list[Segment]:
-        segs: list[Segment] = []
         if self.ahead > 0:
-            segs.append(Segment(f"↑{self.ahead} ", fg=self._theme.fg_success))
+            segs.append(Segment(f" ↑{self.ahead}", fg=self._theme.fg_success))
         if self.behind > 0:
-            segs.append(Segment(f"↓{self.behind}", fg=self._theme.fg_warning))
+            segs.append(Segment(f" ↓{self.behind}", fg=self._theme.fg_warning))
         return segs
 
     def _make_right(self) -> list[Segment]:
