@@ -1,5 +1,25 @@
 # Changelog of pigit
 
+## 2.1.0 (2026-08-21)
+
+### Features
+
+- **Global Push / Pull (`P` / `F`)**: non-interactive `git push` / `git pull` on the current branch via `AsyncTask`, with a centered animated spinner (INFO chrome, min width), busy guard, and shared path with the command palette.
+- **Alert dialogs by `FeedbackKind`**: replace `destructive=` with `kind=`; irreversible confirms use `ERROR`, caution confirms use `WARNING`, with theme chrome and Segment-styled OK/Cancel.
+- **Help**: show bindings for the active panel, then Global only.
+
+### Bug Fixes
+
+- Header ahead/behind (`↑` / `↓`) sits next to the branch name instead of the centered Header slot.
+- Merge-workflow push always settles checkout-back after the async push attempt (success or failure).
+- Pull conflicts persist `mode=pull` merge state, surface git detail in the toast, and resume via `continue-merge` without branch checkout-back.
+- Network sync `work()` never raises into `AsyncTask` (non-`GitError` becomes a failed outcome so busy/spinner clear).
+
+### Improvements
+
+- `GitApi.push()` with `GIT_TERMINAL_PROMPT=0` (same non-interactive env on `pull`).
+- `ToastPosition.CENTER` and spinning `show_spinner(..., position=)`.
+
 ## 2.0.0 (2026-08-20)
 
 ### Breaking Changes
