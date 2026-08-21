@@ -574,7 +574,7 @@ class PigitApplication(Application):
                 items=catalog_for_context(sequencer),
                 list_slots=slots,
             )
-            self._root.show_sheet(self._palette)
+            self._root.show_sheet(self._palette, title="Commands")
 
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
@@ -689,7 +689,7 @@ class PigitApplication(Application):
             self._refresh_active_panel()
 
         panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
-        show_sheet(panel)
+        show_sheet(panel, title="Recent")
         panel.activate()
 
     def toggle_side_preview(self) -> None:
@@ -851,7 +851,7 @@ class PigitApplication(Application):
             self._refresh_active_panel()
 
         panel = RebasePanel(self._git, target, on_done=_on_done)
-        show_sheet(panel, max_fraction=0.5)
+        show_sheet(panel, max_fraction=0.5, title="Rebase")
         panel.activate()
 
     def on_event(self, action: EventType, **data) -> bool:

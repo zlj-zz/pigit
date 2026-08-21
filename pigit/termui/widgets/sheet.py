@@ -13,15 +13,69 @@ from ..component import Component
 from ..surface import Surface, _Subsurface
 from ..theme import get_theme
 from ..types import OverlayDispatchResult
-
-_BOX_CORNER_TL = "╭"
-_BOX_CORNER_TR = "╮"
-_BOX_CORNER_BL = "╰"
-_BOX_CORNER_BR = "╯"
+from ..wcwidth_table import truncate_by_width, wcswidth
 
 DEFAULT_SHEET_HEIGHT = 8
 DEFAULT_MAX_FRACTION = 1 / 3
 MIN_SHEET_HEIGHT = 3
+
+TitleAlign = Literal["left", "center", "right"]
+
+_RULE_CHAR = "─"
+_TITLE_SIDE = " · "
+_ELLIPSIS = "…"
+
+
+def compose_edge_rule(
+    width: int,
+    title: str | None = None,
+    *,
+    align: TitleAlign = "right",
+) -> tuple[str, str, str]:
+    """Build one facing-edge rule as ``(left_fill, core, right_fill)``.
+
+    With a title the core is `` · {title} · ``; fills are ``─``. At least one
+    fill cell is kept on each side when width allows. Oversized titles are
+    truncated with an ellipsis. When the title cannot fit, returns a plain
+    rule (empty core).
+    """
+    if width <= 0:
+        return "", "", ""
+    plain = (_RULE_CHAR * width, "", "")
+    if not title:
+        return plain
+
+    side_w = wcswidth(_TITLE_SIDE)
+    overhead = side_w * 2
+    # Reserve one rule cell on each side when possible.
+    max_core = width - 2 if width >= 2 else 0
+    if max_core < overhead + 1:
+        return plain
+
+    title_budget = max_core - overhead
+    label = title
+    if wcswidth(label) > title_budget:
+        if title_budget <= 1:
+            return plain
+        label = truncate_by_width(label, title_budget - 1) + _ELLIPSIS
+    core = f"{_TITLE_SIDE}{label}{_TITLE_SIDE}"
+    core_w = wcswidth(core)
+    if core_w > max_core or core_w > width:
+        return plain
+
+    fill = width - core_w
+    if align == "left":
+        left_n, right_n = 1, fill - 1
+    elif align == "center":
+        left_n = fill // 2
+        right_n = fill - left_n
+        if left_n == 0 and fill >= 2:
+            left_n, right_n = 1, fill - 1
+        elif right_n == 0 and fill >= 2:
+            right_n, left_n = 1, fill - 1
+    else:
+        left_n, right_n = fill - 1, 1
+    return _RULE_CHAR * left_n, core, _RULE_CHAR * right_n
 
 
 class Sheet(Component):
@@ -29,8 +83,9 @@ class Sheet(Component):
 
     Default chrome: no fill color (``bg=None`` — cells keep the terminal
     default background, not a theme slab) and a facing-edge rule
-    (``show_edge_rule=True``). Callers that need a solid slab or a rule-less
-    one-line input pass those explicitly.
+    (``show_edge_rule=True``): a full-width ``─`` line, optionally embedding
+    `` · title · ``. Callers that need a solid slab or a rule-less one-line
+    input pass those explicitly.
     """
 
     @staticmethod
@@ -84,6 +139,8 @@ class Sheet(Component):
         size: tuple[int, int] | None = None,
         *,
         show_edge_rule: bool = True,
+        title: str | None = None,
+        title_align: TitleAlign = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
     ) -> None:
@@ -92,6 +149,8 @@ class Sheet(Component):
         child.parent = self
         self._target_height = height
         self._show_edge_rule = show_edge_rule
+        self._title = title
+        self._title_align = title_align
         self._edge = edge
         self._bg = bg
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
@@ -153,21 +212,23 @@ class Sheet(Component):
         return self._bg
 
     def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
-        """Draw the facing-edge rule: ╭─╮ on the top of a bottom sheet, ╰─╯ on the bottom of a top sheet."""
+        """Draw the facing-edge rule as a full-width line, optional title core."""
         theme = get_theme()
-        fg, bg = theme.fg_dim, self._sheet_bg()
-        left, right = (
-            (_BOX_CORNER_BL, _BOX_CORNER_BR)
-            if self._edge == "top"
-            else (_BOX_CORNER_TL, _BOX_CORNER_TR)
+        fg_rule, fg_title, bg = theme.fg_dim, theme.fg_muted, self._sheet_bg()
+        left, core, right = compose_edge_rule(
+            sub.width,
+            self._title,
+            align=self._title_align,
         )
-        if sub.width >= 2:
-            sub.draw_text_rgb(row, 0, left, fg=fg, bg=bg)
-            sub.draw_text_rgb(row, sub.width - 1, right, fg=fg, bg=bg)
-            if sub.width > 2:
-                sub.draw_hline_rgb(row, 1, sub.width - 2, fg=fg, bg=bg)
-        else:
-            sub.draw_hline_rgb(row, 0, sub.width, fg=fg, bg=bg)
+        col = 0
+        if left:
+            sub.draw_text_rgb(row, col, left, fg=fg_rule, bg=bg)
+            col += wcswidth(left)
+        if core:
+            sub.draw_text_rgb(row, col, core, fg=fg_title, bg=bg)
+            col += wcswidth(core)
+        if right:
+            sub.draw_text_rgb(row, col, right, fg=fg_rule, bg=bg)
 
     def hide(self) -> None:
         """Close the sheet."""

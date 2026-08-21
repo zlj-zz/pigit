@@ -84,6 +84,8 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
+            title=None,
+            title_align="right",
             edge="bottom",
             bg=None,
         )
@@ -103,6 +105,8 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
+            title=None,
+            title_align="right",
             edge="top",
             bg=None,
         )
@@ -122,6 +126,8 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
+            title=None,
+            title_align="right",
             edge="top",
             bg=None,
         )

@@ -169,6 +169,8 @@ def show_sheet(
     *,
     max_fraction: float = DEFAULT_MAX_FRACTION,
     show_edge_rule: bool = True,
+    title: str | None = None,
+    title_align: Literal["left", "center", "right"] = "right",
     edge: Literal["top", "bottom"] = "bottom",
     bg: tuple[int, int, int] | None = None,
 ) -> Sheet | None:
@@ -178,6 +180,9 @@ def show_sheet(
     (if any) and clamps with ``max_fraction`` (default one-third of the
     terminal, never above half). When ``height`` is given, only the half-
     terminal safety clamp applies; ``max_fraction`` is ignored.
+
+    Optional ``title`` is embedded in the facing-edge rule as
+    ``─ · title · ─`` (``title_align`` defaults to right).
     """
     sheet = _with_host(
         lambda h: h.show_sheet(
@@ -185,6 +190,8 @@ def show_sheet(
             height,
             max_fraction=max_fraction,
             show_edge_rule=show_edge_rule,
+            title=title,
+            title_align=title_align,
             edge=edge,
             bg=bg,
         )

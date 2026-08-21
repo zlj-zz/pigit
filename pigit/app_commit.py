@@ -245,7 +245,7 @@ class CommitPanel(ItemList):
             on_pick=self._on_log_ref_picked,
             on_done=dismiss_sheet,
         )
-        show_sheet(sheet, max_fraction=0.5)
+        show_sheet(sheet, max_fraction=0.5, title="Log ref")
         sheet.activate()
 
     def _on_log_ref_picked(self, name: str) -> None:

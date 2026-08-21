@@ -452,11 +452,11 @@ class TestSheet:
 
         child._render_surface.assert_called_once()
         sub = child._render_surface.call_args[0][0]
-        # Default: facing-edge border; child gets sheet height minus 1
+        # Default: facing-edge rule; child gets sheet height minus 1
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (8, 0)
-        assert surface._rows[7][0].char == "╭"
-        assert surface._rows[7][19].char == "╮"
+        assert surface._rows[7][0].char == "─"
+        assert surface._rows[7][19].char == "─"
 
     def test_sheet_render_surface_borderless(self):
         child = MagicMock()
@@ -486,8 +486,8 @@ class TestSheet:
         # With border: child height is sheet height minus 1
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (8, 0)
-        assert surface._rows[7][0].char == "╭"
-        assert surface._rows[7][19].char == "╮"
+        assert surface._rows[7][0].char == "─"
+        assert surface._rows[7][19].char == "─"
 
     def test_sheet_top_edge_border_is_on_last_row(self):
         child = MagicMock()
@@ -499,9 +499,9 @@ class TestSheet:
         sub = child._render_surface.call_args[0][0]
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (0, 0)
-        assert surface._rows[2][0].char == "╰"
-        assert surface._rows[2][19].char == "╯"
-        assert surface._rows[0][0].char != "╭"
+        assert surface._rows[2][0].char == "─"
+        assert surface._rows[2][19].char == "─"
+        assert surface._rows[0][0].char != "─"
 
     def test_sheet_render_surface_zero_height_skips(self):
         child = MagicMock()
@@ -624,6 +624,42 @@ class TestSheet:
         assert surface._rows[0][0].char == " "
         assert surface._rows[0][0].bg is None
         assert surface._rows[0][4].char == " "
+
+    def test_sheet_title_right_aligned_by_default(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, title="Commands")
+        sheet._size = (24, 3)
+        surface = Surface(24, 10)
+        sheet._render_surface(surface)
+        rule = "".join(c.char for c in surface._rows[7])
+        assert rule.endswith(" · Commands · ─")
+        assert rule.startswith("─")
+
+    def test_compose_edge_rule_alignments(self):
+        from pigit.termui.widgets.sheet import compose_edge_rule
+
+        left, core, right = compose_edge_rule(20, "Hi", align="left")
+        assert left == "─"
+        assert core == " · Hi · "
+        assert right.startswith("─")
+
+        left, core, right = compose_edge_rule(20, "Hi", align="right")
+        assert right == "─"
+        assert core == " · Hi · "
+        assert left.startswith("─")
+
+        left, core, right = compose_edge_rule(21, "Hi", align="center")
+        assert core == " · Hi · "
+        assert abs(len(left) - len(right)) <= 1
+
+    def test_compose_edge_rule_truncates_long_title(self):
+        from pigit.termui.widgets.sheet import compose_edge_rule
+
+        left, core, right = compose_edge_rule(12, "VeryLongTitle")
+        assert left == "─" and right == "─"
+        assert core.startswith(" · ") and core.endswith(" · ")
+        assert "…" in core
 
 
 class TestHelpPanel:

@@ -330,6 +330,8 @@ class ComponentRoot(Component):
         *,
         max_fraction: float = DEFAULT_MAX_FRACTION,
         show_edge_rule: bool = True,
+        title: str | None = None,
+        title_align: Literal["left", "center", "right"] = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
     ) -> Sheet:
@@ -338,7 +340,7 @@ class ComponentRoot(Component):
         Height resolution matches :func:`~pigit.termui.overlay.show_sheet`:
         omitted ``height`` uses the child's preferred height and
         ``max_fraction``; an explicit ``height`` only gets the half-terminal
-        safety clamp.
+        safety clamp. Optional ``title`` embeds in the facing-edge rule.
         """
         from .widgets import Sheet
 
@@ -353,6 +355,8 @@ class ComponentRoot(Component):
             child,
             resolved,
             show_edge_rule=show_edge_rule,
+            title=title,
+            title_align=title_align,
             edge=edge,
             bg=bg,
         )

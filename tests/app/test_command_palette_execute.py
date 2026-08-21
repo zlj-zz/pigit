@@ -58,6 +58,7 @@ def test_toggle_palette_sets_slots_from_root_and_opens_sheet(app):
     args, kwargs = app._root.show_sheet.call_args
     assert args == (app._palette,)
     assert "height" not in kwargs
+    assert kwargs.get("title") == "Commands"
     assert kwargs.get("show_edge_rule", True) is True
     assert kwargs.get("bg") is None
     # Host would resolve to the same height the child reports from those slots.
