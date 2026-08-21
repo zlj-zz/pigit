@@ -1389,14 +1389,20 @@ class DiffViewer(LineTextBrowser):
             )
 
     def _render_surface(self, surface) -> None:
+        w = surface.width
+        h = surface.height
+        can_draw_box = w > self.LINE_NO_WIDTH + 3 and h >= self.BORDER_ROWS + 1
         if not self._content:
+            # Keep chrome when cleared so Preview stays a framed region, not a void.
+            if can_draw_box:
+                surface.draw_box_rgb(
+                    0, 0, w, h, fg=THEME.fg_dim, title=self._box_title or None
+                )
             return
         if self._file_history_mode:
             self._render_file_history(surface)
             return
-        w = surface.width
-        h = surface.height
-        if w <= self.LINE_NO_WIDTH + 3 or h < self.BORDER_ROWS + 1:
+        if not can_draw_box:
             self._render_surface_borderless(surface)
             return
 
