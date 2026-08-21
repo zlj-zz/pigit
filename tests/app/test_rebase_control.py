@@ -75,14 +75,14 @@ class TestRebaseControl:
 
 
 def test_palette_lists_cherry_pick_controls():
-    from pigit.app_command_palette import DEFAULT_COMMANDS
+    from pigit.app_command_palette import KNOWN_COMMAND_IDS
 
     for name in (
         "cherry-pick-continue",
         "cherry-pick-abort",
         "cherry-pick-skip",
     ):
-        assert name in DEFAULT_COMMANDS
+        assert name in KNOWN_COMMAND_IDS
 
 
 class TestCherryPickControl:

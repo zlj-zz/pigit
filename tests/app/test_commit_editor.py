@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module: tests/app/test_commit_editor.py
 Description: Tests for inline CommitEditor status bar shortcuts.

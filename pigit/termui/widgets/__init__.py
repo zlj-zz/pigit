@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .bordered_browser import BorderedBrowser
 from .check_list import CheckList
-from .command_palette import CommandPalette
+from .command_palette import CommandPalette, PaletteItem, list_slots_for_term
 from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
 from .header import Header
@@ -30,6 +30,8 @@ __all__ = [
     "AlertDialogBody",
     "CheckList",
     "CommandPalette",
+    "PaletteItem",
+    "list_slots_for_term",
     "Footer",
     "HeatmapGrid",
     "Header",

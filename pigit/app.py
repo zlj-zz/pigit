@@ -557,8 +557,25 @@ class PigitApplication(Application):
         if self._palette.is_active:
             self._palette.close()
         else:
-            self._palette.open()
-            self._root.show_sheet(self._palette, height=8)
+            from pigit.app_command_palette import catalog_for_context
+            from pigit.termui.widgets.command_palette import list_slots_for_term
+
+            _, rows = terminal_size()
+            slots = list_slots_for_term(rows)
+            try:
+                sequencer = self._git.sequencer_in_progress()
+            except Exception:
+                sequencer = None
+            self._palette.open(
+                items=catalog_for_context(sequencer),
+                list_slots=slots,
+            )
+            self._root.show_sheet(
+                self._palette,
+                height=self._palette.preferred_sheet_height(rows),
+                show_border=True,
+                bg=None,
+            )
 
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
@@ -902,10 +919,23 @@ class PigitApplication(Application):
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
-        lower = cmd.lower()
+        from pigit.app_command_palette import KNOWN_COMMAND_IDS
+
+        lower = cmd.lower().strip()
+        if lower not in KNOWN_COMMAND_IDS:
+            show_toast(
+                f"Unknown command: {cmd}",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
         if lower == "quit":
             self.quit()
-        elif self._tab_view.route_to(lower) is not None:
+            return
+        if lower == "stash":
+            self.goto_stash()
+            return
+        if self._tab_view.route_to(lower) is not None:
             return
         if lower in ("pull", "push"):
             self._run_network_git(lower)
