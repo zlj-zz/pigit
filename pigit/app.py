@@ -560,8 +560,12 @@ class PigitApplication(Application):
             from pigit.app_command_palette import catalog_for_context
             from pigit.termui.widgets.command_palette import list_slots_for_term
 
-            _, rows = terminal_size()
-            slots = list_slots_for_term(rows)
+            # Same height source as Sheet.resolve_height (root size, not a
+            # second terminal_size() read that can disagree after resize).
+            term_h = self._root._size[1]
+            if term_h <= 0:
+                term_h = terminal_size()[1]
+            slots = list_slots_for_term(term_h)
             try:
                 sequencer = self._git.sequencer_in_progress()
             except Exception:
@@ -570,12 +574,7 @@ class PigitApplication(Application):
                 items=catalog_for_context(sequencer),
                 list_slots=slots,
             )
-            self._root.show_sheet(
-                self._palette,
-                height=self._palette.preferred_sheet_height(rows),
-                show_border=True,
-                bg=None,
-            )
+            self._root.show_sheet(self._palette)
 
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
@@ -690,8 +689,7 @@ class PigitApplication(Application):
             self._refresh_active_panel()
 
         panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
-        rows = terminal_size()[1]
-        show_sheet(panel, height=min(12, rows // 3), show_border=True)
+        show_sheet(panel)
         panel.activate()
 
     def toggle_side_preview(self) -> None:
@@ -745,9 +743,7 @@ class PigitApplication(Application):
         token = object()
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
-        placeholder_sheet = show_sheet(
-            placeholder, height=3, show_border=True, edge="top", bg=None
-        )
+        placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
         placeholder.activate()
 
         def load() -> InspectorSnapshot | None:
@@ -767,10 +763,8 @@ class PigitApplication(Application):
                 )
                 return
             lines = InspectorSheet.format(snapshot)
-            _, rows = terminal_size()
-            height = InspectorSheet.sheet_height(lines, rows, border=1)
             sheet = InspectorSheet(lines)
-            show_sheet(sheet, height=height, show_border=True, edge="top", bg=None)
+            show_sheet(sheet, edge="top", max_fraction=0.5)
             sheet.activate()
 
         self._inspector_task = run_async(load, apply)
@@ -857,8 +851,7 @@ class PigitApplication(Application):
             self._refresh_active_panel()
 
         panel = RebasePanel(self._git, target, on_done=_on_done)
-        rows = terminal_size()[1]
-        show_sheet(panel, height=min(20, rows - 4), show_border=True)
+        show_sheet(panel, max_fraction=0.5)
         panel.activate()
 
     def on_event(self, action: EventType, **data) -> bool:

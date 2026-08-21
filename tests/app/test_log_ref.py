@@ -183,14 +183,12 @@ def test_open_log_ref_shows_sheet():
     vm.log_ref = "HEAD"
     vm.list_log_ref_names.return_value = ["HEAD", "main"]
     panel = CommitPanel(vm=vm)
-    with (
-        patch("pigit.app_commit.show_sheet") as sheet,
-        patch("pigit.app_commit.terminal_size", return_value=(80, 24)),
-    ):
+    with patch("pigit.app_commit.show_sheet") as sheet:
         panel.open_log_ref()
     sheet.assert_called_once()
     child = sheet.call_args.args[0]
     assert isinstance(child, LogRefSheet)
+    assert sheet.call_args.kwargs.get("max_fraction") == 0.5
 
 
 def test_on_pick_sets_ref_and_toasts():
@@ -206,7 +204,6 @@ def test_on_pick_sets_ref_and_toasts():
 
     with (
         patch("pigit.app_commit.show_sheet", fake_sheet),
-        patch("pigit.app_commit.terminal_size", return_value=(80, 24)),
         patch("pigit.app_commit.show_toast") as toast,
     ):
         panel.open_log_ref()

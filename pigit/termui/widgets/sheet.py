@@ -14,20 +14,28 @@ from ..surface import Surface, _Subsurface
 from ..theme import get_theme
 from ..types import OverlayDispatchResult
 
-_USE_THEME_BG = object()
-
 _BOX_CORNER_TL = "╭"
 _BOX_CORNER_TR = "╮"
 _BOX_CORNER_BL = "╰"
 _BOX_CORNER_BR = "╯"
 
+DEFAULT_SHEET_HEIGHT = 8
+DEFAULT_MAX_FRACTION = 1 / 3
+MIN_SHEET_HEIGHT = 3
+
 
 class Sheet(Component):
-    """Edge sheet panel (top or bottom) on the SHEET layer."""
+    """Edge sheet panel (top or bottom) on the SHEET layer.
+
+    Default chrome: no fill color (``bg=None`` — cells keep the terminal
+    default background, not a theme slab) and a facing-edge rule
+    (``show_edge_rule=True``). Callers that need a solid slab or a rule-less
+    one-line input pass those explicitly.
+    """
 
     @staticmethod
     def clamp_height(rows: list, term_h: int, *, border: int = 1) -> int:
-        """Clamp sheet height to ``[3, term_h // 2]`` including border.
+        """Clamp sheet height to ``[3, term_h // 2]`` including edge-rule row.
 
         Args:
             rows: Content rows displayed inside the sheet.
@@ -39,21 +47,51 @@ class Sheet(Component):
         """
         return min(max(len(rows) + border, 3), max(3, term_h // 2))
 
+    @staticmethod
+    def resolve_height(
+        child: Component,
+        term_h: int,
+        *,
+        height: int | None = None,
+        max_fraction: float = DEFAULT_MAX_FRACTION,
+    ) -> int:
+        """Resolve sheet height from an explicit value or the child's preference.
+
+        When ``height`` is omitted, calls ``child.preferred_sheet_height(term_h)``
+        if present (else :data:`DEFAULT_SHEET_HEIGHT`), then clamps to
+        ``[MIN_SHEET_HEIGHT, min(term_h // 2, term_h * max_fraction)]``.
+
+        When ``height`` is given, only clamps to ``[MIN_SHEET_HEIGHT, term_h // 2]``;
+        ``max_fraction`` does not apply.
+        """
+        hard_cap = max(MIN_SHEET_HEIGHT, term_h // 2)
+        if height is None:
+            pref = getattr(child, "preferred_sheet_height", None)
+            if callable(pref):
+                height = int(pref(term_h))
+            else:
+                height = DEFAULT_SHEET_HEIGHT
+            soft_cap = max(MIN_SHEET_HEIGHT, int(term_h * max_fraction))
+            ceiling = min(soft_cap, hard_cap)
+        else:
+            ceiling = hard_cap
+        return min(max(height, MIN_SHEET_HEIGHT), ceiling)
+
     def __init__(
         self,
         child: Component,
         height: int = 8,
         size: tuple[int, int] | None = None,
-        show_border: bool = False,
         *,
+        show_edge_rule: bool = True,
         edge: Literal["top", "bottom"] = "bottom",
-        bg: tuple[int, int, int] | None = _USE_THEME_BG,
+        bg: tuple[int, int, int] | None = None,
     ) -> None:
         super().__init__(size=size)
         self._child = child
         child.parent = self
         self._target_height = height
-        self._show_border = show_border
+        self._show_edge_rule = show_edge_rule
         self._edge = edge
         self._bg = bg
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
@@ -65,9 +103,9 @@ class Sheet(Component):
             return 0
         return term_h - sheet_h
 
-    def _border_row(self, sheet_h: int) -> int | None:
-        """0-based row of the 1-line edge rule, or None when there is no border."""
-        if not self._show_border:
+    def _edge_rule_row(self, sheet_h: int) -> int | None:
+        """0-based row of the facing-edge rule, or None when disabled."""
+        if not self._show_edge_rule:
             return None
         if self._edge == "top":
             return sheet_h - 1
@@ -96,20 +134,22 @@ class Sheet(Component):
         y = self._origin_row(surface.height, self._size[1])
         sub = surface.subsurface(y, 0, self._size[0], self._size[1])
         sub.fill_rect_rgb(0, 0, sub.width, sub.height, self._sheet_bg())
-        border_row = self._border_row(self._size[1])
-        if border_row is not None:
-            self._draw_rule(sub, border_row)
-        child_h = self._size[1] - (1 if border_row is not None else 0)
+        rule_row = self._edge_rule_row(self._size[1])
+        if rule_row is not None:
+            self._draw_rule(sub, rule_row)
+        child_h = self._size[1] - (1 if rule_row is not None else 0)
         if child_h <= 0:
             return
-        child_y = 1 if border_row == 0 else 0
+        child_y = 1 if rule_row == 0 else 0
         child_sub = sub.subsurface(child_y, 0, sub.width, child_h)
         self._child._render_surface(child_sub)
 
     def _sheet_bg(self) -> tuple[int, int, int] | None:
-        """Resolve background color at draw time."""
-        if self._bg is _USE_THEME_BG:
-            return get_theme().bg_chrome
+        """Return the sheet fill color.
+
+        ``None`` means no RGB background (terminal default), not see-through
+        to the body layer. The sheet still clears its region to spaces.
+        """
         return self._bg
 
     def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
@@ -143,8 +183,8 @@ class Sheet(Component):
         origin = self._origin_row(size[1], sheet_h)
         self.x = origin + 1
         self.y = 1
-        border_h = 1 if self._show_border else 0
-        child_h = max(1, sheet_h - border_h)
+        rule_h = 1 if self._show_edge_rule else 0
+        child_h = max(1, sheet_h - rule_h)
         self._child.resize((size[0], child_h))
 
     def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
@@ -160,10 +200,10 @@ class Sheet(Component):
             return self, col, row
         local_col = col - (self.y - 1)
         local_row = row - (self.x - 1)
-        border_row = self._border_row(h)
-        # ``local_row`` is 1-based; ``border_row`` is 0-based within the sheet.
-        if border_row is not None and local_row == border_row + 1:
+        rule_row = self._edge_rule_row(h)
+        # ``local_row`` is 1-based; ``rule_row`` is 0-based within the sheet.
+        if rule_row is not None and local_row == rule_row + 1:
             return self, col, row
-        child_row = local_row if border_row != 0 else local_row - 1
+        child_row = local_row if rule_row != 0 else local_row - 1
         hit = child._hit_test(local_col, child_row)
         return hit if hit is not None else (self, col, row)

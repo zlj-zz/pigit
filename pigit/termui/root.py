@@ -19,7 +19,7 @@ from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
 from .overlay import get_badge_signal
-from . import palette
+from .widgets.sheet import DEFAULT_MAX_FRACTION
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
@@ -326,16 +326,36 @@ class ComponentRoot(Component):
     def show_sheet(
         self,
         child: Component,
-        height: int = 8,
-        show_border: bool = False,
+        height: int | None = None,
         *,
+        max_fraction: float = DEFAULT_MAX_FRACTION,
+        show_edge_rule: bool = True,
         edge: Literal["top", "bottom"] = "bottom",
-        bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
+        bg: tuple[int, int, int] | None = None,
     ) -> Sheet:
-        """Display a sheet on the SHEET layer and move focus to its leaf."""
+        """Display a sheet on the SHEET layer and move focus to its leaf.
+
+        Height resolution matches :func:`~pigit.termui.overlay.show_sheet`:
+        omitted ``height`` uses the child's preferred height and
+        ``max_fraction``; an explicit ``height`` only gets the half-terminal
+        safety clamp.
+        """
         from .widgets import Sheet
 
-        sheet = Sheet(child, height, show_border=show_border, edge=edge, bg=bg)
+        term_h = self._size[1] if self._size[1] > 0 else 24
+        resolved = Sheet.resolve_height(
+            child,
+            term_h,
+            height=height,
+            max_fraction=max_fraction,
+        )
+        sheet = Sheet(
+            child,
+            resolved,
+            show_edge_rule=show_edge_rule,
+            edge=edge,
+            bg=bg,
+        )
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
         # Focus must track the stack here so body panels dim on the first frame

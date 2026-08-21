@@ -185,6 +185,10 @@ class CommitEditor(Component):
             widths=["flex", "flex"],
         )
 
+    def preferred_sheet_height(self, term_h: int) -> int:
+        """About 35% of the terminal; host should use max_fraction=0.5."""
+        return min(term_h - 2, max(10, int(term_h * 0.35)))
+
     # -- Component overrides ----------------------------------------------
 
     @property

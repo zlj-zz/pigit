@@ -110,9 +110,13 @@ class CommandPalette(Component):
         return visible
 
     def preferred_sheet_height(self, term_h: int | None = None) -> int:
-        """Sheet rows: border + list slots (or fewer items) + rule + prompt."""
-        if term_h is not None:
-            self._list_slots = list_slots_for_term(term_h)
+        """Sheet rows: list band + rule + prompt (plus Sheet edge rule outside).
+
+        Uses the current ``_list_slots`` budget from the constructor or
+        ``open(list_slots=...)``. ``term_h`` is accepted for the sheet-height
+        protocol only and must not rewrite that budget.
+        """
+        _ = term_h
         list_rows = self._list_rows_for_height()
         return list_rows + 1 + _SHEET_CHROME_ROWS
 

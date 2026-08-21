@@ -39,6 +39,10 @@ class RecentActionsPanel(ItemList):
         self._on_done = on_done
         self._records: list[HistoryRecord] = []
 
+    def preferred_sheet_height(self, term_h: int) -> int:
+        """Prefer up to 12 rows; host clamps to one-third of the terminal."""
+        return 12
+
     def activate(self) -> None:
         """Load and display history records."""
         self._refresh()

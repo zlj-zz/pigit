@@ -37,6 +37,10 @@ class LogRefSheet(ItemList):
         self._on_pick = on_pick
         self._on_done = on_done
 
+    def preferred_sheet_height(self, term_h: int) -> int:
+        """Tall enough for a ref list; host may clamp with max_fraction=0.5."""
+        return min(16, max(term_h - 4, 8))
+
     def _sync_filter(self) -> None:
         """Apply the current search query to the ref list."""
         self.set_source_items(self._all, text_of=lambda name: name)

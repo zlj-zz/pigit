@@ -33,7 +33,6 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.widgets import AlertDialog, InputLine, ItemList
-from pigit.termui.tty_io import terminal_size
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
@@ -548,12 +547,7 @@ class StatusPanel(ItemList):
             on_submit=_do_commit,
             on_cancel=dismiss_sheet,
         )
-        rows = terminal_size()[1]
-        show_sheet(
-            editor,
-            height=min(rows - 2, max(10, int(rows * 0.35))),
-            show_border=True,
-        )
+        show_sheet(editor, max_fraction=0.5)
         editor.activate()
 
     @bind_action(
@@ -658,7 +652,7 @@ class StatusPanel(ItemList):
         if self._visual_mode:
             return
         self._stash_input.clear()
-        show_sheet(self._stash_input, height=3)
+        show_sheet(self._stash_input, height=3, show_edge_rule=False)
 
     def _on_stash_submit(self, message: str) -> None:
         dismiss_sheet()

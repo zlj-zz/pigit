@@ -38,21 +38,32 @@ def test_stash_focuses_stash_panel(app):
     goto.assert_called_once()
 
 
-def test_toggle_palette_uses_border_and_preferred_height(app):
+def test_toggle_palette_sets_slots_from_root_and_opens_sheet(app):
     from pigit.app_command_palette import CommandPalette
+    from pigit.termui.widgets.command_palette import list_slots_for_term
+    from pigit.termui.widgets.sheet import Sheet
 
     app._palette = CommandPalette(
         on_execute=app._on_palette_execute,
         on_dismiss=app._dismiss_palette,
     )
     app._git.sequencer_in_progress.return_value = None
-    with patch("pigit.app.terminal_size", return_value=(120, 40)):
-        app.toggle_palette()
+    app._root._size = (120, 40)
+
+    app.toggle_palette()
+
+    expected_slots = list_slots_for_term(40)
+    assert app._palette._list_slots == expected_slots
     app._root.show_sheet.assert_called_once()
-    kwargs = app._root.show_sheet.call_args.kwargs
-    assert kwargs["show_border"] is True
-    assert kwargs["bg"] is None
-    assert kwargs["height"] == app._palette.preferred_sheet_height(40)
+    args, kwargs = app._root.show_sheet.call_args
+    assert args == (app._palette,)
+    assert "height" not in kwargs
+    assert kwargs.get("show_edge_rule", True) is True
+    assert kwargs.get("bg") is None
+    # Host would resolve to the same height the child reports from those slots.
+    assert (
+        Sheet.resolve_height(app._palette, 40) == app._palette.preferred_sheet_height()
+    )
 
 
 def test_catalog_hides_sequencer_when_idle():

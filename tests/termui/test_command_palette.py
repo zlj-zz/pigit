@@ -146,6 +146,12 @@ class TestCommandPalette:
         # border + 5 list slots + rule + prompt
         assert palette.preferred_sheet_height() == 8
 
+    def test_preferred_sheet_height_does_not_overwrite_list_slots(self):
+        items = [PaletteItem(f"c{i}") for i in range(12)]
+        palette = CommandPalette(items=items, list_slots=5)
+        assert palette.preferred_sheet_height(80) == 8
+        assert palette._list_slots == 5
+
     def test_preferred_sheet_height_shrinks_when_few_items(self):
         palette = CommandPalette(items=_ITEMS, list_slots=10)
         assert palette.preferred_sheet_height() == 6
