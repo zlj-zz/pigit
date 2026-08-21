@@ -36,12 +36,17 @@ class InspectorSheet(Component):
 
     def __init__(self, rows: list[list[Segment]], **kwargs) -> None:
         super().__init__(**kwargs)
+        self._rows = rows
         self._browser = LineTextBrowser(content=rows, bg=None)
         self._browser.parent = self
 
     @property
     def focus_child(self) -> Component | None:
         return self._browser
+
+    def preferred_sheet_height(self, term_h: int) -> int:
+        """Fit snapshot lines plus the facing-edge rule (up to half terminal)."""
+        return self.sheet_height(self._rows, term_h, border=1)
 
     @staticmethod
     def format(snapshot: InspectorSnapshot) -> list[list[Segment]]:

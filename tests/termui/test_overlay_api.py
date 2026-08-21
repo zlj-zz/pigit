@@ -12,7 +12,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from pigit.termui._layer import LayerKind
-from pigit.termui import palette
 from pigit.termui.types import ToastPosition
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.overlay import (
@@ -81,7 +80,14 @@ class TestOverlayHelpers:
         child = MagicMock()
         result = show_sheet(child, height=4)
         host.show_sheet.assert_called_once_with(
-            child, 4, show_border=False, edge="bottom", bg=palette.DEFAULT_BG
+            child,
+            4,
+            max_fraction=1 / 3,
+            show_edge_rule=True,
+            title=None,
+            title_align="right",
+            edge="bottom",
+            bg=None,
         )
         assert result is host.show_sheet.return_value
 
@@ -95,7 +101,14 @@ class TestOverlayHelpers:
         child = MagicMock()
         result = show_sheet(child, height=4, edge="top")
         host.show_sheet.assert_called_once_with(
-            child, 4, show_border=False, edge="top", bg=palette.DEFAULT_BG
+            child,
+            4,
+            max_fraction=1 / 3,
+            show_edge_rule=True,
+            title=None,
+            title_align="right",
+            edge="top",
+            bg=None,
         )
         assert result is host.show_sheet.return_value
 
@@ -109,7 +122,14 @@ class TestOverlayHelpers:
         child = MagicMock()
         show_sheet(child, height=4, edge="top", bg=None)
         host.show_sheet.assert_called_once_with(
-            child, 4, show_border=False, edge="top", bg=None
+            child,
+            4,
+            max_fraction=1 / 3,
+            show_edge_rule=True,
+            title=None,
+            title_align="right",
+            edge="top",
+            bg=None,
         )
 
     def test_dismiss_sheet(self):

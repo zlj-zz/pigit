@@ -438,7 +438,7 @@ class BranchPanel(ItemList):
 
     def _show_new_branch_sheet(self) -> None:
         self._new_branch_input.clear()
-        show_sheet(self._new_branch_input, height=3)
+        show_sheet(self._new_branch_input, height=3, show_edge_rule=False)
 
     def _on_new_branch_submit(self, name: str) -> None:
         name = name.strip()
@@ -461,7 +461,7 @@ class BranchPanel(ItemList):
     def _show_rename_sheet(self, branch_name: str) -> None:
         self._rename_branch_name = branch_name
         self._rename_input.set_value(branch_name)
-        show_sheet(self._rename_input, height=3)
+        show_sheet(self._rename_input, height=3, show_edge_rule=False)
 
     def _on_rename_submit(self, new_name: str) -> None:
         new_name = new_name.strip()

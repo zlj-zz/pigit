@@ -17,9 +17,9 @@ _R = TypeVar("_R")
 
 from .feedback import FeedbackKind, style_for
 from ._layer import LayerKind
-from . import palette
 from .reactive import Signal
 from .types import ToastPosition
+from .widgets.sheet import DEFAULT_MAX_FRACTION
 from ._runtime_context import (
     get_overlay_host,
     get_renderer,
@@ -165,15 +165,36 @@ def show_toast(
 
 def show_sheet(
     child: Component,
-    height: int = 8,
-    show_border: bool = False,
+    height: int | None = None,
     *,
+    max_fraction: float = DEFAULT_MAX_FRACTION,
+    show_edge_rule: bool = True,
+    title: str | None = None,
+    title_align: Literal["left", "center", "right"] = "right",
     edge: Literal["top", "bottom"] = "bottom",
-    bg: tuple[int, int, int] | None = palette.DEFAULT_BG,
+    bg: tuple[int, int, int] | None = None,
 ) -> Sheet | None:
-    """Display a sheet via the current overlay host."""
+    """Display a sheet via the current overlay host.
+
+    When ``height`` is omitted, the host asks ``child.preferred_sheet_height``
+    (if any) and clamps with ``max_fraction`` (default one-third of the
+    terminal, never above half). When ``height`` is given, only the half-
+    terminal safety clamp applies; ``max_fraction`` is ignored.
+
+    Optional ``title`` is embedded in the facing-edge rule as
+    ``─ · title · ─`` (``title_align`` defaults to right).
+    """
     sheet = _with_host(
-        lambda h: h.show_sheet(child, height, show_border=show_border, edge=edge, bg=bg)
+        lambda h: h.show_sheet(
+            child,
+            height,
+            max_fraction=max_fraction,
+            show_edge_rule=show_edge_rule,
+            title=title,
+            title_align=title_align,
+            edge=edge,
+            bg=bg,
+        )
     )
     if sheet is not None:
         request_render()

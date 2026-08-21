@@ -28,7 +28,6 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import ItemList
 from pigit.termui.wcwidth_table import wcswidth
 
@@ -240,14 +239,13 @@ class CommitPanel(ItemList):
         """Open a sheet to choose which ref the commit list shows."""
         from .app_log_ref import LogRefSheet
 
-        rows = terminal_size()[1]
         sheet = LogRefSheet(
             names=self._vm.list_log_ref_names(),
             current_ref=self._vm.log_ref,
             on_pick=self._on_log_ref_picked,
             on_done=dismiss_sheet,
         )
-        show_sheet(sheet, height=min(16, max(rows - 4, 8)), show_border=True)
+        show_sheet(sheet, max_fraction=0.5, title="Log ref")
         sheet.activate()
 
     def _on_log_ref_picked(self, name: str) -> None:

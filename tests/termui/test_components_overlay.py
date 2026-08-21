@@ -441,7 +441,7 @@ class TestToast:
 
 
 class TestSheet:
-    def test_sheet_render_surface_draws_child_at_bottom(self):
+    def test_sheet_render_surface_draws_child_below_default_border(self):
         child = MagicMock()
         child._render_surface = MagicMock()
         sheet = Sheet(child, height=3)
@@ -452,15 +452,30 @@ class TestSheet:
 
         child._render_surface.assert_called_once()
         sub = child._render_surface.call_args[0][0]
-        # Default: no border, child gets full sheet height
+        # Default: facing-edge rule; child gets sheet height minus 1
+        assert sub.height == 2
+        assert sub._to_parent(0, 0) == (8, 0)
+        assert surface._rows[7][0].char == "─"
+        assert surface._rows[7][19].char == "─"
+
+    def test_sheet_render_surface_borderless(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, show_edge_rule=False)
+        sheet._size = (20, 3)
+
+        surface = Surface(20, 10)
+        sheet._render_surface(surface)
+
+        child._render_surface.assert_called_once()
+        sub = child._render_surface.call_args[0][0]
         assert sub.height == 3
         assert sub._to_parent(0, 0) == (7, 0)
-        assert hasattr(sub, "_to_parent")
 
     def test_sheet_render_surface_with_border(self):
         child = MagicMock()
         child._render_surface = MagicMock()
-        sheet = Sheet(child, height=3, show_border=True)
+        sheet = Sheet(child, height=3, show_edge_rule=True)
         sheet._size = (20, 3)
 
         surface = Surface(20, 10)
@@ -471,22 +486,22 @@ class TestSheet:
         # With border: child height is sheet height minus 1
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (8, 0)
-        assert surface._rows[7][0].char == "╭"
-        assert surface._rows[7][19].char == "╮"
+        assert surface._rows[7][0].char == "─"
+        assert surface._rows[7][19].char == "─"
 
     def test_sheet_top_edge_border_is_on_last_row(self):
         child = MagicMock()
         child._render_surface = MagicMock()
-        sheet = Sheet(child, height=3, show_border=True, edge="top")
+        sheet = Sheet(child, height=3, show_edge_rule=True, edge="top")
         sheet._size = (20, 3)
         surface = Surface(20, 10)
         sheet._render_surface(surface)
         sub = child._render_surface.call_args[0][0]
         assert sub.height == 2
         assert sub._to_parent(0, 0) == (0, 0)
-        assert surface._rows[2][0].char == "╰"
-        assert surface._rows[2][19].char == "╯"
-        assert surface._rows[0][0].char != "╭"
+        assert surface._rows[2][0].char == "─"
+        assert surface._rows[2][19].char == "─"
+        assert surface._rows[0][0].char != "─"
 
     def test_sheet_render_surface_zero_height_skips(self):
         child = MagicMock()
@@ -520,8 +535,8 @@ class TestSheet:
         sheet.resize((40, 20))
 
         assert sheet._size == (40, 6)
-        # Default: no border, child gets full sheet height
-        child.resize.assert_called_once_with((40, 6))
+        # Default border: child height is sheet height minus 1
+        child.resize.assert_called_once_with((40, 5))
 
     def test_sheet_resize_clamps_to_half_height(self):
         child = MagicMock()
@@ -529,12 +544,12 @@ class TestSheet:
         sheet.resize((40, 20))
 
         assert sheet._size == (40, 10)
-        # Default: no border, child gets full sheet height
-        child.resize.assert_called_once_with((40, 10))
+        # Default border: child height is sheet height minus 1
+        child.resize.assert_called_once_with((40, 9))
 
     def test_sheet_resize_with_border_reduces_child_height(self):
         child = MagicMock()
-        sheet = Sheet(child, height=6, show_border=True)
+        sheet = Sheet(child, height=6, show_edge_rule=True)
         sheet.resize((40, 20))
 
         assert sheet._size == (40, 6)
@@ -546,7 +561,7 @@ class TestSheet:
         child = MagicMock()
         child._size = (20, 5)
         child._hit_test.return_value = (child, 5, 5)
-        sheet = Sheet(child, height=6, show_border=True, edge="top")
+        sheet = Sheet(child, height=6, show_edge_rule=True, edge="top")
         sheet.resize((20, 20))
         # Row 5 (1-based) is the last content row; it must hit the child.
         hit = sheet._hit_test(3, 5)
@@ -563,7 +578,7 @@ class TestSheet:
         child = MagicMock()
         child._size = (20, 5)
         child._hit_test.return_value = (child, 5, 1)
-        sheet = Sheet(child, height=6, show_border=True)
+        sheet = Sheet(child, height=6, show_edge_rule=True)
         sheet.resize((20, 20))
         # Row 15 (1-based) is the border.
         hit = sheet._hit_test(3, 15)
@@ -609,6 +624,42 @@ class TestSheet:
         assert surface._rows[0][0].char == " "
         assert surface._rows[0][0].bg is None
         assert surface._rows[0][4].char == " "
+
+    def test_sheet_title_right_aligned_by_default(self):
+        child = MagicMock()
+        child._render_surface = MagicMock()
+        sheet = Sheet(child, height=3, title="Commands")
+        sheet._size = (24, 3)
+        surface = Surface(24, 10)
+        sheet._render_surface(surface)
+        rule = "".join(c.char for c in surface._rows[7])
+        assert rule.endswith(" · Commands · ─")
+        assert rule.startswith("─")
+
+    def test_compose_edge_rule_alignments(self):
+        from pigit.termui.widgets.sheet import compose_edge_rule
+
+        left, core, right = compose_edge_rule(20, "Hi", align="left")
+        assert left == "─"
+        assert core == " · Hi · "
+        assert right.startswith("─")
+
+        left, core, right = compose_edge_rule(20, "Hi", align="right")
+        assert right == "─"
+        assert core == " · Hi · "
+        assert left.startswith("─")
+
+        left, core, right = compose_edge_rule(21, "Hi", align="center")
+        assert core == " · Hi · "
+        assert abs(len(left) - len(right)) <= 1
+
+    def test_compose_edge_rule_truncates_long_title(self):
+        from pigit.termui.widgets.sheet import compose_edge_rule
+
+        left, core, right = compose_edge_rule(12, "VeryLongTitle")
+        assert left == "─" and right == "─"
+        assert core.startswith(" · ") and core.endswith(" · ")
+        assert "…" in core
 
 
 class TestHelpPanel:

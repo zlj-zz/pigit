@@ -75,6 +75,10 @@ class RebasePanel(ItemList):
         self._footer = Footer()
         self._footer.set_help_provider(self.get_footer_entries)
 
+    def preferred_sheet_height(self, term_h: int) -> int:
+        """Room for the todo list; host should use max_fraction=0.5."""
+        return min(20, max(3, term_h - 4))
+
     def activate(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
         kind = self._git.sequencer_in_progress()

@@ -1,5 +1,24 @@
 # Changelog of pigit
 
+## 2.1.1 (2026-08-22)
+
+### Features
+
+- **Command palette**: open-with catalog (`PaletteItem` id + description), context-aware sequencer actions, scroll cues, and sheet height from terminal budget.
+- **Sheet height protocol**: children may implement `preferred_sheet_height`; `show_sheet` resolves and clamps (`max_fraction` when height is omitted).
+- **Sheet edge chrome**: facing edge is a full-width `─` rule that can embed ` · title · ` (align left/center/right, default right).
+- **Commit editor**: shortcut hint strip; staged list no longer paints a solid panel fill.
+- Empty DiffViewer still draws box chrome.
+
+### Bug Fixes
+
+- Log-ref / palette tests stay aligned with height and title APIs (no stale `terminal_size` patches).
+- Palette list slots use the same root height source as sheet resolution.
+
+### Docs
+
+- Refresh the architecture map in `CLAUDE.md`.
+
 ## 2.1.0 (2026-08-21)
 
 ### Features

@@ -30,7 +30,7 @@ class TestCommandPalette:
         p.handle_key("s")
         p.handle_key("t")
         assert len(p._candidates) > 0
-        assert "status" in p._candidates
+        assert "status" in [c.id for c in p._candidates]
 
     def test_enter_executes(self):
         executed = []
@@ -42,9 +42,17 @@ class TestCommandPalette:
         p.handle_key("t")
         p.handle_key("u")
         p.handle_key("s")
-        p.handle_key("enter")  # enter
+        from pigit.termui import keys
+
+        p.handle_key(keys.KEY_ENTER)
         assert len(executed) == 1
         assert executed[0] == "status"
+
+    def test_open_lists_catalog(self):
+        p = CommandPalette()
+        p.open()
+        assert any(c.id == "status" for c in p._candidates)
+        assert any(c.desc for c in p._candidates)
 
     def test_esc_closes(self):
         p = CommandPalette()

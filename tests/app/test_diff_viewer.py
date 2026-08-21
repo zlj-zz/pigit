@@ -344,3 +344,22 @@ class TestEscBehavior:
         with patch.object(dv, "emit") as mock_emit:
             dv._leave_display()
             mock_emit.assert_called_once()
+
+
+class TestEmptyContentChrome:
+    """Empty DiffViewer still draws box chrome (preview void is not a blank hole)."""
+
+    def test_empty_content_draws_box(self):
+        from pigit.termui.surface import Surface
+
+        dv = DiffViewer()
+        dv.set_box_title("")
+        dv.set_content([])
+        dv.resize((40, 12))
+        surface = Surface(40, 12)
+        dv._render_surface(surface)
+        rows = surface.rows()
+        assert rows[0][0].char == "\u250c"  # ┌
+        assert rows[0][-1].char == "\u2510"  # ┐
+        assert rows[-1][0].char == "\u2514"  # └
+        assert rows[-1][-1].char == "\u2518"  # ┘
