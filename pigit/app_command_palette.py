@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from pigit.termui import widgets as termui_widgets
-from pigit.termui.widgets.command_palette import PaletteItem
+from pigit.termui.widgets import PaletteItem
 
 # Priority order: navigation → network → quit → sequencer controls.
 DEFAULT_COMMANDS: list[PaletteItem] = [

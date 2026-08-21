@@ -558,7 +558,7 @@ class PigitApplication(Application):
             self._palette.close()
         else:
             from pigit.app_command_palette import catalog_for_context
-            from pigit.termui.widgets.command_palette import list_slots_for_term
+            from pigit.termui.widgets import list_slots_for_term
 
             # Same height source as Sheet.resolve_height (root size, not a
             # second terminal_size() read that can disagree after resize).
