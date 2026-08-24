@@ -363,3 +363,89 @@ class TestEmptyContentChrome:
         assert rows[0][-1].char == "\u2510"  # ┐
         assert rows[-1][0].char == "\u2514"  # └
         assert rows[-1][-1].char == "\u2518"  # ┘
+
+
+class TestContentInstallInvariants:
+    """Content replace must be atomic and invalidate pending tokenize."""
+
+    def test_stale_diff_tokenize_does_not_overwrite_plain(self):
+        """File-history plain load must drop pending diff tokenize callbacks."""
+        dv = DiffViewer()
+        captured: dict[str, object] = {}
+
+        def capture_start(work, callback):
+            captured["callback"] = callback
+
+        with patch.object(dv._tokenize_task, "start", side_effect=capture_start):
+            dv.set_content(
+                [
+                    "diff --git a/f.py b/f.py",
+                    "--- a/f.py",
+                    "+++ b/f.py",
+                    "@@ -1 +1 @@",
+                    "-old",
+                    "+new",
+                ]
+            )
+
+        assert "callback" in captured
+        dv._file_history_path = "f.py"
+        dv._set_plain_content(["line-a", "line-b", "line-c"])
+        plain_tokens = list(dv._render_tokens)
+        assert len(plain_tokens) == 3
+
+        with patch.object(dv, "is_activated", return_value=True):
+            stale = [[("DIFF-ONLY", (255, 0, 0), 9, None)]] * 52
+            captured["callback"](stale)  # type: ignore[operator]
+
+        assert dv._render_tokens == plain_tokens
+        assert dv._content == ["line-a", "line-b", "line-c"]
+
+    def test_parse_failure_keeps_previous_consistent_state(self):
+        """Failed set_content must not clear tokens while leaving old structure."""
+        dv = DiffViewer()
+        with patch.object(dv._tokenize_task, "start"):
+            dv.set_content(["+kept"])
+        dv._render_tokens = [[("kept", (200, 200, 200), 4, None)]]
+        content_before = list(dv._content)
+        tokens_before = list(dv._render_tokens)
+        hunks_before = list(dv._hunks)
+
+        with pytest.raises(TypeError):
+            dv.set_content([123])  # type: ignore[list-item]
+
+        assert dv._content == content_before
+        assert dv._render_tokens == tokens_before
+        assert dv._hunks == hunks_before
+
+    def test_file_history_tokens_fallback_when_shorter_than_content(self):
+        """Short _render_tokens must not blank file-history lines."""
+        from pigit.termui.surface import Surface
+
+        dv = DiffViewer()
+        dv._file_history_mode = True
+        dv._file_history_path = "f.py"
+        dv._file_history_commits = [("abc1234", "msg")]
+        dv._file_history_index = 0
+        dv._set_plain_content(["alpha", "beta", "gamma"])
+        dv._render_tokens = dv._render_tokens[:1]
+        dv.resize((40, 12))
+        surface = Surface(40, 12)
+        dv._render_surface(surface)
+        text = "".join(cell.char for cell in surface.rows()[3])
+        assert "gamma" in text
+
+    def test_heatmap_at_guards_short_heatmap(self):
+        from pigit.app_theme import THEME
+
+        dv = DiffViewer()
+        dv.set_content(["+x"])
+        dv._heatmap = []
+        dv._heatmap_colors = []
+        assert dv._heatmap_at(0) == (" ", THEME.fg_dim)
+
+    def test_init_has_no_dummy_doc(self):
+        dv = DiffViewer()
+        assert not hasattr(dv, "_doc")
+        assert dv._content == []
+        assert dv._render_tokens == []
