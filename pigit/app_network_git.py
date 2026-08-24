@@ -1,0 +1,173 @@
+"""
+Module: pigit/app_network_git.py
+Description: Async push/pull network git operations with pull-conflict handling.
+Author: Zev
+Date: 2026-08-24
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from pigit.app_merge_state import MergeStateStore
+from pigit.git.api import GitApi, GitError, RepoError
+from pigit.termui import (
+    AsyncTask,
+    FeedbackKind,
+    ToastPosition,
+    dismiss_sheet,
+    hide_spinner,
+    show_spinner,
+    show_toast,
+)
+from pigit.termui.containers import TabView
+
+
+@dataclass(frozen=True)
+class NetworkGitOutcome:
+    """Result of a background push/pull (AsyncTask cannot deliver exceptions)."""
+
+    ok: bool
+    message: str = ""
+    conflict: bool = False
+
+
+class NetworkGit:
+    """Run push/pull on a worker with spinner; handle pull-merge conflicts.
+
+    Attributes:
+        store: MergeStateStore for pull-conflict persistence.
+    """
+
+    def __init__(
+        self,
+        *,
+        store: MergeStateStore,
+        get_git: Callable[[], GitApi],
+        get_tab_view: Callable[[], TabView],
+        get_sync_task: Callable[[], AsyncTask[NetworkGitOutcome]],
+        get_refresh_git_vms: Callable[[], None],
+        get_schedule_reload_header: Callable[[], None],
+    ) -> None:
+        """
+        Args:
+            store: Shared merge session state store.
+            get_git: Late-bound GitApi accessor.
+            get_tab_view: Late-bound TabView accessor (route to Status on conflict).
+            get_sync_task: Late-bound AsyncTask for network sync.
+            refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
+            schedule_reload_header: Callback to reload header branch/ahead/behind.
+        """
+        self._store = store
+        self._get_git = get_git
+        self._get_tab_view = get_tab_view
+        self._get_sync_task = get_sync_task
+        self._get_refresh_git_vms = get_refresh_git_vms
+        self._get_schedule_reload_header = get_schedule_reload_header
+        self._busy = False
+
+    @property
+    def busy(self) -> bool:
+        """True while a push/pull worker is in flight."""
+        return self._busy
+
+    @busy.setter
+    def busy(self, value: bool) -> None:
+        self._busy = value
+
+    def run(
+        self,
+        action: str,
+        *,
+        on_complete: Callable[[], None] | None = None,
+    ) -> None:
+        """Run push/pull on a worker with a center spinner; never use exec_external.
+
+        ``on_complete`` runs after the attempt finishes (success or failure), not when
+        the busy-guard rejects a second sync. Merge finish uses this to always
+        checkout back to ``source``.
+        """
+        if action not in ("push", "pull"):
+            raise ValueError(f"Unsupported network git action: {action}")
+        if self._busy:
+            show_toast(
+                "Push/Pull already in progress",
+                duration=1.5,
+                kind=FeedbackKind.INFO,
+            )
+            return
+
+        dismiss_sheet()
+
+        self._busy = True
+        label = "Pushing to upstream" if action == "push" else "Pulling from upstream"
+        show_spinner(label, position=ToastPosition.CENTER)
+
+        def work() -> NetworkGitOutcome:
+            git = self._get_git()
+            try:
+                if action == "push":
+                    git.push()
+                else:
+                    git.pull()
+                return NetworkGitOutcome(ok=True)
+            except GitError as exc:
+                msg = str(exc)
+                return NetworkGitOutcome(
+                    ok=False,
+                    message=msg,
+                    conflict="conflict" in msg.lower(),
+                )
+            except Exception as exc:
+                return NetworkGitOutcome(
+                    ok=False,
+                    message=f"Git {action} error: {exc}",
+                )
+
+        def done(outcome: NetworkGitOutcome) -> None:
+            self._busy = False
+            hide_spinner()
+            try:
+                if outcome.conflict:
+                    self.handle_pull_conflict(outcome.message)
+                    return
+                if not outcome.ok:
+                    show_toast(
+                        outcome.message or f"Git {action} failed",
+                        duration=3.0,
+                        kind=FeedbackKind.ERROR,
+                    )
+                    return
+                show_toast(
+                    f"Git {action} completed",
+                    duration=1.5,
+                    kind=FeedbackKind.SUCCESS,
+                )
+                self._get_refresh_git_vms()
+                self._get_schedule_reload_header()
+            finally:
+                if on_complete is not None:
+                    on_complete()
+
+        self._get_sync_task().start(work, done)
+
+    def handle_pull_conflict(self, message: str) -> None:
+        """Persist pull-merge state, show git detail, and route to Status."""
+        git = self._get_git()
+        branch = ""
+        try:
+            branch = git.get_head() or ""
+        except (GitError, RepoError):
+            branch = ""
+        target = branch or "HEAD"
+        self._store.set_pull_conflict(target)
+
+        detail = (message or "").strip() or "Merge conflict during pull"
+        show_toast(
+            f"{detail}\nResolve in Status, then ';' → continue-merge",
+            duration=4.0,
+            kind=FeedbackKind.WARNING,
+        )
+        self._get_tab_view().route_to("status")
+        self._get_refresh_git_vms()
