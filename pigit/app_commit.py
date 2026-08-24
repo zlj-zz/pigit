@@ -104,13 +104,6 @@ class CommitPanel(ItemList):
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
-    LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
-        palette.SKY_BLUE,
-        palette.GREEN,
-        palette.PURPLE,
-        palette.BLUE,
-        palette.RED,
-    )
     REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
     REPORT_MIN_HEIGHT = 19
 
@@ -801,7 +794,8 @@ class CommitPanel(ItemList):
                         Segment("  ", fg=THEME.fg_dim, style_flags=cursor_flags)
                     )
                     continue
-                color = self.LANE_PALETTE[i % len(self.LANE_PALETTE)]
+                lanes = THEME.graph_lane_colors
+                color = lanes[i % len(lanes)]
                 fg = color if graph_active else THEME.fg_dim
                 segments.append(
                     Segment(self.GRAPH_VERTICAL + " ", fg=fg, style_flags=cursor_flags)
@@ -825,7 +819,8 @@ class CommitPanel(ItemList):
         graph_active: bool,
     ) -> tuple[str, tuple[int, int, int]]:
         """Pick the glyph and color for lane ``i`` on this row."""
-        lane_color = self.LANE_PALETTE[i % len(self.LANE_PALETTE)]
+        lanes = THEME.graph_lane_colors
+        lane_color = lanes[i % len(lanes)]
         lane_fg = lane_color if graph_active else THEME.fg_dim
 
         if i == row.commit_lane:
