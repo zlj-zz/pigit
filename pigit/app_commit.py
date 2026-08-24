@@ -590,7 +590,7 @@ class CommitPanel(ItemList):
             left_tpl, main_tpl = cache[idx]
             left = list(left_tpl)
             main = list(main_tpl)
-            right = self._meta_segments(commit, focused)
+            right = self._meta_segments(commit)
             return left, main, right
 
         return self._describe_compact(commit, idx, False, focused)
@@ -614,7 +614,7 @@ class CommitPanel(ItemList):
                     commit, item_idx, is_cursor, focused
                 )
 
-        right = self._meta_segments(commit, focused)
+        right = self._meta_segments(commit)
         if is_cursor:
             right = [
                 Segment(s.text, fg=s.fg, bg=s.bg, style_flags=palette.STYLE_BOLD)
@@ -650,13 +650,13 @@ class CommitPanel(ItemList):
                 )
             )
 
-        left.append(Segment(commit.sha[:7], fg=THEME.fg_dim, style_flags=cursor_flags))
-        left.append(Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary))
-
-        fg_msg = THEME.fg_primary if focused else THEME.fg_dim
-        main: list[Segment] = self._ref_segments(
-            commit, focused=focused, cursor_flags=cursor_flags
+        left.append(
+            Segment(commit.sha[:7], fg=THEME.fg_muted, style_flags=cursor_flags)
         )
+        left.append(Segment(" ", fg=THEME.fg_primary))
+
+        fg_msg = THEME.fg_primary if focused else THEME.fg_muted
+        main: list[Segment] = self._ref_segments(commit, cursor_flags=cursor_flags)
         main.append(Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags))
         return left, main
 
@@ -673,7 +673,7 @@ class CommitPanel(ItemList):
             lu, mu = self._commit_left_main(commit, idx, is_cursor=False, focused=False)
             self._row_cache_unfocused.append((tuple(lu), tuple(mu)))
 
-    def _meta_segments(self, commit: Commit, focused: bool) -> list[Segment]:
+    def _meta_segments(self, commit: Commit) -> list[Segment]:
         author = commit.author
         rel = self._rel_time_cache.get(commit.sha) or relative_time(
             commit.unix_timestamp
@@ -683,8 +683,7 @@ class CommitPanel(ItemList):
         reserve = max(self._max_meta_w, meta_w)
         if reserve > meta_w:
             meta = " " * (reserve - meta_w) + meta
-        fg_meta = THEME.fg_muted if focused else THEME.fg_dim
-        return [Segment(meta, fg=fg_meta, style_flags=0)]
+        return [Segment(meta, fg=THEME.fg_muted, style_flags=0)]
 
     def _describe_sub_row(
         self,
@@ -715,8 +714,8 @@ class CommitPanel(ItemList):
         if kind in (_SubRow.BLANK, _SubRow.TAIL):
             return left, [], []
 
-        fg_label = THEME.fg_muted if focused else THEME.fg_dim
-        fg_value = THEME.fg_primary if focused else THEME.fg_dim
+        fg_label = THEME.fg_muted
+        fg_value = THEME.fg_primary if focused else THEME.fg_muted
         if kind is _SubRow.MERGE:
             text = " ".join(p[:7] for p in commit.parents)
             main = [
@@ -751,7 +750,6 @@ class CommitPanel(ItemList):
         self,
         commit: Commit,
         *,
-        focused: bool,
         cursor_flags: int,
     ) -> list[Segment]:
         """Render branch-ref badges wrapped in orange parens, comma-separated."""
@@ -763,11 +761,11 @@ class CommitPanel(ItemList):
         if not (head_ref or local_refs or remote_refs or commit.tag):
             return []
 
-        paren_fg = THEME.fg_tag_parent if focused else THEME.fg_dim
-        head_fg = THEME.fg_info if focused else THEME.fg_dim
-        local_fg = THEME.fg_success if focused else THEME.fg_dim
-        remote_fg = THEME.fg_remote_branch if focused else THEME.fg_dim
-        tag_fg = THEME.fg_tag if focused else THEME.fg_dim
+        paren_fg = THEME.fg_tag_parent
+        head_fg = THEME.fg_info
+        local_fg = THEME.fg_local_branch
+        remote_fg = THEME.fg_remote_branch
+        tag_fg = THEME.fg_tag
         arrow_fg = THEME.fg_primary
 
         entries: list[list[Segment]] = []
@@ -850,8 +848,9 @@ class CommitPanel(ItemList):
         lane_fg = lane_color if focused else THEME.fg_dim
 
         if i == row.commit_lane:
-            commit_color = THEME.fg_warning if not commit.is_pushed() else lane_color
-            return self.GRAPH_COMMIT, commit_color
+            if not commit.is_pushed():
+                return self.GRAPH_COMMIT, THEME.fg_unpushed_commit
+            return self.GRAPH_COMMIT, lane_color
 
         if i in row.closed_lanes:
             return self.GRAPH_CLOSE, lane_fg

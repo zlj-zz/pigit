@@ -99,20 +99,22 @@ class StashPanel(ItemList):
         suffix = f" {label} {self._SECTION_TAIL}"
         suffix_w = wcswidth(suffix)
         fill_w = max(0, w - suffix_w)
+        # Structural rule on transparent panel bg — fg_dim, not divider (GUNMETAL).
+        rule_fg = THEME.fg_dim
         if fill_w:
-            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=THEME.fg_dim)
+            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=rule_fg)
         col = fill_w
-        surface.draw_text_rgb(0, col, " ", fg=THEME.fg_dim)
+        surface.draw_text_rgb(0, col, " ", fg=rule_fg)
         col += 1
         surface.draw_text_rgb(
             0,
             col,
             label,
-            fg=THEME.fg_muted,
+            fg=THEME.fg_panel_title,
             style_flags=palette.STYLE_BOLD,
         )
         col += wcswidth(label)
-        surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=THEME.fg_dim)
+        surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=rule_fg)
 
     def _render_surface(self, surface: Surface) -> None:
         """Section header on row 0; stash rows in the remaining viewport."""
@@ -256,17 +258,16 @@ class StashPanel(ItemList):
             return ([], None, [])
         stash = self.stashes[idx]
         cursor_prefix = self.CURSOR if is_cursor else " "
-        fg = THEME.fg_primary if focused else THEME.fg_dim
+        msg_fg = THEME.fg_primary if focused else THEME.fg_muted
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         left = [
-            Segment(cursor_prefix, fg=fg, style_flags=cursor_flags),
-            Segment(" ", fg=fg),
+            Segment(cursor_prefix, fg=THEME.fg_primary, style_flags=cursor_flags),
+            Segment(" ", fg=THEME.fg_primary),
         ]
-        ref_seg = Segment(f"{stash.ref}: ", fg=THEME.fg_muted)
-        msg_seg = Segment(stash.msg, fg=fg, style_flags=cursor_flags)
-        main = [ref_seg, msg_seg]
-        return left, main, []
+        main = [Segment(stash.msg, fg=msg_fg, style_flags=cursor_flags)]
+        right = [Segment(stash.ref, fg=THEME.fg_muted)]
+        return left, main, right
 
     def _handle_result(self, result) -> None:
         if result.success:

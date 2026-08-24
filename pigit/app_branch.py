@@ -330,38 +330,39 @@ class BranchPanel(ItemList):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
-        focused = self.is_focus_leaf
-        is_head = idx < len(self.branches) and self.branches[idx].is_head
+        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]."""
+        if idx >= len(self.branches):
+            return ([], None, [])
+        branch = self.branches[idx]
         prefix = self.CURSOR if is_cursor else " "
-        if is_head:
-            fg = THEME.fg_success if focused else THEME.fg_dim
+        if branch.is_remote:
+            name_fg = THEME.fg_remote_branch
+        elif branch.is_head:
+            name_fg = THEME.fg_local_branch
         else:
-            fg = THEME.fg_primary if focused else THEME.fg_dim
+            name_fg = THEME.fg_primary
         left = [
             Segment(
                 f"{prefix} {self.content[idx]}",
-                fg=fg,
+                fg=name_fg,
                 style_flags=palette.STYLE_BOLD if is_cursor else 0,
             )
         ]
 
         right: list[Segment] = []
-        if idx < len(self.branches):
-            branch = self.branches[idx]
-            if not branch.is_remote:
-                if branch.upstream_name:
-                    right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
-                ahead = branch.ahead if branch.ahead != "?" else ""
-                behind = branch.behind if branch.behind != "?" else ""
-                if ahead:
-                    if right:
-                        right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
-                if behind:
-                    if right:
-                        right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
+        if not branch.is_remote:
+            if branch.upstream_name:
+                right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
+            ahead = branch.ahead if branch.ahead != "?" else ""
+            behind = branch.behind if branch.behind != "?" else ""
+            if ahead:
+                if right:
+                    right.append(Segment(" ", fg=THEME.fg_muted))
+                right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
+            if behind:
+                if right:
+                    right.append(Segment(" ", fg=THEME.fg_muted))
+                right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
         return left, None, right
 

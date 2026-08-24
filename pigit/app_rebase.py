@@ -19,6 +19,7 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     exec_external,
+    palette,
     render_child,
     request_render,
     show_badge,
@@ -191,13 +192,25 @@ class RebasePanel(ItemList):
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         """Render one todo row: cursor, colored action, short sha + subject."""
         item = self._items[idx]
+        flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            Segment(self.CURSOR if is_cursor else " ", fg=THEME.fg_primary),
+            Segment(
+                self.CURSOR if is_cursor else " ",
+                fg=THEME.fg_primary,
+                style_flags=flags,
+            ),
             Segment(" ", fg=THEME.fg_primary),
-            Segment(item.action.ljust(7), fg=_ACTION_FG[item.action]),
+            Segment(
+                item.action.ljust(7),
+                fg=_ACTION_FG[item.action],
+                style_flags=flags,
+            ),
         ]
-        fg = THEME.fg_primary if is_cursor else THEME.fg_dim
-        main = [Segment(f"{item.sha[:8]}  {item.subject}", fg=fg)]
+        subject_fg = THEME.fg_primary if is_cursor else THEME.fg_muted
+        main = [
+            Segment(f"{item.sha[:8]}  ", fg=THEME.fg_muted, style_flags=flags),
+            Segment(item.subject, fg=subject_fg, style_flags=flags),
+        ]
         return left, main, []
 
     def _render_surface(self, surface) -> None:

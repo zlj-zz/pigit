@@ -33,6 +33,8 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
 
 def test_section_header_right_label_with_tail():
     """Top row is fill dashes, bold Stash, then two trailing dashes."""
+    from pigit.app_theme import THEME
+
     panel = _panel_with_stashes(["WIP on main"])
     panel.resize((40, 6))
     surface = Surface(40, 6)
@@ -41,10 +43,21 @@ def test_section_header_right_label_with_tail():
     row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
     assert row.endswith("Stash ──")
     assert "─" in row
-    # Label cells are bold
     label_start = row.index("Stash")
     for col in range(label_start, label_start + 5):
         assert surface._rows[0][col].style_flags & palette.STYLE_BOLD
+        assert surface._rows[0][col].fg == THEME.fg_panel_title
+
+
+def test_describe_row_puts_ref_on_right():
+    from pigit.app_theme import THEME
+
+    panel = _panel_with_stashes(["WIP on main"])
+    left, main, right = panel.describe_row(0, is_cursor=True)
+    assert "".join(s.text for s in main) == "WIP on main"
+    assert "".join(s.text for s in right) == "stash@{0}"
+    assert right[0].fg == THEME.fg_muted
+    assert main[0].fg in (THEME.fg_primary, THEME.fg_muted)
 
 
 def test_visible_row_count_excludes_header():

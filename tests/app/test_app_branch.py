@@ -39,3 +39,21 @@ def test_describe_row_omits_upstream_when_unset():
     _left, _main, right = panel.describe_row(0, is_cursor=False)
     text = "".join(seg.text for seg in right)
     assert "origin/" not in text
+
+
+def test_describe_row_colors_local_vs_remote():
+    from pigit.app_theme import THEME
+
+    panel = _panel_with(
+        [
+            Branch("main", "0", "0", True),
+            Branch("feature", "0", "0", False),
+            Branch("origin/main", "?", "?", False, is_remote=True),
+        ]
+    )
+    head_left, _, _ = panel.describe_row(0, is_cursor=False)
+    local_left, _, _ = panel.describe_row(1, is_cursor=False)
+    remote_left, _, _ = panel.describe_row(2, is_cursor=False)
+    assert head_left[0].fg == THEME.fg_local_branch
+    assert local_left[0].fg == THEME.fg_primary
+    assert remote_left[0].fg == THEME.fg_remote_branch

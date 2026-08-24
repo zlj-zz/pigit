@@ -419,7 +419,7 @@ class TestCommitPanelLifecycle:
         )
         vm.items.set([old_tip])
         # Simulate a render that re-seeds refs_cache after items-changed cleared it.
-        panel._ref_segments(old_tip, focused=True, cursor_flags=0)
+        panel._ref_segments(old_tip, cursor_flags=0)
 
         new_tip = Commit(
             "4a3ad3bbec2801cbee7",
