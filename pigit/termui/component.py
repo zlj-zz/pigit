@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
 from .bindings import (
@@ -22,10 +22,13 @@ from .bindings import (
 from .mouse import MouseEvent
 from .keys import display_key
 from ._runtime_context import (
+    get_focus_manager,
+    get_overlay_host,
     get_renderer,
     get_renderer_strict,
 )
 from .reactive import Computed, Signal
+from .theme import get_theme
 from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
@@ -369,6 +372,51 @@ class Component(ABC):
     def is_focus_leaf(self) -> bool:
         """Return True if this component is the resolved focus leaf."""
         return self._focus_level == 0
+
+    def is_presentation_stolen(self) -> bool:
+        """True while an open MODAL or SHEET owns keys (via overlay host)."""
+        host = get_overlay_host()
+        return host is not None and host.is_presentation_stolen()
+
+    def is_presentation_active(self) -> bool:
+        """True when structural colors use full primary/muted strength.
+
+        False while a MODAL/SHEET steals keys, or while a focus manager has a
+        leaf and this component is not that leaf. Headless (no focus manager
+        / no leaf) stays active so unit tests keep role colors.
+        """
+        if self.is_presentation_stolen():
+            return False
+        fm = get_focus_manager()
+        if (
+            fm is not None
+            and fm.get_focus_leaf() is not None
+            and not self.is_focus_leaf
+        ):
+            return False
+        return True
+
+    def presentation_fg(
+        self,
+        role: Literal["primary", "muted"] = "primary",
+    ) -> tuple[int, int, int]:
+        """Return structural/metadata fg from presentation state.
+
+        Resolution: steal → ``fg_inactive``; non-focus-leaf → primary→muted /
+        muted→dim; else role color. Git semantic colors bypass this helper —
+        pass ``THEME.fg_*`` / panel helpers directly.
+        Cursor-axis contrast (non-cursor muted inside a list) stays in the caller.
+        """
+        theme = get_theme()
+        if not self.is_presentation_active():
+            if self.is_presentation_stolen():
+                return theme.fg_inactive
+            if role == "muted":
+                return theme.fg_dim
+            return theme.fg_muted
+        if role == "muted":
+            return theme.fg_muted
+        return theme.fg_primary
 
     @property
     def renderer(self) -> Renderer | None:

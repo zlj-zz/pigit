@@ -443,7 +443,7 @@ class TestCommitPanelLifecycle:
         vm.items.set([new_tip, former_tip])
 
         def _main_text(row_idx: int) -> str:
-            _left, main = panel._row_cache_focused[row_idx]
+            _left, main = panel._row_cache[row_idx]
             return "".join(seg.text for seg in main)
 
         assert "HEAD" in _main_text(0)

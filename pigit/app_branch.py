@@ -340,7 +340,7 @@ class BranchPanel(ItemList):
         elif branch.is_head:
             name_fg = THEME.fg_local_branch
         else:
-            name_fg = THEME.fg_primary
+            name_fg = self.presentation_fg("primary")
         left = [
             Segment(
                 f"{prefix} {self.content[idx]}",
@@ -352,16 +352,18 @@ class BranchPanel(ItemList):
         right: list[Segment] = []
         if not branch.is_remote:
             if branch.upstream_name:
-                right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
+                right.append(
+                    Segment(branch.upstream_name, fg=self.presentation_fg("muted"))
+                )
             ahead = branch.ahead if branch.ahead != "?" else ""
             behind = branch.behind if branch.behind != "?" else ""
             if ahead:
                 if right:
-                    right.append(Segment(" ", fg=THEME.fg_muted))
+                    right.append(Segment(" ", fg=self.presentation_fg("muted")))
                 right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
             if behind:
                 if right:
-                    right.append(Segment(" ", fg=THEME.fg_muted))
+                    right.append(Segment(" ", fg=self.presentation_fg("muted")))
                 right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
         return left, None, right

@@ -157,6 +157,10 @@ class ComponentRoot(Component):
         """Return True if any overlay (modal, toast, or sheet) is currently open."""
         return self._layer_stack.has_any_open()
 
+    def is_presentation_stolen(self) -> bool:
+        """True while an open MODAL or SHEET owns keyboard chrome (not TOAST)."""
+        return self._top_open_overlay() is not None
+
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
         """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)

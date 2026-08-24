@@ -51,13 +51,19 @@ def test_section_header_right_label_with_tail():
 
 def test_describe_row_puts_ref_on_right():
     from pigit.app_theme import THEME
+    from pigit.termui.theme import get_theme, set_theme
 
-    panel = _panel_with_stashes(["WIP on main"])
-    left, main, right = panel.describe_row(0, is_cursor=True)
-    assert "".join(s.text for s in main) == "WIP on main"
-    assert "".join(s.text for s in right) == "stash@{0}"
-    assert right[0].fg == THEME.fg_muted
-    assert main[0].fg in (THEME.fg_primary, THEME.fg_muted)
+    prev = get_theme()
+    set_theme(THEME)
+    try:
+        panel = _panel_with_stashes(["WIP on main"])
+        left, main, right = panel.describe_row(0, is_cursor=True)
+        assert "".join(s.text for s in main) == "WIP on main"
+        assert "".join(s.text for s in right) == "stash@{0}"
+        assert right[0].fg == THEME.fg_muted
+        assert main[0].fg == THEME.fg_primary
+    finally:
+        set_theme(prev)
 
 
 def test_visible_row_count_excludes_header():

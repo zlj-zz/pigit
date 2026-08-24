@@ -253,20 +253,19 @@ class StashPanel(ItemList):
         item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
-        focused = self.is_focus_leaf
         if not self.stashes or idx >= len(self.stashes):
             return ([], None, [])
         stash = self.stashes[idx]
         cursor_prefix = self.CURSOR if is_cursor else " "
-        msg_fg = THEME.fg_primary if focused else THEME.fg_muted
+        fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         left = [
-            Segment(cursor_prefix, fg=THEME.fg_primary, style_flags=cursor_flags),
-            Segment(" ", fg=THEME.fg_primary),
+            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
         ]
-        main = [Segment(stash.msg, fg=msg_fg, style_flags=cursor_flags)]
-        right = [Segment(stash.ref, fg=THEME.fg_muted)]
+        main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]
+        right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
         return left, main, right
 
     def _handle_result(self, result) -> None:

@@ -54,9 +54,8 @@ class StatusAction(Enum):
     IGNORE = auto()
 
 
-def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
-    if not focused:
-        return THEME.fg_dim
+def _staged_fg(ch: str) -> tuple[int, int, int]:
+    """Semantic color for the index (staged) status column."""
     if ch in "MA":
         return THEME.fg_success
     if ch in "RC":
@@ -68,9 +67,8 @@ def _staged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
     return THEME.fg_muted
 
 
-def _unstaged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
-    if not focused:
-        return THEME.fg_dim
+def _unstaged_fg(ch: str) -> tuple[int, int, int]:
+    """Semantic color for the worktree (unstaged) status column."""
     if ch in "MD":
         return THEME.fg_danger
     if ch in "RC":
@@ -82,10 +80,8 @@ def _unstaged_fg(ch: str, focused: bool) -> tuple[int, int, int]:
     return THEME.fg_muted
 
 
-def _label_fg(label: str, focused: bool) -> tuple[int, int, int]:
-    """Return a semantic color for the status label."""
-    if not focused:
-        return THEME.fg_dim
+def _label_fg(label: str) -> tuple[int, int, int]:
+    """Semantic color for the right-side status label."""
     match label:
         case "Staged":
             return THEME.fg_success
@@ -881,7 +877,6 @@ class StatusPanel(ItemList):
         self, idx: int, is_cursor: bool
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         """Render a flat-view row (original behavior)."""
-        focused = self.is_focus_leaf
         if not self.files or idx >= len(self.files):
             return ([], None, [])
         file = self.files[idx]
@@ -889,21 +884,27 @@ class StatusPanel(ItemList):
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         cursor_prefix = self.CURSOR if is_cursor else " "
 
-        fg_primary = THEME.fg_primary if focused else THEME.fg_dim
+        fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
             Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
-            Segment(staged, fg=_staged_fg(staged, focused), style_flags=cursor_flags),
             Segment(
-                unstaged, fg=_unstaged_fg(unstaged, focused), style_flags=cursor_flags
+                staged,
+                fg=_staged_fg(staged),
+                style_flags=cursor_flags,
+            ),
+            Segment(
+                unstaged,
+                fg=_unstaged_fg(unstaged),
+                style_flags=cursor_flags,
             ),
             Segment(" ", fg=fg_primary),
         ]
 
         is_selected = self._source_index(idx) in self._selected
         if is_selected:
-            filename_fg = THEME.fg_staged_renamed if focused else THEME.fg_dim
+            filename_fg = THEME.fg_staged_renamed
         else:
             filename_fg = fg_primary
         main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
@@ -911,7 +912,7 @@ class StatusPanel(ItemList):
         right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append(Segment(label, fg=_label_fg(label, focused)))
+            right.append(Segment(label, fg=_label_fg(label)))
 
         return left, main, right
 
@@ -922,10 +923,9 @@ class StatusPanel(ItemList):
         row = self._row(idx)
         if row is None:
             return ([], None, [])
-        focused = self.is_focus_leaf
         indent = "  " * row.depth
         cursor_prefix = self.CURSOR if is_cursor else " "
-        fg_primary = THEME.fg_primary if focused else THEME.fg_dim
+        fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         if row.kind == "dir":
@@ -951,22 +951,26 @@ class StatusPanel(ItemList):
         left = [
             Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
-            Segment(staged, fg=_staged_fg(staged, focused), style_flags=cursor_flags),
             Segment(
-                unstaged, fg=_unstaged_fg(unstaged, focused), style_flags=cursor_flags
+                staged,
+                fg=_staged_fg(staged),
+                style_flags=cursor_flags,
+            ),
+            Segment(
+                unstaged,
+                fg=_unstaged_fg(unstaged),
+                style_flags=cursor_flags,
             ),
             Segment(" ", fg=fg_primary),
         ]
         is_selected = row.source_index in self._selected
-        filename_fg = (
-            THEME.fg_staged_renamed if (is_selected and focused) else fg_primary
-        )
+        filename_fg = THEME.fg_staged_renamed if is_selected else fg_primary
         main = [Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
         if label:
-            right.append(Segment(label, fg=_label_fg(label, focused)))
+            right.append(Segment(label, fg=_label_fg(label)))
 
         return left, main, right
 
