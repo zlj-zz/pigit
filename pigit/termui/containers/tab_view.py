@@ -11,14 +11,14 @@ import logging
 from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from ..component import Component, _render_child_to_surface, resolve_focus_leaf
+from ..component import Component, render_child, resolve_focus_leaf
 from .._runtime_context import get_focus_manager
 from ..types import EventType, EVT_GOTO
 
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import SurfaceView
 
 
 class TabView(Component):
@@ -78,6 +78,11 @@ class TabView(Component):
         """Focus drills into the active tab."""
         return self._active
 
+    @property
+    def presentation_child(self) -> Component | None:
+        """Chrome / help resolve to the active tab panel."""
+        return self._active
+
     def activate(self) -> None:
         super().activate()
         if self._active is not None:
@@ -131,13 +136,6 @@ class TabView(Component):
             fm.set_focus_chain(resolve_focus_leaf(resolved))
         return resolved
 
-    def on_event(self, action: EventType, **data) -> bool:
-        """Route goto to accept; let all other events bubble up."""
-        if action is EVT_GOTO:
-            self.accept(action, **data)
-            return True
-        return False
-
     def _resolve_target_id(self, target) -> str | None:
         """Resolve a goto target to a child id string."""
         if isinstance(target, str):
@@ -178,9 +176,9 @@ class TabView(Component):
         for child in self.children:
             child.resize(size)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: SurfaceView) -> None:
         if self._active is not None:
-            _render_child_to_surface(self._active, surface, "TabView")
+            render_child(self._active, surface, "TabView")
 
     def _handle_event(self, key: str) -> bool:
         if self._active is not None:

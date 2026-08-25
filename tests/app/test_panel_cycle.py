@@ -12,7 +12,7 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.config_data import AppConfig
-from pigit.termui import keys
+from pigit.termui import EVT_GOTO, keys
 from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
@@ -87,14 +87,22 @@ def test_shift_tab_cycles_backward(runtime):
     assert _leaf(root) is app._branch_panel
 
 
-def test_tab_on_diff_is_noop(runtime):
+def test_tab_on_diff_closes_detail_and_cycles(runtime):
+    """Tab while Diff detail is open closes detail then advances the product ring."""
     app, root = _mount(runtime)
-    app._tab_view.route_to("diff")
+    app._diff_panel.update(
+        EVT_GOTO,
+        target="diff",
+        source=app._status_panel,
+        content=["+a"],
+    )
+    app._body_host.show_detail()
+    assert app._body_host.is_detail_open
     assert _leaf(root) is app._diff_panel
+
     root._handle_event(keys.KEY_TAB)
-    assert _leaf(root) is app._diff_panel
-    root._handle_event(keys.KEY_SHIFT_TAB)
-    assert _leaf(root) is app._diff_panel
+    assert not app._body_host.is_detail_open
+    assert _leaf(root) is app._stash_panel
 
 
 def test_number_keys_land_on_four_panels(runtime):
@@ -140,7 +148,7 @@ def test_filter_exit_restores_number_goto(runtime):
 
 
 def _body_ids(app: PigitApplication) -> list[str | None]:
-    return [child.id for child in app._body_row.children]
+    return [child.id for child in app._split_pane.children]
 
 
 def test_large_screen_status_inserts_diff_preview_not_log_graph(runtime):

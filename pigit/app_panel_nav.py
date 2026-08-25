@@ -13,20 +13,14 @@ from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
-from pigit.termui import Component, get_focus_manager, resolve_presentation_leaf
+from pigit.termui import Component, resolve_presentation_leaf
 from pigit.termui.containers import Column, TabView
 
 
 class PanelNavigator:
     """Cycle and goto helpers for the four main list panels.
 
-    Attributes:
-        get_tab_view: Late-bound TabView accessor.
-        get_status_stack: Late-bound Status/Stash column accessor.
-        get_status_panel: Late-bound StatusPanel accessor.
-        get_stash_panel: Late-bound StashPanel accessor.
-        get_branch_panel: Late-bound BranchPanel accessor.
-        get_commit_panel: Late-bound CommitPanel accessor.
+    Ring index is derived from the product TabView (never Diff detail focus).
     """
 
     def __init__(
@@ -56,11 +50,17 @@ class PanelNavigator:
         )
 
     def ring_index(self) -> int | None:
-        """Index in the panel ring, or None when Diff (or unknown) is focused."""
-        fm = get_focus_manager()
-        leaf = fm.get_focus_leaf() if fm is not None else None
+        """Index in the panel ring from the product TabView (ignore Diff detail)."""
+        tab = self._get_tab_view()
+        active = tab.active
+        if active is self._get_status_stack():
+            leaf = self._get_status_stack().focus_child
+            if leaf is None:
+                leaf = resolve_presentation_leaf(active)
+        else:
+            leaf = active
         if leaf is None:
-            leaf = resolve_presentation_leaf(self._get_tab_view().active)
+            return None
         for idx, panel in enumerate(self.panel_ring()):
             if leaf is panel:
                 return idx
@@ -82,10 +82,25 @@ class PanelNavigator:
         if panel is self._get_commit_panel():
             self._get_tab_view().route_to("commit")
 
+    def resolve_panel(self, target: object) -> Component | None:
+        """Map a ring panel identity or product id string to a ring panel."""
+        for panel in self.panel_ring():
+            if target is panel:
+                return panel
+        if not isinstance(target, str):
+            return None
+        by_id = {
+            "status": self._get_status_panel(),
+            "stash": self._get_stash_panel(),
+            "branch": self._get_branch_panel(),
+            "commit": self._get_commit_panel(),
+        }
+        return by_id.get(target)
+
     def cycle_panel(self, step: int) -> None:
         """Move focus ``step`` positions around the panel ring.
 
-        No-op when the current focus is outside the ring (e.g. Diff view).
+        No-op when the product tab is outside the ring.
         """
         idx = self.ring_index()
         if idx is None:

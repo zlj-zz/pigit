@@ -67,6 +67,25 @@ class TestResolveFocusLeaf:
         col.set_focus_index(1)
         assert resolve_focus_leaf(col) is b
 
+    def test_same_focus_index_skips_selection_emit(self):
+        a = _KeyLeaf()
+        b = _KeyLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=1)
+        calls = {"n": 0}
+        orig = col.emit
+
+        def counting_emit(action, **data):
+            calls["n"] += 1
+            return orig(action, **data)
+
+        col.emit = counting_emit  # type: ignore[method-assign]
+        col.set_focus_index(1)
+        assert calls["n"] == 0
+        assert resolve_focus_leaf(col) is b
+        col.set_focus_index(0)
+        assert calls["n"] >= 1
+        assert resolve_focus_leaf(col) is a
+
 
 class TestResolvePresentationLeaf:
     def test_follows_presentation_child(self):

@@ -72,6 +72,7 @@ def test_catalog_hides_sequencer_when_idle():
 
     ids = [i.id for i in catalog_for_context(None)]
     assert "status" in ids
+    assert "diff" not in ids
     assert "continue-merge" not in ids
     assert "rebase-continue" not in ids
     assert "cherry-pick-abort" not in ids

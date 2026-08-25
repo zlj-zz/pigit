@@ -21,7 +21,6 @@ from pigit.termui import (
     show_spinner,
     show_toast,
 )
-from pigit.termui.containers import TabView
 
 
 @dataclass(frozen=True)
@@ -45,7 +44,7 @@ class NetworkGit:
         *,
         store: MergeStateStore,
         get_git: Callable[[], GitApi],
-        get_tab_view: Callable[[], TabView],
+        navigate_product: Callable[[str], None],
         get_sync_task: Callable[[], AsyncTask[NetworkGitOutcome]],
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
@@ -54,14 +53,14 @@ class NetworkGit:
         Args:
             store: Shared merge session state store.
             get_git: Late-bound GitApi accessor.
-            get_tab_view: Late-bound TabView accessor (route to Status on conflict).
+            navigate_product: Close Diff detail if open, then route product tab.
             get_sync_task: Late-bound AsyncTask for network sync.
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             schedule_reload_header: Callback to reload header branch/ahead/behind.
         """
         self._store = store
         self._get_git = get_git
-        self._get_tab_view = get_tab_view
+        self._navigate_product = navigate_product
         self._get_sync_task = get_sync_task
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_schedule_reload_header = get_schedule_reload_header
@@ -169,5 +168,5 @@ class NetworkGit:
             duration=4.0,
             kind=FeedbackKind.WARNING,
         )
-        self._get_tab_view().route_to("status")
+        self._navigate_product("status")
         self._get_refresh_git_vms()

@@ -114,6 +114,7 @@ class DiffViewer(LineTextBrowser):
         self._patch_task: AsyncTask[tuple[int, str, str, str, str]] = AsyncTask()
         self._tokenize_task: AsyncTask[list[_RenderLine]] = AsyncTask()
         self._tokenize_gen: int = 0
+        self._patch_gen: int = 0
 
         # Word-diff state
         self._word_diff = word_diff
@@ -643,11 +644,20 @@ class DiffViewer(LineTextBrowser):
             return ["git", "apply", "--cached", patch_path], "Hunk staged"
         return ["git", "apply", "-R", patch_path], "Hunk discarded"
 
-    def deactivate(self) -> None:
-        """Cancel pending patch task and clear stuck badge."""
+    def pause_background(self) -> None:
+        """Cancel in-flight patch/tokenize and clear badge; keep content and tokens.
+
+        BodyHost hide calls this instead of ``deactivate`` so reopen can reuse
+        installed tokens without a full re-parse.
+        """
         self._patch_task.cancel()
-        self._tokenize_task.cancel()
+        self._drop_pending_tokenize()
+        self._patch_gen += 1
         show_badge("", duration=0)
+
+    def deactivate(self) -> None:
+        """Cancel pending work and clear stuck badge on true unmount."""
+        self.pause_background()
         super().deactivate()
 
     def _apply_patch(self, patch: str, action: str) -> None:
@@ -667,6 +677,7 @@ class DiffViewer(LineTextBrowser):
 
         show_badge("Applying...", duration=float("inf"))
         diff_type = self._diff_type
+        current_gen = self._patch_gen
 
         def _work() -> tuple[int, str, str, str, str]:
             """Run in thread pool. Returns (returncode, stdout, stderr, patch_path, msg)."""
@@ -695,7 +706,7 @@ class DiffViewer(LineTextBrowser):
             except OSError:
                 pass
 
-            if not self.is_activated():
+            if not self.is_activated() or current_gen != self._patch_gen:
                 return
 
             if returncode == 0:

@@ -17,7 +17,6 @@ DEFAULT_COMMANDS: list[PaletteItem] = [
     PaletteItem("status", "Switch to Status"),
     PaletteItem("branch", "Switch to Branch"),
     PaletteItem("commit", "Switch to Commit"),
-    PaletteItem("diff", "Switch to Diff"),
     PaletteItem("stash", "Focus Stash panel"),
     PaletteItem("push", "Push to upstream"),
     PaletteItem("pull", "Pull from upstream"),

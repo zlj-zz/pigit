@@ -7,7 +7,7 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 from collections.abc import Sequence
 
 from . import palette
@@ -149,12 +149,7 @@ class _Subsurface:
         r, c = self._to_parent(row, col)
         self._parent.draw_text_rgb(r, c, text, fg=fg, bg=bg, style_flags=style_flags)
 
-    def draw_segments(
-        self,
-        row: int,
-        col: int,
-        segments: Sequence[Segment],
-    ) -> int:
+    def draw_segments(self, row: int, col: int, segments: Sequence[Segment]) -> int:
         """Draw a list of styled segments and return the column after the last one."""
         for seg in segments:
             self.draw_text_rgb(
@@ -509,3 +504,7 @@ class Surface:
     def lines(self) -> list[str]:
         """Flatten buffer to strings for Renderer output."""
         return ["".join(cell.char for cell in row) for row in self._rows]
+
+
+# Drawable target for paint / render_child: root buffer or a clipped view.
+SurfaceView: TypeAlias = Surface | _Subsurface

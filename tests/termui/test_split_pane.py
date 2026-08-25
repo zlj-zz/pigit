@@ -48,6 +48,11 @@ def detail() -> _Leaf:
     return _Leaf(id="detail")
 
 
+def test_presentation_child_is_master(master: _Leaf, detail: _Leaf) -> None:
+    pane = SplitPane(master, detail, id="body")
+    assert pane.presentation_child is master
+
+
 def test_master_only_when_cols_below_breakpoint(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
     pane.activate()

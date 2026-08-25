@@ -15,7 +15,6 @@ from pigit.app_merge_state import MergeStateStore
 from pigit.app_network_git import NetworkGit
 from pigit.git.api import GitApi, GitError, RepoError
 from pigit.termui import FeedbackKind, hide_spinner, show_spinner, show_toast
-from pigit.termui.containers import TabView
 from pigit.termui.widgets import AlertDialog
 
 
@@ -33,7 +32,7 @@ class MergeWorkflow:
         store: MergeStateStore,
         network: NetworkGit,
         get_git: Callable[[], GitApi],
-        get_tab_view: Callable[[], TabView],
+        navigate_product: Callable[[str], None],
         get_branch_panel: Callable[[], BranchPanel],
         get_alert_dialog: Callable[[], AlertDialog],
         get_refresh_git_vms: Callable[[], None],
@@ -44,7 +43,7 @@ class MergeWorkflow:
             store: Shared merge session state store.
             network: NetworkGit collaborator for post-merge push.
             get_git: Late-bound GitApi accessor.
-            get_tab_view: Late-bound TabView accessor.
+            navigate_product: Close Diff detail if open, then route product tab.
             get_branch_panel: Late-bound BranchPanel accessor.
             get_alert_dialog: Late-bound AlertDialog accessor.
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
@@ -53,7 +52,7 @@ class MergeWorkflow:
         self._store = store
         self._network = network
         self._get_git = get_git
-        self._get_tab_view = get_tab_view
+        self._navigate_product = navigate_product
         self._get_branch_panel = get_branch_panel
         self._get_alert_dialog = get_alert_dialog
         self._get_refresh_git_vms = get_refresh_git_vms
@@ -86,7 +85,7 @@ class MergeWorkflow:
                         duration=3.0,
                         kind=FeedbackKind.WARNING,
                     )
-                    self._get_tab_view().route_to("status")
+                    self._navigate_product("status")
                     return
                 show_toast(
                     f"Merge failed: {exc}", duration=3.0, kind=FeedbackKind.ERROR
@@ -151,7 +150,7 @@ class MergeWorkflow:
             )
             return
         self._store.clear()
-        self._get_tab_view().route_to("branch")
+        self._navigate_product("branch")
         self._get_branch_panel().refresh()
         show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
 

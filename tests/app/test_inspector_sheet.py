@@ -233,7 +233,7 @@ def test_open_inspector_is_top_sheet_not_body_child(runtime):
         patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
-    ids = [child.id for child in app._body_row.children]
+    ids = [child.id for child in app._split_pane.children]
     assert "inspector" not in ids
     sheet = root._layer_stack.top(LayerKind.SHEET)
     assert sheet is not None
@@ -314,7 +314,7 @@ def test_inspector_load_dropped_when_placeholder_closed(runtime):
 
 def test_diff_view_toasts_no_inspector(runtime):
     app, root = _mount(runtime)
-    app._tab_view.route_to("diff")
+    app._body_host.show_detail()
     with patch("pigit.app.show_toast") as toast:
         app.open_inspector()
     toast.assert_called_once()

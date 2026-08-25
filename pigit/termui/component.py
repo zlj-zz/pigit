@@ -33,7 +33,7 @@ from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from .renderer import Renderer
-    from .surface import Surface, _Subsurface
+    from .surface import SurfaceView
 
 _logger = logging.getLogger(__name__)
 
@@ -59,9 +59,7 @@ class ComponentError(Exception):
 
 
 def render_child(
-    component: Component,
-    surface: Surface,
-    log_prefix: str = "",
+    component: Component, surface: SurfaceView, log_prefix: str = ""
 ) -> None:
     """Blit ``component`` into ``surface`` using the child's x/y/_size (1-based).
 
@@ -83,12 +81,6 @@ def render_child(
         )
     sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
     component._render_surface(sub)
-
-
-def _render_child_to_surface(
-    component: Component, surface: Surface | _Subsurface, log_prefix: str
-) -> None:
-    render_child(component, surface, log_prefix)
 
 
 class Component(ABC):
@@ -327,7 +319,7 @@ class Component(ABC):
 
         notify_children(self, action, **data)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: SurfaceView) -> None:
         """Render this component into the given Surface.
 
         New components should implement this instead of `_render`.

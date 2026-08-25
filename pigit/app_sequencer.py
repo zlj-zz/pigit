@@ -18,7 +18,6 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.containers import TabView
 from pigit.termui.widgets import AlertDialog
 
 _SEQUENCER_PAUSED = {
@@ -41,7 +40,7 @@ class SequencerControl:
         *,
         get_git: Callable[[], GitApi],
         get_repo_path: Callable[[], str],
-        get_tab_view: Callable[[], TabView],
+        navigate_product: Callable[[str], None],
         get_alert_dialog: Callable[[], AlertDialog],
         get_refresh_git_vms: Callable[[], None],
         get_refresh_active_panel: Callable[[], None],
@@ -50,14 +49,14 @@ class SequencerControl:
         Args:
             get_git: Late-bound GitApi accessor.
             get_repo_path: Callable returning cwd for exec_external.
-            get_tab_view: Late-bound TabView accessor.
+            navigate_product: Close Diff detail if open, then route product tab.
             get_alert_dialog: Late-bound AlertDialog accessor.
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             refresh_active_panel: Callback after rebase sheet completes.
         """
         self._get_git = get_git
         self._get_repo_path = get_repo_path
-        self._get_tab_view = get_tab_view
+        self._navigate_product = navigate_product
         self._get_alert_dialog = get_alert_dialog
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_refresh_active_panel = get_refresh_active_panel
@@ -235,7 +234,7 @@ class SequencerControl:
                         duration=3.0,
                         kind=FeedbackKind.WARNING,
                     )
-                    self._get_tab_view().route_to("status")
+                    self._navigate_product("status")
                 else:
                     show_toast(
                         "Cherry-pick is empty. ';' → cherry-pick-skip or cherry-pick-abort",

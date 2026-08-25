@@ -118,8 +118,19 @@ class Column(Component):
         return self._focused_child()
 
     def set_focus_index(self, idx: int) -> None:
-        """Set the focused child by index, handling activate/deactivate and notify."""
+        """Set the focused child by index, handling activate/deactivate and notify.
+
+        Same-index calls only re-assert the focus chain (e.g. return from Diff)
+        and do not re-emit chrome events.
+        """
         if self._focus_index is None or not self.children:
+            return
+        if idx == self._focus_index:
+            child = self._focused_child()
+            if child is not None:
+                fm = get_focus_manager()
+                if fm is not None:
+                    fm.set_focus_chain(resolve_focus_leaf(child))
             return
         old_child = self._focused_child()
         self._focus_index = idx

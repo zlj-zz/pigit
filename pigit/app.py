@@ -12,6 +12,7 @@ import os
 from collections.abc import Callable
 from pigit.termui import (
     EventType,
+    EVT_GOTO,
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
@@ -38,6 +39,7 @@ from pigit.termui.containers import Column, SplitPane, TabView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
 from pigit.termui.reactive import Signal
+from .app_body_host import BodyHost
 from .app_header_state import HeaderState
 from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
@@ -45,7 +47,7 @@ from .app_panel_nav import PanelNavigator
 from .app_network_git import NetworkGit, NetworkGitOutcome
 from .app_merge_workflow import MergeWorkflow
 from .app_sequencer import SequencerControl
-from .git.api import GitApi, GitError
+from .git.api import GitApi
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -117,7 +119,7 @@ class PigitApplication(Application):
         self._network_git = NetworkGit(
             store=self._merge_state_store,
             get_git=lambda: self._git,
-            get_tab_view=lambda: self._tab_view,
+            navigate_product=self.navigate_product,
             get_sync_task=lambda: self._network_sync_task,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
@@ -126,7 +128,7 @@ class PigitApplication(Application):
             store=self._merge_state_store,
             network=self._network_git,
             get_git=lambda: self._git,
-            get_tab_view=lambda: self._tab_view,
+            navigate_product=self.navigate_product,
             get_branch_panel=lambda: self._branch_panel,
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
@@ -135,7 +137,7 @@ class PigitApplication(Application):
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
             get_repo_path=lambda: self._repo_path,
-            get_tab_view=lambda: self._tab_view,
+            navigate_product=self.navigate_product,
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_refresh_active_panel=lambda: self._refresh_active_panel(),
@@ -149,7 +151,8 @@ class PigitApplication(Application):
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
-        self._body_row: SplitPane
+        self._split_pane: SplitPane
+        self._body_host: BodyHost
         self._palette: CommandPalette
         self._status_stack: Column
         self._status_panel: StatusPanel
@@ -170,7 +173,7 @@ class PigitApplication(Application):
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
-        # the log-graph preview. At most one is in body_row at a time.
+        # the log-graph preview. At most one is in the split pane at a time.
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
@@ -221,7 +224,6 @@ class PigitApplication(Application):
                 self._status_stack,
                 self._branch_panel,
                 self._commit_panel,
-                self._diff_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
@@ -231,10 +233,15 @@ class PigitApplication(Application):
         cols, _ = terminal_size()
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
-        self._body_row = SplitPane(
+        self._split_pane = SplitPane(
             master=self._tab_view,
             breakpoint_cols=self.LARGE_SCREEN_COLS,
-            id="body_row",
+            id="split_pane",
+        )
+        self._body_host = BodyHost(
+            self._split_pane,
+            self._diff_panel,
+            id="body",
         )
 
         self._palette = CommandPalette(
@@ -251,7 +258,7 @@ class PigitApplication(Application):
                 sep_fg=THEME.fg_dim,
                 id="header",
             ),
-            self._body_row,
+            self._body_host,
         ]
         heights: list = [2, "flex"]
         if self._config.show_footer:
@@ -413,7 +420,7 @@ class PigitApplication(Application):
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""
-        if not self._is_large_screen:
+        if self._body_host.is_detail_open or not self._is_large_screen:
             return None
         active = resolve_presentation_leaf(self._tab_view.active)
         if isinstance(active, (StatusPanel, StashPanel)):
@@ -424,21 +431,23 @@ class PigitApplication(Application):
 
     def _apply_body_widths(self, cols: int) -> None:
         """Update SplitPane detail and widths for the active tab."""
+        if self._body_host.is_detail_open:
+            return
         active = resolve_presentation_leaf(self._tab_view.active)
         if isinstance(active, (StatusPanel, StashPanel)):
-            self._body_row.set_detail(self._preview_panel)
-            self._body_row.set_detail_wanted(
+            self._split_pane.set_detail(self._preview_panel)
+            self._split_pane.set_detail_wanted(
                 self._is_large_screen and self._diff_preview_wanted
             )
         elif isinstance(active, BranchPanel):
-            self._body_row.set_detail(self._log_graph_preview)
-            self._body_row.set_detail_wanted(
+            self._split_pane.set_detail(self._log_graph_preview)
+            self._split_pane.set_detail_wanted(
                 self._is_large_screen and self._log_graph_wanted
             )
         else:
-            self._body_row.set_detail(None)
-            self._body_row.set_detail_wanted(False)
-        self._body_row.apply_terminal_width(cols)
+            self._split_pane.set_detail(None)
+            self._split_pane.set_detail_wanted(False)
+        self._split_pane.apply_terminal_width(cols)
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
@@ -476,21 +485,25 @@ class PigitApplication(Application):
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
         """Switch focus to the Status panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._status_panel)
 
     @bind_action("goto_stash", "2", desc="Switch to Stash panel", tip="Stash")
     def goto_stash(self):
         """Switch focus to the Stash panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._stash_panel)
 
     @bind_action("goto_branch", "3", desc="Switch to Branch tab", tip="Branch")
     def goto_branch(self):
         """Switch focus to the Branch panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._branch_panel)
 
     @bind_action("goto_commit", "4", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
         """Switch focus to the Commit panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._commit_panel)
 
     @bind_action(
@@ -500,6 +513,7 @@ class PigitApplication(Application):
     )
     def next_panel(self) -> None:
         """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        self._close_detail_if_open()
         self._cycle_panel(1)
 
     @bind_action(
@@ -509,6 +523,7 @@ class PigitApplication(Application):
     )
     def prev_panel(self) -> None:
         """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        self._close_detail_if_open()
         self._cycle_panel(-1)
 
     def _panel_ring(self) -> tuple[Component, ...]:
@@ -516,7 +531,7 @@ class PigitApplication(Application):
         return self._panel_nav.panel_ring()
 
     def _ring_index(self) -> int | None:
-        """Index in the panel ring, or None when Diff (or unknown) is focused."""
+        """Index in the panel ring from the product TabView."""
         return self._panel_nav.ring_index()
 
     def _focus_destination(self, panel: Component) -> None:
@@ -526,6 +541,51 @@ class PigitApplication(Application):
     def _cycle_panel(self, step: int) -> None:
         """Move focus ``step`` positions around the panel ring."""
         self._panel_nav.cycle_panel(step)
+
+    def _reveal_product(self) -> None:
+        """Close Diff detail if open and resync SplitPane layout for the terminal."""
+        host = getattr(self, "_body_host", None)
+        if host is None or not host.is_detail_open:
+            return
+        host.show_product()
+        cols, _ = terminal_size()
+        self._apply_body_widths(cols)
+
+    def _close_detail_if_open(self) -> None:
+        """Hide Diff detail without deactivating it; resync product layout."""
+        self._reveal_product()
+
+    def presentation_active(self) -> Component | None:
+        """Presentation leaf: Diff when detail open, else product tab leaf."""
+        if (
+            getattr(self, "_body_host", None) is not None
+            and self._body_host.is_detail_open
+        ):
+            return self._diff_panel
+        if getattr(self, "_tab_view", None) is None:
+            return None
+        return resolve_presentation_leaf(self._tab_view.active)
+
+    def navigate_product(self, target: str) -> None:
+        """Close Diff detail if open, then route the product TabView."""
+        self._reveal_product()
+        self._tab_view.route_to(target)
+
+    def _handle_body_goto(self, **data) -> bool:
+        """Own all EVT_GOTO: open Diff detail, or product panel navigation."""
+        target = data.get("target")
+        if target == "diff" or target is self._diff_panel:
+            self._diff_panel.update(EVT_GOTO, **data)
+            self._body_host.show_detail()
+            return True
+        was_detail_open = self._body_host.is_detail_open
+        if was_detail_open:
+            self._reveal_product()
+        panel = self._panel_nav.resolve_panel(target)
+        if panel is not None:
+            self._panel_nav.focus_destination(panel)
+            return True
+        return was_detail_open
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
@@ -560,6 +620,8 @@ class PigitApplication(Application):
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
+        if self._body_host.is_detail_open:
+            return
         cols, _ = terminal_size()
         if cols < self.LARGE_SCREEN_COLS:
             show_toast(
@@ -597,7 +659,7 @@ class PigitApplication(Application):
         The snapshot build spawns several git subprocesses, so it runs on an
         AsyncTask worker; the sheet appears immediately with a loading hint.
         """
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = self.presentation_active()
         if not isinstance(active, InspectorHost):
             show_toast(
                 "No inspector for this view",
@@ -695,12 +757,15 @@ class PigitApplication(Application):
             vm.refresh()
 
     def _refresh_active_panel(self) -> None:
-        """Imperative refresh of the currently active panel.
+        """Imperative refresh of the currently presented product panel.
 
         Used after actions (rebase/merge done, etc.). Skips when a MODAL or
         SHEET is open (toasts do not block). Does not call ``request_render``;
         ViewModel refresh uses AsyncTask and Signal subscribers render.
+        Skips while Diff detail is open (do not refresh a hidden list).
         """
+        if self._body_host.is_detail_open:
+            return
         active = resolve_presentation_leaf(self._tab_view.active)
         if active is None:
             return
@@ -719,8 +784,10 @@ class PigitApplication(Application):
         Header, footer, and preview updates are handled by their own
         bus subscribers.
         """
+        if action is EVT_GOTO:
+            return self._handle_body_goto(**data)
         if action in (EventType("mode_changed"), EVT_SELECTION_CHANGED):
-            data.setdefault("active", self._resolve_active_panel())
+            data.setdefault("active", self.presentation_active())
         if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
             return True
@@ -742,7 +809,7 @@ class PigitApplication(Application):
         """Return the currently presented active panel, or None."""
         if self._root is None:
             return None
-        return resolve_presentation_leaf(self._tab_view.active)
+        return self.presentation_active()
 
     def _pin_log_ref(self, ref: str, *, announce: bool = True) -> None:
         """Pin the Commit log to ``ref``; announce unless it is the checkout."""
@@ -753,8 +820,10 @@ class PigitApplication(Application):
     def _on_show_log(self, ref: str) -> None:
         """Pin Commit log to ``ref`` and open the Commit tab."""
         self._pin_log_ref(ref)
-        if self._tab_view.route_to("commit") is None:
-            # Already on the Commit tab; refresh the title directly.
+        already_on_commit = self._tab_view.active is self._commit_panel
+        self.navigate_product("commit")
+        if already_on_commit:
+            # Already on Commit (route_to no-ops); refresh the title directly.
             self._commit_panel._publish_tab_title()
 
     def _on_follow_head(self, ref: str) -> None:
@@ -786,7 +855,8 @@ class PigitApplication(Application):
         if lower == "stash":
             self.goto_stash()
             return
-        if self._tab_view.route_to(lower) is not None:
+        if lower in ("status", "branch", "commit"):
+            self.navigate_product(lower)
             return
         if lower in ("pull", "push"):
             self._run_network_git(lower)

@@ -50,6 +50,11 @@ class SplitPane(Component):
         self.children = [master]
         master.parent = self
 
+    @property
+    def presentation_child(self) -> Component | None:
+        """Chrome resolves through the master (TabView), not the side preview."""
+        return self._master
+
     def set_detail(self, detail: Component | None) -> None:
         """Replace the detail component without changing the wanted flag."""
         self._detail = detail
