@@ -32,7 +32,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, ItemList
+from pigit.termui.widgets import AlertDialog, InputLine, OptionList
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
@@ -262,7 +262,7 @@ def build_status_tree(
     return rows
 
 
-class StatusPanel(ItemList):
+class StatusPanel(OptionList):
     """Status panel with visual mode."""
 
     CURSOR = "●"  # filled circle

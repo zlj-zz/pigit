@@ -159,7 +159,7 @@ When changing root exports:
 ```python
 # Preferred
 from pigit.termui import Application, Component, show_toast
-from pigit.termui.widgets import ItemList, Sheet
+from pigit.termui.widgets import OptionList, Sheet
 from pigit.termui.primitives import plain
 
 # Avoid in pigit/app*.py (ratcheted)

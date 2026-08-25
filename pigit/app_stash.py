@@ -23,7 +23,7 @@ from pigit.termui import (
     Surface,
 )
 from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import AlertDialog, ItemList
+from pigit.termui.widgets import AlertDialog, OptionList
 
 from .app_diff import DiffType
 from .app_theme import THEME
@@ -65,7 +65,7 @@ class _StashSectionHeader(Component):
         surface.draw_text_rgb(0, col, f" {self._TAIL}", fg=rule_fg)
 
 
-class StashPanel(ItemList):
+class StashPanel(OptionList):
     """Stash list panel with cursor navigation."""
 
     CURSOR = "●"

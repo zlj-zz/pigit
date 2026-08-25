@@ -11,10 +11,10 @@ from .. import palette
 from ..theme import get_theme
 from ..reactive import Signal
 from ..segment import Segment
-from .item_list import ItemList
+from .option_list import OptionList
 
 
-class CheckList(ItemList):
+class CheckList(OptionList):
     """Multi-select list with checkbox prefix."""
 
     CURSOR: str = ""

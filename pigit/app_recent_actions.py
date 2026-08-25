@@ -19,7 +19,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 
 from .app_theme import THEME
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from pigit.session_history import SessionHistory, HistoryRecord
 
 
-class RecentActionsPanel(ItemList):
+class RecentActionsPanel(OptionList):
     """Sheet overlay for browsing and reversing session history records."""
 
     CURSOR = "●"

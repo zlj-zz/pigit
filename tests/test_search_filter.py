@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/test_search_filter.py
-Description: Tests for ItemList search mode and panel search help bindings.
+Description: Tests for OptionList search mode and panel search help bindings.
 Author: Zev
 Date: 2026-08-17
 """
@@ -11,13 +11,13 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from pigit.termui import keys
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 
 
 def test_inactive_slash_not_captured():
     """``/`` is a panel bind_action; search_handle_key must not swallow it when idle."""
     applied = []
-    sel = ItemList(content=["a"], on_search_changed=lambda: applied.append(True))
+    sel = OptionList(content=["a"], on_search_changed=lambda: applied.append(True))
     assert sel.search_handle_key("/") is False
     assert sel.search_active is False
     assert applied == []
@@ -25,7 +25,7 @@ def test_inactive_slash_not_captured():
 
 def test_enter_activates_search():
     applied = []
-    sel = ItemList(content=["a"], on_search_changed=lambda: applied.append(True))
+    sel = OptionList(content=["a"], on_search_changed=lambda: applied.append(True))
     sel.enter_search()
     assert sel.search_active is True
     assert sel.search_query == ""
@@ -33,7 +33,7 @@ def test_enter_activates_search():
 
 
 def test_active_typing_updates_query():
-    sel = ItemList(content=["a"])
+    sel = OptionList(content=["a"])
     sel.enter_search()
     assert sel.search_handle_key("a") is True
     assert sel.search_handle_key("b") is True

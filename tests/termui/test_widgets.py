@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/termui/test_widgets.py
-Description: Unit tests for StatusBar, InputLine, and ItemList widgets.
+Description: Unit tests for StatusBar, InputLine, and OptionList widgets.
 Author: Zev
 Date: 2026-04-20
 """
@@ -10,7 +10,7 @@ from pigit.termui import keys
 from pigit.termui.widgets import (
     CheckList,
     InputLine,
-    ItemList,
+    OptionList,
     StatusBar,
 )
 from pigit.termui.reactive import Signal
@@ -21,17 +21,17 @@ from pigit.termui.surface import Surface
 from pigit.termui.theme import get_theme
 
 
-class TestItemList:
+class TestOptionList:
     def test_viewport_start(self):
-        sel = ItemList(content=["a", "b", "c"])
+        sel = OptionList(content=["a", "b", "c"])
         assert sel.viewport_start == 0
 
     def test_visible_row_count(self):
-        sel = ItemList(content=["a", "b", "c"], size=(10, 5))
+        sel = OptionList(content=["a", "b", "c"], size=(10, 5))
         assert sel.visible_row_count == 5
 
     def test_empty_state_renders_when_content_empty(self):
-        sel = ItemList(size=(40, 10), empty_state=[Segment("hello")])
+        sel = OptionList(size=(40, 10), empty_state=[Segment("hello")])
         sel.set_content([])
         surface = Surface(40, 10)
         sel.paint(surface)
@@ -45,7 +45,7 @@ class TestItemList:
         assert found
 
     def test_empty_state_not_rendered_when_content_present(self):
-        sel = ItemList(size=(40, 10), empty_state=[Segment("empty")])
+        sel = OptionList(size=(40, 10), empty_state=[Segment("empty")])
         sel.set_content(["real"])
         surface = Surface(40, 10)
         sel.paint(surface)
@@ -57,7 +57,7 @@ class TestItemList:
         assert "empty" not in all_text
 
     def test_no_empty_state_renders_nothing(self):
-        sel = ItemList(size=(40, 10))
+        sel = OptionList(size=(40, 10))
         sel.set_content([])
         surface = Surface(40, 10)
         sel.paint(surface)
@@ -66,16 +66,16 @@ class TestItemList:
             assert all(c.char == " " for c in row)
 
 
-class TestItemListSearch:
+class TestOptionListSearch:
     def test_idle_slash_not_consumed(self):
         """``/`` is a panel bind_action; search_handle_key must not swallow it."""
-        sel = ItemList(content=["a", "b"])
+        sel = OptionList(content=["a", "b"])
         assert sel.search_handle_key("/") is False
         assert sel.search_active is False
 
     def test_enter_search_and_typing(self):
         changes = []
-        sel = ItemList(
+        sel = OptionList(
             content=["alpha", "beta"], on_search_changed=lambda: changes.append(True)
         )
         sel.enter_search()
@@ -89,7 +89,7 @@ class TestItemListSearch:
         assert sel.search_query == "a"
 
     def test_esc_exits_and_clears_query(self):
-        sel = ItemList(content=["a"])
+        sel = OptionList(content=["a"])
         sel.enter_search()
         sel.search_handle_key("x")
         assert sel.search_handle_key(keys.KEY_ESC) is True
@@ -97,7 +97,7 @@ class TestItemListSearch:
         assert sel.search_query == ""
 
     def test_enter_deactivates_but_keeps_query(self):
-        sel = ItemList(content=["a"])
+        sel = OptionList(content=["a"])
         sel.enter_search()
         sel.search_handle_key("a")
         sel.search_handle_key("b")
@@ -107,7 +107,7 @@ class TestItemListSearch:
 
     def test_set_source_items_and_filter_mapping(self):
         items = ["alpha", "beta", "other"]
-        sel = ItemList(size=(20, 5))
+        sel = OptionList(size=(20, 5))
         sel.set_source_items(items, text_of=lambda x: x)
         sel.set_filter("a")
         assert sel.content == ["alpha", "beta"]
@@ -118,7 +118,7 @@ class TestItemListSearch:
         assert sel.visible_to_source(0) == 0
 
     def test_search_bar_drawn_when_active(self):
-        sel = ItemList(content=["item"], size=(20, 5))
+        sel = OptionList(content=["item"], size=(20, 5))
         sel.enter_search()
         sel.search_handle_key("q")
         surface = Surface(20, 5)

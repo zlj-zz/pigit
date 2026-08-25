@@ -115,15 +115,15 @@ def test_deactivate_unmounts_all():
 
 
 def test_hidden_child_itemlist_skips_request_render(monkeypatch):
-    from pigit.termui.widgets.item_list import ItemList
+    from pigit.termui.widgets.option_list import OptionList
 
     calls = {"n": 0}
 
     def spy():
         calls["n"] += 1
 
-    monkeypatch.setattr("pigit.termui.widgets.item_list.request_render", spy)
-    product = ItemList(content=["a"], id="product")
+    monkeypatch.setattr("pigit.termui.widgets.option_list.request_render", spy)
+    product = OptionList(content=["a"], id="product")
     detail = _Box("detail", "D")
     view = ExclusiveView([product, detail], visible=product)
     view.mount()

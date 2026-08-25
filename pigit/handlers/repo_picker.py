@@ -13,7 +13,7 @@ from pigit.termui import ExitEventLoop, palette
 from pigit.app_theme import THEME
 from pigit.picker_app import BasePickerApp, PickerRow
 from pigit.termui.segment import Segment
-from pigit.termui.widgets import CheckList, ItemList
+from pigit.termui.widgets import CheckList, OptionList
 from pigit.termui.tty_io import UNSUPPORTED_PLATFORM_MSG, platform_supported, tty_ok
 
 from pigit.git._repo_status import query_repos_status
@@ -95,7 +95,7 @@ def _build_repo_row_body(
 # ---------------------------------------------------------------------------
 
 
-class _RepoCdItemList(ItemList):
+class _RepoCdOptionList(OptionList):
     def __init__(self, app, **kwargs) -> None:
         super().__init__(**kwargs)
         self._app = app
@@ -154,8 +154,8 @@ def run_repo_cd_picker(
         def get_title(self) -> str:
             return title
 
-        def build_list(self) -> ItemList:
-            lst = _RepoCdItemList(
+        def build_list(self) -> OptionList:
+            lst = _RepoCdOptionList(
                 self,
                 on_selection_changed=lambda _: self._update_status(),
             )

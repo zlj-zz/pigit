@@ -23,7 +23,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, ItemList
+from pigit.termui.widgets import AlertDialog, InputLine, OptionList
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(ItemList):
+class BranchPanel(OptionList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"

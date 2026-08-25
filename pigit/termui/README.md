@@ -15,7 +15,7 @@ root.
 
 ```python
 from pigit.termui import Application, Component, show_toast, set_theme, palette
-from pigit.termui.widgets import ItemList, Footer, Sheet, CommandPalette
+from pigit.termui.widgets import OptionList, Footer, Sheet, CommandPalette
 from pigit.termui.containers import Column, Row, TabView, SplitPane
 from pigit.termui.reactive import Signal
 from pigit.termui.primitives import plain, tokenize_with_positions, format_line_number
@@ -106,7 +106,7 @@ from pigit.termui.widgets import (
     HeatmapGrid,
     HelpPanel,
     InputLine,
-    ItemList,
+    OptionList,
     LineTextBrowser,
     LintBar,
     Popup,

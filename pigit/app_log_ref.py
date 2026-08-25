@@ -10,12 +10,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pigit.termui import bind_action, keys, palette, Segment
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 
 from .app_theme import THEME
 
 
-class LogRefSheet(ItemList):
+class LogRefSheet(OptionList):
     """Pick a git ref to show in the Commit log (no checkout)."""
 
     CURSOR = "●"

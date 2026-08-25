@@ -30,7 +30,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
@@ -99,7 +99,7 @@ class _SubRow(Enum):
 
 
 class _CommitReportBand(Component):
-    """ItemList footer band for the contribution-graph report strip.
+    """OptionList footer band for the contribution-graph report strip.
 
     Height is all-or-nothing: ``REPORT_H`` when enabled and the panel is tall
     enough, otherwise 0 so the list keeps the full viewport.
@@ -120,7 +120,7 @@ class _CommitReportBand(Component):
         self.enabled = enabled
 
     def chrome_band_height(self, width: int, panel_height: int) -> int:
-        """Return fitted report height for ``ItemList`` band layout."""
+        """Return fitted report height for ``OptionList`` band layout."""
         del width
         if not self.enabled or panel_height <= self._min_panel_h:
             return 0
@@ -134,7 +134,7 @@ class _CommitReportBand(Component):
         return self._graph.handle_mouse(event)
 
 
-class CommitPanel(ItemList):
+class CommitPanel(OptionList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
     CURSOR = "●"

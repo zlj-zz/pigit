@@ -21,7 +21,7 @@ from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.input import KeyboardInput
-from pigit.termui.widgets.item_list import ItemList
+from pigit.termui.widgets.option_list import OptionList
 from pigit.termui.widgets.line_text_browser import LineTextBrowser
 from pigit.termui.widgets.popup import Popup
 
@@ -228,13 +228,13 @@ class TestHitTest:
 
 
 # ---------------------------------------------------------------------------
-# ItemList mouse handling
+# OptionList mouse handling
 # ---------------------------------------------------------------------------
 
 
-class TestItemListMouse:
+class TestOptionListMouse:
     def _list(self):
-        lst = ItemList()
+        lst = OptionList()
         lst.set_content(["a", "b", "c", "d"])
         lst.resize((10, 4))
         return lst

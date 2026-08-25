@@ -17,7 +17,7 @@ from pigit.termui._runtime_context import (
 )
 from pigit.termui.widgets.check_list import CheckList
 from pigit.termui.widgets.input_line import InputLine
-from pigit.termui.widgets.item_list import ItemList
+from pigit.termui.widgets.option_list import OptionList
 
 
 @pytest.fixture(autouse=True)
@@ -29,12 +29,12 @@ def _clear_runtime_context():
     _runtime_ctx.reset(token)
 
 
-class TestItemListSignalRender:
+class TestOptionListSignalRender:
     def test_curr_no_change_requests_render(self):
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
+            sel = OptionList(content=["a", "b", "c"])
             sel.mount()
             sel.curr_no = 1
             assert len(render_calls) == 1
@@ -45,7 +45,7 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"], size=(10, 1))
+            sel = OptionList(content=["a", "b", "c"], size=(10, 1))
             sel.mount()
             sel._r_start = 1
             assert len(render_calls) == 1
@@ -56,7 +56,7 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
+            sel = OptionList(content=["a", "b", "c"])
             sel.mount()
             sel.next()
             assert len(render_calls) == 1
@@ -69,7 +69,7 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
+            sel = OptionList(content=["a", "b", "c"])
             # Not activated
             sel.curr_no = 1
             assert len(render_calls) == 0
@@ -80,7 +80,7 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
+            sel = OptionList(content=["a", "b", "c"])
             sel.mount()
             sel.destroy()
             sel.curr_no = 2

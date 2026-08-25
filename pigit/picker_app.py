@@ -23,7 +23,7 @@ from pigit.termui.component import Component
 from pigit.termui.containers import Column
 from pigit.termui.reactive import Signal
 from pigit.termui.tty_io import terminal_size, truncate_line
-from pigit.termui.widgets import HelpPanel, InputLine, ItemList, StatusBar
+from pigit.termui.widgets import HelpPanel, InputLine, OptionList, StatusBar
 
 if TYPE_CHECKING:
     from pigit.termui.surface import Surface
@@ -103,8 +103,8 @@ class BasePickerApp(Application):
         """Return the picker title (shown in PickerHeader)."""
         raise NotImplementedError
 
-    def build_list(self) -> ItemList:
-        """Build and return the list component (ItemList, CheckList, etc.)."""
+    def build_list(self) -> OptionList:
+        """Build and return the list component (OptionList, CheckList, etc.)."""
         raise NotImplementedError
 
     def on_confirm(self) -> None:

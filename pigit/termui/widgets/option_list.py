@@ -1,6 +1,6 @@
 """
-Module: pigit/termui/widgets/item_list.py
-Description: List selector widget with cursor and scroll viewport.
+Module: pigit/termui/widgets/option_list.py
+Description: Option list widget with cursor, selection, and scroll viewport.
 Author: Zev
 Date: 2026-05-16
 """
@@ -26,8 +26,8 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 _logger = logging.getLogger(__name__)
 
 
-class ItemList(Component):
-    """List selector with cursor and scroll viewport.
+class OptionList(Component):
+    """Navigable option list with cursor, selection, and scroll viewport.
 
     Optional init-only ``header`` / ``footer`` Component slots are fitted chrome
     bands. A slot may define ``chrome_band_height(width, panel_height) -> int``
@@ -117,7 +117,7 @@ class ItemList(Component):
         probe = getattr(slot, "chrome_band_height", None)
         if callable(probe):
             return max(0, int(probe(width, panel_height)))
-        return ItemList._DEFAULT_BAND_HEIGHT
+        return OptionList._DEFAULT_BAND_HEIGHT
 
     def _apply_chrome_bands(self, width: int, height: int) -> None:
         """Fit chrome into ``height`` (all-or-nothing per slot) and set band heights.

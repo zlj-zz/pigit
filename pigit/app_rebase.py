@@ -24,7 +24,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, Footer, ItemList
+from pigit.termui.widgets import AlertDialog, Footer, OptionList
 
 from .app_theme import THEME
 from .git.api import GitError
@@ -54,7 +54,7 @@ class _TodoItem:
     action: str = "pick"
 
 
-class RebasePanel(ItemList):
+class RebasePanel(OptionList):
     """Sheet overlay for editing the interactive-rebase todo list."""
 
     CURSOR = "●"
@@ -115,7 +115,7 @@ class RebasePanel(ItemList):
         self.set_content([self._display(item) for item in self._items])
 
     def _display(self, item: _TodoItem) -> str:
-        """Return the plain-text form of an item (used as ItemList content)."""
+        """Return the plain-text form of an item (used as OptionList content)."""
         return f"{item.action} {item.sha[:8]} {item.subject}"
 
     @bind_action("next", "j", "down", desc="Navigate todo list", tip="Navigate")

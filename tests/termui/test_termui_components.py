@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from pigit.termui.component import Component, ComponentError
 from pigit.termui.containers import TabView
 from pigit.termui.theme import Theme, get_theme, set_theme
-from pigit.termui.widgets import ItemList, LineTextBrowser
+from pigit.termui.widgets import OptionList, LineTextBrowser
 from pigit.termui.types import (
     EventType,
     EVT_GOTO,
@@ -354,22 +354,22 @@ class TestLineTextBrowser:
         assert surface._rows[0][0].fg == fg
 
 
-class TestItemListFilter:
+class TestOptionListFilter:
     def test_set_source_content(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["x", "y"])
         assert sel.content == ["x", "y"]
         assert sel._source_content == ["x", "y"]
 
     def test_set_filter_basic(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["apple", "banana", "apricot"])
         sel.set_filter("ap")
         assert sel.content == ["apple", "apricot"]
         assert sel._visible_to_source == [0, 2]
 
     def test_set_filter_empty_needle_clears(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["apple", "banana"])
         sel.set_filter("ap")
         assert sel.content == ["apple"]
@@ -377,105 +377,105 @@ class TestItemListFilter:
         assert sel.content == ["apple", "banana"]
 
     def test_set_filter_custom_fn(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["A", "B", "C"])
         sel.set_filter("a", fn=lambda row, n: row.lower() == n.lower())
         assert sel.content == ["A"]
 
     def test_set_filter_no_match(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["apple", "banana"])
         sel.set_filter("zzz")
         assert sel.content == []
         assert sel.curr_no == 0
 
     def test_set_filter_idempotent(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["apple", "banana"])
         sel.set_filter("ap")
         sel.set_filter("ap")
         assert sel.content == ["apple"]
 
     def test_source_index(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["apple", "banana", "apricot"])
         sel.set_filter("ap")
         sel.curr_no = 1
         assert sel.source_index == 2
 
     def test_source_index_empty_visible(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content([])
         assert sel.source_index == 0
 
     def test_visible_to_source(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_filter("b")
         assert sel.visible_to_source(0) == 1
 
     def test_visible_to_source_out_of_bounds(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         assert sel.visible_to_source(-1) == -1
         assert sel.visible_to_source(10) == 10
 
     def test_visible_to_source_no_mapping(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b"])
         assert sel.visible_to_source(0) == 0
 
 
-class TestItemListMultiRow:
+class TestOptionListMultiRow:
     def test_set_item_starts(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_item_starts([0, 2, 4])
         assert sel._item_starts == [0, 2, 4]
 
     def test_set_item_starts_clamps_cursor(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b"])
         sel.curr_no = 5
         sel.set_item_starts([0, 1])
         assert sel.curr_no == 1
 
     def test_set_item_starts_none_reverts(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b"])
         sel.set_item_starts([0, 1])
         sel.set_item_starts(None)
         assert sel._item_starts is None
 
     def test_cursor_row_single_mode(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.curr_no = 2
         assert sel.cursor_row() == 2
 
     def test_cursor_row_multi_mode(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_item_starts([0, 3, 5])
         sel.curr_no = 1
         assert sel.cursor_row() == 3
 
     def test_row_to_item_single_mode(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b"])
         assert sel.row_to_item(1) == (1, 0)
 
     def test_row_to_item_multi_mode(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_item_starts([0, 3, 5])
         assert sel.row_to_item(4) == (1, 1)
         assert sel.row_to_item(5) == (2, 0)
 
 
-class TestItemListSkipIndices:
+class TestOptionListSkipIndices:
     def test_next_skips_separator(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "---", "b"])
         sel.set_skip_indices({1})
         sel.curr_no = 0
@@ -483,7 +483,7 @@ class TestItemListSkipIndices:
         assert sel.curr_no == 2
 
     def test_previous_skips_separator(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "---", "b"])
         sel.set_skip_indices({1})
         sel.curr_no = 2
@@ -491,7 +491,7 @@ class TestItemListSkipIndices:
         assert sel.curr_no == 0
 
     def test_next_with_multi_row(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_item_starts([0, 1, 2])
         sel.set_skip_indices({1})
@@ -500,7 +500,7 @@ class TestItemListSkipIndices:
         assert sel.curr_no == 2
 
     def test_previous_with_multi_row(self):
-        sel = MockItemList()
+        sel = MockOptionList()
         sel.set_source_content(["a", "b", "c"])
         sel.set_item_starts([0, 1, 2])
         sel.set_skip_indices({1})
@@ -509,11 +509,11 @@ class TestItemListSkipIndices:
         assert sel.curr_no == 0
 
 
-class TestItemListDrawHelpers:
+class TestOptionListDrawHelpers:
     def test_draw_right_aligned_draws_when_fits(self):
         from pigit.termui.surface import Surface
 
-        sel = MockItemList(size=(20, 1))
+        sel = MockOptionList(size=(20, 1))
         surface = Surface(20, 1)
         result = sel._draw_right_aligned(surface, 0, "ok", fg=(255, 255, 255))
         assert result is True
@@ -524,7 +524,7 @@ class TestItemListDrawHelpers:
     def test_draw_right_aligned_skips_when_too_wide(self):
         from pigit.termui.surface import Surface
 
-        sel = MockItemList(size=(5, 1))
+        sel = MockOptionList(size=(5, 1))
         surface = Surface(5, 1)
         result = sel._draw_right_aligned(
             surface, 0, "very_long_text", fg=(255, 255, 255)
@@ -535,7 +535,7 @@ class TestItemListDrawHelpers:
         from pigit.termui.surface import Surface
         from pigit.termui.segment import Segment
 
-        sel = MockItemList(size=(10, 1))
+        sel = MockOptionList(size=(10, 1))
         surface = Surface(10, 1)
         left = [Segment("L", bg=(1, 2, 3))]
         main = [Segment("main")]
@@ -545,20 +545,20 @@ class TestItemListDrawHelpers:
         assert any(c.bg == (1, 2, 3) for c in surface._rows[0])
 
 
-class MockItemList(ItemList):
+class MockOptionList(OptionList):
     def refresh(self):
         pass
 
 
-class TestItemList:
-    def test_ItemList_init_error(self):
-        class BadSelector(ItemList):
+class TestOptionList:
+    def test_OptionList_init_error(self):
+        class BadSelector(OptionList):
             CURSOR = "**"
 
         with pytest.raises(ComponentError):
             BadSelector()
 
-    # Test initialization of ItemList
+    # Test initialization of OptionList
     @pytest.mark.parametrize(
         "x, y, size, content",
         [
@@ -566,12 +566,12 @@ class TestItemList:
             (0, 0, (5, 5), []),
         ],
     )
-    def test_ItemList_init(self, x, y, size, content):
+    def test_OptionList_init(self, x, y, size, content):
         # Arrange
-        MockItemList.CURSOR = "*"
+        MockOptionList.CURSOR = "*"
 
         # Act
-        selector = MockItemList(x=x, y=y, size=size, content=content)
+        selector = MockOptionList(x=x, y=y, size=size, content=content)
 
         # Assert
         assert selector.x == x
@@ -591,8 +591,8 @@ class TestItemList:
         ],
         ids=["resize_larger", "resize_smaller"],
     )
-    def test_ItemList_resize(self, initial_size, new_size):
-        selector = MockItemList(size=initial_size)
+    def test_OptionList_resize(self, initial_size, new_size):
+        selector = MockOptionList(size=initial_size)
 
         selector.resize(new_size)
         assert selector._size == new_size
@@ -607,8 +607,8 @@ class TestItemList:
         ],
         ids=["next_single_step", "next_multiple_steps", "next_beyond_end"],
     )
-    def test_ItemList_next(self, content, initial_pos, step, expected_pos):
-        selector = MockItemList(content=content)
+    def test_OptionList_next(self, content, initial_pos, step, expected_pos):
+        selector = MockOptionList(content=content)
         selector.curr_no = initial_pos
 
         selector.next(step=step)
@@ -624,18 +624,18 @@ class TestItemList:
         ],
         ids=["forward_single_step", "forward_multiple_steps", "forward_beyond_start"],
     )
-    def test_ItemList_previous(self, content, initial_pos, step, expected_pos):
-        selector = MockItemList(content=content)
+    def test_OptionList_previous(self, content, initial_pos, step, expected_pos):
+        selector = MockOptionList(content=content)
         selector.curr_no = initial_pos
 
         selector.previous(step=step)
         assert selector.curr_no == expected_pos
 
 
-class TestItemListLazyLoad:
+class TestOptionListLazyLoad:
     def test_inactive_resize_skips_fresh_shows_placeholder(self):
 
-        class DemoPanel(ItemList):
+        class DemoPanel(OptionList):
             CURSOR = ">"
             fresh_calls = 0
 
@@ -656,7 +656,7 @@ class TestItemListLazyLoad:
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 
-        class DemoPanel2(ItemList):
+        class DemoPanel2(OptionList):
             CURSOR = ">"
             fresh_calls = 0
 
