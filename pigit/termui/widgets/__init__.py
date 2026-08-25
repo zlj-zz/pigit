@@ -17,10 +17,13 @@ from .header import Header
 from .help_panel import HelpEntry, HelpPanel
 from .input_line import InputLine
 from .item_list import ItemList
+from .label import Label
 from .line_text_browser import LineTextBrowser
 from .lint_bar import LintBar
 from .popup import AlertDialog, AlertDialogBody, Popup
 from .sheet import Sheet
+from .shortcut_hints import ShortcutHints, measure_shortcut_hints, paint_shortcut_hints
+from .static_list import StaticList
 from .status_bar import StatusBar
 from .toast import Toast
 
@@ -39,10 +42,15 @@ __all__ = [
     "HelpPanel",
     "InputLine",
     "ItemList",
+    "Label",
     "LineTextBrowser",
     "LintBar",
     "Popup",
     "Sheet",
+    "ShortcutHints",
+    "measure_shortcut_hints",
+    "paint_shortcut_hints",
+    "StaticList",
     "StatusBar",
     "StepLineChart",
     "Toast",
