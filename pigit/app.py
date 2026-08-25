@@ -149,16 +149,16 @@ class PigitApplication(Application):
         self._log_graph_wanted = config.log_graph_default
         self._preview_unsub: Callable[[], None] | None = None
         # Typed accessors for key body components (assigned in build_root)
-        self._tab_view: TabView
-        self._split_pane: SplitPane
-        self._body_view: ExclusiveView
-        self._palette: CommandPalette
-        self._status_stack: Column
-        self._status_panel: StatusPanel
-        self._stash_panel: StashPanel
-        self._branch_panel: BranchPanel
-        self._commit_panel: CommitPanel
-        self._diff_panel: DiffViewer
+        self._tab_view: TabView | None = None
+        self._split_pane: SplitPane | None = None
+        self._body_view: ExclusiveView | None = None
+        self._palette: CommandPalette | None = None
+        self._status_stack: Column | None = None
+        self._status_panel: StatusPanel | None = None
+        self._stash_panel: StashPanel | None = None
+        self._branch_panel: BranchPanel | None = None
+        self._commit_panel: CommitPanel | None = None
+        self._diff_panel: DiffViewer | None = None
 
     LARGE_SCREEN_COLS = 120
 
@@ -543,11 +543,12 @@ class PigitApplication(Application):
 
     def _is_detail_open(self) -> bool:
         """True when Diff occupies the body ExclusiveView slot."""
-        return self._body_view.visible is self._diff_panel
+        body = self._body_view
+        return body is not None and body.visible is self._diff_panel
 
     def _reveal_product(self) -> None:
         """Close Diff detail if open and resync SplitPane layout for the terminal."""
-        if not self._is_detail_open():
+        if not self._is_detail_open() or self._body_view is None:
             return
         self._body_view.show(self._split_pane)
         cols, _ = terminal_size()
@@ -561,14 +562,15 @@ class PigitApplication(Application):
         """Presentation leaf: Diff when detail open, else product tab leaf."""
         if self._is_detail_open():
             return self._diff_panel
-        if getattr(self, "_tab_view", None) is None:
+        if self._tab_view is None:
             return None
         return resolve_presentation_leaf(self._tab_view.visible)
 
     def navigate_product(self, target: str) -> None:
         """Close Diff detail if open, then route the product TabView."""
         self._reveal_product()
-        self._tab_view.route_to(target)
+        if self._tab_view is not None:
+            self._tab_view.route_to(target)
 
     def _handle_body_goto(self, **data) -> bool:
         """Own all EVT_GOTO: open Diff detail, or product panel navigation."""

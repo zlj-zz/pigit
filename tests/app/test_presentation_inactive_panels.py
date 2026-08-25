@@ -219,6 +219,7 @@ def test_stash_message_and_ref_inactive_under_steal() -> None:
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
+    panel.on_focus()
 
     _left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
@@ -246,6 +247,7 @@ def test_status_stash_focus_switch_softens_non_leaf() -> None:
     ]
     stash = StashPanel(vm=stash_vm)
     stash.mount()
+    stash.on_focus()
 
     root = ComponentRoot(status)
     root.resize((80, 24))
