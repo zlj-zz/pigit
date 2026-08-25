@@ -23,7 +23,7 @@ def test_contribution_graph_excludes_future_cells():
     graph.set_commits([])
     first_monday = graph._first_monday
     today = datetime.date.today()
-    graph._render_surface(Surface(100, 24))
+    graph.paint(Surface(100, 24))
     for week, day in graph._heatmap._values:
         date = first_monday + datetime.timedelta(weeks=week, days=day)
         assert date <= today

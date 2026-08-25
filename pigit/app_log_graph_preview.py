@@ -170,8 +170,8 @@ class LogGraphPreview(Component):
         """Wheel-scroll the inner browser; clicks are ignored."""
         return self._frame_browser.handle_mouse(event)
 
-    def _render_surface(self, surface: Surface) -> None:
-        self._frame_browser._render_surface(surface)
+    def paint(self, surface: Surface) -> None:
+        self._frame_browser.paint(surface)
 
     @staticmethod
     def _clip_segments(segs: list[Segment], max_width: int) -> list[Segment]:

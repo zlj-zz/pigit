@@ -54,7 +54,7 @@ class LineTextBrowser(Component):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         rows = self._visible_rows()
         if rows is None:
             return

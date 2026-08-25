@@ -39,7 +39,7 @@ def test_shortcut_hints_render_keys() -> None:
     hints = _ShortcutHints()
     hints.resize((_ShortcutHints.WIDTH, 1))
     surface = Surface(_ShortcutHints.WIDTH, 1)
-    hints._render_surface(surface)
+    hints.paint(surface)
     # After leading space, first glyph of "Tab"
     cell = surface.rows()[0][1]
     assert cell.char == "T"

@@ -943,7 +943,7 @@ class DiffViewer(LineTextBrowser):
                 clip_left=text_start,
             )
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         can_draw_box = w > self.LINE_NO_WIDTH + 3 and h >= self.BORDER_ROWS + 1
@@ -958,7 +958,7 @@ class DiffViewer(LineTextBrowser):
             self._render_file_history(surface)
             return
         if not can_draw_box:
-            self._render_surface_borderless(surface)
+            self.paint_borderless(surface)
             return
 
         surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, title=self._box_title or None)
@@ -1028,7 +1028,7 @@ class DiffViewer(LineTextBrowser):
                     style_flags=palette.STYLE_BOLD,
                 )
 
-    def _render_surface_borderless(self, surface: Surface) -> None:
+    def paint_borderless(self, surface: Surface) -> None:
         """Original rendering without box border, used when surface is too small."""
         w = surface.width
         h = surface.height

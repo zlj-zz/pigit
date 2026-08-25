@@ -17,7 +17,7 @@ from pigit.termui.types import OverlayDispatchResult
 class _DummyBody(Component):
     """Minimal component for use as ComponentRoot body in tests."""
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
 
@@ -78,8 +78,8 @@ class TestLayerStack:
         stack.push(LayerKind.TOAST, closed_surf)
         s = Surface(5, 2)
         stack.render(s)
-        open_surf._render_surface.assert_called_once()
-        closed_surf._render_surface.assert_not_called()
+        open_surf.paint.assert_called_once()
+        closed_surf.paint.assert_not_called()
 
     def test_modal_intercepts_dispatch(self):
         stack = LayerStack()

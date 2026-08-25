@@ -96,7 +96,7 @@ class Header(Component):
             unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w <= 0:

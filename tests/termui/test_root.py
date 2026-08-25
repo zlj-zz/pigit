@@ -29,7 +29,7 @@ def _runtime_context():
 class DummyBody(Component):
     NAME = "dummy"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):
@@ -70,7 +70,7 @@ class TestComponentRoot:
             def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
                 return OverlayDispatchResult.HANDLED_EXPLICIT
 
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
         popup = _ModalPopup()
@@ -153,7 +153,7 @@ class TestComponentRoot:
         class _Inner(Component):
             NAME = "inner"
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
             def refresh(self):
@@ -175,7 +175,7 @@ class TestComponentRoot:
         assert body.is_focus_leaf is True
 
         class _Inner(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         inner = _Inner()
@@ -190,7 +190,7 @@ class TestComponentRoot:
         root.resize((80, 24))
 
         class _Inner(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         root.show_sheet(_Inner(), height=4)
@@ -216,7 +216,7 @@ class TestComponentRoot:
         class _Inner(Component):
             NAME = "inner"
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
             def refresh(self):
@@ -248,7 +248,7 @@ class TestComponentRoot:
         class _Inner(Component):
             NAME = "inner"
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
             def refresh(self):
@@ -278,7 +278,7 @@ class TestComponentRoot:
             from pigit.termui.surface import Surface
 
             surface = Surface(10, 5)
-            root._render_surface(surface)
+            root.paint(surface)
             assert root._layer_stack.top(LayerKind.TOAST) is None
             assert toast.open is False
         finally:
@@ -336,7 +336,7 @@ class _DroppingOverlay(Component):
         super().__init__()
         self.open = True
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
@@ -351,7 +351,7 @@ class _ConsumingOverlay(Component):
         self.open = True
         self.received: list[str] = []
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
@@ -368,7 +368,7 @@ class _RecordingBody(Component):
         super().__init__()
         self.received: list[str] = []
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
     def handle_key(self, key: str) -> bool:
@@ -394,7 +394,7 @@ class TestComponentRootKeyDispatch:
         """Root handle_key fires only for keys the focus leaf declined."""
 
         class _SelectiveBody(Component):
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
             def handle_key(self, key: str) -> bool:
@@ -460,7 +460,7 @@ class TestComponentRootKeyDispatch:
         hits: list[str] = []
 
         class _BubblingBody(Component):
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
             def handle_key(self, key: str) -> bool:

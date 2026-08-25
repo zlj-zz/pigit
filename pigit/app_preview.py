@@ -241,5 +241,5 @@ class PreviewPanel(Component):
         """Wheel-scroll the inner diff; clicks are ignored (preview is not focused)."""
         return self._diff_viewer.handle_mouse(event)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         render_child(self._diff_viewer, surface, "PreviewPanel")

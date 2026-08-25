@@ -78,7 +78,7 @@ def render_child(component: Component, surface: Surface, log_prefix: str = "") -
             component.y,
         )
     sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
-    component._render_surface(sub)
+    component.paint(sub)
 
 
 class Component(ABC):
@@ -86,7 +86,7 @@ class Component(ABC):
 
     Skeleton class containing tree structure, geometry, rendering,
     key handling, event bubbling, and lifecycle hooks.
-    Subclasses must implement :meth:`_render_surface`.
+    Subclasses must implement :meth:`paint`.
     """
 
     BINDINGS: BindingsList | None = None
@@ -317,11 +317,8 @@ class Component(ABC):
 
         notify_children(self, action, **data)
 
-    def _render_surface(self, surface: Surface) -> None:
-        """Render this component into the given Surface.
-
-        New components should implement this instead of `_render`.
-        """
+    def paint(self, surface: Surface) -> None:
+        """Draw this component into ``surface`` (override in subclasses)."""
 
     def has_overlay_open(self) -> bool:
         """Return True if an overlay is open. Base components never have overlays."""

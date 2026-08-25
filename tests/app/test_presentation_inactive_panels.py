@@ -48,7 +48,7 @@ def _runtime_and_theme():
 
 
 class _SheetChild(Component):
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 

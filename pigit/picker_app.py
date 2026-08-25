@@ -54,7 +54,7 @@ class PickerHeader(Component):
         super().__init__()
         self._title = title_line
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         cols = surface.width
         surface.draw_text_rgb(
             0,

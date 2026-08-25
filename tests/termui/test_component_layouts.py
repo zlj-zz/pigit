@@ -102,7 +102,7 @@ class TestColumn:
         col = Column([c1, c2], heights=[0, 1])
         col.resize((10, 1))
         s = Surface(10, 1)
-        col._render_surface(s)
+        col.paint(s)
 
     def test_render_skips_negative_position(self):
         from pigit.termui.surface import Surface
@@ -112,7 +112,7 @@ class TestColumn:
         col.resize((10, 1))
         c1.x = 0
         s = Surface(10, 1)
-        col._render_surface(s)
+        col.paint(s)
 
     def test_accept_skips_non_callable(self):
         class NoAccept(Component):
@@ -212,7 +212,7 @@ class TestRow:
         row = Row([c1, c2], widths=[0, 1])
         row.resize((1, 10))
         s = Surface(1, 10)
-        row._render_surface(s)
+        row.paint(s)
 
     def test_render_skips_negative_position(self):
         from pigit.termui.surface import Surface
@@ -222,7 +222,7 @@ class TestRow:
         row.resize((1, 10))
         c1.x = 0
         s = Surface(1, 10)
-        row._render_surface(s)
+        row.paint(s)
 
     def test_accept_skips_non_callable(self):
         class NoAccept(Component):

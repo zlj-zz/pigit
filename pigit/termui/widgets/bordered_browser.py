@@ -83,7 +83,7 @@ class BorderedBrowser(Component):
         self._browser.y = 2
         self._browser.resize((inner_w, inner_h))
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w < 2 or h < 2:

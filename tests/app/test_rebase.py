@@ -138,7 +138,7 @@ class TestRebasePanel:
         panel.activate()
         panel.resize((120, 5))
         surface = Surface(120, 5)
-        panel._render_surface(surface)
+        panel.paint(surface)
         last_row = "".join(c.char for c in surface._rows[4])
         assert "pick" in last_row and "squash" in last_row
 

@@ -34,7 +34,7 @@ class _Leaf(Component):
         self._size = size
         self.sizes.append(size)
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -131,4 +131,4 @@ def test_renders_both_children(master: _Leaf, detail: _Leaf) -> None:
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
     surface = Surface(140, 10)
-    pane._render_surface(surface)
+    pane.paint(surface)

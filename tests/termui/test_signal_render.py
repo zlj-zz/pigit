@@ -43,7 +43,7 @@ class _SignalLeaf(Component):
     def _on_cursor_change(self, _: int) -> None:
         request_render()
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
     def destroy(self) -> None:
@@ -124,7 +124,7 @@ class TestInactivePanelNoRender:
                 if self.is_activated():
                     request_render()
 
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
             def destroy(self) -> None:

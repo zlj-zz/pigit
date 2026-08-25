@@ -38,7 +38,7 @@ def test_section_header_right_label_with_tail():
     panel = _panel_with_stashes(["WIP on main"])
     panel.resize((40, 6))
     surface = Surface(40, 6)
-    panel._render_surface(surface)
+    panel.paint(surface)
 
     row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
     assert row.endswith("Stash ──")

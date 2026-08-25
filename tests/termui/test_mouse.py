@@ -38,7 +38,7 @@ def _runtime_context():
 class _Leaf(Component):
     """A concrete leaf component for hit-testing."""
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):
@@ -333,7 +333,7 @@ class TestSessionMouse:
 
 
 class _DummyBody(Component):
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):

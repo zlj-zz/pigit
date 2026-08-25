@@ -163,7 +163,7 @@ def test_render_draws_title_and_graph_lines(preview: LogGraphPreview) -> None:
     preview.resize((24, 8))
     preview.set_lines(["* abc feat", "* def main"], title="feat")
     surface = Surface(24, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     rows = ["".join(c.char for c in row) for row in surface._rows]
     assert any("feat" in row for row in rows)
     assert any("* abc feat" in row for row in rows)
@@ -174,7 +174,7 @@ def test_render_applies_ansi_foreground(preview: LogGraphPreview) -> None:
     preview.set_lines(["\x1b[32mHEAD\x1b[m"], title="feat")
     assert preview._browser._content == ["HEAD"]
     surface = Surface(24, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     green = _ANSI_16_PALETTE[2]
     painted = [
         cell
@@ -247,7 +247,7 @@ def test_render_truncates_graph_line_before_border(preview: LogGraphPreview) -> 
     long_line = "* abc " + "x" * 60
     preview.set_lines([long_line], title="feat")
     surface = Surface(20, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     rows = ["".join(c.char for c in row) for row in surface._rows]
     # First content row (index 1) holds the line clipped to the inner width (18).
     assert "x" * 12 in rows[1]

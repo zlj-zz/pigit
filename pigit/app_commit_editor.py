@@ -52,7 +52,7 @@ class _StagedHeader(Component):
         super().__init__()
         self._count = count
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         text = f"Staged ({self._count})"
         surface.draw_text_rgb(0, 0, text, fg=THEME.fg_dim, bg=THEME.bg_chrome)
 
@@ -69,7 +69,7 @@ class _StagedList(Component):
         super().__init__(id=id)
         self.files = files
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self.files:
             surface.draw_text_rgb(
                 0,
@@ -103,7 +103,7 @@ class _ShortcutHints(Component):
 
     WIDTH = _shortcut_hints_width()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         theme = get_theme()
         surface.fill_rect_rgb(0, 0, surface.width, surface.height, THEME.bg_base)
         col = 1 if surface.width > 0 else 0
@@ -196,8 +196,8 @@ class CommitEditor(Component):
         """Return the currently focused input."""
         return self._current_input()
 
-    def _render_surface(self, surface: Surface) -> None:
-        self._root._render_surface(surface)
+    def paint(self, surface: Surface) -> None:
+        self._root.paint(surface)
 
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size

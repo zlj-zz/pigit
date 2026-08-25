@@ -355,7 +355,7 @@ def test_preview_title_is_on_diff_box(preview: PreviewPanel) -> None:
     preview.resize((40, 8))
     preview.set_preview(["+ added line"], title="src/main.py", subtitle="Staged")
     surface = Surface(40, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     top = surface.lines()[0]
     assert top.startswith("┌")
     assert "src/main.py" in top

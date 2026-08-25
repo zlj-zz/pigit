@@ -116,7 +116,7 @@ class StashPanel(ItemList):
         col += wcswidth(label)
         surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=rule_fg)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         """Section header on row 0; stash rows in the remaining viewport."""
         w = surface.width
         h = surface.height
@@ -126,7 +126,7 @@ class StashPanel(ItemList):
         if h <= self.HEADER_ROWS:
             return
         sub = surface.subsurface(self.HEADER_ROWS, 0, w, h - self.HEADER_ROWS)
-        ItemList._render_surface(self, sub)
+        ItemList.paint(self, sub)
 
     def handle_mouse(self, event: MouseEvent) -> bool:
         """Ignore clicks on the header row; map remaining rows to list items."""

@@ -53,7 +53,7 @@ class _KeyLeaf(Component):
         self.received.append(key)
         return key != "tab"
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -96,7 +96,7 @@ class TestResolvePresentationLeaf:
             def presentation_child(self) -> Component | None:
                 return inner
 
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
         shell = _Shell()
@@ -166,7 +166,7 @@ class _DualHookEditor(Component):
             return OverlayDispatchResult.HANDLED_EXPLICIT
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 

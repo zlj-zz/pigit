@@ -54,7 +54,7 @@ class StatusBar(Component):
             self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         theme = get_theme()
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)

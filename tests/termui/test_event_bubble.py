@@ -28,7 +28,7 @@ class _EventLeaf(Component):
     def update(self, action, **data) -> None:
         pass
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 

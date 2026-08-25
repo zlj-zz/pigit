@@ -61,7 +61,7 @@ def _clear_runtime_context():
 class _Leaf(Component):
     NAME = "leaf"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
 
@@ -272,7 +272,7 @@ class TestById:
         class _C(Component):
             NAME = "c"
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         c = _C()
@@ -295,7 +295,7 @@ class TestById:
         class _A(Component):
             NAME = "a"
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         a = _A()

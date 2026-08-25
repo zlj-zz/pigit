@@ -498,17 +498,17 @@ class CommitPanel(ItemList):
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
         return f"{sha} {msg}{tag_str}  {author}  {rel}"
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self.content:
             return
         if self._report_h:
             list_surface = surface.subsurface(0, 0, surface.width, self._list_h())
-            super()._render_surface(list_surface)
+            super().paint(list_surface)
             self._render_report(
                 surface.subsurface(self._list_h(), 0, surface.width, self._report_h)
             )
         else:
-            super()._render_surface(surface)
+            super().paint(surface)
 
     def _render_report(self, surface) -> None:
         """Render the contribution-graph report into the bottom strip."""

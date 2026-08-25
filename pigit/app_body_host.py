@@ -106,7 +106,7 @@ class BodyHost(Component):
             return
         fm.set_focus_chain(resolve_focus_leaf(self._visible()))
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         render_child(self._visible(), surface, "BodyHost")
 
     def _handle_event(self, key: str) -> bool:

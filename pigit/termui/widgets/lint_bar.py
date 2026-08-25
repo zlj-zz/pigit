@@ -52,7 +52,7 @@ class LintBar(Component):
         self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         subject = self._subject.value
         body = self._body.value
         segments: list[Segment] = []

@@ -176,7 +176,7 @@ class TabView(Component):
         for child in self.children:
             child.resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if self._active is not None:
             render_child(self._active, surface, "TabView")
 

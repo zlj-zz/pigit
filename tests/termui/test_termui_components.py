@@ -22,7 +22,7 @@ class _Leaf(Component):
     def refresh(self):
         pass
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
 
@@ -31,7 +31,7 @@ class MockComponent(Component):
         self._name = name
         super().__init__(id=id)
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def resize(self, size):
@@ -129,7 +129,7 @@ class TestTabView:
             def _handle_event(self, key: str) -> None:
                 received.append((self._label, key))
 
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
             def resize(self, size) -> None:
@@ -251,7 +251,7 @@ class TestLineTextBrowser:
 
             # Components render at local (0,0) coordinates into the surface.
             s = Surface(size[0], size[1])
-            browser._render_surface(s)
+            browser.paint(s)
             for idx, expected in enumerate(expected_content):
                 assert expected in s.lines()[idx]
 
@@ -321,7 +321,7 @@ class TestLineTextBrowser:
 
         browser = MockLineTextBrowser(size=(10, 2))
         s = Surface(10, 2)
-        browser._render_surface(s)
+        browser.paint(s)
 
     def test_scroll_down_no_content(self):
         browser = MockLineTextBrowser(size=(10, 2))
@@ -334,7 +334,7 @@ class TestLineTextBrowser:
         browser = MockLineTextBrowser(content=["hi"], size=(10, 2), bg=None)
         surface = Surface(10, 2)
         surface.draw_text_rgb(0, 0, "XXXX", bg=(9, 9, 9))
-        browser._render_surface(surface)
+        browser.paint(surface)
         assert surface._rows[0][0].char == "h"
         assert surface._rows[0][0].bg is None
         assert surface._rows[0][2].char == "X"
@@ -349,7 +349,7 @@ class TestLineTextBrowser:
             content=[[Segment("ab", fg=fg)]], size=(10, 2), bg=None
         )
         surface = Surface(10, 2)
-        browser._render_surface(surface)
+        browser.paint(surface)
         assert surface._rows[0][0].char == "a"
         assert surface._rows[0][0].fg == fg
 

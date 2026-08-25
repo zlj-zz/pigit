@@ -91,7 +91,7 @@ class LayerStack:
         for kind in _VISIBLE_LAYER_KINDS:
             for overlay in self._layers[kind]:
                 if getattr(overlay, "open", False):
-                    overlay._render_surface(surface)
+                    overlay.paint(surface)
 
     def resize(self, size: tuple[int, int]) -> None:
         """Propagate a terminal resize to all overlays that support it."""

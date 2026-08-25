@@ -62,7 +62,7 @@ class _MockPanel(Component):
         super().deactivate()
         self._loader.cancel()
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
 

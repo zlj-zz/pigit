@@ -324,7 +324,7 @@ class HelpPanel(Component):
         if self._on_toggle is not None:
             self._on_toggle()
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         theme = get_theme()
         self._frame.fg = theme.fg_primary
         self._frame.bg = theme.bg_chrome

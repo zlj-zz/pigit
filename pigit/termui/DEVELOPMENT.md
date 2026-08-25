@@ -67,7 +67,7 @@ TOAST and SHEET do not intercept keys; MODAL does.
 
 ```mermaid
 flowchart LR
-    C["Component._render_surface(surface)"]
+    C["Component.paint(surface)"]
     Seg["list[Segment]"]
     F["FlatCell"]
     R["Renderer"]
@@ -199,7 +199,7 @@ coverage; application modules must not.
 2. **Segment-first rendering** — new text uses `Segment` / `draw_segments`; do not add `(text, fg, bold)` call sites. (`DiffViewer` in app remains an explicit exception.)
 3. **Colors / styles via `palette` or `Theme`** — avoid hard-coded RGB in new framework widgets when a theme role exists.
 4. **Keys via `keys`** — no raw escapes for special keys.
-5. **Render interface** — implement `_render_surface(surface)`; do not add new `_render()` paths.
+5. **Render interface** — implement `paint(surface)`; do not add new `_render()` paths.
 6. **Overlay cleanup** — handlers that show spinners/sheets must clean up on all exception paths.
 7. **File headers** — new modules use the project header + Google-style docstrings; English inline comments.
 

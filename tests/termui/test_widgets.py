@@ -34,7 +34,7 @@ class TestItemList:
         sel = ItemList(size=(40, 10), empty_state=[Segment("hello")])
         sel.set_content([])
         surface = Surface(40, 10)
-        sel._render_surface(surface)
+        sel.paint(surface)
         # "hello" should be centered on the surface
         found = False
         for row in surface._rows:
@@ -48,7 +48,7 @@ class TestItemList:
         sel = ItemList(size=(40, 10), empty_state=[Segment("empty")])
         sel.set_content(["real"])
         surface = Surface(40, 10)
-        sel._render_surface(surface)
+        sel.paint(surface)
         # "real" should be rendered, "empty" should not
         all_text = ""
         for row in surface._rows:
@@ -60,7 +60,7 @@ class TestItemList:
         sel = ItemList(size=(40, 10))
         sel.set_content([])
         surface = Surface(40, 10)
-        sel._render_surface(surface)
+        sel.paint(surface)
         # All rows should be empty
         for row in surface._rows:
             assert all(c.char == " " for c in row)
@@ -122,7 +122,7 @@ class TestItemListSearch:
         sel.enter_search()
         sel.search_handle_key("q")
         surface = Surface(20, 5)
-        sel._render_surface(surface)
+        sel.paint(surface)
         bottom = "".join(c.char for c in surface._rows[4])
         assert "/q" in bottom
         theme = get_theme()
@@ -367,7 +367,7 @@ class TestInputLine:
         inp.set_value("a")
         inp.handle_key("tab")
         s = Surface(20, 1)
-        inp._render_surface(s)
+        inp.paint(s)
         assert s.lines()[0].startswith("> abc")
         theme = get_theme()
         row_cells = s.rows()[0]
@@ -388,7 +388,7 @@ class TestInputLine:
         inp = InputLine(prompt="> ", size=(10, 1))
         inp.set_value("hi")
         inp._focus_level = 0  # mark as focused so cursor is drawn
-        inp._render_surface(mock_surface)
+        inp.paint(mock_surface)
         # Text is drawn via draw_text_rgb, then block cursor is drawn via draw_text_rgb
         # at cursor position (prompt_len + cursor = 2 + 2 = 4) as reverse video.
         assert mock_surface.draw_text_rgb.call_count == 2
@@ -411,7 +411,7 @@ class TestInputLine:
         inp.set_value("o")
         inp.handle_key("tab")
         inp._focus_level = 0  # mark as focused so cursor is drawn
-        inp._render_surface(mock_surface)
+        inp.paint(mock_surface)
         # Candidate mode draws prefix + dim suffix, then block cursor at end.
         calls = mock_surface.draw_text_rgb.call_args_list
         # Last call should be the block cursor at position 3 ("o" + "pt").

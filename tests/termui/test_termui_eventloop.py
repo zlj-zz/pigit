@@ -56,7 +56,7 @@ class ComponentMock(Component):
     def resize(self, size):
         pass
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def _handle_event(self, event):
@@ -189,7 +189,7 @@ class _Leaf(Component):
     def has_overlay_open(self):
         return False
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):
@@ -308,19 +308,19 @@ def test_resize_calls_renderer_clear_cache():
         reset_renderer()
 
 
-def test_render_surface_path(mock_renderer):
+def testpaint_path(mock_renderer):
     from pigit.termui.surface import Surface
 
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop._size = (10, 5)
     # renderer from mock_renderer fixture
-    component._render_surface = Mock()
+    component.paint = Mock()
 
     event_loop.render()
 
-    component._render_surface.assert_called_once()
-    surface = component._render_surface.call_args[0][0]
+    component.paint.assert_called_once()
+    surface = component.paint.call_args[0][0]
     assert isinstance(surface, Surface)
     assert surface.width == 10
     assert surface.height == 5
@@ -436,7 +436,7 @@ def test_renderer_accessed_via_context():
     class _Leaf(Component):
         NAME = "leaf"
 
-        def _render_surface(self, surface):
+        def paint(self, surface):
             pass
 
         def refresh(self):

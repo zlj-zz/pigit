@@ -70,8 +70,8 @@ class InspectorSheet(Component):
         super().resize(size)
         self._browser.resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
-        self._browser._render_surface(surface)
+    def paint(self, surface: Surface) -> None:
+        self._browser.paint(surface)
 
     @bind_action("next", "j", "down", desc="Scroll down")
     def scroll_down(self) -> None:

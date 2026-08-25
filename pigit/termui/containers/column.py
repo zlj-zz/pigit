@@ -89,14 +89,14 @@ class Column(Component):
             )
             offset_v += h
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
                 continue
             if child.x < 1 or child.y < 1:
                 continue
-            child._render_surface(
+            child.paint(
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 

@@ -389,7 +389,7 @@ class InputLine(Component):
             min(len(self._value_sig.value), self._cursor_sig.value + 1)
         )
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self._visible:
             return
         value = self._value_sig.value

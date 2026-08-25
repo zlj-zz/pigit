@@ -250,7 +250,7 @@ class Toast(Component):
             self._event_loop.remove_interval(self._timer_id)
             self._timer_id = None
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self.open:
             return
 

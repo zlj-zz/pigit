@@ -214,16 +214,16 @@ class RebasePanel(ItemList):
         ]
         return left, main, []
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         """Render the list, reserving the last row for shortcut hints."""
         height = self._size[1]
         if height <= 1:
-            super()._render_surface(surface)
+            super().paint(surface)
             return
         width, _ = self._size
         self._size = (width, height - 1)
         try:
-            super()._render_surface(surface)
+            super().paint(surface)
         finally:
             self._size = (width, height)
         self._footer.x = height

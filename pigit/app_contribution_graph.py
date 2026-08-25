@@ -239,13 +239,13 @@ class ContributionGraph(Component):
             self._line_chart_series, x_labels=self._line_chart_labels
         )
         chart_surface = surface.subsurface(0, start_col, width, height)
-        self._line_chart._render_surface(chart_surface)
+        self._line_chart.paint(chart_surface)
 
     def render_into(self, surface) -> None:
         """Public entry to render this graph into the given surface."""
-        self._render_surface(surface)
+        self.paint(surface)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = min(surface.width, self._size[0] if self._size else surface.width)
         h = min(surface.height, self._size[1] if self._size else surface.height)
         if w <= 0 or h <= 0:
@@ -316,7 +316,7 @@ class ContributionGraph(Component):
                 window[(week, day)] = self._heatmap_values.get((week, day), 0)
         self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)
-        self._heatmap._render_surface(canvas)
+        self._heatmap.paint(canvas)
 
         # --- Legend (Less → More) near the bottom, stats below it ---
         # Anchored to the content height so a taller report spreads the spacer

@@ -54,7 +54,7 @@ def test_root_show_sheet_uses_resolved_preferred() -> None:
     from pigit.termui.root import ComponentRoot
 
     class _Body(Component):
-        def _render_surface(self, surface) -> None:
+        def paint(self, surface) -> None:
             pass
 
     root = ComponentRoot(body=_Body())

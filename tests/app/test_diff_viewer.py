@@ -357,7 +357,7 @@ class TestEmptyContentChrome:
         dv.set_content([])
         dv.resize((40, 12))
         surface = Surface(40, 12)
-        dv._render_surface(surface)
+        dv.paint(surface)
         rows = surface.rows()
         assert rows[0][0].char == "\u250c"  # ┌
         assert rows[0][-1].char == "\u2510"  # ┐
@@ -431,7 +431,7 @@ class TestContentInstallInvariants:
         dv._render_tokens = dv._render_tokens[:1]
         dv.resize((40, 12))
         surface = Surface(40, 12)
-        dv._render_surface(surface)
+        dv.paint(surface)
         text = "".join(cell.char for cell in surface.rows()[3])
         assert "gamma" in text
 

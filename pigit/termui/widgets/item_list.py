@@ -387,7 +387,7 @@ class ItemList(Component):
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             if self.empty_state is not None:

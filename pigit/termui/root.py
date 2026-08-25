@@ -191,10 +191,10 @@ class ComponentRoot(Component):
         self._layer_stack.resize(size)
         super().resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         self._expire_toasts()
         self._expire_badge()
-        self._body._render_surface(surface)
+        self._body.paint(surface)
         self._layer_stack.render(surface)
 
     def _top_open_overlay(self) -> Component | None:

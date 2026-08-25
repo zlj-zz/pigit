@@ -56,7 +56,7 @@ class Footer(Component):
         """
         self._help_provider = provider
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         """Separator row, key bold, desc muted, ellipsis. Same layout as AppFooter."""
         theme = get_theme()
         w = surface.width

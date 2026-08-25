@@ -46,7 +46,7 @@ from pigit.termui import Application, Component, ExitEventLoop, bind_action
 class DemoPanel(Component):
     NAME = "demo"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         surface.draw_text_rgb(
             0,
             0,

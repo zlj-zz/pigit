@@ -37,12 +37,12 @@ def _runtime_context():
 
 
 class _Body(Component):
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
 class _SheetChild(Component):
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -140,7 +140,7 @@ def test_modal_steals_presentation() -> None:
     class _Modal(Component):
         open = True
 
-        def _render_surface(self, surface) -> None:
+        def paint(self, surface) -> None:
             pass
 
     root._layer_stack.push(LayerKind.MODAL, _Modal())

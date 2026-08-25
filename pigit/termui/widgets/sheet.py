@@ -187,7 +187,7 @@ class Sheet(Component):
         self._child._handle_event(key)
         return OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if self._size[1] <= 0:
             return
         y = self._origin_row(surface.height, self._size[1])
@@ -201,7 +201,7 @@ class Sheet(Component):
             return
         child_y = 1 if rule_row == 0 else 0
         child_sub = sub.subsurface(child_y, 0, sub.width, child_h)
-        self._child._render_surface(child_sub)
+        self._child.paint(child_sub)
 
     def _sheet_bg(self) -> tuple[int, int, int] | None:
         """Return the sheet fill color.

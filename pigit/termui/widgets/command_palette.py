@@ -234,7 +234,7 @@ class CommandPalette(Component):
         self._selected = 0
         self._scroll = 0
 
-    def _render_surface(self, surface: Surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self._active:
             return
         theme = get_theme()
