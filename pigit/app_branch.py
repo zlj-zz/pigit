@@ -40,7 +40,7 @@ class BranchPanel(OptionList):
 
     CURSOR = "\u25cf"
     keymap_namespace = "branch"
-    tab_name = "Branch"
+    TAB_NAME = "Branch"
     tab_key = "3"
     _SCOPES = ["local", "remote", "all"]
     _SCOPE_LABELS = {"local": "Local", "remote": "Remote", "all": "All"}

@@ -13,10 +13,19 @@ from ..segment import Segment
 from ..surface import Surface
 from ..theme import get_theme
 
-_USE_THEME_BG = object()
+
+class _ThemeBg:
+    """Sentinel: paint plain lines with ``theme.bg_chrome``."""
+
+    __slots__ = ()
+
+
+_USE_THEME_BG = _ThemeBg()
 
 
 class LineTextBrowser(Component):
+    """Scrollable browser for plain strings or pre-styled segment rows."""
+
     WHEEL_SCROLL_LINES = 1
 
     def __init__(
@@ -26,11 +35,11 @@ class LineTextBrowser(Component):
         size: tuple[int, int] | None = None,
         content: list[str] | list[list[Segment]] | None = None,
         id: str | None = None,
-        bg: tuple[int, int, int] | None = _USE_THEME_BG,
+        bg: tuple[int, int, int] | None | _ThemeBg = _USE_THEME_BG,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._rows: list[list[Segment]] | None = None
-        self._content: list[str] | None
+        self._content: list[str] = []
         self._max_line = self._size[1]
         self._bg = bg
         self._i = 0
@@ -41,13 +50,35 @@ class LineTextBrowser(Component):
         self._cache_bg: tuple[int, int, int] | None = None
         self._cache_rows: list[list[Segment]] | None = None
         if content is None:
-            self._content = None
-        elif content and isinstance(content[0], list):
-            rows = content
-            self._rows = rows
-            self._content = ["".join(seg.text for seg in row) for row in rows]
-        else:
-            self._content = content
+            return
+        if content and isinstance(content[0], list):
+            rows: list[list[Segment]] = []
+            for row in content:
+                if not isinstance(row, list):
+                    raise TypeError("mixed plain/segment content is not supported")
+                rows.append(row)
+            self.set_segment_rows(rows)
+            return
+        lines: list[str] = []
+        for line in content:
+            if not isinstance(line, str):
+                raise TypeError("mixed plain/segment content is not supported")
+            lines.append(line)
+        self.set_plain_lines(lines)
+
+    def set_plain_lines(self, lines: list[str]) -> None:
+        """Replace content with plain strings; clear any segment-row override."""
+        self._rows = None
+        self._content = list(lines)
+        self._cache_rows = None
+        self._i = 0
+
+    def set_segment_rows(self, rows: list[list[Segment]]) -> None:
+        """Replace content with pre-styled segment rows."""
+        self._rows = rows
+        self._content = ["".join(seg.text for seg in row) for row in rows]
+        self._cache_rows = None
+        self._i = 0
 
     def resize(self, size: tuple[int, int]):
         """Resize the browser and update the maximum visible lines."""
@@ -65,11 +96,11 @@ class LineTextBrowser(Component):
     def _visible_rows(self) -> list[list[Segment]] | None:
         if self._rows is not None:
             return self._rows
-        if self._content is None:
+        if not self._content:
             return None
         theme = get_theme()
         fg = theme.fg_primary
-        row_bg = theme.bg_chrome if self._bg is _USE_THEME_BG else self._bg
+        row_bg = theme.bg_chrome if isinstance(self._bg, _ThemeBg) else self._bg
         if self._cache_rows is None or (self._cache_fg, self._cache_bg) != (fg, row_bg):
             self._cache_fg, self._cache_bg = fg, row_bg
             self._cache_rows = [

@@ -43,15 +43,19 @@ class BorderedBrowser(Component):
     def set_content(self, rows: list[str] | list[list[Segment]]) -> None:
         """Replace scrollable content and reset scroll to the top."""
         if rows and isinstance(rows[0], list):
-            styled: list[list[Segment]] = rows
-            self._browser._rows = styled
-            self._browser._content = [
-                "".join(seg.text for seg in row) for row in styled
-            ]
-        else:
-            self._browser._rows = None
-            self._browser._content = list(rows) if rows else []
-        self._browser._i = 0
+            styled: list[list[Segment]] = []
+            for row in rows:
+                if not isinstance(row, list):
+                    raise TypeError("mixed plain/segment content is not supported")
+                styled.append(row)
+            self._browser.set_segment_rows(styled)
+            return
+        plain: list[str] = []
+        for line in rows:
+            if not isinstance(line, str):
+                raise TypeError("mixed plain/segment content is not supported")
+            plain.append(line)
+        self._browser.set_plain_lines(plain)
 
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the inner browser up."""

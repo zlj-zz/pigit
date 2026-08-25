@@ -123,7 +123,8 @@ class Sheet(Component):
         if height is None:
             pref = getattr(child, "preferred_sheet_height", None)
             if callable(pref):
-                height = int(pref(term_h))
+                want = pref(term_h)
+                height = want if isinstance(want, int) else DEFAULT_SHEET_HEIGHT
             else:
                 height = DEFAULT_SHEET_HEIGHT
             soft_cap = max(MIN_SHEET_HEIGHT, int(term_h * max_fraction))
@@ -150,7 +151,7 @@ class Sheet(Component):
         self._target_height = height
         self._show_edge_rule = show_edge_rule
         self._title = title
-        self._title_align = title_align
+        self._title_align: TitleAlign = title_align
         self._edge = edge
         self._bg = bg
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)

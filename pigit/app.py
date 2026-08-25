@@ -73,6 +73,20 @@ class PigitApplication(Application):
 
     keymap_namespace = "universal"
     min_terminal_size = (65, 10)
+    LARGE_SCREEN_COLS = 120
+
+    # Body tree — assigned in build_root; required for a live TUI session.
+    _tab_view: TabView
+    _split_pane: SplitPane
+    _body_view: ExclusiveView
+    _palette: CommandPalette
+    _status_stack: Column
+    _status_panel: StatusPanel
+    _stash_panel: StashPanel
+    _branch_panel: BranchPanel
+    _commit_panel: CommitPanel
+    _diff_panel: DiffViewer
+    _panel_nav: PanelNavigator
 
     def __init__(
         self,
@@ -104,7 +118,6 @@ class PigitApplication(Application):
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         self._config = config
         self._observe_host: ObserveHost | None = None
-        self._panel_nav: PanelNavigator | None = None
         self._header_reload_token: object | None = None
         # ViewModels (assigned in build_root, same lifetime as panels)
         self._status_vm: StatusViewModel
@@ -148,19 +161,6 @@ class PigitApplication(Application):
         self._diff_preview_wanted = config.diff_preview_default
         self._log_graph_wanted = config.log_graph_default
         self._preview_unsub: Callable[[], None] | None = None
-        # Typed accessors for key body components (assigned in build_root)
-        self._tab_view: TabView | None = None
-        self._split_pane: SplitPane | None = None
-        self._body_view: ExclusiveView | None = None
-        self._palette: CommandPalette | None = None
-        self._status_stack: Column | None = None
-        self._status_panel: StatusPanel | None = None
-        self._stash_panel: StashPanel | None = None
-        self._branch_panel: BranchPanel | None = None
-        self._commit_panel: CommitPanel | None = None
-        self._diff_panel: DiffViewer | None = None
-
-    LARGE_SCREEN_COLS = 120
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
@@ -198,12 +198,15 @@ class PigitApplication(Application):
             id="stash",
             on_toggle_preview=self.toggle_side_preview,
         )
+        status_panel = self._status_panel
+        stash_panel = self._stash_panel
         self._status_stack = Column(
-            children=[self._status_panel, self._stash_panel],
+            children=[status_panel, stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
         )
+        status_stack = self._status_stack
 
         self._branch_panel = BranchPanel(
             vm=self._branch_vm,
@@ -211,29 +214,32 @@ class PigitApplication(Application):
             id="branch",
             on_toggle_preview=self.toggle_side_preview,
         )
+        branch_panel = self._branch_panel
 
         self._commit_panel = CommitPanel(
             vm=self._commit_vm,
             id="commit",
             report_default=self._config.commit_report_default,
         )
+        commit_panel = self._commit_panel
         self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
         self._tab_view = TabView(
             children=[
-                self._status_stack,
-                self._branch_panel,
-                self._commit_panel,
+                status_stack,
+                branch_panel,
+                commit_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
             id="tab_view",
         )
+        tab_view = self._tab_view
 
         cols, _ = terminal_size()
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
         self._split_pane = SplitPane(
-            master=self._tab_view,
+            master=tab_view,
             breakpoint_cols=self.LARGE_SCREEN_COLS,
             id="split_pane",
         )
@@ -265,12 +271,12 @@ class PigitApplication(Application):
             heights.append(2)
 
         self._panel_nav = PanelNavigator(
-            get_tab_view=lambda: self._tab_view,
-            get_status_stack=lambda: self._status_stack,
-            get_status_panel=lambda: self._status_panel,
-            get_stash_panel=lambda: self._stash_panel,
-            get_branch_panel=lambda: self._branch_panel,
-            get_commit_panel=lambda: self._commit_panel,
+            get_tab_view=lambda: tab_view,
+            get_status_stack=lambda: status_stack,
+            get_status_panel=lambda: status_panel,
+            get_stash_panel=lambda: stash_panel,
+            get_branch_panel=lambda: branch_panel,
+            get_commit_panel=lambda: commit_panel,
         )
         self._observe_host = ObserveHost(
             ObserveDeps(
@@ -278,7 +284,7 @@ class PigitApplication(Application):
                 get_repo_path=lambda: self._repo_path,
                 get_config=lambda: self._config,
                 get_status_vm=lambda: self._status_vm,
-                get_tab_view=lambda: self._tab_view,
+                get_tab_view=lambda: tab_view,
                 get_preview_panel=lambda: self._preview_panel,
                 get_log_graph_preview=lambda: self._log_graph_preview,
                 get_diff_preview_wanted=lambda: self._diff_preview_wanted,
@@ -324,7 +330,7 @@ class PigitApplication(Application):
             entries = active.get_help_entries()
             if entries:
                 title_fn = getattr(active, "get_help_title", None)
-                title = title_fn() if callable(title_fn) else type(active).__name__
+                title = str(title_fn()) if callable(title_fn) else type(active).__name__
                 groups.append((title, entries))
         universal = self.get_help_entries()
         if universal:
@@ -543,12 +549,12 @@ class PigitApplication(Application):
 
     def _is_detail_open(self) -> bool:
         """True when Diff occupies the body ExclusiveView slot."""
-        body = self._body_view
+        body = getattr(self, "_body_view", None)
         return body is not None and body.visible is self._diff_panel
 
     def _reveal_product(self) -> None:
         """Close Diff detail if open and resync SplitPane layout for the terminal."""
-        if not self._is_detail_open() or self._body_view is None:
+        if not self._is_detail_open():
             return
         self._body_view.show(self._split_pane)
         cols, _ = terminal_size()
@@ -562,15 +568,17 @@ class PigitApplication(Application):
         """Presentation leaf: Diff when detail open, else product tab leaf."""
         if self._is_detail_open():
             return self._diff_panel
-        if self._tab_view is None:
+        tab = getattr(self, "_tab_view", None)
+        if tab is None:
             return None
-        return resolve_presentation_leaf(self._tab_view.visible)
+        return resolve_presentation_leaf(tab.visible)
 
     def navigate_product(self, target: str) -> None:
         """Close Diff detail if open, then route the product TabView."""
         self._reveal_product()
-        if self._tab_view is not None:
-            self._tab_view.route_to(target)
+        tab = getattr(self, "_tab_view", None)
+        if tab is not None:
+            tab.route_to(target)
 
     def _handle_body_goto(self, **data) -> bool:
         """Own all EVT_GOTO: open Diff detail, or product panel navigation."""

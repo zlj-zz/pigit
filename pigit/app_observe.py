@@ -34,6 +34,7 @@ from pigit.observe.denylist import rel_path_is_denied
 from pigit.observe.digest import hash_porcelain
 from pigit.termui import Component, ComponentRoot, resolve_presentation_leaf
 from pigit.termui.containers import TabView
+from pigit.termui.event_loop import AppEventLoop
 from pigit.viewmodels.status import StatusViewModel
 
 # FS mtime poll cadence for StatMtimeBackend.
@@ -74,7 +75,7 @@ class ObserveDeps:
     get_log_graph_wanted: Callable[[], bool]
     get_is_large_screen: Callable[[], bool]
     get_root: Callable[[], ComponentRoot | None]
-    get_loop: Callable[[], object | None]
+    get_loop: Callable[[], AppEventLoop | None]
     schedule_reload_header: Callable[[], None]
     refresh_list_panel: Callable[[Component], None]
 
@@ -132,9 +133,13 @@ class ObserveHost:
             )
         loop = self._deps.get_loop()
         if loop is not None:
+
+            def _poll() -> None:
+                observer.poll_into_queue()
+
             self._observe_poll_id = loop.add_interval(
                 _OBSERVE_POLL_INTERVAL_S,
-                observer.poll_into_queue,
+                _poll,
             )
             self._observe_drain_id = loop.add_interval(
                 _OBSERVE_DRAIN_INTERVAL_S,
@@ -216,23 +221,25 @@ class ObserveHost:
             if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
                 self._deps.refresh_list_panel(active)
             if ChangeKind.PREVIEW_FILE in kinds:
+                preview = self._deps.get_preview_panel()
                 if (
                     self._deps.get_diff_preview_wanted()
-                    and self._deps.get_preview_panel() is not None
+                    and preview is not None
                     and self._deps.get_is_large_screen()
                 ):
-                    self._deps.get_preview_panel().reload()
+                    preview.reload()
             return
 
         if isinstance(active, BranchPanel):
             if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
                 self._deps.refresh_list_panel(active)
+                log_graph = self._deps.get_log_graph_preview()
                 if (
                     self._deps.get_log_graph_wanted()
-                    and self._deps.get_log_graph_preview() is not None
+                    and log_graph is not None
                     and self._deps.get_is_large_screen()
                 ):
-                    self._deps.get_log_graph_preview().reload()
+                    log_graph.reload()
             return
 
         if isinstance(active, CommitPanel):

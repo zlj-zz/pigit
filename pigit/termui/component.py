@@ -90,8 +90,13 @@ class Component(ABC):
     """
 
     BINDINGS: BindingsList | None = None
-    tab_name: str = ""
+    TAB_NAME: str = ""
     tab_key: str = ""
+
+    @property
+    def tab_name(self) -> str:
+        """Header tab label for this component."""
+        return self.TAB_NAME
 
     def __init__(
         self,
@@ -112,6 +117,7 @@ class Component(ABC):
         self.children = list(children) if children else []
 
         self.id = id
+        self._bind_signal_handlers: list[object] = []
         self._try_register_id()
 
         self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
@@ -514,9 +520,8 @@ def bind_signals(
     bound = types.MethodType(_handler, component)
     # Keep bound alive as long as component is alive so WeakMethod
     # continues to resolve while the component exists.
-    handlers: list[object] = getattr(component, "_bind_signal_handlers", [])
+    handlers = component._bind_signal_handlers
     handlers.append(bound)
-    component._bind_signal_handlers = handlers
 
     unsubs: list[Callable[[], None]] = []
     for sig in signals:

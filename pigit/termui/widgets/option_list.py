@@ -116,7 +116,9 @@ class OptionList(Component):
         """Return how many rows ``slot`` wants; default one row."""
         probe = getattr(slot, "chrome_band_height", None)
         if callable(probe):
-            return max(0, int(probe(width, panel_height)))
+            want = probe(width, panel_height)
+            if isinstance(want, int):
+                return max(0, want)
         return OptionList._DEFAULT_BAND_HEIGHT
 
     def _apply_chrome_bands(self, width: int, height: int) -> None:

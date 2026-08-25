@@ -70,7 +70,7 @@ class StashPanel(OptionList):
 
     CURSOR = "●"
     keymap_namespace = "stash"
-    tab_name = "Stash"
+    TAB_NAME = "Stash"
     tab_key = "2"
 
     def __init__(

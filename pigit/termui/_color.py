@@ -272,7 +272,7 @@ def _color_distance(a: tuple[int, int, int], b: tuple[int, int, int]) -> int:
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
 
 
-def _find_nearest_index(value: int, levels: list[int]) -> int:
+def _find_nearest_index(value: int, levels: tuple[int, ...] | list[int]) -> int:
     """Return index of nearest level to value."""
     best = 0
     best_dist = abs(value - levels[0])

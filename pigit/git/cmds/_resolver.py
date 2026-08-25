@@ -136,6 +136,8 @@ class CommandResolver:
         # Check for alias
         if self._registry.is_alias(name):
             target = self._registry.get_aliases().get(name)
+            if target is None:
+                raise ResolverError(f"Alias '{name}' has no target")
             if target in context.alias_chain:
                 raise AliasCycleError(
                     f"Alias cycle detected: {' -> '.join(context.alias_chain)} -> {target}"

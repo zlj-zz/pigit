@@ -45,7 +45,7 @@ class _FakeStatusVM:
 
 
 class _FakeStatusPanel(StatusPanel):
-    tab_name = "Status"
+    TAB_NAME = "Status"
     tab_key = "1"
 
     def __init__(
@@ -66,7 +66,7 @@ class _FakeStatusPanel(StatusPanel):
 
 
 class _FakeStashPanel(StashPanel):
-    tab_name = "Stash"
+    TAB_NAME = "Stash"
     tab_key = "3"
 
     def __init__(self, stashes: list[Stash], curr_no: int, vm: _FakeStatusVM) -> None:
