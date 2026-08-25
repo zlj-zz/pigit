@@ -17,11 +17,9 @@ from collections.abc import Callable
 from pigit.termui import (
     Segment,
     FeedbackKind,
-    Surface,
     bind_action,
     exec_external,
     palette,
-    render_child,
     request_render,
     show_badge,
     show_toast,
@@ -68,13 +66,13 @@ class RebasePanel(ItemList):
         base: str,
         on_done: Callable[[], None],
     ) -> None:
-        super().__init__()
+        self._footer = Footer()
+        super().__init__(footer=self._footer)
         self._git = git
         self._base = base
         self._on_done = on_done
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
-        self._footer = Footer()
         self._footer.set_help_provider(self.get_footer_entries)
 
     def preferred_sheet_height(self, term_h: int) -> int:
@@ -83,6 +81,7 @@ class RebasePanel(ItemList):
 
     def activate(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
+        super().activate()
         kind = self._git.sequencer_in_progress()
         if kind is not None:
             show_toast(
@@ -213,23 +212,6 @@ class RebasePanel(ItemList):
             Segment(item.subject, fg=subject_fg, style_flags=flags),
         ]
         return left, main, []
-
-    def paint(self, surface: Surface) -> None:
-        """Render the list, reserving the last row for shortcut hints."""
-        height = self._size[1]
-        if height <= 1:
-            super().paint(surface)
-            return
-        width, _ = self._size
-        self._size = (width, height - 1)
-        try:
-            super().paint(surface)
-        finally:
-            self._size = (width, height)
-        self._footer.x = height
-        self._footer.y = 1
-        self._footer.resize((width, 1))
-        render_child(self._footer, surface, "RebasePanel")
 
     # ── editing ──
 

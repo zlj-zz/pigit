@@ -46,6 +46,8 @@ class TestRebasePanel:
         panel.activate()
         assert [i.sha for i in panel._items] == ["a1", "b1"]
         assert all(i.action == "pick" for i in panel._items)
+        assert panel.is_activated()
+        assert panel._footer.is_activated()
 
     def test_activate_rejects_empty(self):
         panel, _ = _panel([])
@@ -141,6 +143,17 @@ class TestRebasePanel:
         panel.paint(surface)
         last_row = "".join(c.char for c in surface._rows[4])
         assert "pick" in last_row and "squash" in last_row
+
+    def test_footer_click_does_not_change_selection(self):
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+        panel, _ = _panel([_commit("a1"), _commit("b1"), _commit("c1")])
+        panel.activate()
+        panel.resize((120, 5))
+        panel.curr_no = 0
+        ev = MouseEvent(col=1, row=5, button=MouseButton.LEFT, kind=MouseKind.PRESS)
+        assert panel.handle_mouse(ev) is True
+        assert panel.curr_no == 0
 
     def test_activate_blocks_when_cherry_pick_in_progress(self):
         panel, git = _panel([_commit("a")])
