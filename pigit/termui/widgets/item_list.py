@@ -29,17 +29,17 @@ _logger = logging.getLogger(__name__)
 class ItemList(Component):
     """List selector with cursor and scroll viewport.
 
-    Optional init-only ``header`` / ``footer`` Component slots reserve fitted
-    rows (v1: at most one each). Band heights live in ``_header_h`` /
-    ``_footer_h`` after ``_sync_chrome_bands``. Slots are owned chrome with
-    ``parent`` set but are **not** in ``children`` (focus/layout walks skip
-    them; ``ItemList`` forwards lifecycle and mouse). When using slots,
-    override :meth:`describe_row`, not :meth:`paint`.
+    Optional init-only ``header`` / ``footer`` Component slots are fitted chrome
+    bands. A slot may define ``chrome_band_height(width, panel_height) -> int``
+    (all-or-nothing; default want is 1). Fitted heights live in ``_header_h`` /
+    ``_footer_h``. Slots set ``parent`` but are **not** in ``children``. When
+    using slots, override :meth:`describe_row`, not :meth:`paint`.
     """
 
     CURSOR: str = "→"
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
+    _DEFAULT_BAND_HEIGHT = 1
 
     def __init__(
         self,
@@ -106,25 +106,44 @@ class ItemList(Component):
         self._chrome_size = self._size
         self._apply_chrome_bands(self._size[0], self._size[1])
 
-    def _apply_chrome_bands(self, width: int, height: int) -> None:
-        """Fit chrome into ``height`` and set ``_header_h`` / ``_footer_h``.
+    def invalidate_chrome_bands(self) -> None:
+        """Force the next sync to refit bands (e.g. after a slot height policy change)."""
+        self._chrome_size = None
+        self._sync_chrome_bands()
 
-        Header is preferred when both slots are present but only one row
-        remains; a slot that does not fit gets height 0 (never painted).
-        Fitted heights are stored because a present slot may still be 0-tall.
+    @staticmethod
+    def _slot_want_height(slot: Component, width: int, panel_height: int) -> int:
+        """Return how many rows ``slot`` wants; default one row."""
+        probe = getattr(slot, "chrome_band_height", None)
+        if callable(probe):
+            return max(0, int(probe(width, panel_height)))
+        return ItemList._DEFAULT_BAND_HEIGHT
+
+    def _apply_chrome_bands(self, width: int, height: int) -> None:
+        """Fit chrome into ``height`` (all-or-nothing per slot) and set band heights.
+
+        Header is preferred when both slots compete for remaining space.
         """
         remaining = max(0, height)
-        if self._header is not None and remaining > 0:
-            self._header.resize((width, 1))
-            self._header_h = 1
-            remaining -= 1
-        else:
-            self._header_h = 0
-        if self._footer is not None and remaining > 0:
-            self._footer.resize((width, 1))
-            self._footer_h = 1
-        else:
-            self._footer_h = 0
+        self._header_h = self._fit_slot(self._header, width, height, remaining)
+        remaining -= self._header_h
+        self._footer_h = self._fit_slot(self._footer, width, height, remaining)
+
+    def _fit_slot(
+        self,
+        slot: Component | None,
+        width: int,
+        panel_height: int,
+        remaining: int,
+    ) -> int:
+        """Resize ``slot`` when its full wanted height fits; otherwise height 0."""
+        if slot is None or remaining <= 0:
+            return 0
+        want = self._slot_want_height(slot, width, panel_height)
+        if want <= 0 or want > remaining:
+            return 0
+        slot.resize((width, want))
+        return want
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the selector and refresh content if activated or not lazy."""
@@ -475,7 +494,6 @@ class ItemList(Component):
         )
         if self._header_h and self._header is not None:
             self._header.paint(panel.subsurface(0, 0, w, self._header_h))
-        # Use visible_row_count so subclasses (e.g. CommitPanel) can inset.
         list_h = min(
             self.visible_row_count, max(0, h - self._header_h - self._footer_h)
         )
@@ -761,32 +779,51 @@ class ItemList(Component):
         self._notify_change()
 
     def handle_mouse(self, event: MouseEvent) -> bool:
-        """Handle click/wheel; real chrome bands swallow clicks; wheel scrolls."""
+        """Handle click/wheel; chrome bands get first chance, then list scroll/select."""
         self._sync_chrome_bands()
         if event.kind is not MouseKind.PRESS:
             return False
-        if event.button is MouseButton.WHEEL_UP:
-            self.previous()
-            return True
-        if event.button is MouseButton.WHEEL_DOWN:
-            self.next()
-            return True
-        if event.button is not MouseButton.LEFT:
-            return False
         row0 = event.row - 1
         list_h = self.visible_row_count
-        if self._header_h and row0 < self._header_h:
+        in_header = bool(self._header_h and row0 < self._header_h)
+        in_footer = bool(self._footer_h and row0 >= self._header_h + list_h)
+
+        if event.button in (
+            MouseButton.WHEEL_UP,
+            MouseButton.WHEEL_DOWN,
+            MouseButton.WHEEL_LEFT,
+            MouseButton.WHEEL_RIGHT,
+        ):
+            if in_header and self._header is not None:
+                if self._header.handle_mouse(event):
+                    return True
+            if in_footer and self._footer is not None:
+                local = self._mouse_with_row(
+                    event, event.row - (self._header_h + list_h)
+                )
+                if self._footer.handle_mouse(local):
+                    return True
+            if event.button is MouseButton.WHEEL_UP:
+                self.previous()
+                return True
+            if event.button is MouseButton.WHEEL_DOWN:
+                self.next()
+                return True
+            return False
+
+        if event.button is not MouseButton.LEFT:
+            return False
+        if in_header:
             if self._header is not None:
                 self._header.handle_mouse(event)
             return True
-        if self._footer_h and row0 >= self._header_h + list_h:
+        if in_footer:
             if self._footer is not None:
                 self._footer.handle_mouse(
                     self._mouse_with_row(event, event.row - (self._header_h + list_h))
                 )
             return True
         if row0 < self._header_h or row0 >= self._header_h + list_h:
-            # Past the list with no fitted chrome band (e.g. subclass inset).
             return False
         return self._handle_mouse_list(
             self._mouse_with_row(event, event.row - self._header_h)

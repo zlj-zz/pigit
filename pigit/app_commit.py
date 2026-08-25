@@ -18,6 +18,7 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
+    Component,
     Surface,
     bind_action,
     bind_signals,
@@ -97,6 +98,42 @@ class _SubRow(Enum):
     TAIL = auto()  # blank trailer between commits
 
 
+class _CommitReportBand(Component):
+    """ItemList footer band for the contribution-graph report strip.
+
+    Height is all-or-nothing: ``REPORT_H`` when enabled and the panel is tall
+    enough, otherwise 0 so the list keeps the full viewport.
+    """
+
+    def __init__(
+        self,
+        graph: ContributionGraph,
+        *,
+        report_h: int,
+        min_panel_h: int,
+        enabled: bool = True,
+    ) -> None:
+        super().__init__()
+        self._graph = graph
+        self._report_h = report_h
+        self._min_panel_h = min_panel_h
+        self.enabled = enabled
+
+    def chrome_band_height(self, width: int, panel_height: int) -> int:
+        """Return fitted report height for ``ItemList`` band layout."""
+        del width
+        if not self.enabled or panel_height <= self._min_panel_h:
+            return 0
+        return self._report_h
+
+    def paint(self, surface: Surface) -> None:
+        self._graph.resize((surface.width, surface.height))
+        self._graph.paint(surface)
+
+    def handle_mouse(self, event) -> bool:
+        return self._graph.handle_mouse(event)
+
+
 class CommitPanel(ItemList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
@@ -116,19 +153,25 @@ class CommitPanel(ItemList):
         id: str | None = None,
         report_default: bool = True,
     ) -> None:
+        self._contrib_graph = ContributionGraph()
+        self._report_band = _CommitReportBand(
+            self._contrib_graph,
+            report_h=self.REPORT_H,
+            min_panel_h=self.REPORT_MIN_HEIGHT,
+            enabled=report_default,
+        )
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
+            footer=self._report_band,
         )
         self._vm = vm
         self.commits: list[Commit] = []
         self._all_commits: list[Commit] = []
         self._source_map: list[int] = []
         self._report_enabled = report_default
-        self._report_h = 0
-        self._contrib_graph = ContributionGraph()
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
@@ -151,36 +194,6 @@ class CommitPanel(ItemList):
     def _publish_tab_title(self) -> None:
         """Ask the header to reread ``tab_name`` after ``log_ref`` changes."""
         self.emit(EVT_SELECTION_CHANGED)
-
-    def _compute_report_h(self, panel_h: int) -> int:
-        """Report strip height: ``REPORT_H`` when enabled and the panel is tall."""
-        if not self._report_enabled or panel_h <= self.REPORT_MIN_HEIGHT:
-            return 0
-        return self.REPORT_H
-
-    def _list_h(self) -> int:
-        """Height reserved for the commit list (panel minus the report strip)."""
-        return self._size[1] - self._report_h
-
-    @property
-    def visible_row_count(self) -> int:
-        """List rows visible above the report strip."""
-        return self._list_h()
-
-    def resize(self, size: tuple[int, int]) -> None:
-        """Size the panel; reserve the bottom report strip when enabled."""
-        w, h = size
-        self._report_h = self._compute_report_h(h)
-        if self._report_h:
-            self._contrib_graph.resize((w, self._report_h))
-        super().resize(size)
-
-    def _update_report_layout(self) -> None:
-        """Refit the report strip after a toggle (single layout path)."""
-        if self._size is not None:
-            self.resize(self._size)
-        self._scroll_into_view()
-        self._request_render()
 
     @bind_action("next", "j", "down", desc="Navigate commit list", tip="Navigate")
     def next(self, step: int = 1) -> None:
@@ -265,6 +278,7 @@ class CommitPanel(ItemList):
     def toggle_report(self) -> None:
         """Toggle the bottom contribution-graph report strip."""
         self._report_enabled = not self._report_enabled
+        self._report_band.enabled = self._report_enabled
         h = self._size[1] if self._size else 0
         if h <= self.REPORT_MIN_HEIGHT:
             show_toast(
@@ -272,7 +286,9 @@ class CommitPanel(ItemList):
                 duration=2.0,
                 kind=FeedbackKind.WARNING,
             )
-        self._update_report_layout()
+        self.invalidate_chrome_bands()
+        self._scroll_into_view()
+        self._request_render()
 
     @bind_action("search", "/", desc="Filter commit list by message or SHA")
     def search(self) -> None:
@@ -497,31 +513,6 @@ class CommitPanel(ItemList):
         author = commit.author
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
         return f"{sha} {msg}{tag_str}  {author}  {rel}"
-
-    def paint(self, surface: Surface) -> None:
-        if not self.content:
-            return
-        if self._report_h:
-            list_surface = surface.subsurface(0, 0, surface.width, self._list_h())
-            super().paint(list_surface)
-            self._render_report(
-                surface.subsurface(self._list_h(), 0, surface.width, self._report_h)
-            )
-        else:
-            super().paint(surface)
-
-    def _render_report(self, surface) -> None:
-        """Render the contribution-graph report into the bottom strip."""
-        self._contrib_graph.resize((surface.width, surface.height))
-        self._contrib_graph.render_into(surface)
-
-    def handle_mouse(self, event) -> bool:
-        """Horizontal wheel over the report pans it; everything else falls
-        through to the list (vertical wheel scrolls, clicks select)."""
-        if self._report_h and event.row - 1 >= self._list_h():
-            if self._contrib_graph.handle_mouse(event):
-                return True
-        return super().handle_mouse(event)
 
     def describe_row(
         self,

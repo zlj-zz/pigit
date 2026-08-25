@@ -181,3 +181,65 @@ def test_sizeless_init_syncs_bands_on_first_resize():
     lst.resize((20, 5))
     assert lst._header_h == 1
     assert lst.visible_row_count == 4
+
+
+class _TallFooter(Component):
+    """Footer that wants a fixed multi-row height via ``chrome_band_height``."""
+
+    def __init__(self, want: int, mark: str = "F") -> None:
+        super().__init__()
+        self.want = want
+        self.mark = mark
+        self.wheel_hits = 0
+
+    def chrome_band_height(self, width: int, panel_height: int) -> int:
+        del width, panel_height
+        return self.want
+
+    def paint(self, surface: Surface) -> None:
+        for row in range(surface.height):
+            surface.draw_text_rgb(row, 0, self.mark)
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        if event.button in (MouseButton.WHEEL_LEFT, MouseButton.WHEEL_RIGHT):
+            self.wheel_hits += 1
+            return True
+        return False
+
+
+def test_chrome_band_height_multi_row_footer():
+    footer = _TallFooter(3)
+    lst = ItemList(content=["a", "b", "c", "d"], size=(20, 8), footer=footer)
+    assert lst._footer_h == 3
+    assert lst.visible_row_count == 5
+    surface = Surface(20, 8)
+    lst.paint(surface)
+    assert surface.lines()[5][0] == "F"
+    assert surface.lines()[7][0] == "F"
+
+
+def test_chrome_band_all_or_nothing_when_too_tall():
+    footer = _TallFooter(5)
+    lst = ItemList(content=["a"], size=(20, 4), footer=footer)
+    assert lst._footer_h == 0
+    assert lst.visible_row_count == 4
+
+
+def test_invalidate_chrome_bands_refits_after_policy_change():
+    footer = _TallFooter(3)
+    lst = ItemList(content=["a", "b"], size=(20, 8), footer=footer)
+    assert lst._footer_h == 3
+    footer.want = 0
+    lst.invalidate_chrome_bands()
+    assert lst._footer_h == 0
+    assert lst.visible_row_count == 8
+
+
+def test_footer_horizontal_wheel_consumed():
+    footer = _TallFooter(2)
+    lst = ItemList(content=["a", "b", "c"], size=(20, 6), footer=footer)
+    lst.curr_no = 0
+    left = MouseEvent(col=1, row=5, button=MouseButton.WHEEL_LEFT, kind=MouseKind.PRESS)
+    assert lst.handle_mouse(left) is True
+    assert footer.wheel_hits == 1
+    assert lst.curr_no == 0

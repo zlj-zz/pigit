@@ -469,37 +469,37 @@ class TestCommitReport:
     def test_hidden_at_or_below_19_rows(self):
         panel = self._panel()
         panel.resize((80, 10))
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         panel.resize((80, 19))
-        assert panel._report_h == 0  # 19 is not > 19
+        assert panel._footer_h == 0  # 19 is not > 19
 
     def test_visible_above_19_rows(self):
         panel = self._panel()
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
 
     def test_hidden_when_default_off(self):
         panel = self._panel(report_default=False)
         panel.resize((80, 50))
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
 
     def test_toggle_report_flips_strip(self):
         panel = self._panel()
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
         panel.toggle_report()
         assert not panel._report_enabled
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         panel.toggle_report()
         assert panel._report_enabled
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
 
     def test_toggle_report_toasts_when_panel_too_short(self):
         from unittest.mock import patch
 
         panel = self._panel()
         panel.resize((80, 15))  # below the > 19 gate
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         with patch("pigit.app_commit.show_toast") as toast:
             panel.toggle_report()
         toast.assert_called_once()
@@ -536,7 +536,7 @@ class TestCommitReport:
         ]
         vm.items.set(commits)
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
         surface = Surface(80, 50)
         panel.paint(surface)
         rows = ["".join(c.char for c in r) for r in surface._rows]
