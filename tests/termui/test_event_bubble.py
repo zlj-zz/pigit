@@ -135,11 +135,11 @@ class TestGotoRouting:
         secondary = _EventLeaf("secondary", id="secondary")
         tab_view = _EventTabView(children=[main, secondary], start="main")
 
-        assert tab_view.active is main
+        assert tab_view.visible is main
 
         tab_view.accept(EVT_GOTO, target="secondary")
 
-        assert tab_view.active is secondary
+        assert tab_view.visible is secondary
 
     def test_goto_accept_switches_tabs(self):
         """TabView switches tabs via accept/route_to, not on_event bubble."""
@@ -148,7 +148,7 @@ class TestGotoRouting:
         tab_view = _EventTabView(children=[main, secondary], start="main")
 
         main.emit(EVT_GOTO, target="secondary")
-        assert tab_view.active is main  # EVT_GOTO is not consumed by TabView
+        assert tab_view.visible is main  # EVT_GOTO is not consumed by TabView
 
         tab_view.accept(EVT_GOTO, target="secondary")
-        assert tab_view.active is secondary
+        assert tab_view.visible is secondary

@@ -50,8 +50,9 @@ class RecentActionsPanel(ItemList):
         """Prefer up to 12 rows; host clamps to one-third of the terminal."""
         return 12
 
-    def activate(self) -> None:
-        """Load and display history records."""
+    def mount(self) -> None:
+        """Mount the sheet list and load history records."""
+        super().mount()
         self._refresh()
 
     def _refresh(self) -> None:

@@ -82,17 +82,22 @@ class BranchPanel(ItemList):
             on_result=lambda _: None,
         )
         self._vm_unsubs: list[Callable[[], None]] = []
-        self._vm_unsubs.append(
-            bind_signals(self, vm.items, callback=self._on_items_changed)
-        )
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
+        self._bind_vm_signals()
         self._vm.refresh()
+
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
 
     def _on_items_changed(self) -> None:
         branches = self._vm.items.value
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         self.branches = branches
         if not branches:
@@ -104,8 +109,8 @@ class BranchPanel(ItemList):
         self.set_content(lines)
         self._notify_change()
 
-    def deactivate(self) -> None:
-        super().deactivate()
+    def unmount(self) -> None:
+        super().unmount()
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()
@@ -169,7 +174,7 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = self._log_graph_preview_panel()
-        if preview is not None and preview.is_activated():
+        if preview is not None and preview.is_mounted():
             preview.scroll_down(preview.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -180,7 +185,7 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = self._log_graph_preview_panel()
-        if preview is not None and preview.is_activated():
+        if preview is not None and preview.is_mounted():
             preview.scroll_up(preview.SCROLL_PAGE_SIZE)
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")

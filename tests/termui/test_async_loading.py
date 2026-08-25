@@ -40,10 +40,10 @@ class _MockPanel(Component):
         self._loader = AsyncTask()
         self.data: list[str] = []
         self.loaded = False
-        self._activated = True
+        self._mounted = True
 
-    def is_activated(self):
-        return self._activated
+    def is_mounted(self):
+        return self._mounted
 
     def refresh(self):
         self._loader.start(self._load_data, self._on_loaded)
@@ -53,13 +53,13 @@ class _MockPanel(Component):
         return ["a", "b", "c"]
 
     def _on_loaded(self, data):
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         self.data = data
         self.loaded = True
 
-    def deactivate(self):
-        super().deactivate()
+    def unmount(self):
+        super().unmount()
         self._loader.cancel()
 
     def paint(self, surface):
@@ -140,7 +140,7 @@ def test_panel_deactivate_cancels_load():
     """When panel deactivates, async result is dropped."""
     panel = _MockPanel()
     panel.refresh()
-    panel.deactivate()
+    panel.unmount()
 
     time.sleep(0.1)
     AsyncTask.poll_all()
@@ -184,7 +184,7 @@ def test_inactive_panel_drops_arriving_data():
     time.sleep(0.1)
 
     # Deactivate before polling
-    panel.deactivate()
+    panel.unmount()
     AsyncTask.poll_all()
 
     assert not panel.loaded

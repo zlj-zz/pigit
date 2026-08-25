@@ -121,7 +121,7 @@ class TestInactivePanelNoRender:
                 self._unsub = self.value.subscribe(self._on_change)
 
             def _on_change(self, _new: int) -> None:
-                if self.is_activated():
+                if self.is_mounted():
                     request_render()
 
             def paint(self, surface) -> None:
@@ -134,11 +134,11 @@ class TestInactivePanelNoRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             leaf = _ConditionalLeaf()
-            leaf.activate()
+            leaf.mount()
             leaf.value.set(1)
             assert len(render_calls) == 1
 
-            leaf.deactivate()
+            leaf.unmount()
             leaf.value.set(2)
             assert len(render_calls) == 1  # No additional render request
         finally:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
-from ..component import Component
+from ..component import Component, mount_children, unmount_children
 from .._layout import layout_flex
 
 _logger = logging.getLogger(__name__)
@@ -88,15 +88,13 @@ class SplitPane(Component):
         self._sync_children(desired)
         self._apply_widths(widths)
 
-    def activate(self) -> None:
-        super().activate()
-        for child in self.children:
-            child.activate()
+    def mount(self) -> None:
+        super().mount()
+        mount_children(self)
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        for child in self.children:
-            child.deactivate()
+    def unmount(self) -> None:
+        unmount_children(self)
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the pane and lay out attached children horizontally."""
@@ -134,7 +132,7 @@ class SplitPane(Component):
         desired_set = set(desired)
         for child in list(self.children):
             if child not in desired_set:
-                child.deactivate()
+                child.unmount()
                 self.children.remove(child)
                 if child.parent is self:
                     child.parent = None
@@ -142,7 +140,7 @@ class SplitPane(Component):
             if child not in self.children:
                 self.children.append(child)
                 child.parent = self
-                child.activate()
+                child.mount()
 
     def _apply_widths(self, widths: list[int | Literal["flex"]]) -> None:
         """Update width spec and relayout when children or widths changed."""

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from pigit.termui import palette
 from pigit.termui.theme import get_theme
-from pigit.termui.component import Component, bind_signals
+from pigit.termui.component import Component, bind_signals, is_on_visible_paint_path
 from pigit.termui._runtime_context import request_render
 from pigit.termui.segment import Segment
 
@@ -45,7 +45,7 @@ class LintBar(Component):
         )
 
     def _on_values_changed(self) -> None:
-        if self.is_activated():
+        if self.is_mounted() and is_on_visible_paint_path(self):
             request_render()
 
     def destroy(self) -> None:

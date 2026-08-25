@@ -180,7 +180,7 @@ class ObserveHost:
         ]
         if not self._deps.get_config().observe_worktree:
             return roots
-        active = resolve_presentation_leaf(self._deps.get_tab_view().active)
+        active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if not isinstance(active, StatusPanel):
             return roots
         roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
@@ -208,7 +208,7 @@ class ObserveHost:
         if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
             self._deps.schedule_reload_header()
 
-        active = resolve_presentation_leaf(self._deps.get_tab_view().active)
+        active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if active is None:
             return
 

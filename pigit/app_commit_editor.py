@@ -203,19 +203,19 @@ class CommitEditor(Component):
         self._size = size
         self._root.resize(size)
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._subject.set_value("")
         self._body.set_value("")
-        self._status_bar.activate()
-        self._staged_header.activate()
-        self._staged_list.activate()
+        self._status_bar.mount()
+        self._staged_header.mount()
+        self._staged_list.mount()
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        self._status_bar.deactivate()
-        self._staged_header.deactivate()
-        self._staged_list.deactivate()
+    def unmount(self) -> None:
+        super().unmount()
+        self._status_bar.unmount()
+        self._staged_header.unmount()
+        self._staged_list.unmount()
 
     # -- Focus management -------------------------------------------------
 

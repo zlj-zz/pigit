@@ -24,6 +24,7 @@ from pigit.termui import (
     Component,
     Surface,
     bind_action,
+    is_on_visible_paint_path,
     palette,
     request_render,
     show_badge,
@@ -295,10 +296,11 @@ class DiffViewer(LineTextBrowser):
         def _callback(
             tokens: list[_RenderLine],
         ) -> None:
-            if not self.is_activated() or current_gen != self._tokenize_gen:
+            if not self.is_mounted() or current_gen != self._tokenize_gen:
                 return
             self._render_tokens = tokens
-            request_render()
+            if is_on_visible_paint_path(self):
+                request_render()
 
         self._tokenize_task.start(_work, _callback)
 
@@ -648,18 +650,22 @@ class DiffViewer(LineTextBrowser):
     def pause_background(self) -> None:
         """Cancel in-flight patch/tokenize and clear badge; keep content and tokens.
 
-        BodyHost hide calls this instead of ``deactivate`` so reopen can reuse
-        installed tokens without a full re-parse.
+        Called from ``on_hide`` when an exclusive parent covers this viewer so
+        reopen can reuse installed tokens without a full re-parse.
         """
         self._patch_task.cancel()
         self._drop_pending_tokenize()
         self._patch_gen += 1
         show_badge("", duration=0)
 
-    def deactivate(self) -> None:
+    def on_hide(self) -> None:
+        """Pause async work while covered by another ExclusiveView child."""
+        self.pause_background()
+
+    def unmount(self) -> None:
         """Cancel pending work and clear stuck badge on true unmount."""
         self.pause_background()
-        super().deactivate()
+        super().unmount()
 
     def _apply_patch(self, patch: str, action: str) -> None:
         """Apply or reverse-apply a patch in background thread."""
@@ -707,7 +713,7 @@ class DiffViewer(LineTextBrowser):
             except OSError:
                 pass
 
-            if not self.is_activated() or current_gen != self._patch_gen:
+            if not self.is_mounted() or current_gen != self._patch_gen:
                 return
 
             if returncode == 0:

@@ -139,7 +139,7 @@ class CommandPalette(Component):
         self._scroll = 0
 
     def close(self) -> None:
-        """Deactivate the palette and invoke the dismiss callback."""
+        """Close the palette and invoke the dismiss callback."""
         self._active = False
         self._input_line.clear()
         self._matched = []

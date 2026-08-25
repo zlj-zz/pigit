@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Sequence
 
-from ..component import Component
+from ..component import Component, mount_children, unmount_children
 from .._layout import layout_flex
 from ..types import EventType
 
@@ -61,15 +61,13 @@ class Row(Component):
         if self._size is not None:
             self.resize(self._size)
 
-    def activate(self) -> None:
-        super().activate()
-        for child in self.children:
-            child.activate()
+    def mount(self) -> None:
+        super().mount()
+        mount_children(self)
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        for child in self.children:
-            child.deactivate()
+    def unmount(self) -> None:
+        unmount_children(self)
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the row and lay out children horizontally according to widths."""
@@ -104,9 +102,6 @@ class Row(Component):
             )
 
     def accept(self, action: EventType, **data) -> None:
-        """Broadcast action to all children. Skip leaf components that do not
-        override ``accept``.
-        """
         for child in self.children:
             if callable(getattr(child, "accept", None)):
                 child.accept(action, **data)

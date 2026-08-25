@@ -100,7 +100,7 @@ def preview() -> PreviewPanel:
 
 def _mount(bus: EventBus, preview: PreviewPanel) -> ComponentRoot:
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     return root
 
 
@@ -316,7 +316,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     assert vm.diff_path_calls == ["a.py"]
     assert "a.py" in preview._diff_viewer._box_title
 
-    preview.deactivate()
+    preview.unmount()
     del vm.diff_path_calls[:]
 
     other = _FakeStatusPanel(

@@ -102,7 +102,7 @@ class Component(ABC):
         parent: Component | None = None,
         id: str | None = None,
     ) -> None:
-        self._activated = False
+        self._mounted = False
         self._focus_level: int = -1
 
         self.x, self.y = x, y
@@ -117,20 +117,48 @@ class Component(ABC):
         self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._subscriptions: list[_Subscription] = []
 
-    def activate(self):
-        """Mark the component as active. Called when it enters the visible tree."""
+    def mount(self):
+        """Enter the live component tree (subscriptions / async gate).
+
+        Not the same as becoming visible or focused — exclusive hosts may keep
+        mounted children hidden.
+        """
         self._unsubscribe_all()
         self._replay_pending_subscriptions()
-        self._activated = True
+        self._mounted = True
 
-    def deactivate(self):
-        """Mark the component as inactive. Called when it leaves the visible tree."""
+    def unmount(self):
+        """Leave the live component tree; drop framework subscriptions."""
         self._unsubscribe_all()
-        self._activated = False
+        self._mounted = False
 
-    def is_activated(self):
-        """Get current activate status."""
-        return self._activated
+    def is_mounted(self):
+        """True while this component is on the live session tree."""
+        return self._mounted
+
+    def on_focus(self) -> None:
+        """Called when this component becomes the focused child of a focus host.
+
+        Warm-focus containers (e.g. Column) invoke this on focus changes without
+        unmounting siblings. Override to refresh data that must be current when
+        the user looks at this panel.
+        """
+
+    def on_hide(self) -> None:
+        """Called when an exclusive parent stops painting this child.
+
+        The child remains mounted. Override to pause background work that should
+        not run while covered (e.g. DiffViewer patch/tokenize).
+        """
+
+    def exclusive_visible_child(self) -> Component | None:
+        """If this node paints exactly one child, return it; else ``None``.
+
+        Exclusive-visible containers override this so
+        :func:`is_on_visible_paint_path` does not need a closed set of
+        ``isinstance`` checks.
+        """
+        return None
 
     def subscribe(
         self,
@@ -139,8 +167,9 @@ class Component(ABC):
     ) -> Callable[[], None]:
         """Subscribe to a framework-level event.
 
-        If the component is not yet mounted, the subscription is queued and
-        replayed on activation. The returned callback unsubscribes the handler.
+        If the component is not yet mounted under a root with an event bus,
+        the subscription is queued and replayed on :meth:`mount`. The returned
+        callback unsubscribes the handler.
         """
         from .root import ComponentRoot
 
@@ -222,7 +251,7 @@ class Component(ABC):
 
     def destroy(self) -> None:
         """Destroy children and unregister from component registry."""
-        self.deactivate()
+        self.unmount()
         for child in self.children:
             child.destroy()
         self._try_unregister_id()
@@ -555,3 +584,33 @@ def resolve_presentation_leaf(node: Component | None) -> Component | None:
             break
         node = child
     return node
+
+
+def mount_children(component: Component) -> None:
+    """Mount every direct child (shared container mount policy)."""
+    for child in component.children:
+        child.mount()
+
+
+def unmount_children(component: Component) -> None:
+    """Unmount every direct child (shared container unmount policy)."""
+    for child in component.children:
+        child.unmount()
+
+
+def is_on_visible_paint_path(component: Component) -> bool:
+    """Return True if ``component`` lies under every exclusive ancestor's visible child.
+
+    Ancestors that override :meth:`Component.exclusive_visible_child` paint only
+    that child; mounted siblings off the path must not schedule full-tree renders.
+    """
+    node: Component | None = component
+    while node is not None:
+        parent = node.parent
+        if parent is None:
+            return True
+        sole = parent.exclusive_visible_child()
+        if sole is not None and node is not sole:
+            return False
+        node = parent
+    return True

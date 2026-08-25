@@ -43,50 +43,50 @@ def _panel(
 class TestRebasePanel:
     def test_activate_loads_commits(self):
         panel, _ = _panel([_commit("a1"), _commit("b1", ("a1",))])
-        panel.activate()
+        panel.mount()
         assert [i.sha for i in panel._items] == ["a1", "b1"]
         assert all(i.action == "pick" for i in panel._items)
-        assert panel.is_activated()
-        assert panel._footer.is_activated()
+        assert panel.is_mounted()
+        assert panel._footer.is_mounted()
 
     def test_activate_rejects_empty(self):
         panel, _ = _panel([])
         with patch("pigit.app_rebase.show_toast") as toast:
-            panel.activate()
+            panel.mount()
             toast.assert_called_once()
         panel._on_done.assert_called_once()
 
     def test_activate_rejects_merge(self):
         panel, _ = _panel([_commit("m1", ("a1", "b1"))])
         with patch("pigit.app_rebase.show_toast") as toast:
-            panel.activate()
+            panel.mount()
             toast.assert_called_once()
         panel._on_done.assert_called_once()
 
     def test_activate_rejects_in_progress(self):
         panel, _ = _panel([_commit("a1")], in_progress=True)
         with patch("pigit.app_rebase.show_toast") as toast:
-            panel.activate()
+            panel.mount()
             toast.assert_called_once()
         panel._on_done.assert_called_once()
 
     def test_squash_first_row_rejected(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel.curr_no = 0
         panel._set_action("squash")
         assert panel._items[0].action == "pick"
 
     def test_squash_second_row_ok(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel.curr_no = 1
         panel._set_action("squash")
         assert panel._items[1].action == "squash"
 
     def test_move_up_squash_to_top_rejected(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel._items[1].action = "squash"
         panel.curr_no = 1
         panel._move_up()
@@ -95,7 +95,7 @@ class TestRebasePanel:
 
     def test_move_up_and_down(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel.curr_no = 0
         panel._move_down()
         assert panel._items[0].sha == "b1"
@@ -106,7 +106,7 @@ class TestRebasePanel:
 
     def test_move_down_squash_to_top_rejected(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel._items[1].action = "squash"
         panel.curr_no = 0
         panel._move_down()
@@ -115,20 +115,20 @@ class TestRebasePanel:
 
     def test_validate_squash_after_drop(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel._items[0].action = "drop"
         panel._items[1].action = "squash"
         assert panel._validate() is not None
 
     def test_validate_ok(self):
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel._items[1].action = "squash"
         assert panel._validate() is None
 
     def test_set_drop(self):
         panel, _ = _panel([_commit("a1")])
-        panel.activate()
+        panel.mount()
         panel.curr_no = 0
         panel._set_action("drop")
         assert panel._items[0].action == "drop"
@@ -137,7 +137,7 @@ class TestRebasePanel:
         from pigit.termui.surface import Surface
 
         panel, _ = _panel([_commit("a1"), _commit("b1")])
-        panel.activate()
+        panel.mount()
         panel.resize((120, 5))
         surface = Surface(120, 5)
         panel.paint(surface)
@@ -148,7 +148,7 @@ class TestRebasePanel:
         from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 
         panel, _ = _panel([_commit("a1"), _commit("b1"), _commit("c1")])
-        panel.activate()
+        panel.mount()
         panel.resize((120, 5))
         panel.curr_no = 0
         ev = MouseEvent(col=1, row=5, button=MouseButton.LEFT, kind=MouseKind.PRESS)
@@ -159,7 +159,7 @@ class TestRebasePanel:
         panel, git = _panel([_commit("a")])
         git.sequencer_in_progress.return_value = "cherry-pick"
         with patch("pigit.app_rebase.show_toast") as toast:
-            panel.activate()
+            panel.mount()
         toast.assert_called()
         panel._on_done.assert_called()
         git.list_commits_in_range.assert_not_called()

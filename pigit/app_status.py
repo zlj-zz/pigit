@@ -322,13 +322,17 @@ class StatusPanel(ItemList):
             allow_newline=False,
         )
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._bind_vm_signals()
         self._vm.refresh()
 
-    def deactivate(self) -> None:
-        super().deactivate()
+    def on_focus(self) -> None:
+        """Refresh worktree status when returning focus within the Status column."""
+        self._vm.refresh()
+
+    def unmount(self) -> None:
+        super().unmount()
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()
@@ -344,11 +348,11 @@ class StatusPanel(ItemList):
     def _on_items_changed(self) -> None:
         files = self._vm.items.value
         _logger.debug(
-            "[STATUS] _on_items_changed: activated=%s files=%d",
-            self.is_activated(),
+            "[STATUS] _on_items_changed: mounted=%s files=%d",
+            self.is_mounted(),
             len(files),
         )
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         self._all_files = list(files)
         self._apply_filter()
@@ -431,7 +435,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview.is_activated():
+        if preview.is_mounted():
             preview.scroll_down(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -443,7 +447,7 @@ class StatusPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = by_id("preview", PreviewPanel)
-        if preview.is_activated():
+        if preview.is_mounted():
             preview.scroll_up(DiffViewer.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -544,7 +548,7 @@ class StatusPanel(ItemList):
             on_cancel=dismiss_sheet,
         )
         show_sheet(editor, max_fraction=0.5, title="Commit")
-        editor.activate()
+        editor.mount()
 
     @bind_action(
         "commit_editor",

@@ -394,7 +394,7 @@ class TestContentInstallInvariants:
         plain_tokens = list(dv._render_tokens)
         assert len(plain_tokens) == 3
 
-        with patch.object(dv, "is_activated", return_value=True):
+        with patch.object(dv, "is_mounted", return_value=True):
             stale = [[("DIFF-ONLY", (255, 0, 0), 9, None)]] * 52
             captured["callback"](stale)  # type: ignore[operator]
 

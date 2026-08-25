@@ -27,7 +27,7 @@ def test_route_to_still_switches_tabs():
     b = _Panel("branch")
     tv = TabView(children=[a, b], start="status")
     assert tv.route_to("branch") is b
-    assert tv.active is b
+    assert tv.visible is b
 
 
 def test_presentation_child_is_active_tab():

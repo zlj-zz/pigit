@@ -35,11 +35,10 @@ from pigit.termui import (
     set_theme,
 )
 from pigit.termui.cli_output import Console
-from pigit.termui.containers import Column, SplitPane, TabView
+from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
 from pigit.termui.reactive import Signal
-from .app_body_host import BodyHost
 from .app_header_state import HeaderState
 from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
@@ -152,7 +151,7 @@ class PigitApplication(Application):
         # Typed accessors for key body components (assigned in build_root)
         self._tab_view: TabView
         self._split_pane: SplitPane
-        self._body_host: BodyHost
+        self._body_view: ExclusiveView
         self._palette: CommandPalette
         self._status_stack: Column
         self._status_panel: StatusPanel
@@ -238,9 +237,9 @@ class PigitApplication(Application):
             breakpoint_cols=self.LARGE_SCREEN_COLS,
             id="split_pane",
         )
-        self._body_host = BodyHost(
-            self._split_pane,
-            self._diff_panel,
+        self._body_view = ExclusiveView(
+            [self._split_pane, self._diff_panel],
+            visible=self._split_pane,
             id="body",
         )
 
@@ -258,7 +257,7 @@ class PigitApplication(Application):
                 sep_fg=THEME.fg_dim,
                 id="header",
             ),
-            self._body_host,
+            self._body_view,
         ]
         heights: list = [2, "flex"]
         if self._config.show_footer:
@@ -367,10 +366,10 @@ class PigitApplication(Application):
         if self._config.repo_observe and self._observe_host is not None:
             self._observe_host.start()
 
-        # Initial sync: all components are activated now, so subscribers receive
+        # Initial sync: all components are mounted now, so subscribers receive
         # the event and update header/footer/preview.
-        if self._tab_view.active is not None:
-            self._on_tab_switch(self._tab_view.active)
+        if self._tab_view.visible is not None:
+            self._on_tab_switch(self._tab_view.visible)
 
     def on_exit(self) -> None:
         """Stop repo observation timers and backend before root destroy."""
@@ -420,9 +419,9 @@ class PigitApplication(Application):
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""
-        if self._body_host.is_detail_open or not self._is_large_screen:
+        if self._is_detail_open() or not self._is_large_screen:
             return None
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             return self._preview_panel if self._diff_preview_wanted else None
         if isinstance(active, BranchPanel):
@@ -431,9 +430,9 @@ class PigitApplication(Application):
 
     def _apply_body_widths(self, cols: int) -> None:
         """Update SplitPane detail and widths for the active tab."""
-        if self._body_host.is_detail_open:
+        if self._is_detail_open():
             return
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             self._split_pane.set_detail(self._preview_panel)
             self._split_pane.set_detail_wanted(
@@ -542,29 +541,29 @@ class PigitApplication(Application):
         """Move focus ``step`` positions around the panel ring."""
         self._panel_nav.cycle_panel(step)
 
+    def _is_detail_open(self) -> bool:
+        """True when Diff occupies the body ExclusiveView slot."""
+        return self._body_view.visible is self._diff_panel
+
     def _reveal_product(self) -> None:
         """Close Diff detail if open and resync SplitPane layout for the terminal."""
-        host = getattr(self, "_body_host", None)
-        if host is None or not host.is_detail_open:
+        if not self._is_detail_open():
             return
-        host.show_product()
+        self._body_view.show(self._split_pane)
         cols, _ = terminal_size()
         self._apply_body_widths(cols)
 
     def _close_detail_if_open(self) -> None:
-        """Hide Diff detail without deactivating it; resync product layout."""
+        """Hide Diff detail without unmounting it; resync product layout."""
         self._reveal_product()
 
     def presentation_active(self) -> Component | None:
         """Presentation leaf: Diff when detail open, else product tab leaf."""
-        if (
-            getattr(self, "_body_host", None) is not None
-            and self._body_host.is_detail_open
-        ):
+        if self._is_detail_open():
             return self._diff_panel
         if getattr(self, "_tab_view", None) is None:
             return None
-        return resolve_presentation_leaf(self._tab_view.active)
+        return resolve_presentation_leaf(self._tab_view.visible)
 
     def navigate_product(self, target: str) -> None:
         """Close Diff detail if open, then route the product TabView."""
@@ -576,9 +575,9 @@ class PigitApplication(Application):
         target = data.get("target")
         if target == "diff" or target is self._diff_panel:
             self._diff_panel.update(EVT_GOTO, **data)
-            self._body_host.show_detail()
+            self._body_view.show(self._diff_panel)
             return True
-        was_detail_open = self._body_host.is_detail_open
+        was_detail_open = self._is_detail_open()
         if was_detail_open:
             self._reveal_product()
         panel = self._panel_nav.resolve_panel(target)
@@ -616,11 +615,11 @@ class PigitApplication(Application):
 
         panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
         show_sheet(panel, title="Recent")
-        panel.activate()
+        panel.mount()
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
-        if self._body_host.is_detail_open:
+        if self._is_detail_open():
             return
         cols, _ = terminal_size()
         if cols < self.LARGE_SCREEN_COLS:
@@ -630,7 +629,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.WARNING,
             )
             return
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             self._diff_preview_wanted = not self._diff_preview_wanted
             showing = self._diff_preview_wanted
@@ -643,8 +642,8 @@ class PigitApplication(Application):
             return
         self._apply_body_widths(cols)
         if showing:
-            if self._tab_view.active is not None:
-                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+            if self._tab_view.visible is not None:
+                self._tab_view.visible.emit(EVT_SELECTION_CHANGED)
         elif hidden is not None:
             hidden.clear()
         renderer = get_renderer()
@@ -672,7 +671,7 @@ class PigitApplication(Application):
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
         placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
-        placeholder.activate()
+        placeholder.mount()
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -693,7 +692,7 @@ class PigitApplication(Application):
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
             show_sheet(sheet, edge="top", max_fraction=0.5)
-            sheet.activate()
+            sheet.mount()
 
         self._inspector_task = run_async(load, apply)
 
@@ -742,8 +741,8 @@ class PigitApplication(Application):
                 if panel is not None:
                     panel.clear()
         if not was_large and self._is_large_screen:
-            if self._tab_view.active is not None:
-                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+            if self._tab_view.visible is not None:
+                self._tab_view.visible.emit(EVT_SELECTION_CHANGED)
 
     def _refresh_list_panel(self, panel: Component) -> None:
         """Refresh a list panel via an overridden ``refresh`` or its ViewModel."""
@@ -764,9 +763,9 @@ class PigitApplication(Application):
         ViewModel refresh uses AsyncTask and Signal subscribers render.
         Skips while Diff detail is open (do not refresh a hidden list).
         """
-        if self._body_host.is_detail_open:
+        if self._is_detail_open():
             return
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if active is None:
             return
         if self._root is not None and should_defer_repo_refresh(self._root):
@@ -820,7 +819,7 @@ class PigitApplication(Application):
     def _on_show_log(self, ref: str) -> None:
         """Pin Commit log to ``ref`` and open the Commit tab."""
         self._pin_log_ref(ref)
-        already_on_commit = self._tab_view.active is self._commit_panel
+        already_on_commit = self._tab_view.visible is self._commit_panel
         self.navigate_product("commit")
         if already_on_commit:
             # Already on Commit (route_to no-ops); refresh the title directly.

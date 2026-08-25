@@ -64,10 +64,10 @@ class ComponentRoot(Component):
         if key_handlers:
             self._key_handlers.update(key_handlers)
 
-    def activate(self) -> None:
-        """Activate the root and propagate to the body component tree."""
-        super().activate()
-        self._body.activate()
+    def mount(self) -> None:
+        """Activate the root and propagate mount to the body component tree."""
+        super().mount()
+        self._body.mount()
         # Reset stale badge from previous sessions.
         sig = get_badge_signal()
         if sig.value is not None:

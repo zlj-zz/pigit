@@ -41,7 +41,7 @@ def _mount(
     runtime.focus_manager = root._focus_manager
     root._app_on_event = app.on_event
     app._root = root
-    root.activate()
+    root.mount()
     root.resize((80, 24))
     return app, root
 
@@ -96,12 +96,12 @@ def test_tab_on_diff_closes_detail_and_cycles(runtime):
         source=app._status_panel,
         content=["+a"],
     )
-    app._body_host.show_detail()
-    assert app._body_host.is_detail_open
+    app._body_view.show(app._diff_panel)
+    assert app._is_detail_open()
     assert _leaf(root) is app._diff_panel
 
     root._handle_event(keys.KEY_TAB)
-    assert not app._body_host.is_detail_open
+    assert not app._is_detail_open()
     assert _leaf(root) is app._stash_panel
 
 

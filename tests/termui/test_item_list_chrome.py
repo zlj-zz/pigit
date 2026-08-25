@@ -21,16 +21,16 @@ class _MarkChrome(Component):
     def __init__(self, mark: str) -> None:
         super().__init__()
         self.mark = mark
-        self.activated = False
+        self.mounted = False
         self.destroyed = False
 
-    def activate(self) -> None:
-        super().activate()
-        self.activated = True
+    def mount(self) -> None:
+        super().mount()
+        self.mounted = True
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        self.activated = False
+    def unmount(self) -> None:
+        super().unmount()
+        self.mounted = False
 
     def destroy(self) -> None:
         self.destroyed = True
@@ -165,10 +165,10 @@ def test_slots_lifecycle_forwarded_and_not_in_children():
     lst = ItemList(content=["a"], size=(20, 5), header=header, footer=footer)
     assert header not in lst.children
     assert footer not in lst.children
-    lst.activate()
-    assert header.activated and footer.activated
-    lst.deactivate()
-    assert not header.activated and not footer.activated
+    lst.mount()
+    assert header.mounted and footer.mounted
+    lst.unmount()
+    assert not header.mounted and not footer.mounted
     lst.destroy()
     assert header.destroyed and footer.destroyed
 

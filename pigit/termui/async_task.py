@@ -43,7 +43,7 @@ class AsyncTask(Generic[T]):
     Calling :meth:`cancel` marks the task as cancelled.  If the worker
     finishes after cancellation, its result is silently dropped.  If the
     callback has already been queued, it is still invoked; the callback
-    itself should check ``component.is_activated()`` to decide whether to
+    itself should check ``component.is_mounted()`` to decide whether to
     apply the result.
     """
 

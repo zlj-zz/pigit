@@ -52,7 +52,7 @@ class PanelNavigator:
     def ring_index(self) -> int | None:
         """Index in the panel ring from the product TabView (ignore Diff detail)."""
         tab = self._get_tab_view()
-        active = tab.active
+        active = tab.visible
         if active is self._get_status_stack():
             leaf = self._get_status_stack().focus_child
             if leaf is None:

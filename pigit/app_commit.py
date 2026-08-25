@@ -249,7 +249,7 @@ class CommitPanel(ItemList):
             on_done=dismiss_sheet,
         )
         show_sheet(sheet, max_fraction=0.5, title="Log ref")
-        sheet.activate()
+        sheet.mount()
 
     def _on_log_ref_picked(self, name: str) -> None:
         """Apply a ref chosen in the log-ref sheet."""
@@ -338,8 +338,8 @@ class CommitPanel(ItemList):
         source_idx = self._source_index(self.curr_no)
         return self._vm.get_inspector_snapshot(source_idx)
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._bind_vm_signals()
         self._vm.refresh()
 
@@ -351,7 +351,7 @@ class CommitPanel(ItemList):
             )
 
     def _on_items_changed(self) -> None:
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         commits = self._vm.items.value
         self._all_commits = list(commits)
@@ -401,8 +401,8 @@ class CommitPanel(ItemList):
         self._build_row_cache()
         self._notify_change()
 
-    def deactivate(self) -> None:
-        super().deactivate()
+    def unmount(self) -> None:
+        super().unmount()
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()

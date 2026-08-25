@@ -65,13 +65,13 @@ class BorderedBrowser(Component):
         """Delegate wheel events to the inner browser."""
         return self._browser.handle_mouse(event)
 
-    def activate(self) -> None:
-        super().activate()
-        self._browser.activate()
+    def mount(self) -> None:
+        super().mount()
+        self._browser.mount()
 
-    def deactivate(self) -> None:
-        self._browser.deactivate()
-        super().deactivate()
+    def unmount(self) -> None:
+        self._browser.unmount()
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Size the border frame and inner browser."""

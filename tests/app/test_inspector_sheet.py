@@ -202,7 +202,7 @@ def _mount(runtime: RuntimeContext) -> tuple[PigitApplication, ComponentRoot]:
     runtime.focus_manager = root._focus_manager
     root._app_on_event = app.on_event
     app._root = root
-    root.activate()
+    root.mount()
     root.resize((80, 24))
     return app, root
 
@@ -314,7 +314,7 @@ def test_inspector_load_dropped_when_placeholder_closed(runtime):
 
 def test_diff_view_toasts_no_inspector(runtime):
     app, root = _mount(runtime)
-    app._body_host.show_detail()
+    app._body_view.show(app._diff_panel)
     with patch("pigit.app.show_toast") as toast:
         app.open_inspector()
     toast.assert_called_once()

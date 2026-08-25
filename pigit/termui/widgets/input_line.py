@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from .. import keys
 from ..theme import get_theme
-from ..component import Component
+from ..component import Component, is_on_visible_paint_path
 from .._runtime_context import get_focus_manager, request_render
 from ..surface import Surface
 from ..reactive import Signal
@@ -81,8 +81,8 @@ class InputLine(Component):
         self._request_render()
 
     def _request_render(self) -> None:
-        """Request a render if this component is currently activated."""
-        if self.is_activated():
+        """Request a render when mounted and on the visible paint path."""
+        if self.is_mounted() and is_on_visible_paint_path(self):
             request_render()
 
     def destroy(self) -> None:

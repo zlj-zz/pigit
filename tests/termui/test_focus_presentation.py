@@ -86,6 +86,36 @@ class TestResolveFocusLeaf:
         assert calls["n"] >= 1
         assert resolve_focus_leaf(col) is a
 
+    def test_set_focus_index_keeps_siblings_mounted(self):
+        """Warm focus: switching focus must not unmount siblings (still painted)."""
+        a = _KeyLeaf()
+        b = _KeyLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=0)
+        col.mount()
+        assert a.is_mounted() and b.is_mounted()
+        col.set_focus_index(1)
+        assert a.is_mounted() and b.is_mounted()
+        assert resolve_focus_leaf(col) is b
+
+    def test_set_focus_index_calls_on_focus(self):
+        class _FocusLeaf(_KeyLeaf):
+            def __init__(self) -> None:
+                super().__init__()
+                self.focus_hits = 0
+
+            def on_focus(self) -> None:
+                self.focus_hits += 1
+
+        a = _FocusLeaf()
+        b = _FocusLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=0)
+        col.mount()
+        assert a.focus_hits == 1
+        assert b.focus_hits == 0
+        col.set_focus_index(1)
+        assert b.focus_hits == 1
+        assert a.focus_hits == 1
+
 
 class TestResolvePresentationLeaf:
     def test_follows_presentation_child(self):

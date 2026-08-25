@@ -18,6 +18,7 @@ from pigit.termui import (
     Component,
     MouseEvent,
     Surface,
+    is_on_visible_paint_path,
     render_child,
     run_async,
 )
@@ -74,21 +75,21 @@ class PreviewPanel(Component):
         self._load_task: AsyncTask[list[str]] | None = None
         self._request: _PreviewRequest | None = None
 
-    def activate(self) -> None:
+    def mount(self) -> None:
         """Activate the inner diff viewer and subscribe to selection changes."""
-        super().activate()
-        self._diff_viewer.activate()
+        super().mount()
+        self._diff_viewer.mount()
         self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
-    def deactivate(self) -> None:
-        """Cancel loads, unsubscribe, and deactivate the inner diff viewer."""
+    def unmount(self) -> None:
+        """Cancel loads, unsubscribe, and unmount the inner diff viewer."""
         self._cancel_load()
         self._set_preview_target(None)
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
-        self._diff_viewer.deactivate()
-        super().deactivate()
+        self._diff_viewer.unmount()
+        super().unmount()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
         """Start an async diff load for the active PreviewPayload panel."""
@@ -183,7 +184,7 @@ class PreviewPanel(Component):
 
     def _on_loaded(self, request: _PreviewRequest, lines: list[str]) -> None:
         """Apply a completed load if the selection key is still current."""
-        if not self.is_activated():
+        if not self.is_mounted() or not is_on_visible_paint_path(self):
             return
         if self._request is None or self._request.key != request.key:
             return

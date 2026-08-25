@@ -35,7 +35,7 @@ class TestItemListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel.mount()
             sel.curr_no = 1
             assert len(render_calls) == 1
         finally:
@@ -46,7 +46,7 @@ class TestItemListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             sel = ItemList(content=["a", "b", "c"], size=(10, 1))
-            sel.activate()
+            sel.mount()
             sel._r_start = 1
             assert len(render_calls) == 1
         finally:
@@ -57,7 +57,7 @@ class TestItemListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel.mount()
             sel.next()
             assert len(render_calls) == 1
             sel.previous()
@@ -81,7 +81,7 @@ class TestItemListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel.mount()
             sel.destroy()
             sel.curr_no = 2
             assert len(render_calls) == 0
@@ -95,7 +95,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.toggle(0)
             assert len(render_calls) == 1
             cl.toggle(0)
@@ -108,7 +108,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.select_all()
             assert len(render_calls) == 1
         finally:
@@ -119,7 +119,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.select_all()
             render_calls.clear()
             cl.select_none()
@@ -132,7 +132,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.destroy()
             cl.toggle(0)
             assert len(render_calls) == 0
@@ -146,7 +146,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.insert("a")
             # insert() changes both value and cursor -> 2 requests (coalesced to 1 render)
             assert len(render_calls) == 2
@@ -158,7 +158,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.set_value("ab")
             render_calls.clear()
             inp.backspace()
@@ -172,7 +172,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.set_value("ab")
             render_calls.clear()
             inp.cursor_left()
@@ -196,7 +196,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.destroy()
             inp.insert("a")
             assert len(render_calls) == 0

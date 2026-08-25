@@ -1,6 +1,6 @@
 """
 Module: pigit/termui/containers/tab_view.py
-Description: Tabbed component stack container.
+Description: Tabbed component stack with cold exclusive visibility.
 Author: Zev
 Date: 2026-05-17
 """
@@ -8,21 +8,18 @@ Date: 2026-05-17
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
-from ..component import Component, render_child, resolve_focus_leaf
+from ..component import Component, resolve_focus_leaf
 from .._runtime_context import get_focus_manager
 from ..types import EventType, EVT_GOTO
+from .exclusive_base import ExclusiveBase
 
 _logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from ..surface import Surface
 
-
-class TabView(Component):
-    """Tabbed component stack: only the activated sub-component is rendered."""
+class TabView(ExclusiveBase):
+    """Tabbed stack: only the visible child is painted (cold unmount on switch)."""
 
     def __init__(
         self,
@@ -46,52 +43,34 @@ class TabView(Component):
         self._start_id = start
         self._resolve_start()
 
-    def _id_map(self) -> dict[str, Component]:
-        return {c.id: c for c in self.children if c.id}
-
     def _resolve_start(self) -> None:
         """Resolve start id to component reference after children are ready."""
         id_map = self._id_map()
 
         resolved = id_map.get(self._start_id) if self._start_id else None
         if resolved is not None:
-            self._active = resolved
+            self._visible = resolved
         else:
             if self._start_id:
                 _logger.warning(
                     "TabView start id '%s' not found, falling back to first child",
                     self._start_id,
                 )
-            self._active = self.children[0]
-        self._active.activate()
+            self._visible = self.children[0]
+        self._visible.mount()
         fm = get_focus_manager()
         if fm is not None:
-            fm.set_focus_chain(resolve_focus_leaf(self._active))
+            fm.set_focus_chain(resolve_focus_leaf(self._visible))
 
-    @property
-    def active(self) -> Component | None:
-        """Return the currently active child panel."""
-        return self._active
+    def mount(self) -> None:
+        super().mount()
+        if self._visible is not None:
+            self._visible.mount()
 
-    @property
-    def focus_child(self) -> Component | None:
-        """Focus drills into the active tab."""
-        return self._active
-
-    @property
-    def presentation_child(self) -> Component | None:
-        """Chrome / help resolve to the active tab panel."""
-        return self._active
-
-    def activate(self) -> None:
-        super().activate()
-        if self._active is not None:
-            self._active.activate()
-
-    def deactivate(self) -> None:
-        super().deactivate()
-        for child in self.children:
-            child.deactivate()
+    def unmount(self) -> None:
+        if self._visible is not None:
+            self._visible.unmount()
+        super().unmount()
 
     def route_to(self, target: str | Component) -> Component | None:
         """Switch to the child identified by id string or component reference.
@@ -108,17 +87,17 @@ class TabView(Component):
         resolved = self._id_map().get(tid)
         if resolved is None:
             return None
-        if resolved is self._active:
+        if resolved is self._visible:
             return resolved
         # Force full redraw; previous panel content would otherwise ghost
         # through incremental row diff.
         r = self.renderer
         if r is not None:
             r.clear_cache()
-        if self._active is not None:
-            self._active.deactivate()
-        resolved.activate()
-        self._active = resolved
+        if self._visible is not None:
+            self._visible.unmount()
+        resolved.mount()
+        self._visible = resolved
         fresh_fn = getattr(resolved, "refresh", None)
         if callable(fresh_fn):
             try:
@@ -141,11 +120,8 @@ class TabView(Component):
         if isinstance(target, str):
             return target
         if isinstance(target, Component):
-            # Direct child
             if target in self.children and target.id:
                 return target.id
-            # Descendant of a direct child — walk up from target to find
-            # the ancestor that is a direct child of this TabView.
             node: Component | None = target.parent
             while node is not None and node is not self:
                 if node in self.children and node.id:
@@ -160,8 +136,8 @@ class TabView(Component):
             target_id = self._resolve_target_id(target)
             if target_id:
                 self.route_to(target_id)
-                if self._active is not None:
-                    self._active.update(action, **data)
+                if self._visible is not None:
+                    self._visible.update(action, **data)
             else:
                 _logger.warning(
                     "TabView.goto: target %r not found in children",
@@ -169,24 +145,3 @@ class TabView(Component):
                 )
             return
         _logger.warning("TabView: unsupported action %r", action)
-
-    def resize(self, size: tuple[int, int]) -> None:
-        """Resize the container and propagate the new size to all children."""
-        self._size = size
-        for child in self.children:
-            child.resize(size)
-
-    def paint(self, surface: Surface) -> None:
-        if self._active is not None:
-            render_child(self._active, surface, "TabView")
-
-    def _handle_event(self, key: str) -> bool:
-        if self._active is not None:
-            return self._active._handle_event(key)
-        return False
-
-    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
-        """Only the active child is rendered, so only it is hit-testable."""
-        if self._active is not None:
-            return self._active._hit_test(col, row)
-        return None

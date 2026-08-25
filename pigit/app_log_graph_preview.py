@@ -17,6 +17,7 @@ from pigit.termui import (
     Component,
     MouseEvent,
     Surface,
+    is_on_visible_paint_path,
     run_async,
     Segment,
 )
@@ -65,20 +66,20 @@ class LogGraphPreview(Component):
     def _title(self) -> str:
         return self._frame_browser._title
 
-    def activate(self) -> None:
+    def mount(self) -> None:
         """Activate the graph browser and subscribe to selection changes."""
-        super().activate()
-        self._frame_browser.activate()
+        super().mount()
+        self._frame_browser.mount()
         self._unsubs.append(self.subscribe(EVT_SELECTION_CHANGED, self._on_selection))
 
-    def deactivate(self) -> None:
-        """Cancel any pending load, unsubscribe, and deactivate the browser."""
+    def unmount(self) -> None:
+        """Cancel any pending load, unsubscribe, and unmount the browser."""
         self._cancel_load()
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
-        self._frame_browser.deactivate()
-        super().deactivate()
+        self._frame_browser.unmount()
+        super().unmount()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
         """Start a background graph load for the selected branch."""
@@ -117,7 +118,7 @@ class LogGraphPreview(Component):
 
     def _on_graph_loaded(self, name: str, lines: list[str]) -> None:
         """Apply a completed graph load if the selection is still current."""
-        if not self.is_activated():
+        if not self.is_mounted() or not is_on_visible_paint_path(self):
             return
         if self._requested_branch != name:
             return

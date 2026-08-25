@@ -146,7 +146,7 @@ class TestTabView:
 
         # route_to switches to secondary
         tv.route_to("secondary")
-        assert secondary.is_activated() is True
+        assert secondary.is_mounted() is True
 
         # key "k" delegates to active child
         received.clear()
@@ -176,7 +176,7 @@ class TestTabView:
 
         assert children[
             expected_active_idx
-        ].is_activated(), f"child[{expected_active_idx}] should be activated"
+        ].is_mounted(), f"child[{expected_active_idx}] should be activated"
 
     @pytest.mark.parametrize(
         "action, data",
@@ -644,12 +644,12 @@ class TestItemListLazyLoad:
                 self.set_content(["ready"])
 
         p = DemoPanel(size=(12, 4), lazy_load=True)
-        p.deactivate()
+        p.unmount()
         p.resize((12, 4))
         assert DemoPanel.fresh_calls == 0
         assert p.content == ["Loading..."]
 
-        p.activate()
+        p.mount()
         p.resize((12, 4))
         assert DemoPanel.fresh_calls == 1
         assert p.content == ["ready"]
@@ -665,10 +665,10 @@ class TestItemListLazyLoad:
                 self.set_content(["a", "b"])
 
         p = DemoPanel2(size=(12, 4), lazy_load=True)
-        p.activate()
+        p.mount()
         p.resize((12, 4))
         assert DemoPanel2.fresh_calls == 1
-        p.deactivate()
+        p.unmount()
         p.resize((20, 10))
         assert DemoPanel2.fresh_calls == 1
         assert p.content == ["a", "b"]

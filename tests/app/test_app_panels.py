@@ -287,7 +287,7 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.refresh.assert_called_once()
 
     def test_deactivate_disposes_vm(self):
@@ -300,8 +300,8 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
-        panel.deactivate()
+        panel.mount()
+        panel.unmount()
         vm.dispose.assert_called_once()
 
     def test_items_changed_updates_content(self):
@@ -315,7 +315,7 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Branch("main", "0", "0", True)])
         assert len(panel.content) == 1
         assert panel.branches[0].name == "main"
@@ -334,7 +334,7 @@ class TestBranchPanelLifecycle:
         monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Branch("dev", "0", "0", True)])
         panel.create_pull_request()
 
@@ -354,7 +354,7 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.refresh.assert_called_once()
 
     def test_deactivate_disposes_vm(self):
@@ -367,8 +367,8 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
-        panel.deactivate()
+        panel.mount()
+        panel.unmount()
         vm.dispose.assert_called_once()
 
     def test_items_changed_rebuilds_content(self):
@@ -384,7 +384,7 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Commit("abc1234", "msg", "Zev", 0, "pushed", "", [])])
         assert len(panel.commits) == 1
         assert panel.commits[0].sha == "abc1234"
@@ -406,7 +406,7 @@ class TestCommitPanelLifecycle:
         vm.graph_rows = []
         vm.remotes = ()
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
 
         old_tip = Commit(
             "7ae8c9792406ac728a9",
@@ -463,7 +463,7 @@ class TestCommitReport:
         vm.items = Signal([])
         vm.graph_rows = []
         panel = CommitPanel(vm=vm, report_default=report_default)
-        panel.activate()
+        panel.mount()
         return panel
 
     def test_hidden_at_or_below_19_rows(self):
@@ -520,7 +520,7 @@ class TestCommitReport:
         vm.items = Signal([])
         vm.graph_rows = []
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         now = int(datetime.datetime.now().timestamp())
         commits = [
             Commit(

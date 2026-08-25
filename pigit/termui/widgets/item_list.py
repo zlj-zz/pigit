@@ -14,7 +14,7 @@ import logging
 
 from .. import keys, palette
 from ..theme import get_theme
-from ..component import Component, ComponentError
+from ..component import Component, ComponentError, is_on_visible_paint_path
 from ..mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
 from ..segment import Segment
@@ -146,11 +146,11 @@ class ItemList(Component):
         return want
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Resize the selector and refresh content if activated or not lazy."""
+        """Resize the selector and refresh content if mounted or not lazy."""
         self._size = size
         self._sync_chrome_bands()
         if self._lazy_load:
-            if self.is_activated():
+            if self.is_mounted():
                 self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
@@ -419,12 +419,16 @@ class ItemList(Component):
         self._request_render()
 
     def _request_render(self) -> None:
-        """Request a render if this component is currently activated."""
-        activated = self.is_activated()
+        """Request a render when mounted and on the visible paint path."""
+        mounted = self.is_mounted()
+        on_path = is_on_visible_paint_path(self)
         _logger.debug(
-            "[RENDER] %s._request_render activated=%s", type(self).__name__, activated
+            "[RENDER] %s._request_render mounted=%s on_path=%s",
+            type(self).__name__,
+            mounted,
+            on_path,
         )
-        if activated:
+        if mounted and on_path:
             request_render()
 
     @property
@@ -445,21 +449,21 @@ class ItemList(Component):
     def _r_start(self, value: int) -> None:
         self._r_start_sig.set(value)
 
-    def activate(self) -> None:
+    def mount(self) -> None:
         """Activate the list and any chrome slots."""
-        super().activate()
+        super().mount()
         if self._header is not None:
-            self._header.activate()
+            self._header.mount()
         if self._footer is not None:
-            self._footer.activate()
+            self._footer.mount()
 
-    def deactivate(self) -> None:
-        """Deactivate chrome slots then the list."""
+    def unmount(self) -> None:
+        """Unmount chrome slots then the list."""
         if self._header is not None:
-            self._header.deactivate()
+            self._header.unmount()
         if self._footer is not None:
-            self._footer.deactivate()
-        super().deactivate()
+            self._footer.unmount()
+        super().unmount()
 
     def destroy(self) -> None:
         """Tear down chrome slots, unsubscribe signals, then destroy."""

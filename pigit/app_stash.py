@@ -96,12 +96,22 @@ class StashPanel(ItemList):
         )
         self.stashes: list[Stash] = []
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        # Warm-mounted under Status Column: do not run git here — load on focus.
+        super().mount()
+
+    def on_focus(self) -> None:
+        """Reload stash list when this panel becomes the focused Column child."""
         self._load_stashes()
 
     def _load_stashes(self) -> None:
-        self.stashes = self._vm.load_stashes()
+        try:
+            self.stashes = self._vm.load_stashes()
+        except Exception as exc:
+            self.stashes = []
+            self.set_content([])
+            show_toast(str(exc), duration=2.0, kind=FeedbackKind.ERROR)
+            return
         if not self.stashes:
             self.set_content([])
             return

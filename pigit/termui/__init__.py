@@ -27,6 +27,7 @@ from .component import (
     Component,
     ComponentError,
     bind_signals,
+    is_on_visible_paint_path,
     render_child,
     resolve_presentation_leaf,
 )
@@ -94,6 +95,7 @@ __all__ = [
     "bind_signals",
     "render_child",
     "resolve_presentation_leaf",
+    "is_on_visible_paint_path",
     # Root & App
     "ComponentRoot",
     "Application",

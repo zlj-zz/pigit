@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Sequence
 
-from ..component import Component, resolve_focus_leaf
+from ..component import Component, mount_children, resolve_focus_leaf, unmount_children
 from .._layout import layout_flex
 from .._runtime_context import get_focus_manager, request_render
 from ..types import EventType, EVT_SELECTION_CHANGED
@@ -118,7 +118,7 @@ class Column(Component):
         return self._focused_child()
 
     def set_focus_index(self, idx: int) -> None:
-        """Set the focused child by index, handling activate/deactivate and notify.
+        """Set the focused child by index; keep siblings mounted (warm focus).
 
         Same-index calls only re-assert the focus chain (e.g. return from Diff)
         and do not re-emit chrome events.
@@ -141,31 +141,25 @@ class Column(Component):
             type(new_child).__name__ if new_child else None,
             self._focus_index,
         )
-        if old_child is not None and old_child is not new_child:
-            old_child.deactivate()
-        if new_child is not None and new_child is not old_child:
-            new_child.activate()
         if new_child is not None:
             fm = get_focus_manager()
             if fm is not None:
                 fm.set_focus_chain(resolve_focus_leaf(new_child))
+            new_child.on_focus()
         self.emit(EventType("mode_changed"), mode="")
         self.emit(EVT_SELECTION_CHANGED)
         request_render()
 
-    def activate(self) -> None:
-        super().activate()
-        child = self._focused_child()
-        if child is not None:
-            child.activate()
-        else:
-            for child in self.children:
-                child.activate()
+    def mount(self) -> None:
+        super().mount()
+        mount_children(self)
+        focused = self._focused_child()
+        if focused is not None:
+            focused.on_focus()
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        for child in self.children:
-            child.deactivate()
+    def unmount(self) -> None:
+        unmount_children(self)
+        super().unmount()
 
     def accept(self, action: EventType, **data) -> None:
         """Broadcast action to all children. Skip leaf components that do not

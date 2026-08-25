@@ -166,7 +166,7 @@ class Application:
             root._event_loop = self._loop
             self._auto_setup_root(root)
             self.setup_root(root)
-            root.activate()
+            root.mount()
             self._loop.run()
         finally:
             try:

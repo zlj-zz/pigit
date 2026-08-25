@@ -37,7 +37,7 @@ def _mount(runtime: RuntimeContext) -> tuple[PigitApplication, ComponentRoot]:
     runtime.focus_manager = root._focus_manager
     root._app_on_event = app.on_event
     app._root = root
-    root.activate()
+    root.mount()
     root.resize((80, 24))
     return app, root
 

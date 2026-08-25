@@ -60,7 +60,7 @@ def _sync_async(monkeypatch):
 
 def _mount(bus: EventBus, preview: LogGraphPreview) -> ComponentRoot:
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     return root
 
 
@@ -127,7 +127,7 @@ def test_deactivate_unsubscribes(preview: LogGraphPreview, vm: Mock) -> None:
     _mount(bus, preview)
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "feat"))
     assert vm.load_log_graph.call_count == 1
-    preview.deactivate()
+    preview.unmount()
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "other"))
     assert vm.load_log_graph.call_count == 1
 
@@ -138,7 +138,7 @@ def test_graph_loads_when_branch_list_arrives(
     """Tab switch happens before async load_branches; preview must follow items."""
     bus = EventBus()
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     panel = BranchPanel(vm=vm)
     panel.parent = root
 
@@ -147,7 +147,7 @@ def test_graph_loads_when_branch_list_arrives(
         return bus.publish(action, **data)
 
     root._app_on_event = _publish
-    panel.activate()
+    panel.mount()
 
     bus.publish(EVT_SELECTION_CHANGED, active=panel)
     vm.load_log_graph.assert_not_called()
@@ -190,7 +190,7 @@ def test_branch_jk_scrolls_preview(
 ) -> None:
     preview.resize((24, 10))
     preview.set_lines([f"* c{i}" for i in range(40)], title="feat")
-    preview.activate()
+    preview.mount()
     monkeypatch.setattr("pigit.app_branch.by_id", lambda *_args, **_kwargs: preview)
     panel = _branch_panel(vm)
     panel._scroll_preview_down()

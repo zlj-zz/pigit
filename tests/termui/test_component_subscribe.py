@@ -26,7 +26,7 @@ def test_subscribe_after_mount_is_immediate() -> None:
     root = ComponentRoot(leaf, event_bus=bus)
     leaf.parent = root
 
-    leaf.activate()
+    leaf.mount()
     leaf.subscribe(EVT_SELECTION_CHANGED, leaf._handler)
     bus.publish(EVT_SELECTION_CHANGED, msg="hi")
 
@@ -44,7 +44,7 @@ def test_subscribe_before_mount_is_replayed() -> None:
     # Mount: pending subscriptions are replayed onto the bus.
     root = ComponentRoot(leaf, event_bus=bus)
     leaf.parent = root
-    leaf.activate()
+    leaf.mount()
 
     bus.publish(EVT_SELECTION_CHANGED, msg="queued")
     assert leaf.calls == ["queued"]
@@ -65,8 +65,8 @@ class _SubscribingLeaf(Component):
         self.calls.append(msg)
         return True
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self.subscribe(EVT_SELECTION_CHANGED, self._handler)
 
 
@@ -76,12 +76,12 @@ def test_activate_is_reentrant() -> None:
     root = ComponentRoot(leaf, event_bus=bus)
     leaf.parent = root
 
-    leaf.activate()
+    leaf.mount()
     bus.publish(EVT_SELECTION_CHANGED, msg="a")
     assert leaf.calls == ["a"]
 
     # Activate again: should unsubscribe previous and re-subscribe once.
-    leaf.activate()
+    leaf.mount()
     bus.publish(EVT_SELECTION_CHANGED, msg="b")
     assert leaf.calls == ["a", "b"]
 
@@ -92,11 +92,11 @@ def test_deactivate_unsubscribes() -> None:
     root = ComponentRoot(leaf, event_bus=bus)
     leaf.parent = root
 
-    leaf.activate()
+    leaf.mount()
     bus.publish(EVT_SELECTION_CHANGED, msg="hi")
     assert leaf.calls == ["hi"]
 
-    leaf.deactivate()
+    leaf.unmount()
     bus.publish(EVT_SELECTION_CHANGED, msg="gone")
     assert leaf.calls == ["hi"]
 
@@ -110,7 +110,7 @@ def test_delayed_unsubscribe_before_mount() -> None:
     bus = EventBus()
     root = ComponentRoot(leaf, event_bus=bus)
     leaf.parent = root
-    leaf.activate()
+    leaf.mount()
 
     bus.publish(EVT_SELECTION_CHANGED, msg="nope")
     assert leaf.calls == []

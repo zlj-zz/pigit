@@ -11,5 +11,12 @@ from .tab_view import TabView
 from .column import Column
 from .row import Row
 from .split_pane import SplitPane
+from .exclusive_view import ExclusiveView
 
-__all__ = ["TabView", "Column", "Row", "SplitPane"]
+__all__ = [
+    "Column",
+    "Row",
+    "SplitPane",
+    "TabView",
+    "ExclusiveView",
+]

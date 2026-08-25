@@ -46,8 +46,8 @@ class LogRefSheet(ItemList):
         self.set_source_items(self._all, text_of=lambda name: name)
         self.set_filter(self.search_query)
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._sync_filter()
         if self._current_ref in self.content:
             self.curr_no = self.content.index(self._current_ref)

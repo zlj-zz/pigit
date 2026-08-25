@@ -27,7 +27,8 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
         for i, msg in enumerate(msgs)
     ]
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     return panel
 
 
@@ -81,7 +82,8 @@ def test_drop_requires_confirmation():
     ]
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
 
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
@@ -108,7 +110,8 @@ def test_drop_empty_list_is_noop():
     vm.load_stashes.return_value = []
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
         panel.drop()
         alert.assert_not_called()
@@ -125,7 +128,8 @@ def test_apply_keeps_stash_without_confirmation():
         return_value=ActionResult(success=True, message="Applied stash")
     )
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
     with patch("pigit.app_stash.show_badge"):
         panel.apply()
@@ -141,7 +145,8 @@ def test_get_inspector_snapshot_delegates_to_vm():
     ]
     vm.get_stash_snapshot.return_value = object()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
     assert panel.get_inspector_snapshot() is vm.get_stash_snapshot.return_value
     vm.get_stash_snapshot.assert_called_once_with("stash@{0}")
@@ -152,7 +157,7 @@ def test_get_inspector_snapshot_empty_is_none():
     vm.items = Signal([])
     vm.load_stashes.return_value = []
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
     assert panel.get_inspector_snapshot() is None
 
 
@@ -162,6 +167,6 @@ def test_apply_empty_list_is_noop():
     vm.load_stashes.return_value = []
     vm.stash_apply = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
     panel.apply()
     vm.stash_apply.assert_not_called()
