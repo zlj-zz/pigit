@@ -10,7 +10,7 @@ from __future__ import annotations
 from ..component import Component
 from ..mouse import MouseButton, MouseKind, MouseEvent
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..theme import get_theme
 
 _USE_THEME_BG = object()
@@ -54,7 +54,7 @@ class LineTextBrowser(Component):
         self._max_line = size[1]
         super().resize(size)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         rows = self._visible_rows()
         if rows is None:
             return

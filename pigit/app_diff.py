@@ -22,6 +22,7 @@ from pigit.termui import (
     EVT_GOTO,
     AsyncTask,
     Component,
+    Surface,
     bind_action,
     palette,
     request_render,
@@ -942,7 +943,7 @@ class DiffViewer(LineTextBrowser):
                 clip_left=text_start,
             )
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         can_draw_box = w > self.LINE_NO_WIDTH + 3 and h >= self.BORDER_ROWS + 1
@@ -1027,7 +1028,7 @@ class DiffViewer(LineTextBrowser):
                     style_flags=palette.STYLE_BOLD,
                 )
 
-    def _render_surface_borderless(self, surface) -> None:
+    def _render_surface_borderless(self, surface: Surface) -> None:
         """Original rendering without box border, used when surface is too small."""
         w = surface.width
         h = surface.height

@@ -18,7 +18,7 @@ from ..types import EventType, EVT_GOTO
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..surface import SurfaceView
+    from ..surface import Surface
 
 
 class TabView(Component):
@@ -176,7 +176,7 @@ class TabView(Component):
         for child in self.children:
             child.resize(size)
 
-    def _render_surface(self, surface: SurfaceView) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if self._active is not None:
             render_child(self._active, surface, "TabView")
 

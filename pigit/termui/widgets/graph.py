@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from .. import palette
 from ..component import Component
+from ..surface import Surface
 from ..wcwidth_table import wcswidth
 
 # Box-drawing characters
@@ -101,7 +102,7 @@ class HeatmapGrid(Component):
         level = max(1, min(max_level, int(ratio * (max_level - 1)) + 1))
         return self._colors[level]
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         cell_w = wcswidth(self._cell_char)
         max_col = surface.width
         max_row = surface.height
@@ -172,7 +173,7 @@ class StepLineChart(Component):
         for s in self._series.values():
             self._overall_max = max(self._overall_max, max(s) if s else 0)
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         plot_w = self._plot_w
         plot_h = self._plot_h
         title_h = 1 if self._title else 0

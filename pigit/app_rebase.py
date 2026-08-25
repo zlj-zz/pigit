@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pigit.termui import (
     Segment,
     FeedbackKind,
+    Surface,
     bind_action,
     exec_external,
     palette,
@@ -213,7 +214,7 @@ class RebasePanel(ItemList):
         ]
         return left, main, []
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Render the list, reserving the last row for shortcut hints."""
         height = self._size[1]
         if height <= 1:

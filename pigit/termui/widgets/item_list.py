@@ -18,7 +18,7 @@ from ..component import Component, ComponentError
 from ..mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..reactive import Signal
 from ..types import EVT_SELECTION_CHANGED
 from ..wcwidth_table import truncate_by_width, wcswidth
@@ -184,7 +184,7 @@ class ItemList(Component):
             self._on_search_changed()
         self._request_render()
 
-    def _draw_search_bar(self, surface: Surface | _Subsurface) -> None:
+    def _draw_search_bar(self, surface: Surface) -> None:
         """Draw the search/filter bar on the bottom row of ``surface``."""
         if not self._search_query and not self._search_active:
             return
@@ -387,7 +387,7 @@ class ItemList(Component):
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         """Viewport loop — delegates to describe_row for each visible item."""
         if not self.content:
             if self.empty_state is not None:
@@ -415,7 +415,7 @@ class ItemList(Component):
         if self._search_query or self._search_active:
             self._draw_search_bar(surface)
 
-    def _render_empty_state(self, surface: Surface | _Subsurface) -> None:
+    def _render_empty_state(self, surface: Surface) -> None:
         """Render empty-state segments centered on the surface."""
         w = surface.width
         h = surface.height
@@ -493,7 +493,7 @@ class ItemList(Component):
 
     def _draw_row_layout(
         self,
-        surface: Surface | _Subsurface,
+        surface: Surface,
         row: int,
         left: Sequence[Segment],
         main: Sequence[Segment] | None,

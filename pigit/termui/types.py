@@ -11,7 +11,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from .surface import SurfaceView
+    from .surface import Surface
 
 # ---------------------------------------------------------------------------
 # EventType — unified event identifier
@@ -115,7 +115,7 @@ class OverlaySurface(Protocol):
 
     def hide(self) -> None: ...
 
-    def _render_surface(self, surface: SurfaceView) -> None: ...
+    def _render_surface(self, surface: Surface) -> None: ...
 
 
 @runtime_checkable

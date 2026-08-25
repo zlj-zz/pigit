@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from .types import LayerKind, OverlayDispatchResult
 
 if TYPE_CHECKING:
-    from .surface import Surface, _Subsurface
+    from .surface import Surface
 
 _VISIBLE_LAYER_KINDS = (LayerKind.TOAST, LayerKind.SHEET, LayerKind.MODAL)
 
@@ -86,7 +86,7 @@ class LayerStack:
         """Return True if any layer contains at least one surface."""
         return any(not layer.is_empty() for layer in self._layers.values())
 
-    def render(self, surface: Surface | _Subsurface) -> None:
+    def render(self, surface: Surface) -> None:
         """Render all open overlays onto the given surface."""
         for kind in _VISIBLE_LAYER_KINDS:
             for overlay in self._layers[kind]:

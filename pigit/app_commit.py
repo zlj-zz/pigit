@@ -18,6 +18,7 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
+    Surface,
     bind_action,
     bind_signals,
     dismiss_sheet,
@@ -497,7 +498,7 @@ class CommitPanel(ItemList):
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
         return f"{sha} {msg}{tag_str}  {author}  {rel}"
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self.content:
             return
         if self._report_h:

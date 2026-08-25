@@ -245,7 +245,7 @@ class ContributionGraph(Component):
         """Public entry to render this graph into the given surface."""
         self._render_surface(surface)
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         w = min(surface.width, self._size[0] if self._size else surface.width)
         h = min(surface.height, self._size[1] if self._size else surface.height)
         if w <= 0 or h <= 0:

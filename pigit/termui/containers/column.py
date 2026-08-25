@@ -19,7 +19,7 @@ from ..types import EventType, EVT_SELECTION_CHANGED
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class Column(Component):
@@ -89,7 +89,7 @@ class Column(Component):
             )
             offset_v += h
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:

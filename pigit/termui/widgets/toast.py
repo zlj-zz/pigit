@@ -17,7 +17,7 @@ from ..component import Component
 from ..feedback import FeedbackKind, style_for
 from ..primitives.frame import BoxFrame
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..types import ToastPosition, OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 
@@ -250,7 +250,7 @@ class Toast(Component):
             self._event_loop.remove_interval(self._timer_id)
             self._timer_id = None
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self.open:
             return
 

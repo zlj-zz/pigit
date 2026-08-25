@@ -131,7 +131,9 @@ Locked decisions (see `docs/superpowers/specs/2026-08-20-termui-public-api-expor
 - Text/diff/layout helpers live in **`primitives`** (not root).
 - Hard cut: no deprecated root re-exports when moving symbols.
 - `palette` remains on root for now.
-- Do **not** export `_Subsurface`.
+- Drawing buffer is a single type: **`Surface`**. Views from `subsurface` /
+  `subsurface_with_margin` share the root buffer; `clear` / `rows` / `lines`
+  are root-only. Do not reintroduce `_Subsurface` / `SurfaceView`.
 
 When changing root exports:
 

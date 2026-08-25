@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from .. import palette
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class BoxFrame:
@@ -51,7 +51,7 @@ class BoxFrame:
     def outer_height(self) -> int:
         return self.inner_height + 2
 
-    def draw(self, surface: Surface | _Subsurface, row: int = 0, col: int = 0) -> None:
+    def draw(self, surface: Surface, row: int = 0, col: int = 0) -> None:
         """Draw border onto surface at (row, col)."""
         surface.draw_box_rgb(
             row,

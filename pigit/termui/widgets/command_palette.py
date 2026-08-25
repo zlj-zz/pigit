@@ -13,6 +13,7 @@ from typing import NamedTuple
 from .. import keys, palette
 from ..theme import get_theme
 from ..component import Component
+from ..surface import Surface
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 from .input_line import InputLine
@@ -233,7 +234,7 @@ class CommandPalette(Component):
         self._selected = 0
         self._scroll = 0
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if not self._active:
             return
         theme = get_theme()

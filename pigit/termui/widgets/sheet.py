@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ..component import Component
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..theme import get_theme
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
@@ -187,7 +187,7 @@ class Sheet(Component):
         self._child._handle_event(key)
         return OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         if self._size[1] <= 0:
             return
         y = self._origin_row(surface.height, self._size[1])
@@ -211,7 +211,7 @@ class Sheet(Component):
         """
         return self._bg
 
-    def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
+    def _draw_rule(self, sub: Surface, row: int) -> None:
         """Draw the facing-edge rule as a full-width line, optional title core."""
         theme = get_theme()
         fg_rule, fg_title, bg = theme.fg_dim, theme.fg_muted, self._sheet_bg()

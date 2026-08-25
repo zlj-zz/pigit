@@ -26,7 +26,7 @@ from pigit.termui.tty_io import terminal_size, truncate_line
 from pigit.termui.widgets import HelpPanel, InputLine, ItemList, StatusBar
 
 if TYPE_CHECKING:
-    from pigit.termui.surface import Surface, _Subsurface
+    from pigit.termui.surface import Surface
 
 PICK_EXIT_CTRL_C = 130
 
@@ -54,7 +54,7 @@ class PickerHeader(Component):
         super().__init__()
         self._title = title_line
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         cols = surface.width
         surface.draw_text_rgb(
             0,

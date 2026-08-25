@@ -16,7 +16,7 @@ from .._layout import layout_flex
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class SplitPane(Component):
@@ -118,7 +118,7 @@ class SplitPane(Component):
             )
             offset_h += w
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:

@@ -17,7 +17,7 @@ from ..theme import get_theme
 from .line_text_browser import LineTextBrowser
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class BorderedBrowser(Component):
@@ -83,7 +83,7 @@ class BorderedBrowser(Component):
         self._browser.y = 2
         self._browser.resize((inner_w, inner_h))
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w < 2 or h < 2:

@@ -454,7 +454,7 @@ class TestSheet:
         sub = child._render_surface.call_args[0][0]
         # Default: facing-edge rule; child gets sheet height minus 1
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (8, 0)
+        assert (sub._origin_row, sub._origin_col) == (8, 0)
         assert surface._rows[7][0].char == "─"
         assert surface._rows[7][19].char == "─"
 
@@ -470,7 +470,7 @@ class TestSheet:
         child._render_surface.assert_called_once()
         sub = child._render_surface.call_args[0][0]
         assert sub.height == 3
-        assert sub._to_parent(0, 0) == (7, 0)
+        assert (sub._origin_row, sub._origin_col) == (7, 0)
 
     def test_sheet_render_surface_with_border(self):
         child = MagicMock()
@@ -485,7 +485,7 @@ class TestSheet:
         sub = child._render_surface.call_args[0][0]
         # With border: child height is sheet height minus 1
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (8, 0)
+        assert (sub._origin_row, sub._origin_col) == (8, 0)
         assert surface._rows[7][0].char == "─"
         assert surface._rows[7][19].char == "─"
 
@@ -498,7 +498,7 @@ class TestSheet:
         sheet._render_surface(surface)
         sub = child._render_surface.call_args[0][0]
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (0, 0)
+        assert (sub._origin_row, sub._origin_col) == (0, 0)
         assert surface._rows[2][0].char == "─"
         assert surface._rows[2][19].char == "─"
         assert surface._rows[0][0].char != "─"
@@ -603,7 +603,7 @@ class TestSheet:
         surface = Surface(20, 10)
         sheet._render_surface(surface)
         sub = child._render_surface.call_args[0][0]
-        assert sub._to_parent(0, 0) == (0, 0)
+        assert (sub._origin_row, sub._origin_col) == (0, 0)
 
     def test_sheet_top_edge_resize_origin(self):
         child = MagicMock()

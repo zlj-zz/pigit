@@ -16,6 +16,7 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     Component,
     MouseEvent,
+    Surface,
     run_async,
     Segment,
 )
@@ -169,7 +170,7 @@ class LogGraphPreview(Component):
         """Wheel-scroll the inner browser; clicks are ignored."""
         return self._frame_browser.handle_mouse(event)
 
-    def _render_surface(self, surface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._frame_browser._render_surface(surface)
 
     @staticmethod

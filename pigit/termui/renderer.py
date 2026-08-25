@@ -185,6 +185,8 @@ class Renderer:
 
     def render_surface(self, surface: Surface) -> None:
         """Draw a full Surface to the terminal using row-level diff."""
+        if not surface.is_root:
+            raise ValueError("Renderer.render_surface requires a root Surface")
         lines = [self._row_to_str(row) for row in surface.rows()]
         curr_size = (surface.width, surface.height)
 

@@ -16,7 +16,7 @@ from pigit.termui._runtime_context import request_render
 from pigit.termui.segment import Segment
 
 if TYPE_CHECKING:
-    from pigit.termui.surface import Surface, _Subsurface
+    from pigit.termui.surface import Surface
     from pigit.termui.widgets import InputLine
 
 
@@ -52,7 +52,7 @@ class LintBar(Component):
         self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         subject = self._subject.value
         body = self._body.value
         segments: list[Segment] = []

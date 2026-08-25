@@ -23,7 +23,7 @@ from .widgets.sheet import DEFAULT_MAX_FRACTION
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
-    from .surface import Surface, _Subsurface
+    from .surface import Surface
     from .widgets import Sheet
 
 
@@ -191,7 +191,7 @@ class ComponentRoot(Component):
         self._layer_stack.resize(size)
         super().resize(size)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def _render_surface(self, surface: Surface) -> None:
         self._expire_toasts()
         self._expire_badge()
         self._body._render_surface(surface)

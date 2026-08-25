@@ -33,6 +33,17 @@ class TestRowToStr:
 
 
 class TestRenderSurface:
+    def test_rejects_view_surface(self):
+        r = Renderer(FakeSession())
+        root = Surface(4, 2)
+        view = root.subsurface(0, 0, 2, 2)
+        try:
+            r.render_surface(view)
+        except ValueError as exc:
+            assert "root" in str(exc).lower()
+        else:
+            raise AssertionError("render_surface should reject a view")
+
     def test_first_frame_does_full_clear(self):
         sess = FakeSession()
         r = Renderer(sess)
