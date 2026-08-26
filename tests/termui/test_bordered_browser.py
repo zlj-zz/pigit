@@ -12,7 +12,7 @@ from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.segment import Segment
 from pigit.termui.surface import Surface
 from pigit.termui.widgets.bordered_browser import BorderedBrowser
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser
 
 
 def test_set_title_and_string_content() -> None:
@@ -42,7 +42,7 @@ def test_scroll_and_wheel_delegate() -> None:
     assert browser._browser._i == 2
     down = MouseEvent(2, 2, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert browser.handle_mouse(down) is True
-    assert browser._browser._i == 2 + LineTextBrowser.WHEEL_SCROLL_LINES
+    assert browser._browser._i == 2 + TextBrowser.WHEEL_SCROLL_LINES
 
 
 def test_set_title_updates_frame() -> None:

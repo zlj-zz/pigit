@@ -3,7 +3,7 @@ Package: pigit.termui.widgets
 Description: Widget components for the TUI framework.
 
 Usage:
-    from pigit.termui.widgets import LineTextBrowser, OptionList, CheckList
+    from pigit.termui.widgets import TextBrowser, OptionList, CheckList
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .help_panel import HelpEntry, HelpPanel
 from .input_line import InputLine
 from .option_list import OptionList
 from .label import Label
-from .line_text_browser import LineTextBrowser
+from .text_browser import TextBrowser
 from .lint_bar import LintBar
 from .popup import AlertDialog, AlertDialogBody, Popup
 from .sheet import Sheet
@@ -43,7 +43,7 @@ __all__ = [
     "OptionList",
     "CheckList",
     "Label",
-    "LineTextBrowser",
+    "TextBrowser",
     "LintBar",
     "Popup",
     "Sheet",

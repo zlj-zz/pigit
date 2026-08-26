@@ -14,7 +14,7 @@ from ..primitives.frame import BoxFrame
 from ..mouse import MouseEvent
 from ..segment import Segment
 from ..theme import get_theme
-from .line_text_browser import LineTextBrowser
+from .text_browser import TextBrowser
 
 if TYPE_CHECKING:
     from ..surface import Surface
@@ -28,7 +28,7 @@ class BorderedBrowser(Component):
         self._title = title
         theme = get_theme()
         self._frame = BoxFrame(0, 0, title=title or None, fg=theme.fg_dim)
-        self._browser = LineTextBrowser(
+        self._browser = TextBrowser(
             x=2,
             y=2,
             content=[],

@@ -22,7 +22,7 @@ from pigit.termui.surface import Surface
 from pigit.termui._color import _ANSI_16_PALETTE
 from pigit.termui.event_bus import EventBus
 from pigit.termui.reactive import Signal
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser
 from pigit.viewmodels.branch import IBranchViewModel
 
 
@@ -106,7 +106,7 @@ def test_wheel_scrolls_graph(preview: LogGraphPreview) -> None:
     assert preview._browser._i == 0
     down = MouseEvent(2, 3, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert preview.handle_mouse(down) is True
-    assert preview._browser._i == LineTextBrowser.WHEEL_SCROLL_LINES
+    assert preview._browser._i == TextBrowser.WHEEL_SCROLL_LINES
 
 
 def test_clears_when_branch_has_no_selection(

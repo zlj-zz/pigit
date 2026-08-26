@@ -59,7 +59,7 @@ class LogGraphPreview(Component):
 
     @property
     def _browser(self):
-        """Inner LineTextBrowser (test and scroll helpers)."""
+        """Inner TextBrowser (test and scroll helpers)."""
         return self._frame_browser._browser
 
     @property

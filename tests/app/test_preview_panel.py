@@ -16,7 +16,7 @@ from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.root import ComponentRoot
 from pigit.termui.surface import Surface
 from pigit.termui.event_bus import EventBus
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser
 
 
 class _FakeStatusVM:
@@ -369,7 +369,7 @@ def test_wheel_scrolls_preview_content(preview: PreviewPanel) -> None:
     assert preview._diff_viewer._i == 0
     down = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert preview.handle_mouse(down) is True
-    assert preview._diff_viewer._i == LineTextBrowser.WHEEL_SCROLL_LINES
+    assert preview._diff_viewer._i == TextBrowser.WHEEL_SCROLL_LINES
     up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
     assert preview.handle_mouse(up) is True
     assert preview._diff_viewer._i == 0

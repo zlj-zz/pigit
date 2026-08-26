@@ -31,7 +31,7 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.syntax import SyntaxTokenizer
-from pigit.termui.widgets import AlertDialog, LineTextBrowser
+from pigit.termui.widgets import AlertDialog, TextBrowser
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -64,7 +64,7 @@ _Hunk = Hunk
 _RenderLine = RenderLine
 
 
-class DiffViewer(LineTextBrowser):
+class DiffViewer(TextBrowser):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
 
     keymap_namespace = "diff"
@@ -92,7 +92,7 @@ class DiffViewer(LineTextBrowser):
         word_diff: bool = False,
     ) -> None:
         super().__init__(x, y, size, [], id=id)
-        # LineTextBrowser sets _max_line to full height; adjust for border rows
+        # TextBrowser sets _max_line to full height; adjust for border rows
         if self._size[1] >= 3:
             self._max_line = self._size[1] - 2
         self._heatmap: list[str] = []
@@ -728,8 +728,8 @@ class DiffViewer(LineTextBrowser):
     def resize(self, size: tuple[int, int]) -> None:
         # Reserve BORDER_ROWS for top/bottom borders
         self._max_line = max(0, size[1] - self.BORDER_ROWS)
-        # Bypass LineTextBrowser.resize() which would reset _max_line to full height
-        super(LineTextBrowser, self).resize(size)
+        # Bypass TextBrowser.resize() which would reset _max_line to full height
+        super(TextBrowser, self).resize(size)
         # Recompute horizontal scroll bounds for the new viewport width.
         content_w = max(0, size[0] - self.BORDER_COLS)
         self._compute_max_col_offset(content_w=content_w)

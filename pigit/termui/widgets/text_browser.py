@@ -1,6 +1,6 @@
 """
-Module: pigit/termui/widgets/line_text_browser.py
-Description: Simple scrollable text browser widget.
+Module: pigit/termui/widgets/text_browser.py
+Description: Scrollable text browser for plain or segment rows.
 Author: Zev
 Date: 2026-05-16
 """
@@ -23,7 +23,7 @@ class _ThemeBg:
 _USE_THEME_BG = _ThemeBg()
 
 
-class LineTextBrowser(Component):
+class TextBrowser(Component):
     """Scrollable browser for plain strings or pre-styled segment rows."""
 
     WHEEL_SCROLL_LINES = 1
