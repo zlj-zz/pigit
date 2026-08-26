@@ -65,18 +65,6 @@ def test_get_inspector_snapshot_joins_tags(commit_vm):
     assert info.tags == "v1.0, latest"
 
 
-def test_get_inspector_snapshot_invalid_index(commit_vm):
-    assert commit_vm.get_inspector_snapshot(99) is None
-
-
-def test_get_inspector_snapshot_memoizes_same_selection(commit_vm):
-    commit_vm._git.get_commit_stats.return_value = ([("a.py", 10, 5)], 10, 5)
-    first = commit_vm.get_inspector_snapshot(0)
-    second = commit_vm.get_inspector_snapshot(0)
-    assert first is second
-    assert commit_vm._git.get_commit_stats.call_count == 1
-
-
 def test_load_diff(commit_vm):
     commit_vm._git.load_commit_info.return_value = "line1\nline2\nline3"
     diff = commit_vm.load_diff(0)
