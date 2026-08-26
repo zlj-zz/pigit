@@ -31,7 +31,7 @@ def test_set_segment_content() -> None:
     browser = BorderedTextBrowser(id="bb")
     browser.resize((20, 6))
     browser.set_content([[Segment("HEAD", fg=(0, 255, 0))]])
-    assert browser._browser._content == ["HEAD"]
+    assert browser._browser.lines == ["HEAD"]
 
 
 def test_scroll_and_wheel_delegate() -> None:
@@ -39,10 +39,10 @@ def test_scroll_and_wheel_delegate() -> None:
     browser.resize((20, 4))
     browser.set_content([f"row {i}" for i in range(30)])
     browser.scroll_down(2)
-    assert browser._browser._i == 2
+    assert browser._browser.scroll_i == 2
     down = MouseEvent(2, 2, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert browser.handle_mouse(down) is True
-    assert browser._browser._i == 2 + TextBrowser.WHEEL_SCROLL_LINES
+    assert browser._browser.scroll_i == 2 + TextBrowser.WHEEL_SCROLL_LINES
 
 
 def test_set_title_updates_frame() -> None:

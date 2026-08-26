@@ -26,7 +26,7 @@ class TestCurrentFilePath:
             "+import bcrypt",
         ]
         dv = self._viewer_with_diff(lines)
-        dv._i = 4  # cursor on the + line, inside the hunk
+        dv.scroll_i = 4  # cursor on the + line, inside the hunk
         assert dv._current_file_path() == "src/auth.py"
 
     def test_extracts_path_with_spaces(self):
@@ -38,12 +38,12 @@ class TestCurrentFilePath:
             "+hello",
         ]
         dv = self._viewer_with_diff(lines)
-        dv._i = 4
+        dv.scroll_i = 4
         assert dv._current_file_path() == "path with spaces"
 
     def test_returns_none_when_no_hunk(self):
         dv = DiffViewer()
-        dv._i = 0
+        dv.scroll_i = 0
         assert dv._current_file_path() is None
 
     def test_returns_none_for_malformed_header(self):
@@ -52,7 +52,7 @@ class TestCurrentFilePath:
             "some content",
         ]
         dv = self._viewer_with_diff(lines)
-        dv._i = 1
+        dv.scroll_i = 1
         assert dv._current_file_path() is None
 
 
@@ -77,7 +77,7 @@ class TestFileHistoryState:
                 "+added",
             ]
         )
-        dv._i = 2
+        dv.scroll_i = 2
         return dv
 
     @patch(_LOCALGIT_PATH)
@@ -108,16 +108,16 @@ class TestFileHistoryState:
         mock_git.get_file_at_commit.return_value = "line1"
         mock_git_cls.return_value = mock_git
 
-        original_content = list(viewer._content)
+        original_content = list(viewer._lines)
         viewer._enter_file_history("src/main.py")
-        assert viewer._content != original_content
+        assert viewer._lines != original_content
 
         viewer._exit_file_history()
 
         assert viewer._file_history_mode is False
-        assert viewer._content == original_content
+        assert viewer._lines == original_content
         assert viewer._diff_type == DiffType.COMMIT
-        assert viewer._i == 2
+        assert viewer.scroll_i == 2
 
     @patch(_LOCALGIT_PATH)
     def test_multiple_enter_exit_cycles(self, mock_git_cls, viewer):
@@ -132,7 +132,7 @@ class TestFileHistoryState:
             viewer._exit_file_history()
             assert viewer._file_history_mode is False
             assert viewer._diff_type == DiffType.COMMIT
-            assert viewer._i == 2
+            assert viewer.scroll_i == 2
 
 
 class TestFileHistoryNavigation:
@@ -204,7 +204,7 @@ class TestToggleFileHistory:
         dv = DiffViewer()
         dv._diff_type = DiffType.STAGED
         dv.set_content(["diff --git a/f.py b/f.py", "@@ -1,1 +1,1 @@", " x"])
-        dv._i = 2
+        dv.scroll_i = 2
 
         with patch("pigit.app_diff.show_toast") as mock_toast:
             dv._toggle_file_history()
@@ -283,7 +283,7 @@ class TestFileHistoryBinaryAndDeleted:
         mock_git_cls.return_value = mock_git
 
         dv._enter_file_history("f.bin")
-        assert "Binary file (1234 bytes)" in dv._content[0]
+        assert "Binary file (1234 bytes)" in dv._lines[0]
 
     @patch(_LOCALGIT_PATH)
     def test_shows_deleted_message(self, mock_git_cls):
@@ -305,7 +305,7 @@ class TestFileHistoryBinaryAndDeleted:
         mock_git_cls.return_value = mock_git
 
         dv._enter_file_history("f.py")
-        assert "File deleted in this commit" in dv._content[0]
+        assert "File deleted in this commit" in dv._lines[0]
 
 
 class TestEscBehavior:
@@ -399,7 +399,7 @@ class TestContentInstallInvariants:
             captured["callback"](stale)  # type: ignore[operator]
 
         assert dv._render_tokens == plain_tokens
-        assert dv._content == ["line-a", "line-b", "line-c"]
+        assert dv._lines == ["line-a", "line-b", "line-c"]
 
     def test_parse_failure_keeps_previous_consistent_state(self):
         """Failed set_content must not clear tokens while leaving old structure."""
@@ -407,14 +407,14 @@ class TestContentInstallInvariants:
         with patch.object(dv._tokenize_task, "start"):
             dv.set_content(["+kept"])
         dv._render_tokens = [[("kept", (200, 200, 200), 4, None)]]
-        content_before = list(dv._content)
+        content_before = list(dv._lines)
         tokens_before = list(dv._render_tokens)
         hunks_before = list(dv._hunks)
 
         with pytest.raises(TypeError):
             dv.set_content([123])  # type: ignore[list-item]
 
-        assert dv._content == content_before
+        assert dv._lines == content_before
         assert dv._render_tokens == tokens_before
         assert dv._hunks == hunks_before
 
@@ -447,5 +447,81 @@ class TestContentInstallInvariants:
     def test_init_has_no_dummy_doc(self):
         dv = DiffViewer()
         assert not hasattr(dv, "_doc")
-        assert dv._content == []
+        assert dv._lines == []
         assert dv._render_tokens == []
+
+
+def test_diff_viewer_owns_line_state() -> None:
+    d = DiffViewer(id="diff")
+    assert not hasattr(d, "_browser")
+    d.set_content(["+a", "-b"])
+    assert d._lines[0].startswith("+")
+
+
+def test_diff_viewer_forwards_scroll_up_down() -> None:
+    d = DiffViewer(id="diff")
+    d.resize((40, 10))
+    d.set_content([f"line {i}" for i in range(40)])
+    d.scroll_down(3)
+    assert d.scroll_i == 3
+    d.scroll_up(1)
+    assert d.scroll_i == 2
+
+
+def test_hunk_jump_beyond_clamped_viewport_resolves_path() -> None:
+    """Hunk past max viewport line must not clamp _line_i (path badge / v)."""
+    lines = [
+        "diff --git a/a.py b/a.py",
+        "--- a/a.py",
+        "+++ b/a.py",
+        "@@ -1,30 +1,30 @@",
+    ]
+    lines.extend(f" ctx-a-{i}" for i in range(30))
+    lines.extend(
+        [
+            "diff --git a/b.py b/b.py",
+            "--- a/b.py",
+            "+++ b/b.py",
+            "@@ -1,2 +1,2 @@",
+            "+b1",
+            "+b2",
+        ]
+    )
+    dv = DiffViewer()
+    dv.resize((40, 6))
+    dv.set_content(lines)
+    assert dv._max_viewport_i() == len(lines) - dv._viewport_rows
+    dv.scroll_i = 0
+    dv._next_hunk()  # first hunk header
+    assert dv._current_file_path() == "a.py"
+    dv._next_hunk()  # second file hunk — beyond clamped browser scroll
+    assert dv.scroll_i > dv._max_viewport_i()
+    assert dv._current_file_path() == "b.py"
+
+
+def test_hunk_navigation_reaches_eof_hunks() -> None:
+    """] must advance through late hunks even when headers exceed max viewport."""
+    lines = [f"pad-{i}" for i in range(100)]
+    lines[4] = "@@ hunk-a"
+    lines[85] = "@@ hunk-b"
+    lines[95] = "@@ hunk-c"
+    dv = DiffViewer()
+    dv.resize((80, 20))
+    dv.set_content(lines)
+    dv.scroll_i = 0
+    dv._next_hunk()
+    assert dv.scroll_i == 4
+    dv._next_hunk()
+    assert dv.scroll_i == 85
+    dv._next_hunk()
+    assert dv.scroll_i == 95
+
+
+def test_line_i_survives_resize_after_pre_resize_assignment() -> None:
+    """Logical line index survives resize; Diff owns scroll state directly."""
+    dv = DiffViewer()
+    dv.set_content([f"line {i}" for i in range(100)])
+    dv.scroll_i = 85
+    dv.resize((80, 20))
+    assert dv.scroll_i == 85
+    assert dv._max_viewport_i() == 82

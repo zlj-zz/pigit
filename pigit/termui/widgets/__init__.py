@@ -3,7 +3,7 @@ Package: pigit.termui.widgets
 Description: Widget components for the TUI framework.
 
 Usage:
-    from pigit.termui.widgets import TextBrowser, OptionList, CheckList
+    from pigit.termui.widgets import TextBrowser, BorderedTextBrowser, OptionList
 """
 
 from __future__ import annotations

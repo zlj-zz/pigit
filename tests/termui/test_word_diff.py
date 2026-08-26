@@ -100,8 +100,8 @@ class TestSetContentLocalWordDiff:
         dv = DiffViewer(word_diff=True)
         dv.set_content(self._simple_diff())
         # Content stays exactly the same as input (normal unified diff).
-        assert dv._content[5] == "-old hello world"
-        assert dv._content[6] == "+old new world"
+        assert dv._lines[5] == "-old hello world"
+        assert dv._lines[6] == "+old new world"
 
     def test_segments_highlight_changed_words(self):
         dv = DiffViewer(word_diff=True)

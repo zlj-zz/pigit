@@ -266,9 +266,7 @@ class TestOptionListMouse:
 
 class TestTextBrowserMouse:
     def _browser(self):
-        browser = TextBrowser(
-            content=["l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7"]
-        )
+        browser = TextBrowser(content=["l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7"])
         browser.resize((10, 3))
         return browser
 
@@ -277,7 +275,7 @@ class TestTextBrowserMouse:
         assert browser._i == 0
         down = MouseEvent(1, 1, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
         assert browser.handle_mouse(down) is True
-        assert browser._i == TextBrowser.WHEEL_SCROLL_LINES
+        assert browser.scroll_i == TextBrowser.WHEEL_SCROLL_LINES
         up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
         assert browser.handle_mouse(up) is True
         assert browser._i == 0

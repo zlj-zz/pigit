@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.app_diff import DiffType
+from pigit.app_diff import DiffType, DiffViewer
 from pigit.app_preview import PreviewPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
@@ -16,7 +16,6 @@ from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.root import ComponentRoot
 from pigit.termui.surface import Surface
 from pigit.termui.event_bus import EventBus
-from pigit.termui.widgets.text_browser import TextBrowser
 
 
 class _FakeStatusVM:
@@ -112,7 +111,7 @@ def test_clears_when_active_is_not_status_or_stash(preview: PreviewPanel) -> Non
     bus.publish(EVT_SELECTION_CHANGED, active=Component())
 
     assert preview._diff_viewer._box_title == ""
-    assert preview._diff_viewer._content == []
+    assert preview._diff_viewer._lines == []
 
 
 def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
@@ -142,7 +141,7 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
     assert "src/main.py" in preview._diff_viewer._box_title
     assert "Staged" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STAGED
-    assert preview._diff_viewer._content == ["diff line"]
+    assert preview._diff_viewer._lines == ["diff line"]
 
 
 def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
@@ -160,7 +159,7 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     assert "WIP" in preview._diff_viewer._box_title
     assert "stash@{0}" in preview._diff_viewer._box_title
     assert preview._diff_viewer._diff_type is DiffType.STASH
-    assert preview._diff_viewer._content == ["stash diff line"]
+    assert preview._diff_viewer._lines == ["stash diff line"]
 
 
 def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
@@ -221,12 +220,12 @@ def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
     vm.diff_return = ["from a"]
     work_a, cb_a = pending[0]
     cb_a(work_a())
-    assert preview._diff_viewer._content == []
+    assert preview._diff_viewer._lines == []
 
     vm.diff_return = ["from b"]
     work_b, cb_b = pending[1]
     cb_b(work_b())
-    assert preview._diff_viewer._content == ["from b"]
+    assert preview._diff_viewer._lines == ["from b"]
     assert "b.py" in preview._diff_viewer._box_title
 
 
@@ -256,7 +255,7 @@ def test_reload_refetches_current_status_preview(preview: PreviewPanel) -> None:
     preview.reload()
     assert vm.diff_path_calls == ["src/main.py", "src/main.py"]
     assert vm.diff_calls == []
-    assert preview._diff_viewer._content == ["updated"]
+    assert preview._diff_viewer._lines == ["updated"]
 
 
 def test_reload_uses_path_not_captured_source_index(preview: PreviewPanel) -> None:
@@ -289,7 +288,7 @@ def test_reload_uses_path_not_captured_source_index(preview: PreviewPanel) -> No
     preview.reload()
     assert vm.diff_path_calls == ["a.py", "a.py"]
     assert vm.diff_calls == []
-    assert preview._diff_viewer._content == ["still a"]
+    assert preview._diff_viewer._lines == ["still a"]
 
 
 def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
@@ -366,13 +365,13 @@ def test_preview_title_is_on_diff_box(preview: PreviewPanel) -> None:
 def test_wheel_scrolls_preview_content(preview: PreviewPanel) -> None:
     preview.resize((20, 8))
     preview.set_preview([f"line {i}" for i in range(40)], "file.py")
-    assert preview._diff_viewer._i == 0
+    assert preview._diff_viewer.scroll_i == 0
     down = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert preview.handle_mouse(down) is True
-    assert preview._diff_viewer._i == TextBrowser.WHEEL_SCROLL_LINES
+    assert preview._diff_viewer.scroll_i == DiffViewer.WHEEL_SCROLL_LINES
     up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
     assert preview.handle_mouse(up) is True
-    assert preview._diff_viewer._i == 0
+    assert preview._diff_viewer.scroll_i == 0
 
 
 def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
@@ -382,4 +381,4 @@ def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
     assert preview.handle_mouse(click) is False
     release = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.RELEASE)
     assert preview.handle_mouse(release) is False
-    assert preview._diff_viewer._i == 0
+    assert preview._diff_viewer.scroll_i == 0

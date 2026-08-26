@@ -13,7 +13,7 @@ from pigit.termui.surface import Surface
 class TestDiffViewer:
     def test_init(self):
         d = DiffViewer()
-        assert d._content == []
+        assert d._lines == []
         assert d._heatmap == []
         assert d._heatmap_colors == []
         assert d._line_numbers == []
@@ -68,11 +68,11 @@ class TestDiffViewer:
     def test_hunk_navigation(self):
         d = DiffViewer()
         d.set_content(["@@ hunk1", "+line1", "@@ hunk2", "+line2"])
-        d._i = 0
+        d.scroll_i = 0
         d._next_hunk()
-        assert d._i == 2  # jumped to second hunk
+        assert d.scroll_i == 2  # jumped to second hunk
         d._prev_hunk()
-        assert d._i == 0  # jumped back to first hunk
+        assert d.scroll_i == 0  # jumped back to first hunk
 
     def test_scroll_position_cache(self):
         from pigit.termui.component import Component
@@ -83,7 +83,7 @@ class TestDiffViewer:
 
         source = FakeSource()
         d = DiffViewer()
-        d._i = 5
+        d.scroll_i = 5
         from pigit.termui.types import EventType, EVT_GOTO
 
         d.update(EVT_GOTO, source=source, key="test.py", content=["line1"])
@@ -210,8 +210,8 @@ class TestDiffViewer:
         d.set_content(["+\t\tName"])
         # After expandtabs(8): '+' at col 0, first tab -> 7 spaces to col 8,
         # second tab -> 8 spaces to col 16, then "Name"
-        assert "\t" not in d._content[0]
-        assert d._content[0] == "+               Name"
+        assert "\t" not in d._lines[0]
+        assert d._lines[0] == "+               Name"
 
     def testpaint_with_tabs_no_overflow(self):
         """Regression: tab-heavy diff lines must not overflow surface bounds."""
@@ -248,8 +248,8 @@ class TestDiffViewer:
             key="test.go",
             content=["+\t\tName"],
         )
-        assert "\t" not in d._content[0]
-        assert d._content[0] == "+               Name"
+        assert "\t" not in d._lines[0]
+        assert d._lines[0] == "+               Name"
 
     def testpaint_blank_rows_have_borders(self):
         """When content is shorter than viewport, blank rows must keep borders."""
