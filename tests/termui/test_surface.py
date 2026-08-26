@@ -118,6 +118,61 @@ class TestSubsurface:
         # col >= width is a no-op
         assert parent.lines()[1] == "     "
 
+    def test_clipping_negative_col_does_not_write_outside_view(self):
+        """Regression: local col < 0 must not translate into the parent."""
+        parent = Surface(5, 5)
+        parent.draw_text_rgb(1, 0, "!!!!!", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.draw_text_rgb(0, -1, "x", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        # Parent row 1 must be unchanged (no write at col 0 via translate).
+        assert parent.lines()[1] == "!!!!!"
+
+    def test_view_partial_text_from_negative_col_stays_inside(self):
+        """Visible glyphs write inside the view; left-clipped glyph is dropped."""
+        parent = Surface(5, 5)
+        parent.draw_text_rgb(1, 0, "!!!!!", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.draw_text_rgb(0, -1, "abc", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        assert parent.lines()[1] == "!bc!!"
+
+    def test_blit_negative_dst_col_does_not_write_outside_view(self):
+        parent = Surface(5, 5)
+        parent.draw_text_rgb(1, 0, "!!!!!", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        src = Surface(1, 1)
+        src.draw_text_rgb(0, 0, "x", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.blit(src, 0, 0, 1, 1, 0, -1)
+        assert parent.lines()[1] == "!!!!!"
+
+    def test_subsurface_returns_surface(self):
+        parent = Surface(5, 5)
+        sub = parent.subsurface(1, 1, 3, 3)
+        assert isinstance(sub, Surface)
+        assert not sub.is_root
+        assert parent.is_root
+
+    def test_view_root_only_methods_raise(self):
+        parent = Surface(4, 2)
+        sub = parent.subsurface(0, 0, 2, 2)
+        for method in (sub.clear, sub.rows, sub.lines):
+            try:
+                method()
+            except RuntimeError as exc:
+                assert "root-only" in str(exc)
+            else:
+                raise AssertionError(f"{method.__name__} should raise on view")
+
+    def test_blit_rejects_view_as_src(self):
+        root = Surface(4, 4)
+        view = root.subsurface(0, 0, 2, 2)
+        dst = Surface(2, 2)
+        try:
+            dst.blit(view, 0, 0, 1, 1, 0, 0)
+        except RuntimeError as exc:
+            assert "root" in str(exc).lower()
+        else:
+            raise AssertionError("blit should reject view source")
+
     def test_nested_subsurface(self):
         parent = Surface(6, 6)
         sub1 = parent.subsurface(1, 1, 4, 4)
@@ -129,12 +184,21 @@ class TestSubsurface:
         parent = Surface(6, 6)
         sub = parent.subsurface(1, 1, 3, 3)
         sub.draw_box_rgb(0, 0, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG)
-        # Only 3x3 area should be affected inside the subsurface
+        # Oversized box is clipped per-cell; top-left corner lands in the view.
         lines = parent.lines()
         assert lines[1][1] == "┌"
-        assert lines[1][3] == "┐"
-        assert lines[3][1] == "└"
-        assert lines[3][3] == "┘"
+        assert lines[1][2] == "─"
+        assert lines[1][3] == "─"
+        # Outside the 3x3 view must stay blank.
+        assert lines[1][4] == " "
+        assert lines[4][1] == " "
+
+    def test_draw_box_rgb_partial_overlap_still_draws_visible_edge(self):
+        parent = Surface(5, 5)
+        sub = parent.subsurface(1, 1, 3, 3)
+        sub.draw_box_rgb(0, 2, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG)
+        # Only local col 2 is inside the view for the top edge start.
+        assert parent.lines()[1][3] == "┌"
 
 
 class TestSurfaceEdgeCases:
@@ -148,12 +212,10 @@ class TestSurfaceEdgeCases:
 
 
 class TestSubsurfaceEdgeCases:
-    def test_draw_box_rgb_clipped_to_zero_is_noop(self):
+    def test_draw_box_rgb_starting_past_right_edge_is_noop(self):
         parent = Surface(5, 5)
         sub = parent.subsurface(1, 1, 3, 3)
-        sub.draw_box_rgb(
-            0, 2, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG
-        )  # col=2 >= width=3 -> clipped None
+        sub.draw_box_rgb(0, 3, 5, 5, fg=DEFAULT_FG, bg=DEFAULT_BG)
         assert parent.lines()[1] == "     "
 
 
@@ -223,6 +285,8 @@ class TestSurfaceRGB:
         sub = s.subsurface_with_margin(
             0, 0, 10, 10, margin_top=1, margin_bottom=1, margin_left=2, margin_right=2
         )
+        assert isinstance(sub, Surface)
+        assert not sub.is_root
         assert sub.width == 6
         assert sub.height == 8
         sub.draw_text_rgb(0, 0, "x", fg=DEFAULT_FG, bg=DEFAULT_BG)

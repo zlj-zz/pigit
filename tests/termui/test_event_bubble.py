@@ -28,7 +28,7 @@ class _EventLeaf(Component):
     def update(self, action, **data) -> None:
         pass
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -135,26 +135,20 @@ class TestGotoRouting:
         secondary = _EventLeaf("secondary", id="secondary")
         tab_view = _EventTabView(children=[main, secondary], start="main")
 
-        assert tab_view.active is main
+        assert tab_view.visible is main
 
         tab_view.accept(EVT_GOTO, target="secondary")
 
-        assert tab_view.active is secondary
+        assert tab_view.visible is secondary
 
-    def test_goto_bubbles_to_tab_view(self):
-        """A goto emitted from a leaf bubbles up to TabView and switches tabs."""
+    def test_goto_accept_switches_tabs(self):
+        """TabView switches tabs via accept/route_to, not on_event bubble."""
         main = _EventLeaf("main", id="main")
         secondary = _EventLeaf("secondary", id="secondary")
         tab_view = _EventTabView(children=[main, secondary], start="main")
-        root = _EventLeaf("root")
-        tab_view.parent = root
 
-        # root.on_event returns False so event continues bubbling
-        # TabView.on_event returns True for goto
-        root.on_event = MagicMock(return_value=False)
-
-        # Emit goto from main (active child)
         main.emit(EVT_GOTO, target="secondary")
+        assert tab_view.visible is main  # EVT_GOTO is not consumed by TabView
 
-        # Event bubbles: main -> tab_view.on_event (handles it)
-        assert tab_view.active is secondary
+        tab_view.accept(EVT_GOTO, target="secondary")
+        assert tab_view.visible is secondary

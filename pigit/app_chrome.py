@@ -32,8 +32,8 @@ class AppFooter(Footer):
         # Retained for API compatibility; colors resolve via get_theme() at render time.
         self._theme = theme
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self.subscribe(EVT_SELECTION_CHANGED, self._sync_help)
         self.subscribe(EventType("mode_changed"), self._sync_help)
 
@@ -41,7 +41,7 @@ class AppFooter(Footer):
         if active is None:
             tab_view = by_id("tab_view", TabView)
             active = (
-                resolve_presentation_leaf(tab_view.active)
+                resolve_presentation_leaf(tab_view.visible)
                 if tab_view is not None
                 else None
             )

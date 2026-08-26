@@ -23,7 +23,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, ItemList
+from pigit.termui.widgets import AlertDialog, InputLine, OptionList
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
@@ -35,12 +35,12 @@ if TYPE_CHECKING:
     from .git.model import Branch
 
 
-class BranchPanel(ItemList):
+class BranchPanel(OptionList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = "\u25cf"
     keymap_namespace = "branch"
-    tab_name = "Branch"
+    TAB_NAME = "Branch"
     tab_key = "3"
     _SCOPES = ["local", "remote", "all"]
     _SCOPE_LABELS = {"local": "Local", "remote": "Remote", "all": "All"}
@@ -82,17 +82,22 @@ class BranchPanel(ItemList):
             on_result=lambda _: None,
         )
         self._vm_unsubs: list[Callable[[], None]] = []
-        self._vm_unsubs.append(
-            bind_signals(self, vm.items, callback=self._on_items_changed)
-        )
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
+        self._bind_vm_signals()
         self._vm.refresh()
+
+    def _bind_vm_signals(self) -> None:
+        """Bind vm.items; safe to call multiple times (idempotent)."""
+        if not self._vm_unsubs:
+            self._vm_unsubs.append(
+                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+            )
 
     def _on_items_changed(self) -> None:
         branches = self._vm.items.value
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         self.branches = branches
         if not branches:
@@ -104,8 +109,8 @@ class BranchPanel(ItemList):
         self.set_content(lines)
         self._notify_change()
 
-    def deactivate(self) -> None:
-        super().deactivate()
+    def unmount(self) -> None:
+        super().unmount()
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()
@@ -169,7 +174,7 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_down(self) -> None:
         preview = self._log_graph_preview_panel()
-        if preview is not None and preview.is_activated():
+        if preview is not None and preview.is_mounted():
             preview.scroll_down(preview.SCROLL_PAGE_SIZE)
 
     @bind_action(
@@ -180,7 +185,7 @@ class BranchPanel(ItemList):
     )
     def _scroll_preview_up(self) -> None:
         preview = self._log_graph_preview_panel()
-        if preview is not None and preview.is_activated():
+        if preview is not None and preview.is_mounted():
             preview.scroll_up(preview.SCROLL_PAGE_SIZE)
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
@@ -330,38 +335,41 @@ class BranchPanel(ItemList):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]"""
-        focused = self.is_focus_leaf
-        is_head = idx < len(self.branches) and self.branches[idx].is_head
+        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]."""
+        if idx >= len(self.branches):
+            return ([], None, [])
+        branch = self.branches[idx]
         prefix = self.CURSOR if is_cursor else " "
-        if is_head:
-            fg = THEME.fg_success if focused else THEME.fg_dim
+        if branch.is_remote:
+            name_fg = THEME.fg_remote_branch
+        elif branch.is_head:
+            name_fg = THEME.fg_local_branch
         else:
-            fg = THEME.fg_primary if focused else THEME.fg_dim
+            name_fg = self.presentation_fg("primary")
         left = [
             Segment(
                 f"{prefix} {self.content[idx]}",
-                fg=fg,
+                fg=name_fg,
                 style_flags=palette.STYLE_BOLD if is_cursor else 0,
             )
         ]
 
         right: list[Segment] = []
-        if idx < len(self.branches):
-            branch = self.branches[idx]
-            if not branch.is_remote:
-                if branch.upstream_name:
-                    right.append(Segment(branch.upstream_name, fg=THEME.fg_muted))
-                ahead = branch.ahead if branch.ahead != "?" else ""
-                behind = branch.behind if branch.behind != "?" else ""
-                if ahead:
-                    if right:
-                        right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
-                if behind:
-                    if right:
-                        right.append(Segment(" ", fg=THEME.fg_muted))
-                    right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
+        if not branch.is_remote:
+            if branch.upstream_name:
+                right.append(
+                    Segment(branch.upstream_name, fg=self.presentation_fg("muted"))
+                )
+            ahead = branch.ahead if branch.ahead != "?" else ""
+            behind = branch.behind if branch.behind != "?" else ""
+            if ahead:
+                if right:
+                    right.append(Segment(" ", fg=self.presentation_fg("muted")))
+                right.append(Segment(f"\u2191{ahead}", fg=THEME.fg_success))
+            if behind:
+                if right:
+                    right.append(Segment(" ", fg=self.presentation_fg("muted")))
+                right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
         return left, None, right
 

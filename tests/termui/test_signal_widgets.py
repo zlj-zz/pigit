@@ -17,7 +17,7 @@ from pigit.termui._runtime_context import (
 )
 from pigit.termui.widgets.check_list import CheckList
 from pigit.termui.widgets.input_line import InputLine
-from pigit.termui.widgets.item_list import ItemList
+from pigit.termui.widgets.option_list import OptionList
 
 
 @pytest.fixture(autouse=True)
@@ -29,13 +29,13 @@ def _clear_runtime_context():
     _runtime_ctx.reset(token)
 
 
-class TestItemListSignalRender:
+class TestOptionListSignalRender:
     def test_curr_no_change_requests_render(self):
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel = OptionList(content=["a", "b", "c"])
+            sel.mount()
             sel.curr_no = 1
             assert len(render_calls) == 1
         finally:
@@ -45,8 +45,8 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"], size=(10, 1))
-            sel.activate()
+            sel = OptionList(content=["a", "b", "c"], size=(10, 1))
+            sel.mount()
             sel._r_start = 1
             assert len(render_calls) == 1
         finally:
@@ -56,8 +56,8 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel = OptionList(content=["a", "b", "c"])
+            sel.mount()
             sel.next()
             assert len(render_calls) == 1
             sel.previous()
@@ -69,7 +69,7 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
+            sel = OptionList(content=["a", "b", "c"])
             # Not activated
             sel.curr_no = 1
             assert len(render_calls) == 0
@@ -80,8 +80,8 @@ class TestItemListSignalRender:
         render_calls: list = []
         set_render_request(lambda: render_calls.append(1))
         try:
-            sel = ItemList(content=["a", "b", "c"])
-            sel.activate()
+            sel = OptionList(content=["a", "b", "c"])
+            sel.mount()
             sel.destroy()
             sel.curr_no = 2
             assert len(render_calls) == 0
@@ -95,7 +95,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.toggle(0)
             assert len(render_calls) == 1
             cl.toggle(0)
@@ -108,7 +108,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.select_all()
             assert len(render_calls) == 1
         finally:
@@ -119,7 +119,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.select_all()
             render_calls.clear()
             cl.select_none()
@@ -132,7 +132,7 @@ class TestCheckListSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             cl = CheckList(content=["a", "b", "c"])
-            cl.activate()
+            cl.mount()
             cl.destroy()
             cl.toggle(0)
             assert len(render_calls) == 0
@@ -146,7 +146,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.insert("a")
             # insert() changes both value and cursor -> 2 requests (coalesced to 1 render)
             assert len(render_calls) == 2
@@ -158,7 +158,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.set_value("ab")
             render_calls.clear()
             inp.backspace()
@@ -172,7 +172,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.set_value("ab")
             render_calls.clear()
             inp.cursor_left()
@@ -196,7 +196,7 @@ class TestInputLineSignalRender:
         set_render_request(lambda: render_calls.append(1))
         try:
             inp = InputLine()
-            inp.activate()
+            inp.mount()
             inp.destroy()
             inp.insert("a")
             assert len(render_calls) == 0

@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 
 from ..component import Component, bind_signals
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..reactive import Computed, Signal, ValueRef
 from ..wcwidth_table import truncate_by_width, wcswidth
 
@@ -96,7 +96,7 @@ class Header(Component):
             unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w <= 0:
@@ -109,7 +109,7 @@ class Header(Component):
         else:
             self._draw_content(surface, 0, w)
 
-    def _draw_content(self, surface: Surface | _Subsurface, row: int, w: int) -> None:
+    def _draw_content(self, surface: Surface, row: int, w: int) -> None:
         surface.fill_rect_rgb(row, 0, w, 1)
 
         left = self._get(self._left_src)

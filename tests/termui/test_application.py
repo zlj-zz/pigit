@@ -20,7 +20,7 @@ from pigit.termui.root import ComponentRoot
 class DummyRoot(Component):
     NAME = "dummy"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):

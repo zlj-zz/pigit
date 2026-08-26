@@ -24,7 +24,7 @@ from pigit.app_theme import THEME
 from pigit.termui.segment import Segment
 from pigit.termui.containers import Column
 from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import InputLine, ItemList, StatusBar
+from pigit.termui.widgets import InputLine, OptionList, StatusBar
 from pigit.termui.tty_io import (
     UNSUPPORTED_PLATFORM_MSG,
     platform_supported,
@@ -166,7 +166,7 @@ def run_cmd_new_picker(
     )
 
     # 2. Custom selector with category-aware rendering
-    class _CmdItemList(ItemList):
+    class _CmdOptionList(OptionList):
         def __init__(
             self,
             app,
@@ -284,7 +284,7 @@ def run_cmd_new_picker(
             self._row_data = row_data
             self._separator_indices = sep_indices
             self._sep_category_map = sep_cats
-            self._list = _CmdItemList(
+            self._list = _CmdOptionList(
                 self,
                 content=content,
                 on_selection_changed=lambda idx: self._state.selected_idx.set(idx),

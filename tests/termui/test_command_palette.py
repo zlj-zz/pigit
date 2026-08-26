@@ -72,7 +72,7 @@ class TestCommandPalette:
         palette.open()
         surface = Surface(40, 12)
         palette.resize((40, 12))
-        palette._render_surface(surface)
+        palette.paint(surface)
         assert "↓7" in "".join(surface.lines())
 
     def test_filter_substring(self):
@@ -159,7 +159,7 @@ class TestCommandPalette:
     def test_render_inactive(self):
         palette = CommandPalette(items=_ITEMS)
         surface = Surface(20, 5)
-        palette._render_surface(surface)
+        palette.paint(surface)
         assert all(c.char == " " for row in surface._rows for c in row)
 
     def test_render_active_separates_list_and_input(self):
@@ -167,7 +167,7 @@ class TestCommandPalette:
         palette.open()
         surface = Surface(40, 6)
         palette.resize((40, 6))
-        palette._render_surface(surface)
+        palette.paint(surface)
         lines = surface.lines()
         assert ">" in lines[-1]
         assert "alpha" in "".join(lines)
@@ -180,6 +180,6 @@ class TestCommandPalette:
         palette.open()
         surface = Surface(40, 5)
         palette.resize((40, 5))
-        palette._render_surface(surface)
+        palette.paint(surface)
         overlay = get_theme().bg_overlay
         assert surface.rows()[-1][0].bg != overlay

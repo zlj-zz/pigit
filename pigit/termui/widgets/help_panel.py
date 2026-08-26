@@ -16,7 +16,7 @@ from ..primitives.frame import BoxFrame
 from .._layout import Padding
 from ..mouse import MouseButton, MouseEvent, MouseKind
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..wcwidth_table import truncate_by_width, wcswidth
 
 HelpEntry = tuple[str, str]
@@ -324,7 +324,7 @@ class HelpPanel(Component):
         if self._on_toggle is not None:
             self._on_toggle()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         theme = get_theme()
         self._frame.fg = theme.fg_primary
         self._frame.bg = theme.bg_chrome

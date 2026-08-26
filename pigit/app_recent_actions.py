@@ -11,8 +11,15 @@ from typing import TYPE_CHECKING
 from collections.abc import Callable
 
 from pigit.ext.utils import relative_time
-from pigit.termui import FeedbackKind, Segment, bind_action, show_badge, show_toast
-from pigit.termui.widgets import ItemList
+from pigit.termui import (
+    FeedbackKind,
+    Segment,
+    bind_action,
+    palette,
+    show_badge,
+    show_toast,
+)
+from pigit.termui.widgets import OptionList
 
 from .app_theme import THEME
 
@@ -21,7 +28,7 @@ if TYPE_CHECKING:
     from pigit.session_history import SessionHistory, HistoryRecord
 
 
-class RecentActionsPanel(ItemList):
+class RecentActionsPanel(OptionList):
     """Sheet overlay for browsing and reversing session history records."""
 
     CURSOR = "●"
@@ -43,8 +50,9 @@ class RecentActionsPanel(ItemList):
         """Prefer up to 12 rows; host clamps to one-third of the terminal."""
         return 12
 
-    def activate(self) -> None:
-        """Load and display history records."""
+    def mount(self) -> None:
+        """Mount the sheet list and load history records."""
+        super().mount()
         self._refresh()
 
     def _refresh(self) -> None:
@@ -84,12 +92,17 @@ class RecentActionsPanel(ItemList):
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         record = self._records[idx]
-        cursor_seg = Segment(self.CURSOR if is_cursor else " ", fg=THEME.fg_primary)
+        flags = palette.STYLE_BOLD if is_cursor else 0
+        cursor_seg = Segment(
+            self.CURSOR if is_cursor else " ",
+            fg=THEME.fg_primary,
+            style_flags=flags,
+        )
         left = [cursor_seg, Segment(" ")]
 
-        main = [Segment(record.description, fg=THEME.fg_primary)]
+        main = [Segment(record.description, fg=THEME.fg_primary, style_flags=flags)]
 
         right_text = f"{relative_time(int(record.timestamp))}  {record.panel_hint}"
-        right = [Segment(right_text, fg=THEME.fg_dim)]
+        right = [Segment(right_text, fg=THEME.fg_muted)]
 
         return left, main, right

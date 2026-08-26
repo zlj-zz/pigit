@@ -13,7 +13,7 @@ from __future__ import annotations
 import datetime
 from collections import defaultdict
 
-from pigit.termui import Component, MouseButton, MouseKind, palette, Surface
+from pigit.termui import Component, MouseButton, MouseKind, Surface
 from pigit.termui.primitives import (
     build_contribution_calendar,
     calendar_day_values,
@@ -22,27 +22,6 @@ from pigit.termui.widgets import HeatmapGrid, StepLineChart
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
-
-# GitHub-style green heatmap palette (0 → 5)
-# Level 0 is intentionally lighter so empty cells pop on the panel background.
-_HEATMAP_COLORS: list[tuple[int, int, int]] = [
-    (100, 100, 110),  # 0 commits (muted, not dim)
-    (155, 233, 168),  # level 1 (lightest green)
-    (105, 210, 130),  # level 2 (light green)
-    (64, 196, 99),  # level 3 (medium green)
-    (48, 161, 78),  # level 4 (dark green)
-    (33, 110, 57),  # level 5 (very dark green)
-]
-
-# Author line chart colors (top 6 authors)
-_AUTHOR_COLORS: list[tuple[int, int, int]] = [
-    palette.SKY_BLUE,
-    palette.YELLOW,
-    palette.PURPLE,
-    palette.RED,
-    palette.GREEN,
-    palette.BLUE,
-]
 
 _CELL_CHAR = "■"
 _EMPTY_CHAR = "·"
@@ -80,7 +59,7 @@ class ContributionGraph(Component):
         self._heatmap = HeatmapGrid(
             rows=7,
             cols=53,
-            colors=_HEATMAP_COLORS,
+            colors=list(THEME.contrib_heatmap_colors),
             bg=None,
             cell_char=_CELL_CHAR,
             empty_char=_EMPTY_CHAR,
@@ -90,7 +69,7 @@ class ContributionGraph(Component):
         self._line_chart = StepLineChart(
             plot_w=55,
             plot_h=7,
-            colors=_AUTHOR_COLORS,
+            colors=list(THEME.chart_author_colors),
             bg=None,
             title="Commits per Day",
             title_fg=THEME.fg_primary,
@@ -260,13 +239,13 @@ class ContributionGraph(Component):
             self._line_chart_series, x_labels=self._line_chart_labels
         )
         chart_surface = surface.subsurface(0, start_col, width, height)
-        self._line_chart._render_surface(chart_surface)
+        self._line_chart.paint(chart_surface)
 
     def render_into(self, surface) -> None:
         """Public entry to render this graph into the given surface."""
-        self._render_surface(surface)
+        self.paint(surface)
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = min(surface.width, self._size[0] if self._size else surface.width)
         h = min(surface.height, self._size[1] if self._size else surface.height)
         if w <= 0 or h <= 0:
@@ -337,7 +316,7 @@ class ContributionGraph(Component):
                 window[(week, day)] = self._heatmap_values.get((week, day), 0)
         self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)
-        self._heatmap._render_surface(canvas)
+        self._heatmap.paint(canvas)
 
         # --- Legend (Less → More) near the bottom, stats below it ---
         # Anchored to the content height so a taller report spreads the spacer
@@ -355,7 +334,7 @@ class ContributionGraph(Component):
                     legend_row,
                     x,
                     ch,
-                    fg=_HEATMAP_COLORS[level],
+                    fg=THEME.contrib_heatmap_colors[level],
                     bg=None,
                 )
                 x += 2

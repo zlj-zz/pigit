@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ..component import Component
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..theme import get_theme
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
@@ -123,7 +123,8 @@ class Sheet(Component):
         if height is None:
             pref = getattr(child, "preferred_sheet_height", None)
             if callable(pref):
-                height = int(pref(term_h))
+                want = pref(term_h)
+                height = want if isinstance(want, int) else DEFAULT_SHEET_HEIGHT
             else:
                 height = DEFAULT_SHEET_HEIGHT
             soft_cap = max(MIN_SHEET_HEIGHT, int(term_h * max_fraction))
@@ -150,7 +151,7 @@ class Sheet(Component):
         self._target_height = height
         self._show_edge_rule = show_edge_rule
         self._title = title
-        self._title_align = title_align
+        self._title_align: TitleAlign = title_align
         self._edge = edge
         self._bg = bg
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
@@ -187,7 +188,7 @@ class Sheet(Component):
         self._child._handle_event(key)
         return OverlayDispatchResult.HANDLED_EXPLICIT
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         if self._size[1] <= 0:
             return
         y = self._origin_row(surface.height, self._size[1])
@@ -201,7 +202,7 @@ class Sheet(Component):
             return
         child_y = 1 if rule_row == 0 else 0
         child_sub = sub.subsurface(child_y, 0, sub.width, child_h)
-        self._child._render_surface(child_sub)
+        self._child.paint(child_sub)
 
     def _sheet_bg(self) -> tuple[int, int, int] | None:
         """Return the sheet fill color.
@@ -211,7 +212,7 @@ class Sheet(Component):
         """
         return self._bg
 
-    def _draw_rule(self, sub: Surface | _Subsurface, row: int) -> None:
+    def _draw_rule(self, sub: Surface, row: int) -> None:
         """Draw the facing-edge rule as a full-width line, optional title core."""
         theme = get_theme()
         fg_rule, fg_title, bg = theme.fg_dim, theme.fg_muted, self._sheet_bg()

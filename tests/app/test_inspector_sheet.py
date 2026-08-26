@@ -55,7 +55,7 @@ def test_format_file_omits_xy_prose():
     assert rows[0][2].fg == THEME.fg_info
     last_row = rows[-1]
     assert last_row[1].text == "deadbee"
-    assert last_row[1].fg == THEME.fg_dim
+    assert last_row[1].fg == THEME.fg_muted
 
 
 def test_format_branch_includes_tracking_and_recent():
@@ -82,7 +82,11 @@ def test_format_branch_includes_tracking_and_recent():
     assert "Zev" in text
     assert "contained yes" in text
     tip_row = rows[1]
-    assert tip_row[1].fg == THEME.fg_dim
+    assert tip_row[1].fg == THEME.fg_muted
+    by_label = next(r for r in rows if r[0].text.startswith("ahead"))
+    assert by_label[1].fg == THEME.fg_success
+    behind_row = next(r for r in rows if r[0].text.startswith("behind"))
+    assert behind_row[1].fg == THEME.fg_warning
     contained_row = rows[-1]
     assert contained_row[1].fg == THEME.fg_success
 
@@ -144,7 +148,7 @@ def test_format_commit_includes_metadata():
     assert file_row[5].fg == THEME.fg_danger
     status_row = rows[4]
     assert status_row[1].text == "unpushed"
-    assert status_row[1].fg == THEME.fg_warning
+    assert status_row[1].fg == THEME.fg_unpushed_commit
 
 
 def test_format_stash_includes_numstat():
@@ -198,7 +202,7 @@ def _mount(runtime: RuntimeContext) -> tuple[PigitApplication, ComponentRoot]:
     runtime.focus_manager = root._focus_manager
     root._app_on_event = app.on_event
     app._root = root
-    root.activate()
+    root.mount()
     root.resize((80, 24))
     return app, root
 
@@ -229,7 +233,7 @@ def test_open_inspector_is_top_sheet_not_body_child(runtime):
         patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
     ):
         app.open_inspector()
-    ids = [child.id for child in app._body_row.children]
+    ids = [child.id for child in app._split_pane.children]
     assert "inspector" not in ids
     sheet = root._layer_stack.top(LayerKind.SHEET)
     assert sheet is not None
@@ -310,7 +314,7 @@ def test_inspector_load_dropped_when_placeholder_closed(runtime):
 
 def test_diff_view_toasts_no_inspector(runtime):
     app, root = _mount(runtime)
-    app._tab_view.route_to("diff")
+    app._body_view.show(app._diff_panel)
     with patch("pigit.app.show_toast") as toast:
         app.open_inspector()
     toast.assert_called_once()

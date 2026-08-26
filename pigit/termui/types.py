@@ -8,7 +8,10 @@ Date: 2026-04-19
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from .surface import Surface
 
 # ---------------------------------------------------------------------------
 # EventType — unified event identifier
@@ -112,7 +115,7 @@ class OverlaySurface(Protocol):
 
     def hide(self) -> None: ...
 
-    def _render_surface(self, surface: SurfaceProtocol) -> None: ...
+    def paint(self, surface: Surface) -> None: ...
 
 
 @runtime_checkable
@@ -122,18 +125,3 @@ class PreviewPayload(Protocol):
     def preview_title(self) -> str: ...
 
     def preview_lines(self) -> list[str]: ...
-
-
-@runtime_checkable
-class SurfaceProtocol(Protocol):
-    """Surface protocol for type checking."""
-
-    @property
-    def width(self) -> int: ...
-
-    @property
-    def height(self) -> int: ...
-
-    def draw_text(self, row: int, col: int, text: str) -> None: ...
-
-    def subsurface(self, x: int, y: int, w: int, h: int) -> SurfaceProtocol: ...

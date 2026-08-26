@@ -53,7 +53,7 @@ class _KeyLeaf(Component):
         self.received.append(key)
         return key != "tab"
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -67,6 +67,55 @@ class TestResolveFocusLeaf:
         col.set_focus_index(1)
         assert resolve_focus_leaf(col) is b
 
+    def test_same_focus_index_skips_selection_emit(self):
+        a = _KeyLeaf()
+        b = _KeyLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=1)
+        calls = {"n": 0}
+        orig = col.emit
+
+        def counting_emit(action, **data):
+            calls["n"] += 1
+            return orig(action, **data)
+
+        col.emit = counting_emit  # type: ignore[method-assign]
+        col.set_focus_index(1)
+        assert calls["n"] == 0
+        assert resolve_focus_leaf(col) is b
+        col.set_focus_index(0)
+        assert calls["n"] >= 1
+        assert resolve_focus_leaf(col) is a
+
+    def test_set_focus_index_keeps_siblings_mounted(self):
+        """Warm focus: switching focus must not unmount siblings (still painted)."""
+        a = _KeyLeaf()
+        b = _KeyLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=0)
+        col.mount()
+        assert a.is_mounted() and b.is_mounted()
+        col.set_focus_index(1)
+        assert a.is_mounted() and b.is_mounted()
+        assert resolve_focus_leaf(col) is b
+
+    def test_set_focus_index_calls_on_focus(self):
+        class _FocusLeaf(_KeyLeaf):
+            def __init__(self) -> None:
+                super().__init__()
+                self.focus_hits = 0
+
+            def on_focus(self) -> None:
+                self.focus_hits += 1
+
+        a = _FocusLeaf()
+        b = _FocusLeaf()
+        col = Column(children=[a, b], heights=[1, 1], focus_index=0)
+        col.mount()
+        assert a.focus_hits == 1
+        assert b.focus_hits == 0
+        col.set_focus_index(1)
+        assert b.focus_hits == 1
+        assert a.focus_hits == 1
+
 
 class TestResolvePresentationLeaf:
     def test_follows_presentation_child(self):
@@ -77,7 +126,7 @@ class TestResolvePresentationLeaf:
             def presentation_child(self) -> Component | None:
                 return inner
 
-            def _render_surface(self, surface) -> None:
+            def paint(self, surface) -> None:
                 pass
 
         shell = _Shell()
@@ -147,7 +196,7 @@ class _DualHookEditor(Component):
             return OverlayDispatchResult.HANDLED_EXPLICIT
         return OverlayDispatchResult.DROPPED_UNBOUND
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 

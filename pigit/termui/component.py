@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
 from collections.abc import Callable, Sequence
 
 from .bindings import (
@@ -22,15 +22,18 @@ from .bindings import (
 from .mouse import MouseEvent
 from .keys import display_key
 from ._runtime_context import (
+    get_focus_manager,
+    get_overlay_host,
     get_renderer,
     get_renderer_strict,
 )
 from .reactive import Computed, Signal
+from .theme import get_theme
 from .types import EventType, OverlayDispatchResult
 
 if TYPE_CHECKING:
     from .renderer import Renderer
-    from .surface import Surface, _Subsurface
+    from .surface import Surface
 
 _logger = logging.getLogger(__name__)
 
@@ -55,11 +58,7 @@ class ComponentError(Exception):
     """Error class of ~Component."""
 
 
-def render_child(
-    component: Component,
-    surface: Surface,
-    log_prefix: str = "",
-) -> None:
+def render_child(component: Component, surface: Surface, log_prefix: str = "") -> None:
     """Blit ``component`` into ``surface`` using the child's x/y/_size (1-based).
 
     Args:
@@ -79,13 +78,7 @@ def render_child(
             component.y,
         )
     sub = surface.subsurface(max(0, component.x - 1), max(0, component.y - 1), w, h)
-    component._render_surface(sub)
-
-
-def _render_child_to_surface(
-    component: Component, surface: Surface | _Subsurface, log_prefix: str
-) -> None:
-    render_child(component, surface, log_prefix)
+    component.paint(sub)
 
 
 class Component(ABC):
@@ -93,12 +86,17 @@ class Component(ABC):
 
     Skeleton class containing tree structure, geometry, rendering,
     key handling, event bubbling, and lifecycle hooks.
-    Subclasses must implement :meth:`_render_surface`.
+    Subclasses must implement :meth:`paint`.
     """
 
     BINDINGS: BindingsList | None = None
-    tab_name: str = ""
+    TAB_NAME: str = ""
     tab_key: str = ""
+
+    @property
+    def tab_name(self) -> str:
+        """Header tab label for this component."""
+        return self.TAB_NAME
 
     def __init__(
         self,
@@ -109,7 +107,7 @@ class Component(ABC):
         parent: Component | None = None,
         id: str | None = None,
     ) -> None:
-        self._activated = False
+        self._mounted = False
         self._focus_level: int = -1
 
         self.x, self.y = x, y
@@ -119,25 +117,54 @@ class Component(ABC):
         self.children = list(children) if children else []
 
         self.id = id
+        self._bind_signal_handlers: list[object] = []
         self._try_register_id()
 
         self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._subscriptions: list[_Subscription] = []
 
-    def activate(self):
-        """Mark the component as active. Called when it enters the visible tree."""
+    def mount(self):
+        """Enter the live component tree (subscriptions / async gate).
+
+        Not the same as becoming visible or focused — exclusive hosts may keep
+        mounted children hidden.
+        """
         self._unsubscribe_all()
         self._replay_pending_subscriptions()
-        self._activated = True
+        self._mounted = True
 
-    def deactivate(self):
-        """Mark the component as inactive. Called when it leaves the visible tree."""
+    def unmount(self):
+        """Leave the live component tree; drop framework subscriptions."""
         self._unsubscribe_all()
-        self._activated = False
+        self._mounted = False
 
-    def is_activated(self):
-        """Get current activate status."""
-        return self._activated
+    def is_mounted(self):
+        """True while this component is on the live session tree."""
+        return self._mounted
+
+    def on_focus(self) -> None:
+        """Called when this component becomes the focused child of a focus host.
+
+        Warm-focus containers (e.g. Column) invoke this on focus changes without
+        unmounting siblings. Override to refresh data that must be current when
+        the user looks at this panel.
+        """
+
+    def on_hide(self) -> None:
+        """Called when an exclusive parent stops painting this child.
+
+        The child remains mounted. Override to pause background work that should
+        not run while covered (e.g. DiffViewer patch/tokenize).
+        """
+
+    def exclusive_visible_child(self) -> Component | None:
+        """If this node paints exactly one child, return it; else ``None``.
+
+        Exclusive-visible containers override this so
+        :func:`is_on_visible_paint_path` does not need a closed set of
+        ``isinstance`` checks.
+        """
+        return None
 
     def subscribe(
         self,
@@ -146,8 +173,9 @@ class Component(ABC):
     ) -> Callable[[], None]:
         """Subscribe to a framework-level event.
 
-        If the component is not yet mounted, the subscription is queued and
-        replayed on activation. The returned callback unsubscribes the handler.
+        If the component is not yet mounted under a root with an event bus,
+        the subscription is queued and replayed on :meth:`mount`. The returned
+        callback unsubscribes the handler.
         """
         from .root import ComponentRoot
 
@@ -229,7 +257,7 @@ class Component(ABC):
 
     def destroy(self) -> None:
         """Destroy children and unregister from component registry."""
-        self.deactivate()
+        self.unmount()
         for child in self.children:
             child.destroy()
         self._try_unregister_id()
@@ -324,11 +352,8 @@ class Component(ABC):
 
         notify_children(self, action, **data)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
-        """Render this component into the given Surface.
-
-        New components should implement this instead of `_render`.
-        """
+    def paint(self, surface: Surface) -> None:
+        """Draw this component into ``surface`` (override in subclasses)."""
 
     def has_overlay_open(self) -> bool:
         """Return True if an overlay is open. Base components never have overlays."""
@@ -369,6 +394,51 @@ class Component(ABC):
     def is_focus_leaf(self) -> bool:
         """Return True if this component is the resolved focus leaf."""
         return self._focus_level == 0
+
+    def is_presentation_stolen(self) -> bool:
+        """True while an open MODAL or SHEET owns keys (via overlay host)."""
+        host = get_overlay_host()
+        return host is not None and host.is_presentation_stolen()
+
+    def is_presentation_active(self) -> bool:
+        """True when structural colors use full primary/muted strength.
+
+        False while a MODAL/SHEET steals keys, or while a focus manager has a
+        leaf and this component is not that leaf. Headless (no focus manager
+        / no leaf) stays active so unit tests keep role colors.
+        """
+        if self.is_presentation_stolen():
+            return False
+        fm = get_focus_manager()
+        if (
+            fm is not None
+            and fm.get_focus_leaf() is not None
+            and not self.is_focus_leaf
+        ):
+            return False
+        return True
+
+    def presentation_fg(
+        self,
+        role: Literal["primary", "muted"] = "primary",
+    ) -> tuple[int, int, int]:
+        """Return structural/metadata fg from presentation state.
+
+        Resolution: steal → ``fg_inactive``; non-focus-leaf → primary→muted /
+        muted→dim; else role color. Git semantic colors bypass this helper —
+        pass ``THEME.fg_*`` / panel helpers directly.
+        Cursor-axis contrast (non-cursor muted inside a list) stays in the caller.
+        """
+        theme = get_theme()
+        if not self.is_presentation_active():
+            if self.is_presentation_stolen():
+                return theme.fg_inactive
+            if role == "muted":
+                return theme.fg_dim
+            return theme.fg_muted
+        if role == "muted":
+            return theme.fg_muted
+        return theme.fg_primary
 
     @property
     def renderer(self) -> Renderer | None:
@@ -450,9 +520,8 @@ def bind_signals(
     bound = types.MethodType(_handler, component)
     # Keep bound alive as long as component is alive so WeakMethod
     # continues to resolve while the component exists.
-    handlers: list[object] = getattr(component, "_bind_signal_handlers", [])
+    handlers = component._bind_signal_handlers
     handlers.append(bound)
-    component._bind_signal_handlers = handlers
 
     unsubs: list[Callable[[], None]] = []
     for sig in signals:
@@ -520,3 +589,33 @@ def resolve_presentation_leaf(node: Component | None) -> Component | None:
             break
         node = child
     return node
+
+
+def mount_children(component: Component) -> None:
+    """Mount every direct child (shared container mount policy)."""
+    for child in component.children:
+        child.mount()
+
+
+def unmount_children(component: Component) -> None:
+    """Unmount every direct child (shared container unmount policy)."""
+    for child in component.children:
+        child.unmount()
+
+
+def is_on_visible_paint_path(component: Component) -> bool:
+    """Return True if ``component`` lies under every exclusive ancestor's visible child.
+
+    Ancestors that override :meth:`Component.exclusive_visible_child` paint only
+    that child; mounted siblings off the path must not schedule full-tree renders.
+    """
+    node: Component | None = component
+    while node is not None:
+        parent = node.parent
+        if parent is None:
+            return True
+        sole = parent.exclusive_visible_child()
+        if sole is not None and node is not sole:
+            return False
+        node = parent
+    return True

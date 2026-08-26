@@ -53,7 +53,7 @@ class _RecordingLeaf(Component):
     def _handle_event(self, key: str) -> None:
         self.received_keys.append(key)
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -63,7 +63,7 @@ class _NoHandleEventLeaf(Component):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -232,7 +232,7 @@ class _BoundLeaf(Component):
     def on_j(self) -> None:
         self.j_pressed = True
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 

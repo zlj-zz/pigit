@@ -100,8 +100,10 @@ class SecureExecutor:
 
         cmd_str = " ".join(parts)
         exit_code, stderr, stdout = self._base.exec(cmd_str, flags=WAITING)
-        output = stdout if stdout else (stderr if stderr else "")
-        return exit_code, output
+        raw = stdout if stdout else (stderr if stderr else "")
+        text = raw.decode() if isinstance(raw, bytes) else str(raw)
+        code = 0 if exit_code is None else int(exit_code)
+        return code, text
 
     def _normalize_command(
         self, cmd: str | list[str], args: list[str] | None
@@ -153,4 +155,4 @@ class SecureExecutor:
 
     def get_audit_log(self) -> list[dict]:
         """Get audit log entries."""
-        return self._audit_log.copy()
+        return list(self._audit_log)

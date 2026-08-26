@@ -66,7 +66,7 @@ class TestCommandPalette:
     def test_render_inactive(self):
         p = CommandPalette()
         s = Surface(20, 5)
-        p._render_surface(s)
+        p.paint(s)
         # Should not crash when inactive
 
     def test_render_active(self):
@@ -74,7 +74,7 @@ class TestCommandPalette:
         p.open()
         s = Surface(20, 5)
         p.resize((20, 5))
-        p._render_surface(s)
+        p.paint(s)
         # Should draw prompt
         lines = s.lines()
         assert ">" in lines[-1]
@@ -132,7 +132,7 @@ class TestContributionGraph:
         r.set_commits(commits)
         s = Surface(60, 12)
         r.resize((60, 12))
-        r._render_surface(s)
+        r.paint(s)
         lines = s.lines()
         # Should draw something (month labels, day labels, cells, legend)
         assert any(c != " " for line in lines for c in line)
@@ -160,7 +160,7 @@ class TestContributionGraph:
         r.set_commits(commits)
         r.resize((120, 16))
         s = Surface(120, 16)
-        r._render_surface(s)
+        r.paint(s)
         rows = ["".join(c.char for c in row) for row in s._rows]
         # Heatmap cells in the left region, line-chart glyphs on the right.
         assert any("■" in row[:59] for row in rows)

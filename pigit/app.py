@@ -7,15 +7,12 @@ Date: 2026-04-17
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from collections.abc import Callable
-from dataclasses import dataclass, replace
-from pathlib import Path
-
 from pigit.termui import (
     EventType,
+    EVT_GOTO,
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
@@ -23,11 +20,8 @@ from pigit.termui import (
     Component,
     ComponentRoot,
     dismiss_sheet,
-    exec_external,
     ExitEventLoop,
-    get_focus_manager,
     get_renderer,
-    hide_spinner,
     keys,
     AsyncTask,
     request_render,
@@ -36,18 +30,23 @@ from pigit.termui import (
     Segment,
     show_badge,
     show_sheet,
-    show_spinner,
     show_toast,
     ToastPosition,
     set_theme,
 )
 from pigit.termui.cli_output import Console
-from pigit.termui.containers import Column, SplitPane, TabView
+from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
-from .git.api import GitApi, GitError, RepoError
+from .app_merge_state import MergeStateStore
+from .app_observe import ObserveDeps, ObserveHost
+from .app_panel_nav import PanelNavigator
+from .app_network_git import NetworkGit, NetworkGitOutcome
+from .app_merge_workflow import MergeWorkflow
+from .app_sequencer import SequencerControl
+from .git.api import GitApi
 from .app_branch import BranchPanel
 from .app_chrome import AppFooter
 from .app_commit import CommitPanel
@@ -61,37 +60,12 @@ from .app_stash import StashPanel
 from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
-from .observe import (
-    ChangeBatch,
-    ChangeKind,
-    ObserveContext,
-    RefreshCoordinator,
-    RepoObserver,
-    StatMtimeBackend,
-    WatchRoot,
-    should_defer_repo_refresh,
-)
-from .observe.denylist import rel_path_is_denied
-from .observe.digest import hash_porcelain
+from .observe.overlay import should_defer_repo_refresh
 from .viewmodels.status import StatusViewModel
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
 from .config_data import AppConfig
-
-# FS mtime poll cadence for StatMtimeBackend.
-_OBSERVE_POLL_INTERVAL_S = 1.0
-# UI queue drain / debounce flush retry cadence.
-_OBSERVE_DRAIN_INTERVAL_S = 0.15
-
-
-@dataclass(frozen=True)
-class _NetworkGitOutcome:
-    """Result of a background push/pull (AsyncTask cannot deliver exceptions)."""
-
-    ok: bool
-    message: str = ""
-    conflict: bool = False
 
 
 class PigitApplication(Application):
@@ -99,6 +73,20 @@ class PigitApplication(Application):
 
     keymap_namespace = "universal"
     min_terminal_size = (65, 10)
+    LARGE_SCREEN_COLS = 120
+
+    # Body tree — assigned in build_root; required for a live TUI session.
+    _tab_view: TabView
+    _split_pane: SplitPane
+    _body_view: ExclusiveView
+    _palette: CommandPalette
+    _status_stack: Column
+    _status_panel: StatusPanel
+    _stash_panel: StashPanel
+    _branch_panel: BranchPanel
+    _commit_panel: CommitPanel
+    _diff_panel: DiffViewer
+    _panel_nav: PanelNavigator
 
     def __init__(
         self,
@@ -118,8 +106,10 @@ class PigitApplication(Application):
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
-        # Merge workflow state
-        self._merge_state: dict | None = None
+        self._merge_state_store = MergeStateStore(
+            self._header_state,
+            get_git_dir=self._git.get_git_dir,
+        )
         self._alert_dialog = AlertDialog(
             inner_width=50,
             on_result=lambda _: None,
@@ -127,13 +117,7 @@ class PigitApplication(Application):
         # Session history (undo stack)
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         self._config = config
-        # Repo observation (change-driven refresh)
-        self._observer: RepoObserver | None = None
-        self._coordinator: RefreshCoordinator | None = None
-        self._observe_ctx: ObserveContext | None = None
-        self._observe_poll_id: int | None = None
-        self._observe_drain_id: int | None = None
-        self._observe_status_unsub: Callable[[], None] | None = None
+        self._observe_host: ObserveHost | None = None
         self._header_reload_token: object | None = None
         # ViewModels (assigned in build_root, same lifetime as panels)
         self._status_vm: StatusViewModel
@@ -143,8 +127,33 @@ class PigitApplication(Application):
         self._inspector_task: AsyncTask | None = None
         self._inspector_token: object = None
         # Background push/pull (must not use exec_external on the worker)
-        self._network_sync_busy = False
-        self._network_sync_task: AsyncTask[_NetworkGitOutcome] = AsyncTask()
+        self._network_sync_task: AsyncTask[NetworkGitOutcome] = AsyncTask()
+        self._network_git = NetworkGit(
+            store=self._merge_state_store,
+            get_git=lambda: self._git,
+            navigate_product=self.navigate_product,
+            get_sync_task=lambda: self._network_sync_task,
+            get_refresh_git_vms=lambda: self._refresh_git_vms(),
+            get_schedule_reload_header=lambda: self._schedule_reload_header(),
+        )
+        self._merge_workflow = MergeWorkflow(
+            store=self._merge_state_store,
+            network=self._network_git,
+            get_git=lambda: self._git,
+            navigate_product=self.navigate_product,
+            get_branch_panel=lambda: self._branch_panel,
+            get_alert_dialog=lambda: self._alert_dialog,
+            get_refresh_git_vms=lambda: self._refresh_git_vms(),
+            get_schedule_reload_header=lambda: self._schedule_reload_header(),
+        )
+        self._sequencer = SequencerControl(
+            get_git=lambda: self._git,
+            get_repo_path=lambda: self._repo_path,
+            navigate_product=self.navigate_product,
+            get_alert_dialog=lambda: self._alert_dialog,
+            get_refresh_git_vms=lambda: self._refresh_git_vms(),
+            get_refresh_active_panel=lambda: self._refresh_active_panel(),
+        )
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
         self._log_graph_preview: LogGraphPreview | None = None
@@ -152,18 +161,6 @@ class PigitApplication(Application):
         self._diff_preview_wanted = config.diff_preview_default
         self._log_graph_wanted = config.log_graph_default
         self._preview_unsub: Callable[[], None] | None = None
-        # Typed accessors for key body components (assigned in build_root)
-        self._tab_view: TabView
-        self._body_row: SplitPane
-        self._palette: CommandPalette
-        self._status_stack: Column
-        self._status_panel: StatusPanel
-        self._stash_panel: StashPanel
-        self._branch_panel: BranchPanel
-        self._commit_panel: CommitPanel
-        self._diff_panel: DiffViewer
-
-    LARGE_SCREEN_COLS = 120
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
@@ -175,11 +172,15 @@ class PigitApplication(Application):
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
-        # the log-graph preview. At most one is in body_row at a time.
+        # the log-graph preview. At most one is in the split pane at a time.
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
-            on_preview_target=self._set_observe_preview_target,
+            on_preview_target=lambda rel: (
+                self._observe_host.set_preview_target(rel)
+                if self._observe_host
+                else None
+            ),
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
@@ -197,12 +198,15 @@ class PigitApplication(Application):
             id="stash",
             on_toggle_preview=self.toggle_side_preview,
         )
+        status_panel = self._status_panel
+        stash_panel = self._stash_panel
         self._status_stack = Column(
-            children=[self._status_panel, self._stash_panel],
+            children=[status_panel, stash_panel],
             heights=["flex", 4],
             focus_index=0,
             id="status",
         )
+        status_stack = self._status_stack
 
         self._branch_panel = BranchPanel(
             vm=self._branch_vm,
@@ -210,32 +214,39 @@ class PigitApplication(Application):
             id="branch",
             on_toggle_preview=self.toggle_side_preview,
         )
+        branch_panel = self._branch_panel
 
         self._commit_panel = CommitPanel(
             vm=self._commit_vm,
             id="commit",
             report_default=self._config.commit_report_default,
         )
+        commit_panel = self._commit_panel
         self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
         self._tab_view = TabView(
             children=[
-                self._status_stack,
-                self._branch_panel,
-                self._commit_panel,
-                self._diff_panel,
+                status_stack,
+                branch_panel,
+                commit_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
             id="tab_view",
         )
+        tab_view = self._tab_view
 
         cols, _ = terminal_size()
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
 
-        self._body_row = SplitPane(
-            master=self._tab_view,
+        self._split_pane = SplitPane(
+            master=tab_view,
             breakpoint_cols=self.LARGE_SCREEN_COLS,
-            id="body_row",
+            id="split_pane",
+        )
+        self._body_view = ExclusiveView(
+            [self._split_pane, self._diff_panel],
+            visible=self._split_pane,
+            id="body",
         )
 
         self._palette = CommandPalette(
@@ -252,12 +263,39 @@ class PigitApplication(Application):
                 sep_fg=THEME.fg_dim,
                 id="header",
             ),
-            self._body_row,
+            self._body_view,
         ]
         heights: list = [2, "flex"]
         if self._config.show_footer:
             children.append(footer)
             heights.append(2)
+
+        self._panel_nav = PanelNavigator(
+            get_tab_view=lambda: tab_view,
+            get_status_stack=lambda: status_stack,
+            get_status_panel=lambda: status_panel,
+            get_stash_panel=lambda: stash_panel,
+            get_branch_panel=lambda: branch_panel,
+            get_commit_panel=lambda: commit_panel,
+        )
+        self._observe_host = ObserveHost(
+            ObserveDeps(
+                get_git=lambda: self._git,
+                get_repo_path=lambda: self._repo_path,
+                get_config=lambda: self._config,
+                get_status_vm=lambda: self._status_vm,
+                get_tab_view=lambda: tab_view,
+                get_preview_panel=lambda: self._preview_panel,
+                get_log_graph_preview=lambda: self._log_graph_preview,
+                get_diff_preview_wanted=lambda: self._diff_preview_wanted,
+                get_log_graph_wanted=lambda: self._log_graph_wanted,
+                get_is_large_screen=lambda: self._is_large_screen,
+                get_root=lambda: self._root,
+                get_loop=lambda: self._loop,
+                schedule_reload_header=self._schedule_reload_header,
+                refresh_list_panel=self._refresh_list_panel,
+            )
+        )
         return Column(children=children, heights=heights)
 
     def _on_tab_switch(self, panel: Component) -> None:
@@ -271,7 +309,8 @@ class PigitApplication(Application):
             cols, _ = terminal_size()
             self._apply_body_widths(cols)
         panel.emit(EVT_SELECTION_CHANGED)
-        self._resync_observe_roots()
+        if self._observe_host is not None:
+            self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
         self._help_panel = HelpPanel(
@@ -291,7 +330,7 @@ class PigitApplication(Application):
             entries = active.get_help_entries()
             if entries:
                 title_fn = getattr(active, "get_help_title", None)
-                title = title_fn() if callable(title_fn) else type(active).__name__
+                title = str(title_fn()) if callable(title_fn) else type(active).__name__
                 groups.append((title, entries))
         universal = self.get_help_entries()
         if universal:
@@ -328,176 +367,46 @@ class PigitApplication(Application):
             position=ToastPosition.BOTTOM_LEFT,
             kind=FeedbackKind.INFO,
         )
-        self._try_restore_merge_state()
+        self._merge_state_store.try_restore(self._git.is_merge_in_progress)
 
-        if self._config.repo_observe:
-            self._start_repo_observe()
+        if self._config.repo_observe and self._observe_host is not None:
+            self._observe_host.start()
 
-        # Initial sync: all components are activated now, so subscribers receive
+        # Initial sync: all components are mounted now, so subscribers receive
         # the event and update header/footer/preview.
-        if self._tab_view.active is not None:
-            self._on_tab_switch(self._tab_view.active)
+        if self._tab_view.visible is not None:
+            self._on_tab_switch(self._tab_view.visible)
 
     def on_exit(self) -> None:
         """Stop repo observation timers and backend before root destroy."""
-        self._stop_repo_observe()
+        if self._observe_host is not None:
+            self._observe_host.stop()
 
     def _start_repo_observe(self) -> None:
-        """Start StatMtime observation of git metadata (and Status worktree)."""
-        try:
-            git_dir = self._git.get_git_dir()
-            common_dir = self._git.get_git_common_dir()
-        except GitError:
-            logging.warning(
-                "Repo observe disabled: cannot resolve git dirs", exc_info=True
-            )
-            return
-        repo_root = self._repo_path or ""
-        self._observe_ctx = ObserveContext(
-            repo_root=repo_root,
-            git_dir=git_dir,
-            common_dir=common_dir,
-        )
-        backend = StatMtimeBackend(worktree_digest=self._observe_worktree_digest)
-        observer = RepoObserver(backend=backend)
-        self._observer = observer
-        self._coordinator = RefreshCoordinator(
-            observer.queue,
-            defer_fn=lambda: should_defer_repo_refresh(self._root),
-            on_batch=self._on_observe_batch,
-            ctx_provider=self._observe_context,
-        )
-        self._resync_observe_roots(reset=True)
-        if self._observe_status_unsub is None:
-            self._observe_status_unsub = self._status_vm.items.subscribe(
-                self._on_status_items_for_observe
-            )
-        if self._loop is not None:
-            self._observe_poll_id = self._loop.add_interval(
-                _OBSERVE_POLL_INTERVAL_S,
-                observer.poll_into_queue,
-            )
-            self._observe_drain_id = self._loop.add_interval(
-                _OBSERVE_DRAIN_INTERVAL_S,
-                self._coordinator.drain,
-            )
+        """Delegate to ObserveHost.start()."""
+        if self._observe_host is not None:
+            self._observe_host.start()
 
-    def _observe_worktree_digest(self) -> str | None:
-        """Return a porcelain digest while Status worktree observe is active."""
-        try:
-            return hash_porcelain(self._git.status_porcelain())
-        except Exception:
-            logging.debug("Worktree digest failed", exc_info=True)
-            return None
-
-    def _on_status_items_for_observe(self, _items: list) -> None:
-        """Refresh worktree path set when the Status list changes."""
-        self._resync_observe_roots()
-
-    def _build_observe_roots(self) -> list[WatchRoot]:
-        """Build watch roots; attach worktree only when Status is focused."""
-        ctx = self._observe_ctx
-        if ctx is None:
+    def _build_observe_roots(self):
+        """Delegate to ObserveHost.build_roots()."""
+        if self._observe_host is None:
             return []
-        roots: list[WatchRoot] = [
-            WatchRoot(kind="git_dir", path=ctx.git_dir),
-            WatchRoot(kind="common_dir", path=ctx.common_dir),
-        ]
-        if not self._config.observe_worktree:
-            return roots
-        active = resolve_presentation_leaf(self._tab_view.active)
-        if not isinstance(active, StatusPanel):
-            return roots
-        roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
-        repo = Path(ctx.repo_root)
-        for file_item in self._status_vm.items.value:
-            rel = file_item.get_file_str()
-            if not rel or rel_path_is_denied(rel):
-                continue
-            roots.append(WatchRoot(kind="file", path=str(repo / rel)))
-        return roots
+        return self._observe_host.build_roots()
 
     def _resync_observe_roots(self, *, reset: bool = False) -> None:
-        """Start or update backend roots for the current tab / status files."""
-        if self._observer is None or self._observe_ctx is None:
-            return
-        roots = self._build_observe_roots()
-        if reset:
-            self._observer.start(roots)
-        else:
-            self._observer.update_roots(roots)
+        """Delegate to ObserveHost.resync_roots()."""
+        if self._observe_host is not None:
+            self._observe_host.resync_roots(reset=reset)
 
     def _stop_repo_observe(self) -> None:
-        """Remove observe intervals and stop the backend."""
-        if self._observe_status_unsub is not None:
-            self._observe_status_unsub()
-            self._observe_status_unsub = None
-        if self._loop is not None:
-            if self._observe_poll_id is not None:
-                self._loop.remove_interval(self._observe_poll_id)
-                self._observe_poll_id = None
-            if self._observe_drain_id is not None:
-                self._loop.remove_interval(self._observe_drain_id)
-                self._observe_drain_id = None
-        if self._observer is not None:
-            self._observer.stop()
-            self._observer = None
-        self._coordinator = None
+        """Delegate to ObserveHost.stop()."""
+        if self._observe_host is not None:
+            self._observe_host.stop()
 
-    def _observe_context(self) -> ObserveContext:
-        """Return the current ObserveContext (must be started)."""
-        if self._observe_ctx is None:
-            raise RuntimeError("ObserveContext not initialized")
-        return self._observe_ctx
-
-    def _set_observe_preview_target(self, rel: str | None) -> None:
-        """Update ObserveContext.preview_target for PREVIEW_FILE classification."""
-        if self._observe_ctx is None:
-            return
-        self._observe_ctx = replace(self._observe_ctx, preview_target=rel)
-
-    def _on_observe_batch(self, batch: ChangeBatch) -> None:
-        """Apply a debounced ChangeBatch to header and the active panel."""
-        kinds = batch.kinds
-        if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
-            self._schedule_reload_header()
-
-        active = resolve_presentation_leaf(self._tab_view.active)
-        if active is None:
-            return
-
-        if isinstance(active, StatusPanel):
-            if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
-                self._refresh_list_panel(active)
-            if ChangeKind.PREVIEW_FILE in kinds:
-                if (
-                    self._diff_preview_wanted
-                    and self._preview_panel is not None
-                    and self._is_large_screen
-                ):
-                    self._preview_panel.reload()
-            return
-
-        if isinstance(active, BranchPanel):
-            if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
-                self._refresh_list_panel(active)
-                if (
-                    self._log_graph_wanted
-                    and self._log_graph_preview is not None
-                    and self._is_large_screen
-                ):
-                    self._log_graph_preview.reload()
-            return
-
-        if isinstance(active, CommitPanel):
-            # Refresh keeps the pinned log_ref; never silently unpin.
-            if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
-                self._refresh_list_panel(active)
-            return
-
-        if isinstance(active, StashPanel):
-            if ChangeKind.STASH in kinds or ChangeKind.REFS in kinds:
-                self._refresh_list_panel(active)
+    def _on_observe_batch(self, batch) -> None:
+        """Delegate to ObserveHost.on_batch()."""
+        if self._observe_host is not None:
+            self._observe_host.on_batch(batch)
 
     def _schedule_reload_header(self) -> None:
         """Async-load branch + ahead/behind into HeaderState with stale-guard."""
@@ -516,9 +425,9 @@ class PigitApplication(Application):
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""
-        if not self._is_large_screen:
+        if self._is_detail_open() or not self._is_large_screen:
             return None
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             return self._preview_panel if self._diff_preview_wanted else None
         if isinstance(active, BranchPanel):
@@ -527,21 +436,23 @@ class PigitApplication(Application):
 
     def _apply_body_widths(self, cols: int) -> None:
         """Update SplitPane detail and widths for the active tab."""
-        active = resolve_presentation_leaf(self._tab_view.active)
+        if self._is_detail_open():
+            return
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
-            self._body_row.set_detail(self._preview_panel)
-            self._body_row.set_detail_wanted(
+            self._split_pane.set_detail(self._preview_panel)
+            self._split_pane.set_detail_wanted(
                 self._is_large_screen and self._diff_preview_wanted
             )
         elif isinstance(active, BranchPanel):
-            self._body_row.set_detail(self._log_graph_preview)
-            self._body_row.set_detail_wanted(
+            self._split_pane.set_detail(self._log_graph_preview)
+            self._split_pane.set_detail_wanted(
                 self._is_large_screen and self._log_graph_wanted
             )
         else:
-            self._body_row.set_detail(None)
-            self._body_row.set_detail_wanted(False)
-        self._body_row.apply_terminal_width(cols)
+            self._split_pane.set_detail(None)
+            self._split_pane.set_detail_wanted(False)
+        self._split_pane.apply_terminal_width(cols)
 
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
@@ -579,21 +490,25 @@ class PigitApplication(Application):
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
         """Switch focus to the Status panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._status_panel)
 
     @bind_action("goto_stash", "2", desc="Switch to Stash panel", tip="Stash")
     def goto_stash(self):
         """Switch focus to the Stash panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._stash_panel)
 
     @bind_action("goto_branch", "3", desc="Switch to Branch tab", tip="Branch")
     def goto_branch(self):
         """Switch focus to the Branch panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._branch_panel)
 
     @bind_action("goto_commit", "4", desc="Switch to Commit tab", tip="Commit")
     def goto_commit(self):
         """Switch focus to the Commit panel."""
+        self._close_detail_if_open()
         self._focus_destination(self._commit_panel)
 
     @bind_action(
@@ -603,6 +518,7 @@ class PigitApplication(Application):
     )
     def next_panel(self) -> None:
         """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        self._close_detail_if_open()
         self._cycle_panel(1)
 
     @bind_action(
@@ -612,54 +528,73 @@ class PigitApplication(Application):
     )
     def prev_panel(self) -> None:
         """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        self._close_detail_if_open()
         self._cycle_panel(-1)
 
     def _panel_ring(self) -> tuple[Component, ...]:
         """Return the four panels that Tab/Shift+Tab cycle through, in order."""
-        return (
-            self._status_panel,
-            self._stash_panel,
-            self._branch_panel,
-            self._commit_panel,
-        )
+        return self._panel_nav.panel_ring()
 
     def _ring_index(self) -> int | None:
-        """Index in the panel ring, or None when Diff (or unknown) is focused."""
-        fm = get_focus_manager()
-        leaf = fm.get_focus_leaf() if fm is not None else None
-        if leaf is None:
-            leaf = resolve_presentation_leaf(self._tab_view.active)
-        for idx, panel in enumerate(self._panel_ring()):
-            if leaf is panel:
-                return idx
-        return None
+        """Index in the panel ring from the product TabView."""
+        return self._panel_nav.ring_index()
 
     def _focus_destination(self, panel: Component) -> None:
         """Move TabView + Status/Stash column focus to *panel*."""
-        if panel is self._status_panel:
-            self._tab_view.route_to("status")
-            self._status_stack.set_focus_index(0)
-            return
-        if panel is self._stash_panel:
-            self._tab_view.route_to("status")
-            self._status_stack.set_focus_index(1)
-            return
-        if panel is self._branch_panel:
-            self._tab_view.route_to("branch")
-            return
-        if panel is self._commit_panel:
-            self._tab_view.route_to("commit")
+        self._panel_nav.focus_destination(panel)
 
     def _cycle_panel(self, step: int) -> None:
-        """Move focus ``step`` positions around the panel ring.
+        """Move focus ``step`` positions around the panel ring."""
+        self._panel_nav.cycle_panel(step)
 
-        No-op when the current focus is outside the ring (e.g. Diff view).
-        """
-        idx = self._ring_index()
-        if idx is None:
+    def _is_detail_open(self) -> bool:
+        """True when Diff occupies the body ExclusiveView slot."""
+        body = getattr(self, "_body_view", None)
+        return body is not None and body.visible is self._diff_panel
+
+    def _reveal_product(self) -> None:
+        """Close Diff detail if open and resync SplitPane layout for the terminal."""
+        if not self._is_detail_open():
             return
-        ring = self._panel_ring()
-        self._focus_destination(ring[(idx + step) % len(ring)])
+        self._body_view.show(self._split_pane)
+        cols, _ = terminal_size()
+        self._apply_body_widths(cols)
+
+    def _close_detail_if_open(self) -> None:
+        """Hide Diff detail without unmounting it; resync product layout."""
+        self._reveal_product()
+
+    def presentation_active(self) -> Component | None:
+        """Presentation leaf: Diff when detail open, else product tab leaf."""
+        if self._is_detail_open():
+            return self._diff_panel
+        tab = getattr(self, "_tab_view", None)
+        if tab is None:
+            return None
+        return resolve_presentation_leaf(tab.visible)
+
+    def navigate_product(self, target: str) -> None:
+        """Close Diff detail if open, then route the product TabView."""
+        self._reveal_product()
+        tab = getattr(self, "_tab_view", None)
+        if tab is not None:
+            tab.route_to(target)
+
+    def _handle_body_goto(self, **data) -> bool:
+        """Own all EVT_GOTO: open Diff detail, or product panel navigation."""
+        target = data.get("target")
+        if target == "diff" or target is self._diff_panel:
+            self._diff_panel.update(EVT_GOTO, **data)
+            self._body_view.show(self._diff_panel)
+            return True
+        was_detail_open = self._is_detail_open()
+        if was_detail_open:
+            self._reveal_product()
+        panel = self._panel_nav.resolve_panel(target)
+        if panel is not None:
+            self._panel_nav.focus_destination(panel)
+            return True
+        return was_detail_open
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
@@ -690,10 +625,12 @@ class PigitApplication(Application):
 
         panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
         show_sheet(panel, title="Recent")
-        panel.activate()
+        panel.mount()
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
+        if self._is_detail_open():
+            return
         cols, _ = terminal_size()
         if cols < self.LARGE_SCREEN_COLS:
             show_toast(
@@ -702,7 +639,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.WARNING,
             )
             return
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             self._diff_preview_wanted = not self._diff_preview_wanted
             showing = self._diff_preview_wanted
@@ -715,8 +652,8 @@ class PigitApplication(Application):
             return
         self._apply_body_widths(cols)
         if showing:
-            if self._tab_view.active is not None:
-                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+            if self._tab_view.visible is not None:
+                self._tab_view.visible.emit(EVT_SELECTION_CHANGED)
         elif hidden is not None:
             hidden.clear()
         renderer = get_renderer()
@@ -731,7 +668,7 @@ class PigitApplication(Application):
         The snapshot build spawns several git subprocesses, so it runs on an
         AsyncTask worker; the sheet appears immediately with a loading hint.
         """
-        active = resolve_presentation_leaf(self._tab_view.active)
+        active = self.presentation_active()
         if not isinstance(active, InspectorHost):
             show_toast(
                 "No inspector for this view",
@@ -744,7 +681,7 @@ class PigitApplication(Application):
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
         placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
-        placeholder.activate()
+        placeholder.mount()
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -765,7 +702,7 @@ class PigitApplication(Application):
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
             show_sheet(sheet, edge="top", max_fraction=0.5)
-            sheet.activate()
+            sheet.mount()
 
         self._inspector_task = run_async(load, apply)
 
@@ -814,8 +751,8 @@ class PigitApplication(Application):
                 if panel is not None:
                     panel.clear()
         if not was_large and self._is_large_screen:
-            if self._tab_view.active is not None:
-                self._tab_view.active.emit(EVT_SELECTION_CHANGED)
+            if self._tab_view.visible is not None:
+                self._tab_view.visible.emit(EVT_SELECTION_CHANGED)
 
     def _refresh_list_panel(self, panel: Component) -> None:
         """Refresh a list panel via an overridden ``refresh`` or its ViewModel."""
@@ -829,13 +766,16 @@ class PigitApplication(Application):
             vm.refresh()
 
     def _refresh_active_panel(self) -> None:
-        """Imperative refresh of the currently active panel.
+        """Imperative refresh of the currently presented product panel.
 
         Used after actions (rebase/merge done, etc.). Skips when a MODAL or
         SHEET is open (toasts do not block). Does not call ``request_render``;
         ViewModel refresh uses AsyncTask and Signal subscribers render.
+        Skips while Diff detail is open (do not refresh a hidden list).
         """
-        active = resolve_presentation_leaf(self._tab_view.active)
+        if self._is_detail_open():
+            return
+        active = resolve_presentation_leaf(self._tab_view.visible)
         if active is None:
             return
         if self._root is not None and should_defer_repo_refresh(self._root):
@@ -844,15 +784,7 @@ class PigitApplication(Application):
 
     def _on_rebase_request(self, target: str) -> None:
         """Open the interactive-rebase todo panel for ``target``."""
-        from .app_rebase import RebasePanel
-
-        def _on_done() -> None:
-            dismiss_sheet()
-            self._refresh_active_panel()
-
-        panel = RebasePanel(self._git, target, on_done=_on_done)
-        show_sheet(panel, max_fraction=0.5, title="Rebase")
-        panel.activate()
+        self._sequencer.on_rebase_request(target)
 
     def on_event(self, action: EventType, **data) -> bool:
         """Bridge bubbled events to the framework bus; enrich cross-cutting events.
@@ -861,8 +793,10 @@ class PigitApplication(Application):
         Header, footer, and preview updates are handled by their own
         bus subscribers.
         """
+        if action is EVT_GOTO:
+            return self._handle_body_goto(**data)
         if action in (EventType("mode_changed"), EVT_SELECTION_CHANGED):
-            data.setdefault("active", self._resolve_active_panel())
+            data.setdefault("active", self.presentation_active())
         if action is EventType("action_requested") and data.get("cmd") == "merge":
             self._on_merge_request(data["source"], data["target"])
             return True
@@ -884,7 +818,7 @@ class PigitApplication(Application):
         """Return the currently presented active panel, or None."""
         if self._root is None:
             return None
-        return resolve_presentation_leaf(self._tab_view.active)
+        return self.presentation_active()
 
     def _pin_log_ref(self, ref: str, *, announce: bool = True) -> None:
         """Pin the Commit log to ``ref``; announce unless it is the checkout."""
@@ -895,8 +829,10 @@ class PigitApplication(Application):
     def _on_show_log(self, ref: str) -> None:
         """Pin Commit log to ``ref`` and open the Commit tab."""
         self._pin_log_ref(ref)
-        if self._tab_view.route_to("commit") is None:
-            # Already on the Commit tab; refresh the title directly.
+        already_on_commit = self._tab_view.visible is self._commit_panel
+        self.navigate_product("commit")
+        if already_on_commit:
+            # Already on Commit (route_to no-ops); refresh the title directly.
             self._commit_panel._publish_tab_title()
 
     def _on_follow_head(self, ref: str) -> None:
@@ -928,7 +864,8 @@ class PigitApplication(Application):
         if lower == "stash":
             self.goto_stash()
             return
-        if self._tab_view.route_to(lower) is not None:
+        if lower in ("status", "branch", "commit"):
+            self.navigate_product(lower)
             return
         if lower in ("pull", "push"):
             self._run_network_git(lower)
@@ -950,142 +887,35 @@ class PigitApplication(Application):
             self._run_cherry_pick_control(lower)
             return
 
+    @property
+    def _network_sync_busy(self) -> bool:
+        """Backward-compatible busy flag for network push/pull."""
+        return self._network_git.busy
+
+    @_network_sync_busy.setter
+    def _network_sync_busy(self, value: bool) -> None:
+        self._network_git.busy = value
+
     def _run_network_git(
         self,
         action: str,
         *,
         on_complete: Callable[[], None] | None = None,
     ) -> None:
-        """Run push/pull on a worker with a center spinner; never use exec_external.
-
-        ``on_complete`` runs after the attempt finishes (success or failure), not when
-        the busy-guard rejects a second sync. Merge finish uses this to always
-        checkout back to ``source``.
-        """
-        if action not in ("push", "pull"):
-            raise ValueError(f"Unsupported network git action: {action}")
-        if self._network_sync_busy:
-            show_toast(
-                "Push/Pull already in progress",
-                duration=1.5,
-                kind=FeedbackKind.INFO,
-            )
-            return
-
-        # Palette SHEET paints above TOAST; drop it before showing the spinner.
-        dismiss_sheet()
-
-        self._network_sync_busy = True
-        label = "Pushing to upstream" if action == "push" else "Pulling from upstream"
-        show_spinner(label, position=ToastPosition.CENTER)
-
-        def work() -> _NetworkGitOutcome:
-            # AsyncTask drops uncaught exceptions without invoking done(); never raise.
-            try:
-                if action == "push":
-                    self._git.push()
-                else:
-                    self._git.pull()
-                return _NetworkGitOutcome(ok=True)
-            except GitError as e:
-                msg = str(e)
-                return _NetworkGitOutcome(
-                    ok=False,
-                    message=msg,
-                    conflict="conflict" in msg.lower(),
-                )
-            except Exception as e:
-                return _NetworkGitOutcome(
-                    ok=False,
-                    message=f"Git {action} error: {e}",
-                )
-
-        def done(outcome: _NetworkGitOutcome) -> None:
-            self._network_sync_busy = False
-            hide_spinner()
-            try:
-                if outcome.conflict:
-                    self._handle_pull_conflict(outcome.message)
-                    return
-                if not outcome.ok:
-                    show_toast(
-                        outcome.message or f"Git {action} failed",
-                        duration=3.0,
-                        kind=FeedbackKind.ERROR,
-                    )
-                    return
-                show_toast(
-                    f"Git {action} completed",
-                    duration=1.5,
-                    kind=FeedbackKind.SUCCESS,
-                )
-                self._refresh_git_vms()
-                self._schedule_reload_header()
-            finally:
-                # Always settle (e.g. merge checkout-back), matching pre-async behavior.
-                if on_complete is not None:
-                    on_complete()
-
-        self._network_sync_task.start(work, done)
+        """Delegate to NetworkGit.run()."""
+        self._network_git.run(action, on_complete=on_complete)
 
     def _handle_pull_conflict(self, message: str) -> None:
-        """Persist pull-merge state, show git detail, and route to Status."""
-        branch = ""
-        try:
-            branch = self._git.get_head() or ""
-        except (GitError, RepoError):
-            branch = ""
-        target = branch or "HEAD"
-        state = {"source": "@{upstream}", "target": target, "mode": "pull"}
-        self._merge_state = state
-        self._header_state.merge_target = target
-        self._save_merge_state(state["source"], target, mode="pull")
-
-        detail = (message or "").strip() or "Merge conflict during pull"
-        show_toast(
-            f"{detail}\nResolve in Status, then ';' → continue-merge",
-            duration=4.0,
-            kind=FeedbackKind.WARNING,
-        )
-        self._tab_view.route_to("status")
-        self._refresh_git_vms()
+        """Delegate to NetworkGit.handle_pull_conflict()."""
+        self._network_git.handle_pull_conflict(message)
 
     def _run_git_action(self, action: str) -> None:
-        """Run a git action via exec_external and show result toast."""
-        try:
-            result = exec_external(["git", action], cwd=self._repo_path)
-            if result.returncode == 0:
-                show_toast(
-                    f"Git {action} completed", duration=1.5, kind=FeedbackKind.SUCCESS
-                )
-            else:
-                stderr = result.stderr.strip() if result.stderr else "Unknown error"
-                show_toast(
-                    f"Git {action} failed: {stderr}",
-                    duration=3.0,
-                    kind=FeedbackKind.ERROR,
-                )
-        except Exception as e:
-            show_toast(
-                f"Git {action} error: {e}", duration=3.0, kind=FeedbackKind.ERROR
-            )
+        """Delegate to SequencerControl.run_git_action()."""
+        self._sequencer.run_git_action(action)
 
     def _run_rebase_control(self, action: str) -> None:
-        """Run a rebase control flag (--continue/--abort/--skip)."""
-        flag = action[len("rebase-") :]
-        if flag == "abort":
-
-            def on_confirm(confirmed: bool) -> None:
-                if confirmed:
-                    self._do_rebase_control(flag)
-
-            self._alert_dialog.alert(
-                "Abort rebase? All progress will be lost.",
-                on_confirm,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        self._do_rebase_control(flag)
+        """Delegate to SequencerControl.run_rebase_control()."""
+        self._sequencer.run_rebase_control(action)
 
     def _refresh_git_vms(self) -> None:
         """Refresh Status, Branch, and Commit VMs (safe while a palette overlay is open)."""
@@ -1093,390 +923,49 @@ class PigitApplication(Application):
         self._branch_vm.refresh()
         self._commit_vm.refresh()
 
-    _SEQUENCER_PAUSED = {
-        "rebase": "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
-        "cherry-pick": "Cherry-pick paused. Resolve, then ';' → cherry-pick-continue/abort/skip",
-        "revert": "Revert paused. Resolve, then ';' → cherry-pick-continue/abort/skip",
-    }
-
-    def _after_external_git(
-        self,
-        result,
-        *,
-        flag: str,
-        done_msg: str,
-        failed_msg: str,
-    ) -> None:
-        """Toast and refresh after an exec_external sequencer command.
-
-        git's sequencer is shared, so a revert is resumed via
-        ``cherry-pick-continue``; the paused state is labeled by the actual
-        sequencer kind, not the command that was run.
-        """
-        still = self._git.sequencer_in_progress()
-        if result.returncode == 0:
-            if still is not None:
-                show_toast(
-                    self._SEQUENCER_PAUSED.get(still, f"{still} paused"),
-                    duration=3.0,
-                    kind=FeedbackKind.WARNING,
-                )
-            else:
-                show_toast(done_msg, duration=1.5, kind=FeedbackKind.SUCCESS)
-            self._refresh_git_vms()
-            return
-        show_toast(failed_msg, duration=2.0, kind=FeedbackKind.ERROR)
-
     def _do_rebase_control(self, flag: str) -> None:
-        """Execute ``git rebase --<flag>`` via exec_external and refresh panels."""
-        try:
-            result = exec_external(["git", "rebase", f"--{flag}"], cwd=self._repo_path)
-        except Exception as e:
-            show_toast(
-                f"Rebase {flag} error: {e}", duration=3.0, kind=FeedbackKind.ERROR
-            )
-            return
-        self._after_external_git(
-            result,
-            flag=flag,
-            done_msg=f"Rebase {flag} completed",
-            failed_msg=f"Rebase {flag} failed",
-        )
+        """Delegate to SequencerControl.do_rebase_control()."""
+        self._sequencer.do_rebase_control(flag)
 
     def _run_cherry_pick_control(self, action: str) -> None:
-        """Run a cherry-pick control flag (--continue/--abort/--skip)."""
-        flag = action[len("cherry-pick-") :]
-        if flag == "abort":
-
-            def on_confirm(confirmed: bool) -> None:
-                if confirmed:
-                    self._do_cherry_pick_control(flag)
-
-            self._alert_dialog.alert(
-                "Abort cherry-pick? All progress will be lost.",
-                on_confirm,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        self._do_cherry_pick_control(flag)
+        """Delegate to SequencerControl.run_cherry_pick_control()."""
+        self._sequencer.run_cherry_pick_control(action)
 
     def _do_cherry_pick_control(self, flag: str) -> None:
-        """Execute ``git cherry-pick --<flag>`` via exec_external."""
-        argv = ["git", "cherry-pick", f"--{flag}"]
-        if flag == "continue":
-            argv.append("--no-edit")
-        try:
-            result = exec_external(argv, cwd=self._repo_path)
-        except Exception as e:
-            show_toast(
-                f"Cherry-pick {flag} error: {e}",
-                duration=3.0,
-                kind=FeedbackKind.ERROR,
-            )
-            return
-        self._after_external_git(
-            result,
-            flag=flag,
-            done_msg=f"Cherry-pick {flag} completed",
-            failed_msg=f"Cherry-pick {flag} failed",
-        )
+        """Delegate to SequencerControl.do_cherry_pick_control()."""
+        self._sequencer.do_cherry_pick_control(flag)
 
     def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
-        """Guard, confirm, then copy ``sha`` onto HEAD via exec_external."""
-        try:
-            kind = self._git.sequencer_in_progress()
-            if kind is not None:
-                show_toast(
-                    f"A {kind} is already in progress",
-                    duration=2.0,
-                    kind=FeedbackKind.WARNING,
-                )
-                return
-            if sha == self._git.resolve_head_sha():
-                show_toast(
-                    "Already at this commit",
-                    duration=2.0,
-                    kind=FeedbackKind.WARNING,
-                )
-                return
-            if is_merge:
-                show_toast(
-                    "Cannot cherry-pick a merge commit",
-                    duration=2.0,
-                    kind=FeedbackKind.WARNING,
-                )
-                return
-        except (GitError, RepoError) as e:
-            show_toast(str(e), duration=2.0, kind=FeedbackKind.ERROR)
-            return
-
-        def on_confirm(confirmed: bool) -> None:
-            if confirmed:
-                self._exec_cherry_pick(sha)
-
-        self._alert_dialog.alert(
-            f"Cherry-pick {sha[:7]} onto current HEAD?",
-            on_confirm,
-        )
+        """Delegate to SequencerControl.on_cherry_pick()."""
+        self._sequencer.on_cherry_pick(sha, is_merge)
 
     def _exec_cherry_pick(self, sha: str) -> None:
-        """Run ``git cherry-pick`` after the user confirmed."""
-        try:
-            result = exec_external(["git", "cherry-pick", sha], cwd=self._repo_path)
-        except Exception as e:
-            show_toast(f"Cherry-pick error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
-            return
-        self._finish_cherry_pick(result, sha)
+        """Delegate to SequencerControl.exec_cherry_pick()."""
+        self._sequencer.exec_cherry_pick(sha)
 
     def _finish_cherry_pick(self, result, sha: str) -> None:
-        """Toast or badge the outcome of a just-run cherry-pick."""
-        try:
-            kind = self._git.sequencer_in_progress()
-            if result.returncode == 0:
-                show_badge(f"Cherry-picked {sha[:7]}")
-                self._refresh_git_vms()
-                return
-            if kind == "cherry-pick":
-                if self._git.has_unmerged_paths():
-                    show_toast(
-                        "Conflict! Resolve in Status, then ';' → cherry-pick-continue/abort",
-                        duration=3.0,
-                        kind=FeedbackKind.WARNING,
-                    )
-                    self._tab_view.route_to("status")
-                else:
-                    show_toast(
-                        "Cherry-pick is empty. ';' → cherry-pick-skip or cherry-pick-abort",
-                        duration=3.0,
-                        kind=FeedbackKind.WARNING,
-                    )
-                return
-        except (GitError, RepoError) as e:
-            show_toast(str(e), duration=2.0, kind=FeedbackKind.ERROR)
-            return
-        show_toast("Cherry-pick failed", duration=2.0, kind=FeedbackKind.ERROR)
-        self._refresh_git_vms()
-
-    def _merge_state_path(self) -> str:
-        """Return the path to the persistent merge state file."""
-        git_dir = self._git.get_git_dir()
-        return os.path.join(git_dir, "pigit_merge_state")
-
-    def _save_merge_state(
-        self, source: str, target: str, *, mode: str = "branch"
-    ) -> None:
-        try:
-            with open(self._merge_state_path(), "w") as f:
-                json.dump({"source": source, "target": target, "mode": mode}, f)
-        except Exception:
-            pass
-
-    def _load_merge_state(self) -> dict | None:
-        try:
-            with open(self._merge_state_path()) as f:
-                data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return None
-        if not isinstance(data, dict):
-            return None
-        # Older files omit mode; treat as branch-merge workflow.
-        data.setdefault("mode", "branch")
-        return data
-
-    def _clear_merge_state(self) -> None:
-        try:
-            os.remove(self._merge_state_path())
-        except FileNotFoundError:
-            pass
-
-    def _try_restore_merge_state(self) -> None:
-        """On startup: recover pending merge state if merge is still in progress.
-
-        Swallows GitError (e.g. not a git repo) — merge state restoration is
-        best-effort and should never prevent the TUI from starting.
-        """
-        try:
-            state = self._load_merge_state()
-        except GitError:
-            return
-        if state is None:
-            return
-        if self._git.is_merge_in_progress():
-            self._merge_state = state
-            self._header_state.merge_target = state.get("target", "")
-            mode = state.get("mode", "branch")
-            if mode == "pull":
-                show_toast(
-                    "Resume pull merge (continue-merge)",
-                    duration=3.0,
-                    kind=FeedbackKind.INFO,
-                )
-            else:
-                show_toast(
-                    f"Resume merge: {state['source']} → {state['target']} (continue-merge)",
-                    duration=3.0,
-                    kind=FeedbackKind.INFO,
-                )
-        else:
-            self._clear_merge_state()
-            self._header_state.merge_target = ""
+        """Delegate to SequencerControl.finish_cherry_pick()."""
+        self._sequencer.finish_cherry_pick(result, sha)
 
     def _on_merge_request(self, source: str, target: str) -> None:
-        """Callback from BranchPanel: confirm then execute merge workflow."""
-        kind = self._git.sequencer_in_progress()
-        if kind is not None:
-            show_toast(
-                f"A {kind} is already in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-
-        def on_confirm(confirmed: bool) -> None:
-            if not confirmed:
-                return
-            try:
-                self._do_merge_workflow(source, target)
-            except GitError as e:
-                hide_spinner()
-                err_msg = str(e).lower()
-                if "conflict" in err_msg:
-                    self._merge_state = {"source": source, "target": target}
-                    self._header_state.merge_target = target
-                    self._save_merge_state(source, target)
-                    show_toast(
-                        "Conflict! Resolve in Status, then continue-merge",
-                        duration=3.0,
-                        kind=FeedbackKind.WARNING,
-                    )
-                    self._tab_view.route_to("status")
-                    return
-                show_toast(f"Merge failed: {e}", duration=3.0, kind=FeedbackKind.ERROR)
-                return
-            except Exception:
-                hide_spinner()
-                logging.exception("Merge workflow failed with unexpected error")
-                return
-            self._confirm_push_and_finish(target, source)
-
-        self._alert_dialog.alert(f"Merge {source} into {target}?", on_confirm)
+        """Delegate to MergeWorkflow.on_merge_request()."""
+        self._merge_workflow.on_merge_request(source, target)
 
     def _do_merge_workflow(self, source: str, target: str) -> None:
-        """Atomically: checkout target \u2192 pull \u2192 merge source.
-
-        On any step failure, best-effort checkout back to source then raise.
-        """
-        steps = [
-            (f"Checking out {target}", lambda: self._git.checkout_branch(target)),
-            (f"Pulling {target}", lambda: self._git.pull()),
-            (f"Merging {source}", lambda: self._git.merge(source)),
-        ]
-        for msg, step in steps:
-            show_spinner(msg)
-            try:
-                step()
-            except GitError:
-                hide_spinner()
-                self._try_checkout_back(source)
-                raise
-            except Exception:
-                hide_spinner()
-                self._try_checkout_back(source)
-                raise
-        hide_spinner()
-
-    def _try_checkout_back(self, source: str) -> None:
-        """Best-effort checkout back to source branch on failure."""
-        try:
-            self._git.checkout_branch(source)
-        except GitError:
-            pass
+        """Delegate to MergeWorkflow.do_merge_workflow()."""
+        self._merge_workflow.do_merge_workflow(source, target)
 
     def _confirm_push_and_finish(self, target: str, source: str) -> None:
-        """Alert confirm push, then checkout back to source branch after push completes."""
-
-        def on_push_confirmed(confirmed: bool) -> None:
-            if not confirmed:
-                self._finish_merge_checkout(target, source)
-                return
-
-            def after_push() -> None:
-                self._finish_merge_checkout(target, source)
-
-            self._run_network_git("push", on_complete=after_push)
-
-        self._alert_dialog.alert(f"Push {target} to remote?", on_push_confirmed)
+        """Delegate to MergeWorkflow.confirm_push_and_finish()."""
+        self._merge_workflow.confirm_push_and_finish(target, source)
 
     def _finish_merge_checkout(self, target: str, source: str) -> None:
-        """Checkout back to source and clear merge state after merge push step."""
-        try:
-            self._git.checkout_branch(source)
-        except GitError as e:
-            show_toast(
-                f"Checkout back failed: {e}", duration=3.0, kind=FeedbackKind.ERROR
-            )
-            return
-        self._merge_state = None
-        self._header_state.merge_target = ""
-        self._clear_merge_state()
-        self._tab_view.route_to("branch")
-        self._branch_panel.refresh()
-        show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
+        """Delegate to MergeWorkflow.finish_merge_checkout()."""
+        self._merge_workflow.finish_merge_checkout(target, source)
 
     def _continue_merge(self) -> None:
-        """Resume a pending merge after conflicts have been resolved."""
-        state = self._merge_state
-        if state is None and self._git.is_merge_in_progress():
-            # Pull/merge left MERGE_HEAD without pigit state (e.g. older session).
-            branch = ""
-            try:
-                branch = self._git.get_head() or ""
-            except (GitError, RepoError):
-                branch = ""
-            state = {
-                "source": "@{upstream}",
-                "target": branch or "HEAD",
-                "mode": "pull",
-            }
-            self._merge_state = state
-
-        if not state:
-            show_toast("No pending merge", duration=2.0, kind=FeedbackKind.WARNING)
-            return
-
-        target = state["target"]
-        source = state["source"]
-        mode = state.get("mode", "branch")
-
-        if self._git.is_merge_in_progress():
-            try:
-                self._git.commit_no_edit()
-            except GitError as e:
-                err = str(e).lower()
-                if "conflict" in err or "unmerged" in err:
-                    show_toast(
-                        "Unresolved conflicts remain. Fix in Status, then retry.",
-                        duration=3.0,
-                        kind=FeedbackKind.WARNING,
-                    )
-                else:
-                    show_toast(
-                        f"Merge commit failed: {e}",
-                        duration=3.0,
-                        kind=FeedbackKind.ERROR,
-                    )
-                return
-
-        if mode == "pull":
-            self._merge_state = None
-            self._header_state.merge_target = ""
-            self._clear_merge_state()
-            self._refresh_git_vms()
-            self._schedule_reload_header()
-            show_toast("Pull completed", duration=2.0, kind=FeedbackKind.SUCCESS)
-            return
-
-        self._confirm_push_and_finish(target, source)
+        """Delegate to MergeWorkflow.continue_merge()."""
+        self._merge_workflow.continue_merge()
 
     def run(self):
         if not self._repo_path:

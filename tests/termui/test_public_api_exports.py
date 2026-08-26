@@ -19,6 +19,7 @@ REQUIRED_ROOT: frozenset[str] = frozenset(
         "bind_signals",
         "render_child",
         "resolve_presentation_leaf",
+        "is_on_visible_paint_path",
         "Binding",
         "BindingError",
         "bind_action",

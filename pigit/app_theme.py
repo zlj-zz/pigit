@@ -19,9 +19,13 @@ class PigitTheme(Theme):
 
     Extends :class:`Theme` with application-only semantic colors. Base widget
     roles and syntax tokens live on :class:`Theme`.
+
+    ``fg_primary`` / ``fg_dim`` override the framework defaults (PEARL / SLATE)
+    for product chrome contrast. Graph and contribution colors live here so
+    panels never hardcode ``palette.*`` RGB values.
     """
 
-    # Base widget roles (match legacy palette.DEFAULT_FG / DEFAULT_FG_DIM)
+    # Product text hierarchy (overrides Theme.ALMOST_WHITE / DIM).
     fg_primary: tuple[int, int, int] = palette.PEARL
     fg_dim: tuple[int, int, int] = palette.SLATE
 
@@ -54,8 +58,8 @@ class PigitTheme(Theme):
     # Overlay
     bg_overlay_dim: tuple[int, int, int] = palette.NAVY_GRAY
 
-    # Chrome (status bar)
-    fg_chrome_active: tuple[int, int, int] = palette.ALMOST_WHITE
+    # Chrome: active matches fg_primary; inactive matches fg_inactive (SLATE).
+    fg_chrome_active: tuple[int, int, int] = palette.PEARL
     fg_chrome_inactive: tuple[int, int, int] = palette.SLATE
     fg_header_repo: tuple[int, int, int] = palette.AMBER
     fg_header_branch: tuple[int, int, int] = palette.CYAN
@@ -74,6 +78,36 @@ class PigitTheme(Theme):
     # File history header
     bg_file_history_header: tuple[int, int, int] = palette.GREEN
     fg_file_history_header: tuple[int, int, int] = palette.BLACK
+
+    # Inline commit merge-graph lane colors (cycled by lane index).
+    graph_lane_colors: tuple[tuple[int, int, int], ...] = (
+        palette.SKY_BLUE,
+        palette.GREEN,
+        palette.PURPLE,
+        palette.BLUE,
+        palette.RED,
+    )
+
+    # Contribution report: author line-chart series colors.
+    chart_author_colors: tuple[tuple[int, int, int], ...] = (
+        palette.SKY_BLUE,
+        palette.YELLOW,
+        palette.PURPLE,
+        palette.RED,
+        palette.GREEN,
+        palette.BLUE,
+    )
+
+    # Contribution heatmap intensity 0..5 (level 0 stays slightly lighter
+    # so empty cells read on the panel background).
+    contrib_heatmap_colors: tuple[tuple[int, int, int], ...] = (
+        (100, 100, 110),
+        (155, 233, 168),
+        (105, 210, 130),
+        (64, 196, 99),
+        (48, 161, 78),
+        (33, 110, 57),
+    )
 
 
 # Global singleton theme instance.

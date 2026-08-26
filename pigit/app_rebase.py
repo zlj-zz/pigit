@@ -19,12 +19,12 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     exec_external,
-    render_child,
+    palette,
     request_render,
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, Footer, ItemList
+from pigit.termui.widgets import AlertDialog, Footer, OptionList
 
 from .app_theme import THEME
 from .git.api import GitError
@@ -54,7 +54,7 @@ class _TodoItem:
     action: str = "pick"
 
 
-class RebasePanel(ItemList):
+class RebasePanel(OptionList):
     """Sheet overlay for editing the interactive-rebase todo list."""
 
     CURSOR = "●"
@@ -66,21 +66,22 @@ class RebasePanel(ItemList):
         base: str,
         on_done: Callable[[], None],
     ) -> None:
-        super().__init__()
+        self._footer = Footer()
+        super().__init__(footer=self._footer)
         self._git = git
         self._base = base
         self._on_done = on_done
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
-        self._footer = Footer()
         self._footer.set_help_provider(self.get_footer_entries)
 
     def preferred_sheet_height(self, term_h: int) -> int:
         """Room for the todo list; host should use max_fraction=0.5."""
         return min(20, max(3, term_h - 4))
 
-    def activate(self) -> None:
+    def mount(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
+        super().mount()
         kind = self._git.sequencer_in_progress()
         if kind is not None:
             show_toast(
@@ -114,7 +115,7 @@ class RebasePanel(ItemList):
         self.set_content([self._display(item) for item in self._items])
 
     def _display(self, item: _TodoItem) -> str:
-        """Return the plain-text form of an item (used as ItemList content)."""
+        """Return the plain-text form of an item (used as OptionList content)."""
         return f"{item.action} {item.sha[:8]} {item.subject}"
 
     @bind_action("next", "j", "down", desc="Navigate todo list", tip="Navigate")
@@ -191,31 +192,26 @@ class RebasePanel(ItemList):
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         """Render one todo row: cursor, colored action, short sha + subject."""
         item = self._items[idx]
+        flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            Segment(self.CURSOR if is_cursor else " ", fg=THEME.fg_primary),
+            Segment(
+                self.CURSOR if is_cursor else " ",
+                fg=THEME.fg_primary,
+                style_flags=flags,
+            ),
             Segment(" ", fg=THEME.fg_primary),
-            Segment(item.action.ljust(7), fg=_ACTION_FG[item.action]),
+            Segment(
+                item.action.ljust(7),
+                fg=_ACTION_FG[item.action],
+                style_flags=flags,
+            ),
         ]
-        fg = THEME.fg_primary if is_cursor else THEME.fg_dim
-        main = [Segment(f"{item.sha[:8]}  {item.subject}", fg=fg)]
+        subject_fg = THEME.fg_primary if is_cursor else THEME.fg_muted
+        main = [
+            Segment(f"{item.sha[:8]}  ", fg=THEME.fg_muted, style_flags=flags),
+            Segment(item.subject, fg=subject_fg, style_flags=flags),
+        ]
         return left, main, []
-
-    def _render_surface(self, surface) -> None:
-        """Render the list, reserving the last row for shortcut hints."""
-        height = self._size[1]
-        if height <= 1:
-            super()._render_surface(surface)
-            return
-        width, _ = self._size
-        self._size = (width, height - 1)
-        try:
-            super()._render_surface(surface)
-        finally:
-            self._size = (width, height)
-        self._footer.x = height
-        self._footer.y = 1
-        self._footer.resize((width, 1))
-        render_child(self._footer, surface, "RebasePanel")
 
     # ── editing ──
 

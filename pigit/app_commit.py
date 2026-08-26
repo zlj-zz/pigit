@@ -18,6 +18,8 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
+    Component,
+    Surface,
     bind_action,
     bind_signals,
     dismiss_sheet,
@@ -28,7 +30,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
@@ -96,7 +98,43 @@ class _SubRow(Enum):
     TAIL = auto()  # blank trailer between commits
 
 
-class CommitPanel(ItemList):
+class _CommitReportBand(Component):
+    """OptionList footer band for the contribution-graph report strip.
+
+    Height is all-or-nothing: ``REPORT_H`` when enabled and the panel is tall
+    enough, otherwise 0 so the list keeps the full viewport.
+    """
+
+    def __init__(
+        self,
+        graph: ContributionGraph,
+        *,
+        report_h: int,
+        min_panel_h: int,
+        enabled: bool = True,
+    ) -> None:
+        super().__init__()
+        self._graph = graph
+        self._report_h = report_h
+        self._min_panel_h = min_panel_h
+        self.enabled = enabled
+
+    def chrome_band_height(self, width: int, panel_height: int) -> int:
+        """Return fitted report height for ``OptionList`` band layout."""
+        del width
+        if not self.enabled or panel_height <= self._min_panel_h:
+            return 0
+        return self._report_h
+
+    def paint(self, surface: Surface) -> None:
+        self._graph.resize((surface.width, surface.height))
+        self._graph.paint(surface)
+
+    def handle_mouse(self, event) -> bool:
+        return self._graph.handle_mouse(event)
+
+
+class CommitPanel(OptionList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
     CURSOR = "●"
@@ -104,13 +142,6 @@ class CommitPanel(ItemList):
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
-    LANE_PALETTE: tuple[tuple[int, int, int], ...] = (
-        palette.SKY_BLUE,
-        palette.GREEN,
-        palette.PURPLE,
-        palette.BLUE,
-        palette.RED,
-    )
     REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
     REPORT_MIN_HEIGHT = 19
 
@@ -122,19 +153,25 @@ class CommitPanel(ItemList):
         id: str | None = None,
         report_default: bool = True,
     ) -> None:
+        self._contrib_graph = ContributionGraph()
+        self._report_band = _CommitReportBand(
+            self._contrib_graph,
+            report_h=self.REPORT_H,
+            min_panel_h=self.REPORT_MIN_HEIGHT,
+            enabled=report_default,
+        )
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
+            footer=self._report_band,
         )
         self._vm = vm
         self.commits: list[Commit] = []
         self._all_commits: list[Commit] = []
         self._source_map: list[int] = []
         self._report_enabled = report_default
-        self._report_h = 0
-        self._contrib_graph = ContributionGraph()
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
@@ -143,12 +180,8 @@ class CommitPanel(ItemList):
         self._bodies: dict[str, str] | None = None
         self._body_lines_cache: dict[str, list[str]] = {}
         self._vm_unsubs: list[Callable[[], None]] = []
-        self._row_cache_focused: list[
-            tuple[tuple[Segment, ...], tuple[Segment, ...]]
-        ] = []
-        self._row_cache_unfocused: list[
-            tuple[tuple[Segment, ...], tuple[Segment, ...]]
-        ] = []
+        # Active (non-stolen) left/main Segments; cursor + steal rebuild live.
+        self._row_cache: list[tuple[tuple[Segment, ...], tuple[Segment, ...]]] = []
 
     keymap_namespace = "commit"
     tab_key = "4"
@@ -161,36 +194,6 @@ class CommitPanel(ItemList):
     def _publish_tab_title(self) -> None:
         """Ask the header to reread ``tab_name`` after ``log_ref`` changes."""
         self.emit(EVT_SELECTION_CHANGED)
-
-    def _compute_report_h(self, panel_h: int) -> int:
-        """Report strip height: ``REPORT_H`` when enabled and the panel is tall."""
-        if not self._report_enabled or panel_h <= self.REPORT_MIN_HEIGHT:
-            return 0
-        return self.REPORT_H
-
-    def _list_h(self) -> int:
-        """Height reserved for the commit list (panel minus the report strip)."""
-        return self._size[1] - self._report_h
-
-    @property
-    def visible_row_count(self) -> int:
-        """List rows visible above the report strip."""
-        return self._list_h()
-
-    def resize(self, size: tuple[int, int]) -> None:
-        """Size the panel; reserve the bottom report strip when enabled."""
-        w, h = size
-        self._report_h = self._compute_report_h(h)
-        if self._report_h:
-            self._contrib_graph.resize((w, self._report_h))
-        super().resize(size)
-
-    def _update_report_layout(self) -> None:
-        """Refit the report strip after a toggle (single layout path)."""
-        if self._size is not None:
-            self.resize(self._size)
-        self._scroll_into_view()
-        self._request_render()
 
     @bind_action("next", "j", "down", desc="Navigate commit list", tip="Navigate")
     def next(self, step: int = 1) -> None:
@@ -246,7 +249,7 @@ class CommitPanel(ItemList):
             on_done=dismiss_sheet,
         )
         show_sheet(sheet, max_fraction=0.5, title="Log ref")
-        sheet.activate()
+        sheet.mount()
 
     def _on_log_ref_picked(self, name: str) -> None:
         """Apply a ref chosen in the log-ref sheet."""
@@ -275,6 +278,7 @@ class CommitPanel(ItemList):
     def toggle_report(self) -> None:
         """Toggle the bottom contribution-graph report strip."""
         self._report_enabled = not self._report_enabled
+        self._report_band.enabled = self._report_enabled
         h = self._size[1] if self._size else 0
         if h <= self.REPORT_MIN_HEIGHT:
             show_toast(
@@ -282,7 +286,9 @@ class CommitPanel(ItemList):
                 duration=2.0,
                 kind=FeedbackKind.WARNING,
             )
-        self._update_report_layout()
+        self.invalidate_chrome_bands()
+        self._scroll_into_view()
+        self._request_render()
 
     @bind_action("search", "/", desc="Filter commit list by message or SHA")
     def search(self) -> None:
@@ -332,8 +338,8 @@ class CommitPanel(ItemList):
         source_idx = self._source_index(self.curr_no)
         return self._vm.get_inspector_snapshot(source_idx)
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._bind_vm_signals()
         self._vm.refresh()
 
@@ -345,7 +351,7 @@ class CommitPanel(ItemList):
             )
 
     def _on_items_changed(self) -> None:
-        if not self.is_activated():
+        if not self.is_mounted():
             return
         commits = self._vm.items.value
         self._all_commits = list(commits)
@@ -379,8 +385,7 @@ class CommitPanel(ItemList):
         if not self.commits:
             self.set_content(["No matching commits."])
             self._max_meta_w = 0
-            self._row_cache_focused.clear()
-            self._row_cache_unfocused.clear()
+            self._row_cache.clear()
             self._notify_change()
             return
         self._rel_time_cache.clear()
@@ -396,8 +401,8 @@ class CommitPanel(ItemList):
         self._build_row_cache()
         self._notify_change()
 
-    def deactivate(self) -> None:
-        super().deactivate()
+    def unmount(self) -> None:
+        super().unmount()
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()
@@ -509,31 +514,6 @@ class CommitPanel(ItemList):
         tag_str = f" {commit.tag[0]}" if commit.tag else ""
         return f"{sha} {msg}{tag_str}  {author}  {rel}"
 
-    def _render_surface(self, surface) -> None:
-        if not self.content:
-            return
-        if self._report_h:
-            list_surface = surface.subsurface(0, 0, surface.width, self._list_h())
-            super()._render_surface(list_surface)
-            self._render_report(
-                surface.subsurface(self._list_h(), 0, surface.width, self._report_h)
-            )
-        else:
-            super()._render_surface(surface)
-
-    def _render_report(self, surface) -> None:
-        """Render the contribution-graph report into the bottom strip."""
-        self._contrib_graph.resize((surface.width, surface.height))
-        self._contrib_graph.render_into(surface)
-
-    def handle_mouse(self, event) -> bool:
-        """Horizontal wheel over the report pans it; everything else falls
-        through to the list (vertical wheel scrolls, clicks select)."""
-        if self._report_h and event.row - 1 >= self._list_h():
-            if self._contrib_graph.handle_mouse(event):
-                return True
-        return super().handle_mouse(event)
-
     def describe_row(
         self,
         idx: int,
@@ -551,8 +531,6 @@ class CommitPanel(ItemList):
         Compact mode: ``[cursor][graph rails][SHA][refs][msg][meta]``.
         Expanded mode dispatches to per-sub-row helpers.
         """
-        focused = self.is_focus_leaf
-
         # Placeholder ("No commits found.") — the only case where content
         # outranks commits.
         if not self.commits:
@@ -562,7 +540,7 @@ class CommitPanel(ItemList):
                 [
                     Segment(
                         prefix + self.content[idx],
-                        fg=THEME.fg_muted,
+                        fg=self.presentation_fg("muted"),
                         style_flags=cursor_flags,
                     )
                 ],
@@ -574,47 +552,29 @@ class CommitPanel(ItemList):
             commit = self.commits[item_idx]
             kind, payload = self._schema_for(commit)[sub_row]
             if kind is _SubRow.COMMIT:
-                left, main = self._commit_left_main(
-                    commit, item_idx, is_cursor, focused
-                )
+                left, main = self._commit_left_main(commit, item_idx, is_cursor)
                 return left, main, []
-            return self._describe_sub_row(commit, item_idx, kind, payload, focused)
+            return self._describe_sub_row(commit, item_idx, kind, payload)
 
-        # Compact mode: cursor row built dynamically; non-cursor rows read cache.
+        # Compact: cache is full-strength only; cursor or inactive rebuilds live.
         commit = self.commits[idx]
-        if is_cursor:
-            return self._describe_compact(commit, idx, True, focused)
+        if is_cursor or not self.is_presentation_active():
+            return self._describe_compact(commit, idx, is_cursor)
 
-        cache = self._row_cache_focused if focused else self._row_cache_unfocused
-        if idx < len(cache):
-            left_tpl, main_tpl = cache[idx]
-            left = list(left_tpl)
-            main = list(main_tpl)
-            right = self._meta_segments(commit, focused)
-            return left, main, right
+        if idx < len(self._row_cache):
+            left_tpl, main_tpl = self._row_cache[idx]
+            return list(left_tpl), list(main_tpl), self._meta_segments(commit)
 
-        return self._describe_compact(commit, idx, False, focused)
+        return self._describe_compact(commit, idx, False)
 
     def _describe_compact(
         self,
         commit: Commit,
         item_idx: int,
         is_cursor: bool,
-        focused: bool,
     ) -> tuple[list[Segment], list[Segment], list[Segment]]:
-        if is_cursor:
-            left, main = self._commit_left_main(commit, item_idx, is_cursor, focused)
-        else:
-            cache = self._row_cache_focused if focused else self._row_cache_unfocused
-            if item_idx < len(cache):
-                left_tpl, main_tpl = cache[item_idx]
-                left, main = list(left_tpl), list(main_tpl)
-            else:
-                left, main = self._commit_left_main(
-                    commit, item_idx, is_cursor, focused
-                )
-
-        right = self._meta_segments(commit, focused)
+        left, main = self._commit_left_main(commit, item_idx, is_cursor)
+        right = self._meta_segments(commit)
         if is_cursor:
             right = [
                 Segment(s.text, fg=s.fg, bg=s.bg, style_flags=palette.STYLE_BOLD)
@@ -627,17 +587,28 @@ class CommitPanel(ItemList):
         commit: Commit,
         item_idx: int,
         is_cursor: bool,
-        focused: bool,
+        *,
+        bake_active: bool = False,
     ) -> tuple[list[Segment], list[Segment]]:
-        """Build the cursor + rails + sha + refs + subject portion of a COMMIT row."""
+        """Build the cursor + rails + sha + refs + subject portion of a COMMIT row.
+
+        ``bake_active`` forces primary/muted/graph colors for the active cache
+        (steal / non-leaf must not be baked — those rebuild live via ``presentation_fg``).
+        """
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
+        fg_primary = (
+            THEME.fg_primary if bake_active else self.presentation_fg("primary")
+        )
+        fg_muted = THEME.fg_muted if bake_active else self.presentation_fg("muted")
+        graph_active = bake_active or self.is_presentation_active()
+
         if is_cursor:
             left: list[Segment] = [
-                Segment(self.CURSOR, fg=THEME.fg_primary, style_flags=cursor_flags),
-                Segment(" ", fg=THEME.fg_primary),
+                Segment(self.CURSOR, fg=fg_primary, style_flags=cursor_flags),
+                Segment(" ", fg=fg_primary),
             ]
         else:
-            left = [Segment("  ", fg=THEME.fg_primary)]
+            left = [Segment("  ", fg=fg_primary)]
 
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
@@ -646,34 +617,30 @@ class CommitPanel(ItemList):
                     self._vm.graph_rows[source_idx],
                     commit,
                     cursor_flags=cursor_flags,
-                    focused=focused,
+                    graph_active=graph_active,
                 )
             )
 
-        left.append(Segment(commit.sha[:7], fg=THEME.fg_dim, style_flags=cursor_flags))
-        left.append(Segment(" ", fg=THEME.fg_dim if not focused else THEME.fg_primary))
+        left.append(Segment(commit.sha[:7], fg=fg_muted, style_flags=cursor_flags))
+        left.append(Segment(" ", fg=fg_primary))
 
-        fg_msg = THEME.fg_primary if focused else THEME.fg_dim
-        main: list[Segment] = self._ref_segments(
-            commit, focused=focused, cursor_flags=cursor_flags
-        )
-        main.append(Segment(commit.msg, fg=fg_msg, style_flags=cursor_flags))
+        main: list[Segment] = self._ref_segments(commit, cursor_flags=cursor_flags)
+        main.append(Segment(commit.msg, fg=fg_primary, style_flags=cursor_flags))
         return left, main
 
     def _build_row_cache(self) -> None:
-        """Pre-build per-commit (left, main) Segments for focused/unfocused.
+        """Pre-build per-commit (left, main) Segments for full-strength presentation.
 
-        Cursor styling is excluded; only the static portions are cached.
+        Cursor styling, steal, and non-leaf soften are excluded; those rebuild live.
         """
-        self._row_cache_focused = []
-        self._row_cache_unfocused = []
+        self._row_cache = []
         for idx, commit in enumerate(self.commits):
-            lf, mf = self._commit_left_main(commit, idx, is_cursor=False, focused=True)
-            self._row_cache_focused.append((tuple(lf), tuple(mf)))
-            lu, mu = self._commit_left_main(commit, idx, is_cursor=False, focused=False)
-            self._row_cache_unfocused.append((tuple(lu), tuple(mu)))
+            left, main = self._commit_left_main(
+                commit, idx, is_cursor=False, bake_active=True
+            )
+            self._row_cache.append((tuple(left), tuple(main)))
 
-    def _meta_segments(self, commit: Commit, focused: bool) -> list[Segment]:
+    def _meta_segments(self, commit: Commit) -> list[Segment]:
         author = commit.author
         rel = self._rel_time_cache.get(commit.sha) or relative_time(
             commit.unix_timestamp
@@ -683,8 +650,7 @@ class CommitPanel(ItemList):
         reserve = max(self._max_meta_w, meta_w)
         if reserve > meta_w:
             meta = " " * (reserve - meta_w) + meta
-        fg_meta = THEME.fg_muted if focused else THEME.fg_dim
-        return [Segment(meta, fg=fg_meta, style_flags=0)]
+        return [Segment(meta, fg=self.presentation_fg("muted"), style_flags=0)]
 
     def _describe_sub_row(
         self,
@@ -692,14 +658,15 @@ class CommitPanel(ItemList):
         item_idx: int,
         kind: _SubRow,
         payload: int,
-        focused: bool,
     ) -> tuple[list[Segment], list[Segment], list[Segment]]:
         """Render a non-COMMIT sub-row (Merge:/Author:/Date:/blank/body line).
 
         The cursor only ever lives on a COMMIT row, so sub-rows are never
         styled bold and we omit ``cursor_flags`` entirely.
         """
-        left: list[Segment] = [Segment("  ", fg=THEME.fg_primary)]
+        fg_primary = self.presentation_fg("primary")
+        fg_muted = self.presentation_fg("muted")
+        left: list[Segment] = [Segment("  ", fg=fg_primary)]
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
             left.extend(
@@ -708,40 +675,38 @@ class CommitPanel(ItemList):
                     None,
                     sub=True,
                     cursor_flags=0,
-                    focused=focused,
+                    graph_active=self.is_presentation_active(),
                 )
             )
 
         if kind in (_SubRow.BLANK, _SubRow.TAIL):
             return left, [], []
 
-        fg_label = THEME.fg_muted if focused else THEME.fg_dim
-        fg_value = THEME.fg_primary if focused else THEME.fg_dim
         if kind is _SubRow.MERGE:
             text = " ".join(p[:7] for p in commit.parents)
             main = [
-                Segment("Merge: ", fg=fg_label),
-                Segment(text, fg=fg_value),
+                Segment("Merge: ", fg=fg_muted),
+                Segment(text, fg=fg_primary),
             ]
         elif kind is _SubRow.AUTHOR:
             main = [
-                Segment("Author: ", fg=fg_label),
-                Segment(commit.author, fg=fg_value),
+                Segment("Author: ", fg=fg_muted),
+                Segment(commit.author, fg=fg_primary),
             ]
         elif kind is _SubRow.DATE:
             text = self._abs_time_cache.get(commit.sha) or self._format_abs_time(
                 commit.unix_timestamp
             )
             main = [
-                Segment("Date:   ", fg=fg_label),
-                Segment(text, fg=fg_value),
+                Segment("Date:   ", fg=fg_muted),
+                Segment(text, fg=fg_primary),
             ]
         elif kind is _SubRow.MESSAGE:
             body_lines = self._body_lines(commit)
             text = body_lines[payload] if 0 <= payload < len(body_lines) else ""
             main = [
-                Segment("    ", fg=fg_value),
-                Segment(text, fg=fg_value),
+                Segment("    ", fg=fg_primary),
+                Segment(text, fg=fg_primary),
             ]
         else:
             main = []
@@ -751,7 +716,6 @@ class CommitPanel(ItemList):
         self,
         commit: Commit,
         *,
-        focused: bool,
         cursor_flags: int,
     ) -> list[Segment]:
         """Render branch-ref badges wrapped in orange parens, comma-separated."""
@@ -763,11 +727,11 @@ class CommitPanel(ItemList):
         if not (head_ref or local_refs or remote_refs or commit.tag):
             return []
 
-        paren_fg = THEME.fg_tag_parent if focused else THEME.fg_dim
-        head_fg = THEME.fg_info if focused else THEME.fg_dim
-        local_fg = THEME.fg_success if focused else THEME.fg_dim
-        remote_fg = THEME.fg_remote_branch if focused else THEME.fg_dim
-        tag_fg = THEME.fg_tag if focused else THEME.fg_dim
+        paren_fg = THEME.fg_tag_parent
+        head_fg = THEME.fg_info
+        local_fg = THEME.fg_local_branch
+        remote_fg = THEME.fg_remote_branch
+        tag_fg = THEME.fg_tag
         arrow_fg = THEME.fg_primary
 
         entries: list[list[Segment]] = []
@@ -805,7 +769,7 @@ class CommitPanel(ItemList):
         *,
         sub: bool = False,
         cursor_flags: int,
-        focused: bool,
+        graph_active: bool,
     ) -> list[Segment]:
         """Render graph rails for one row (2 columns per lane).
 
@@ -822,8 +786,9 @@ class CommitPanel(ItemList):
                         Segment("  ", fg=THEME.fg_dim, style_flags=cursor_flags)
                     )
                     continue
-                color = self.LANE_PALETTE[i % len(self.LANE_PALETTE)]
-                fg = color if focused else THEME.fg_dim
+                lanes = THEME.graph_lane_colors
+                color = lanes[i % len(lanes)]
+                fg = color if graph_active else THEME.fg_dim
                 segments.append(
                     Segment(self.GRAPH_VERTICAL + " ", fg=fg, style_flags=cursor_flags)
                 )
@@ -833,7 +798,7 @@ class CommitPanel(ItemList):
         segments = []
         assert commit is not None
         for i in range(total_lanes):
-            ch, fg = self._lane_glyph(row, i, commit, focused=focused)
+            ch, fg = self._lane_glyph(row, i, commit, graph_active=graph_active)
             segments.append(Segment(ch + " ", fg=fg, style_flags=cursor_flags))
         return segments
 
@@ -843,15 +808,18 @@ class CommitPanel(ItemList):
         i: int,
         commit: Commit,
         *,
-        focused: bool,
+        graph_active: bool,
     ) -> tuple[str, tuple[int, int, int]]:
         """Pick the glyph and color for lane ``i`` on this row."""
-        lane_color = self.LANE_PALETTE[i % len(self.LANE_PALETTE)]
-        lane_fg = lane_color if focused else THEME.fg_dim
+        lanes = THEME.graph_lane_colors
+        lane_color = lanes[i % len(lanes)]
+        lane_fg = lane_color if graph_active else THEME.fg_dim
 
         if i == row.commit_lane:
-            commit_color = THEME.fg_warning if not commit.is_pushed() else lane_color
-            return self.GRAPH_COMMIT, commit_color
+            if not commit.is_pushed():
+                # Semantic: keep yellow under steal / non-leaf (design §1).
+                return self.GRAPH_COMMIT, THEME.fg_unpushed_commit
+            return self.GRAPH_COMMIT, lane_color if graph_active else THEME.fg_dim
 
         if i in row.closed_lanes:
             return self.GRAPH_CLOSE, lane_fg

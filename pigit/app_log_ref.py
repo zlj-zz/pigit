@@ -10,12 +10,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pigit.termui import bind_action, keys, palette, Segment
-from pigit.termui.widgets import ItemList
+from pigit.termui.widgets import OptionList
 
 from .app_theme import THEME
 
 
-class LogRefSheet(ItemList):
+class LogRefSheet(OptionList):
     """Pick a git ref to show in the Commit log (no checkout)."""
 
     CURSOR = "●"
@@ -46,8 +46,8 @@ class LogRefSheet(ItemList):
         self.set_source_items(self._all, text_of=lambda name: name)
         self.set_filter(self.search_query)
 
-    def activate(self) -> None:
-        super().activate()
+    def mount(self) -> None:
+        super().mount()
         self._sync_filter()
         if self._current_ref in self.content:
             self.curr_no = self.content.index(self._current_ref)

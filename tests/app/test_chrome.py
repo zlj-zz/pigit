@@ -26,7 +26,7 @@ class TestHeader:
         ]
         s = Surface(40, 2)
         h.resize((40, 2))
-        h._render_surface(s)
+        h.paint(s)
         # Row 0: content
         assert "my-repo" in s.lines()[0]
         assert "main" in s.lines()[0]
@@ -46,7 +46,7 @@ class TestHeader:
         ]
         s = Surface(30, 2)
         h.resize((30, 2))
-        h._render_surface(s)
+        h.paint(s)
         line = s.lines()[0]
         assert "↑2" in line  # up arrow 2
         assert "↓1" in line  # down arrow 1
@@ -61,7 +61,7 @@ class TestHeader:
         ]
         s = Surface(10, 2)
         h.resize((10, 2))
-        h._render_surface(s)
+        h.paint(s)
         line = s.lines()[0]
         assert "…" in line or "very" in line
         assert "─" in s.lines()[1]  # separator
@@ -85,7 +85,7 @@ class TestFooter:
         f.set_help_provider(lambda: [("Enter", "Open")])
         s = Surface(50, 2)
         f.resize((50, 2))
-        f._render_surface(s)
+        f.paint(s)
         assert "─" in s.lines()[0]
         content = s.lines()[1]
         assert "main.py" in content
@@ -104,7 +104,7 @@ class TestAppFooter:
         f.set_help_provider(lambda: [("Enter", "Diff"), ("Space", "Stage")])
         s = Surface(50, 2)
         f.resize((50, 2))
-        f._render_surface(s)
+        f.paint(s)
         # Row 0: separator line
         assert "─" in s.lines()[0]
         # Row 1: content
@@ -115,7 +115,7 @@ class TestAppFooter:
         f = AppFooter(THEME)
         s = Surface(20, 2)
         f.resize((20, 2))
-        f._render_surface(s)
+        f.paint(s)
         # Should not crash
         assert "─" in s.lines()[0]
 

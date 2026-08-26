@@ -60,7 +60,7 @@ def _sync_async(monkeypatch):
 
 def _mount(bus: EventBus, preview: LogGraphPreview) -> ComponentRoot:
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     return root
 
 
@@ -127,7 +127,7 @@ def test_deactivate_unsubscribes(preview: LogGraphPreview, vm: Mock) -> None:
     _mount(bus, preview)
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "feat"))
     assert vm.load_log_graph.call_count == 1
-    preview.deactivate()
+    preview.unmount()
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "other"))
     assert vm.load_log_graph.call_count == 1
 
@@ -138,7 +138,7 @@ def test_graph_loads_when_branch_list_arrives(
     """Tab switch happens before async load_branches; preview must follow items."""
     bus = EventBus()
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     panel = BranchPanel(vm=vm)
     panel.parent = root
 
@@ -147,7 +147,7 @@ def test_graph_loads_when_branch_list_arrives(
         return bus.publish(action, **data)
 
     root._app_on_event = _publish
-    panel.activate()
+    panel.mount()
 
     bus.publish(EVT_SELECTION_CHANGED, active=panel)
     vm.load_log_graph.assert_not_called()
@@ -163,7 +163,7 @@ def test_render_draws_title_and_graph_lines(preview: LogGraphPreview) -> None:
     preview.resize((24, 8))
     preview.set_lines(["* abc feat", "* def main"], title="feat")
     surface = Surface(24, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     rows = ["".join(c.char for c in row) for row in surface._rows]
     assert any("feat" in row for row in rows)
     assert any("* abc feat" in row for row in rows)
@@ -174,7 +174,7 @@ def test_render_applies_ansi_foreground(preview: LogGraphPreview) -> None:
     preview.set_lines(["\x1b[32mHEAD\x1b[m"], title="feat")
     assert preview._browser._content == ["HEAD"]
     surface = Surface(24, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     green = _ANSI_16_PALETTE[2]
     painted = [
         cell
@@ -190,7 +190,7 @@ def test_branch_jk_scrolls_preview(
 ) -> None:
     preview.resize((24, 10))
     preview.set_lines([f"* c{i}" for i in range(40)], title="feat")
-    preview.activate()
+    preview.mount()
     monkeypatch.setattr("pigit.app_branch.by_id", lambda *_args, **_kwargs: preview)
     panel = _branch_panel(vm)
     panel._scroll_preview_down()
@@ -247,7 +247,7 @@ def test_render_truncates_graph_line_before_border(preview: LogGraphPreview) -> 
     long_line = "* abc " + "x" * 60
     preview.set_lines([long_line], title="feat")
     surface = Surface(20, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     rows = ["".join(c.char for c in row) for row in surface._rows]
     # First content row (index 1) holds the line clipped to the inner width (18).
     assert "x" * 12 in rows[1]

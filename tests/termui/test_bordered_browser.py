@@ -20,7 +20,7 @@ def test_set_title_and_string_content() -> None:
     browser.resize((24, 8))
     browser.set_content(["line one", "line two"])
     surface = Surface(24, 8)
-    browser._render_surface(surface)
+    browser.paint(surface)
     top = "".join(c.char for c in surface._rows[0])
     assert "Log" in top
     rows = ["".join(c.char for c in row) for row in surface._rows]
@@ -51,6 +51,6 @@ def test_set_title_updates_frame() -> None:
     browser.resize((20, 6))
     browser.set_content(["* abc"])
     surface = Surface(20, 6)
-    browser._render_surface(surface)
+    browser.paint(surface)
     top = "".join(c.char for c in surface._rows[0])
     assert "feat" in top

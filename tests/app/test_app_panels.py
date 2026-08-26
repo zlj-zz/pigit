@@ -31,18 +31,18 @@ class TestDiffViewer:
         assert d._heatmap[2] == " "
         assert d._heatmap[3] == " "
 
-    def test_render_surface_empty(self):
+    def testpaint_empty(self):
         d = DiffViewer()
         s = Surface(10, 5)
-        d._render_surface(s)
+        d.paint(s)
         # No crash, no content
 
-    def test_render_surface_diff(self):
+    def testpaint_diff(self):
         d = DiffViewer()
         d.set_content(["+added", "-removed", " context"])
         d.resize((20, 5))
         s = Surface(20, 5)
-        d._render_surface(s)
+        d.paint(s)
         # With box border: row 0 = top border, row 1+ = content, last row = bottom border
         lines = s.lines()
         assert "\u250c" in lines[0]  # ┌ top-left corner
@@ -52,13 +52,13 @@ class TestDiffViewer:
         assert "\u2514" in lines[-1]  # └ bottom-left corner
         assert "\u2518" in lines[-1]  # ┘ bottom-right corner
 
-    def test_render_surface_borderless_fallback(self):
+    def testpaint_borderless_fallback(self):
         """When surface is too small for borders, fall back to borderless."""
         d = DiffViewer()
         d.set_content(["+added"])
         d.resize((10, 2))
         s = Surface(10, 2)
-        d._render_surface(s)
+        d.paint(s)
         lines = s.lines()
         # Should render without box border characters
         assert "\u250c" not in lines[0]
@@ -78,7 +78,7 @@ class TestDiffViewer:
         from pigit.termui.component import Component
 
         class FakeSource(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         source = FakeSource()
@@ -94,7 +94,7 @@ class TestDiffViewer:
         from pigit.termui.component import Component
 
         class FakeSource(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         d = DiffViewer()
@@ -113,7 +113,7 @@ class TestDiffViewer:
             def _handle_event(self, key):
                 pass
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
             def on_event(self, action, **data):
@@ -121,7 +121,7 @@ class TestDiffViewer:
                 return True
 
         class FakeSource(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         parent = FakeParent()
@@ -136,13 +136,13 @@ class TestDiffViewer:
 
     # -- Wide-character regression tests --
 
-    def test_render_surface_wide_char_no_overflow(self):
+    def testpaint_wide_char_no_overflow(self):
         """Regression: CJK diff content must not overflow and overwrite borders."""
         d = DiffViewer()
         d.set_content(["+中文内容测试"])
         d.resize((20, 5))
         s = Surface(20, 5)
-        d._render_surface(s)
+        d.paint(s)
         lines = s.lines()
         rows = s.rows()
         # Box borders must remain intact
@@ -154,13 +154,13 @@ class TestDiffViewer:
         assert rows[1][0].char == "\u2502"  # │ left border
         assert rows[1][-1].char == "\u2502"  # │ right border
 
-    def test_render_surface_wide_char_heatmap_intact(self):
+    def testpaint_wide_char_heatmap_intact(self):
         """Heatmap symbol must not be overwritten by wide-char diff text."""
         d = DiffViewer()
         d.set_content(["+中文内容测试"])
         d.resize((20, 5))
         s = Surface(20, 5)
-        d._render_surface(s)
+        d.paint(s)
         # Heatmap is at column w-2 on content rows
         heatmap_col = 18
         for r in range(1, 4):
@@ -168,14 +168,14 @@ class TestDiffViewer:
             # Should be a heatmap symbol (not space, not part of diff text)
             assert cell.char in {"\u2591", "\u2592", "\u2593", "\u2588", " "}
 
-    def test_render_surface_borderless_wide_char(self):
+    def testpaint_borderless_wide_char(self):
         """Borderless fallback must also handle wide chars without overflow."""
         d = DiffViewer()
         d.set_content(["+中文内容测试"])
         # w=8 triggers borderless fallback (w <= LINE_NO_WIDTH + 3 = 8)
         d.resize((8, 3))
         s = Surface(8, 3)
-        d._render_surface(s)
+        d.paint(s)
         lines = s.lines()
         # Should not have box borders (too small)
         assert "\u250c" not in lines[0]
@@ -186,13 +186,13 @@ class TestDiffViewer:
         cell = s.rows()[0][-1]
         assert cell.char in {"\u2591", "\u2592", "\u2593", "\u2588", " "}
 
-    def test_render_surface_multiple_wide_chars(self):
+    def testpaint_multiple_wide_chars(self):
         """Multiple CJK chars in a row should all render within bounds."""
         d = DiffViewer()
         d.set_content(["+中文内容测试", "-更多中文测试"])
         d.resize((25, 6))
         s = Surface(25, 6)
-        d._render_surface(s)
+        d.paint(s)
         lines = s.lines()
         rows = s.rows()
         # Every row must have exactly surface.width cells
@@ -213,13 +213,13 @@ class TestDiffViewer:
         assert "\t" not in d._content[0]
         assert d._content[0] == "+               Name"
 
-    def test_render_surface_with_tabs_no_overflow(self):
+    def testpaint_with_tabs_no_overflow(self):
         """Regression: tab-heavy diff lines must not overflow surface bounds."""
         d = DiffViewer()
         d.set_content(["+\t\tPotentialRange string"])
         d.resize((40, 5))
         s = Surface(40, 5)
-        d._render_surface(s)
+        d.paint(s)
         lines = s.lines()
         # Top and bottom borders must be intact
         assert lines[0][0] == "\u250c"
@@ -237,7 +237,7 @@ class TestDiffViewer:
         from pigit.termui.types import EventType, EVT_GOTO
 
         class FakeSource(Component):
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
         d = DiffViewer()
@@ -251,13 +251,13 @@ class TestDiffViewer:
         assert "\t" not in d._content[0]
         assert d._content[0] == "+               Name"
 
-    def test_render_surface_blank_rows_have_borders(self):
+    def testpaint_blank_rows_have_borders(self):
         """When content is shorter than viewport, blank rows must keep borders."""
         d = DiffViewer()
         d.set_content(["+line1", "-line2"])
         d.resize((20, 8))
         s = Surface(20, 8)
-        d._render_surface(s)
+        d.paint(s)
         rows = s.rows()
         # Row 0: top border
         assert rows[0][0].char == "\u250c"
@@ -287,7 +287,7 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.refresh.assert_called_once()
 
     def test_deactivate_disposes_vm(self):
@@ -300,8 +300,8 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
-        panel.deactivate()
+        panel.mount()
+        panel.unmount()
         vm.dispose.assert_called_once()
 
     def test_items_changed_updates_content(self):
@@ -315,7 +315,7 @@ class TestBranchPanelLifecycle:
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Branch("main", "0", "0", True)])
         assert len(panel.content) == 1
         assert panel.branches[0].name == "main"
@@ -334,7 +334,7 @@ class TestBranchPanelLifecycle:
         monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
 
         panel = BranchPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Branch("dev", "0", "0", True)])
         panel.create_pull_request()
 
@@ -354,7 +354,7 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.refresh.assert_called_once()
 
     def test_deactivate_disposes_vm(self):
@@ -367,8 +367,8 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
-        panel.deactivate()
+        panel.mount()
+        panel.unmount()
         vm.dispose.assert_called_once()
 
     def test_items_changed_rebuilds_content(self):
@@ -384,7 +384,7 @@ class TestCommitPanelLifecycle:
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         vm.items.set([Commit("abc1234", "msg", "Zev", 0, "pushed", "", [])])
         assert len(panel.commits) == 1
         assert panel.commits[0].sha == "abc1234"
@@ -406,7 +406,7 @@ class TestCommitPanelLifecycle:
         vm.graph_rows = []
         vm.remotes = ()
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
 
         old_tip = Commit(
             "7ae8c9792406ac728a9",
@@ -419,7 +419,7 @@ class TestCommitPanelLifecycle:
         )
         vm.items.set([old_tip])
         # Simulate a render that re-seeds refs_cache after items-changed cleared it.
-        panel._ref_segments(old_tip, focused=True, cursor_flags=0)
+        panel._ref_segments(old_tip, cursor_flags=0)
 
         new_tip = Commit(
             "4a3ad3bbec2801cbee7",
@@ -443,7 +443,7 @@ class TestCommitPanelLifecycle:
         vm.items.set([new_tip, former_tip])
 
         def _main_text(row_idx: int) -> str:
-            _left, main = panel._row_cache_focused[row_idx]
+            _left, main = panel._row_cache[row_idx]
             return "".join(seg.text for seg in main)
 
         assert "HEAD" in _main_text(0)
@@ -463,43 +463,43 @@ class TestCommitReport:
         vm.items = Signal([])
         vm.graph_rows = []
         panel = CommitPanel(vm=vm, report_default=report_default)
-        panel.activate()
+        panel.mount()
         return panel
 
     def test_hidden_at_or_below_19_rows(self):
         panel = self._panel()
         panel.resize((80, 10))
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         panel.resize((80, 19))
-        assert panel._report_h == 0  # 19 is not > 19
+        assert panel._footer_h == 0  # 19 is not > 19
 
     def test_visible_above_19_rows(self):
         panel = self._panel()
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
 
     def test_hidden_when_default_off(self):
         panel = self._panel(report_default=False)
         panel.resize((80, 50))
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
 
     def test_toggle_report_flips_strip(self):
         panel = self._panel()
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
         panel.toggle_report()
         assert not panel._report_enabled
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         panel.toggle_report()
         assert panel._report_enabled
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
 
     def test_toggle_report_toasts_when_panel_too_short(self):
         from unittest.mock import patch
 
         panel = self._panel()
         panel.resize((80, 15))  # below the > 19 gate
-        assert panel._report_h == 0
+        assert panel._footer_h == 0
         with patch("pigit.app_commit.show_toast") as toast:
             panel.toggle_report()
         toast.assert_called_once()
@@ -520,7 +520,7 @@ class TestCommitReport:
         vm.items = Signal([])
         vm.graph_rows = []
         panel = CommitPanel(vm=vm)
-        panel.activate()
+        panel.mount()
         now = int(datetime.datetime.now().timestamp())
         commits = [
             Commit(
@@ -536,9 +536,9 @@ class TestCommitReport:
         ]
         vm.items.set(commits)
         panel.resize((80, 50))
-        assert panel._report_h == 15
+        assert panel._footer_h == 15
         surface = Surface(80, 50)
-        panel._render_surface(surface)
+        panel.paint(surface)
         rows = ["".join(c.char for c in r) for r in surface._rows]
         # List rows occupy the top 35; report cells fill the bottom 15.
         assert any("msg" in row for row in rows[:35])

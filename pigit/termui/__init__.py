@@ -4,7 +4,7 @@ Description: Lightweight terminal UI framework (tiered public API).
 
 Usage:
     from pigit.termui import Application, Component, show_toast, set_theme
-    from pigit.termui.widgets import ItemList, Footer, Sheet
+    from pigit.termui.widgets import OptionList, Footer, Sheet
     from pigit.termui.containers import Column, TabView
     from pigit.termui.primitives import plain, tokenize_with_positions
 """
@@ -27,6 +27,7 @@ from .component import (
     Component,
     ComponentError,
     bind_signals,
+    is_on_visible_paint_path,
     render_child,
     resolve_presentation_leaf,
 )
@@ -94,6 +95,7 @@ __all__ = [
     "bind_signals",
     "render_child",
     "resolve_presentation_leaf",
+    "is_on_visible_paint_path",
     # Root & App
     "ComponentRoot",
     "Application",

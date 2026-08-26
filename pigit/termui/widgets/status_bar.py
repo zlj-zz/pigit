@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from ..theme import get_theme
 from ..component import Component, bind_signals
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..reactive import Computed, Signal, ValueRef
 from ..tty_io import truncate_line
 from ..wcwidth_table import pad_by_width
@@ -54,7 +54,7 @@ class StatusBar(Component):
             self._unsub()
         super().destroy()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         theme = get_theme()
         text = truncate_line(self._text, surface.width)
         text = pad_by_width(text, surface.width)

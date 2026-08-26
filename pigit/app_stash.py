@@ -15,9 +15,7 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
-    MouseButton,
-    MouseEvent,
-    MouseKind,
+    Component,
     palette,
     Segment,
     show_badge,
@@ -25,7 +23,7 @@ from pigit.termui import (
     Surface,
 )
 from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import AlertDialog, ItemList
+from pigit.termui.widgets import AlertDialog, OptionList
 
 from .app_diff import DiffType
 from .app_theme import THEME
@@ -36,16 +34,44 @@ if TYPE_CHECKING:
     from pigit.viewmodels.status import IStatusViewModel
 
 
-class StashPanel(ItemList):
+class _StashSectionHeader(Component):
+    """One-row section rule: fill dashes + bold Stash + tail."""
+
+    _LABEL = "Stash"
+    _TAIL = "──"
+
+    def paint(self, surface: Surface) -> None:
+        w = surface.width
+        if w <= 0 or surface.height <= 0:
+            return
+        label = self._LABEL
+        suffix = f" {label} {self._TAIL}"
+        suffix_w = wcswidth(suffix)
+        fill_w = max(0, w - suffix_w)
+        rule_fg = THEME.fg_dim
+        if fill_w:
+            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=rule_fg)
+        col = fill_w
+        surface.draw_text_rgb(0, col, " ", fg=rule_fg)
+        col += 1
+        surface.draw_text_rgb(
+            0,
+            col,
+            label,
+            fg=THEME.fg_panel_title,
+            style_flags=palette.STYLE_BOLD,
+        )
+        col += wcswidth(label)
+        surface.draw_text_rgb(0, col, f" {self._TAIL}", fg=rule_fg)
+
+
+class StashPanel(OptionList):
     """Stash list panel with cursor navigation."""
 
     CURSOR = "●"
     keymap_namespace = "stash"
-    tab_name = "Stash"
+    TAB_NAME = "Stash"
     tab_key = "2"
-    HEADER_ROWS = 1
-    _SECTION_LABEL = "Stash"
-    _SECTION_TAIL = "──"
 
     def __init__(
         self,
@@ -60,6 +86,7 @@ class StashPanel(ItemList):
                 Segment("  Press 's' to stash current changes", fg=THEME.fg_dim),
             ],
             id=id,
+            header=_StashSectionHeader(),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
@@ -69,17 +96,22 @@ class StashPanel(ItemList):
         )
         self.stashes: list[Stash] = []
 
-    @property
-    def visible_row_count(self) -> int:
-        """Viewport rows available for stash entries (excludes section header)."""
-        return max(0, self._size[1] - self.HEADER_ROWS)
+    def mount(self) -> None:
+        # Warm-mounted under Status Column: do not run git here — load on focus.
+        super().mount()
 
-    def activate(self) -> None:
-        super().activate()
+    def on_focus(self) -> None:
+        """Reload stash list when this panel becomes the focused Column child."""
         self._load_stashes()
 
     def _load_stashes(self) -> None:
-        self.stashes = self._vm.load_stashes()
+        try:
+            self.stashes = self._vm.load_stashes()
+        except Exception as exc:
+            self.stashes = []
+            self.set_content([])
+            show_toast(str(exc), duration=2.0, kind=FeedbackKind.ERROR)
+            return
         if not self.stashes:
             self.set_content([])
             return
@@ -88,66 +120,6 @@ class StashPanel(ItemList):
 
     def refresh(self):
         self._load_stashes()
-
-    def _draw_section_header(self, surface: Surface) -> None:
-        """Draw ``──── Stash ──`` across the top row."""
-        w = surface.width
-        if w <= 0 or surface.height <= 0:
-            return
-        label = self._SECTION_LABEL
-        # " Stash ──" — space, bold label, space, two dashes
-        suffix = f" {label} {self._SECTION_TAIL}"
-        suffix_w = wcswidth(suffix)
-        fill_w = max(0, w - suffix_w)
-        if fill_w:
-            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=THEME.fg_dim)
-        col = fill_w
-        surface.draw_text_rgb(0, col, " ", fg=THEME.fg_dim)
-        col += 1
-        surface.draw_text_rgb(
-            0,
-            col,
-            label,
-            fg=THEME.fg_muted,
-            style_flags=palette.STYLE_BOLD,
-        )
-        col += wcswidth(label)
-        surface.draw_text_rgb(0, col, f" {self._SECTION_TAIL}", fg=THEME.fg_dim)
-
-    def _render_surface(self, surface: Surface) -> None:
-        """Section header on row 0; stash rows in the remaining viewport."""
-        w = surface.width
-        h = surface.height
-        if w <= 0 or h <= 0:
-            return
-        self._draw_section_header(surface)
-        if h <= self.HEADER_ROWS:
-            return
-        sub = surface.subsurface(self.HEADER_ROWS, 0, w, h - self.HEADER_ROWS)
-        ItemList._render_surface(self, sub)
-
-    def handle_mouse(self, event: MouseEvent) -> bool:
-        """Ignore clicks on the header row; map remaining rows to list items."""
-        if event.kind is not MouseKind.PRESS:
-            return False
-        if event.button in (MouseButton.WHEEL_UP, MouseButton.WHEEL_DOWN):
-            return super().handle_mouse(event)
-        if event.button is not MouseButton.LEFT:
-            return False
-        row0 = event.row - 1
-        if row0 < self.HEADER_ROWS:
-            return True
-        adjusted = MouseEvent(
-            col=event.col,
-            row=event.row - self.HEADER_ROWS,
-            button=event.button,
-            kind=event.kind,
-            shift=event.shift,
-            alt=event.alt,
-            ctrl=event.ctrl,
-            motion=event.motion,
-        )
-        return ItemList.handle_mouse(self, adjusted)
 
     def _current_stash(self) -> Stash | None:
         """Return the stash under the cursor, or None if the list is empty."""
@@ -251,22 +223,20 @@ class StashPanel(ItemList):
         item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
-        focused = self.is_focus_leaf
         if not self.stashes or idx >= len(self.stashes):
             return ([], None, [])
         stash = self.stashes[idx]
         cursor_prefix = self.CURSOR if is_cursor else " "
-        fg = THEME.fg_primary if focused else THEME.fg_dim
+        fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         left = [
-            Segment(cursor_prefix, fg=fg, style_flags=cursor_flags),
-            Segment(" ", fg=fg),
+            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
+            Segment(" ", fg=fg_primary),
         ]
-        ref_seg = Segment(f"{stash.ref}: ", fg=THEME.fg_muted)
-        msg_seg = Segment(stash.msg, fg=fg, style_flags=cursor_flags)
-        main = [ref_seg, msg_seg]
-        return left, main, []
+        main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]
+        right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
+        return left, main, right
 
     def _handle_result(self, result) -> None:
         if result.success:

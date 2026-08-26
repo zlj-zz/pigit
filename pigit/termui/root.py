@@ -23,7 +23,7 @@ from .widgets.sheet import DEFAULT_MAX_FRACTION
 
 if TYPE_CHECKING:
     from ._runtime_context import ComponentRegistry
-    from .surface import Surface, _Subsurface
+    from .surface import Surface
     from .widgets import Sheet
 
 
@@ -64,10 +64,10 @@ class ComponentRoot(Component):
         if key_handlers:
             self._key_handlers.update(key_handlers)
 
-    def activate(self) -> None:
-        """Activate the root and propagate to the body component tree."""
-        super().activate()
-        self._body.activate()
+    def mount(self) -> None:
+        """Activate the root and propagate mount to the body component tree."""
+        super().mount()
+        self._body.mount()
         # Reset stale badge from previous sessions.
         sig = get_badge_signal()
         if sig.value is not None:
@@ -157,6 +157,10 @@ class ComponentRoot(Component):
         """Return True if any overlay (modal, toast, or sheet) is currently open."""
         return self._layer_stack.has_any_open()
 
+    def is_presentation_stolen(self) -> bool:
+        """True while an open MODAL or SHEET owns keyboard chrome (not TOAST)."""
+        return self._top_open_overlay() is not None
+
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
         """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)
@@ -187,10 +191,10 @@ class ComponentRoot(Component):
         self._layer_stack.resize(size)
         super().resize(size)
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         self._expire_toasts()
         self._expire_badge()
-        self._body._render_surface(surface)
+        self._body.paint(surface)
         self._layer_stack.render(surface)
 
     def _top_open_overlay(self) -> Component | None:

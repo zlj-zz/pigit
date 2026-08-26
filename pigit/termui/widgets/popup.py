@@ -17,7 +17,7 @@ from ..primitives.frame import BoxFrame
 from ..mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..primitives.text import sanitize_for_display
 from ..theme import get_theme
 from ..wcwidth_table import wcswidth
@@ -159,7 +159,7 @@ class Popup(Component):
         self.end_session()
         self.hide()
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self.open:
             return
         curr_size = (surface.width, surface.height)
@@ -170,7 +170,7 @@ class Popup(Component):
         sub = surface.subsurface(
             max(0, self._child.x - 1), max(0, self._child.y - 1), w, h
         )
-        self._child._render_surface(sub)
+        self._child.paint(sub)
 
     def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
         """Hit-test the sole rendered child (local coords after normalization)."""
@@ -316,7 +316,7 @@ class AlertDialogBody(Component):
             return True
         return False
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self.open:
             return
         if self._needs_rebuild:

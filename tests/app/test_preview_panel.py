@@ -45,7 +45,7 @@ class _FakeStatusVM:
 
 
 class _FakeStatusPanel(StatusPanel):
-    tab_name = "Status"
+    TAB_NAME = "Status"
     tab_key = "1"
 
     def __init__(
@@ -66,7 +66,7 @@ class _FakeStatusPanel(StatusPanel):
 
 
 class _FakeStashPanel(StashPanel):
-    tab_name = "Stash"
+    TAB_NAME = "Stash"
     tab_key = "3"
 
     def __init__(self, stashes: list[Stash], curr_no: int, vm: _FakeStatusVM) -> None:
@@ -100,7 +100,7 @@ def preview() -> PreviewPanel:
 
 def _mount(bus: EventBus, preview: PreviewPanel) -> ComponentRoot:
     root = ComponentRoot(preview, event_bus=bus)
-    preview.activate()
+    preview.mount()
     return root
 
 
@@ -316,7 +316,7 @@ def test_deactivate_unsubscribes(preview: PreviewPanel) -> None:
     assert vm.diff_path_calls == ["a.py"]
     assert "a.py" in preview._diff_viewer._box_title
 
-    preview.deactivate()
+    preview.unmount()
     del vm.diff_path_calls[:]
 
     other = _FakeStatusPanel(
@@ -355,7 +355,7 @@ def test_preview_title_is_on_diff_box(preview: PreviewPanel) -> None:
     preview.resize((40, 8))
     preview.set_preview(["+ added line"], title="src/main.py", subtitle="Staged")
     surface = Surface(40, 8)
-    preview._render_surface(surface)
+    preview.paint(surface)
     top = surface.lines()[0]
     assert top.startswith("┌")
     assert "src/main.py" in top

@@ -188,7 +188,7 @@ class AppEventLoop:
                 renderer.clear_cache()
         self._had_overlay = has_overlay
 
-        self._child._render_surface(surface)
+        self._child.paint(surface)
         renderer = get_renderer()
         if renderer is not None:
             renderer.render_surface(surface)

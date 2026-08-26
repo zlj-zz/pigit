@@ -108,6 +108,13 @@ class Application:
         """
         return False
 
+    def handle_key(self, key: str) -> bool:
+        """Optional app-level key hook after overlay/bindings.
+
+        Return True when the key was handled.
+        """
+        return False
+
     def _auto_setup_root(self, root: ComponentRoot) -> None:
         """Inject framework-level setup before user ``setup_root`` runs."""
         if self.help_popup_class is not None:
@@ -146,13 +153,16 @@ class Application:
         token = _runtime_ctx.set(runtime)
         try:
             body = self.build_root()
-            handle_key = getattr(self, "handle_key", None)
+
+            def _app_handle_key(key: str) -> bool:
+                return self.handle_key(key)
+
             self._root = root = ComponentRoot(
                 body,
                 runtime.registry,
                 event_bus=self._event_bus,
                 key_handlers=self._key_handlers,
-                handle_key=handle_key if callable(handle_key) else None,
+                handle_key=_app_handle_key,
             )
             runtime.overlay_host = root
             runtime.focus_manager = root._focus_manager
@@ -166,7 +176,7 @@ class Application:
             root._event_loop = self._loop
             self._auto_setup_root(root)
             self.setup_root(root)
-            root.activate()
+            root.mount()
             self._loop.run()
         finally:
             try:

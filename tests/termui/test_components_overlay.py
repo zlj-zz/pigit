@@ -36,7 +36,7 @@ def _runtime_context():
 class _Leaf(Component):
     NAME = "leaf"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):
@@ -46,7 +46,7 @@ class _Leaf(Component):
 class DummyBody(Component):
     NAME = "dummy"
 
-    def _render_surface(self, surface):
+    def paint(self, surface):
         pass
 
     def refresh(self):
@@ -122,14 +122,14 @@ class TestOverlayContext:
 
 
 class TestToast:
-    def test_toast_render_surface(self):
+    def test_toastpaint(self):
         # 使用无动画的 Toast 以确保立即可见
         toast = Toast(
             "Hello World", duration=5.0, enter_duration=0.0, exit_duration=0.0
         )
         surface = Surface(40, 10)
         toast.resize((40, 10))  # 新实现需要 resize
-        toast._render_surface(surface)
+        toast.paint(surface)
 
         # TOP_RIGHT 位置，内容在边框内（第2行，因为第1行是上边框）
         # 找到包含 "Hello World" 的行
@@ -147,7 +147,7 @@ class TestToast:
         toast = Toast(msg, duration=5.0, enter_duration=0.0, exit_duration=0.0)
         surface = Surface(20, 10)
         toast.resize((20, 10))  # 新实现需要 resize
-        toast._render_surface(surface)
+        toast.paint(surface)
 
         # TOP_RIGHT 位置在第1行附近，外框占用空间
         row_text = surface._rows[2]  # 边框内行
@@ -177,7 +177,7 @@ class TestToast:
         toast = Toast("Hello", duration=5.0)
         surface = Surface(40, 10)
         toast.resize((40, 10))
-        toast._render_surface(surface)
+        toast.paint(surface)
 
         # 检查边框字符是否出现在 surface 上
         all_chars = []
@@ -344,7 +344,7 @@ class TestToast:
         toast.outer_row_count = 100  # 很大的高度
 
         # 不应抛出异常，且不应绘制任何内容
-        toast._render_surface(surface)
+        toast.paint(surface)
 
     def test_toast_skips_render_when_terminal_too_small(self):
         """验证 surface.width < 4 or surface.height < 3 时直接返回"""
@@ -352,11 +352,11 @@ class TestToast:
 
         # 太窄的终端
         surface_narrow = Surface(3, 10)
-        toast._render_surface(surface_narrow)  # 不应抛出异常
+        toast.paint(surface_narrow)  # 不应抛出异常
 
         # 太矮的终端
         surface_short = Surface(40, 2)
-        toast._render_surface(surface_short)  # 不应抛出异常
+        toast.paint(surface_short)  # 不应抛出异常
 
     def test_toast_resizes_during_animation(self):
         """验证调用 resize() 后 _needs_rebuild 被正确置位"""
@@ -441,77 +441,77 @@ class TestToast:
 
 
 class TestSheet:
-    def test_sheet_render_surface_draws_child_below_default_border(self):
+    def test_sheetpaint_draws_child_below_default_border(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3)
         sheet._size = (20, 3)
 
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
+        sheet.paint(surface)
 
-        child._render_surface.assert_called_once()
-        sub = child._render_surface.call_args[0][0]
+        child.paint.assert_called_once()
+        sub = child.paint.call_args[0][0]
         # Default: facing-edge rule; child gets sheet height minus 1
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (8, 0)
+        assert (sub._origin_row, sub._origin_col) == (8, 0)
         assert surface._rows[7][0].char == "─"
         assert surface._rows[7][19].char == "─"
 
-    def test_sheet_render_surface_borderless(self):
+    def test_sheetpaint_borderless(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, show_edge_rule=False)
         sheet._size = (20, 3)
 
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
+        sheet.paint(surface)
 
-        child._render_surface.assert_called_once()
-        sub = child._render_surface.call_args[0][0]
+        child.paint.assert_called_once()
+        sub = child.paint.call_args[0][0]
         assert sub.height == 3
-        assert sub._to_parent(0, 0) == (7, 0)
+        assert (sub._origin_row, sub._origin_col) == (7, 0)
 
-    def test_sheet_render_surface_with_border(self):
+    def test_sheetpaint_with_border(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, show_edge_rule=True)
         sheet._size = (20, 3)
 
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
+        sheet.paint(surface)
 
-        child._render_surface.assert_called_once()
-        sub = child._render_surface.call_args[0][0]
+        child.paint.assert_called_once()
+        sub = child.paint.call_args[0][0]
         # With border: child height is sheet height minus 1
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (8, 0)
+        assert (sub._origin_row, sub._origin_col) == (8, 0)
         assert surface._rows[7][0].char == "─"
         assert surface._rows[7][19].char == "─"
 
     def test_sheet_top_edge_border_is_on_last_row(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, show_edge_rule=True, edge="top")
         sheet._size = (20, 3)
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
-        sub = child._render_surface.call_args[0][0]
+        sheet.paint(surface)
+        sub = child.paint.call_args[0][0]
         assert sub.height == 2
-        assert sub._to_parent(0, 0) == (0, 0)
+        assert (sub._origin_row, sub._origin_col) == (0, 0)
         assert surface._rows[2][0].char == "─"
         assert surface._rows[2][19].char == "─"
         assert surface._rows[0][0].char != "─"
 
-    def test_sheet_render_surface_zero_height_skips(self):
+    def test_sheetpaint_zero_height_skips(self):
         child = MagicMock()
         sheet = Sheet(child, height=0)
         sheet._size = (20, 0)
 
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
+        sheet.paint(surface)
 
-        child._render_surface.assert_not_called()
+        child.paint.assert_not_called()
 
     def test_sheet_dispatch_delegates_to_child(self):
         child = MagicMock()
@@ -597,13 +597,13 @@ class TestSheet:
 
     def test_sheet_top_edge_renders_at_row_zero(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, edge="top")
         sheet._size = (20, 3)
         surface = Surface(20, 10)
-        sheet._render_surface(surface)
-        sub = child._render_surface.call_args[0][0]
-        assert sub._to_parent(0, 0) == (0, 0)
+        sheet.paint(surface)
+        sub = child.paint.call_args[0][0]
+        assert (sub._origin_row, sub._origin_col) == (0, 0)
 
     def test_sheet_top_edge_resize_origin(self):
         child = MagicMock()
@@ -615,23 +615,23 @@ class TestSheet:
 
     def test_sheet_bg_none_still_clears_region(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, edge="top", bg=None)
         sheet._size = (20, 3)
         surface = Surface(20, 10)
         surface.draw_text_rgb(0, 0, "HELLO", bg=(1, 2, 3))
-        sheet._render_surface(surface)
+        sheet.paint(surface)
         assert surface._rows[0][0].char == " "
         assert surface._rows[0][0].bg is None
         assert surface._rows[0][4].char == " "
 
     def test_sheet_title_right_aligned_by_default(self):
         child = MagicMock()
-        child._render_surface = MagicMock()
+        child.paint = MagicMock()
         sheet = Sheet(child, height=3, title="Commands")
         sheet._size = (24, 3)
         surface = Surface(24, 10)
-        sheet._render_surface(surface)
+        sheet.paint(surface)
         rule = "".join(c.char for c in surface._rows[7])
         assert rule.endswith(" · Commands · ─")
         assert rule.startswith("─")
@@ -668,7 +668,7 @@ class TestHelpPanel:
         panel.set_entries([("j", "down"), ("k", "up")])
         surface = Surface(60, 20)
         panel.resize((60, 20))
-        panel._render_surface(surface)
+        panel.paint(surface)
 
         # Frame should have drawn a border; content rows should include bindings.
         row_text = surface._rows[1]
@@ -841,7 +841,7 @@ class TestPopup:
             def on_x(self):
                 pass
 
-            def _render_surface(self, surface):
+            def paint(self, surface):
                 pass
 
             def refresh(self):
@@ -890,21 +890,21 @@ class TestPopup:
         result = popup.dispatch_overlay_key("z")
         assert result is OverlayDispatchResult.DROPPED_UNBOUND
 
-    def test_popup_render_surface_not_open_skips(self):
+    def test_popuppaint_not_open_skips(self):
         child = _Leaf()
         popup = Popup(child)
         popup.open = False
         surface = Surface(40, 20)
-        popup._render_surface(surface)
+        popup.paint(surface)
         # No exception and child not rendered
 
-    def test_popup_render_surface_resizes_if_needed(self):
+    def test_popuppaint_resizes_if_needed(self):
         child = _Leaf()
         popup = Popup(child)
         popup.open = True
         popup._term_size = (0, 0)
         surface = Surface(40, 20)
-        popup._render_surface(surface)
+        popup.paint(surface)
         assert popup._term_size == (40, 20)
 
 

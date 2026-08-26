@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -66,7 +67,9 @@ def app():
     from pigit.app import PigitApplication
     from pigit.config_data import AppConfig
 
-    yield PigitApplication(config=AppConfig())
+    application = PigitApplication(config=AppConfig())
+    application.build_root()
+    yield application
 
 
 @pytest.fixture
@@ -149,31 +152,37 @@ class TestObserveBatchSinks:
     def test_head_batch_schedules_header_and_branch_refresh(self, app):
         from pigit.app_branch import BranchPanel
 
-        app._tab_view = MagicMock()
-        app._schedule_reload_header = MagicMock()
-        app._refresh_list_panel = MagicMock()
-        app._log_graph_wanted = False
-        app._is_large_screen = False
+        schedule = MagicMock()
+        refresh = MagicMock()
+        app._observe_host._deps = replace(
+            app._observe_host._deps,
+            schedule_reload_header=schedule,
+            refresh_list_panel=refresh,
+        )
         panel = object.__new__(BranchPanel)
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=panel):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
             app._on_observe_batch(
                 ChangeBatch(kinds=frozenset({ChangeKind.HEAD}), paths=frozenset())
             )
 
-        app._schedule_reload_header.assert_called_once()
-        app._refresh_list_panel.assert_called_once_with(panel)
+        schedule.assert_called_once()
+        refresh.assert_called_once_with(panel)
 
     def test_worktree_meta_refreshes_status_when_active(self, app):
         """WORKTREE_META on Status tab triggers list refresh."""
         from pigit.app_status import StatusPanel
 
-        app._tab_view = MagicMock()
-        app._schedule_reload_header = MagicMock()
-        app._refresh_list_panel = MagicMock()
+        schedule = MagicMock()
+        refresh = MagicMock()
+        app._observe_host._deps = replace(
+            app._observe_host._deps,
+            schedule_reload_header=schedule,
+            refresh_list_panel=refresh,
+        )
         panel = object.__new__(StatusPanel)
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=panel):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
             app._on_observe_batch(
                 ChangeBatch(
                     kinds=frozenset({ChangeKind.WORKTREE_META}),
@@ -181,32 +190,30 @@ class TestObserveBatchSinks:
                 )
             )
 
-        app._refresh_list_panel.assert_called_once_with(panel)
-        app._schedule_reload_header.assert_not_called()
+        refresh.assert_called_once_with(panel)
+        schedule.assert_not_called()
 
     def test_build_observe_roots_attaches_worktree_only_for_status(self, app):
         """Worktree root is present only while Status is the active panel."""
         from pigit.app_status import StatusPanel
         from pigit.app_branch import BranchPanel
 
-        app._observe_ctx = ObserveContext(
+        app._observe_host._observe_ctx = ObserveContext(
             repo_root="/repo",
             git_dir="/repo/.git",
             common_dir="/repo/.git",
         )
         app._config.observe_worktree = True
-        app._status_vm = MagicMock()
-        app._status_vm.items.value = []
+        app._status_vm.items.set([])
 
         status = object.__new__(StatusPanel)
         branch = object.__new__(BranchPanel)
-        app._tab_view = MagicMock()
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=status):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=status):
             roots = app._build_observe_roots()
         assert any(r.kind == "worktree" for r in roots)
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=branch):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=branch):
             roots = app._build_observe_roots()
         assert all(r.kind != "worktree" for r in roots)
 
@@ -215,7 +222,7 @@ class TestObserveBatchSinks:
         from pigit.app_status import StatusPanel
         from pigit.git.model import File
 
-        app._observe_ctx = ObserveContext(
+        app._observe_host._observe_ctx = ObserveContext(
             repo_root="/repo",
             git_dir="/repo/.git",
             common_dir="/repo/.git",
@@ -233,12 +240,10 @@ class TestObserveBatchSinks:
             has_merged_conflicts=False,
             has_inline_merged_conflicts=False,
         )
-        app._status_vm = MagicMock()
-        app._status_vm.items.value = [renamed]
+        app._status_vm.items.set([renamed])
         status = object.__new__(StatusPanel)
-        app._tab_view = MagicMock()
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=status):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=status):
             roots = app._build_observe_roots()
         file_roots = [r.path for r in roots if r.kind == "file"]
         assert any(p.endswith("src/renamed.txt") for p in file_roots)
@@ -256,7 +261,7 @@ class TestObserveBatchSinks:
         app._preview_panel = MagicMock()
         panel = object.__new__(StatusPanel)
 
-        with patch("pigit.app.resolve_presentation_leaf", return_value=panel):
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
             app._on_observe_batch(
                 ChangeBatch(
                     kinds=frozenset({ChangeKind.PREVIEW_FILE}),

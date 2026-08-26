@@ -21,5 +21,9 @@ __all__ = (
 def git_version() -> str:
     """Get Git version."""
 
-    _, _, _version = ExecutorFactory.get().exec("git --version", flags=REPLY | DECODE)
-    return _version.strip() or ""
+    _, _, version = ExecutorFactory.get().exec("git --version", flags=REPLY | DECODE)
+    if version is None:
+        return ""
+    if isinstance(version, bytes):
+        return version.decode().strip() or ""
+    return version.strip() or ""

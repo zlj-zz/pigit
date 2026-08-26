@@ -11,9 +11,9 @@ from collections.abc import Callable
 
 from .. import keys
 from ..theme import get_theme
-from ..component import Component
+from ..component import Component, is_on_visible_paint_path
 from .._runtime_context import get_focus_manager, request_render
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..reactive import Signal
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
@@ -81,8 +81,8 @@ class InputLine(Component):
         self._request_render()
 
     def _request_render(self) -> None:
-        """Request a render if this component is currently activated."""
-        if self.is_activated():
+        """Request a render when mounted and on the visible paint path."""
+        if self.is_mounted() and is_on_visible_paint_path(self):
             request_render()
 
     def destroy(self) -> None:
@@ -389,7 +389,7 @@ class InputLine(Component):
             min(len(self._value_sig.value), self._cursor_sig.value + 1)
         )
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self._visible:
             return
         value = self._value_sig.value
@@ -490,7 +490,7 @@ class InputLine(Component):
                         surface, row, wcswidth(line[:cursor_col]), line, cursor_col
                     )
 
-    def _render_candidates(self, surface: Surface | _Subsurface, value: str) -> None:
+    def _render_candidates(self, surface: Surface, value: str) -> None:
         """Render inline completion candidate (single-line mode)."""
         theme = get_theme()
         match_len = len(self._original_value)
@@ -525,7 +525,7 @@ class InputLine(Component):
 
     def _draw_block_cursor(
         self,
-        surface: Surface | _Subsurface,
+        surface: Surface,
         row: int,
         cursor_x: int,
         line: str,

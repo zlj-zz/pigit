@@ -27,24 +27,44 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
         for i, msg in enumerate(msgs)
     ]
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     return panel
 
 
 def test_section_header_right_label_with_tail():
     """Top row is fill dashes, bold Stash, then two trailing dashes."""
+    from pigit.app_theme import THEME
+
     panel = _panel_with_stashes(["WIP on main"])
     panel.resize((40, 6))
     surface = Surface(40, 6)
-    panel._render_surface(surface)
+    panel.paint(surface)
 
     row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
     assert row.endswith("Stash ──")
     assert "─" in row
-    # Label cells are bold
     label_start = row.index("Stash")
     for col in range(label_start, label_start + 5):
         assert surface._rows[0][col].style_flags & palette.STYLE_BOLD
+        assert surface._rows[0][col].fg == THEME.fg_panel_title
+
+
+def test_describe_row_puts_ref_on_right():
+    from pigit.app_theme import THEME
+    from pigit.termui.theme import get_theme, set_theme
+
+    prev = get_theme()
+    set_theme(THEME)
+    try:
+        panel = _panel_with_stashes(["WIP on main"])
+        left, main, right = panel.describe_row(0, is_cursor=True)
+        assert "".join(s.text for s in main) == "WIP on main"
+        assert "".join(s.text for s in right) == "stash@{0}"
+        assert right[0].fg == THEME.fg_muted
+        assert main[0].fg == THEME.fg_primary
+    finally:
+        set_theme(prev)
 
 
 def test_visible_row_count_excludes_header():
@@ -62,7 +82,8 @@ def test_drop_requires_confirmation():
     ]
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
 
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
@@ -89,7 +110,8 @@ def test_drop_empty_list_is_noop():
     vm.load_stashes.return_value = []
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
         panel.drop()
         alert.assert_not_called()
@@ -106,7 +128,8 @@ def test_apply_keeps_stash_without_confirmation():
         return_value=ActionResult(success=True, message="Applied stash")
     )
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
     with patch("pigit.app_stash.show_badge"):
         panel.apply()
@@ -122,7 +145,8 @@ def test_get_inspector_snapshot_delegates_to_vm():
     ]
     vm.get_stash_snapshot.return_value = object()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
+    panel.on_focus()
     panel.curr_no = 0
     assert panel.get_inspector_snapshot() is vm.get_stash_snapshot.return_value
     vm.get_stash_snapshot.assert_called_once_with("stash@{0}")
@@ -133,7 +157,7 @@ def test_get_inspector_snapshot_empty_is_none():
     vm.items = Signal([])
     vm.load_stashes.return_value = []
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
     assert panel.get_inspector_snapshot() is None
 
 
@@ -143,6 +167,6 @@ def test_apply_empty_list_is_noop():
     vm.load_stashes.return_value = []
     vm.stash_apply = Mock()
     panel = StashPanel(vm=vm)
-    panel.activate()
+    panel.mount()
     panel.apply()
     vm.stash_apply.assert_not_called()

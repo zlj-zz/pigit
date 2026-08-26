@@ -1,5 +1,32 @@
 # Changelog of pigit
 
+## 2.2.0 (2026-08-26)
+
+### Features
+
+- **Diff as body detail**: DiffViewer sits in an exclusive body layer over Status / Branch / Commit (warm show/hide) instead of a fourth TabView page.
+- **OptionList chrome bands**: optional header/footer slots with fitted band heights; Commit report migrates onto the list chrome.
+- **CommitEditor widgets**: public `Label`, `StaticList`, and `ShortcutHints` replace private staged/hint helpers.
+- **Panel fg hierarchy**: dim inactive presentation via `presentation_fg` on steal/focus without painting row backgrounds.
+- **DiffContent**: parse/install path extracted from DiffViewer so content swaps stay atomic.
+
+### Improvements
+
+- **Mount vs visibility**: `ExclusiveView` (warm) / `TabView` (cold); `activate` → `mount`; paint gated by exclusive visible child; Diff pauses background work on hide.
+- **Surface unify**: single drawing type (no separate subsurface type).
+- **Component `paint`**: draw hook renamed from `draw` for consistency.
+- **Theme**: contribution / graph colors route through `PigitTheme`.
+- **App orchestration**: panel navigation and observe deps extracted from `PigitApplication`.
+
+### Refactors
+
+- **ItemList → OptionList** (module, widgets, panels, tests).
+- Body tree typing: required attrs set in `build_root`; pyright-clean `pigit` package (`TAB_NAME` + `tab_name` property, typed browsers / ObserveDeps).
+
+### Bug Fixes
+
+- Product navigation tolerates an unbuilt body (tests / early paths) without crashing on missing `_body_view`.
+
 ## 2.1.1 (2026-08-22)
 
 ### Features

@@ -10,13 +10,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
-from ..component import Component
+from ..component import Component, mount_children, unmount_children
 from .._layout import layout_flex
 
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class SplitPane(Component):
@@ -49,6 +49,11 @@ class SplitPane(Component):
         self._last_child_ids: tuple[int, ...] | None = None
         self.children = [master]
         master.parent = self
+
+    @property
+    def presentation_child(self) -> Component | None:
+        """Chrome resolves through the master (TabView), not the side preview."""
+        return self._master
 
     def set_detail(self, detail: Component | None) -> None:
         """Replace the detail component without changing the wanted flag."""
@@ -83,15 +88,13 @@ class SplitPane(Component):
         self._sync_children(desired)
         self._apply_widths(widths)
 
-    def activate(self) -> None:
-        super().activate()
-        for child in self.children:
-            child.activate()
+    def mount(self) -> None:
+        super().mount()
+        mount_children(self)
 
-    def deactivate(self) -> None:
-        super().deactivate()
-        for child in self.children:
-            child.deactivate()
+    def unmount(self) -> None:
+        unmount_children(self)
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Resize the pane and lay out attached children horizontally."""
@@ -113,14 +116,14 @@ class SplitPane(Component):
             )
             offset_h += w
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         for child in self.children:
             w, h = child._size
             if w <= 0 or h <= 0:
                 continue
             if child.x < 1 or child.y < 1:
                 continue
-            child._render_surface(
+            child.paint(
                 surface.subsurface(max(0, child.x - 1), max(0, child.y - 1), w, h)
             )
 
@@ -129,7 +132,7 @@ class SplitPane(Component):
         desired_set = set(desired)
         for child in list(self.children):
             if child not in desired_set:
-                child.deactivate()
+                child.unmount()
                 self.children.remove(child)
                 if child.parent is self:
                     child.parent = None
@@ -137,7 +140,7 @@ class SplitPane(Component):
             if child not in self.children:
                 self.children.append(child)
                 child.parent = self
-                child.activate()
+                child.mount()
 
     def _apply_widths(self, widths: list[int | Literal["flex"]]) -> None:
         """Update width spec and relayout when children or widths changed."""

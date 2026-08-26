@@ -1,25 +1,26 @@
-"""Tests for DiffViewer local word-diff support."""
+"""Tests for DiffContent / DiffViewer local word-diff support."""
 
 from __future__ import annotations
 
 from pigit.app_diff import DiffViewer
+from pigit.diff_content import DiffContent
 
 
 class TestWordDiffRanges:
     """Word-level diff ranges via difflib.SequenceMatcher."""
 
     def test_range_no_change(self):
-        del_r, add_r = DiffViewer._word_diff_ranges("hello world", "hello world")
+        del_r, add_r = DiffContent.word_diff_ranges("hello world", "hello world")
         assert del_r == []
         assert add_r == []
 
     def test_range_word_replace(self):
-        del_r, add_r = DiffViewer._word_diff_ranges("hello world", "hello new")
+        del_r, add_r = DiffContent.word_diff_ranges("hello world", "hello new")
         assert del_r == [(6, 11)]  # "world"
         assert add_r == [(6, 9)]  # "new"
 
     def test_range_multiple_word_changes(self):
-        del_r, add_r = DiffViewer._word_diff_ranges(
+        del_r, add_r = DiffContent.word_diff_ranges(
             "old hello world tail",
             "new hello earth tail",
         )
@@ -28,11 +29,11 @@ class TestWordDiffRanges:
         assert len(add_r) == 2
 
     def test_range_addition_at_end(self):
-        del_r, add_r = DiffViewer._word_diff_ranges("foo", "foo bar")
+        del_r, add_r = DiffContent.word_diff_ranges("foo", "foo bar")
         assert add_r == [(3, 7)]
 
     def test_range_deletion_at_end(self):
-        del_r, add_r = DiffViewer._word_diff_ranges("foo bar", "foo")
+        del_r, add_r = DiffContent.word_diff_ranges("foo bar", "foo")
         assert del_r == [(3, 7)]
 
 
@@ -41,19 +42,19 @@ class TestWordBoundaryTokenization:
 
     def test_punctuation_splits(self):
         """``foo.bar()`` → ``["foo", ".", "bar", "(", ")"]``."""
-        del_r, add_r = DiffViewer._word_diff_ranges("func foo.bar()", "func fooBar()")
+        del_r, add_r = DiffContent.word_diff_ranges("func foo.bar()", "func fooBar()")
         # ".bar()" → "Bar()": only the changed sub-range highlighted.
         assert del_r == [(5, 12)]  # "foo.bar"
         assert add_r == [(5, 11)]  # "fooBar"
 
     def test_camelCase_not_split(self):
         """Word characters [a-zA-Z0-9_] stay together."""
-        del_r, add_r = DiffViewer._word_diff_ranges("fooBar", "fooBaz")
+        del_r, add_r = DiffContent.word_diff_ranges("fooBar", "fooBaz")
         assert del_r == [(0, 6)]
         assert add_r == [(0, 6)]
 
     def test_multiple_punctuation_changes(self):
-        del_r, add_r = DiffViewer._word_diff_ranges(
+        del_r, add_r = DiffContent.word_diff_ranges(
             "x = a + b",
             "x = a - b",
         )
@@ -66,18 +67,18 @@ class TestRangesToSegments:
     """Convert diff ranges into (text, kind, width) segments."""
 
     def test_no_ranges_all_unchanged(self):
-        segs = DiffViewer._ranges_to_segments("hello world", [], "del")
+        segs = DiffContent.ranges_to_segments("hello world", [], "del")
         assert segs == [("hello world", None, 11)]
 
     def test_single_delete_middle(self):
-        segs = DiffViewer._ranges_to_segments("hello old world", [(6, 9)], "del")
+        segs = DiffContent.ranges_to_segments("hello old world", [(6, 9)], "del")
         assert len(segs) == 3
         assert segs[0] == ("hello ", None, 6)
         assert segs[1] == ("old", "del", 3)
         assert segs[2] == (" world", None, 6)
 
     def test_single_add_middle(self):
-        segs = DiffViewer._ranges_to_segments("hello new world", [(6, 9)], "add")
+        segs = DiffContent.ranges_to_segments("hello new world", [(6, 9)], "add")
         assert segs[1] == ("new", "add", 3)
 
 
@@ -170,7 +171,7 @@ class TestPreTokenizeWithWordDiff:
                 (" baz", None, 4),
             ]
         ]
-        tokens = DiffViewer._pre_tokenize_with(
+        tokens = DiffContent.pre_tokenize_with(
             content, ["plain"], [None], tokenizer, segments
         )
 
@@ -189,7 +190,7 @@ class TestPreTokenizeWithWordDiff:
         segments: list[list[tuple[str, str | None, int]]] = [
             [("foo ", None, 4), ("bar", "del", 3)]
         ]
-        tokens = DiffViewer._pre_tokenize_with(
+        tokens = DiffContent.pre_tokenize_with(
             content, ["plain"], [None], tokenizer, segments
         )
 

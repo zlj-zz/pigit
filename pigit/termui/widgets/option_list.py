@@ -1,6 +1,6 @@
 """
-Module: pigit/termui/widgets/item_list.py
-Description: List selector widget with cursor and scroll viewport.
+Module: pigit/termui/widgets/option_list.py
+Description: Option list widget with cursor, selection, and scroll viewport.
 Author: Zev
 Date: 2026-05-16
 """
@@ -14,11 +14,11 @@ import logging
 
 from .. import keys, palette
 from ..theme import get_theme
-from ..component import Component, ComponentError
+from ..component import Component, ComponentError, is_on_visible_paint_path
 from ..mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
 from ..segment import Segment
-from ..surface import Surface, _Subsurface
+from ..surface import Surface
 from ..reactive import Signal
 from ..types import EVT_SELECTION_CHANGED
 from ..wcwidth_table import truncate_by_width, wcswidth
@@ -26,10 +26,20 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 _logger = logging.getLogger(__name__)
 
 
-class ItemList(Component):
+class OptionList(Component):
+    """Navigable option list with cursor, selection, and scroll viewport.
+
+    Optional init-only ``header`` / ``footer`` Component slots are fitted chrome
+    bands. A slot may define ``chrome_band_height(width, panel_height) -> int``
+    (all-or-nothing; default want is 1). Fitted heights live in ``_header_h`` /
+    ``_footer_h``. Slots set ``parent`` but are **not** in ``children``. When
+    using slots, override :meth:`describe_row`, not :meth:`paint`.
+    """
+
     CURSOR: str = "→"
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
+    _DEFAULT_BAND_HEIGHT = 1
 
     def __init__(
         self,
@@ -43,6 +53,8 @@ class ItemList(Component):
         lazy_load: bool = False,
         on_search_changed: Callable[[], None] | None = None,
         id: str | None = None,
+        header: Component | None = None,
+        footer: Component | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         if len(self.CURSOR) > 1:
@@ -75,12 +87,72 @@ class ItemList(Component):
         self._on_search_changed = on_search_changed
         self._source_items: list[Any] = []
         self._text_of: Callable[[Any], str] | None = None
+        self._header = header
+        self._footer = footer
+        self._header_h = 0
+        self._footer_h = 0
+        self._chrome_size: tuple[int, int] | None = None
+        if header is not None:
+            header.parent = self
+        if footer is not None:
+            footer.parent = self
+        # Slots are owned chrome, not layout children (avoids focus/layout walks).
+        self._sync_chrome_bands()
+
+    def _sync_chrome_bands(self) -> None:
+        """Recompute fitted band heights from the current ``_size`` if needed."""
+        if self._chrome_size == self._size:
+            return
+        self._chrome_size = self._size
+        self._apply_chrome_bands(self._size[0], self._size[1])
+
+    def invalidate_chrome_bands(self) -> None:
+        """Force the next sync to refit bands (e.g. after a slot height policy change)."""
+        self._chrome_size = None
+        self._sync_chrome_bands()
+
+    @staticmethod
+    def _slot_want_height(slot: Component, width: int, panel_height: int) -> int:
+        """Return how many rows ``slot`` wants; default one row."""
+        probe = getattr(slot, "chrome_band_height", None)
+        if callable(probe):
+            want = probe(width, panel_height)
+            if isinstance(want, int):
+                return max(0, want)
+        return OptionList._DEFAULT_BAND_HEIGHT
+
+    def _apply_chrome_bands(self, width: int, height: int) -> None:
+        """Fit chrome into ``height`` (all-or-nothing per slot) and set band heights.
+
+        Header is preferred when both slots compete for remaining space.
+        """
+        remaining = max(0, height)
+        self._header_h = self._fit_slot(self._header, width, height, remaining)
+        remaining -= self._header_h
+        self._footer_h = self._fit_slot(self._footer, width, height, remaining)
+
+    def _fit_slot(
+        self,
+        slot: Component | None,
+        width: int,
+        panel_height: int,
+        remaining: int,
+    ) -> int:
+        """Resize ``slot`` when its full wanted height fits; otherwise height 0."""
+        if slot is None or remaining <= 0:
+            return 0
+        want = self._slot_want_height(slot, width, panel_height)
+        if want <= 0 or want > remaining:
+            return 0
+        slot.resize((width, want))
+        return want
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Resize the selector and refresh content if activated or not lazy."""
+        """Resize the selector and refresh content if mounted or not lazy."""
         self._size = size
+        self._sync_chrome_bands()
         if self._lazy_load:
-            if self.is_activated():
+            if self.is_mounted():
                 self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
@@ -92,8 +164,9 @@ class ItemList(Component):
 
     @property
     def visible_row_count(self) -> int:
-        """Viewport height in rows (how many list lines are painted per frame)."""
-        return self._size[1]
+        """List viewport height (panel height minus chrome bands)."""
+        self._sync_chrome_bands()
+        return max(0, self._size[1] - self._header_h - self._footer_h)
 
     @property
     def viewport_start(self) -> int:
@@ -184,7 +257,7 @@ class ItemList(Component):
             self._on_search_changed()
         self._request_render()
 
-    def _draw_search_bar(self, surface: Surface | _Subsurface) -> None:
+    def _draw_search_bar(self, surface: Surface) -> None:
         """Draw the search/filter bar on the bottom row of ``surface``."""
         if not self._search_query and not self._search_active:
             return
@@ -348,12 +421,16 @@ class ItemList(Component):
         self._request_render()
 
     def _request_render(self) -> None:
-        """Request a render if this component is currently activated."""
-        activated = self.is_activated()
+        """Request a render when mounted and on the visible paint path."""
+        mounted = self.is_mounted()
+        on_path = is_on_visible_paint_path(self)
         _logger.debug(
-            "[RENDER] %s._request_render activated=%s", type(self).__name__, activated
+            "[RENDER] %s._request_render mounted=%s on_path=%s",
+            type(self).__name__,
+            mounted,
+            on_path,
         )
-        if activated:
+        if mounted and on_path:
             request_render()
 
     @property
@@ -374,8 +451,28 @@ class ItemList(Component):
     def _r_start(self, value: int) -> None:
         self._r_start_sig.set(value)
 
+    def mount(self) -> None:
+        """Activate the list and any chrome slots."""
+        super().mount()
+        if self._header is not None:
+            self._header.mount()
+        if self._footer is not None:
+            self._footer.mount()
+
+    def unmount(self) -> None:
+        """Unmount chrome slots then the list."""
+        if self._header is not None:
+            self._header.unmount()
+        if self._footer is not None:
+            self._footer.unmount()
+        super().unmount()
+
     def destroy(self) -> None:
-        """Unsubscribe from signals and tear down."""
+        """Tear down chrome slots, unsubscribe signals, then destroy."""
+        if self._header is not None:
+            self._header.destroy()
+        if self._footer is not None:
+            self._footer.destroy()
         for unsub in self._unsubs:
             unsub()
         super().destroy()
@@ -387,8 +484,35 @@ class ItemList(Component):
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
-        """Viewport loop — delegates to describe_row for each visible item."""
+    def paint(self, surface: Surface) -> None:
+        """Paint chrome bands, then the list body (rows / empty / search)."""
+        self._sync_chrome_bands()
+        alloc_w, alloc_h = self._size
+        w = min(surface.width, alloc_w)
+        h = min(surface.height, alloc_h)
+        if w <= 0 or h <= 0:
+            return
+        # Draw only inside the allocated panel even if ``surface`` is taller.
+        panel = (
+            surface
+            if w == surface.width and h == surface.height
+            else surface.subsurface(0, 0, w, h)
+        )
+        if self._header_h and self._header is not None:
+            self._header.paint(panel.subsurface(0, 0, w, self._header_h))
+        list_h = min(
+            self.visible_row_count, max(0, h - self._header_h - self._footer_h)
+        )
+        if list_h > 0:
+            body = panel.subsurface(self._header_h, 0, w, list_h)
+            self._paint_list_body(body)
+        if self._footer_h and self._footer is not None:
+            self._footer.paint(
+                panel.subsurface(self._header_h + list_h, 0, w, self._footer_h)
+            )
+
+    def _paint_list_body(self, surface: Surface) -> None:
+        """Viewport loop, empty-state, and search bar on the list band only."""
         if not self.content:
             if self.empty_state is not None:
                 self._render_empty_state(surface)
@@ -415,7 +539,7 @@ class ItemList(Component):
         if self._search_query or self._search_active:
             self._draw_search_bar(surface)
 
-    def _render_empty_state(self, surface: Surface | _Subsurface) -> None:
+    def _render_empty_state(self, surface: Surface) -> None:
         """Render empty-state segments centered on the surface."""
         w = surface.width
         h = surface.height
@@ -493,7 +617,7 @@ class ItemList(Component):
 
     def _draw_row_layout(
         self,
-        surface: Surface | _Subsurface,
+        surface: Surface,
         row: int,
         left: Sequence[Segment],
         main: Sequence[Segment] | None,
@@ -661,17 +785,72 @@ class ItemList(Component):
         self._notify_change()
 
     def handle_mouse(self, event: MouseEvent) -> bool:
-        """Handle a mouse click (select row) or wheel (scroll) at local coords."""
+        """Handle click/wheel; chrome bands get first chance, then list scroll/select."""
+        self._sync_chrome_bands()
         if event.kind is not MouseKind.PRESS:
             return False
-        if event.button is MouseButton.WHEEL_UP:
-            self.previous()
-            return True
-        if event.button is MouseButton.WHEEL_DOWN:
-            self.next()
-            return True
+        row0 = event.row - 1
+        list_h = self.visible_row_count
+        in_header = bool(self._header_h and row0 < self._header_h)
+        in_footer = bool(self._footer_h and row0 >= self._header_h + list_h)
+
+        if event.button in (
+            MouseButton.WHEEL_UP,
+            MouseButton.WHEEL_DOWN,
+            MouseButton.WHEEL_LEFT,
+            MouseButton.WHEEL_RIGHT,
+        ):
+            if in_header and self._header is not None:
+                if self._header.handle_mouse(event):
+                    return True
+            if in_footer and self._footer is not None:
+                local = self._mouse_with_row(
+                    event, event.row - (self._header_h + list_h)
+                )
+                if self._footer.handle_mouse(local):
+                    return True
+            if event.button is MouseButton.WHEEL_UP:
+                self.previous()
+                return True
+            if event.button is MouseButton.WHEEL_DOWN:
+                self.next()
+                return True
+            return False
+
         if event.button is not MouseButton.LEFT:
             return False
+        if in_header:
+            if self._header is not None:
+                self._header.handle_mouse(event)
+            return True
+        if in_footer:
+            if self._footer is not None:
+                self._footer.handle_mouse(
+                    self._mouse_with_row(event, event.row - (self._header_h + list_h))
+                )
+            return True
+        if row0 < self._header_h or row0 >= self._header_h + list_h:
+            return False
+        return self._handle_mouse_list(
+            self._mouse_with_row(event, event.row - self._header_h)
+        )
+
+    @staticmethod
+    def _mouse_with_row(event: MouseEvent, row: int) -> MouseEvent:
+        """Copy ``event`` with a remapped 1-based row."""
+        return MouseEvent(
+            col=event.col,
+            row=row,
+            button=event.button,
+            kind=event.kind,
+            shift=event.shift,
+            alt=event.alt,
+            ctrl=event.ctrl,
+            motion=event.motion,
+        )
+
+    def _handle_mouse_list(self, event: MouseEvent) -> bool:
+        """Select a row from list-local mouse coordinates."""
         row0 = event.row - 1
         if row0 < 0 or row0 >= self.visible_row_count:
             return False

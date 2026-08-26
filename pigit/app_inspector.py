@@ -70,8 +70,8 @@ class InspectorSheet(Component):
         super().resize(size)
         self._browser.resize(size)
 
-    def _render_surface(self, surface: Surface) -> None:
-        self._browser._render_surface(surface)
+    def paint(self, surface: Surface) -> None:
+        self._browser.paint(surface)
 
     @bind_action("next", "j", "down", desc="Scroll down")
     def scroll_down(self) -> None:
@@ -111,10 +111,18 @@ def _plain(text: str, fg: tuple[int, int, int] = THEME.fg_primary) -> list[Segme
 
 def _last_value(last: str) -> list[Segment]:
     sha, sep, rest = last.partition(" ")
-    segs = [Segment(sha, fg=THEME.fg_dim)]
+    segs = [Segment(sha, fg=THEME.fg_muted)]
     if sep:
         segs.append(Segment(sep + rest, fg=THEME.fg_primary))
     return segs
+
+
+def _tracking_count(value: str, *, kind: str) -> list[Segment]:
+    """Color ahead/behind counts; unknown or zero stay muted."""
+    if value in ("", "?", "0"):
+        return _plain(value, THEME.fg_muted)
+    fg = THEME.fg_success if kind == "ahead" else THEME.fg_warning
+    return _plain(value, fg)
 
 
 def _numstat_rows(
@@ -133,7 +141,7 @@ def _numstat_rows(
     for name, add, delete in files:
         rows.append(
             [
-                Segment("  ", fg=THEME.fg_dim),
+                Segment("  ", fg=THEME.fg_muted),
                 Segment(name, fg=THEME.fg_primary),
                 Segment(" ", fg=THEME.fg_muted),
                 Segment(f"+{add}", fg=THEME.fg_success),
@@ -148,14 +156,14 @@ def _format_file(data: FileSnapshot) -> list[list[Segment]]:
     rows = [
         _title("file", data.identity),
         _labeled("path", _plain(data.path)),
-        _labeled("blobs", _plain(data.blobs)),
+        _labeled("blobs", _plain(data.blobs, THEME.fg_muted)),
     ]
     if data.stages:
-        rows.append(_labeled("stages", _plain(data.stages)))
+        rows.append(_labeled("stages", _plain(data.stages, THEME.fg_warning)))
     if data.size != "?":
         rows.append(_labeled("size", _plain(data.size)))
     if data.mode != "?":
-        rows.append(_labeled("mode", _plain(data.mode)))
+        rows.append(_labeled("mode", _plain(data.mode, THEME.fg_muted)))
     if data.last:
         rows.append(_labeled("last", _last_value(data.last)))
     return rows
@@ -167,37 +175,40 @@ def _format_branch(data: BranchSnapshot) -> list[list[Segment]]:
     else:
         contained = "yes" if data.contained else "no"
         contained_fg = THEME.fg_success if data.contained else THEME.fg_danger
-    current_fg = THEME.fg_success if data.current == "yes" else THEME.fg_primary
+    current_fg = THEME.fg_local_branch if data.current == "yes" else THEME.fg_primary
     rows = [
         _title("branch", data.identity),
-        _labeled("tip", _plain(data.tip, THEME.fg_dim)),
+        _labeled("tip", _plain(data.tip, THEME.fg_muted)),
     ]
     if data.created:
-        rows.append(_labeled("created", _plain(data.created)))
+        rows.append(_labeled("created", _plain(data.created, THEME.fg_muted)))
     rows.append(_labeled("current", _plain(data.current, current_fg)))
-    rows.append(_labeled("upstream", _plain(data.upstream)))
-    rows.append(_labeled("ahead", _plain(data.ahead)))
-    rows.append(_labeled("behind", _plain(data.behind)))
+    rows.append(_labeled("upstream", _plain(data.upstream, THEME.fg_muted)))
+    rows.append(_labeled("ahead", _tracking_count(data.ahead, kind="ahead")))
+    rows.append(_labeled("behind", _tracking_count(data.behind, kind="behind")))
     if data.recent_msg != "?":
         rows.append(_labeled("recent", _plain(data.recent_msg)))
     if data.recent_author != "?":
-        rows.append(_labeled("by", _plain(data.recent_author)))
+        rows.append(_labeled("by", _plain(data.recent_author, THEME.fg_muted)))
     rows.append(_labeled("contained", _plain(contained, contained_fg)))
     return rows
 
 
 def _format_commit(data: CommitSnapshot) -> list[list[Segment]]:
     parents = " ".join(data.parents) if data.parents else "(root)"
-    status_fg = THEME.fg_success if data.status == "pushed" else THEME.fg_warning
+    if data.status == "pushed":
+        status_fg = THEME.fg_success
+    else:
+        status_fg = THEME.fg_unpushed_commit
     rows = [
         _title("commit", data.identity),
         _labeled("msg", _plain(data.msg)),
         _labeled("author", _plain(data.author)),
-        _labeled("when", _plain(data.when)),
+        _labeled("when", _plain(data.when, THEME.fg_muted)),
         _labeled("status", _plain(data.status, status_fg)),
-        _labeled("tags", _plain(data.tags)),
-        _labeled("sha", _plain(data.sha, THEME.fg_dim)),
-        _labeled("parents", _plain(parents)),
+        _labeled("tags", _plain(data.tags, THEME.fg_tag)),
+        _labeled("sha", _plain(data.sha, THEME.fg_muted)),
+        _labeled("parents", _plain(parents, THEME.fg_muted)),
     ]
     rows.extend(_numstat_rows(data.files, data.total_add, data.total_del))
     return rows

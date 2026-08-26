@@ -10,9 +10,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
-from .. import keys
+from .. import keys, palette
 from ..theme import get_theme
 from ..component import Component
+from ..surface import Surface
 from ..types import OverlayDispatchResult
 from ..wcwidth_table import truncate_by_width, wcswidth
 from .input_line import InputLine
@@ -138,7 +139,7 @@ class CommandPalette(Component):
         self._scroll = 0
 
     def close(self) -> None:
-        """Deactivate the palette and invoke the dismiss callback."""
+        """Close the palette and invoke the dismiss callback."""
         self._active = False
         self._input_line.clear()
         self._matched = []
@@ -233,7 +234,7 @@ class CommandPalette(Component):
         self._selected = 0
         self._scroll = 0
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface: Surface) -> None:
         if not self._active:
             return
         theme = get_theme()
@@ -313,7 +314,9 @@ class CommandPalette(Component):
         """Draw one catalog row; edge rows may show a scroll cue on the right."""
         theme = get_theme()
         bg = theme.bg_active if selected else None
-        fg = theme.fg_primary if selected else theme.fg_muted
+        name_fg = theme.fg_primary if selected else theme.fg_muted
+        name_flags = palette.STYLE_BOLD if selected else 0
+        desc_fg = theme.fg_muted if selected else theme.fg_dim
         name = f"  {item.id}"
         desc = f"  {item.desc}" if item.desc else ""
         cue = ""
@@ -336,8 +339,8 @@ class CommandPalette(Component):
                 desc = truncate_by_width(desc, avail_for_desc - 1) + "…"
         if selected and width > 0:
             surface.fill_rect_rgb(row, 0, width, 1, bg)
-        surface.draw_text_rgb(row, 0, name, fg=fg, bg=bg)
+        surface.draw_text_rgb(row, 0, name, fg=name_fg, bg=bg, style_flags=name_flags)
         if desc:
-            surface.draw_text_rgb(row, name_w, desc, fg=theme.fg_dim, bg=bg)
+            surface.draw_text_rgb(row, name_w, desc, fg=desc_fg, bg=bg)
         if cue:
             surface.draw_text_rgb(row, width - cue_w, cue, fg=theme.fg_dim, bg=bg)

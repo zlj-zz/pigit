@@ -17,7 +17,7 @@ from ..theme import get_theme
 from .line_text_browser import LineTextBrowser
 
 if TYPE_CHECKING:
-    from ..surface import Surface, _Subsurface
+    from ..surface import Surface
 
 
 class BorderedBrowser(Component):
@@ -43,15 +43,19 @@ class BorderedBrowser(Component):
     def set_content(self, rows: list[str] | list[list[Segment]]) -> None:
         """Replace scrollable content and reset scroll to the top."""
         if rows and isinstance(rows[0], list):
-            styled: list[list[Segment]] = rows
-            self._browser._rows = styled
-            self._browser._content = [
-                "".join(seg.text for seg in row) for row in styled
-            ]
-        else:
-            self._browser._rows = None
-            self._browser._content = list(rows) if rows else []
-        self._browser._i = 0
+            styled: list[list[Segment]] = []
+            for row in rows:
+                if not isinstance(row, list):
+                    raise TypeError("mixed plain/segment content is not supported")
+                styled.append(row)
+            self._browser.set_segment_rows(styled)
+            return
+        plain: list[str] = []
+        for line in rows:
+            if not isinstance(line, str):
+                raise TypeError("mixed plain/segment content is not supported")
+            plain.append(line)
+        self._browser.set_plain_lines(plain)
 
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the inner browser up."""
@@ -65,13 +69,13 @@ class BorderedBrowser(Component):
         """Delegate wheel events to the inner browser."""
         return self._browser.handle_mouse(event)
 
-    def activate(self) -> None:
-        super().activate()
-        self._browser.activate()
+    def mount(self) -> None:
+        super().mount()
+        self._browser.mount()
 
-    def deactivate(self) -> None:
-        self._browser.deactivate()
-        super().deactivate()
+    def unmount(self) -> None:
+        self._browser.unmount()
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         """Size the border frame and inner browser."""
@@ -83,7 +87,7 @@ class BorderedBrowser(Component):
         self._browser.y = 2
         self._browser.resize((inner_w, inner_h))
 
-    def _render_surface(self, surface: Surface | _Subsurface) -> None:
+    def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
         if w < 2 or h < 2:

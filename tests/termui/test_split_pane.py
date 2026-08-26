@@ -18,23 +18,23 @@ from pigit.termui.containers.split_pane import SplitPane
 class _Leaf(Component):
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
-        self.activated = False
-        self.deactivated = False
+        self.mounted = False
+        self.unmounted = False
         self.sizes: list[tuple[int, int]] = []
 
-    def activate(self) -> None:
-        super().activate()
-        self.activated = True
+    def mount(self) -> None:
+        super().mount()
+        self.mounted = True
 
-    def deactivate(self) -> None:
-        self.deactivated = True
-        super().deactivate()
+    def unmount(self) -> None:
+        self.unmounted = True
+        super().unmount()
 
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size
         self.sizes.append(size)
 
-    def _render_surface(self, surface) -> None:
+    def paint(self, surface) -> None:
         pass
 
 
@@ -48,9 +48,14 @@ def detail() -> _Leaf:
     return _Leaf(id="detail")
 
 
+def test_presentation_child_is_master(master: _Leaf, detail: _Leaf) -> None:
+    pane = SplitPane(master, detail, id="body")
+    assert pane.presentation_child is master
+
+
 def test_master_only_when_cols_below_breakpoint(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((100, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(100)
@@ -60,31 +65,31 @@ def test_master_only_when_cols_below_breakpoint(master: _Leaf, detail: _Leaf) ->
 
 def test_attaches_detail_on_wide_terminal(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
     assert [c.id for c in pane.children] == ["master", "detail"]
-    assert detail.activated is True
+    assert detail.mounted is True
     assert master.sizes[-1][0] == max(50, int(140 * 0.35))
     assert detail.sizes[-1][0] == 140 - master.sizes[-1][0]
 
 
 def test_detaches_when_detail_not_wanted(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
     pane.set_detail_wanted(False)
     pane.apply_terminal_width(140)
     assert [c.id for c in pane.children] == ["master"]
-    assert detail.deactivated is True
+    assert detail.unmounted is True
 
 
 def test_detaches_when_detail_is_none(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
@@ -95,7 +100,7 @@ def test_detaches_when_detail_is_none(master: _Leaf, detail: _Leaf) -> None:
 
 def test_toggle_detail_flips_wanted(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
@@ -108,22 +113,22 @@ def test_toggle_detail_flips_wanted(master: _Leaf, detail: _Leaf) -> None:
 def test_swapping_detail_detaches_old(master: _Leaf, detail: _Leaf) -> None:
     other = _Leaf(id="other")
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 20))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
     pane.set_detail(other)
     pane.apply_terminal_width(140)
     assert [c.id for c in pane.children] == ["master", "other"]
-    assert detail.deactivated is True
-    assert other.activated is True
+    assert detail.unmounted is True
+    assert other.mounted is True
 
 
 def test_renders_both_children(master: _Leaf, detail: _Leaf) -> None:
     pane = SplitPane(master, detail, id="body")
-    pane.activate()
+    pane.mount()
     pane.resize((140, 10))
     pane.set_detail_wanted(True)
     pane.apply_terminal_width(140)
     surface = Surface(140, 10)
-    pane._render_surface(surface)
+    pane.paint(surface)

@@ -24,7 +24,8 @@ class Theme:
         bg_active: Active selection background.
         fg_primary: Primary foreground text.
         fg_muted: Muted foreground text.
-        fg_dim: Dimmed foreground text.
+        fg_dim: Dimmed foreground text (decor / chrome rules).
+        fg_inactive: Structural text when a MODAL/SHEET steals presentation.
         fg_success: Success state foreground.
         fg_warning: Warning state foreground.
         fg_danger: Danger state foreground.
@@ -51,6 +52,7 @@ class Theme:
     fg_primary: tuple[int, int, int] = palette.ALMOST_WHITE
     fg_muted: tuple[int, int, int] = palette.MUTED
     fg_dim: tuple[int, int, int] = palette.DIM
+    fg_inactive: tuple[int, int, int] = palette.SLATE
     fg_success: tuple[int, int, int] = palette.GREEN
     fg_warning: tuple[int, int, int] = palette.YELLOW
     fg_danger: tuple[int, int, int] = palette.RED
