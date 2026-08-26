@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from pigit.termui.component import Component, ComponentError
 from pigit.termui.containers import TabView
 from pigit.termui.theme import Theme, get_theme, set_theme
-from pigit.termui.widgets import OptionList, LineTextBrowser
+from pigit.termui.widgets import OptionList, TextBrowser
 from pigit.termui.types import (
     EventType,
     EVT_GOTO,
@@ -192,20 +192,20 @@ class TestTabView:
         assert "unsupported" in caplog.text or "not found" in caplog.text
 
 
-class MockLineTextBrowser(LineTextBrowser):
+class MockTextBrowser(TextBrowser):
     pass
 
 
-class TestLineTextBrowser:
+class TestTextBrowser:
     def test_visible_rows_caches_segment_rows(self):
-        browser = LineTextBrowser(content=["a", "b"], size=(10, 2), bg=None)
+        browser = TextBrowser(content=["a", "b"], size=(10, 2), bg=None)
         first = browser._visible_rows()
         second = browser._visible_rows()
         assert first is second
         assert first[0][0].text == "a"
 
     def test_visible_rows_rebuilds_when_theme_changes(self):
-        browser = LineTextBrowser(content=["a"], size=(10, 1), bg=None)
+        browser = TextBrowser(content=["a"], size=(10, 1), bg=None)
         before = browser._visible_rows()
         old = get_theme()
         set_theme(Theme(fg_primary=(1, 2, 3), bg_chrome=(4, 5, 6)))
@@ -237,11 +237,11 @@ class TestLineTextBrowser:
             ),  # ID: Test-3, edge case with no size and content
         ],
     )
-    def test_LineTextBrowser_init(
+    def test_TextBrowser_init(
         self, mocker, x, y, size, content, expected_position, expected_content
     ):
         # Act
-        browser = MockLineTextBrowser(x, y, size, content)
+        browser = MockTextBrowser(x, y, size, content)
 
         # Assert
         assert browser.x == expected_position[0]
@@ -264,7 +264,7 @@ class TestLineTextBrowser:
     )
     def test_resize(self, mocker, initial_size, new_size, expected_size):
         # Arrange
-        browser = MockLineTextBrowser(size=initial_size)
+        browser = MockTextBrowser(size=initial_size)
         mocker.patch.object(browser, "refresh")
 
         # Act
@@ -286,7 +286,7 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        browser = MockLineTextBrowser(content=content, size=[0, 1])
+        browser = MockTextBrowser(content=content, size=[0, 1])
         browser._i = initial_index
 
         # Act
@@ -307,7 +307,7 @@ class TestLineTextBrowser:
         self, mocker, content, initial_index, scroll_lines, expected_index
     ):
         # Arrange
-        browser = MockLineTextBrowser(content=content)
+        browser = MockTextBrowser(content=content)
         browser._i = initial_index
 
         # Act
@@ -319,19 +319,19 @@ class TestLineTextBrowser:
     def test_render_no_content(self):
         from pigit.termui.surface import Surface
 
-        browser = MockLineTextBrowser(size=(10, 2))
+        browser = MockTextBrowser(size=(10, 2))
         s = Surface(10, 2)
         browser.paint(s)
 
     def test_scroll_down_no_content(self):
-        browser = MockLineTextBrowser(size=(10, 2))
+        browser = MockTextBrowser(size=(10, 2))
         browser.scroll_down(1)
         assert browser._i == 0
 
     def test_render_transparent_bg_does_not_paint_cell_background(self):
         from pigit.termui.surface import Surface
 
-        browser = MockLineTextBrowser(content=["hi"], size=(10, 2), bg=None)
+        browser = MockTextBrowser(content=["hi"], size=(10, 2), bg=None)
         surface = Surface(10, 2)
         surface.draw_text_rgb(0, 0, "XXXX", bg=(9, 9, 9))
         browser.paint(surface)
@@ -345,7 +345,7 @@ class TestLineTextBrowser:
         from pigit.termui.surface import Surface
 
         fg = (1, 2, 3)
-        browser = MockLineTextBrowser(
+        browser = MockTextBrowser(
             content=[[Segment("ab", fg=fg)]], size=(10, 2), bg=None
         )
         surface = Surface(10, 2)

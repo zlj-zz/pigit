@@ -31,7 +31,9 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.syntax import SyntaxTokenizer
-from pigit.termui.widgets import AlertDialog, LineTextBrowser
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+from pigit.termui.primitives.frame import BoxFrame
+from pigit.termui.widgets import AlertDialog
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
@@ -64,7 +66,7 @@ _Hunk = Hunk
 _RenderLine = RenderLine
 
 
-class DiffViewer(LineTextBrowser):
+class DiffViewer(Component):
     """Diff viewer with TrueColor background rendering, line numbers, and heatmap column."""
 
     keymap_namespace = "diff"
@@ -79,6 +81,7 @@ class DiffViewer(LineTextBrowser):
     TAB_WIDTH = DiffContent.TAB_WIDTH
     BORDER_ROWS = 2
     BORDER_COLS = 2
+    WHEEL_SCROLL_LINES = 1
 
     def _main_width(self, available: int) -> int:
         return available - self.LINE_NO_WIDTH - self.DIFF_PREFIX_WIDTH - 1
@@ -91,10 +94,13 @@ class DiffViewer(LineTextBrowser):
         id: str | None = None,
         word_diff: bool = False,
     ) -> None:
-        super().__init__(x, y, size, [], id=id)
-        # LineTextBrowser sets _max_line to full height; adjust for border rows
-        if self._size[1] >= 3:
-            self._max_line = self._size[1] - 2
+        super().__init__(x, y, size, id=id)
+        self._lines: list[str] = []
+        self._line_i = 0
+        self._viewport_rows = max(0, self._size[1] - self.BORDER_ROWS)
+        self._box_title: str = ""
+        self._frame = BoxFrame(0, 0, title=None, fg=THEME.fg_dim)
+        self._sync_frame(self._size[0], self._size[1])
         self._heatmap: list[str] = []
         self._heatmap_colors: list[tuple[int, int, int]] = []
         self._line_numbers: list[str] = []
@@ -135,7 +141,23 @@ class DiffViewer(LineTextBrowser):
         self._cached_path_i = -1
         self._cached_path_hunks_id = -1
         self._cached_path: str | None = None
-        self._box_title: str = ""
+
+    def _max_viewport_i(self) -> int:
+        """Last scroll index that keeps the viewport full (line scroll only)."""
+        return max(0, len(self._lines) - self._viewport_rows)
+
+    def _sync_frame(self, width: int, height: int) -> None:
+        """Keep BoxFrame inner size and title aligned with outer geometry."""
+        self._frame.set_inner_size(
+            max(0, width - self.BORDER_COLS),
+            max(0, height - self.BORDER_ROWS),
+        )
+        self._frame.title = self._box_title or None
+
+    def _draw_frame(self, surface: Surface) -> None:
+        """Draw the bordered chrome for the current surface size."""
+        self._sync_frame(surface.width, surface.height)
+        self._frame.draw(surface, 0, 0)
 
     def _drop_pending_tokenize(self) -> None:
         """Cancel in-flight syntax work and invalidate queued callbacks."""
@@ -154,7 +176,8 @@ class DiffViewer(LineTextBrowser):
         leaves the previous consistent viewer state untouched.
         """
         self._drop_pending_tokenize()
-        self._content = doc.lines
+        self._lines = list(doc.lines)
+        self._line_i = 0
         self._hunks = doc.hunks
         self._hunk_starts = doc.hunk_starts
         self._heatmap = doc.heatmap
@@ -164,7 +187,6 @@ class DiffViewer(LineTextBrowser):
         self._multiline_mask = doc.multiline_mask
         self._word_diff_segments = doc.word_diff_segments
         self._render_tokens = [] if tokens is None else tokens
-        self._i = 0
         self._compute_max_col_offset()
 
     def _tokens_at(
@@ -187,31 +209,34 @@ class DiffViewer(LineTextBrowser):
 
     def _current_file_path(self) -> str | None:
         """Return the file path at the current cursor position in diff mode."""
-        if not self._hunks or not self._content:
+        if not self._hunks or not self._lines:
             return None
         hunks_id = id(self._hunks)
-        if self._cached_path_i == self._i and self._cached_path_hunks_id == hunks_id:
+        if (
+            self._cached_path_i == self._line_i
+            and self._cached_path_hunks_id == hunks_id
+        ):
             return self._cached_path
         target_hunk = None
         for h in self._hunks:
-            if h.start <= self._i < h.end:
+            if h.start <= self._line_i < h.end:
                 target_hunk = h
                 break
         if target_hunk is None:
-            self._cached_path_i = self._i
+            self._cached_path_i = self._line_i
             self._cached_path_hunks_id = hunks_id
             self._cached_path = None
             return None
         header_idx = target_hunk.file_header_start
-        if header_idx >= len(self._content):
-            self._cached_path_i = self._i
+        if header_idx >= len(self._lines):
+            self._cached_path_i = self._line_i
             self._cached_path_hunks_id = hunks_id
             self._cached_path = None
             return None
-        line = self._content[header_idx]
+        line = self._lines[header_idx]
         m = _DIFF_GIT_RE.match(line)
         result = m.group(2).strip('"') if m else None
-        self._cached_path_i = self._i
+        self._cached_path_i = self._line_i
         self._cached_path_hunks_id = hunks_id
         self._cached_path = result
         return result
@@ -234,14 +259,14 @@ class DiffViewer(LineTextBrowser):
             content_w: Available width for the content area.  Derived from
                 the current surface size when omitted.
         """
-        if not self._content:
+        if not self._lines:
             self._max_col_offset = 0
             self._col_offset = 0
             return
         # Widest line after stripping the diff prefix (+/ -/ ).
         max_text_w = max(
             (wcswidth(line) - 1 if line and line[0] in "+- " else wcswidth(line))
-            for line in self._content
+            for line in self._lines
         )
         if content_w is None:
             w = self._size[0] if self._size else 80
@@ -320,12 +345,31 @@ class DiffViewer(LineTextBrowser):
         """Set the optional label drawn on the viewer's own box border."""
         self._box_title = title
 
+    @property
+    def scroll_i(self) -> int:
+        """First visible line index (may exceed clamped viewport when near EOF)."""
+        return self._line_i
+
+    @scroll_i.setter
+    def scroll_i(self, value: int) -> None:
+        self._line_i = max(0, int(value))
+
+    def scroll_up(self, step: int = 1) -> None:
+        """Scroll the diff viewport up."""
+        self._line_i = max(0, self._line_i - step)
+
+    def scroll_down(self, step: int = 1) -> None:
+        """Scroll the diff viewport down (clamped to full viewport)."""
+        if not self._lines:
+            return
+        self._line_i = min(self._line_i + step, self._max_viewport_i())
+
     def get_help_title(self) -> str:
         return "Diff"
 
     def update(self, action: EventType, **data) -> None:
         if action is EVT_GOTO:
-            self.i_cache[self.i_cache_key] = self._i
+            self.i_cache[self.i_cache_key] = self._line_i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
             src = data.get("source")
@@ -348,7 +392,7 @@ class DiffViewer(LineTextBrowser):
                     self.set_content(content)
                 case str():
                     self.set_content(content.splitlines())
-            self._i = self.i_cache.get(self.i_cache_key, 0)
+            self._line_i = self.i_cache.get(self.i_cache_key, 0)
 
     @bind_action("down", "j", desc="Navigate diff lines down", tip="Navigate")
     def _on_j(self) -> None:
@@ -377,18 +421,18 @@ class DiffViewer(LineTextBrowser):
         """Jump to next hunk header (@@ line)."""
         if not self._hunk_starts:
             return
-        pos = bisect.bisect_right(self._hunk_starts, self._i)
+        pos = bisect.bisect_right(self._hunk_starts, self._line_i)
         if pos < len(self._hunk_starts):
-            self._i = self._hunk_starts[pos]
+            self._line_i = self._hunk_starts[pos]
 
     @bind_action("prev_hunk", "[", desc="Jump to previous hunk", tip="Jump hunk")
     def _prev_hunk(self) -> None:
         """Jump to previous hunk header (@@ line)."""
         if not self._hunk_starts:
             return
-        pos = bisect.bisect_left(self._hunk_starts, self._i) - 1
+        pos = bisect.bisect_left(self._hunk_starts, self._line_i) - 1
         if pos >= 0:
-            self._i = self._hunk_starts[pos]
+            self._line_i = self._hunk_starts[pos]
 
     @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
     def _scroll_left(self) -> None:
@@ -519,9 +563,9 @@ class DiffViewer(LineTextBrowser):
         """Save diff state and switch to File History view."""
         # Save BEFORE set_content overwrites everything
         self._saved_diff_state = _DiffStateSnapshot(
-            content=list(self._content),
+            content=list(self._lines),
             diff_type=self._diff_type,
-            scroll_i=self._i,
+            scroll_i=self._line_i,
             come_from=self.come_from,
         )
         self._file_history_path = path
@@ -582,7 +626,7 @@ class DiffViewer(LineTextBrowser):
         if snap is not None:
             self.set_content(snap.content)
             self._diff_type = snap.diff_type
-            self._i = snap.scroll_i
+            self._line_i = snap.scroll_i
             self.come_from = snap.come_from
         self._saved_diff_state = None
 
@@ -599,7 +643,7 @@ class DiffViewer(LineTextBrowser):
     def _scroll_to_hunk(self, idx: int) -> None:
         """Scroll so hunk header is at top of viewport."""
         hunk = self._hunks[idx]
-        self._i = max(0, hunk.start)
+        self._line_i = max(0, hunk.start)
 
     def _run_hunk_action(self, action: str, *, needs_confirm: bool = False) -> None:
         if not self._hunks or self._diff_type is DiffType.COMMIT:
@@ -633,9 +677,9 @@ class DiffViewer(LineTextBrowser):
 
         header_lines: list[str] = []
         for i in range(hunk.file_header_start, hunk.start):
-            header_lines.append(self._content[i])
+            header_lines.append(self._lines[i])
 
-        hunk_lines = [self._content[i] for i in range(hunk.start, hunk.end)]
+        hunk_lines = [self._lines[i] for i in range(hunk.start, hunk.end)]
         return "\n".join(header_lines + hunk_lines) + "\n"
 
     def _patch_cmd_and_msg(
@@ -666,6 +710,18 @@ class DiffViewer(LineTextBrowser):
         """Cancel pending work and clear stuck badge on true unmount."""
         self.pause_background()
         super().unmount()
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Scroll on wheel via the diff viewport."""
+        if event.kind is not MouseKind.PRESS:
+            return False
+        if event.button is MouseButton.WHEEL_UP:
+            self.scroll_up(self.WHEEL_SCROLL_LINES)
+            return True
+        if event.button is MouseButton.WHEEL_DOWN:
+            self.scroll_down(self.WHEEL_SCROLL_LINES)
+            return True
+        return False
 
     def _apply_patch(self, patch: str, action: str) -> None:
         """Apply or reverse-apply a patch in background thread."""
@@ -726,13 +782,11 @@ class DiffViewer(LineTextBrowser):
         self._patch_task.start(_work, _callback)
 
     def resize(self, size: tuple[int, int]) -> None:
-        # Reserve BORDER_ROWS for top/bottom borders
-        self._max_line = max(0, size[1] - self.BORDER_ROWS)
-        # Bypass LineTextBrowser.resize() which would reset _max_line to full height
-        super(LineTextBrowser, self).resize(size)
-        # Recompute horizontal scroll bounds for the new viewport width.
-        content_w = max(0, size[0] - self.BORDER_COLS)
-        self._compute_max_col_offset(content_w=content_w)
+        super().resize(size)
+        inner_w = max(0, size[0] - self.BORDER_COLS)
+        self._viewport_rows = max(0, size[1] - self.BORDER_ROWS)
+        self._sync_frame(size[0], size[1])
+        self._compute_max_col_offset(content_w=inner_w)
 
     def _draw_diff_line(
         self,
@@ -864,7 +918,7 @@ class DiffViewer(LineTextBrowser):
         return f' {self._file_history_path}  @  {short_sha}  "{subject}"  {pos} '
 
     def _render_file_history(self, surface) -> None:
-        if not self._content:
+        if not self._lines:
             return
         w = surface.width
         h = surface.height
@@ -894,17 +948,17 @@ class DiffViewer(LineTextBrowser):
         content_h = h - self.BORDER_ROWS  # rows between top and bottom borders
         content_w = w - self.BORDER_COLS
         main_w = content_w - self.LINE_NO_WIDTH - 1
-        end = min(self._i + content_h, len(self._content))
+        end = min(self._line_i + content_h, len(self._lines))
 
-        for idx in range(self._i, end):
-            row = idx - self._i + 1  # +1 for top border
+        for idx in range(self._line_i, end):
+            row = idx - self._line_i + 1  # +1 for top border
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
             if line_no:
                 surface.draw_text_rgb(row, 1, line_no, fg=THEME.fg_dim)
 
             text_start = 1 + self.LINE_NO_WIDTH + 1
-            line = self._content[idx]
+            line = self._lines[idx]
             tokens = self._tokens_at(idx, line, strip_diff_prefix=False)
             self._draw_tokens(
                 surface,
@@ -928,17 +982,17 @@ class DiffViewer(LineTextBrowser):
             return
 
         main_w = self._main_width(w)
-        end = min(self._i + h, len(self._content))
+        end = min(self._line_i + h, len(self._lines))
 
-        for idx in range(self._i, end):
-            row = idx - self._i
+        for idx in range(self._line_i, end):
+            row = idx - self._line_i
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
             if line_no:
                 surface.draw_text_rgb(row, 0, line_no, fg=THEME.fg_dim)
 
             text_start = self.LINE_NO_WIDTH + 1
-            line = self._content[idx]
+            line = self._lines[idx]
             tokens = self._tokens_at(idx, line, strip_diff_prefix=False)
             self._draw_tokens(
                 surface,
@@ -953,12 +1007,10 @@ class DiffViewer(LineTextBrowser):
         w = surface.width
         h = surface.height
         can_draw_box = w > self.LINE_NO_WIDTH + 3 and h >= self.BORDER_ROWS + 1
-        if not self._content:
+        if not self._lines:
             # Keep chrome when cleared so Preview stays a framed region, not a void.
             if can_draw_box:
-                surface.draw_box_rgb(
-                    0, 0, w, h, fg=THEME.fg_dim, title=self._box_title or None
-                )
+                self._draw_frame(surface)
             return
         if self._file_history_mode:
             self._render_file_history(surface)
@@ -967,19 +1019,19 @@ class DiffViewer(LineTextBrowser):
             self.paint_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim, title=self._box_title or None)
+        self._draw_frame(surface)
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS
         main_w = self._main_width(content_w)
-        end = min(self._i + content_h, len(self._content))
+        end = min(self._line_i + content_h, len(self._lines))
 
-        for idx in range(self._i, end):
-            row = idx - self._i + 1
+        for idx in range(self._line_i, end):
+            row = idx - self._line_i + 1
             self._draw_diff_line(
                 surface,
                 row,
-                self._content[idx],
+                self._lines[idx],
                 idx,
                 x_offset=1,
                 main_w=main_w,
@@ -988,7 +1040,7 @@ class DiffViewer(LineTextBrowser):
                 col_offset=self._col_offset,
             )
 
-        last_content_row = end - self._i
+        last_content_row = end - self._line_i
         blank_count = h - 1 - (last_content_row + 1)
         if blank_count > 0:
             surface.fill_rect_rgb(
@@ -1042,14 +1094,14 @@ class DiffViewer(LineTextBrowser):
             return
 
         main_w = self._main_width(w)
-        end = min(self._i + h, len(self._content))
+        end = min(self._line_i + h, len(self._lines))
 
-        for idx in range(self._i, end):
-            row = idx - self._i
+        for idx in range(self._line_i, end):
+            row = idx - self._line_i
             self._draw_diff_line(
                 surface,
                 row,
-                self._content[idx],
+                self._lines[idx],
                 idx,
                 x_offset=0,
                 main_w=main_w,

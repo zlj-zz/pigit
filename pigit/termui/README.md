@@ -98,7 +98,7 @@ Prefer `keys.KEY_*` constants for special keys. Full Git TUI wiring lives in
 ```python
 from pigit.termui.widgets import (
     AlertDialog,
-    BorderedBrowser,
+    BorderedTextBrowser,
     CheckList,
     CommandPalette,
     Footer,
@@ -107,7 +107,7 @@ from pigit.termui.widgets import (
     HelpPanel,
     InputLine,
     OptionList,
-    LineTextBrowser,
+    TextBrowser,
     LintBar,
     Popup,
     Sheet,

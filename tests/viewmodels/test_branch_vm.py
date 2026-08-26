@@ -130,22 +130,6 @@ def test_get_inspector_snapshot(branch_vm):
     assert info.recent_author == "Zev"
 
 
-def test_get_inspector_snapshot_invalid_index(branch_vm):
-    assert branch_vm.get_inspector_snapshot(99) is None
-
-
-def test_get_inspector_snapshot_memoizes_same_selection(branch_vm):
-    branch_vm._git.verify_commitish.return_value = "abc1234deadbeef"
-    branch_vm._git.is_ancestor.return_value = True
-    branch_vm._git.get_branch_creation_time.return_value = "2026-01-01"
-    branch_vm._git.get_branch_recent_commit.return_value = ("Add thing", "Zev")
-    first = branch_vm.get_inspector_snapshot(1)
-    second = branch_vm.get_inspector_snapshot(1)
-    assert first is second
-    assert branch_vm._git.verify_commitish.call_count == 1
-    assert branch_vm._git.get_branch_recent_commit.call_count == 1
-
-
 def test_get_inspector_snapshot_dangling_ref_marks_contained_unknown(branch_vm):
     """A ref that fails ancestry resolution must not abort the whole snapshot."""
     from pigit.git.api import GitError

@@ -1,6 +1,6 @@
 """
-Module: pigit/termui/widgets/line_text_browser.py
-Description: Simple scrollable text browser widget.
+Module: pigit/termui/widgets/text_browser.py
+Description: Scrollable text browser for plain or segment rows.
 Author: Zev
 Date: 2026-05-16
 """
@@ -23,7 +23,7 @@ class _ThemeBg:
 _USE_THEME_BG = _ThemeBg()
 
 
-class LineTextBrowser(Component):
+class TextBrowser(Component):
     """Scrollable browser for plain strings or pre-styled segment rows."""
 
     WHEEL_SCROLL_LINES = 1
@@ -66,19 +66,52 @@ class LineTextBrowser(Component):
             lines.append(line)
         self.set_plain_lines(lines)
 
-    def set_plain_lines(self, lines: list[str]) -> None:
-        """Replace content with plain strings; clear any segment-row override."""
+    def _clamp_scroll_i(self, value: int) -> int:
+        """Clamp scroll index to ``[0, max(0, len(lines) - viewport_rows)]``."""
+        max_i = max(0, len(self._content) - self._max_line)
+        return max(0, min(int(value), max_i))
+
+    @property
+    def lines(self) -> list[str]:
+        """Plain-text lines (segment rows contribute joined text)."""
+        return self._content
+
+    @property
+    def scroll_i(self) -> int:
+        """First visible line index (clamped to viewport)."""
+        return self._i
+
+    @scroll_i.setter
+    def scroll_i(self, value: int) -> None:
+        self._i = self._clamp_scroll_i(value)
+
+    @property
+    def viewport_rows(self) -> int:
+        """How many lines fit in the current size."""
+        return self._max_line
+
+    def replace_lines(
+        self,
+        lines: list[str],
+        *,
+        scroll_i: int | None = None,
+    ) -> None:
+        """Replace plain lines; default scroll 0; optional restore then clamp."""
         self._rows = None
         self._content = list(lines)
         self._cache_rows = None
-        self._i = 0
+        self._i = self._clamp_scroll_i(0 if scroll_i is None else scroll_i)
+
+    def set_plain_lines(self, lines: list[str]) -> None:
+        """Replace content with plain strings; clear any segment-row override."""
+        self.replace_lines(lines)
 
     def set_segment_rows(self, rows: list[list[Segment]]) -> None:
         """Replace content with pre-styled segment rows."""
         self._rows = rows
         self._content = ["".join(seg.text for seg in row) for row in rows]
         self._cache_rows = None
-        self._i = 0
+        self._i = self._clamp_scroll_i(0)
 
     def resize(self, size: tuple[int, int]):
         """Resize the browser and update the maximum visible lines."""
@@ -110,13 +143,13 @@ class LineTextBrowser(Component):
 
     def scroll_up(self, line: int = 1):
         """Scroll the view up by the given number of lines."""
-        self._i = max(self._i - line, 0)
+        self._i = max(0, self._i - line)
 
     def scroll_down(self, line: int = 1):
         """Scroll the view down by the given number of lines."""
         if not self._content:
             return
-        self._i = min(self._i + line, max(0, len(self._content) - self._max_line))
+        self._i = self._clamp_scroll_i(self._i + line)
 
     def handle_mouse(self, event: MouseEvent) -> bool:
         """Scroll on wheel; one detent scrolls ``WHEEL_SCROLL_LINES`` lines."""

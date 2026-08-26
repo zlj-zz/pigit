@@ -22,7 +22,7 @@ from pigit.termui.surface import Surface
 from pigit.termui._color import _ANSI_16_PALETTE
 from pigit.termui.event_bus import EventBus
 from pigit.termui.reactive import Signal
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser
 from pigit.viewmodels.branch import IBranchViewModel
 
 
@@ -77,7 +77,7 @@ def test_loads_graph_for_branch_selection(preview: LogGraphPreview, vm: Mock) ->
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "feat"))
     vm.load_log_graph.assert_called_once_with("feat")
     assert preview._title == "feat"
-    assert preview._browser._content == ["* abc feat", "* def main"]
+    assert preview._browser.lines == ["* abc feat", "* def main"]
 
 
 def test_clears_when_active_is_not_branch(preview: LogGraphPreview, vm: Mock) -> None:
@@ -87,7 +87,7 @@ def test_clears_when_active_is_not_branch(preview: LogGraphPreview, vm: Mock) ->
     bus.publish(EVT_SELECTION_CHANGED, active=Component())
     vm.load_log_graph.assert_called_once()
     assert preview._title == "Log"
-    assert preview._browser._content == []
+    assert preview._browser.lines == []
 
 
 def test_shows_placeholder_when_branch_has_no_commits(
@@ -97,16 +97,16 @@ def test_shows_placeholder_when_branch_has_no_commits(
     bus = EventBus()
     _mount(bus, preview)
     bus.publish(EVT_SELECTION_CHANGED, active=_branch_panel(vm, "empty"))
-    assert preview._browser._content == ["No commits"]
+    assert preview._browser.lines == ["No commits"]
 
 
 def test_wheel_scrolls_graph(preview: LogGraphPreview) -> None:
     preview.resize((24, 10))
     preview.set_lines([f"* c{i}" for i in range(40)], title="feat")
-    assert preview._browser._i == 0
+    assert preview._browser.scroll_i == 0
     down = MouseEvent(2, 3, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
     assert preview.handle_mouse(down) is True
-    assert preview._browser._i == LineTextBrowser.WHEEL_SCROLL_LINES
+    assert preview._browser.scroll_i == TextBrowser.WHEEL_SCROLL_LINES
 
 
 def test_clears_when_branch_has_no_selection(
@@ -119,7 +119,7 @@ def test_clears_when_branch_has_no_selection(
     bus.publish(EVT_SELECTION_CHANGED, active=panel)
     vm.load_log_graph.assert_not_called()
     assert preview._title == "Log"
-    assert preview._browser._content == []
+    assert preview._browser.lines == []
 
 
 def test_deactivate_unsubscribes(preview: LogGraphPreview, vm: Mock) -> None:
@@ -151,12 +151,12 @@ def test_graph_loads_when_branch_list_arrives(
 
     bus.publish(EVT_SELECTION_CHANGED, active=panel)
     vm.load_log_graph.assert_not_called()
-    assert preview._browser._content == []
+    assert preview._browser.lines == []
 
     vm.items.set([Branch("feat", "0", "0", False)])
     vm.load_log_graph.assert_called_once_with("feat")
     assert preview._title == "feat"
-    assert preview._browser._content == ["* abc feat", "* def main"]
+    assert preview._browser.lines == ["* abc feat", "* def main"]
 
 
 def test_render_draws_title_and_graph_lines(preview: LogGraphPreview) -> None:
@@ -172,7 +172,7 @@ def test_render_draws_title_and_graph_lines(preview: LogGraphPreview) -> None:
 def test_render_applies_ansi_foreground(preview: LogGraphPreview) -> None:
     preview.resize((24, 8))
     preview.set_lines(["\x1b[32mHEAD\x1b[m"], title="feat")
-    assert preview._browser._content == ["HEAD"]
+    assert preview._browser.lines == ["HEAD"]
     surface = Surface(24, 8)
     preview.paint(surface)
     green = _ANSI_16_PALETTE[2]
@@ -194,9 +194,9 @@ def test_branch_jk_scrolls_preview(
     monkeypatch.setattr("pigit.app_branch.by_id", lambda *_args, **_kwargs: preview)
     panel = _branch_panel(vm)
     panel._scroll_preview_down()
-    assert preview._browser._i == LogGraphPreview.SCROLL_PAGE_SIZE
+    assert preview._browser.scroll_i == LogGraphPreview.SCROLL_PAGE_SIZE
     panel._scroll_preview_up()
-    assert preview._browser._i == 0
+    assert preview._browser.scroll_i == 0
 
 
 def test_jk_does_not_scroll_detached_preview(
@@ -209,7 +209,7 @@ def test_jk_does_not_scroll_detached_preview(
     panel = _branch_panel(vm)
     panel._scroll_preview_down()
     panel._scroll_preview_up()
-    assert preview._browser._i == 0
+    assert preview._browser.scroll_i == 0
 
 
 def test_stale_async_result_is_dropped(
@@ -233,12 +233,12 @@ def test_stale_async_result_is_dropped(
     stale_work, stale_cb = captured[0]
     stale_cb(stale_work())
     assert preview._title == "Log"
-    assert preview._browser._content == []
+    assert preview._browser.lines == []
 
     current_work, current_cb = captured[1]
     current_cb(current_work())
     assert preview._title == "main"
-    assert preview._browser._content == ["* abc feat", "* def main"]
+    assert preview._browser.lines == ["* abc feat", "* def main"]
 
 
 def test_render_truncates_graph_line_before_border(preview: LogGraphPreview) -> None:

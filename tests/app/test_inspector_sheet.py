@@ -255,10 +255,10 @@ def test_j_scrolls_sheet_not_status_list(runtime):
     sheet = root._layer_stack.top(LayerKind.SHEET)
     assert sheet is not None
     browser = sheet._child._browser
-    assert browser._i == 0
+    assert browser.scroll_i == 0
     root._layer_stack.dispatch("j")
     assert app._status_panel.curr_no == before
-    assert browser._i == 1
+    assert browser.scroll_i == 1
 
 
 def test_esc_and_i_dismiss_inspector(runtime):

@@ -11,7 +11,9 @@ run:
 test:
 	@$(PY) -c "import pytest" 2>/dev/null || $(PY) -m pip install pytest
 	$(PY) -m pytest ./tests
-	# pytest ./tests --cov=pigit --cov-report=html
+
+cov:
+	@$(PY) -m pytest ./tests --cov=pigit --cov-report=xml --cov-report=html
 
 lint:
 	@$(PY) -c "import flake8" 2>/dev/null || $(PY) -m pip install flake8
@@ -50,4 +52,4 @@ todo:
 uml:
 	pyreverse -ASmy -o png pigit -d docs
 
-.PHONY: run lint clear del install release todo test uml
+.PHONY: run lint clear del install release todo test cov uml

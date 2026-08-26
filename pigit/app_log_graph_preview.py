@@ -23,7 +23,7 @@ from pigit.termui import (
 )
 from pigit.termui.primitives import parse_ansi_line
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
-from pigit.termui.widgets import BorderedBrowser
+from pigit.termui.widgets import BorderedTextBrowser
 
 from .git.api import GitError
 
@@ -50,7 +50,7 @@ class LogGraphPreview(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._vm = vm
-        self._frame_browser = BorderedBrowser(
+        self._frame_browser = BorderedTextBrowser(
             title=_EMPTY_TITLE, id="log_graph_browser"
         )
         self._unsubs: list[Callable[[], None]] = []
@@ -59,7 +59,7 @@ class LogGraphPreview(Component):
 
     @property
     def _browser(self):
-        """Inner LineTextBrowser (test and scroll helpers)."""
+        """Inner TextBrowser (test and scroll helpers)."""
         return self._frame_browser._browser
 
     @property

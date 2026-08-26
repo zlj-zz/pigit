@@ -12,6 +12,7 @@
 [![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Coverage](https://codecov.io/gh/zlj-zz/pigit/branch/main/graph/badge.svg)](https://codecov.io/gh/zlj-zz/pigit)
 
 **A terminal UI for Git** — short commands and multi-repo management.
 

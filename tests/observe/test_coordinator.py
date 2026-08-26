@@ -25,6 +25,13 @@ def _ctx(repo: str = "/repo") -> ObserveContext:
     return ObserveContext(repo_root=repo, git_dir=git, common_dir=git)
 
 
+def test_fake_clock_starts_and_advances():
+    clock = FakeClock(start=1.0)
+    assert clock.monotonic() == 1.0
+    clock.advance(0.3)
+    assert clock.monotonic() == 1.3
+
+
 def test_debounce_merges_bursts():
     batches: list[Any] = []
     clock = FakeClock()

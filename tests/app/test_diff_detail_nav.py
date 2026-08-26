@@ -140,7 +140,7 @@ def test_reopen_detail_keeps_render_tokens_without_set_content():
 
     product = _Box("product")
     dv = _SpyDiff()
-    dv._content = ["+a", "+b", "+c"]
+    dv._lines = ["+a", "+b", "+c"]
     dv._render_tokens = [[("a", (1, 1, 1), 1, None)]] * 3
     host = ExclusiveView([product, dv], visible=product, id="body")
     host.mount()

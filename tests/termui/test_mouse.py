@@ -22,7 +22,7 @@ from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.input import KeyboardInput
 from pigit.termui.widgets.option_list import OptionList
-from pigit.termui.widgets.line_text_browser import LineTextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser
 from pigit.termui.widgets.popup import Popup
 
 
@@ -260,15 +260,13 @@ class TestOptionListMouse:
 
 
 # ---------------------------------------------------------------------------
-# LineTextBrowser mouse handling (diff viewer wheel scroll)
+# TextBrowser mouse handling (diff viewer wheel scroll)
 # ---------------------------------------------------------------------------
 
 
-class TestLineTextBrowserMouse:
+class TestTextBrowserMouse:
     def _browser(self):
-        browser = LineTextBrowser(
-            content=["l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7"]
-        )
+        browser = TextBrowser(content=["l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7"])
         browser.resize((10, 3))
         return browser
 
@@ -277,7 +275,7 @@ class TestLineTextBrowserMouse:
         assert browser._i == 0
         down = MouseEvent(1, 1, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
         assert browser.handle_mouse(down) is True
-        assert browser._i == LineTextBrowser.WHEEL_SCROLL_LINES
+        assert browser.scroll_i == TextBrowser.WHEEL_SCROLL_LINES
         up = MouseEvent(1, 1, MouseButton.WHEEL_UP, MouseKind.PRESS)
         assert browser.handle_mouse(up) is True
         assert browser._i == 0

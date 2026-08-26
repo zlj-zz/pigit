@@ -1,6 +1,6 @@
 """
-Module: pigit/termui/widgets/bordered_browser.py
-Description: Bordered scrollable text browser with optional title.
+Module: pigit/termui/widgets/bordered_text_browser.py
+Description: Box-framed TextBrowser with optional title.
 Author: Zev
 Date: 2026-08-20
 """
@@ -14,13 +14,13 @@ from ..primitives.frame import BoxFrame
 from ..mouse import MouseEvent
 from ..segment import Segment
 from ..theme import get_theme
-from .line_text_browser import LineTextBrowser
+from .text_browser import TextBrowser
 
 if TYPE_CHECKING:
     from ..surface import Surface
 
 
-class BorderedBrowser(Component):
+class BorderedTextBrowser(Component):
     """Box-framed scrollable browser for plain or styled line content."""
 
     def __init__(self, *, title: str = "", id: str | None = None) -> None:
@@ -28,7 +28,7 @@ class BorderedBrowser(Component):
         self._title = title
         theme = get_theme()
         self._frame = BoxFrame(0, 0, title=title or None, fg=theme.fg_dim)
-        self._browser = LineTextBrowser(
+        self._browser = TextBrowser(
             x=2,
             y=2,
             content=[],
@@ -97,4 +97,4 @@ class BorderedBrowser(Component):
         self._frame.set_inner_size(inner_w, inner_h)
         self._frame.title = self._title or None
         self._frame.draw(surface, 0, 0)
-        render_child(self._browser, surface, "BorderedBrowser")
+        render_child(self._browser, surface, "BorderedTextBrowser")

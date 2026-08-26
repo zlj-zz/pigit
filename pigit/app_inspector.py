@@ -15,7 +15,7 @@ from pigit.termui import (
     Segment,
     Surface,
 )
-from pigit.termui.widgets import LineTextBrowser, Sheet
+from pigit.termui.widgets import TextBrowser, Sheet
 
 from .app_theme import THEME
 from .app_types import (
@@ -37,7 +37,7 @@ class InspectorSheet(Component):
     def __init__(self, rows: list[list[Segment]], **kwargs) -> None:
         super().__init__(**kwargs)
         self._rows = rows
-        self._browser = LineTextBrowser(content=rows, bg=None)
+        self._browser = TextBrowser(content=rows, bg=None)
         self._browser.parent = self
 
     @property
