@@ -118,7 +118,7 @@ class Footer(Component):
                 row,
                 x,
                 key,
-                fg=theme.fg_primary,
+                fg=theme.fg_accent,
                 style_flags=palette.STYLE_BOLD,
             )
             x += key_w

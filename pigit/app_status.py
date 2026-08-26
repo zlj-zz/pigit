@@ -32,7 +32,13 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, OptionList
+from pigit.termui.widgets import (
+    ACCENT_BAR,
+    AlertDialog,
+    InputLine,
+    OptionList,
+    SectionRule,
+)
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
@@ -265,7 +271,7 @@ def build_status_tree(
 class StatusPanel(OptionList):
     """Status panel with visual mode."""
 
-    CURSOR = "●"  # filled circle
+    CURSOR = ACCENT_BAR
     keymap_namespace = "status"
     TAB_NAME = "Status"
     tab_key = "1"
@@ -292,6 +298,7 @@ class StatusPanel(OptionList):
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
+            header=SectionRule("Status"),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
@@ -886,12 +893,10 @@ class StatusPanel(OptionList):
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
-        cursor_prefix = self.CURSOR if is_cursor else " "
 
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
             Segment(
                 staged,
@@ -928,14 +933,12 @@ class StatusPanel(OptionList):
         if row is None:
             return ([], None, [])
         indent = "  " * row.depth
-        cursor_prefix = self.CURSOR if is_cursor else " "
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         if row.kind == "dir":
             arrow = "▶" if row.path in self._collapsed_dirs else "▼"
             left = [
-                Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
                 Segment(" ", fg=fg_primary),
             ]
             main = [
@@ -953,7 +956,6 @@ class StatusPanel(OptionList):
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         left = [
-            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
             Segment(
                 staged,

@@ -114,7 +114,7 @@ class HeaderState:
                 Segment("  ", fg=self._theme.fg_dim),
                 Segment(
                     self.branch,
-                    fg=self._theme.fg_header_branch,
+                    fg=self._theme.fg_accent,
                     style_flags=palette.STYLE_BOLD,
                 ),
             ]

@@ -58,11 +58,8 @@ class PigitTheme(Theme):
     # Overlay
     bg_overlay_dim: tuple[int, int, int] = palette.NAVY_GRAY
 
-    # Chrome: active matches fg_primary; inactive matches fg_inactive (SLATE).
-    fg_chrome_active: tuple[int, int, int] = palette.PEARL
-    fg_chrome_inactive: tuple[int, int, int] = palette.SLATE
+    # Chrome / header
     fg_header_repo: tuple[int, int, int] = palette.AMBER
-    fg_header_branch: tuple[int, int, int] = palette.CYAN
 
     # Borders
     divider: tuple[int, int, int] = palette.GUNMETAL

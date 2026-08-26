@@ -92,12 +92,17 @@ def test_describe_row_marks_cursor_and_current_ref():
     panel = _sheet(current="origin/foo")
     panel.mount()
     left, main, _right = panel.describe_row(2, True)
-    assert panel.CURSOR in "".join(s.text for s in left)
+    # Cursor mark is owned by OptionList, not describe_row.
+    assert panel.CURSOR not in "".join(s.text for s in left)
+    painted = panel._with_cursor_mark(left, is_cursor=True)
+    assert painted[0].text == panel.CURSOR
     assert "origin/foo" in "".join(s.text for s in main)
     _, _, right = panel.describe_row(2, True)
     assert any("current" in s.text for s in right)
     left_other, _, _ = panel.describe_row(0, False)
-    assert panel.CURSOR not in "".join(s.text for s in left_other)
+    other = panel._with_cursor_mark(left_other, is_cursor=False)
+    assert other[0].text == " "
+    assert panel.CURSOR not in "".join(s.text for s in other)
 
 
 @pytest.fixture

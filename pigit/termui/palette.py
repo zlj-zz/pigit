@@ -19,7 +19,7 @@ YELLOW: tuple[int, int, int] = (220, 205, 100)
 CYAN: tuple[int, int, int] = (78, 201, 176)
 GREEN: tuple[int, int, int] = (137, 209, 133)
 RED: tuple[int, int, int] = (244, 135, 113)
-MUTED: tuple[int, int, int] = (150, 150, 150)
+MUTED: tuple[int, int, int] = (165, 165, 172)
 DIM: tuple[int, int, int] = (100, 100, 100)
 
 # Extended palette
@@ -49,6 +49,9 @@ MIDNIGHT: tuple[int, int, int] = (30, 50, 75)
 ALMOST_WHITE: tuple[int, int, int] = (220, 220, 220)
 MAGENTA: tuple[int, int, int] = (240, 130, 200)
 AMBER: tuple[int, int, int] = (255, 175, 80)
+
+# Brand accent (interaction domain: focus borders, cursor indicator, active keys).
+ACCENT: tuple[int, int, int] = (150, 200, 255)
 
 # ── Semantic role colors ──
 DEFAULT_FG = PEARL

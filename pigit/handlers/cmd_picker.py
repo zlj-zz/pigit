@@ -167,6 +167,9 @@ def run_cmd_new_picker(
 
     # 2. Custom selector with category-aware rendering
     class _CmdOptionList(OptionList):
+        # Custom left badges (◆ / ⚠); no framework cursor column.
+        CURSOR = ""
+
         def __init__(
             self,
             app,

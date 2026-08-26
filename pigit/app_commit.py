@@ -142,6 +142,8 @@ class CommitPanel(OptionList):
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
+    # One column between OptionList cursor mark and graph rails (all row kinds).
+    GRAPH_PAD = " "
     REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
     REPORT_MIN_HEIGHT = 19
 
@@ -535,11 +537,10 @@ class CommitPanel(OptionList):
         # outranks commits.
         if not self.commits:
             cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-            prefix = self.CURSOR + " " if is_cursor else "  "
             return (
                 [
                     Segment(
-                        prefix + self.content[idx],
+                        self.content[idx],
                         fg=self.presentation_fg("muted"),
                         style_flags=cursor_flags,
                     )
@@ -590,7 +591,7 @@ class CommitPanel(OptionList):
         *,
         bake_active: bool = False,
     ) -> tuple[list[Segment], list[Segment]]:
-        """Build the cursor + rails + sha + refs + subject portion of a COMMIT row.
+        """Build rails + sha + refs + subject; cursor mark comes from OptionList.
 
         ``bake_active`` forces primary/muted/graph colors for the active cache
         (steal / non-leaf must not be baked — those rebuild live via ``presentation_fg``).
@@ -602,13 +603,7 @@ class CommitPanel(OptionList):
         fg_muted = THEME.fg_muted if bake_active else self.presentation_fg("muted")
         graph_active = bake_active or self.is_presentation_active()
 
-        if is_cursor:
-            left: list[Segment] = [
-                Segment(self.CURSOR, fg=fg_primary, style_flags=cursor_flags),
-                Segment(" ", fg=fg_primary),
-            ]
-        else:
-            left = [Segment("  ", fg=fg_primary)]
+        left: list[Segment] = [Segment(self.GRAPH_PAD, fg=fg_primary)]
 
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
@@ -666,7 +661,7 @@ class CommitPanel(OptionList):
         """
         fg_primary = self.presentation_fg("primary")
         fg_muted = self.presentation_fg("muted")
-        left: list[Segment] = [Segment("  ", fg=fg_primary)]
+        left: list[Segment] = [Segment(self.GRAPH_PAD, fg=fg_primary)]
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
             left.extend(

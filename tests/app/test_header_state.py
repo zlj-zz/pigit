@@ -76,7 +76,7 @@ def test_left_repo_and_branch_styles(header_state: HeaderState) -> None:
     assert repo.style_flags == 0
     assert spacer.text == "  "
     assert branch.text == "dev"
-    assert branch.fg == THEME.fg_header_branch
+    assert branch.fg == THEME.fg_accent
     assert branch.style_flags & STYLE_BOLD
 
 

@@ -35,19 +35,25 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
 def test_section_header_right_label_with_tail():
     """Top row is fill dashes, bold Stash, then two trailing dashes."""
     from pigit.app_theme import THEME
+    from pigit.termui.theme import get_theme, set_theme
 
-    panel = _panel_with_stashes(["WIP on main"])
-    panel.resize((40, 6))
-    surface = Surface(40, 6)
-    panel.paint(surface)
+    prev = get_theme()
+    set_theme(THEME)
+    try:
+        panel = _panel_with_stashes(["WIP on main"])
+        panel.resize((40, 6))
+        surface = Surface(40, 6)
+        panel.paint(surface)
 
-    row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
-    assert row.endswith("Stash ──")
-    assert "─" in row
-    label_start = row.index("Stash")
-    for col in range(label_start, label_start + 5):
-        assert surface._rows[0][col].style_flags & palette.STYLE_BOLD
-        assert surface._rows[0][col].fg == THEME.fg_panel_title
+        row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
+        assert row.endswith("Stash ──")
+        assert "─" in row
+        label_start = row.index("Stash")
+        for col in range(label_start, label_start + 5):
+            assert surface._rows[0][col].style_flags & palette.STYLE_BOLD
+            assert surface._rows[0][col].fg == THEME.fg_panel_title
+    finally:
+        set_theme(prev)
 
 
 def test_describe_row_puts_ref_on_right():
@@ -116,6 +122,67 @@ def test_drop_empty_list_is_noop():
         panel.drop()
         alert.assert_not_called()
         vm.stash_drop.assert_not_called()
+
+
+def test_section_rule_follows_panel_focus():
+    """Stash header rule follows the owning panel's presentation (brand when
+    focused); the chrome slot itself is never a focus leaf."""
+    from pigit.app_theme import THEME
+    from pigit.termui._layer import LayerKind
+    from pigit.termui._runtime_context import (
+        RuntimeContext,
+        _runtime_ctx,
+        reset_focus_manager,
+        reset_overlay_host,
+        set_focus_manager,
+        set_overlay_host,
+    )
+    from pigit.termui.component import Component
+    from pigit.termui.root import ComponentRoot
+    from pigit.termui.theme import get_theme, set_theme
+
+    prev = get_theme()
+    set_theme(THEME)
+    runtime = RuntimeContext()
+    token = _runtime_ctx.set(runtime)
+    try:
+        vm = Mock(spec=IStatusViewModel)
+        vm.items = Signal([])
+        vm.load_stashes.return_value = []
+        stash = StashPanel(vm=vm)
+        root = ComponentRoot(stash)
+        root.resize((40, 12))
+        set_overlay_host(root)
+        set_focus_manager(root._focus_manager)
+
+        # Focus on the stash panel: rule uses brand accent.
+        root._focus_manager.set_focus_chain(stash)
+        assert stash.is_presentation_active() is True
+        assert stash._header._rule_fg() == THEME.fg_accent
+
+        # Focus elsewhere: rule dims.
+        other = Component()
+        root._focus_manager.set_focus_chain(other)
+        assert stash.is_presentation_active() is False
+        assert stash._header._rule_fg() == THEME.fg_dim
+
+        # Overlay steal dims even while focused.
+        root._focus_manager.set_focus_chain(stash)
+
+        class _Sheet(Component):
+            open = True
+
+            def paint(self, surface) -> None:
+                pass
+
+        root._layer_stack.push(LayerKind.MODAL, _Sheet())
+        assert root.is_presentation_stolen() is True
+        assert stash._header._rule_fg() == THEME.fg_dim
+    finally:
+        reset_overlay_host()
+        reset_focus_manager()
+        _runtime_ctx.reset(token)
+        set_theme(prev)
 
 
 def test_apply_keeps_stash_without_confirmation():

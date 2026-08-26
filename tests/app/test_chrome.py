@@ -92,7 +92,7 @@ class TestFooter:
         assert "Enter" in content
         row_cells = s.rows()[1]
         key_cell = next(c for c in row_cells if c.char == "E")
-        assert key_cell.fg == theme.fg_primary
+        assert key_cell.fg == theme.fg_accent
         assert key_cell.style_flags & STYLE_BOLD
 
 

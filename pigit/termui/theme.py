@@ -32,7 +32,6 @@ class Theme:
         fg_info: Informational foreground.
         bg_overlay: Overlay panel background.
         bg_chrome: Chrome bar background (status bar, input line).
-        border: Border color.
         bg_diff_add: Diff added-line background.
         bg_diff_del: Diff deleted-line background.
         fg_diff_add: Diff added-line foreground.
@@ -53,13 +52,15 @@ class Theme:
     fg_muted: tuple[int, int, int] = palette.MUTED
     fg_dim: tuple[int, int, int] = palette.DIM
     fg_inactive: tuple[int, int, int] = palette.SLATE
+    fg_panel_title: tuple[int, int, int] = palette.ALMOST_WHITE
     fg_success: tuple[int, int, int] = palette.GREEN
     fg_warning: tuple[int, int, int] = palette.YELLOW
     fg_danger: tuple[int, int, int] = palette.RED
     fg_info: tuple[int, int, int] = palette.BLUE
     bg_overlay: tuple[int, int, int] = palette.SLATE_DARK
     bg_chrome: tuple[int, int, int] = palette.INK
-    border: tuple[int, int, int] = palette.GUNMETAL
+    # Brand interaction accent (cursor mark, footer keys, focused section rules).
+    fg_accent: tuple[int, int, int] = palette.ACCENT
     bg_diff_add: tuple[int, int, int] = palette.FOREST
     bg_diff_del: tuple[int, int, int] = palette.MAROON
     fg_diff_add: tuple[int, int, int] = palette.GREEN

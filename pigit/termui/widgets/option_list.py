@@ -25,6 +25,10 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 
 _logger = logging.getLogger(__name__)
 
+# Brand accent bar for the cursor column. Panels set ``CURSOR = ACCENT_BAR``;
+# OptionList draws and styles it — describe_row never paints the mark.
+ACCENT_BAR = "\u258e"
+
 
 class OptionList(Component):
     """Navigable option list with cursor, selection, and scroll viewport.
@@ -34,6 +38,10 @@ class OptionList(Component):
     (all-or-nothing; default want is 1). Fitted heights live in ``_header_h`` /
     ``_footer_h``. Slots set ``parent`` but are **not** in ``children``. When
     using slots, override :meth:`describe_row`, not :meth:`paint`.
+
+    The leading cursor cell is owned here via class attribute ``CURSOR``:
+    a glyph character, ``ACCENT_BAR`` (brand-tinted bar), or ``""`` (no mark).
+    Subclasses must not prepend the mark in :meth:`describe_row`.
     """
 
     CURSOR: str = "→"
@@ -104,7 +112,8 @@ class OptionList(Component):
         if self._chrome_size == self._size:
             return
         self._chrome_size = self._size
-        self._apply_chrome_bands(self._size[0], self._size[1])
+        w, h = self._size
+        self._apply_chrome_bands(w, h)
 
     def invalidate_chrome_bands(self) -> None:
         """Force the next sync to refit bands (e.g. after a slot height policy change)."""
@@ -166,7 +175,8 @@ class OptionList(Component):
     def visible_row_count(self) -> int:
         """List viewport height (panel height minus chrome bands)."""
         self._sync_chrome_bands()
-        return max(0, self._size[1] - self._header_h - self._footer_h)
+        _, h = self._size
+        return max(0, h - self._header_h - self._footer_h)
 
     @property
     def viewport_start(self) -> int:
@@ -525,7 +535,9 @@ class OptionList(Component):
                 row = idx - self._r_start
                 is_cursor = idx == self.curr_no
                 left, main, right = self.describe_row(idx, is_cursor)
-                self._draw_row_layout(surface, row, left, main, right)
+                self._draw_row_layout(
+                    surface, row, self._with_cursor_mark(left, is_cursor), main, right
+                )
         else:
             cursor_r = self.cursor_row()
             for idx in range(self._r_start, end):
@@ -535,9 +547,36 @@ class OptionList(Component):
                 left, main, right = self.describe_row(
                     idx, is_cursor, item_idx=item_idx, sub_row=sub_row
                 )
-                self._draw_row_layout(surface, row, left, main, right)
+                self._draw_row_layout(
+                    surface, row, self._with_cursor_mark(left, is_cursor), main, right
+                )
         if self._search_query or self._search_active:
             self._draw_search_bar(surface)
+
+    def _with_cursor_mark(
+        self,
+        left: Sequence[Segment],
+        is_cursor: bool,
+    ) -> list[Segment]:
+        """Prepend the cursor column from ``CURSOR``; ``""`` leaves ``left`` as-is."""
+        if not self.CURSOR:
+            return list(left)
+        theme = get_theme()
+        cell = self.CURSOR if is_cursor else " "
+        if self.CURSOR == ACCENT_BAR:
+            active = self.is_presentation_active()
+            if active and is_cursor:
+                fg = theme.fg_accent
+                style = palette.STYLE_BOLD
+            else:
+                # Off-focus or non-cursor: keep column alignment without brand accent.
+                fg = theme.fg_dim
+                style = 0
+        else:
+            # Glyph follows the same presentation softening as row text.
+            fg = self.presentation_fg("primary")
+            style = palette.STYLE_BOLD if is_cursor else 0
+        return [Segment(cell, fg=fg, style_flags=style)] + list(left)
 
     def _render_empty_state(self, surface: Surface) -> None:
         """Render empty-state segments centered on the surface."""

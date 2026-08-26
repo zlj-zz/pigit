@@ -87,12 +87,12 @@ def test_status_filename_inactive_under_steal_xy_semantic_kept() -> None:
 
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
-    assert left[2].fg == THEME.fg_success  # staged M
+    assert left[1].fg == THEME.fg_success  # staged M
 
     _steal_presentation()
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_inactive
-    assert left[2].fg == THEME.fg_success
+    assert left[1].fg == THEME.fg_success
     assert right[0].fg == THEME.fg_success  # Staged label
 
 

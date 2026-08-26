@@ -96,6 +96,9 @@ def _build_repo_row_body(
 
 
 class _RepoCdOptionList(OptionList):
+    # Picker rows use custom left badges/padding; no framework cursor column.
+    CURSOR = ""
+
     def __init__(self, app, **kwargs) -> None:
         super().__init__(**kwargs)
         self._app = app
