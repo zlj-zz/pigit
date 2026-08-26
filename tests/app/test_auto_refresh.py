@@ -191,7 +191,33 @@ class TestObserveBatchSinks:
             )
 
         refresh.assert_called_once_with(panel)
-        schedule.assert_not_called()
+        # Worktree edits change the header dirty dot, so they must also
+        # schedule a header reload (not only the active list refresh).
+        schedule.assert_called_once()
+
+    def test_head_refreshes_header_but_not_status_list(self, app):
+        """HEAD on Status tab triggers header reload only (list stays)."""
+        from pigit.app_status import StatusPanel
+
+        schedule = MagicMock()
+        refresh = MagicMock()
+        app._observe_host._deps = replace(
+            app._observe_host._deps,
+            schedule_reload_header=schedule,
+            refresh_list_panel=refresh,
+        )
+        panel = object.__new__(StatusPanel)
+
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
+            app._on_observe_batch(
+                ChangeBatch(
+                    kinds=frozenset({ChangeKind.HEAD}),
+                    paths=frozenset({"HEAD"}),
+                )
+            )
+
+        schedule.assert_called_once()
+        refresh.assert_not_called()
 
     def test_build_observe_roots_attaches_worktree_only_for_status(self, app):
         """Worktree root is present only while Status is the active panel."""

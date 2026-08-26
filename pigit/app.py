@@ -408,20 +408,41 @@ class PigitApplication(Application):
         if self._observe_host is not None:
             self._observe_host.on_batch(batch)
 
+    def _header_dirty_probe(self) -> bool:
+        """Dirty flag from observe digest when active, else a direct probe.
+
+        The observe host already runs ``git status --porcelain`` on every poll;
+        reusing its last digest avoids a second git call per header refresh.
+        """
+        if self._observe_host is not None:
+            observed = self._observe_host.worktree_dirty
+            if observed is not None:
+                return observed
+        return self._git.is_worktree_dirty()
+
     def _schedule_reload_header(self) -> None:
-        """Async-load branch + ahead/behind into HeaderState with stale-guard."""
+        """Async-load branch/ahead/behind + dirty into HeaderState.
+
+        The git probes run in the worker thread; ``apply`` only writes Signal
+        state on the UI thread (never runs git).
+        """
         token = object()
         self._header_reload_token = token
 
-        def apply(result: tuple[str, int, int]) -> None:
+        def worker() -> tuple[str, int, int, bool]:
+            head, ahead, behind = self._git.get_head_tracking()
+            return head, ahead, behind, self._header_dirty_probe()
+
+        def apply(result: tuple[str, int, int, bool]) -> None:
             if token is not self._header_reload_token:
                 return
-            branch, ahead, behind = result
+            branch, ahead, behind, dirty = result
             self._header_state.branch = branch
             self._header_state.ahead = ahead
             self._header_state.behind = behind
+            self._header_state.dirty = dirty
 
-        run_async(self._git.get_head_tracking, apply)
+        run_async(worker, apply)
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""

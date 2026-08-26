@@ -172,6 +172,9 @@ class GitApi:
     def status_porcelain(self, path=None):
         return self._status.status_porcelain(path)
 
+    def is_worktree_dirty(self, path=None):
+        return self._status.is_worktree_dirty(path)
+
     def _load_status_cache_signature(self, cwd):
         return self._status._load_status_cache_signature(cwd)
 

@@ -99,6 +99,7 @@ class ObserveHost:
         self._observe_poll_id: int | None = None
         self._observe_drain_id: int | None = None
         self._observe_status_unsub: Callable[[], None] | None = None
+        self._last_worktree_dirty: bool | None = None
 
     def start(self) -> None:
         """Start StatMtime observation of git metadata (and Status worktree)."""
@@ -210,7 +211,16 @@ class ObserveHost:
     def on_batch(self, batch: ChangeBatch) -> None:
         """Apply a debounced ChangeBatch to header and the active panel."""
         kinds = batch.kinds
-        if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
+        if (
+            ChangeKind.HEAD in kinds
+            or ChangeKind.REFS in kinds
+            or ChangeKind.WORKTREE_META in kinds
+            or ChangeKind.INDEX in kinds
+            or ChangeKind.STASH in kinds
+        ):
+            # Branch tracking AND the worktree dirty dot both live in the
+            # header; file edits (WORKTREE_META/INDEX) are the most common
+            # dirty transition, so they must refresh it too.
             self._deps.schedule_reload_header()
 
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
@@ -252,12 +262,24 @@ class ObserveHost:
                 self._deps.refresh_list_panel(active)
 
     def _worktree_digest(self) -> str | None:
-        """Return a porcelain digest while Status worktree observe is active."""
+        """Return a porcelain digest while Status worktree observe is active.
+
+        Also records the raw dirty flag so the header can reuse this probe
+        instead of running a second ``git status`` per refresh.
+        """
         try:
-            return hash_porcelain(self._deps.get_git().status_porcelain())
+            porcelain = self._deps.get_git().status_porcelain()
         except Exception:
             logging.debug("Worktree digest failed", exc_info=True)
+            self._last_worktree_dirty = None
             return None
+        self._last_worktree_dirty = bool(porcelain.strip())
+        return hash_porcelain(porcelain)
+
+    @property
+    def worktree_dirty(self) -> bool | None:
+        """Most recent worktree dirty flag, or None when observe is inactive."""
+        return self._last_worktree_dirty
 
     def _on_status_items(self, _items: list) -> None:
         """Refresh worktree path set when the Status list changes."""
