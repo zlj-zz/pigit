@@ -75,7 +75,7 @@ omit = [
     "*/pigit/__main__.py",
     "*/pigit/console_scripts.py",
     # Large modules covered by integration / dedicated manual QA; keep coverage focused on CLI + git orchestration.
-    "*/pigit/git/local_git.py",
+    "*/pigit/git/api/*",
     "*/pigit/config.py",
     "*/pigit/ext/lcstat.py",
     "*/pigit/app.py",
