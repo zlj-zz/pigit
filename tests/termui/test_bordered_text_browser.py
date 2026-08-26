@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Module: tests/termui/test_bordered_browser.py
-Description: Tests for BorderedBrowser title, content, and scroll delegation.
+Module: tests/termui/test_bordered_text_browser.py
+Description: Tests for BorderedTextBrowser title, content, and scroll delegation.
 Author: Zev
 Date: 2026-08-20
 """
@@ -11,12 +11,12 @@ from __future__ import annotations
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.segment import Segment
 from pigit.termui.surface import Surface
-from pigit.termui.widgets.bordered_browser import BorderedBrowser
+from pigit.termui.widgets.bordered_text_browser import BorderedTextBrowser
 from pigit.termui.widgets.text_browser import TextBrowser
 
 
 def test_set_title_and_string_content() -> None:
-    browser = BorderedBrowser(title="Log", id="bb")
+    browser = BorderedTextBrowser(title="Log", id="bb")
     browser.resize((24, 8))
     browser.set_content(["line one", "line two"])
     surface = Surface(24, 8)
@@ -28,14 +28,14 @@ def test_set_title_and_string_content() -> None:
 
 
 def test_set_segment_content() -> None:
-    browser = BorderedBrowser(id="bb")
+    browser = BorderedTextBrowser(id="bb")
     browser.resize((20, 6))
     browser.set_content([[Segment("HEAD", fg=(0, 255, 0))]])
     assert browser._browser._content == ["HEAD"]
 
 
 def test_scroll_and_wheel_delegate() -> None:
-    browser = BorderedBrowser(id="bb")
+    browser = BorderedTextBrowser(id="bb")
     browser.resize((20, 4))
     browser.set_content([f"row {i}" for i in range(30)])
     browser.scroll_down(2)
@@ -46,7 +46,7 @@ def test_scroll_and_wheel_delegate() -> None:
 
 
 def test_set_title_updates_frame() -> None:
-    browser = BorderedBrowser(title="old", id="bb")
+    browser = BorderedTextBrowser(title="old", id="bb")
     browser.set_title("feat")
     browser.resize((20, 6))
     browser.set_content(["* abc"])
