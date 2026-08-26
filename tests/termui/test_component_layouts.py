@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/termui/test_component_layouts.py
-Description: Unit tests for layout container components (Column).
+Description: Unit tests for layout container components (Column/Row).
 Author: Zev
 Date: 2026-04-20
 """
@@ -10,12 +10,73 @@ import pytest
 
 from pigit.termui.component import Component
 from pigit.termui.containers import Column, Row
-from pigit.termui.types import EventType, EVT_GOTO, EVT_SELECTION_CHANGED
+from pigit.termui.types import EventType
 
 
 def _make_component(name: str = "mock") -> Component:
     """Return a concrete Component subclass with the given NAME."""
     return type(name, (Component,), {"NAME": name, "refresh": lambda self: None})()
+
+
+@pytest.fixture(params=["column", "row"], ids=["column", "row"])
+def container_factory(request):
+    """Return a builder that sizes children along the container's own axis."""
+
+    def build(children, spec):
+        if request.param == "column":
+            return Column(children, heights=spec)
+        return Row(children, widths=spec)
+
+    return build
+
+
+def test_accept_skips_non_callable(container_factory):
+    class NoAccept(Component):
+        NAME = "no_accept"
+
+    c1 = NoAccept()
+    container = container_factory([c1], [1])
+    container.accept(EventType("action_requested"), foo="bar")
+    assert container.children == [c1]
+
+
+def test_accept_broadcasts(container_factory):
+    class Acceptable(Component):
+        NAME = "acc"
+
+        def __init__(self):
+            super().__init__()
+            self.received = []
+
+        def accept(self, action, **data):
+            self.received.append((action, data))
+
+    a1 = Acceptable()
+    a2 = Acceptable()
+    container = container_factory([a1, a2], [1, 1])
+    container.accept(EventType("action_requested"), key="v")
+    assert a1.received == [(EventType("action_requested"), {"key": "v"})]
+    assert a2.received == [(EventType("action_requested"), {"key": "v"})]
+
+
+def test_render_skips_zero_size(container_factory):
+    from pigit.termui.surface import Surface
+
+    c1 = _make_component()
+    c2 = _make_component()
+    container = container_factory([c1, c2], [0, 1])
+    container.resize((10, 1))
+    container.paint(Surface(10, 1))
+
+
+def test_render_skips_negative_position(container_factory):
+    from pigit.termui.surface import Surface
+
+    c1 = _make_component()
+    container = container_factory([c1], [1])
+    container.resize((10, 1))
+    c1.x = 0
+    container.paint(Surface(10, 1))
 
 
 class TestColumn:
@@ -94,53 +155,6 @@ class TestColumn:
         col.set_heights([5, "flex"])
         assert c1._size == (10, 5)
 
-    def test_render_skips_zero_size(self):
-        from pigit.termui.surface import Surface
-
-        c1 = _make_component()
-        c2 = _make_component()
-        col = Column([c1, c2], heights=[0, 1])
-        col.resize((10, 1))
-        s = Surface(10, 1)
-        col.paint(s)
-
-    def test_render_skips_negative_position(self):
-        from pigit.termui.surface import Surface
-
-        c1 = _make_component()
-        col = Column([c1], heights=[1])
-        col.resize((10, 1))
-        c1.x = 0
-        s = Surface(10, 1)
-        col.paint(s)
-
-    def test_accept_skips_non_callable(self):
-        class NoAccept(Component):
-            NAME = "no_accept"
-
-        c1 = NoAccept()
-        col = Column([c1], heights=[1])
-        col.accept(EventType("action_requested"), foo="bar")
-        assert col.children == [c1]
-
-    def test_accept_broadcasts(self):
-        class Acceptable(Component):
-            NAME = "acc"
-
-            def __init__(self):
-                super().__init__()
-                self.received = []
-
-            def accept(self, action, **data):
-                self.received.append((action, data))
-
-        a1 = Acceptable()
-        a2 = Acceptable()
-        col = Column([a1, a2], heights=[1, 1])
-        col.accept(EventType("action_requested"), key="v")
-        assert a1.received == [(EventType("action_requested"), {"key": "v"})]
-        assert a2.received == [(EventType("action_requested"), {"key": "v"})]
-
 
 class TestRow:
     def test_set_widths_mismatch(self):
@@ -203,51 +217,3 @@ class TestRow:
         c3.parent = row
         row.set_widths([3, 7])
         assert c3._size == (7, 5)
-
-    def test_render_skips_zero_size(self):
-        from pigit.termui.surface import Surface
-
-        c1 = _make_component()
-        c2 = _make_component()
-        row = Row([c1, c2], widths=[0, 1])
-        row.resize((1, 10))
-        s = Surface(1, 10)
-        row.paint(s)
-
-    def test_render_skips_negative_position(self):
-        from pigit.termui.surface import Surface
-
-        c1 = _make_component()
-        row = Row([c1], widths=[1])
-        row.resize((1, 10))
-        c1.x = 0
-        s = Surface(1, 10)
-        row.paint(s)
-
-    def test_accept_skips_non_callable(self):
-        class NoAccept(Component):
-            NAME = "no_accept"
-
-        c1 = NoAccept()
-        row = Row([c1], widths=[1])
-        row.accept(EventType("action_requested"), foo="bar")
-        assert row.children == [c1]
-
-    def test_accept_broadcasts(self):
-        class Acceptable(Component):
-            NAME = "acc"
-
-            def __init__(self):
-                super().__init__()
-                self.received = []
-
-            def accept(self, action, **data):
-                self.received.append((action, data))
-
-        a1 = Acceptable()
-        a2 = Acceptable()
-        row = Row([a1, a2], widths=[1, 1])
-        row.resize((2, 1))
-        row.accept(EventType("action_requested"), key="v")
-        assert a1.received == [(EventType("action_requested"), {"key": "v"})]
-        assert a2.received == [(EventType("action_requested"), {"key": "v"})]
