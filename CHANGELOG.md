@@ -1,5 +1,17 @@
 # Changelog of pigit
 
+## 2.3.0 (2026-08-26)
+
+### Bug Fixes
+
+- **Diff scroll / hunk jump**: DiffViewer owns `_lines` / `_line_i` instead of a nested TextBrowser scroll bag, so `]` / `[` near EOF still land on late hunks and path badge / file-history (`v`) resolve the correct file.
+
+### Refactors
+
+- **LineTextBrowser → TextBrowser**; **BorderedBrowser → BorderedTextBrowser** (widgets package + callers).
+- TextBrowser exposes `lines` / clamped `scroll_i` / `replace_lines`; resize no longer permanently clamps deep scroll across viewport shrink/restore.
+- Test layout: consolidate duplicated Column/Row and scattered cases; CI uploads coverage to Codecov.
+
 ## 2.2.0 (2026-08-26)
 
 ### Features
