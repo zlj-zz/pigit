@@ -30,6 +30,7 @@ class _GlyphPanel(OptionList):
 
 class _AccentPanel(OptionList):
     CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
 
     def describe_row(
         self, idx, is_cursor, *, item_idx=None, sub_row=0

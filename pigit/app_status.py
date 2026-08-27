@@ -272,6 +272,7 @@ class StatusPanel(OptionList):
     """Status panel with visual mode."""
 
     CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "status"
     TAB_NAME = "Status"
     tab_key = "1"

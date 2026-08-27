@@ -25,8 +25,9 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 
 _logger = logging.getLogger(__name__)
 
-# Brand accent bar for the cursor column. Panels set ``CURSOR = ACCENT_BAR``;
-# OptionList draws and styles it — describe_row never paints the mark.
+# Brand accent bar for the cursor column. Panels set ``CURSOR = ACCENT_BAR``
+# (and ``CURSOR_ACCENT = True``); OptionList draws and styles it —
+# describe_row never paints the mark.
 ACCENT_BAR = "\u258e"
 
 
@@ -45,10 +46,19 @@ class OptionList(Component):
     """
 
     CURSOR: str = "→"
+    # True when CURSOR is the brand accent bar: the cursor column then uses
+    # the accent presentation path (accent on focus, dim otherwise). Plain
+    # glyphs follow row-text presentation softening.
+    CURSOR_ACCENT: bool = False
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
     _DEFAULT_BAND_HEIGHT = 1
     _SKELETON_ROWS = 3
+    _SKELETON_GAP = 1
+    # Skeleton bars shrink from this fraction of the panel width by this step.
+    _SKELETON_WIDTH_START = 0.9
+    _SKELETON_WIDTH_STEP = 0.15
+    _SKELETON_MIN_W = 8
 
     def __init__(
         self,
@@ -570,7 +580,7 @@ class OptionList(Component):
             return list(left)
         theme = get_theme()
         cell = self.CURSOR if is_cursor else " "
-        if self.CURSOR == ACCENT_BAR:
+        if self.CURSOR_ACCENT:
             active = self.is_presentation_active()
             if active and is_cursor:
                 fg = theme.fg_accent
@@ -593,14 +603,18 @@ class OptionList(Component):
         if w <= 0 or h <= 0:
             return
         bar_h = 1
-        gap = 1
-        total_h = self._SKELETON_ROWS * (bar_h + gap) - gap
+        total_h = (
+            self._SKELETON_ROWS * (bar_h + self._SKELETON_GAP) - self._SKELETON_GAP
+        )
         start_row = max(0, (h - total_h) // 2)
         for i in range(self._SKELETON_ROWS):
-            row = start_row + i * (bar_h + gap)
+            row = start_row + i * (bar_h + self._SKELETON_GAP)
             # Lead bar in hover tone, rest in panel tone, shrinking widths.
             bg = theme.bg_hover if i == 0 else theme.bg_panel
-            width = max(8, int(w * (0.9 - i * 0.15)))
+            width = max(
+                self._SKELETON_MIN_W,
+                int(w * (self._SKELETON_WIDTH_START - i * self._SKELETON_WIDTH_STEP)),
+            )
             col = max(0, (w - width) // 2)
             surface.fill_rect_rgb(row, col, min(width, w), bar_h, bg)
 

@@ -68,6 +68,12 @@ from .session_history import SessionHistory
 from .config_data import AppConfig
 
 
+# Footer chrome height in rows. The layout height (build_root) and the
+# toast_bottom_pad (setup_root) both derive from this constant, so growing
+# the footer can never silently overlap bottom-anchored toasts.
+FOOTER_HEIGHT = 2
+
+
 class PigitApplication(Application):
     """Pigit TUI application entry."""
 
@@ -269,7 +275,7 @@ class PigitApplication(Application):
         heights: list = [2, "flex"]
         if self._config.show_footer:
             children.append(footer)
-            heights.append(2)
+            heights.append(FOOTER_HEIGHT)
 
         self._panel_nav = PanelNavigator(
             get_tab_view=lambda: tab_view,
@@ -315,8 +321,8 @@ class PigitApplication(Application):
             self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
-        # Footer occupies the bottom 2 rows when shown; keep toasts above it.
-        root.toast_bottom_pad = 2 if self._config.show_footer else 0
+        # Footer occupies FOOTER_HEIGHT rows when shown; keep toasts above it.
+        root.toast_bottom_pad = FOOTER_HEIGHT if self._config.show_footer else 0
         self._help_panel = HelpPanel(
             key_fg=THEME.fg_info,
         )

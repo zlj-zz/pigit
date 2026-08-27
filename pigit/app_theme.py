@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from pigit.termui import palette
 from pigit.termui.theme import Theme
 
+# Fraction of the blend toward the brand accent for the hunk header tone:
+# 0.30 reads as a clearly distinct block while keeping ~6:1 contrast.
+_HUNK_TONE_BLEND = 0.30
+
 
 @dataclass(frozen=True)
 class PigitTheme(Theme):
@@ -55,7 +59,7 @@ class PigitTheme(Theme):
     # clearly distinct block (0.18 was barely distinguishable from the panel)
     # while keeping ~6:1 contrast against fg_diff_hunk.
     bg_diff_hunk: tuple[int, int, int] = palette.blend(
-        palette.CHARCOAL, palette.ACCENT, 0.30
+        palette.CHARCOAL, palette.ACCENT, _HUNK_TONE_BLEND
     )
     fg_diff_hunk: tuple[int, int, int] = palette.PEARL
     bg_diff_context: tuple[int, int, int] = palette.INK

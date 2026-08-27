@@ -45,6 +45,7 @@ class BranchPanel(OptionList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
     CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "branch"
     TAB_NAME = "Branch"
     tab_key = "3"
