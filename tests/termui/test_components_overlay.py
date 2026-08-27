@@ -400,7 +400,7 @@ class TestToast:
         assert toast.outer_row_count == 5  # 3 + 2
 
     def test_toast_overflow_truncates_with_marker(self):
-        """超过行数上限时截断并在末行加溢出标记"""
+        """超过行数上限时保留尾部（hint 可见）并在首行加省略标记"""
         lines = "\n".join(f"Line{i}" for i in range(9))  # 9 行 > 上限 6
         toast = Toast(lines, duration=5.0)
         surface = Surface(40, 10)
@@ -408,7 +408,9 @@ class TestToast:
         toast._rebuild_frame()
 
         assert len(toast._line_segments) == 6
-        assert any(seg.text == "…" for seg in toast._line_segments[-1])
+        # Head is marked, tail is kept so actionable hint lines survive.
+        assert any(seg.text == "… " for seg in toast._line_segments[0])
+        assert "Line8" in "".join(s.text for s in toast._line_segments[-1])
 
     def test_toast_bottom_pad_lifts_bottom_position(self):
         """bottom_pad reserves rows above app chrome like the footer."""

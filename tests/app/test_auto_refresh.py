@@ -170,14 +170,17 @@ class TestObserveBatchSinks:
         refresh.assert_called_once_with(panel)
 
     def test_worktree_meta_refreshes_status_when_active(self, app):
-        """WORKTREE_META on Status tab triggers list refresh."""
+        """WORKTREE_META on Status tab triggers list refresh and dirty dot
+        update (not the full header reload)."""
         from pigit.app_status import StatusPanel
 
         schedule = MagicMock()
+        dirty = MagicMock()
         refresh = MagicMock()
         app._observe_host._deps = replace(
             app._observe_host._deps,
             schedule_reload_header=schedule,
+            refresh_header_dirty=dirty,
             refresh_list_panel=refresh,
         )
         panel = object.__new__(StatusPanel)
@@ -191,9 +194,10 @@ class TestObserveBatchSinks:
             )
 
         refresh.assert_called_once_with(panel)
-        # Worktree edits change the header dirty dot, so they must also
-        # schedule a header reload (not only the active list refresh).
-        schedule.assert_called_once()
+        # Pure worktree edits only move the dirty dot; branch tracking does
+        # not need a two-subprocess reload per batch.
+        dirty.assert_called_once()
+        schedule.assert_not_called()
 
     def test_head_refreshes_header_but_not_status_list(self, app):
         """HEAD on Status tab triggers header reload only (list stays)."""

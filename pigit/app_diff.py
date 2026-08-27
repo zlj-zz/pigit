@@ -282,7 +282,13 @@ class DiffViewer(Component):
         if content_w is None:
             w = self._size[0] if self._size else 80
             content_w = max(0, w - self.BORDER_COLS)
-        main_w = self._main_width(content_w, self.LINE_NO_WIDTH)
+        else:
+            w = content_w + self.BORDER_COLS
+        # Rendering uses the adaptive gutter width (0 on very narrow panels);
+        # the scroll budget must match or the max offset overshoots by the
+        # hidden gutter width.
+        line_no_w = self._line_no_w(w)
+        main_w = self._main_width(content_w, line_no_w)
         self._max_col_offset = max(0, max_text_w - main_w)
         self._col_offset = min(self._col_offset, self._max_col_offset)
 

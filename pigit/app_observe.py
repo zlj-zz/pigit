@@ -61,6 +61,7 @@ class ObserveDeps:
         get_root: Callable returning ComponentRoot (may be None pre-mount).
         get_loop: Callable returning the AppEventLoop (may be None pre-start).
         schedule_reload_header: Callback to async-reload header branch/ahead/behind.
+        refresh_header_dirty: Callback to update just the worktree dirty dot.
         refresh_list_panel: Callback to refresh a list panel or its ViewModel.
     """
 
@@ -77,6 +78,7 @@ class ObserveDeps:
     get_root: Callable[[], ComponentRoot | None]
     get_loop: Callable[[], AppEventLoop | None]
     schedule_reload_header: Callable[[], None]
+    refresh_header_dirty: Callable[[], None]
     refresh_list_panel: Callable[[Component], None]
 
 
@@ -219,17 +221,17 @@ class ObserveHost:
     def on_batch(self, batch: ChangeBatch) -> None:
         """Apply a debounced ChangeBatch to header and the active panel."""
         kinds = batch.kinds
-        if (
-            ChangeKind.HEAD in kinds
-            or ChangeKind.REFS in kinds
-            or ChangeKind.WORKTREE_META in kinds
+        if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
+            self._deps.schedule_reload_header()
+        elif (
+            ChangeKind.WORKTREE_META in kinds
             or ChangeKind.INDEX in kinds
             or ChangeKind.STASH in kinds
         ):
-            # Branch tracking AND the worktree dirty dot both live in the
-            # header; file edits (WORKTREE_META/INDEX) are the most common
-            # dirty transition, so they must refresh it too.
-            self._deps.schedule_reload_header()
+            # Pure worktree edits cannot move branch tracking; refresh only
+            # the dirty dot from the digest the poll already computed, so a
+            # file-edit storm does not fork git subprocesses per batch.
+            self._deps.refresh_header_dirty()
 
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if active is None:

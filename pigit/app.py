@@ -294,6 +294,7 @@ class PigitApplication(Application):
                 get_root=lambda: self._root,
                 get_loop=lambda: self._loop,
                 schedule_reload_header=self._schedule_reload_header,
+                refresh_header_dirty=self._refresh_header_dirty,
                 refresh_list_panel=self._refresh_list_panel,
             )
         )
@@ -410,6 +411,22 @@ class PigitApplication(Application):
         """Delegate to ObserveHost.on_batch()."""
         if self._observe_host is not None:
             self._observe_host.on_batch(batch)
+
+    def _refresh_header_dirty(self) -> None:
+        """Update just the worktree dirty dot from the observe digest.
+
+        Worktree edits cannot change branch tracking, so skip the full header
+        reload (two git subprocesses per batch) and reuse the digest the
+        observe poll already computed. Called from on_batch for
+        WORKTREE_META/INDEX/STASH kinds.
+        """
+        if self._observe_host is None:
+            return
+        observed = self._observe_host.worktree_dirty
+        if observed is None:
+            # Worktree observe not active on this tab; nothing fresh to read.
+            return
+        self._header_state.dirty = observed
 
     def _header_dirty_probe(self) -> bool:
         """Dirty flag from observe digest when active, else a direct probe.

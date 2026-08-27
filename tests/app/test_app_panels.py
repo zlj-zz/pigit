@@ -115,6 +115,23 @@ class TestDiffViewer:
         # text starts right after the border; no gutter columns
         assert row[1].char == "+"
 
+    def test_scroll_budget_matches_adaptive_gutter(self):
+        """max_col_offset must use the adaptive gutter width (0 on narrow
+        panels) or the scroll range overshoots by the hidden gutter."""
+        d = DiffViewer()
+        d.set_content(["+" + "x" * 60])
+        d.resize((14, 5))  # < 16 cols: gutter hidden
+        d._compute_max_col_offset(content_w=12)
+        # main_w = 12 - 0(gutter) - 1(prefix) - 1 = 10; max_text_w = 60
+        assert d._max_col_offset == 50
+
+        d2 = DiffViewer()
+        d2.set_content(["+" + "x" * 60])
+        d2.resize((40, 5))
+        d2._compute_max_col_offset(content_w=38)
+        # main_w = 38 - 4(gutter) - 1(prefix) - 1 = 32; max_text_w = 60
+        assert d2._max_col_offset == 28
+
     def test_hunk_navigation(self):
         d = DiffViewer()
         d.set_content(["@@ hunk1", "+line1", "@@ hunk2", "+line2"])

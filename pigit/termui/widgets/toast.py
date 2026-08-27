@@ -148,11 +148,21 @@ class Toast(Component):
                     )
         truncated: list[list[Segment]] = []
         inner_w = 0
-        all_lines = line_segments[:MAX_TOAST_LINES]
+        # Keep the TAIL on overflow so actionable hint lines stay visible;
+        # the truncation marker goes at the head.
         overflowed = len(line_segments) > MAX_TOAST_LINES
+        all_lines = (
+            line_segments[-MAX_TOAST_LINES:] if overflowed else line_segments
+        )
         for i, line in enumerate(all_lines):
             line_w = 0
             new_line: list[Segment] = []
+            if overflowed and i == 0:
+                marker = Segment("… ", fg=text_fg)
+                mw = wcswidth(marker.text)
+                if mw <= max_text_w:
+                    new_line.append(marker)
+                    line_w += mw
             for seg in line:
                 seg_w = wcswidth(seg.text)
                 if line_w + seg_w > max_text_w:
@@ -171,13 +181,6 @@ class Toast(Component):
                     break
                 new_line.append(seg)
                 line_w += seg_w
-            # Overflow marker on the last visible line.
-            if overflowed and i == len(all_lines) - 1:
-                marker = Segment("…", fg=text_fg)
-                marker_w = wcswidth(marker.text)
-                if line_w + marker_w <= max_text_w:
-                    new_line.append(marker)
-                    line_w += marker_w
             truncated.append(new_line)
             inner_w = max(inner_w, self._prefix_w + line_w)
 
