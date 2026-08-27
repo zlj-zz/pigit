@@ -48,6 +48,7 @@ class OptionList(Component):
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
     _DEFAULT_BAND_HEIGHT = 1
+    _SKELETON_ROWS = 3
 
     def __init__(
         self,
@@ -78,6 +79,9 @@ class OptionList(Component):
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False
+        # True while a lazy panel has requested content but the VM has not
+        # delivered it yet; renders skeleton bars instead of empty-state.
+        self.loading = False
         self.empty_state = empty_state
         # When set, the selector renders multiple rows per item: ``_item_starts[i]``
         # is the row index where item ``i`` begins. ``curr_no`` then tracks the
@@ -165,7 +169,8 @@ class OptionList(Component):
                 self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
-                self.set_content(["Loading..."])
+                self.loading = True
+                self.set_content([])
                 self.curr_no = 0
                 self._r_start = 0
         else:
@@ -524,7 +529,9 @@ class OptionList(Component):
     def _paint_list_body(self, surface: Surface) -> None:
         """Viewport loop, empty-state, and search bar on the list band only."""
         if not self.content:
-            if self.empty_state is not None:
+            if self.loading:
+                self._render_loading_skeleton(surface)
+            elif self.empty_state is not None:
                 self._render_empty_state(surface)
             if self._search_query or self._search_active:
                 self._draw_search_bar(surface)
@@ -578,8 +585,32 @@ class OptionList(Component):
             style = palette.STYLE_BOLD if is_cursor else 0
         return [Segment(cell, fg=fg, style_flags=style)] + list(left)
 
+    def _render_loading_skeleton(self, surface: Surface) -> None:
+        """Draw placeholder bars while a lazy panel's content is loading."""
+        theme = get_theme()
+        w = surface.width
+        h = surface.height
+        if w <= 0 or h <= 0:
+            return
+        bar_h = 1
+        gap = 1
+        total_h = self._SKELETON_ROWS * (bar_h + gap) - gap
+        start_row = max(0, (h - total_h) // 2)
+        for i in range(self._SKELETON_ROWS):
+            row = start_row + i * (bar_h + gap)
+            # Lead bar in hover tone, rest in panel tone, shrinking widths.
+            bg = theme.bg_hover if i == 0 else theme.bg_panel
+            width = max(8, int(w * (0.9 - i * 0.15)))
+            col = max(0, (w - width) // 2)
+            surface.fill_rect_rgb(row, col, min(width, w), bar_h, bg)
+
     def _render_empty_state(self, surface: Surface) -> None:
-        """Render empty-state segments centered on the surface."""
+        """Render empty-state segments centered on the surface.
+
+        Segments with ``fg=None`` follow presentation softening (dimmed when
+        the panel is not the focus leaf), matching row text; semantic colors
+        (e.g. success/warning) pass through unchanged.
+        """
         w = surface.width
         h = surface.height
         if w <= 0 or h <= 0:
@@ -587,17 +618,19 @@ class OptionList(Component):
         lines = self.empty_state
         if lines is None:
             return
+        fg_primary = self.presentation_fg("primary")
         total_height = len(lines)
         start_row = (h - total_height) // 2
         for i, seg in enumerate(lines):
             row = start_row + i
+            fg = seg.fg if seg.fg is not None else fg_primary
             line_w = wcswidth(seg.text)
             col = max(0, (w - line_w) // 2)
             surface.draw_text_rgb(
                 row,
                 col,
                 seg.text,
-                fg=seg.fg,
+                fg=fg,
                 bg=seg.bg,
                 style_flags=seg.style_flags,
             )

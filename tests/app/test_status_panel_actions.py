@@ -179,6 +179,41 @@ def test_stash_submit_strips_message_and_pushes() -> None:
         vm.stash_push.assert_called_once_with("wip")
 
 
+def test_clean_tree_sync_clears_loading_and_shows_empty_state() -> None:
+    """A clean tree re-sets items to the same [] so Signal never notifies;
+    mount must reconcile the current snapshot or loading sticks on skeleton."""
+    from pigit.termui.surface import Surface
+
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.refresh = Mock()
+    panel = StatusPanel(vm=vm)
+    panel.unmount()
+    panel.resize((44, 12))
+    assert panel.loading is True
+
+    panel.mount()
+    assert panel.loading is False
+
+    s = Surface(44, 12)
+    panel.paint(s)
+    text = "\n".join(s.lines())
+    assert "Working tree clean" in text
+
+
+def test_remount_clears_loading_without_signal_notify() -> None:
+    """TabView mounts the visible tab twice; second mount must not leave loading on."""
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.refresh = Mock()
+    panel = StatusPanel(vm=vm)
+    panel.mount()
+    assert panel.loading is False
+
+    panel.mount()
+    assert panel.loading is False
+
+
 def test_stash_submit_empty_message_still_pushes() -> None:
     files = [_file("a.py")]
     panel, vm = _panel(files)

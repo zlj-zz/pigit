@@ -23,7 +23,6 @@ from pigit.termui import (
 from pigit.termui.widgets import AlertDialog, OptionList, SectionRule
 
 from .app_diff import DiffType
-from .app_theme import THEME
 from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
@@ -48,8 +47,8 @@ class StashPanel(OptionList):
     ) -> None:
         super().__init__(
             empty_state=[
-                Segment("  No stashes", fg=THEME.fg_dim),
-                Segment("  Press 's' to stash current changes", fg=THEME.fg_dim),
+                Segment("  No stashes"),
+                Segment("stash new changes from Status (s)"),
             ],
             id=id,
             header=SectionRule("Stash"),

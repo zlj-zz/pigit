@@ -289,11 +289,15 @@ class StatusPanel(OptionList):
         super().__init__(
             on_selection_changed=on_selection_changed,
             empty_state=[
+                # ASCII-only bunny: bullet/check glyphs render as tofu blocks
+                # on some terminals, which reads as black smudges.
                 Segment("    (\\__/)", fg=THEME.fg_success),
-                Segment("    ( •_• )", fg=THEME.fg_success),
-                Segment("    / > ✓", fg=THEME.fg_success),
-                Segment("  Pigit Clean", fg=THEME.fg_dim),
-                Segment("Working tree clean", fg=THEME.fg_dim),
+                Segment("    ( ._. )", fg=THEME.fg_success),
+                Segment("    ( > v )", fg=THEME.fg_success),
+                # Structural rows: fg=None so they follow presentation
+                # softening (dimmed when this panel is not focused).
+                Segment("Working tree clean"),
+                Segment("a stage · s stash · / filter"),
             ],
             lazy_load=True,
             id=id,
@@ -332,7 +336,12 @@ class StatusPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        self.loading = True
         self._vm.refresh()
+        # TabView / Column can mount the same panel more than once; the signal
+        # sync in _bind_vm_signals runs only on first subscribe, so always
+        # reconcile after refresh is kicked off.
+        self._sync_items_from_vm()
 
     def on_focus(self) -> None:
         """Refresh worktree status when returning focus within the Status column."""
@@ -352,6 +361,10 @@ class StatusPanel(OptionList):
                 bind_signals(self, self._vm.items, callback=self._on_items_changed)
             )
 
+    def _sync_items_from_vm(self) -> None:
+        """Apply the current vm.items snapshot (Signal skips unchanged values)."""
+        self._on_items_changed()
+
     def _on_items_changed(self) -> None:
         files = self._vm.items.value
         _logger.debug(
@@ -362,6 +375,7 @@ class StatusPanel(OptionList):
         if not self.is_mounted():
             return
         self._all_files = list(files)
+        self.loading = False
         self._apply_filter()
 
     def _apply_filter(self) -> None:
