@@ -313,6 +313,8 @@ class PigitApplication(Application):
             self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
+        # Footer occupies the bottom 2 rows when shown; keep toasts above it.
+        root.toast_bottom_pad = 2 if self._config.show_footer else 0
         self._help_panel = HelpPanel(
             key_fg=THEME.fg_info,
         )
