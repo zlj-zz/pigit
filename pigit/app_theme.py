@@ -16,6 +16,24 @@ from pigit.termui.theme import Theme
 # 0.30 reads as a clearly distinct block while keeping ~6:1 contrast.
 _HUNK_TONE_BLEND = 0.30
 
+# Commit panel: cursor-selected row background.
+_HEAD_ROW_BLEND = 0.15
+_HEAD_ROW_INACTIVE_BLEND = 0.10
+
+# Heatmap current-week side bars: muted accent, not full fg_accent brightness.
+_CONTRIB_WEEK_FRAME_BLEND = 0.35
+
+# Author line chart: six equal-blend hues (between muted chrome and full palette).
+_CHART_AUTHOR_BLEND = 0.55
+_CHART_AUTHOR_HUES: tuple[tuple[int, int, int], ...] = (
+    palette.ACCENT,
+    palette.GREEN,
+    palette.AMBER,
+    palette.MAGENTA,
+    palette.CYAN,
+    palette.PURPLE,
+)
+
 
 @dataclass(frozen=True)
 class PigitTheme(Theme):
@@ -46,6 +64,14 @@ class PigitTheme(Theme):
     fg_tag_parent: tuple[int, int, int] = palette.AMBER
     fg_head_commit: tuple[int, int, int] = palette.BLUE
     fg_unpushed_commit: tuple[int, int, int] = palette.YELLOW
+
+    # Cursor-selected commit row background.
+    bg_commit_selected: tuple[int, int, int] = palette.blend(
+        palette.STEEL, palette.ACCENT, _HEAD_ROW_BLEND
+    )
+    bg_commit_selected_inactive: tuple[int, int, int] = palette.blend(
+        palette.CHARCOAL, palette.ACCENT, _HEAD_ROW_INACTIVE_BLEND
+    )
 
     # Panel / title / search
     fg_branch_name: tuple[int, int, int] = palette.PEARL
@@ -96,14 +122,10 @@ class PigitTheme(Theme):
         palette.RED,
     )
 
-    # Contribution report: author line-chart series colors.
-    chart_author_colors: tuple[tuple[int, int, int], ...] = (
-        palette.SKY_BLUE,
-        palette.YELLOW,
-        palette.PURPLE,
-        palette.RED,
-        palette.GREEN,
-        palette.BLUE,
+    # Contribution report: six soft, equal-blend author line colors (hash-assigned).
+    chart_author_colors: tuple[tuple[int, int, int], ...] = tuple(
+        palette.blend(palette.STEEL, hue, _CHART_AUTHOR_BLEND)
+        for hue in _CHART_AUTHOR_HUES
     )
 
     # Contribution heatmap intensity 0..5 (level 0 stays slightly lighter
@@ -115,6 +137,11 @@ class PigitTheme(Theme):
         (64, 196, 99),
         (48, 161, 78),
         (33, 110, 57),
+    )
+
+    # Contribution heatmap: vertical side bars for the current week column.
+    fg_contrib_week_frame: tuple[int, int, int] = palette.blend(
+        palette.SLATE, palette.ACCENT, _CONTRIB_WEEK_FRAME_BLEND
     )
 
 

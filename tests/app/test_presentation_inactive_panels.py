@@ -137,7 +137,7 @@ def test_commit_message_inactive_refs_keep_color() -> None:
     assert THEME.fg_local_branch in ref_fgs
 
     _steal_presentation()
-    left, main, right = panel.describe_row(0, is_cursor=False)
+    left, main, right = panel.describe_row(0, is_cursor=True)
     msg = [s for s in main if s.text == "fix bug"][0]
     assert msg.fg == THEME.fg_inactive
     sha = [s for s in left if s.text == "abc1234"][0]
@@ -146,6 +146,13 @@ def test_commit_message_inactive_refs_keep_color() -> None:
     ref_fgs = {s.fg for s in main if s.text in ("HEAD", "main")}
     assert THEME.fg_info in ref_fgs
     assert THEME.fg_local_branch in ref_fgs
+    assert all(
+        s.bg == THEME.bg_commit_selected_inactive for s in left if s.bg is not None
+    )
+    assert all(
+        s.bg == THEME.bg_commit_selected_inactive for s in main if s.bg is not None
+    )
+    assert right[0].bg == THEME.bg_commit_selected_inactive
 
 
 def test_unpushed_commit_glyph_stays_semantic_under_steal() -> None:

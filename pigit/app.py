@@ -67,7 +67,6 @@ from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
 from .config_data import AppConfig
 
-
 # Footer chrome height in rows. The layout height (build_root) and the
 # toast_bottom_pad (setup_root) both derive from this constant, so growing
 # the footer can never silently overlap bottom-anchored toasts.

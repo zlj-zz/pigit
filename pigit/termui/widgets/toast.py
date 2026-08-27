@@ -151,9 +151,7 @@ class Toast(Component):
         # Keep the TAIL on overflow so actionable hint lines stay visible;
         # the truncation marker goes at the head.
         overflowed = len(line_segments) > MAX_TOAST_LINES
-        all_lines = (
-            line_segments[-MAX_TOAST_LINES:] if overflowed else line_segments
-        )
+        all_lines = line_segments[-MAX_TOAST_LINES:] if overflowed else line_segments
         for i, line in enumerate(all_lines):
             line_w = 0
             new_line: list[Segment] = []

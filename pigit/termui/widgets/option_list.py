@@ -593,7 +593,8 @@ class OptionList(Component):
             # Glyph follows the same presentation softening as row text.
             fg = self.presentation_fg("primary")
             style = palette.STYLE_BOLD if is_cursor else 0
-        return [Segment(cell, fg=fg, style_flags=style)] + list(left)
+        row_bg = left[0].bg if left and left[0].bg is not None else None
+        return [Segment(cell, fg=fg, bg=row_bg, style_flags=style)] + list(left)
 
     def _render_loading_skeleton(self, surface: Surface) -> None:
         """Draw placeholder bars while a lazy panel's content is loading."""

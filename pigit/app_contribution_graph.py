@@ -11,9 +11,10 @@ Date: 2026-04-25
 from __future__ import annotations
 
 import datetime
+import hashlib
 from collections import defaultdict
 
-from pigit.termui import Component, MouseButton, MouseKind, Surface
+from pigit.termui import Component, MouseButton, MouseKind, Surface, palette
 from pigit.termui.primitives import (
     build_contribution_calendar,
     calendar_day_values,
@@ -37,6 +38,18 @@ _PAN_STEP = 5
 
 # Width of the cell character in terminal columns (1 for half-width, 2 for full-width)
 _CELL_CHAR_W = wcswidth(_CELL_CHAR)
+# Heatmap rows (Mon→Sun); shared by grid geometry and week highlight.
+_HEATMAP_ROWS = 7
+# Blend heatmap cell fg toward the week-frame accent (keeps intensity visible).
+_WEEK_CELL_FRAME_BLEND = 0.28
+
+
+def _author_chart_color(author: str) -> tuple[int, int, int]:
+    """Stable series color from author name (hash into chart_author_colors)."""
+    colors = THEME.chart_author_colors
+    digest = hashlib.md5(author.encode("utf-8")).digest()
+    idx = int.from_bytes(digest[:4], "big") % len(colors)
+    return colors[idx]
 
 
 class ContributionGraph(Component):
@@ -57,7 +70,7 @@ class ContributionGraph(Component):
         self._day_counts: dict[datetime.date, int] = {}
         self._author_day_counts: dict[str, dict[datetime.date, int]] = {}
         self._heatmap = HeatmapGrid(
-            rows=7,
+            rows=_HEATMAP_ROWS,
             cols=53,
             colors=list(THEME.contrib_heatmap_colors),
             bg=None,
@@ -236,7 +249,12 @@ class ContributionGraph(Component):
             return
 
         self._line_chart.set_series(
-            self._line_chart_series, x_labels=self._line_chart_labels
+            self._line_chart_series,
+            x_labels=self._line_chart_labels,
+            series_colors={
+                author: _author_chart_color(author)
+                for author in self._line_chart_series
+            },
         )
         chart_surface = surface.subsurface(0, start_col, width, height)
         self._line_chart.paint(chart_surface)
@@ -309,7 +327,7 @@ class ContributionGraph(Component):
         # render as blank panel background instead of the empty glyph.
         window: dict[tuple[int, int], int] = {}
         for week in range(num_weeks):
-            for day in range(7):
+            for day in range(_HEATMAP_ROWS):
                 date = first_monday + datetime.timedelta(weeks=week, days=day)
                 if date > today:
                     continue
@@ -317,6 +335,14 @@ class ContributionGraph(Component):
         self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)
         self._heatmap.paint(canvas)
+        self._draw_current_week_frame(
+            canvas,
+            today=today,
+            first_monday=first_monday,
+            num_weeks=num_weeks,
+            content_h=content_h,
+            window=window,
+        )
 
         # --- Legend (Less → More) near the bottom, stats below it ---
         # Anchored to the content height so a taller report spreads the spacer
@@ -351,6 +377,60 @@ class ContributionGraph(Component):
 
         # --- Show the pannable window ---
         surface.blit(canvas, 0, pan, w, content_h, _TOP_PAD, 0)
+
+    def _draw_current_week_frame(
+        self,
+        canvas: Surface,
+        *,
+        today: datetime.date,
+        first_monday: datetime.date,
+        num_weeks: int,
+        content_h: int,
+        window: dict[tuple[int, int], int],
+    ) -> None:
+        """Highlight the current week column without clobbering adjacent weeks.
+
+        Single-column weeks have no gutter between columns, so side ``│`` bars
+        are drawn only in margin space (before the grid or after the last week).
+        The week column itself is tinted toward ``fg_contrib_week_frame``.
+        """
+        today_week = (today - first_monday).days // 7
+        if today_week < 0 or today_week >= num_weeks:
+            return
+
+        cell_w = _CELL_CHAR_W
+        col_start = _LEFT_MARGIN + today_week * cell_w
+        col_end = col_start + cell_w - 1
+        frame_fg = THEME.fg_contrib_week_frame
+        heatmap_right = _LEFT_MARGIN + num_weeks * cell_w
+
+        side_top = max(_TOP_MARGIN, 0)
+        side_bottom = min(_TOP_MARGIN + _HEATMAP_ROWS - 1, content_h - 1)
+        if side_top > side_bottom:
+            return
+
+        color_fn = self._heatmap._color_fn
+        for day in range(_HEATMAP_ROWS):
+            row = _TOP_MARGIN + day
+            if row < side_top or row > side_bottom:
+                continue
+            date = first_monday + datetime.timedelta(weeks=today_week, days=day)
+            if date > today:
+                continue
+            value = window.get((today_week, day), 0)
+            base_fg = color_fn(value, self._max_count)
+            ch = _CELL_CHAR if value > 0 else _EMPTY_CHAR
+            tint_fg = palette.blend(base_fg, frame_fg, _WEEK_CELL_FRAME_BLEND)
+            for col in range(col_start, col_end + 1):
+                canvas.draw_text_rgb(row, col, ch, fg=tint_fg, bg=None)
+
+        left_bar = col_start - 1
+        right_bar = col_end + 1
+        for row in range(side_top, side_bottom + 1):
+            if left_bar >= 0 and left_bar < _LEFT_MARGIN:
+                canvas.draw_text_rgb(row, left_bar, "│", fg=frame_fg, bg=None)
+            if right_bar < canvas.width and right_bar >= heatmap_right:
+                canvas.draw_text_rgb(row, right_bar, "│", fg=frame_fg, bg=None)
 
     def handle_mouse(self, event) -> bool:
         """Horizontal wheel over the report pans the combined graph."""
