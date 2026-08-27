@@ -81,7 +81,7 @@ def test_status_filename_inactive_under_steal_xy_semantic_kept() -> None:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
     vm.repo_path = "/tmp/repo"
-    panel = StatusPanel(vm=vm, default_view="flat")
+    panel = StatusPanel(vm=vm, default_view="flat", file_icons=False)
     panel.files = [_status_file()]
     panel.content = [panel.files[0].display_str]
 

@@ -44,7 +44,7 @@ from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
 from .app_types import FileSnapshot
 from .app_theme import THEME
-from .ext.utils import copy_to_clipboard
+from .ext.utils import adjudgment_type, copy_to_clipboard, get_file_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -275,6 +275,8 @@ class StatusPanel(OptionList):
     keymap_namespace = "status"
     TAB_NAME = "Status"
     tab_key = "1"
+    # nf-fa-folder (PUA block, width 1).
+    _DIR_ICON = "\uf07b"
 
     def __init__(
         self,
@@ -285,6 +287,7 @@ class StatusPanel(OptionList):
         default_view: str = "tree",
         id: str | None = None,
         on_toggle_preview: Callable[[], None] | None = None,
+        file_icons: bool = True,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -306,6 +309,7 @@ class StatusPanel(OptionList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
+        self._file_icons = file_icons
         self.files: list[File] = []
         self._all_files: list[File] = []
         self._source_map: list[int] = []
@@ -898,6 +902,18 @@ class StatusPanel(OptionList):
             return self._describe_tree_row(idx, is_cursor)
         return self._describe_flat_row(idx, is_cursor)
 
+    def _file_icon_glyph(self, name: str, *, is_dir: bool) -> str:
+        """Nerd Font icon glyph for a row, or '' when icons are disabled.
+
+        The icon is a name prefix (same color as the name), so off-focus
+        dimming and selection colors follow automatically.
+        """
+        if not self._file_icons:
+            return ""
+        if is_dir:
+            return self._DIR_ICON
+        return get_file_icon(adjudgment_type(name))
+
     def _describe_flat_row(
         self, idx: int, is_cursor: bool
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
@@ -930,7 +946,13 @@ class StatusPanel(OptionList):
             filename_fg = THEME.fg_staged_renamed
         else:
             filename_fg = fg_primary
-        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
+        icon = self._file_icon_glyph(file.name, is_dir=False)
+        icon_prefix = f"{icon} " if icon else ""
+        main = [
+            Segment(
+                icon_prefix + file.display_str, fg=filename_fg, style_flags=cursor_flags
+            )
+        ]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -955,9 +977,11 @@ class StatusPanel(OptionList):
             left = [
                 Segment(" ", fg=fg_primary),
             ]
+            icon = self._file_icon_glyph(row.name, is_dir=True)
+            icon_prefix = f"{icon} " if icon else ""
             main = [
                 Segment(
-                    indent + arrow + " " + row.name + "/",
+                    indent + arrow + " " + icon_prefix + row.name + "/",
                     fg=fg_primary,
                     style_flags=cursor_flags,
                 )
@@ -985,7 +1009,15 @@ class StatusPanel(OptionList):
         ]
         is_selected = row.source_index in self._selected
         filename_fg = THEME.fg_staged_renamed if is_selected else fg_primary
-        main = [Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)]
+        icon = self._file_icon_glyph(file.name, is_dir=False)
+        icon_prefix = f"{icon} " if icon else ""
+        main = [
+            Segment(
+                indent + icon_prefix + row.name,
+                fg=filename_fg,
+                style_flags=cursor_flags,
+            )
+        ]
 
         right: list[Segment] = []
         label = _status_label(file)

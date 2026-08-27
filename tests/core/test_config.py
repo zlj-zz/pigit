@@ -92,6 +92,31 @@ def test_default_values_when_no_config_file():
     assert data.app.diff_preview_default is True
     assert data.app.log_graph_default is True
     assert data.app.commit_report_default is True
+    assert data.app.file_icons is True
+
+
+def test_app_file_icons_read_from_toml(tmp_path, monkeypatch):
+    monkeypatch.delenv("PIGIT_ICONS", raising=False)
+    config_path = tmp_path / "pigit-fileicons.toml"
+    config_path.write_text("[app]\nfile_icons = false\n", encoding="utf-8")
+    c = Config(str(config_path), version="test", auto_load=True)
+    assert c.get().app.file_icons is False
+
+
+def test_pigit_icons_env_force_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("PIGIT_ICONS", "0")
+    config_path = tmp_path / "pigit-env.toml"
+    config_path.write_text("[app]\nfile_icons = true\n", encoding="utf-8")
+    c = Config(str(config_path), version="test", auto_load=True)
+    assert c.get().app.file_icons is False
+
+
+def test_config_template_renders_file_icons(tmp_path):
+    """CONFIG_TEMPLATE must render file_icons without KeyError."""
+    c = Config(str(tmp_path / "pigit-new.toml"), version="test", auto_load=True)
+    assert c.create_config_template() is True
+    content = (tmp_path / "pigit-new.toml").read_text(encoding="utf-8")
+    assert "file_icons = true" in content
 
 
 def test_invalid_format_falls_back_to_default(tmp_path):

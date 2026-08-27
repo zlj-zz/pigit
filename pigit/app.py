@@ -192,6 +192,7 @@ class PigitApplication(Application):
             id="status_panel",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
+            file_icons=self._config.file_icons,
         )
         self._stash_panel = StashPanel(
             vm=self._status_vm,

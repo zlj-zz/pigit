@@ -179,6 +179,32 @@ def test_stash_submit_strips_message_and_pushes() -> None:
         vm.stash_push.assert_called_once_with("wip")
 
 
+def test_file_icon_name_prefix_when_enabled_and_disabled() -> None:
+    """file_icons=True prefixes the name with a Nerd Font icon; False keeps
+    the plain name."""
+    from pigit.ext.utils import adjudgment_type, get_file_icon
+
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([_file("main.py")])
+    vm.repo_path = "/tmp/repo"
+    file = _file("main.py")
+
+    panel = StatusPanel(vm=vm, default_view="flat", file_icons=True)
+    panel.files = [file]
+    panel.set_content(["main.py"])
+    left, main, _right = panel.describe_row(0, False)
+    assert main[0].text == get_file_icon(adjudgment_type("main.py")) + " main.py"
+    # Icon moved out of the leading status column.
+    assert left[0].text == " "
+    assert left[2].text == "M"  # unstaged column
+
+    panel_off = StatusPanel(vm=vm, default_view="flat", file_icons=False)
+    panel_off.files = [file]
+    panel_off.set_content(["main.py"])
+    _left, main_off, _r = panel_off.describe_row(0, False)
+    assert main_off[0].text == "main.py"
+
+
 def test_clean_tree_sync_clears_loading_and_shows_empty_state() -> None:
     """A clean tree re-sets items to the same [] so Signal never notifies;
     mount must reconcile the current snapshot or loading sticks on skeleton."""
