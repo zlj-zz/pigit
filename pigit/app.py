@@ -140,6 +140,7 @@ class PigitApplication(Application):
             get_sync_task=lambda: self._network_sync_task,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
+            get_alert_dialog=lambda: self._alert_dialog,
         )
         self._merge_workflow = MergeWorkflow(
             store=self._merge_state_store,
@@ -763,9 +764,9 @@ class PigitApplication(Application):
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
-    @bind_action("push", "P", desc="Push current branch to upstream", tip="Push")
+    @bind_action("push", "P", desc="Push current branch (set upstream if needed)", tip="Push")
     def push_upstream(self) -> None:
-        """Push HEAD to its configured upstream (non-interactive)."""
+        """Push HEAD; confirm ``git push -u`` when no upstream is configured."""
         self._run_network_git("push")
 
     @bind_action("pull", "F", desc="Pull current branch from upstream", tip="Pull")

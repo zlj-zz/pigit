@@ -70,6 +70,15 @@ class GitApi:
     def get_head(self, path=None):
         return self._core.get_head(path)
 
+    def get_current_branch(self, path=None):
+        return self._core.get_current_branch(path)
+
+    def has_upstream(self, path=None):
+        return self._core.has_upstream(path)
+
+    def default_push_remote(self, path=None):
+        return self._core.default_push_remote(path)
+
     def get_first_pushed_commit(self, path=None, branch_name=None):
         return self._core.get_first_pushed_commit(path, branch_name)
 
@@ -262,6 +271,9 @@ class GitApi:
 
     def push(self, path=None):
         return self._merge.push(path)
+
+    def push_set_upstream(self, remote, branch, path=None):
+        return self._merge.push_set_upstream(remote, branch, path)
 
     def merge(self, source, path=None):
         return self._merge.merge(source, path)

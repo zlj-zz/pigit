@@ -146,6 +146,38 @@ class _CoreOps(_OpsBase):
             head = cast(str, head).rstrip()
         return head
 
+    def get_current_branch(self, path: str | None = None) -> str | None:
+        """Return the short branch name, or None when HEAD is detached."""
+        path = path or self.path
+        code, _err, out = self.executor.exec(
+            "git symbolic-ref -q --short HEAD",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code != 0 or not out:
+            return None
+        name = cast(str, out).strip()
+        return name or None
+
+    def has_upstream(self, path: str | None = None) -> bool:
+        """Return True when the current branch has a configured upstream."""
+        path = path or self.path
+        code, _err, _out = self.executor.exec(
+            "git rev-parse --abbrev-ref @{upstream}",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        return code == 0
+
+    def default_push_remote(self, path: str | None = None) -> str | None:
+        """Prefer ``origin``, else the first configured remote, else None."""
+        remotes = self.get_remotes(path)
+        if not remotes:
+            return None
+        if "origin" in remotes:
+            return "origin"
+        return remotes[0]
+
     def get_first_pushed_commit(
         self, path: str | None = None, branch_name: str | None = None
     ) -> str:
