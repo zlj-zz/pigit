@@ -50,7 +50,12 @@ class PigitTheme(Theme):
     fg_file_history_link: tuple[int, int, int] = palette.SKY_BLUE
 
     # Diff viewer (extra slots beyond Theme diff add/del)
-    bg_diff_hunk: tuple[int, int, int] = palette.GRAPHITE
+    # Hunk header tone derives from the brand accent so it follows accent
+    # changes without hand-tuning (low-saturation blend over the base bg).
+    bg_diff_hunk: tuple[int, int, int] = palette.blend(
+        palette.ACCENT, palette.CHARCOAL, 0.25
+    )
+    fg_diff_hunk: tuple[int, int, int] = palette.PEARL
     bg_diff_context: tuple[int, int, int] = palette.INK
     bg_word_diff_add: tuple[int, int, int] = (50, 105, 60)
     bg_word_diff_del: tuple[int, int, int] = (120, 50, 50)

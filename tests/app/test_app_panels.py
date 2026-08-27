@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_diff import DiffViewer
+from pigit.app_theme import THEME
 from pigit.termui.component import ComponentError
 from pigit.termui.surface import Surface
 
@@ -64,6 +65,41 @@ class TestDiffViewer:
         assert "\u250c" not in lines[0]
         # Borderless renders line number + truncated content + heatmap
         assert "+ad" in lines[0] or "added" in lines[0]
+
+    def test_hunk_header_uses_accent_tone(self):
+        """@@ hunk headers render on the derived hunk tone with hunk fg."""
+        d = DiffViewer()
+        d.set_content(["@@ -1,3 +1,4 @@", "+added", " context"])
+        d.resize((40, 5))
+        s = Surface(40, 5)
+        d.paint(s)
+        row = s.rows()[1]
+        # Column 6 = 1 (border) + 4 (gutter) + 1 (prefix)
+        cell = row[6]
+        assert cell.bg == THEME.bg_diff_hunk
+        assert cell.fg == THEME.fg_diff_hunk
+
+    def test_line_numbers_flush_against_prefix(self):
+        """Gutter width matches formatting so numbers sit flush before +/-."""
+        d = DiffViewer()
+        d.set_content(["+added", "-removed"])
+        d.resize((20, 4))
+        s = Surface(20, 4)
+        d.paint(s)
+        row = s.rows()[1]
+        # gutter ends at col 5 (1 border + 4 gutter), +/- prefix follows
+        assert row[5].char == "+"
+
+    def test_line_numbers_hidden_on_narrow_surface(self):
+        """Narrow surfaces drop the line-number gutter entirely."""
+        d = DiffViewer()
+        d.set_content(["+added"])
+        d.resize((14, 3))
+        s = Surface(14, 3)
+        d.paint(s)
+        row = s.rows()[1]
+        # text starts right after the border; no gutter columns
+        assert row[1].char == "+"
 
     def test_hunk_navigation(self):
         d = DiffViewer()
@@ -172,16 +208,16 @@ class TestDiffViewer:
         """Borderless fallback must also handle wide chars without overflow."""
         d = DiffViewer()
         d.set_content(["+中文内容测试"])
-        # w=8 triggers borderless fallback (w <= LINE_NO_WIDTH + 3 = 8)
-        d.resize((8, 3))
-        s = Surface(8, 3)
+        # w=7 triggers borderless fallback (w <= LINE_NO_WIDTH + 3 = 7)
+        d.resize((7, 3))
+        s = Surface(7, 3)
         d.paint(s)
         lines = s.lines()
         # Should not have box borders (too small)
         assert "\u250c" not in lines[0]
         # Each row must have exactly surface.width cells
         for row in s.rows():
-            assert len(row) == 8
+            assert len(row) == 7
         # Rightmost column should be heatmap symbol (not overwritten)
         cell = s.rows()[0][-1]
         assert cell.char in {"\u2591", "\u2592", "\u2593", "\u2588", " "}
