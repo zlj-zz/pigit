@@ -852,10 +852,28 @@ class DiffViewer(Component):
         max_col = text_start_col + main_w
 
         if is_hunk:
-            # Hunk headers render verbatim in the hunk tone; their syntax
-            # tokens carry their own fg, so bypass token drawing entirely.
-            surface.draw_text_rgb(
-                row, text_start_col, line, fg=THEME.fg_diff_hunk, bg=bg
+            # Hunk headers keep the normal token path (horizontal scroll +
+            # truncation), but plain parts render in the hunk tone while
+            # syntax tokens (function names etc.) keep their colors.
+            tokens = [
+                (
+                    text,
+                    THEME.fg_diff_hunk if fg == THEME.fg_primary else fg,
+                    width,
+                    bg,
+                )
+                for text, fg, width, bg in self._tokens_at(
+                    idx, line, strip_diff_prefix=True
+                )
+            ]
+            self._draw_tokens(
+                surface,
+                row,
+                col,
+                max_col,
+                tokens,
+                bg,
+                clip_left=text_start_col,
             )
         elif line.startswith("\\"):
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)

@@ -32,9 +32,16 @@ class Signal(Generic[T]):
         """Return the current value of the signal."""
         return self._value
 
-    def set(self, value: T) -> None:
-        """Set the value and notify subscribers if it changed."""
-        if value == self._value:
+    def set(self, value: T, *, force: bool = False) -> None:
+        """Set the value and notify subscribers if it changed.
+
+        Args:
+            value: New value.
+            force: Notify even when ``value`` equals the current value.
+                Async loaders use this so a completed refresh that re-produces
+                the same result (e.g. an empty list) still wakes subscribers.
+        """
+        if not force and value == self._value:
             return
         self._value = value
         cbs: list[Callable[[T], None]] = []

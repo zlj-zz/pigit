@@ -77,7 +77,10 @@ class ViewModelBase(Generic[T]):
         raise NotImplementedError
 
     def _on_loaded(self, data: list[T]) -> None:
-        self._items.set(data)
+        # force=True: a refresh that re-produces the same value (e.g. an empty
+        # tree) must still notify so loading state clears and empty-state
+        # renders; Signal.set alone would skip the unchanged value.
+        self._items.set(data, force=True)
         # A fresh load may have changed the underlying git state, so any
         # memoized inspector snapshot is stale.
         with self._inspector_lock:

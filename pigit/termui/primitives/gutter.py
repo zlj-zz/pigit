@@ -20,4 +20,10 @@ def format_line_number(value: int | str, width: int) -> str:
     """
     if value == "":
         return "".rjust(width)
-    return str(value).rjust(width)
+    text = str(value)
+    # Keep the rightmost digits when the number outgrows the gutter
+    # (e.g. 10000 in a 4-wide column); rjust alone would overflow and
+    # collide with the +/- prefix column.
+    if len(text) > width:
+        text = text[-width:]
+    return text.rjust(width)

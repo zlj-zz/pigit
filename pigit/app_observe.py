@@ -100,6 +100,10 @@ class ObserveHost:
         self._observe_drain_id: int | None = None
         self._observe_status_unsub: Callable[[], None] | None = None
         self._last_worktree_dirty: bool | None = None
+        # True only while a worktree root is actually attached (Status tab
+        # focused); digest values from other tabs are stale and must not be
+        # reused for the header dirty dot.
+        self._worktree_watched = False
 
     def start(self) -> None:
         """Start StatMtime observation of git metadata (and Status worktree)."""
@@ -149,6 +153,8 @@ class ObserveHost:
 
     def stop(self) -> None:
         """Remove observe intervals and stop the backend."""
+        self._worktree_watched = False
+        self._last_worktree_dirty = None
         if self._observe_status_unsub is not None:
             self._observe_status_unsub()
             self._observe_status_unsub = None
@@ -184,11 +190,13 @@ class ObserveHost:
             WatchRoot(kind="git_dir", path=ctx.git_dir),
             WatchRoot(kind="common_dir", path=ctx.common_dir),
         ]
+        self._worktree_watched = False
         if not self._deps.get_config().observe_worktree:
             return roots
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if not isinstance(active, StatusPanel):
             return roots
+        self._worktree_watched = True
         roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
         repo = Path(ctx.repo_root)
         for file_item in self._deps.get_status_vm().items.value:
@@ -278,7 +286,13 @@ class ObserveHost:
 
     @property
     def worktree_dirty(self) -> bool | None:
-        """Most recent worktree dirty flag, or None when observe is inactive."""
+        """Most recent worktree dirty flag while worktree observe is active.
+
+        None when observe is inactive or a non-Status tab is focused, so
+        callers fall back to a direct probe instead of a stale digest.
+        """
+        if not self._worktree_watched:
+            return None
         return self._last_worktree_dirty
 
     def _on_status_items(self, _items: list) -> None:

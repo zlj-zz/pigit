@@ -242,6 +242,36 @@ class TestObserveBatchSinks:
         with patch("pigit.app_observe.resolve_presentation_leaf", return_value=branch):
             roots = app._build_observe_roots()
         assert all(r.kind != "worktree" for r in roots)
+        # Digest is only trustworthy while a worktree root is actually watched;
+        # on other tabs it must read None so the header falls back to a direct
+        # probe instead of a stale dirty flag.
+        assert app._observe_host.worktree_dirty is None
+
+    def test_worktree_dirty_stale_on_non_status_tab(self, app):
+        """worktree_dirty returns None when Status is not the active tab."""
+        from pigit.app_status import StatusPanel
+        from pigit.app_branch import BranchPanel
+
+        app._observe_host._observe_ctx = ObserveContext(
+            repo_root="/repo",
+            git_dir="/repo/.git",
+            common_dir="/repo/.git",
+        )
+        app._config.observe_worktree = True
+        app._status_vm.items.set([])
+        status = object.__new__(StatusPanel)
+        branch = object.__new__(BranchPanel)
+
+        # Status focused: digest recorded and readable.
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=status):
+            app._build_observe_roots()
+        app._observe_host._last_worktree_dirty = True
+        assert app._observe_host.worktree_dirty is True
+
+        # Switch away: stale digest must not leak into the header probe.
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=branch):
+            app._build_observe_roots()
+        assert app._observe_host.worktree_dirty is None
 
     def test_build_observe_roots_uses_rename_destination_path(self, app):
         """Rename porcelain must not become a WatchRoot path with '->'."""

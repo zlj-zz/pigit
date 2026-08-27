@@ -340,12 +340,9 @@ class StatusPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Content arrives asynchronously via vm.items; show skeleton until then.
         self.loading = True
         self._vm.refresh()
-        # TabView / Column can mount the same panel more than once; the signal
-        # sync in _bind_vm_signals runs only on first subscribe, so always
-        # reconcile after refresh is kicked off.
-        self._sync_items_from_vm()
 
     def on_focus(self) -> None:
         """Refresh worktree status when returning focus within the Status column."""
@@ -364,10 +361,6 @@ class StatusPanel(OptionList):
             self._vm_unsubs.append(
                 bind_signals(self, self._vm.items, callback=self._on_items_changed)
             )
-
-    def _sync_items_from_vm(self) -> None:
-        """Apply the current vm.items snapshot (Signal skips unchanged values)."""
-        self._on_items_changed()
 
     def _on_items_changed(self) -> None:
         files = self._vm.items.value

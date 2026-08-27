@@ -51,9 +51,11 @@ class PigitTheme(Theme):
 
     # Diff viewer (extra slots beyond Theme diff add/del)
     # Hunk header tone derives from the brand accent so it follows accent
-    # changes without hand-tuning (low-saturation blend over the base bg).
+    # changes without hand-tuning. blend(CHARCOAL, ACCENT, 0.30) reads as a
+    # clearly distinct block (0.18 was barely distinguishable from the panel)
+    # while keeping ~6:1 contrast against fg_diff_hunk.
     bg_diff_hunk: tuple[int, int, int] = palette.blend(
-        palette.ACCENT, palette.CHARCOAL, 0.25
+        palette.CHARCOAL, palette.ACCENT, 0.30
     )
     fg_diff_hunk: tuple[int, int, int] = palette.PEARL
     bg_diff_context: tuple[int, int, int] = palette.INK

@@ -205,9 +205,10 @@ def test_file_icon_name_prefix_when_enabled_and_disabled() -> None:
     assert main_off[0].text == "main.py"
 
 
-def test_clean_tree_sync_clears_loading_and_shows_empty_state() -> None:
-    """A clean tree re-sets items to the same [] so Signal never notifies;
-    mount must reconcile the current snapshot or loading sticks on skeleton."""
+def test_clean_tree_refresh_completion_clears_loading() -> None:
+    """A clean tree refresh re-sets items to the same [] — Signal.set skips
+    unchanged values, so the VM must force-notify on load completion or
+    loading sticks on skeleton bars forever."""
     from pigit.termui.surface import Surface
 
     vm = Mock(spec=IStatusViewModel)
@@ -219,6 +220,11 @@ def test_clean_tree_sync_clears_loading_and_shows_empty_state() -> None:
     assert panel.loading is True
 
     panel.mount()
+    # Async refresh is in flight: skeleton stays until the VM delivers.
+    assert panel.loading is True
+
+    # Load completes with the same empty list — force notify wakes the panel.
+    vm.items.set([], force=True)
     assert panel.loading is False
 
     s = Surface(44, 12)
@@ -227,16 +233,19 @@ def test_clean_tree_sync_clears_loading_and_shows_empty_state() -> None:
     assert "Working tree clean" in text
 
 
-def test_remount_clears_loading_without_signal_notify() -> None:
-    """TabView mounts the visible tab twice; second mount must not leave loading on."""
+def test_remount_requests_reload_and_skeleton() -> None:
+    """Remounting kicks a fresh async refresh; skeleton shows until the VM
+    force-notifies the (possibly unchanged) result."""
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
     vm.refresh = Mock()
     panel = StatusPanel(vm=vm)
     panel.mount()
-    assert panel.loading is False
+    assert panel.loading is True
 
     panel.mount()
+    assert panel.loading is True  # fresh request in flight
+    vm.items.set([], force=True)
     assert panel.loading is False
 
 

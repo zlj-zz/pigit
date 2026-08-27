@@ -66,6 +66,20 @@ class TestDiffViewer:
         # Borderless renders line number + truncated content + heatmap
         assert "+ad" in lines[0] or "added" in lines[0]
 
+    def test_hunk_header_scrolls_with_col_offset(self):
+        """@@ headers follow horizontal scroll instead of staying fixed."""
+        d = DiffViewer()
+        d.set_content(["@@ -1,20 +1,20 @@", "+added", " context"])
+        d.resize((30, 5))
+        d._col_offset = 6
+        s = Surface(30, 5)
+        d.paint(s)
+        row = "".join(c.char for c in s.rows()[1])
+        # scrolled past the leading "@@ -1,"; the rest shifts left, so the
+        # header is NOT pinned at the fixed text-start column.
+        assert "20 +1,20 @@" in row
+        assert row[0] == "\u2502"  # border intact, nothing overwrites it
+
     def test_hunk_header_uses_accent_tone(self):
         """@@ hunk headers render on the derived hunk tone with hunk fg."""
         d = DiffViewer()
