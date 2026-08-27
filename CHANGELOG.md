@@ -1,5 +1,30 @@
 # Changelog of pigit
 
+## 2.3.1 (2026-08-27)
+
+### Features
+
+- **List chrome**: OptionList owns the cursor column (`CURSOR` / `CURSOR_ACCENT`); Status / Branch / Stash use a `SectionRule` (accent when focused).
+- **Header**: `*` current-branch marker (green clean / amber dirty) with live dirty updates from observe digests; compact upstream arrows.
+- **Diff hunk headers**: accent-tinted row fill; adaptive line gutter (drops below narrow widths).
+- **Toasts**: dock above the footer with stable card sizing; neutral toasts use the brand accent border.
+- **Lazy panels**: skeleton loading bars; Status / Stash empty states with real next-step hints.
+- **Status file icons**: Nerd Font prefixes beside names; opt out via config or `PIGIT_ICONS=0`.
+- **Commit selection / contribution report**: full selected-row background; current-week heatmap tint; unpushed HEAD stays yellow; author line colors and legend aligned with heatmap Less.
+
+### Bug Fixes
+
+- Diff hunk headers keep horizontal scroll / truncation; line numbers clip to the gutter instead of overflowing into `+/-`.
+- Loading / empty: force-notify when a refresh completes with an unchanged empty list so skeletons clear on clean trees.
+- Header dirty dot stays fresh off the Status tab; pure worktree batches refresh dirty state without extra git subprocesses.
+- Multi-line toasts keep trailing hint lines (truncate from the head).
+- Diff horizontal scroll budget uses the adaptive gutter width.
+
+### Improvements
+
+- Named constants for hunk blend, skeleton widths, and footer height (toast pad tracks footer).
+- Shared `GRAPH_PAD` keeps expanded commit rails aligned under the cursor mark.
+
 ## 2.3.0 (2026-08-26)
 
 ### Bug Fixes

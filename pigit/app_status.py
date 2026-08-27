@@ -32,13 +32,19 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, OptionList
+from pigit.termui.widgets import (
+    ACCENT_BAR,
+    AlertDialog,
+    InputLine,
+    OptionList,
+    SectionRule,
+)
 
 from .app_diff import DiffType, DiffViewer
 from .app_preview import PreviewPanel
 from .app_types import FileSnapshot
 from .app_theme import THEME
-from .ext.utils import copy_to_clipboard
+from .ext.utils import adjudgment_type, copy_to_clipboard, get_file_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -265,10 +271,13 @@ def build_status_tree(
 class StatusPanel(OptionList):
     """Status panel with visual mode."""
 
-    CURSOR = "●"  # filled circle
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "status"
     TAB_NAME = "Status"
     tab_key = "1"
+    # nf-fa-folder (PUA block, width 1).
+    _DIR_ICON = "\uf07b"
 
     def __init__(
         self,
@@ -279,22 +288,29 @@ class StatusPanel(OptionList):
         default_view: str = "tree",
         id: str | None = None,
         on_toggle_preview: Callable[[], None] | None = None,
+        file_icons: bool = True,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
             empty_state=[
+                # ASCII-only bunny: bullet/check glyphs render as tofu blocks
+                # on some terminals, which reads as black smudges.
                 Segment("    (\\__/)", fg=THEME.fg_success),
-                Segment("    ( •_• )", fg=THEME.fg_success),
-                Segment("    / > ✓", fg=THEME.fg_success),
-                Segment("  Pigit Clean", fg=THEME.fg_dim),
-                Segment("Working tree clean", fg=THEME.fg_dim),
+                Segment("    ( ._. )", fg=THEME.fg_success),
+                Segment("    ( > v )", fg=THEME.fg_success),
+                # Structural rows: fg=None so they follow presentation
+                # softening (dimmed when this panel is not focused).
+                Segment("Working tree clean"),
+                Segment("a stage · s stash · / filter"),
             ],
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
+            header=SectionRule("Status"),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
+        self._file_icons = file_icons
         self.files: list[File] = []
         self._all_files: list[File] = []
         self._source_map: list[int] = []
@@ -325,6 +341,8 @@ class StatusPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Content arrives asynchronously via vm.items; show skeleton until then.
+        self.loading = True
         self._vm.refresh()
 
     def on_focus(self) -> None:
@@ -355,6 +373,7 @@ class StatusPanel(OptionList):
         if not self.is_mounted():
             return
         self._all_files = list(files)
+        self.loading = False
         self._apply_filter()
 
     def _apply_filter(self) -> None:
@@ -877,6 +896,18 @@ class StatusPanel(OptionList):
             return self._describe_tree_row(idx, is_cursor)
         return self._describe_flat_row(idx, is_cursor)
 
+    def _file_icon_glyph(self, name: str, *, is_dir: bool) -> str:
+        """Nerd Font icon glyph for a row, or '' when icons are disabled.
+
+        The icon is a name prefix (same color as the name), so off-focus
+        dimming and selection colors follow automatically.
+        """
+        if not self._file_icons:
+            return ""
+        if is_dir:
+            return self._DIR_ICON
+        return get_file_icon(adjudgment_type(name))
+
     def _describe_flat_row(
         self, idx: int, is_cursor: bool
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
@@ -886,12 +917,10 @@ class StatusPanel(OptionList):
         file = self.files[idx]
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
-        cursor_prefix = self.CURSOR if is_cursor else " "
 
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
             Segment(
                 staged,
@@ -911,7 +940,13 @@ class StatusPanel(OptionList):
             filename_fg = THEME.fg_staged_renamed
         else:
             filename_fg = fg_primary
-        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
+        icon = self._file_icon_glyph(file.name, is_dir=False)
+        icon_prefix = f"{icon} " if icon else ""
+        main = [
+            Segment(
+                icon_prefix + file.display_str, fg=filename_fg, style_flags=cursor_flags
+            )
+        ]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -928,19 +963,19 @@ class StatusPanel(OptionList):
         if row is None:
             return ([], None, [])
         indent = "  " * row.depth
-        cursor_prefix = self.CURSOR if is_cursor else " "
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         if row.kind == "dir":
             arrow = "▶" if row.path in self._collapsed_dirs else "▼"
             left = [
-                Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
                 Segment(" ", fg=fg_primary),
             ]
+            icon = self._file_icon_glyph(row.name, is_dir=True)
+            icon_prefix = f"{icon} " if icon else ""
             main = [
                 Segment(
-                    indent + arrow + " " + row.name + "/",
+                    indent + arrow + " " + icon_prefix + row.name + "/",
                     fg=fg_primary,
                     style_flags=cursor_flags,
                 )
@@ -953,7 +988,6 @@ class StatusPanel(OptionList):
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
         left = [
-            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
             Segment(
                 staged,
@@ -969,7 +1003,15 @@ class StatusPanel(OptionList):
         ]
         is_selected = row.source_index in self._selected
         filename_fg = THEME.fg_staged_renamed if is_selected else fg_primary
-        main = [Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)]
+        icon = self._file_icon_glyph(file.name, is_dir=False)
+        icon_prefix = f"{icon} " if icon else ""
+        main = [
+            Segment(
+                indent + icon_prefix + row.name,
+                fg=filename_fg,
+                style_flags=cursor_flags,
+            )
+        ]
 
         right: list[Segment] = []
         label = _status_label(file)

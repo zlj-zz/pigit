@@ -647,12 +647,57 @@ class TestOptionListLazyLoad:
         p.unmount()
         p.resize((12, 4))
         assert DemoPanel.fresh_calls == 0
-        assert p.content == ["Loading..."]
+        assert p.content == []
+        assert p.loading is True
 
         p.mount()
         p.resize((12, 4))
         assert DemoPanel.fresh_calls == 1
         assert p.content == ["ready"]
+
+    def test_loading_skeleton_bars(self):
+        """Unloaded lazy panel paints skeleton bars instead of text."""
+        from pigit.app_theme import THEME
+        from pigit.termui.surface import Surface
+
+        p = OptionList(size=(30, 8), lazy_load=True, empty_state=None)
+        p.unmount()
+        p.resize((30, 8))
+        assert p.loading is True
+        assert p.content == []
+
+        s = Surface(30, 8)
+        p.paint(s)
+        rows = s.rows()
+        # Lead bar in hover tone, followers in panel tone, on centered rows.
+        assert any(c.bg == THEME.bg_hover for c in rows[1])
+        assert any(c.bg == THEME.bg_panel for c in rows[3])
+        assert any(c.bg == THEME.bg_panel for c in rows[5])
+        # Skeleton rows carry no glyphs.
+        assert "".join(c.char for c in rows[1]).strip() == ""
+
+    def test_loading_cleared_by_set_content_flow(self):
+        """A panel clears loading once real content replaces the skeleton."""
+        p = OptionList(size=(12, 4), lazy_load=True)
+        p.unmount()
+        p.resize((12, 4))
+        assert p.loading is True
+        p.loading = False
+        p.set_content(["ready"])
+        assert p.content == ["ready"]
+
+    def test_empty_state_structural_rows_use_presentation_fg(self):
+        """fg=None empty-state rows render in the presentation primary tone."""
+        from pigit.termui.segment import Segment
+        from pigit.termui.surface import Surface
+        from pigit.termui.theme import get_theme
+
+        p = OptionList(size=(30, 6), empty_state=[Segment("No items")])
+        p.set_content([])
+        s = Surface(30, 6)
+        p.paint(s)
+        # Headless presentation is active, so the structural row uses primary fg.
+        assert any(c.fg == get_theme().fg_primary for c in s.rows()[2])
 
     def test_inactive_after_load_keeps_content_on_resize(self):
 

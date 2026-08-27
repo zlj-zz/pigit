@@ -93,12 +93,7 @@ class RecentActionsPanel(OptionList):
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
         record = self._records[idx]
         flags = palette.STYLE_BOLD if is_cursor else 0
-        cursor_seg = Segment(
-            self.CURSOR if is_cursor else " ",
-            fg=THEME.fg_primary,
-            style_flags=flags,
-        )
-        left = [cursor_seg, Segment(" ")]
+        left = [Segment(" ")]
 
         main = [Segment(record.description, fg=THEME.fg_primary, style_flags=flags)]
 

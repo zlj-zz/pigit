@@ -200,8 +200,8 @@ class TestToast:
     def test_toast_position(self, position, top, left):
         """Verify each ToastPosition computes the correct base area."""
         toast = Toast("Test", duration=5.0, position=position)
-        surface = Surface(40, 10)
-        toast.resize((40, 10))
+        surface = Surface(100, 10)
+        toast.resize((100, 10))
         toast._rebuild_frame()
 
         base_row, base_col = toast._compute_base_position(surface)
@@ -388,16 +388,45 @@ class TestToast:
         assert offset_mid == 0
 
     def test_toast_multiline_message(self):
-        """验证多行消息的边框高度计算正确"""
+        """多行消息保留全部行（上限内）"""
         toast = Toast("Line1\nLine2\nLine3", duration=5.0)
         surface = Surface(40, 10)
         toast.resize((40, 10))
         toast._rebuild_frame()
 
-        # 3 行内容，inner_h 应该为 3
+        # 3 行内容在上限内，不截断
         assert len(toast._line_segments) == 3
-        # outer_row_count 应该包含边框（上下各1行）
+        # outer_row_count 包含边框（上下各1行）
         assert toast.outer_row_count == 5  # 3 + 2
+
+    def test_toast_overflow_truncates_with_marker(self):
+        """超过行数上限时保留尾部（hint 可见）并在首行加省略标记"""
+        lines = "\n".join(f"Line{i}" for i in range(9))  # 9 行 > 上限 6
+        toast = Toast(lines, duration=5.0)
+        surface = Surface(40, 10)
+        toast.resize((40, 10))
+        toast._rebuild_frame()
+
+        assert len(toast._line_segments) == 6
+        # Head is marked, tail is kept so actionable hint lines survive.
+        assert any(seg.text == "… " for seg in toast._line_segments[0])
+        assert "Line8" in "".join(s.text for s in toast._line_segments[-1])
+
+    def test_toast_bottom_pad_lifts_bottom_position(self):
+        """bottom_pad reserves rows above app chrome like the footer."""
+        toast = Toast(
+            "Hi",
+            duration=5.0,
+            position=ToastPosition.BOTTOM_RIGHT,
+            bottom_pad=2,
+        )
+        surface = Surface(100, 20)
+        toast.resize((100, 20))
+        toast._rebuild_frame()
+        base_row, _ = toast._compute_base_position(surface)
+        # 20 rows, toast outer height 3: 20 - 3 - 1 - 2 = 14; footer rows 18-19.
+        assert base_row == 14
+        assert base_row + toast.outer_row_count <= surface.height - 2
 
     def test_toast_cjk_content_truncate_by_width(self):
         """验证 CJK 字符消息按显示宽度截断，不破坏边框对齐"""

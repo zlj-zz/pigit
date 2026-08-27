@@ -25,6 +25,11 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 
 _logger = logging.getLogger(__name__)
 
+# Brand accent bar for the cursor column. Panels set ``CURSOR = ACCENT_BAR``
+# (and ``CURSOR_ACCENT = True``); OptionList draws and styles it —
+# describe_row never paints the mark.
+ACCENT_BAR = "\u258e"
+
 
 class OptionList(Component):
     """Navigable option list with cursor, selection, and scroll viewport.
@@ -34,12 +39,26 @@ class OptionList(Component):
     (all-or-nothing; default want is 1). Fitted heights live in ``_header_h`` /
     ``_footer_h``. Slots set ``parent`` but are **not** in ``children``. When
     using slots, override :meth:`describe_row`, not :meth:`paint`.
+
+    The leading cursor cell is owned here via class attribute ``CURSOR``:
+    a glyph character, ``ACCENT_BAR`` (brand-tinted bar), or ``""`` (no mark).
+    Subclasses must not prepend the mark in :meth:`describe_row`.
     """
 
     CURSOR: str = "→"
+    # True when CURSOR is the brand accent bar: the cursor column then uses
+    # the accent presentation path (accent on focus, dim otherwise). Plain
+    # glyphs follow row-text presentation softening.
+    CURSOR_ACCENT: bool = False
     # Hint for callers: materialize at most this many rows per viewport refresh when building lists.
     PAGE_SIZE: int = 100
     _DEFAULT_BAND_HEIGHT = 1
+    _SKELETON_ROWS = 3
+    _SKELETON_GAP = 1
+    # Skeleton bars shrink from this fraction of the panel width by this step.
+    _SKELETON_WIDTH_START = 0.9
+    _SKELETON_WIDTH_STEP = 0.15
+    _SKELETON_MIN_W = 8
 
     def __init__(
         self,
@@ -70,6 +89,9 @@ class OptionList(Component):
         self._on_change = on_selection_changed
         self._lazy_load = lazy_load
         self._panel_loaded = False
+        # True while a lazy panel has requested content but the VM has not
+        # delivered it yet; renders skeleton bars instead of empty-state.
+        self.loading = False
         self.empty_state = empty_state
         # When set, the selector renders multiple rows per item: ``_item_starts[i]``
         # is the row index where item ``i`` begins. ``curr_no`` then tracks the
@@ -104,7 +126,8 @@ class OptionList(Component):
         if self._chrome_size == self._size:
             return
         self._chrome_size = self._size
-        self._apply_chrome_bands(self._size[0], self._size[1])
+        w, h = self._size
+        self._apply_chrome_bands(w, h)
 
     def invalidate_chrome_bands(self) -> None:
         """Force the next sync to refit bands (e.g. after a slot height policy change)."""
@@ -156,7 +179,8 @@ class OptionList(Component):
                 self.refresh()
                 self._panel_loaded = True
             elif not self._panel_loaded:
-                self.set_content(["Loading..."])
+                self.loading = True
+                self.set_content([])
                 self.curr_no = 0
                 self._r_start = 0
         else:
@@ -166,7 +190,8 @@ class OptionList(Component):
     def visible_row_count(self) -> int:
         """List viewport height (panel height minus chrome bands)."""
         self._sync_chrome_bands()
-        return max(0, self._size[1] - self._header_h - self._footer_h)
+        _, h = self._size
+        return max(0, h - self._header_h - self._footer_h)
 
     @property
     def viewport_start(self) -> int:
@@ -514,7 +539,9 @@ class OptionList(Component):
     def _paint_list_body(self, surface: Surface) -> None:
         """Viewport loop, empty-state, and search bar on the list band only."""
         if not self.content:
-            if self.empty_state is not None:
+            if self.loading:
+                self._render_loading_skeleton(surface)
+            elif self.empty_state is not None:
                 self._render_empty_state(surface)
             if self._search_query or self._search_active:
                 self._draw_search_bar(surface)
@@ -525,7 +552,9 @@ class OptionList(Component):
                 row = idx - self._r_start
                 is_cursor = idx == self.curr_no
                 left, main, right = self.describe_row(idx, is_cursor)
-                self._draw_row_layout(surface, row, left, main, right)
+                self._draw_row_layout(
+                    surface, row, self._with_cursor_mark(left, is_cursor), main, right
+                )
         else:
             cursor_r = self.cursor_row()
             for idx in range(self._r_start, end):
@@ -535,12 +564,68 @@ class OptionList(Component):
                 left, main, right = self.describe_row(
                     idx, is_cursor, item_idx=item_idx, sub_row=sub_row
                 )
-                self._draw_row_layout(surface, row, left, main, right)
+                self._draw_row_layout(
+                    surface, row, self._with_cursor_mark(left, is_cursor), main, right
+                )
         if self._search_query or self._search_active:
             self._draw_search_bar(surface)
 
+    def _with_cursor_mark(
+        self,
+        left: Sequence[Segment],
+        is_cursor: bool,
+    ) -> list[Segment]:
+        """Prepend the cursor column from ``CURSOR``; ``""`` leaves ``left`` as-is."""
+        if not self.CURSOR:
+            return list(left)
+        theme = get_theme()
+        cell = self.CURSOR if is_cursor else " "
+        if self.CURSOR_ACCENT:
+            active = self.is_presentation_active()
+            if active and is_cursor:
+                fg = theme.fg_accent
+                style = palette.STYLE_BOLD
+            else:
+                # Off-focus or non-cursor: keep column alignment without brand accent.
+                fg = theme.fg_dim
+                style = 0
+        else:
+            # Glyph follows the same presentation softening as row text.
+            fg = self.presentation_fg("primary")
+            style = palette.STYLE_BOLD if is_cursor else 0
+        row_bg = left[0].bg if left and left[0].bg is not None else None
+        return [Segment(cell, fg=fg, bg=row_bg, style_flags=style)] + list(left)
+
+    def _render_loading_skeleton(self, surface: Surface) -> None:
+        """Draw placeholder bars while a lazy panel's content is loading."""
+        theme = get_theme()
+        w = surface.width
+        h = surface.height
+        if w <= 0 or h <= 0:
+            return
+        bar_h = 1
+        total_h = (
+            self._SKELETON_ROWS * (bar_h + self._SKELETON_GAP) - self._SKELETON_GAP
+        )
+        start_row = max(0, (h - total_h) // 2)
+        for i in range(self._SKELETON_ROWS):
+            row = start_row + i * (bar_h + self._SKELETON_GAP)
+            # Lead bar in hover tone, rest in panel tone, shrinking widths.
+            bg = theme.bg_hover if i == 0 else theme.bg_panel
+            width = max(
+                self._SKELETON_MIN_W,
+                int(w * (self._SKELETON_WIDTH_START - i * self._SKELETON_WIDTH_STEP)),
+            )
+            col = max(0, (w - width) // 2)
+            surface.fill_rect_rgb(row, col, min(width, w), bar_h, bg)
+
     def _render_empty_state(self, surface: Surface) -> None:
-        """Render empty-state segments centered on the surface."""
+        """Render empty-state segments centered on the surface.
+
+        Segments with ``fg=None`` follow presentation softening (dimmed when
+        the panel is not the focus leaf), matching row text; semantic colors
+        (e.g. success/warning) pass through unchanged.
+        """
         w = surface.width
         h = surface.height
         if w <= 0 or h <= 0:
@@ -548,17 +633,19 @@ class OptionList(Component):
         lines = self.empty_state
         if lines is None:
             return
+        fg_primary = self.presentation_fg("primary")
         total_height = len(lines)
         start_row = (h - total_height) // 2
         for i, seg in enumerate(lines):
             row = start_row + i
+            fg = seg.fg if seg.fg is not None else fg_primary
             line_w = wcswidth(seg.text)
             col = max(0, (w - line_w) // 2)
             surface.draw_text_rgb(
                 row,
                 col,
                 seg.text,
-                fg=seg.fg,
+                fg=fg,
                 bg=seg.bg,
                 style_flags=seg.style_flags,
             )

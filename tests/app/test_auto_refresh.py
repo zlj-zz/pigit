@@ -170,7 +170,37 @@ class TestObserveBatchSinks:
         refresh.assert_called_once_with(panel)
 
     def test_worktree_meta_refreshes_status_when_active(self, app):
-        """WORKTREE_META on Status tab triggers list refresh."""
+        """WORKTREE_META on Status tab triggers list refresh and dirty dot
+        update (not the full header reload)."""
+        from pigit.app_status import StatusPanel
+
+        schedule = MagicMock()
+        dirty = MagicMock()
+        refresh = MagicMock()
+        app._observe_host._deps = replace(
+            app._observe_host._deps,
+            schedule_reload_header=schedule,
+            refresh_header_dirty=dirty,
+            refresh_list_panel=refresh,
+        )
+        panel = object.__new__(StatusPanel)
+
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
+            app._on_observe_batch(
+                ChangeBatch(
+                    kinds=frozenset({ChangeKind.WORKTREE_META}),
+                    paths=frozenset({"foo.py"}),
+                )
+            )
+
+        refresh.assert_called_once_with(panel)
+        # Pure worktree edits only move the dirty dot; branch tracking does
+        # not need a two-subprocess reload per batch.
+        dirty.assert_called_once()
+        schedule.assert_not_called()
+
+    def test_head_refreshes_header_but_not_status_list(self, app):
+        """HEAD on Status tab triggers header reload only (list stays)."""
         from pigit.app_status import StatusPanel
 
         schedule = MagicMock()
@@ -185,13 +215,13 @@ class TestObserveBatchSinks:
         with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
             app._on_observe_batch(
                 ChangeBatch(
-                    kinds=frozenset({ChangeKind.WORKTREE_META}),
-                    paths=frozenset({"foo.py"}),
+                    kinds=frozenset({ChangeKind.HEAD}),
+                    paths=frozenset({"HEAD"}),
                 )
             )
 
-        refresh.assert_called_once_with(panel)
-        schedule.assert_not_called()
+        schedule.assert_called_once()
+        refresh.assert_not_called()
 
     def test_build_observe_roots_attaches_worktree_only_for_status(self, app):
         """Worktree root is present only while Status is the active panel."""
@@ -216,6 +246,36 @@ class TestObserveBatchSinks:
         with patch("pigit.app_observe.resolve_presentation_leaf", return_value=branch):
             roots = app._build_observe_roots()
         assert all(r.kind != "worktree" for r in roots)
+        # Digest is only trustworthy while a worktree root is actually watched;
+        # on other tabs it must read None so the header falls back to a direct
+        # probe instead of a stale dirty flag.
+        assert app._observe_host.worktree_dirty is None
+
+    def test_worktree_dirty_stale_on_non_status_tab(self, app):
+        """worktree_dirty returns None when Status is not the active tab."""
+        from pigit.app_status import StatusPanel
+        from pigit.app_branch import BranchPanel
+
+        app._observe_host._observe_ctx = ObserveContext(
+            repo_root="/repo",
+            git_dir="/repo/.git",
+            common_dir="/repo/.git",
+        )
+        app._config.observe_worktree = True
+        app._status_vm.items.set([])
+        status = object.__new__(StatusPanel)
+        branch = object.__new__(BranchPanel)
+
+        # Status focused: digest recorded and readable.
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=status):
+            app._build_observe_roots()
+        app._observe_host._last_worktree_dirty = True
+        assert app._observe_host.worktree_dirty is True
+
+        # Switch away: stale digest must not leak into the header probe.
+        with patch("pigit.app_observe.resolve_presentation_leaf", return_value=branch):
+            app._build_observe_roots()
+        assert app._observe_host.worktree_dirty is None
 
     def test_build_observe_roots_uses_rename_destination_path(self, app):
         """Rename porcelain must not become a WatchRoot path with '->'."""

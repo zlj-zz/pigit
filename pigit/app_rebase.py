@@ -194,11 +194,6 @@ class RebasePanel(OptionList):
         item = self._items[idx]
         flags = palette.STYLE_BOLD if is_cursor else 0
         left = [
-            Segment(
-                self.CURSOR if is_cursor else " ",
-                fg=THEME.fg_primary,
-                style_flags=flags,
-            ),
             Segment(" ", fg=THEME.fg_primary),
             Segment(
                 item.action.ljust(7),

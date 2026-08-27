@@ -142,6 +142,8 @@ class CommitPanel(OptionList):
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
+    # One column between OptionList cursor mark and graph rails (all row kinds).
+    GRAPH_PAD = " "
     REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
     REPORT_MIN_HEIGHT = 19
 
@@ -535,11 +537,10 @@ class CommitPanel(OptionList):
         # outranks commits.
         if not self.commits:
             cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-            prefix = self.CURSOR + " " if is_cursor else "  "
             return (
                 [
                     Segment(
-                        prefix + self.content[idx],
+                        self.content[idx],
                         fg=self.presentation_fg("muted"),
                         style_flags=cursor_flags,
                     )
@@ -563,7 +564,11 @@ class CommitPanel(OptionList):
 
         if idx < len(self._row_cache):
             left_tpl, main_tpl = self._row_cache[idx]
-            return list(left_tpl), list(main_tpl), self._meta_segments(commit)
+            return (
+                list(left_tpl),
+                list(main_tpl),
+                self._meta_segments(commit, bake_active=False, is_cursor=False),
+            )
 
         return self._describe_compact(commit, idx, False)
 
@@ -574,13 +579,33 @@ class CommitPanel(OptionList):
         is_cursor: bool,
     ) -> tuple[list[Segment], list[Segment], list[Segment]]:
         left, main = self._commit_left_main(commit, item_idx, is_cursor)
-        right = self._meta_segments(commit)
+        right = self._meta_segments(commit, is_cursor=is_cursor)
         if is_cursor:
             right = [
-                Segment(s.text, fg=s.fg, bg=s.bg, style_flags=palette.STYLE_BOLD)
+                Segment(
+                    s.text,
+                    fg=s.fg,
+                    bg=s.bg,
+                    style_flags=palette.STYLE_BOLD,
+                )
                 for s in right
             ]
         return left, main, right
+
+    def _is_head_commit(self, commit: Commit) -> bool:
+        """Return True when git decoration marks this commit as HEAD."""
+        cached = self._refs_cache.get(commit.sha)
+        if cached is None:
+            cached = _parse_decoration(commit.extra_info, self._vm.remotes)
+            self._refs_cache[commit.sha] = cached
+        head_ref, _, _ = cached
+        return head_ref != ""
+
+    def _selected_row_bg(self, *, bake_active: bool = False) -> tuple[int, int, int]:
+        """Background for the cursor-selected commit row."""
+        if bake_active or self.is_presentation_active():
+            return THEME.bg_commit_selected
+        return THEME.bg_commit_selected_inactive
 
     def _commit_left_main(
         self,
@@ -590,7 +615,7 @@ class CommitPanel(OptionList):
         *,
         bake_active: bool = False,
     ) -> tuple[list[Segment], list[Segment]]:
-        """Build the cursor + rails + sha + refs + subject portion of a COMMIT row.
+        """Build rails + sha + refs + subject; cursor mark comes from OptionList.
 
         ``bake_active`` forces primary/muted/graph colors for the active cache
         (steal / non-leaf must not be baked — those rebuild live via ``presentation_fg``).
@@ -601,14 +626,9 @@ class CommitPanel(OptionList):
         )
         fg_muted = THEME.fg_muted if bake_active else self.presentation_fg("muted")
         graph_active = bake_active or self.is_presentation_active()
+        row_bg = self._selected_row_bg(bake_active=bake_active) if is_cursor else None
 
-        if is_cursor:
-            left: list[Segment] = [
-                Segment(self.CURSOR, fg=fg_primary, style_flags=cursor_flags),
-                Segment(" ", fg=fg_primary),
-            ]
-        else:
-            left = [Segment("  ", fg=fg_primary)]
+        left: list[Segment] = [Segment(self.GRAPH_PAD, fg=fg_primary, bg=row_bg)]
 
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
@@ -618,14 +638,33 @@ class CommitPanel(OptionList):
                     commit,
                     cursor_flags=cursor_flags,
                     graph_active=graph_active,
+                    row_bg=row_bg,
                 )
             )
 
-        left.append(Segment(commit.sha[:7], fg=fg_muted, style_flags=cursor_flags))
-        left.append(Segment(" ", fg=fg_primary))
+        left.append(
+            Segment(
+                commit.sha[:7],
+                fg=fg_muted,
+                style_flags=cursor_flags,
+                bg=row_bg,
+            )
+        )
+        left.append(Segment(" ", fg=fg_primary, bg=row_bg))
 
-        main: list[Segment] = self._ref_segments(commit, cursor_flags=cursor_flags)
-        main.append(Segment(commit.msg, fg=fg_primary, style_flags=cursor_flags))
+        main: list[Segment] = self._ref_segments(
+            commit,
+            cursor_flags=cursor_flags,
+            row_bg=row_bg,
+        )
+        main.append(
+            Segment(
+                commit.msg,
+                fg=fg_primary,
+                style_flags=cursor_flags,
+                bg=row_bg,
+            )
+        )
         return left, main
 
     def _build_row_cache(self) -> None:
@@ -640,7 +679,13 @@ class CommitPanel(OptionList):
             )
             self._row_cache.append((tuple(left), tuple(main)))
 
-    def _meta_segments(self, commit: Commit) -> list[Segment]:
+    def _meta_segments(
+        self,
+        commit: Commit,
+        *,
+        bake_active: bool = False,
+        is_cursor: bool = False,
+    ) -> list[Segment]:
         author = commit.author
         rel = self._rel_time_cache.get(commit.sha) or relative_time(
             commit.unix_timestamp
@@ -650,7 +695,9 @@ class CommitPanel(OptionList):
         reserve = max(self._max_meta_w, meta_w)
         if reserve > meta_w:
             meta = " " * (reserve - meta_w) + meta
-        return [Segment(meta, fg=self.presentation_fg("muted"), style_flags=0)]
+        row_bg = self._selected_row_bg(bake_active=bake_active) if is_cursor else None
+        fg = THEME.fg_muted if bake_active else self.presentation_fg("muted")
+        return [Segment(meta, fg=fg, style_flags=0, bg=row_bg)]
 
     def _describe_sub_row(
         self,
@@ -666,7 +713,7 @@ class CommitPanel(OptionList):
         """
         fg_primary = self.presentation_fg("primary")
         fg_muted = self.presentation_fg("muted")
-        left: list[Segment] = [Segment("  ", fg=fg_primary)]
+        left: list[Segment] = [Segment(self.GRAPH_PAD, fg=fg_primary)]
         source_idx = self._source_index(item_idx)
         if source_idx < len(self._vm.graph_rows):
             left.extend(
@@ -717,6 +764,7 @@ class CommitPanel(OptionList):
         commit: Commit,
         *,
         cursor_flags: int,
+        row_bg: tuple[int, int, int] | None = None,
     ) -> list[Segment]:
         """Render branch-ref badges wrapped in orange parens, comma-separated."""
         cached = self._refs_cache.get(commit.sha)
@@ -734,32 +782,44 @@ class CommitPanel(OptionList):
         tag_fg = THEME.fg_tag
         arrow_fg = THEME.fg_primary
 
+        seg_bg = row_bg
+
         entries: list[list[Segment]] = []
         if head_ref == "HEAD":
-            entries.append([Segment("HEAD", fg=head_fg, style_flags=cursor_flags)])
+            entries.append(
+                [Segment("HEAD", fg=head_fg, style_flags=cursor_flags, bg=seg_bg)]
+            )
         elif head_ref:
             entries.append(
                 [
-                    Segment("HEAD", fg=head_fg, style_flags=cursor_flags),
-                    Segment(" -> ", fg=arrow_fg, style_flags=cursor_flags),
-                    Segment(head_ref, fg=local_fg, style_flags=cursor_flags),
+                    Segment("HEAD", fg=head_fg, style_flags=cursor_flags, bg=seg_bg),
+                    Segment(" -> ", fg=arrow_fg, style_flags=cursor_flags, bg=seg_bg),
+                    Segment(head_ref, fg=local_fg, style_flags=cursor_flags, bg=seg_bg),
                 ]
             )
         for name in local_refs:
-            entries.append([Segment(name, fg=local_fg, style_flags=cursor_flags)])
+            entries.append(
+                [Segment(name, fg=local_fg, style_flags=cursor_flags, bg=seg_bg)]
+            )
         for name in remote_refs:
-            entries.append([Segment(name, fg=remote_fg, style_flags=cursor_flags)])
+            entries.append(
+                [Segment(name, fg=remote_fg, style_flags=cursor_flags, bg=seg_bg)]
+            )
         if commit.tag:
             entries.append(
-                [Segment(commit.tag[0], fg=tag_fg, style_flags=cursor_flags)]
+                [Segment(commit.tag[0], fg=tag_fg, style_flags=cursor_flags, bg=seg_bg)]
             )
 
-        segs: list[Segment] = [Segment("(", fg=paren_fg, style_flags=cursor_flags)]
+        segs: list[Segment] = [
+            Segment("(", fg=paren_fg, style_flags=cursor_flags, bg=seg_bg)
+        ]
         for i, entry in enumerate(entries):
             if i > 0:
-                segs.append(Segment(", ", fg=paren_fg, style_flags=cursor_flags))
+                segs.append(
+                    Segment(", ", fg=paren_fg, style_flags=cursor_flags, bg=seg_bg)
+                )
             segs.extend(entry)
-        segs.append(Segment(") ", fg=paren_fg, style_flags=cursor_flags))
+        segs.append(Segment(") ", fg=paren_fg, style_flags=cursor_flags, bg=seg_bg))
         return segs
 
     def _render_rails(
@@ -770,6 +830,7 @@ class CommitPanel(OptionList):
         sub: bool = False,
         cursor_flags: int,
         graph_active: bool,
+        row_bg: tuple[int, int, int] | None = None,
     ) -> list[Segment]:
         """Render graph rails for one row (2 columns per lane).
 
@@ -783,14 +844,24 @@ class CommitPanel(OptionList):
             for i, sha in enumerate(row.lanes_after):
                 if sha is None:
                     segments.append(
-                        Segment("  ", fg=THEME.fg_dim, style_flags=cursor_flags)
+                        Segment(
+                            "  ",
+                            fg=THEME.fg_dim,
+                            style_flags=cursor_flags,
+                            bg=row_bg,
+                        )
                     )
                     continue
                 lanes = THEME.graph_lane_colors
                 color = lanes[i % len(lanes)]
                 fg = color if graph_active else THEME.fg_dim
                 segments.append(
-                    Segment(self.GRAPH_VERTICAL + " ", fg=fg, style_flags=cursor_flags)
+                    Segment(
+                        self.GRAPH_VERTICAL + " ",
+                        fg=fg,
+                        style_flags=cursor_flags,
+                        bg=row_bg,
+                    )
                 )
             return segments
 
@@ -799,7 +870,14 @@ class CommitPanel(OptionList):
         assert commit is not None
         for i in range(total_lanes):
             ch, fg = self._lane_glyph(row, i, commit, graph_active=graph_active)
-            segments.append(Segment(ch + " ", fg=fg, style_flags=cursor_flags))
+            segments.append(
+                Segment(
+                    ch + " ",
+                    fg=fg,
+                    style_flags=cursor_flags,
+                    bg=row_bg,
+                )
+            )
         return segments
 
     def _lane_glyph(
@@ -817,8 +895,10 @@ class CommitPanel(OptionList):
 
         if i == row.commit_lane:
             if not commit.is_pushed():
-                # Semantic: keep yellow under steal / non-leaf (design §1).
+                # Unpushed wins over HEAD so local-only tip stays yellow.
                 return self.GRAPH_COMMIT, THEME.fg_unpushed_commit
+            if self._is_head_commit(commit):
+                return self.GRAPH_COMMIT, THEME.fg_head_commit
             return self.GRAPH_COMMIT, lane_color if graph_active else THEME.fg_dim
 
         if i in row.closed_lanes:

@@ -18,3 +18,11 @@ def test_format_line_number_right_justifies_int():
 def test_format_line_number_blank_string():
     assert format_line_number("", 4) == "    "
     assert len(format_line_number("", 4)) == 4
+
+
+def test_format_line_number_truncates_overflow():
+    """Numbers wider than the gutter keep their rightmost digits instead of
+    overflowing into the +/- prefix column."""
+    assert format_line_number(10000, 4) == "0000"
+    assert format_line_number(10001, 4) == "0001"
+    assert len(format_line_number(123456, 4)) == 4

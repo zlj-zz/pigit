@@ -70,13 +70,15 @@ def test_bind_to_bus_unsubscribe_stops_updates(
 def test_left_repo_and_branch_styles(header_state: HeaderState) -> None:
     header_state.repo = "pigit"
     header_state.branch = "dev"
-    repo, spacer, branch = header_state.left.value[-3:]
+    repo, spacer, dot, branch = header_state.left.value[-4:]
     assert repo.text == "pigit"
     assert repo.fg == THEME.fg_header_repo
     assert repo.style_flags == 0
     assert spacer.text == "  "
+    assert dot.text == "*"
+    assert dot.fg == THEME.fg_success  # clean by default
     assert branch.text == "dev"
-    assert branch.fg == THEME.fg_header_branch
+    assert branch.fg == THEME.fg_accent
     assert branch.style_flags & STYLE_BOLD
 
 
@@ -86,6 +88,28 @@ def test_left_appends_ahead_behind_after_branch(header_state: HeaderState) -> No
     header_state.ahead = 1
     header_state.behind = 2
     texts = [seg.text for seg in header_state.left.value]
-    assert texts[-3:] == ["dev", " ↑1", " ↓2"]
+    # Branch name, separator dot, then the two tracking arrows.
+    assert texts[-4:] == ["dev", " · ", "↑1", "↓2"]
     assert header_state.left.value[-2].fg == THEME.fg_success
     assert header_state.left.value[-1].fg == THEME.fg_warning
+
+
+def test_left_separator_dot_only_when_tracking(header_state: HeaderState) -> None:
+    header_state.branch = "dev"
+    texts = [seg.text for seg in header_state.left.value]
+    assert texts[-1] == "dev"  # no arrows, no separator
+
+    header_state.behind = 2
+    texts = [seg.text for seg in header_state.left.value]
+    assert texts[-3:] == ["dev", " · ", "↓2"]
+
+
+def test_left_worktree_dot_follows_dirty_signal(header_state: HeaderState) -> None:
+    header_state.branch = "dev"
+    assert header_state.left.value[-2].fg == THEME.fg_success
+
+    header_state.dirty = True
+    assert header_state.left.value[-2].fg == THEME.fg_warning
+
+    header_state.dirty = False
+    assert header_state.left.value[-2].fg == THEME.fg_success

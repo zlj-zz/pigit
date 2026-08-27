@@ -150,6 +150,7 @@ class StepLineChart(Component):
         self._y_axis_label_w = y_axis_label_w
         self._padding_left = padding_left
         self._series: dict[str, list[int]] = {}
+        self._series_colors: dict[str, tuple[int, int, int]] = {}
         self._x_labels: list[tuple[int, str]] = []
         self._overall_max = 0
 
@@ -165,13 +166,25 @@ class StepLineChart(Component):
         self,
         series: dict[str, list[int]],
         x_labels: list[tuple[int, str]] | None = None,
+        *,
+        series_colors: dict[str, tuple[int, int, int]] | None = None,
     ) -> None:
-        """Set data series and optional X-axis labels."""
+        """Set data series, optional X-axis labels, and per-series colors."""
         self._series = series
+        self._series_colors = series_colors or {}
         self._x_labels = x_labels or []
         self._overall_max = 0
         for s in self._series.values():
             self._overall_max = max(self._overall_max, max(s) if s else 0)
+
+    def _series_color(
+        self, name: str, series_index: int, num_fallback_colors: int
+    ) -> tuple[int, int, int]:
+        """Resolve draw color: explicit map, else cycle the fallback palette."""
+        mapped = self._series_colors.get(name)
+        if mapped is not None:
+            return mapped
+        return self._colors[series_index % num_fallback_colors]
 
     def paint(self, surface: Surface) -> None:
         plot_w = self._plot_w
@@ -254,7 +267,7 @@ class StepLineChart(Component):
 
         # Draw lines (uniformly mapped to plot_w columns)
         for aidx, (name, series) in enumerate(self._series.items()):
-            color = self._colors[aidx % num_colors]
+            color = self._series_color(name, aidx, num_colors)
             num_points = len(series)
             mapped_rows: list[int] = []
             for c in range(plot_w):
@@ -303,17 +316,18 @@ class StepLineChart(Component):
                             next_row, col, _BOX_CORNER_BL, fg=color, bg=self._bg
                         )
 
-        # Legend
-        legend_row = x_axis_row + 2
-        if legend_row >= surf_h:
+        # Legend shares the report bottom band with heatmap "Less" (row surf_h-2).
+        legend_row = surf_h - 2
+        if legend_row <= x_axis_row + 1:
             return
         x = self._padding_left
         for aidx, (name, series) in enumerate(self._series.items()):
-            color = self._colors[aidx % num_colors]
-            entry_width = 2 + len(name) + 3
+            color = self._series_color(name, aidx, num_colors)
+            entry_width = 3 + len(name) + 3
             if x + entry_width > surf_w:
                 break
             surface.draw_text_rgb(legend_row, x, "*", fg=color, bg=self._bg)
-            x += 2
+            surface.draw_text_rgb(legend_row, x + 1, "─", fg=color, bg=self._bg)
+            x += 3
             surface.draw_text_rgb(legend_row, x, name, fg=self._label_fg, bg=self._bg)
             x += len(name) + 3

@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2] / "pigit"
 
 # ---- deep widget imports ----
 
+
 def _deep_widget_imports() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
     for path in sorted(ROOT.glob("app*.py")):

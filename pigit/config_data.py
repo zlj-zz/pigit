@@ -54,6 +54,8 @@ class AppConfig:
     log_graph_default: bool = True
     commit_report_default: bool = True
     show_footer: bool = True
+    # Nerd Font file icons in the Status list (needs a Nerd Font terminal).
+    file_icons: bool = True
     keybindings: dict[str, str | list[str]] = field(default_factory=dict)
 
 

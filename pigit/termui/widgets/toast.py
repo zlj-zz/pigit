@@ -24,10 +24,13 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 if TYPE_CHECKING:
     from ..event_loop import AppEventLoop
 
-MAX_TOAST_LINES = 100
+MAX_TOAST_LINES = 6
 _SPIN_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 # Keep spinning toasts from looking like a tiny sticker when the label is short.
 _MIN_SPIN_INNER_W = 32
+# Neutral toasts stretch to this width so content changes don't make the
+# card jump around the screen.
+MIN_TOAST_INNER_W = 40
 
 
 class Toast(Component):
@@ -46,6 +49,7 @@ class Toast(Component):
         enter_duration: float = 0.5,
         exit_duration: float = 0.5,
         spin: bool = False,
+        bottom_pad: int = 0,
     ) -> None:
         super().__init__(size=size)
         self._spin = spin
@@ -54,6 +58,7 @@ class Toast(Component):
         self.duration = duration
         self._clock = clock
         self._position = position
+        self._bottom_pad = bottom_pad
 
         # Semantic level: None means neutral (no glyph, no semantic color).
         # Spinners use INFO chrome (border + braille) without the kind glyph.
@@ -143,9 +148,19 @@ class Toast(Component):
                     )
         truncated: list[list[Segment]] = []
         inner_w = 0
-        for line in line_segments[:MAX_TOAST_LINES]:
+        # Keep the TAIL on overflow so actionable hint lines stay visible;
+        # the truncation marker goes at the head.
+        overflowed = len(line_segments) > MAX_TOAST_LINES
+        all_lines = line_segments[-MAX_TOAST_LINES:] if overflowed else line_segments
+        for i, line in enumerate(all_lines):
             line_w = 0
             new_line: list[Segment] = []
+            if overflowed and i == 0:
+                marker = Segment("… ", fg=text_fg)
+                mw = wcswidth(marker.text)
+                if mw <= max_text_w:
+                    new_line.append(marker)
+                    line_w += mw
             for seg in line:
                 seg_w = wcswidth(seg.text)
                 if line_w + seg_w > max_text_w:
@@ -169,11 +184,15 @@ class Toast(Component):
 
         if self._spin:
             inner_w = max(inner_w, min(_MIN_SPIN_INNER_W, max_inner_w))
+        else:
+            inner_w = max(inner_w, min(MIN_TOAST_INNER_W, max_inner_w))
 
         self._line_segments = truncated
         inner_h = len(self._line_segments)
 
-        frame_fg = self._kind_fg or get_theme().fg_primary
+        # Neutral toasts use the brand accent border; kinded toasts keep
+        # their semantic color.
+        frame_fg = self._kind_fg or get_theme().fg_accent
         if self._frame is None:
             self._frame = BoxFrame(inner_w, inner_h, fg=frame_fg)
         else:
@@ -215,7 +234,10 @@ class Toast(Component):
         if self._position in (ToastPosition.TOP_LEFT, ToastPosition.TOP_RIGHT):
             base_row = 1
         else:
-            base_row = max(0, surface.height - self.outer_row_count - 1)
+            # BOTTOM_*: sit above the footer (height known from the app).
+            base_row = max(
+                0, surface.height - self.outer_row_count - 1 - self._bottom_pad
+            )
 
         if self._position in (ToastPosition.TOP_LEFT, ToastPosition.BOTTOM_LEFT):
             base_col = 1

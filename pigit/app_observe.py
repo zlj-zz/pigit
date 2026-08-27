@@ -61,6 +61,7 @@ class ObserveDeps:
         get_root: Callable returning ComponentRoot (may be None pre-mount).
         get_loop: Callable returning the AppEventLoop (may be None pre-start).
         schedule_reload_header: Callback to async-reload header branch/ahead/behind.
+        refresh_header_dirty: Callback to update just the worktree dirty dot.
         refresh_list_panel: Callback to refresh a list panel or its ViewModel.
     """
 
@@ -77,6 +78,7 @@ class ObserveDeps:
     get_root: Callable[[], ComponentRoot | None]
     get_loop: Callable[[], AppEventLoop | None]
     schedule_reload_header: Callable[[], None]
+    refresh_header_dirty: Callable[[], None]
     refresh_list_panel: Callable[[Component], None]
 
 
@@ -99,6 +101,11 @@ class ObserveHost:
         self._observe_poll_id: int | None = None
         self._observe_drain_id: int | None = None
         self._observe_status_unsub: Callable[[], None] | None = None
+        self._last_worktree_dirty: bool | None = None
+        # True only while a worktree root is actually attached (Status tab
+        # focused); digest values from other tabs are stale and must not be
+        # reused for the header dirty dot.
+        self._worktree_watched = False
 
     def start(self) -> None:
         """Start StatMtime observation of git metadata (and Status worktree)."""
@@ -148,6 +155,8 @@ class ObserveHost:
 
     def stop(self) -> None:
         """Remove observe intervals and stop the backend."""
+        self._worktree_watched = False
+        self._last_worktree_dirty = None
         if self._observe_status_unsub is not None:
             self._observe_status_unsub()
             self._observe_status_unsub = None
@@ -183,11 +192,13 @@ class ObserveHost:
             WatchRoot(kind="git_dir", path=ctx.git_dir),
             WatchRoot(kind="common_dir", path=ctx.common_dir),
         ]
+        self._worktree_watched = False
         if not self._deps.get_config().observe_worktree:
             return roots
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if not isinstance(active, StatusPanel):
             return roots
+        self._worktree_watched = True
         roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
         repo = Path(ctx.repo_root)
         for file_item in self._deps.get_status_vm().items.value:
@@ -212,6 +223,15 @@ class ObserveHost:
         kinds = batch.kinds
         if ChangeKind.HEAD in kinds or ChangeKind.REFS in kinds:
             self._deps.schedule_reload_header()
+        elif (
+            ChangeKind.WORKTREE_META in kinds
+            or ChangeKind.INDEX in kinds
+            or ChangeKind.STASH in kinds
+        ):
+            # Pure worktree edits cannot move branch tracking; refresh only
+            # the dirty dot from the digest the poll already computed, so a
+            # file-edit storm does not fork git subprocesses per batch.
+            self._deps.refresh_header_dirty()
 
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
         if active is None:
@@ -252,12 +272,30 @@ class ObserveHost:
                 self._deps.refresh_list_panel(active)
 
     def _worktree_digest(self) -> str | None:
-        """Return a porcelain digest while Status worktree observe is active."""
+        """Return a porcelain digest while Status worktree observe is active.
+
+        Also records the raw dirty flag so the header can reuse this probe
+        instead of running a second ``git status`` per refresh.
+        """
         try:
-            return hash_porcelain(self._deps.get_git().status_porcelain())
+            porcelain = self._deps.get_git().status_porcelain()
         except Exception:
             logging.debug("Worktree digest failed", exc_info=True)
+            self._last_worktree_dirty = None
             return None
+        self._last_worktree_dirty = bool(porcelain.strip())
+        return hash_porcelain(porcelain)
+
+    @property
+    def worktree_dirty(self) -> bool | None:
+        """Most recent worktree dirty flag while worktree observe is active.
+
+        None when observe is inactive or a non-Status tab is focused, so
+        callers fall back to a direct probe instead of a stale digest.
+        """
+        if not self._worktree_watched:
+            return None
+        return self._last_worktree_dirty
 
     def _on_status_items(self, _items: list) -> None:
         """Refresh worktree path set when the Status list changes."""

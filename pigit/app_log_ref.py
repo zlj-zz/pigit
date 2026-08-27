@@ -63,11 +63,10 @@ class LogRefSheet(OptionList):
         item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
-        """Cursor glyph, ref name, and a ``current`` tag on the active log_ref."""
+        """Cursor column (via OptionList.CURSOR), ref name, and a ``current`` tag."""
         name = self.content[idx] if idx < len(self.content) else ""
-        cursor = self.CURSOR if is_cursor else " "
         name_fg = THEME.fg_primary if is_cursor else THEME.fg_dim
-        left = [Segment(f"{cursor} ", fg=THEME.fg_primary)]
+        left = [Segment(" ", fg=THEME.fg_primary)]
         main = [
             Segment(
                 name,

@@ -67,6 +67,11 @@ from .viewmodels.commit import CommitViewModel
 from .session_history import SessionHistory
 from .config_data import AppConfig
 
+# Footer chrome height in rows. The layout height (build_root) and the
+# toast_bottom_pad (setup_root) both derive from this constant, so growing
+# the footer can never silently overlap bottom-anchored toasts.
+FOOTER_HEIGHT = 2
+
 
 class PigitApplication(Application):
     """Pigit TUI application entry."""
@@ -192,6 +197,7 @@ class PigitApplication(Application):
             id="status_panel",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
+            file_icons=self._config.file_icons,
         )
         self._stash_panel = StashPanel(
             vm=self._status_vm,
@@ -268,7 +274,7 @@ class PigitApplication(Application):
         heights: list = [2, "flex"]
         if self._config.show_footer:
             children.append(footer)
-            heights.append(2)
+            heights.append(FOOTER_HEIGHT)
 
         self._panel_nav = PanelNavigator(
             get_tab_view=lambda: tab_view,
@@ -293,6 +299,7 @@ class PigitApplication(Application):
                 get_root=lambda: self._root,
                 get_loop=lambda: self._loop,
                 schedule_reload_header=self._schedule_reload_header,
+                refresh_header_dirty=self._refresh_header_dirty,
                 refresh_list_panel=self._refresh_list_panel,
             )
         )
@@ -313,6 +320,8 @@ class PigitApplication(Application):
             self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
+        # Footer occupies FOOTER_HEIGHT rows when shown; keep toasts above it.
+        root.toast_bottom_pad = FOOTER_HEIGHT if self._config.show_footer else 0
         self._help_panel = HelpPanel(
             key_fg=THEME.fg_info,
         )
@@ -408,20 +417,57 @@ class PigitApplication(Application):
         if self._observe_host is not None:
             self._observe_host.on_batch(batch)
 
+    def _refresh_header_dirty(self) -> None:
+        """Update just the worktree dirty dot from the observe digest.
+
+        Worktree edits cannot change branch tracking, so skip the full header
+        reload (two git subprocesses per batch) and reuse the digest the
+        observe poll already computed. Called from on_batch for
+        WORKTREE_META/INDEX/STASH kinds.
+        """
+        if self._observe_host is None:
+            return
+        observed = self._observe_host.worktree_dirty
+        if observed is None:
+            # Worktree observe not active on this tab; nothing fresh to read.
+            return
+        self._header_state.dirty = observed
+
+    def _header_dirty_probe(self) -> bool:
+        """Dirty flag from observe digest when active, else a direct probe.
+
+        The observe host already runs ``git status --porcelain`` on every poll;
+        reusing its last digest avoids a second git call per header refresh.
+        """
+        if self._observe_host is not None:
+            observed = self._observe_host.worktree_dirty
+            if observed is not None:
+                return observed
+        return self._git.is_worktree_dirty()
+
     def _schedule_reload_header(self) -> None:
-        """Async-load branch + ahead/behind into HeaderState with stale-guard."""
+        """Async-load branch/ahead/behind + dirty into HeaderState.
+
+        The git probes run in the worker thread; ``apply`` only writes Signal
+        state on the UI thread (never runs git).
+        """
         token = object()
         self._header_reload_token = token
 
-        def apply(result: tuple[str, int, int]) -> None:
+        def worker() -> tuple[str, int, int, bool]:
+            head, ahead, behind = self._git.get_head_tracking()
+            return head, ahead, behind, self._header_dirty_probe()
+
+        def apply(result: tuple[str, int, int, bool]) -> None:
             if token is not self._header_reload_token:
                 return
-            branch, ahead, behind = result
+            branch, ahead, behind, dirty = result
             self._header_state.branch = branch
             self._header_state.ahead = ahead
             self._header_state.behind = behind
+            self._header_state.dirty = dirty
 
-        run_async(self._git.get_head_tracking, apply)
+        run_async(worker, apply)
 
     def _side_preview_for_active(self) -> Component | None:
         """Return the one large-screen side panel for the current tab, or None."""

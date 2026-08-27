@@ -16,7 +16,8 @@ from .graph import HeatmapGrid, StepLineChart
 from .header import Header
 from .help_panel import HelpEntry, HelpPanel
 from .input_line import InputLine
-from .option_list import OptionList
+from .option_list import ACCENT_BAR, OptionList
+from .section_rule import SectionRule
 from .label import Label
 from .text_browser import TextBrowser
 from .lint_bar import LintBar
@@ -41,6 +42,8 @@ __all__ = [
     "HelpPanel",
     "InputLine",
     "OptionList",
+    "ACCENT_BAR",
+    "SectionRule",
     "CheckList",
     "Label",
     "TextBrowser",

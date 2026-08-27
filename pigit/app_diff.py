@@ -73,9 +73,14 @@ class DiffViewer(Component):
     TAB_NAME = "Display"
     tab_key = ""
     _CACHE_MAX = 64
-    LINE_NO_WIDTH = 5
+    # Matches DiffContent.LINE_NO_STR_WIDTH so formatted numbers sit flush
+    # against the +/- prefix (no stray 1-col gap).
+    LINE_NO_WIDTH = 4
     LINE_NO_STR_WIDTH = DiffContent.LINE_NO_STR_WIDTH
     DIFF_PREFIX_WIDTH = 1
+    # Total width below which the line-number gutter is dropped entirely:
+    # gutter 4 + prefix 1 leaves at least 11 columns of diff text.
+    MIN_WIDTH_FOR_LINE_NUMBERS = 16
     SCROLL_PAGE_SIZE = 5
     SCROLL_COL_STEP = 8
     TAB_WIDTH = DiffContent.TAB_WIDTH
@@ -83,8 +88,14 @@ class DiffViewer(Component):
     BORDER_COLS = 2
     WHEEL_SCROLL_LINES = 1
 
-    def _main_width(self, available: int) -> int:
-        return available - self.LINE_NO_WIDTH - self.DIFF_PREFIX_WIDTH - 1
+    def _main_width(self, available: int, line_no_w: int) -> int:
+        return available - line_no_w - self.DIFF_PREFIX_WIDTH - 1
+
+    def _line_no_w(self, surface_w: int) -> int:
+        """Line-number gutter width; 0 on very narrow surfaces."""
+        if surface_w < self.MIN_WIDTH_FOR_LINE_NUMBERS:
+            return 0
+        return self.LINE_NO_WIDTH
 
     def __init__(
         self,
@@ -271,7 +282,13 @@ class DiffViewer(Component):
         if content_w is None:
             w = self._size[0] if self._size else 80
             content_w = max(0, w - self.BORDER_COLS)
-        main_w = self._main_width(content_w)
+        else:
+            w = content_w + self.BORDER_COLS
+        # Rendering uses the adaptive gutter width (0 on very narrow panels);
+        # the scroll budget must match or the max offset overshoots by the
+        # hidden gutter width.
+        line_no_w = self._line_no_w(w)
+        main_w = self._main_width(content_w, line_no_w)
         self._max_col_offset = max(0, max_text_w - main_w)
         self._col_offset = min(self._col_offset, self._max_col_offset)
 
@@ -799,20 +816,24 @@ class DiffViewer(Component):
         main_w: int,
         heatmap_x: int,
         fill_width: int,
+        line_no_w: int,
         col_offset: int = 0,
     ) -> None:
         """Render one diff line: background, line number, text, and heatmap."""
         is_add = self._is_add_line(line)
         is_del = self._is_del_line(line)
+        is_hunk = line.startswith("@@")
 
-        if is_add:
+        if is_hunk:
+            bg = THEME.bg_diff_hunk
+        elif is_add:
             bg = THEME.bg_success
         elif is_del:
             bg = THEME.bg_danger
         else:
             bg = THEME.bg_diff_context
 
-        # Hunk mode highlight: override bg for active hunk
+        # Hunk mode highlight: override bg for the active hunk
         if self._hunk_mode and self._hunks:
             hunk = self._hunks[self._hunk_index]
             if hunk.start <= idx < hunk.end:
@@ -822,38 +843,61 @@ class DiffViewer(Component):
             surface.fill_rect_rgb(row, x_offset, fill_width, 1, bg)
 
         line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
-        if line_no:
+        if line_no and line_no_w:
             surface.draw_text_rgb(row, x_offset, line_no, fg=THEME.fg_dim, bg=bg)
 
-        prefix_x = x_offset + self.LINE_NO_WIDTH
+        prefix_x = x_offset + line_no_w
         if is_add:
             surface.draw_text_rgb(row, prefix_x, "+", fg=THEME.fg_success, bg=bg)
         elif is_del:
             surface.draw_text_rgb(row, prefix_x, "-", fg=THEME.fg_danger, bg=bg)
 
-        # ── Syntax-highlighted text rendering ──
-        text_start_col = x_offset + self.LINE_NO_WIDTH + self.DIFF_PREFIX_WIDTH
+        # ── Text rendering ──
+        text_start_col = x_offset + line_no_w + self.DIFF_PREFIX_WIDTH
         col = text_start_col - col_offset
         max_col = text_start_col + main_w
-        tokens: _RenderLine = []
 
-        if line.startswith("\\"):
+        if is_hunk:
+            # Hunk headers keep the normal token path (horizontal scroll +
+            # truncation), but plain parts render in the hunk tone while
+            # syntax tokens (function names etc.) keep their colors.
+            tokens = [
+                (
+                    text,
+                    THEME.fg_diff_hunk if fg == THEME.fg_primary else fg,
+                    width,
+                    bg,
+                )
+                for text, fg, width, bg in self._tokens_at(
+                    idx, line, strip_diff_prefix=True
+                )
+            ]
+            self._draw_tokens(
+                surface,
+                row,
+                col,
+                max_col,
+                tokens,
+                bg,
+                clip_left=text_start_col,
+            )
+        elif line.startswith("\\"):
             surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
         else:
             tokens = self._tokens_at(idx, line, strip_diff_prefix=True)
+            self._draw_tokens(
+                surface,
+                row,
+                col,
+                max_col,
+                tokens,
+                bg,
+                clip_left=text_start_col,
+            )
 
-        self._draw_tokens(
-            surface,
-            row,
-            col,
-            max_col,
-            tokens,
-            bg,
-            clip_left=text_start_col,
-        )
-
-        sym, color = self._heatmap_at(idx)
-        surface.draw_text_rgb(row, heatmap_x, sym, fg=color, bg=bg)
+        if not is_hunk:
+            sym, color = self._heatmap_at(idx)
+            surface.draw_text_rgb(row, heatmap_x, sym, fg=color, bg=bg)
 
     def _draw_tokens(
         self,
@@ -922,7 +966,8 @@ class DiffViewer(Component):
             return
         w = surface.width
         h = surface.height
-        if w <= self.LINE_NO_WIDTH + 3 or h < self.BORDER_ROWS + 1:
+        line_no_w = self._line_no_w(w)
+        if w <= line_no_w + 3 or h < self.BORDER_ROWS + 1:
             self._render_file_history_borderless(surface)
             return
 
@@ -947,17 +992,17 @@ class DiffViewer(Component):
         # Content area
         content_h = h - self.BORDER_ROWS  # rows between top and bottom borders
         content_w = w - self.BORDER_COLS
-        main_w = content_w - self.LINE_NO_WIDTH - 1
+        main_w = content_w - line_no_w - 1
         end = min(self._line_i + content_h, len(self._lines))
 
         for idx in range(self._line_i, end):
             row = idx - self._line_i + 1  # +1 for top border
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
-            if line_no:
+            if line_no and line_no_w:
                 surface.draw_text_rgb(row, 1, line_no, fg=THEME.fg_dim)
 
-            text_start = 1 + self.LINE_NO_WIDTH + 1
+            text_start = 1 + line_no_w + 1
             line = self._lines[idx]
             tokens = self._tokens_at(idx, line, strip_diff_prefix=False)
             self._draw_tokens(
@@ -978,20 +1023,21 @@ class DiffViewer(Component):
         """File history rendering when surface is too small for borders."""
         w = surface.width
         h = surface.height
-        if w <= self.LINE_NO_WIDTH + 1:
+        line_no_w = self._line_no_w(w)
+        if w <= line_no_w + 1:
             return
 
-        main_w = self._main_width(w)
+        main_w = self._main_width(w, line_no_w)
         end = min(self._line_i + h, len(self._lines))
 
         for idx in range(self._line_i, end):
             row = idx - self._line_i
 
             line_no = self._line_numbers[idx] if idx < len(self._line_numbers) else ""
-            if line_no:
+            if line_no and line_no_w:
                 surface.draw_text_rgb(row, 0, line_no, fg=THEME.fg_dim)
 
-            text_start = self.LINE_NO_WIDTH + 1
+            text_start = line_no_w + 1
             line = self._lines[idx]
             tokens = self._tokens_at(idx, line, strip_diff_prefix=False)
             self._draw_tokens(
@@ -1023,7 +1069,8 @@ class DiffViewer(Component):
 
         content_h = h - self.BORDER_ROWS
         content_w = w - self.BORDER_COLS
-        main_w = self._main_width(content_w)
+        line_no_w = self._line_no_w(w)
+        main_w = self._main_width(content_w, line_no_w)
         end = min(self._line_i + content_h, len(self._lines))
 
         for idx in range(self._line_i, end):
@@ -1037,6 +1084,7 @@ class DiffViewer(Component):
                 main_w=main_w,
                 heatmap_x=w - self.BORDER_COLS,
                 fill_width=w - self.BORDER_COLS,
+                line_no_w=line_no_w,
                 col_offset=self._col_offset,
             )
 
@@ -1093,7 +1141,8 @@ class DiffViewer(Component):
         if w <= self.LINE_NO_WIDTH + 1:
             return
 
-        main_w = self._main_width(w)
+        line_no_w = self._line_no_w(w)
+        main_w = self._main_width(w, line_no_w)
         end = min(self._line_i + h, len(self._lines))
 
         for idx in range(self._line_i, end):
@@ -1107,5 +1156,6 @@ class DiffViewer(Component):
                 main_w=main_w,
                 heatmap_x=w - 1,
                 fill_width=w,
+                line_no_w=line_no_w,
                 col_offset=self._col_offset,
             )

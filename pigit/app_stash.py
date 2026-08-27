@@ -15,54 +15,19 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     FeedbackKind,
     bind_action,
-    Component,
     palette,
     Segment,
     show_badge,
     show_toast,
-    Surface,
 )
-from pigit.termui.wcwidth_table import wcswidth
-from pigit.termui.widgets import AlertDialog, OptionList
+from pigit.termui.widgets import AlertDialog, OptionList, SectionRule
 
 from .app_diff import DiffType
-from .app_theme import THEME
 from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
     from pigit.git.model import Stash
     from pigit.viewmodels.status import IStatusViewModel
-
-
-class _StashSectionHeader(Component):
-    """One-row section rule: fill dashes + bold Stash + tail."""
-
-    _LABEL = "Stash"
-    _TAIL = "──"
-
-    def paint(self, surface: Surface) -> None:
-        w = surface.width
-        if w <= 0 or surface.height <= 0:
-            return
-        label = self._LABEL
-        suffix = f" {label} {self._TAIL}"
-        suffix_w = wcswidth(suffix)
-        fill_w = max(0, w - suffix_w)
-        rule_fg = THEME.fg_dim
-        if fill_w:
-            surface.draw_text_rgb(0, 0, "─" * fill_w, fg=rule_fg)
-        col = fill_w
-        surface.draw_text_rgb(0, col, " ", fg=rule_fg)
-        col += 1
-        surface.draw_text_rgb(
-            0,
-            col,
-            label,
-            fg=THEME.fg_panel_title,
-            style_flags=palette.STYLE_BOLD,
-        )
-        col += wcswidth(label)
-        surface.draw_text_rgb(0, col, f" {self._TAIL}", fg=rule_fg)
 
 
 class StashPanel(OptionList):
@@ -82,11 +47,11 @@ class StashPanel(OptionList):
     ) -> None:
         super().__init__(
             empty_state=[
-                Segment("  No stashes", fg=THEME.fg_dim),
-                Segment("  Press 's' to stash current changes", fg=THEME.fg_dim),
+                Segment("  No stashes"),
+                Segment("stash new changes from Status (s)"),
             ],
             id=id,
-            header=_StashSectionHeader(),
+            header=SectionRule("Stash"),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
@@ -226,12 +191,10 @@ class StashPanel(OptionList):
         if not self.stashes or idx >= len(self.stashes):
             return ([], None, [])
         stash = self.stashes[idx]
-        cursor_prefix = self.CURSOR if is_cursor else " "
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         left = [
-            Segment(cursor_prefix, fg=fg_primary, style_flags=cursor_flags),
             Segment(" ", fg=fg_primary),
         ]
         main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]

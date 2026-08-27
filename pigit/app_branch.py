@@ -23,7 +23,13 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, InputLine, OptionList
+from pigit.termui.widgets import (
+    ACCENT_BAR,
+    AlertDialog,
+    InputLine,
+    OptionList,
+    SectionRule,
+)
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
@@ -38,7 +44,8 @@ if TYPE_CHECKING:
 class BranchPanel(OptionList):
     """Branch panel with ahead/behind display and current branch highlighting."""
 
-    CURSOR = "\u25cf"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "branch"
     TAB_NAME = "Branch"
     tab_key = "3"
@@ -58,6 +65,7 @@ class BranchPanel(OptionList):
             on_selection_changed=on_selection_changed,
             lazy_load=True,
             id=id,
+            header=SectionRule("Branch"),
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
@@ -339,7 +347,6 @@ class BranchPanel(OptionList):
         if idx >= len(self.branches):
             return ([], None, [])
         branch = self.branches[idx]
-        prefix = self.CURSOR if is_cursor else " "
         if branch.is_remote:
             name_fg = THEME.fg_remote_branch
         elif branch.is_head:
@@ -348,7 +355,7 @@ class BranchPanel(OptionList):
             name_fg = self.presentation_fg("primary")
         left = [
             Segment(
-                f"{prefix} {self.content[idx]}",
+                f" {self.content[idx]}",
                 fg=name_fg,
                 style_flags=palette.STYLE_BOLD if is_cursor else 0,
             )

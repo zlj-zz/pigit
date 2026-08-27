@@ -53,6 +53,7 @@ class HeaderState:
         self._branch = Signal("")
         self._ahead = Signal(0)
         self._behind = Signal(0)
+        self._dirty = Signal(False)
         self._mode = Signal("")
         self._merge_target = Signal("")
         self._tab = Signal("")
@@ -67,6 +68,7 @@ class HeaderState:
                 self._branch,
                 self._ahead,
                 self._behind,
+                self._dirty,
                 self._badge_signal,
             ],
         )
@@ -80,6 +82,7 @@ class HeaderState:
     branch = _SignalProp()
     ahead = _SignalProp()
     behind = _SignalProp()
+    dirty = _SignalProp()
     mode = _SignalProp()
     merge_target = _SignalProp()
     tab = _SignalProp()
@@ -99,12 +102,13 @@ class HeaderState:
 
     def _make_left(self) -> list[Segment]:
         segs: list[Segment] = []
-        badge, _badge_bg, badge_fg = get_badge()
+        badge, badge_bg, badge_fg = get_badge()
         if badge:
             segs.append(
                 Segment(
                     f"{badge} ",
                     fg=badge_fg or self._theme.fg_primary,
+                    bg=badge_bg,
                     style_flags=palette.STYLE_BOLD,
                 )
             )
@@ -112,17 +116,26 @@ class HeaderState:
             [
                 Segment(self.repo, fg=self._theme.fg_header_repo),
                 Segment("  ", fg=self._theme.fg_dim),
-                Segment(
-                    self.branch,
-                    fg=self._theme.fg_header_branch,
-                    style_flags=palette.STYLE_BOLD,
-                ),
             ]
         )
+        # Current-branch marker: ``*`` in git convention; green when clean,
+        # amber when dirty.
+        dot_fg = self._theme.fg_warning if self.dirty else self._theme.fg_success
+        segs.append(Segment("*", fg=dot_fg))
+        segs.append(
+            Segment(
+                self.branch,
+                fg=self._theme.fg_accent,
+                style_flags=palette.STYLE_BOLD,
+            )
+        )
+        # Separator between branch name and upstream tracking arrows.
+        if self.ahead > 0 or self.behind > 0:
+            segs.append(Segment(" · ", fg=self._theme.fg_dim))
         if self.ahead > 0:
-            segs.append(Segment(f" ↑{self.ahead}", fg=self._theme.fg_success))
+            segs.append(Segment(f"↑{self.ahead}", fg=self._theme.fg_success))
         if self.behind > 0:
-            segs.append(Segment(f" ↓{self.behind}", fg=self._theme.fg_warning))
+            segs.append(Segment(f"↓{self.behind}", fg=self._theme.fg_warning))
         return segs
 
     def _make_right(self) -> list[Segment]:

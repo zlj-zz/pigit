@@ -19,7 +19,7 @@ YELLOW: tuple[int, int, int] = (220, 205, 100)
 CYAN: tuple[int, int, int] = (78, 201, 176)
 GREEN: tuple[int, int, int] = (137, 209, 133)
 RED: tuple[int, int, int] = (244, 135, 113)
-MUTED: tuple[int, int, int] = (150, 150, 150)
+MUTED: tuple[int, int, int] = (165, 165, 172)
 DIM: tuple[int, int, int] = (100, 100, 100)
 
 # Extended palette
@@ -50,10 +50,45 @@ ALMOST_WHITE: tuple[int, int, int] = (220, 220, 220)
 MAGENTA: tuple[int, int, int] = (240, 130, 200)
 AMBER: tuple[int, int, int] = (255, 175, 80)
 
+# Brand accent (interaction domain: focus borders, cursor indicator, active keys).
+ACCENT: tuple[int, int, int] = (150, 200, 255)
+
 # ── Semantic role colors ──
 DEFAULT_FG = PEARL
 DEFAULT_FG_DIM = SLATE
 DEFAULT_BG = INK
+
+
+# ── Color utilities ──
+
+
+def blend(
+    a: tuple[int, int, int],
+    b: tuple[int, int, int],
+    t: float,
+) -> tuple[int, int, int]:
+    """Linearly interpolate between two RGB colors.
+
+    Used to derive low-saturation background tones from the brand accent
+    (e.g. hunk headers) so they follow accent changes without hand-tuning.
+
+    Args:
+        a: First color (t=0).
+        b: Second color (t=1).
+        t: Blend factor in [0, 1]; outside the range the result is clamped.
+
+    Returns:
+        The interpolated color, components rounded to ints.
+
+    Example:
+        >>> blend((10, 20, 30), (30, 40, 50), 0.5)
+        (20, 30, 40)
+    """
+    t = max(0.0, min(1.0, float(t)))
+    return tuple(
+        round(pa + (pb - pa) * t) for pa, pb in zip(a, b)
+    )  # type: ignore[return-value]
+
 
 BG_HOVER = GUNMETAL
 BG_ACTIVE = NAVY_GRAY

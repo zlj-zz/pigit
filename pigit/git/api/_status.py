@@ -155,6 +155,21 @@ class _StatusOps(_OpsBase):
             return ""
         return cast(str, files)
 
+    def is_worktree_dirty(self, path: str | None = None) -> bool:
+        """Return True if the working tree has any changes.
+
+        Staged, unstaged, and untracked changes all count; empty output from
+        ``git status --porcelain`` means a clean tree.
+
+        Args:
+            path: Repo root; defaults to :attr:`path`.
+
+        Returns:
+            True when porcelain output is non-empty. False on error so a
+            failed probe degrades to "clean" instead of flashing dirty.
+        """
+        return bool(self.status_porcelain(path))
+
     def has_staged_changes(self, path: str | None = None) -> bool:
         """Return True if index has staged changes."""
         path = path or self.path

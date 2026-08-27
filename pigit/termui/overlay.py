@@ -139,12 +139,15 @@ def show_toast(
         layer_pop(LayerKind.TOAST)
 
     if position is None:
-        position = ToastPosition.TOP_RIGHT
+        position = ToastPosition.BOTTOM_RIGHT
 
     # segments (e.g. custom Segment lists) render verbatim; suppress kind.
     # spin applies INFO chrome inside Toast and does not use a kind glyph.
     if segments is not None:
         kind = None
+
+    # App chrome (e.g. footer) reserves space below bottom-anchored toasts.
+    bottom_pad = getattr(host, "toast_bottom_pad", 0)
 
     toast = Toast(
         message,
@@ -155,6 +158,7 @@ def show_toast(
         spin=spin,
         enter_duration=0.0 if spin else 0.5,
         exit_duration=0.0 if spin else 0.5,
+        bottom_pad=bottom_pad,
     )
     toast._event_loop = getattr(host, "_event_loop", None)
     toast.resize(host.size)

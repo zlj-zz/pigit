@@ -162,3 +162,15 @@ def test_fg_inactive_on_base_theme() -> None:
         assert body.presentation_fg("primary") == (9, 9, 9)
     finally:
         set_theme(old)
+
+
+def test_fg_accent_on_base_theme() -> None:
+    """Brand accent is a dedicated point-chrome token, not a panel frame."""
+    from pigit.termui.component import Component
+
+    theme = Theme()
+    assert theme.fg_accent == palette.ACCENT
+    assert not hasattr(theme, "border")
+    assert not hasattr(theme, "border_active")
+    assert not hasattr(theme, "border_inactive")
+    assert not hasattr(Component, "presentation_border")

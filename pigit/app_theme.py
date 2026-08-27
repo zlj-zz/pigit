@@ -12,6 +12,28 @@ from dataclasses import dataclass
 from pigit.termui import palette
 from pigit.termui.theme import Theme
 
+# Fraction of the blend toward the brand accent for the hunk header tone:
+# 0.30 reads as a clearly distinct block while keeping ~6:1 contrast.
+_HUNK_TONE_BLEND = 0.30
+
+# Commit panel: cursor-selected row background.
+_HEAD_ROW_BLEND = 0.15
+_HEAD_ROW_INACTIVE_BLEND = 0.10
+
+# Heatmap current-week side bars: muted accent, not full fg_accent brightness.
+_CONTRIB_WEEK_FRAME_BLEND = 0.35
+
+# Author line chart: six equal-blend hues (between muted chrome and full palette).
+_CHART_AUTHOR_BLEND = 0.55
+_CHART_AUTHOR_HUES: tuple[tuple[int, int, int], ...] = (
+    palette.ACCENT,
+    palette.GREEN,
+    palette.AMBER,
+    palette.MAGENTA,
+    palette.CYAN,
+    palette.PURPLE,
+)
+
 
 @dataclass(frozen=True)
 class PigitTheme(Theme):
@@ -43,6 +65,14 @@ class PigitTheme(Theme):
     fg_head_commit: tuple[int, int, int] = palette.BLUE
     fg_unpushed_commit: tuple[int, int, int] = palette.YELLOW
 
+    # Cursor-selected commit row background.
+    bg_commit_selected: tuple[int, int, int] = palette.blend(
+        palette.STEEL, palette.ACCENT, _HEAD_ROW_BLEND
+    )
+    bg_commit_selected_inactive: tuple[int, int, int] = palette.blend(
+        palette.CHARCOAL, palette.ACCENT, _HEAD_ROW_INACTIVE_BLEND
+    )
+
     # Panel / title / search
     fg_branch_name: tuple[int, int, int] = palette.PEARL
     fg_panel_title: tuple[int, int, int] = palette.PEARL
@@ -50,7 +80,14 @@ class PigitTheme(Theme):
     fg_file_history_link: tuple[int, int, int] = palette.SKY_BLUE
 
     # Diff viewer (extra slots beyond Theme diff add/del)
-    bg_diff_hunk: tuple[int, int, int] = palette.GRAPHITE
+    # Hunk header tone derives from the brand accent so it follows accent
+    # changes without hand-tuning. blend(CHARCOAL, ACCENT, 0.30) reads as a
+    # clearly distinct block (0.18 was barely distinguishable from the panel)
+    # while keeping ~6:1 contrast against fg_diff_hunk.
+    bg_diff_hunk: tuple[int, int, int] = palette.blend(
+        palette.CHARCOAL, palette.ACCENT, _HUNK_TONE_BLEND
+    )
+    fg_diff_hunk: tuple[int, int, int] = palette.PEARL
     bg_diff_context: tuple[int, int, int] = palette.INK
     bg_word_diff_add: tuple[int, int, int] = (50, 105, 60)
     bg_word_diff_del: tuple[int, int, int] = (120, 50, 50)
@@ -58,11 +95,8 @@ class PigitTheme(Theme):
     # Overlay
     bg_overlay_dim: tuple[int, int, int] = palette.NAVY_GRAY
 
-    # Chrome: active matches fg_primary; inactive matches fg_inactive (SLATE).
-    fg_chrome_active: tuple[int, int, int] = palette.PEARL
-    fg_chrome_inactive: tuple[int, int, int] = palette.SLATE
+    # Chrome / header
     fg_header_repo: tuple[int, int, int] = palette.AMBER
-    fg_header_branch: tuple[int, int, int] = palette.CYAN
 
     # Borders
     divider: tuple[int, int, int] = palette.GUNMETAL
@@ -88,14 +122,10 @@ class PigitTheme(Theme):
         palette.RED,
     )
 
-    # Contribution report: author line-chart series colors.
-    chart_author_colors: tuple[tuple[int, int, int], ...] = (
-        palette.SKY_BLUE,
-        palette.YELLOW,
-        palette.PURPLE,
-        palette.RED,
-        palette.GREEN,
-        palette.BLUE,
+    # Contribution report: six soft, equal-blend author line colors (hash-assigned).
+    chart_author_colors: tuple[tuple[int, int, int], ...] = tuple(
+        palette.blend(palette.STEEL, hue, _CHART_AUTHOR_BLEND)
+        for hue in _CHART_AUTHOR_HUES
     )
 
     # Contribution heatmap intensity 0..5 (level 0 stays slightly lighter
@@ -107,6 +137,11 @@ class PigitTheme(Theme):
         (64, 196, 99),
         (48, 161, 78),
         (33, 110, 57),
+    )
+
+    # Contribution heatmap: vertical side bars for the current week column.
+    fg_contrib_week_frame: tuple[int, int, int] = palette.blend(
+        palette.SLATE, palette.ACCENT, _CONTRIB_WEEK_FRAME_BLEND
     )
 
 

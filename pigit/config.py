@@ -125,6 +125,10 @@ class Config(metaclass=Singleton):
 
         # (bool) Show the footer key-hint bar.
         show_footer = {app_show_footer}
+
+        # (bool) Show Nerd Font file icons in the Status list. Needs a
+        # Nerd Font terminal; set PIGIT_ICONS=0 to force off.
+        file_icons = {app_file_icons}
         {keybindings}
         """)
 
@@ -308,6 +312,10 @@ class Config(metaclass=Singleton):
             log_graph_default=app_raw.get("log_graph_default", True),
             commit_report_default=app_raw.get("commit_report_default", True),
             show_footer=app_raw.get("show_footer", True),
+            # PIGIT_ICONS=0 forces icons off regardless of config (first
+            # UI-class env override; kept here so it lives next to parsing).
+            file_icons=os.environ.get("PIGIT_ICONS", "") != "0"
+            and app_raw.get("file_icons", True),
             keybindings=_flatten_keybindings(kb_raw),
         )
 
@@ -387,6 +395,7 @@ class Config(metaclass=Singleton):
                             data.app.commit_report_default
                         ).lower(),
                         app_show_footer=str(data.app.show_footer).lower(),
+                        app_file_icons=str(data.app.file_icons).lower(),
                         keybindings=keybindings_block,
                     )
                 )
