@@ -21,7 +21,7 @@ from pigit.termui import (
     show_spinner,
     show_toast,
 )
-from pigit.termui.widgets.popup import AlertDialog
+from pigit.termui.widgets import AlertDialog
 
 
 @dataclass(frozen=True)
