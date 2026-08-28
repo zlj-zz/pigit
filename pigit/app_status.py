@@ -582,7 +582,6 @@ class StatusPanel(OptionList):
             on_cancel=dismiss_sheet,
         )
         show_sheet(editor, max_fraction=0.5, title="Commit")
-        editor.mount()
 
     @bind_action(
         "commit_editor",

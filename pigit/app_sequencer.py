@@ -71,7 +71,6 @@ class SequencerControl:
 
         panel = RebasePanel(self._get_git(), target, on_done=_on_done)
         show_sheet(panel, max_fraction=0.5, title="Rebase")
-        panel.mount()
 
     def run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""

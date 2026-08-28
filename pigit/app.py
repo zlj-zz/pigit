@@ -503,7 +503,6 @@ class PigitApplication(Application):
             title="Welcome to Pigit",
             max_fraction=WELCOME_SHEET_MAX_FRACTION,
         )
-        sheet.mount()
 
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
     def show_welcome(self) -> None:
@@ -970,16 +969,11 @@ class PigitApplication(Application):
             on_add_current=self._add_current_and_switch,
             on_toggle_mode=self.open_worktree_picker,
         )
-        # The switcher replaces any open sheet (e.g. RecentActions) — the
-        # Header RepoSlot click is reachable while a sheet is open, so without
-        # this the layer stack would accumulate stacked sheets (M1).
-        dismiss_sheet()
         show_sheet(
             panel,
             title="Switch repo",
             edge="bottom",
         )
-        panel.mount()
 
     def open_worktree_picker(self) -> None:
         """Open the worktree list sheet (``w`` from repo switcher)."""
@@ -1006,17 +1000,14 @@ class PigitApplication(Application):
             on_remove=self._confirm_remove_worktree,
             on_toggle_mode=self.open_repo_switcher,
         )
-        dismiss_sheet()
         show_sheet(
             panel,
             title="Switch worktree",
             edge="bottom",
         )
-        panel.mount()
 
     def _show_add_worktree_sheet(self) -> None:
         """Prompt for ``path [branch]`` then create a linked worktree."""
-        dismiss_sheet()
         self._add_worktree_input.clear()
         show_sheet(self._add_worktree_input, height=3, show_edge_rule=False)
 
@@ -1255,9 +1246,7 @@ class PigitApplication(Application):
             on_operation=self._refresh_after_bisect_operation,
             on_done=dismiss_sheet,
         )
-        dismiss_sheet()
         show_sheet(panel, title="Bisect", edge="bottom")
-        panel.mount()
 
     def _refresh_after_bisect_operation(self) -> None:
         """Refresh git VMs and header after a bisect operation moved HEAD."""
@@ -1266,7 +1255,6 @@ class PigitApplication(Application):
 
     def _show_bisect_start_input(self) -> None:
         """Prompt for good/bad refs to start a bisect session."""
-        dismiss_sheet()
         self._bisect_start_input.clear()
         show_sheet(self._bisect_start_input, height=3, show_edge_rule=False)
 
@@ -1337,7 +1325,6 @@ class PigitApplication(Application):
 
         panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
         show_sheet(panel, title="Recent")
-        panel.mount()
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
@@ -1393,7 +1380,6 @@ class PigitApplication(Application):
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
         placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
-        placeholder.mount()
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -1414,7 +1400,6 @@ class PigitApplication(Application):
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
             show_sheet(sheet, edge="top", max_fraction=0.5)
-            sheet.mount()
 
         self._inspector_task = run_async(
             load, self._guard_repo(self._repo_token, apply)

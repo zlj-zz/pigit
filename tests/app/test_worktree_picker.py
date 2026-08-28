@@ -26,6 +26,7 @@ from pigit.git.api import GitError, WorktreeInfo
 from pigit.termui import FeedbackKind
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx, set_overlay_host
 from pigit.termui.root import ComponentRoot
+from pigit.termui.types import LayerKind
 
 
 def test_format_worktree_row_marks_current_and_detached():
@@ -158,6 +159,20 @@ def test_open_worktree_picker_lists_and_switch_reuses_switch_repo(runtime):
     with patch("pigit.app_worktree_picker.dismiss_sheet"):
         panel._activate_index(1)
     app._switch_repo.assert_called_once_with("/other/wt")
+
+
+def test_open_worktree_picker_replaces_existing_sheet(runtime):
+    """Opening a sheet replaces the previous one on the real root (no stacking)."""
+    app, root = _mount(runtime)
+    app._git.list_worktrees = Mock(return_value=[])
+    app.open_worktree_picker()
+    first = root._layer_stack.top(LayerKind.SHEET)
+    assert first is not None
+    app.open_worktree_picker()
+    second = root._layer_stack.top(LayerKind.SHEET)
+    assert second is not None and second is not first
+    assert first.open is False
+    assert second.open is True
 
 
 def test_remove_current_session_worktree_blocked(runtime):
