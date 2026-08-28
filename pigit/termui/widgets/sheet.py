@@ -87,6 +87,9 @@ class Sheet(Component):
     (``show_edge_rule=True``): a full-width ``─`` line, optionally embedding
     `` · title · ``. Callers that need a solid slab or a rule-less one-line
     input pass those explicitly.
+
+    ``top_pad`` / ``bottom_pad`` reserve app chrome rows (header / footer) so
+    the sheet paints in the body region and does not cover those hints.
     """
 
     @staticmethod
@@ -162,6 +165,8 @@ class Sheet(Component):
         title_align: TitleAlign = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
+        top_pad: int = 0,
+        bottom_pad: int = 0,
         height_cap_fraction: float = DEFAULT_HARD_CAP_FRACTION,
     ) -> None:
         super().__init__(size=size)
@@ -174,14 +179,16 @@ class Sheet(Component):
         self._title_align: TitleAlign = title_align
         self._edge = edge
         self._bg = bg
+        self._top_pad = top_pad
+        self._bottom_pad = bottom_pad
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
         self.open = True
 
     def _origin_row(self, term_h: int, sheet_h: int) -> int:
-        """Return 0-based row of the sheet's top edge on a terminal of *term_h*."""
+        """0-based row of the sheet's top edge on a terminal of *term_h*."""
         if self._edge == "top":
-            return 0
-        return term_h - sheet_h
+            return self._top_pad
+        return max(0, term_h - sheet_h - self._bottom_pad)
 
     def _edge_rule_row(self, sheet_h: int) -> int | None:
         """0-based row of the facing-edge rule, or None when disabled."""
@@ -256,10 +263,15 @@ class Sheet(Component):
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Resize the sheet and its child to the given terminal size."""
+        """Resize the sheet and its child to the given terminal size.
+
+        The height cap deducts both chrome pads so the sheet always fits in
+        the body region between header and footer, regardless of edge.
+        """
+        body_rows = size[1] - self._top_pad - self._bottom_pad
         cap_rows = max(
             MIN_SHEET_HEIGHT,
-            int(size[1] * self._height_cap_fraction),
+            int(body_rows * self._height_cap_fraction),
         )
         sheet_h = min(self._target_height, cap_rows)
         new_size = (size[0], sheet_h)

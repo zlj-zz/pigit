@@ -80,9 +80,11 @@ from .repo_session import RepoSession
 from .session_history import SessionHistory
 from .config_data import AppConfig
 
-# Footer chrome height in rows. The layout height (build_root) and the
-# toast_bottom_pad (setup_root) both derive from this constant, so growing
-# the footer can never silently overlap bottom-anchored toasts.
+# Chrome heights in rows. The layout heights (build_root) and the
+# top_chrome_pad / bottom_chrome_pad (setup_root) derive from these
+# constants, so growing the chrome can never silently overlap toasts
+# or sheets.
+HEADER_HEIGHT = 2
 FOOTER_HEIGHT = 2
 
 
@@ -335,7 +337,7 @@ class PigitApplication(Application):
             self._header,
             self._body_view,
         ]
-        heights: list = [2, "flex"]
+        heights: list = [HEADER_HEIGHT, "flex"]
         if self._config.show_footer:
             children.append(footer)
             heights.append(FOOTER_HEIGHT)
@@ -384,8 +386,10 @@ class PigitApplication(Application):
             self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
-        # Footer occupies FOOTER_HEIGHT rows when shown; keep toasts above it.
-        root.toast_bottom_pad = FOOTER_HEIGHT if self._config.show_footer else 0
+        # Header is always shown; footer only when show_footer. Sheets and toasts
+        # stay within the body region between them.
+        root.top_chrome_pad = HEADER_HEIGHT
+        root.bottom_chrome_pad = FOOTER_HEIGHT if self._config.show_footer else 0
         self._help_browser = BindingBrowser(
             key_fg=THEME.fg_info,
             on_invoke_error=self._on_help_invoke_error,

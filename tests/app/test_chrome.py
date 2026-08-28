@@ -197,3 +197,68 @@ class TestAppFooter:
             assert "main.py" not in content
         finally:
             _runtime_ctx.reset(token)
+
+    def test_sheet_footer_shows_child_hints(self):
+        """Overlay branch surfaces sheet key hints once geometry leaves footer free."""
+        from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+
+        class _HintChild(Component):
+            def get_footer_entries(self) -> list[tuple[str, str]]:
+                return [("s", "Start")]
+
+            def paint(self, surface) -> None:
+                pass
+
+        child = _HintChild()
+        sheet_shell = Sheet(child, height=4, edge="bottom")
+        ctx = RuntimeContext()
+        token = _runtime_ctx.set(ctx)
+        try:
+            body = Component(id="body")
+            root = ComponentRoot(body, ctx.registry)
+            ctx.overlay_host = root
+            root._layer_stack.push(LayerKind.SHEET, sheet_shell)
+            f = AppFooter(THEME)
+            f.set_context("src/main.py")
+            f.set_global_help([("Q", "Quit"), (";", "Palette")])
+            f.set_help_provider(lambda: [("Enter", "Open")])
+            assert ("s", "Start") in f._help_pairs()
+            s = Surface(80, 2)
+            f.resize((80, 2))
+            f.paint(s)
+            content = s.lines()[1]
+            assert "Start" in content
+            assert "Quit" not in content
+            assert "Palette" not in content
+            assert "main.py" not in content
+        finally:
+            _runtime_ctx.reset(token)
+
+    def test_sheet_bottom_pad_keeps_footer_free(self):
+        """Chrome pad end-to-end: sheet stays above the footer and hints stay visible."""
+        from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+
+        class _HintChild(Component):
+            def get_footer_entries(self) -> list[tuple[str, str]]:
+                return [("b", "Bad")]
+
+            def paint(self, surface) -> None:
+                pass
+
+        ctx = RuntimeContext()
+        token = _runtime_ctx.set(ctx)
+        try:
+            body = Component(id="body")
+            root = ComponentRoot(body, ctx.registry)
+            ctx.overlay_host = root
+            root.top_chrome_pad = 2
+            root.bottom_chrome_pad = 2
+            root.resize((100, 30))
+            sheet = root.show_sheet(_HintChild(), height=4, edge="bottom")
+            bottom_row = sheet._origin_row(30, sheet._size[1]) + sheet._size[1]
+            assert bottom_row <= 30 - root.bottom_chrome_pad
+            f = AppFooter(THEME)
+            f.set_global_help([("Q", "Quit")])
+            assert ("b", "Bad") in f._help_pairs()
+        finally:
+            _runtime_ctx.reset(token)

@@ -167,6 +167,25 @@ class TestComponentRoot:
         assert sheet._child is inner
         assert inner.parent is sheet
 
+    def test_show_sheet_threads_chrome_pads(self):
+        from pigit.termui.component import Component
+
+        class _Inner(Component):
+            def paint(self, surface):
+                pass
+
+        root = ComponentRoot(DummyBody())
+        root.resize((80, 10))
+        root.top_chrome_pad = 2
+        root.bottom_chrome_pad = 1
+        bottom = root.show_sheet(_Inner(), height=3, edge="bottom")
+        assert bottom._bottom_pad == 1
+        assert bottom._origin_row(10, 3) == 6
+        root.dismiss_sheet()
+        top = root.show_sheet(_Inner(), height=3, edge="top")
+        assert top._top_pad == 2
+        assert top._origin_row(10, 3) == 2
+
     def test_show_sheet_syncs_focus_without_key(self):
         """Body dim depends on is_focus_leaf; sheet open must move focus immediately."""
         body = DummyBody()

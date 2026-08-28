@@ -19,7 +19,7 @@ from pigit.app_welcome import (
     should_auto_show_welcome,
     WELCOME_SHEET_MAX_FRACTION,
 )
-from pigit.termui.widgets.text_browser import block_inset, block_inset_for
+from pigit.termui.widgets.text_browser import block_inset
 from pigit.config_data import AppConfig
 from pigit.termui import by_id
 from pigit.termui.root import ComponentRoot
@@ -217,15 +217,22 @@ def test_show_welcome_manual_does_not_mark_seen(mount_welcome_app, state_path):
 
 
 def test_footer_shows_welcome_keys_when_sheet_open(mount_welcome_app, state_path):
-    app, _root = mount_welcome_app
+    app, root = mount_welcome_app
     app.after_start()
+    top = root._layer_stack.top(LayerKind.SHEET)
+    child = top._child  # WelcomeSheet
+    # Chrome pads shrink the sheet vs an unpadded terminal, so Navigate is
+    # advertised exactly when the welcome content overflows the viewport
+    # (mirrors WelcomeSheet.get_footer_entries).
+    viewport = child._size[1] if child._size[1] > 0 else child._browser.viewport_rows
+    should_navigate = len(child._rows) > viewport
     footer = by_id("footer")
     surface = Surface(100, 2)
     footer.resize((100, 2))
     footer.paint(surface)
     content = surface.lines()[1]
     assert "Close" in content
-    assert "Navigate" not in content
+    assert ("Navigate" in content) is should_navigate
     assert "Quit" not in content
 
 

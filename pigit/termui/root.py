@@ -56,8 +56,11 @@ class ComponentRoot(Component):
         self._badge_bg: tuple[int, int, int] | None = None
         self._badge_fg: tuple[int, int, int] | None = None
         self._badge_until = 0
-        # Rows reserved below bottom-anchored toasts (app chrome like footer).
-        self.toast_bottom_pad = 0
+        # Rows reserved at the bottom for app chrome (footer): bottom-anchored
+        # toasts and sheets stay above it.
+        self.bottom_chrome_pad = 0
+        # Rows reserved at the top for app chrome (header): top sheets stay below it.
+        self.top_chrome_pad = 0
         self._event_bus = event_bus
         self._app_on_event: Callable | None = None
         self._event_loop: Any | None = None
@@ -393,6 +396,8 @@ class ComponentRoot(Component):
             title_align=title_align,
             edge=edge,
             bg=bg,
+            top_pad=self.top_chrome_pad,
+            bottom_pad=self.bottom_chrome_pad,
             height_cap_fraction=Sheet.height_cap_fraction(max_fraction),
         )
         sheet.resize(self._size)

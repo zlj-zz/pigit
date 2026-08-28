@@ -65,7 +65,9 @@ def _mount(bus: EventBus, preview: LogGraphPreview) -> ComponentRoot:
 
 
 def _branch_panel(vm: Mock, name: str = "feat") -> BranchPanel:
-    panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.branches = [Branch(name, "0", "0", False)]
     panel.curr_no = 0
     return panel
@@ -139,7 +141,9 @@ def test_graph_loads_when_branch_list_arrives(
     bus = EventBus()
     root = ComponentRoot(preview, event_bus=bus)
     preview.mount()
-    panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.parent = root
 
     def _publish(action, **data):
