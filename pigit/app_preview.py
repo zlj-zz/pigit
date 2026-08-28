@@ -110,9 +110,14 @@ class PreviewPanel(Component):
             self.clear()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
-        """Start an async diff load for the active PreviewPayload panel."""
-        self._cancel_load()
+        """Start an async diff load for the active PreviewPayload panel.
+
+        Identical re-emissions (same file / stash selected again) keep the
+        current preview — cancel+reload would clear and flicker with no change.
+        Disk updates still refresh via :meth:`reload`.
+        """
         if not isinstance(active, PreviewPayload):
+            self._cancel_load()
             self._request = None
             self._set_preview_target(None)
             self.clear()
@@ -120,11 +125,16 @@ class PreviewPanel(Component):
 
         request = self._capture_request(active)
         if request is None:
+            self._cancel_load()
             self._request = None
             self._set_preview_target(None)
             self.clear()
             return True
 
+        if request == self._request:
+            return True
+
+        self._cancel_load()
         self._request = request
         if request.kind == "status":
             self._set_preview_target(request.key)
