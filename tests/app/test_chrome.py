@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from pigit.app_chrome import AppFooter
 from pigit.app_theme import THEME
-from pigit.termui import Segment
+from pigit.termui import Component, ComponentRoot, Segment
+from pigit.termui.types import LayerKind
 from pigit.termui.widgets import Footer, Header
 from pigit.termui.palette import STYLE_BOLD
 from pigit.termui.surface import Surface
@@ -125,3 +126,40 @@ class TestAppFooter:
         assert f._context_text == "→ file"
         f.set_context("")
         assert f._context_text == ""
+
+    def test_modal_footer_omits_global_and_context(self):
+        from pigit.termui.component import collect_overlay_footer_entries
+        from pigit.termui.widgets import Popup
+        from pigit.termui.widgets.binding_browser import BindingBrowser
+        from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+
+        browser = BindingBrowser()
+        popup = Popup(browser, exit_key="esc")
+        popup.show()
+        pairs = collect_overlay_footer_entries(popup)
+        tips = {tip for _key, tip in pairs}
+        assert "Navigate" in tips
+        assert "Run" in tips
+        assert "Close" in tips
+
+        ctx = RuntimeContext()
+        token = _runtime_ctx.set(ctx)
+        try:
+            body = Component(id="body")
+            root = ComponentRoot(body, ctx.registry)
+            ctx.overlay_host = root
+            root._layer_stack.push(LayerKind.MODAL, popup)
+            f = AppFooter(THEME)
+            f.set_context("src/main.py")
+            f.set_global_help([("Q", "Quit"), (";", "Palette")])
+            f.set_help_provider(lambda: [("Enter", "Open")])
+            s = Surface(80, 2)
+            f.resize((80, 2))
+            f.paint(s)
+            content = s.lines()[1]
+            assert "Navigate" in content
+            assert "Quit" not in content
+            assert "Palette" not in content
+            assert "main.py" not in content
+        finally:
+            _runtime_ctx.reset(token)

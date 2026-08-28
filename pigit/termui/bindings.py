@@ -196,6 +196,39 @@ def bind_action(
     return decorator
 
 
+def merge_footer_pairs(
+    entries: Sequence[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Merge ``(semantic_key, tip)`` rows that share a tip into one footer entry.
+
+    Keys are rendered with :func:`~pigit.termui.keys.display_key` and joined
+    with ``/`` (e.g. ``j/k/down/up Navigate``).
+    """
+    grouped: dict[str, list[str]] = {}
+    order: list[str] = []
+    for key, tip in entries:
+        if tip not in grouped:
+            grouped[tip] = []
+            order.append(tip)
+        grouped[tip].append(key)
+    return [("/".join(display_key(k) for k in grouped[tip]), tip) for tip in order]
+
+
+def join_footer_display_pairs(
+    parts: Sequence[Sequence[tuple[str, str]]],
+) -> list[tuple[str, str]]:
+    """Merge already-displayed ``(key, tip)`` rows that share a tip."""
+    grouped: dict[str, list[str]] = {}
+    order: list[str] = []
+    for entries in parts:
+        for key, tip in entries:
+            if tip not in grouped:
+                grouped[tip] = []
+                order.append(tip)
+            grouped[tip].append(key)
+    return [("/".join(grouped[tip]), tip) for tip in order]
+
+
 def collect_action_bindings(cls: type, namespace: str = "") -> list[Binding]:
     """Collect ``Binding`` entries from ``@bind_action`` across the MRO.
 
@@ -271,21 +304,58 @@ def resolve_instance_bindings(
     return action_bindings, key_handlers
 
 
+@dataclass(frozen=True)
+class ExecutableBinding:
+    """One help/browser row: display fields plus a zero-arg invoke callable.
+
+    Distinct from ``BindingEntry`` (declarative ``BINDINGS`` key/target pairs).
+    """
+
+    keys_display: str
+    desc: str
+    action: str
+    owner: Any
+    invoke: Callable[[], Any]
+
+
+def derive_executable_bindings(
+    bindings: Sequence[Binding],
+    owner: Any,
+) -> list[ExecutableBinding]:
+    """Derive executable help rows from ``@bind_action`` bindings.
+
+    Omits bindings whose ``target`` is missing or not callable on ``owner``.
+    Does not filter by ``tip_when`` (help lists all actions; handlers guard modes).
+    """
+    rows: list[ExecutableBinding] = []
+    for binding in bindings:
+        if not binding.target:
+            continue
+        fn = getattr(owner, binding.target, None)
+        if not callable(fn):
+            continue
+        desc = binding.desc(owner) if callable(binding.desc) else binding.desc
+        if desc is None:
+            desc = binding.action
+        keys_display = "/".join(display_key(k) for k in resolve_action_keys(binding))
+        rows.append(
+            ExecutableBinding(
+                keys_display=keys_display,
+                desc=str(desc),
+                action=binding.action,
+                owner=owner,
+                invoke=fn,
+            )
+        )
+    return rows
+
+
 def derive_help_entries(
     bindings: Sequence[Binding],
     owner: Any,
 ) -> list[tuple[str, str]]:
-    """Derive ``(keys, desc)`` help entries from ``@bind_action`` bindings.
-
-    Always includes every binding; ``desc`` falls back to the action id when
-    callable or None. Footer visibility is gated by ``tip_when`` separately.
-    """
-    entries: list[tuple[str, str]] = []
-    for binding in bindings:
-        desc = binding.desc(owner) if callable(binding.desc) else binding.desc
-        if desc is None:
-            desc = binding.action
-        entries.append(
-            ("/".join(display_key(k) for k in resolve_action_keys(binding)), desc)
-        )
-    return entries
+    """Derive ``(keys, desc)`` help entries as a projection of executable rows."""
+    return [
+        (row.keys_display, row.desc)
+        for row in derive_executable_bindings(bindings, owner)
+    ]

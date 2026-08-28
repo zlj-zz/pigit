@@ -66,9 +66,11 @@ from .overlay import (
 # Other utilities
 from .bindings import (
     Binding,
+    ExecutableBinding,
     bind_action,
     BindingError,
     collect_action_bindings,
+    derive_executable_bindings,
     set_key_overrides,
 )
 from . import keys
@@ -106,7 +108,9 @@ __all__ = [
     # Utils
     "bind_action",
     "Binding",
+    "ExecutableBinding",
     "collect_action_bindings",
+    "derive_executable_bindings",
     "set_key_overrides",
     "BindingError",
     "keys",

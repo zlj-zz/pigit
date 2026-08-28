@@ -37,7 +37,8 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
+from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup
+from pigit.termui.bindings import ExecutableBinding
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
 from .app_merge_state import MergeStateStore
@@ -323,29 +324,44 @@ class PigitApplication(Application):
     def setup_root(self, root: ComponentRoot) -> None:
         # Footer occupies FOOTER_HEIGHT rows when shown; keep toasts above it.
         root.toast_bottom_pad = FOOTER_HEIGHT if self._config.show_footer else 0
-        self._help_panel = HelpPanel(
+        self._help_browser = BindingBrowser(
             key_fg=THEME.fg_info,
+            on_invoke_error=self._on_help_invoke_error,
         )
-        self._help_panel.set_grouped_entries(self.get_help_groups())
+        self._help_browser.set_groups(self.get_help_groups())
         self._help_popup = Popup(
-            self._help_panel,
+            self._help_browser,
             exit_key=keys.KEY_ESC,
         )
 
-    def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+    def _on_help_invoke_error(self, exc: BaseException) -> None:
+        """Toast after Help dismiss when an invoked binding raises."""
+        show_toast(str(exc) or "Action failed", duration=2.5, kind=FeedbackKind.ERROR)
+
+    def get_help_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
         """Help for the active presentation panel, then Global app bindings."""
-        groups: list[tuple[str, list[tuple[str, str]]]] = []
+        groups: list[tuple[str, list[ExecutableBinding]]] = []
         active = self._resolve_active_panel()
         if active is not None:
-            entries = active.get_help_entries()
+            entries = active.get_executable_bindings()
             if entries:
                 title_fn = getattr(active, "get_help_title", None)
                 title = str(title_fn()) if callable(title_fn) else type(active).__name__
                 groups.append((title, entries))
-        universal = self.get_help_entries()
+        universal = self.get_executable_bindings()
         if universal:
             groups.append(("Global", universal))
         return groups
+
+    def _open_help_browser(self) -> None:
+        """Rebuild groups and show Help when the popup is closed."""
+        popup = self._help_popup
+        browser = self._help_browser
+        if popup is None or browser is None:
+            return
+        browser.set_groups(self.get_help_groups())
+        if not popup.open:
+            popup.toggle()
 
     def after_start(self):
         cols, rows = terminal_size()
@@ -504,8 +520,13 @@ class PigitApplication(Application):
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
         """Toggle help popup visibility. Rebuild groups so Commit's title tracks log_ref."""
-        self._help_panel.set_grouped_entries(self.get_help_groups())
-        self._help_popup.toggle()
+        popup = self._help_popup
+        if popup is None:
+            return
+        if popup.open:
+            popup.toggle()
+            return
+        self._open_help_browser()
 
     @bind_action("palette", ";", desc="Open command palette", tip="Palette")
     def toggle_palette(self):
@@ -764,7 +785,9 @@ class PigitApplication(Application):
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
-    @bind_action("push", "P", desc="Push current branch (set upstream if needed)", tip="Push")
+    @bind_action(
+        "push", "P", desc="Push current branch (set upstream if needed)", tip="Push"
+    )
     def push_upstream(self) -> None:
         """Push HEAD; confirm ``git push -u`` when no upstream is configured."""
         self._run_network_git("push")

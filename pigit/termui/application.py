@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from .bindings import (
     BindingsList,
+    derive_executable_bindings,
     derive_help_entries,
     resolve_instance_bindings,
 )
@@ -56,6 +57,10 @@ class Application:
         self._action_bindings, self._key_handlers = resolve_instance_bindings(self)
         self._help_popup: Any = None
         self._event_bus = EventBus()
+
+    def get_executable_bindings(self):
+        """Derive app-level executable help rows from ``@bind_action``."""
+        return derive_executable_bindings(self._action_bindings, self)
 
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Derive app-level (universal) help entries from ``@bind_action``."""

@@ -163,6 +163,13 @@ class ComponentRoot(Component):
         """True while an open MODAL or SHEET owns keyboard chrome (not TOAST)."""
         return self._top_open_overlay() is not None
 
+    def open_modal(self) -> Component | None:
+        """Return the open modal overlay, if any."""
+        top = self._layer_stack.top(LayerKind.MODAL)
+        if top is not None and getattr(top, "open", False):
+            return top
+        return None
+
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
         """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)

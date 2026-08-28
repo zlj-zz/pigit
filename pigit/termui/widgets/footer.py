@@ -84,7 +84,7 @@ class Footer(Component):
         Panel help is pulled from the registered provider each render cycle;
         global help is appended and deduplicated by key.
         """
-        left_text = self._context_text
+        left_text = self._display_context()
         left_w = wcswidth(left_text)
         x = 0
 
@@ -92,12 +92,7 @@ class Footer(Component):
             surface.draw_text_rgb(row, x, left_text, fg=theme.fg_primary)
             x += left_w + 2
 
-        panel_help = self._help_provider() if self._help_provider else []
-        seen = {key for key, _ in panel_help}
-        help_pairs = list(panel_help)
-        for key, desc in self._global_help:
-            if key not in seen:
-                help_pairs.append((key, desc))
+        help_pairs = self._help_pairs()
 
         for key, desc in help_pairs:
             pair_text = f"{key} {desc}"
@@ -126,3 +121,17 @@ class Footer(Component):
             rest = f" {desc}  "
             surface.draw_text_rgb(row, x, rest, fg=theme.fg_muted)
             x += wcswidth(rest)
+
+    def _display_context(self) -> str:
+        """Left-side context label for the current footer mode."""
+        return self._context_text
+
+    def _help_pairs(self) -> list[tuple[str, str]]:
+        """Key/description pairs for the right side of the footer row."""
+        panel_help = self._help_provider() if self._help_provider else []
+        seen = {key for key, _ in panel_help}
+        help_pairs = list(panel_help)
+        for key, desc in self._global_help:
+            if key not in seen:
+                help_pairs.append((key, desc))
+        return help_pairs

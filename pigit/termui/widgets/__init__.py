@@ -15,6 +15,7 @@ from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
 from .header import Header
 from .help_panel import HelpEntry, HelpPanel
+from .binding_browser import BindingBrowser
 from .input_line import InputLine
 from .option_list import ACCENT_BAR, OptionList
 from .section_rule import SectionRule
@@ -40,6 +41,7 @@ __all__ = [
     "Header",
     "HelpEntry",
     "HelpPanel",
+    "BindingBrowser",
     "InputLine",
     "OptionList",
     "ACCENT_BAR",

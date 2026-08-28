@@ -56,6 +56,12 @@ class Popup(Component):
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
 
+    def get_footer_entries(self) -> list[tuple[str, str]]:
+        """Footer hint for the modal dismiss key."""
+        from ..keys import display_key
+
+        return [(display_key(self.exit_key), "Close")]
+
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
         Handle one key while this shell is the active modal: try shell bindings,

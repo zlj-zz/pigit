@@ -50,17 +50,13 @@ def test_has_upstream_false_when_rev_parse_fails() -> None:
 
 
 def test_get_current_branch_none_when_detached() -> None:
-    ex = MockExecutor(
-        responses={"git symbolic-ref -q --short HEAD": (1, "", "")}
-    )
+    ex = MockExecutor(responses={"git symbolic-ref -q --short HEAD": (1, "", "")})
     git = GitApi(executor=ex, path="/repo")
     assert git.get_current_branch() is None
 
 
 def test_default_push_remote_prefers_origin() -> None:
-    ex = MockExecutor(
-        responses={"git remote show": (0, "", "upstream\norigin\n")}
-    )
+    ex = MockExecutor(responses={"git remote show": (0, "", "upstream\norigin\n")})
     git = GitApi(executor=ex, path="/repo")
     assert git.default_push_remote() == "origin"
 
