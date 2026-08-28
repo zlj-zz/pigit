@@ -16,11 +16,13 @@ import pytest
 
 from pigit.termui.component import Component
 from pigit.termui._layer import LayerKind
+from pigit.termui import bind_action
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind, parse_sgr_mouse
 from pigit.termui.root import ComponentRoot
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.containers import Column, Row, TabView
 from pigit.termui.input import KeyboardInput
+from pigit.termui.widgets.binding_browser import BindingBrowser
 from pigit.termui.widgets.option_list import OptionList
 from pigit.termui.widgets.text_browser import TextBrowser
 from pigit.termui.widgets.popup import Popup
@@ -402,3 +404,78 @@ class TestRootMouse:
 
         assert root._handle_mouse(self._mouse()) is True
         assert root._focus_manager.get_focus_leaf() is root.body
+
+
+# ---------------------------------------------------------------------------
+# BindingBrowser inside a Popup: full-path click routing
+# ---------------------------------------------------------------------------
+
+
+class _BrowserOwner(Component):
+    keymap_namespace = "demo"
+
+    @bind_action("demo.run", "r", desc="Run it")
+    def do_run(self) -> None:
+        self.hit = "run"
+
+    @bind_action("demo.stash", "s", desc="Stash it")
+    def do_stash(self) -> None:
+        self.hit = "stash"
+
+    @bind_action("demo.pull", "p", desc="Pull it")
+    def do_pull(self) -> None:
+        self.hit = "pull"
+
+    @bind_action("demo.push", "u", desc="Push it")
+    def do_push(self) -> None:
+        self.hit = "push"
+
+
+class TestBindingBrowserPopupMouse:
+    def _setup(self):
+        root = ComponentRoot(_DummyBody())
+        root.resize((80, 24))
+        owner = _BrowserOwner()
+        owner.hit = None
+        rows = owner.get_executable_bindings()
+        browser = BindingBrowser(inner_width=40, inner_height=5)
+        browser.resize((80, 24))
+        browser.set_groups([("Panel", rows)])
+        popup = Popup(browser)
+        popup.resize((80, 24))
+        popup.open = True
+        root._layer_stack.push(LayerKind.MODAL, popup)
+        return root, browser, owner
+
+    def _first_content_cell(self, browser):
+        # Browser is centered by the popup; its first content row/col sit one
+        # cell inside the border: global 1-based = child.x/y + 1.
+        return browser.y + 1, browser.x + 1
+
+    def _first_selectable_cell(self, browser):
+        # The group header occupies the first content row; the first
+        # selectable row sits one cell below it.
+        return browser.y + 1, browser.x + 2
+
+    def test_popup_left_click_reaches_browser_cursor(self):
+        root, browser, _owner = self._setup()
+        col, row = self._first_selectable_cell(browser)
+        ev = MouseEvent(col, row, MouseButton.LEFT, MouseKind.PRESS)
+        assert root._handle_mouse(ev) is True
+        assert browser._cursor == 0
+
+    def test_popup_double_click_invokes_binding(self):
+        root, browser, owner = self._setup()
+        col, row = self._first_selectable_cell(browser)
+        ev = MouseEvent(col, row, MouseButton.LEFT, MouseKind.PRESS)
+        assert root._handle_mouse(ev) is True
+        assert owner.hit is None
+        assert root._handle_mouse(ev) is True
+        assert owner.hit == "run"
+
+    def test_popup_wheel_still_scrolls_browser(self):
+        root, browser, _owner = self._setup()
+        col, row = self._first_content_cell(browser)
+        ev = MouseEvent(col, row, MouseButton.WHEEL_DOWN, MouseKind.PRESS)
+        assert root._handle_mouse(ev) is True
+        assert browser._offset == 1

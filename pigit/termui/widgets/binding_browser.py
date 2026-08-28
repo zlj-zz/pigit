@@ -8,6 +8,7 @@ Date: 2026-08-27
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable, Sequence
 
 from .. import keys, palette
@@ -19,6 +20,12 @@ from ..primitives.frame import BoxFrame
 from ..segment import Segment
 from ..surface import Surface
 from ..theme import get_theme
+from ..viewport_hit import (
+    DOUBLE_CLICK_MS,
+    ViewportLayout,
+    build_viewport_layout,
+    hit_row,
+)
 from ..wcwidth_table import truncate_by_width, wcswidth
 from .help_format import build_binding_browser_lines, _CURSOR_COL_W, _CURSOR_GLYPH
 
@@ -87,6 +94,11 @@ class BindingBrowser(Component):
         self._padding = Padding(top=2, right=4, bottom=2, left=4)
         # (segments, selectable_index | None) — None for headers / blank / wraps
         self._render: list[tuple[list[Segment], int | None]] = []
+        # Viewport hit geometry rebuilt alongside ``_render`` (see _rebuild).
+        self._layout: ViewportLayout | None = None
+        # Last left press, for double-click detection (cleared on dismiss/reset).
+        self._last_click_index: int | None = None
+        self._last_click_time = 0.0
 
     def set_on_toggle(self, cb: Callable[[], None] | None) -> None:
         """Set the callback invoked by :meth:`toggle` (Popup wires this)."""
@@ -94,6 +106,7 @@ class BindingBrowser(Component):
 
     def toggle(self) -> None:
         """Delegate toggle to the wrapping popup shell, if any."""
+        self._clear_double_click()
         if self._on_toggle is not None:
             self._on_toggle()
 
@@ -116,8 +129,9 @@ class BindingBrowser(Component):
         self,
         groups: Sequence[tuple[str, Sequence[ExecutableBinding]]],
     ) -> None:
-        """Replace grouped bindings and reset cursor / scroll."""
+        """Replace grouped bindings and reset cursor / scroll / click state."""
         self._groups = [(title, list(entries)) for title, entries in groups]
+        self._clear_double_click()
         self._rebuild_selectable()
         self._rebuild()
         self._cursor = 0
@@ -140,6 +154,7 @@ class BindingBrowser(Component):
         """Move cursor to the next selectable entry (clamped)."""
         if not self._selectable:
             return
+        self._clear_double_click()
         self._cursor = min(self._cursor + 1, len(self._selectable) - 1)
         self._ensure_cursor_visible()
 
@@ -147,6 +162,7 @@ class BindingBrowser(Component):
         """Move cursor to the previous selectable entry (clamped)."""
         if not self._selectable:
             return
+        self._clear_double_click()
         self._cursor = max(self._cursor - 1, 0)
         self._ensure_cursor_visible()
 
@@ -155,6 +171,7 @@ class BindingBrowser(Component):
         entry = self.selected_binding()
         if entry is None:
             return
+        self._clear_double_click()
         dismiss_only = _is_dismiss_only_action(entry.action)
         if self._on_toggle is not None:
             self._on_toggle()
@@ -168,7 +185,7 @@ class BindingBrowser(Component):
                 self._on_invoke_error(exc)
 
     def handle_mouse(self, event: MouseEvent) -> bool:
-        """Scroll on wheel; one detent scrolls ``WHEEL_SCROLL_LINES`` lines."""
+        """Wheel scrolls; a left click moves the cursor, a double-click activates."""
         if event.kind is not MouseKind.PRESS:
             return False
         if event.button is MouseButton.WHEEL_UP:
@@ -177,14 +194,57 @@ class BindingBrowser(Component):
         if event.button is MouseButton.WHEEL_DOWN:
             self._scroll_down(self.WHEEL_SCROLL_LINES)
             return True
+        if event.button is MouseButton.LEFT:
+            return self._handle_left_press(event)
         return False
+
+    def _handle_left_press(self, event: MouseEvent) -> bool:
+        """Move the cursor to the clicked selectable row; double-click activates.
+
+        Clicks on group headers, blank separators, wrapped continuations or
+        the frame border are consumed without moving the cursor or dismissing
+        (mirrors how a modal swallows clicks that miss it).
+        """
+        layout = self._layout
+        if layout is None:
+            return True
+        origin_row, origin_col = layout.content_origin
+        idx = hit_row(event.row - origin_row, event.col - origin_col, layout)
+        if idx is None:
+            return True
+        now = time.monotonic()
+        is_double = (
+            idx == self._last_click_index
+            and now - self._last_click_time <= DOUBLE_CLICK_MS / 1000.0
+        )
+        self._last_click_index = idx
+        self._last_click_time = now
+        self._cursor = idx
+        self._ensure_cursor_visible()
+        if is_double:
+            self._clear_double_click()
+            self.activate_selected()
+        return True
+
+    def _clear_double_click(self) -> None:
+        """Forget the previous left press (used on dismiss and content reset)."""
+        self._last_click_index = None
+        self._last_click_time = 0.0
 
     def _scroll_down(self, line: int = 1) -> None:
         max_off = max(0, len(self._render) - self._scroll_h)
-        self._offset = min(self._offset + max(1, line), max_off)
+        new_off = min(self._offset + max(1, line), max_off)
+        if new_off != self._offset:
+            self._offset = new_off
+            self._clear_double_click()
+            self._rebuild_layout()
 
     def _scroll_up(self, line: int = 1) -> None:
-        self._offset = max(0, self._offset - max(1, line))
+        new_off = max(0, self._offset - max(1, line))
+        if new_off != self._offset:
+            self._offset = new_off
+            self._clear_double_click()
+            self._rebuild_layout()
 
     def _cursor_primary_render_index(self) -> int | None:
         for i, (_segs, sel_i) in enumerate(self._render):
@@ -196,10 +256,14 @@ class BindingBrowser(Component):
         idx = self._cursor_primary_render_index()
         if idx is None:
             return
-        if idx < self._offset:
-            self._offset = idx
-        elif idx >= self._offset + self._scroll_h:
-            self._offset = idx - self._scroll_h + 1
+        new_off = self._offset
+        if idx < new_off:
+            new_off = idx
+        elif idx >= new_off + self._scroll_h:
+            new_off = idx - self._scroll_h + 1
+        if new_off != self._offset:
+            self._offset = new_off
+            self._rebuild_layout()
 
     def _estimate_content_width(self) -> int:
         gap = 2
@@ -217,7 +281,12 @@ class BindingBrowser(Component):
         return group_indent + _CURSOR_COL_W + max_key_w + gap + desc_w
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Recalculate inner and outer dimensions for the given terminal size."""
+        """Recalculate inner and outer dimensions for the given terminal size.
+
+        A terminal resize must not let a click before the resize pair with one
+        after it; clear the double-click window like other lifecycle resets.
+        """
+        self._clear_double_click()
         tw, th = int(size[0]), int(size[1])
         avail_w, avail_h = self._padding.apply((tw, th))
 
@@ -248,10 +317,26 @@ class BindingBrowser(Component):
         self._ensure_cursor_visible()
 
     def _rebuild(self) -> None:
-        """Rebuild render lines from groups using current ``_inner_w``."""
+        """Rebuild paint lines and the viewport layout from current ``_inner_w``."""
         self._render = self._build_grouped(self._groups)
         max_off = max(0, len(self._render) - self._scroll_h)
         self._offset = min(self._offset, max_off)
+        self._rebuild_layout()
+
+    def _rebuild_layout(self) -> None:
+        """Project the current paint lines and ``_offset`` into viewport geometry.
+
+        Pure geometry (no text wrapping), so it may rerun whenever ``_offset``
+        changes; paint and hit always read the same scroll position.
+        """
+        cr, cc, cw, _ch = self._frame.content_rect(0, 0)
+        self._layout = build_viewport_layout(
+            [sel for _segs, sel in self._render],
+            content_origin=(cr, cc),
+            content_width=cw,
+            viewport_height=self._scroll_h,
+            scroll_offset=self._offset,
+        )
 
     def _build_grouped(
         self, groups: list[tuple[str, list[ExecutableBinding]]]

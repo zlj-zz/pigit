@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from .. import palette
 from ..bindings import ExecutableBinding
 from ..segment import Segment
+from ..viewport_hit import ViewportLayout, build_viewport_layout
 from ..wcwidth_table import wcswidth
 from .help_panel import _wrap_text
 
@@ -98,6 +99,45 @@ def build_binding_browser_lines(
             selectable_i += 1
         render.append(([], None))
     return render
+
+
+def build_binding_browser_layout(
+    groups: Sequence[tuple[str, Sequence[ExecutableBinding]]],
+    *,
+    inner_width: int,
+    content_origin: tuple[int, int],
+    content_width: int,
+    viewport_height: int,
+    scroll_offset: int,
+    key_fg: tuple[int, int, int] | None = None,
+    desc_fg: tuple[int, int, int] | None = None,
+    show_cursor: bool = False,
+) -> ViewportLayout:
+    """Build viewport hit geometry from the same groups as the paint rows.
+
+    Layout and paint share one wrap implementation
+    (:func:`build_binding_browser_lines`), so click mapping can never drift
+    from what is rendered.
+
+    ``BindingBrowser`` derives its layout directly from ``_render`` (see
+    ``BindingBrowser._rebuild_layout``); this helper is for ``HelpPanel``
+    migration and unit tests. Callers must pass ``show_cursor=True`` to match
+    the browser's paint — the default hides the cursor column and shifts hits.
+    """
+    lines = build_binding_browser_lines(
+        groups,
+        inner_width=inner_width,
+        key_fg=key_fg,
+        desc_fg=desc_fg,
+        show_cursor=show_cursor,
+    )
+    return build_viewport_layout(
+        [sel for _segs, sel in lines],
+        content_origin=content_origin,
+        content_width=content_width,
+        viewport_height=viewport_height,
+        scroll_offset=scroll_offset,
+    )
 
 
 def format_binding_group_rows(
