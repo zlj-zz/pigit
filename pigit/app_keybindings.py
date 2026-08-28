@@ -21,6 +21,7 @@ from .app_log_ref import LogRefSheet
 from .app_rebase import RebasePanel
 from .app_recent_actions import RecentActionsPanel
 from .app_repo_switcher import RepoSwitcherSheet
+from .app_worktree_picker import WorktreePickerSheet
 from .app_stash import StashPanel
 from .app_welcome import WelcomeSheet
 from .app_status import StatusPanel
@@ -37,6 +38,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     RebasePanel,
     RecentActionsPanel,
     RepoSwitcherSheet,
+    WorktreePickerSheet,
     LogRefSheet,
     InspectorSheet,
     WelcomeSheet,

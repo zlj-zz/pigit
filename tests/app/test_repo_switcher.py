@@ -8,6 +8,8 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
+import itertools
+
 from unittest.mock import MagicMock, Mock, patch
 
 from pigit.app import PigitApplication
@@ -249,8 +251,8 @@ def test_switcher_sheet_double_click_activates():
     with (
         patch("pigit.app_repo_switcher.dismiss_sheet"),
         patch(
-            "pigit.app_repo_switcher.time.monotonic",
-            side_effect=[0.0, 0.2],
+            "pigit.app_list_picker.time.monotonic",
+            side_effect=itertools.count(0, 0.2),
         ),
     ):
         sheet.handle_mouse(ev)

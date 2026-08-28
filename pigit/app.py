@@ -45,6 +45,7 @@ from pigit.termui.widgets import (
     AlertDialog,
     BindingBrowser,
     Header,
+    InputLine,
     Popup,
     RepoSlot,
     TabSlot,
@@ -150,6 +151,12 @@ class PigitApplication(Application):
         self._alert_dialog = AlertDialog(
             inner_width=50,
             on_result=lambda _: None,
+        )
+        self._add_worktree_input = InputLine(
+            prompt="Add worktree (path [branch], quote paths with spaces): ",
+            on_submit=self._on_add_worktree_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
         )
         self._config = config
         self._observe_host: ObserveHost | None = None
@@ -958,6 +965,7 @@ class PigitApplication(Application):
             entries=entries,
             on_switch=self._switch_repo,
             on_add_current=self._add_current_and_switch,
+            on_toggle_mode=self.open_worktree_picker,
         )
         # The switcher replaces any open sheet (e.g. RecentActions) — the
         # Header RepoSlot click is reachable while a sheet is open, so without
@@ -969,6 +977,147 @@ class PigitApplication(Application):
             edge="bottom",
         )
         panel.mount()
+
+    def open_worktree_picker(self) -> None:
+        """Open the worktree list sheet (``w`` from repo switcher)."""
+        from pigit.git.api import GitError
+        from .app_worktree_picker import (
+            WorktreePickerSheet,
+            build_worktree_picker_entries,
+        )
+
+        try:
+            worktrees = self._git.list_worktrees()
+        except GitError as exc:
+            show_toast(
+                str(exc) or "Failed to list worktrees",
+                duration=2.5,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        entries = build_worktree_picker_entries(worktrees, current_path=self._repo_path)
+        panel = WorktreePickerSheet(
+            entries=entries,
+            on_switch=self._switch_repo,
+            on_add=self._show_add_worktree_sheet,
+            on_remove=self._confirm_remove_worktree,
+            on_toggle_mode=self.open_repo_switcher,
+        )
+        dismiss_sheet()
+        show_sheet(
+            panel,
+            title="Switch worktree",
+            edge="bottom",
+        )
+        panel.mount()
+
+    def _show_add_worktree_sheet(self) -> None:
+        """Prompt for ``path [branch]`` then create a linked worktree."""
+        dismiss_sheet()
+        self._add_worktree_input.clear()
+        show_sheet(self._add_worktree_input, height=3, show_edge_rule=False)
+
+    def _on_add_worktree_submit(self, raw: str) -> None:
+        from pigit.git.api import GitError
+        from .app_worktree_picker import parse_add_worktree_input
+
+        raw = raw.strip()
+        if not raw:
+            dismiss_sheet()
+            return
+        try:
+            target, branch = parse_add_worktree_input(raw)
+        except ValueError:
+            show_toast("Enter a worktree path", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+        try:
+            self._git.add_worktree(target, branch, new=True)
+        except GitError as exc:
+            show_toast(
+                str(exc) or "Failed to add worktree",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        dismiss_sheet()
+        show_toast(f"Added worktree {target}", duration=1.5, kind=FeedbackKind.SUCCESS)
+        self._switch_repo(target)
+
+    def _confirm_remove_worktree(self, info) -> None:
+        """Confirm remove with M1 session guard and dirty --force flow."""
+        from pathlib import Path
+
+        from pigit.git.api import GitError, WorktreeInfo
+
+        if not isinstance(info, WorktreeInfo):
+            return
+        try:
+            session = str(Path(self._repo_path).resolve())
+            target = str(Path(info.path).resolve())
+        except OSError:
+            session = self._repo_path
+            target = info.path
+        if target == session:
+            show_toast(
+                "先切换到其他工作树再移除",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        if info.is_main:
+            show_toast(
+                "不能移除主工作树",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def _do_remove(*, force: bool) -> None:
+            try:
+                self._git.remove_worktree(info.path, force=force)
+            except GitError as exc:
+                show_toast(
+                    str(exc) or "Failed to remove worktree",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            dismiss_sheet()
+            show_toast(
+                f"Removed worktree {info.path}",
+                duration=1.5,
+                kind=FeedbackKind.SUCCESS,
+            )
+            self.open_worktree_picker()
+
+        dirty = False
+        try:
+            dirty = bool(self._git.is_worktree_dirty(path=info.path))
+        except Exception:
+            dirty = False
+
+        if dirty:
+
+            def on_force(ok: bool) -> None:
+                if ok:
+                    _do_remove(force=True)
+
+            self._alert_dialog.alert(
+                f"Worktree is dirty. Remove with --force?\n{info.path}",
+                on_force,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+
+        def on_confirm(ok: bool) -> None:
+            if ok:
+                _do_remove(force=False)
+
+        self._alert_dialog.alert(
+            f"Remove worktree?\n{info.path}",
+            on_confirm,
+            kind=FeedbackKind.WARNING,
+        )
 
     def open_panel_picker(self, event: MouseEvent) -> None:
         """Open the anchored panel picker from a TabSlot click.

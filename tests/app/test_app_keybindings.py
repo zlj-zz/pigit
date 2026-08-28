@@ -40,6 +40,7 @@ class TestCollectAllActionBindings:
             "stash",
             "recent",
             "repo_switcher",
+            "worktree_picker",
             "log_ref",
             "inspector",
             "welcome",

@@ -20,11 +20,13 @@ from ._status import _StatusOps
 from ._stash import _StashOps
 from ._diff import _DiffOps
 from ._worktree import _WorktreeOps
+from ._worktrees import WorktreeInfo, _WorktreesOps
+from ._bisect import BisectState, _BisectOps
 from ._merge import _MergeOps
 from ._fileio import _FileioOps
 from ._display import _DisplayOps
 
-__all__ = ("GitApi", "GitError", "RepoError")
+__all__ = ("GitApi", "GitError", "RepoError", "WorktreeInfo", "BisectState")
 
 
 class GitApi:
@@ -49,6 +51,8 @@ class GitApi:
         self._stash = _StashOps(self)
         self._diff = _DiffOps(self)
         self._worktree = _WorktreeOps(self, self._core)
+        self._wt_ops = _WorktreesOps(self)
+        self._bisect_ops = _BisectOps(self, self._core)
         self._merge = _MergeOps(self, self._core)
         self._fileio = _FileioOps(self)
         self._display = _DisplayOps(self, self._core, self._branch)
@@ -264,6 +268,35 @@ class GitApi:
 
     def soft_reset_head1(self, path=None):
         return self._worktree.soft_reset_head1(path)
+
+    # ── _wt_ops (git worktree feature; not working-tree file ops) ──
+    def list_worktrees(self, path=None):
+        return self._wt_ops.list_worktrees(path)
+
+    def add_worktree(self, target, branch, *, new=True, path=None):
+        return self._wt_ops.add_worktree(target, branch, new=new, path=path)
+
+    def remove_worktree(self, target, *, force=False, path=None):
+        return self._wt_ops.remove_worktree(target, force=force, path=path)
+
+    def is_worktree(self, path=None):
+        return self._wt_ops.is_worktree(path)
+
+    # ── _bisect_ops ──
+    def bisect_status(self, path=None):
+        return self._bisect_ops.bisect_status(path)
+
+    def bisect_start(self, good_ref, bad_ref=None, path=None):
+        return self._bisect_ops.bisect_start(good_ref, bad_ref, path)
+
+    def bisect_mark_good(self, path=None):
+        return self._bisect_ops.bisect_mark_good(path)
+
+    def bisect_mark_bad(self, path=None):
+        return self._bisect_ops.bisect_mark_bad(path)
+
+    def bisect_reset(self, path=None):
+        return self._bisect_ops.bisect_reset(path)
 
     # ── _merge ──
     def pull(self, path=None):
