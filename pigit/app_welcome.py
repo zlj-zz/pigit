@@ -21,10 +21,13 @@ from pigit.termui import (
 )
 from pigit.termui.bindings import ExecutableBinding, merge_footer_pairs
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import Sheet, TextBrowser
-from pigit.termui.widgets.help_format import format_binding_group_rows
-from pigit.termui.widgets.help_panel import _wrap_text
-from pigit.termui.widgets.text_browser import block_inset_for
+from pigit.termui.widgets import (
+    Sheet,
+    TextBrowser,
+    block_inset_for,
+    format_binding_group_rows,
+    wrap_text,
+)
 
 from .app_theme import THEME
 from .config_data import AppConfig
@@ -142,7 +145,7 @@ def _welcome_intro_rows() -> list[list[Segment]]:
         ],
         [],
     ]
-    for line in _wrap_text(_INTRO_BODY, _WELCOME_INTRO_WIDTH):
+    for line in wrap_text(_INTRO_BODY, _WELCOME_INTRO_WIDTH):
         rows.append([Segment(line, fg=muted)])
     rows.extend(
         [

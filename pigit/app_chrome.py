@@ -12,9 +12,9 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     by_id,
     Component,
+    get_overlay_host,
     resolve_presentation_leaf,
 )
-from pigit.termui._runtime_context import get_overlay_host
 from pigit.termui.component import collect_overlay_footer_entries
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import Footer

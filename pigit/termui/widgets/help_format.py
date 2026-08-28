@@ -14,7 +14,7 @@ from ..bindings import ExecutableBinding
 from ..segment import Segment
 from ..viewport_hit import ViewportLayout, build_viewport_layout
 from ..wcwidth_table import wcswidth
-from .help_panel import _wrap_text
+from .help_panel import wrap_text
 
 _GROUP_INDENT = 2
 _KEY_DESC_GAP = 2
@@ -63,7 +63,7 @@ def build_binding_browser_lines(
         header = f"[{title}]"
         render.append(([Segment(header, style_flags=palette.STYLE_BOLD)], None))
         for row in entries:
-            wrapped = _wrap_text(row.desc, desc_avail)
+            wrapped = wrap_text(row.desc, desc_avail)
             for line_i, desc_line in enumerate(wrapped):
                 if line_i == 0:
                     pad = max_key_w - wcswidth(row.keys_display)

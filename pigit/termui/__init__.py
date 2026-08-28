@@ -43,6 +43,7 @@ from .application import Application
 from ._runtime_context import (
     by_id,
     get_focus_manager,
+    get_overlay_host,
     get_registry,
     get_renderer,
     get_renderer_strict,
