@@ -24,6 +24,7 @@ from .label import Label
 from .text_browser import TextBrowser, block_inset_for
 from .lint_bar import LintBar
 from .popup import AlertDialog, AlertDialogBody, Popup
+from .repo_slot import RepoSlot
 from .sheet import Sheet
 from .shortcut_hints import ShortcutHints, measure_shortcut_hints, paint_shortcut_hints
 from .static_list import StaticList
@@ -55,6 +56,7 @@ __all__ = [
     "block_inset_for",
     "LintBar",
     "Popup",
+    "RepoSlot",
     "Sheet",
     "ShortcutHints",
     "measure_shortcut_hints",

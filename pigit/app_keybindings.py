@@ -20,6 +20,7 @@ from .app_inspector import InspectorSheet
 from .app_log_ref import LogRefSheet
 from .app_rebase import RebasePanel
 from .app_recent_actions import RecentActionsPanel
+from .app_repo_switcher import RepoSwitcherSheet
 from .app_stash import StashPanel
 from .app_welcome import WelcomeSheet
 from .app_status import StatusPanel
@@ -35,6 +36,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     DiffViewer,
     RebasePanel,
     RecentActionsPanel,
+    RepoSwitcherSheet,
     LogRefSheet,
     InspectorSheet,
     WelcomeSheet,

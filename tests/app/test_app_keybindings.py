@@ -39,6 +39,7 @@ class TestCollectAllActionBindings:
             "commit",
             "stash",
             "recent",
+            "repo_switcher",
             "log_ref",
             "inspector",
             "welcome",

@@ -64,7 +64,6 @@ class HeaderState:
         self._left = Computed(
             self._make_left,
             deps=[
-                self._repo,
                 self._branch,
                 self._ahead,
                 self._behind,
@@ -101,6 +100,7 @@ class HeaderState:
     # --- Internal: segment generators ---
 
     def _make_left(self) -> list[Segment]:
+        """Branch / dirty / ahead-behind segments (repo name lives in RepoSlot)."""
         segs: list[Segment] = []
         badge, badge_bg, badge_fg = get_badge()
         if badge:
@@ -112,12 +112,8 @@ class HeaderState:
                     style_flags=palette.STYLE_BOLD,
                 )
             )
-        segs.extend(
-            [
-                Segment(self.repo, fg=self._theme.fg_header_repo),
-                Segment("  ", fg=self._theme.fg_dim),
-            ]
-        )
+        # Gap after RepoSlot (``@ name ▾``) before the branch marker.
+        segs.append(Segment(" · ", fg=self._theme.fg_dim))
         # Current-branch marker: ``*`` in git convention; green when clean,
         # amber when dirty.
         dot_fg = self._theme.fg_warning if self.dirty else self._theme.fg_success
@@ -131,7 +127,7 @@ class HeaderState:
         )
         # Separator between branch name and upstream tracking arrows.
         if self.ahead > 0 or self.behind > 0:
-            segs.append(Segment(" · ", fg=self._theme.fg_dim))
+            segs.append(Segment(" ", fg=self._theme.fg_dim))
         if self.ahead > 0:
             segs.append(Segment(f"↑{self.ahead}", fg=self._theme.fg_success))
         if self.behind > 0:
@@ -177,6 +173,11 @@ class HeaderState:
     def branch_signal(self) -> Signal[str]:
         """Expose the underlying branch signal for external writers."""
         return self._branch
+
+    @property
+    def repo_signal(self) -> Signal[str]:
+        """Expose the underlying repo-name signal for RepoSlot binding."""
+        return self._repo
 
     def bind_to_bus(self, bus: EventBus) -> Callable[[], None]:
         """Subscribe to framework events and update header state.

@@ -41,7 +41,7 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup
+from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup, RepoSlot
 from pigit.termui.bindings import ExecutableBinding
 from pigit.termui.reactive import Signal
 from .app_header_state import HeaderState
@@ -289,6 +289,12 @@ class PigitApplication(Application):
             Header(
                 left=self._header_state.left,
                 right=self._header_state.right,
+                left_child=RepoSlot(
+                    name=self._header_state.repo_signal,
+                    on_open=self.open_repo_switcher,
+                    fg=THEME.fg_header_repo,
+                    id="repo_slot",
+                ),
                 separator=True,
                 sep_fg=THEME.fg_dim,
                 id="header",
@@ -904,6 +910,68 @@ class PigitApplication(Application):
             self._refresh_active_panel()
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+    @bind_action("switch_repo", "@", desc="Switch repository", tip="Repos")
+    def open_repo_switcher(self) -> None:
+        """Open the managed-repo switcher sheet (``@`` key or RepoSlot click).
+
+        When search/overlays capture keys, ``@`` may be unreachable — use the
+        Header RepoSlot click path instead (R6).
+        """
+        if self._managed_repos is None:
+            show_toast(
+                "未配置 repos.json（repos.json 未找到）",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_repo_switcher import (
+            RepoSwitcherSheet,
+            build_repo_switcher_entries,
+        )
+
+        repos = self._managed_repos.load_repos()
+        entries = build_repo_switcher_entries(
+            repos,
+            current_path=self._repo_path,
+            cwd=self._repo_path,
+        )
+        panel = RepoSwitcherSheet(
+            entries=entries,
+            on_switch=self._switch_repo,
+            on_add_current=self._add_current_and_switch,
+        )
+        # The switcher replaces any open sheet (e.g. RecentActions) — the
+        # Header RepoSlot click is reachable while a sheet is open, so without
+        # this the layer stack would accumulate stacked sheets (M1).
+        dismiss_sheet()
+        show_sheet(
+            panel,
+            title="Switch repo",
+            edge="bottom",
+        )
+        panel.mount()
+
+    def _add_current_and_switch(self, path: str) -> None:
+        """Add ``path`` to ManagedRepos, then switch the TUI session to it."""
+        if self._managed_repos is None:
+            show_toast(
+                "未配置 repos.json（repos.json 未找到）",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        added = self._managed_repos.add_repos([path])
+        if not added and path not in {
+            info.get("path") for info in self._managed_repos.load_repos().values()
+        }:
+            show_toast(
+                "Could not add current repo",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._switch_repo(path)
 
     @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
     def open_recent_actions(self) -> None:
