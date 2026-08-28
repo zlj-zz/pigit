@@ -270,7 +270,9 @@ class ComponentRoot(Component):
     def _handle_mouse(self, event: MouseEvent) -> bool:
         """Route a mouse event: overlays first, then body with click-to-focus.
 
-        MODAL swallows clicks that miss it (it is a centered dialog). A SHEET
+        MODAL swallows clicks that miss it by default (centered dialogs). When
+        the top modal sets ``dismiss_on_miss`` (e.g. an anchored picker), a miss
+        ends the session and restores focus, still consuming the click. A SHEET
         is an edge overlay, so a click outside it falls through to the body —
         the rest of the app stays clickable while the sheet is open.
         """
@@ -278,6 +280,15 @@ class ComponentRoot(Component):
         if modal is not None and getattr(modal, "open", False):
             hit = modal._hit_test(event.col, event.row)
             if hit is None:
+                # Exact True: MagicMock stubs in tests must not trip dismiss.
+                if getattr(modal, "dismiss_on_miss", False) is True:
+                    end_session = getattr(modal, "end_session", None)
+                    if callable(end_session):
+                        end_session()
+                    hide = getattr(modal, "hide", None)
+                    if callable(hide):
+                        hide()
+                    self._focus_manager.sync_focus_to_overlay_or_leaf()
                 return True
             target, lcol, lrow = hit
             target.handle_mouse(replace(event, col=lcol, row=lrow))

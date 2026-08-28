@@ -117,3 +117,21 @@ def test_left_worktree_dot_follows_dirty_signal(header_state: HeaderState) -> No
 def test_repo_signal_tracks_repo_property(header_state: HeaderState) -> None:
     header_state.repo = "api"
     assert header_state.repo_signal.value == "api"
+
+
+def test_right_omits_tab_text(header_state: HeaderState) -> None:
+    """Tab label lives in TabSlot; right holds merge/mode badges only."""
+    header_state.tab = "Status"
+    header_state.tab_key = "1"
+    header_state.mode = "visual"
+    texts = "".join(seg.text for seg in header_state.right.value)
+    assert "Status" not in texts
+    assert "[1]" not in texts
+    assert "[visual]" in texts
+
+
+def test_tab_signals_track_properties(header_state: HeaderState) -> None:
+    header_state.tab = "Branch"
+    header_state.tab_key = "3"
+    assert header_state.tab_signal.value == "Branch"
+    assert header_state.tab_key_signal.value == "3"

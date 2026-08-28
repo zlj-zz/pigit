@@ -41,9 +41,11 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup, RepoSlot
+from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup, RepoSlot, TabSlot
 from pigit.termui.bindings import ExecutableBinding
 from pigit.termui.reactive import Signal
+from pigit.termui.mouse import MouseEvent
+from pigit.termui.types import LayerKind
 from .app_header_state import HeaderState
 from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
@@ -285,20 +287,33 @@ class PigitApplication(Application):
             id="palette",
         )
 
-        children = [
-            Header(
-                left=self._header_state.left,
-                right=self._header_state.right,
-                left_child=RepoSlot(
-                    name=self._header_state.repo_signal,
-                    on_open=self.open_repo_switcher,
-                    fg=THEME.fg_header_repo,
-                    id="repo_slot",
-                ),
-                separator=True,
-                sep_fg=THEME.fg_dim,
-                id="header",
+        # Most-recent anchored picker popup. Kept for tests/inspection (asserts
+        # on `.open` right after showing) and replaced on each open; closing is
+        # handled by the Popup shell (esc / dismiss_on_miss), so this may hold a
+        # closed instance between opens.
+        self._panel_picker_popup: Popup | None = None
+        self._tab_slot = TabSlot(
+            tab_name=self._header_state.tab_signal,
+            tab_key=self._header_state.tab_key_signal,
+            on_open=self.open_panel_picker,
+            id="tab_slot",
+        )
+        self._header = Header(
+            left=self._header_state.left,
+            right=self._header_state.right,
+            left_child=RepoSlot(
+                name=self._header_state.repo_signal,
+                on_open=self.open_repo_switcher,
+                fg=THEME.fg_header_repo,
+                id="repo_slot",
             ),
+            right_child=self._tab_slot,
+            separator=True,
+            sep_fg=THEME.fg_dim,
+            id="header",
+        )
+        children = [
+            self._header,
             self._body_view,
         ]
         heights: list = [2, "flex"]
@@ -951,6 +966,76 @@ class PigitApplication(Application):
             edge="bottom",
         )
         panel.mount()
+
+    def open_panel_picker(self, event: MouseEvent) -> None:
+        """Open the anchored panel picker from a TabSlot click.
+
+        Uses Header + TabSlot geometry for a 0-based Popup offset (below the
+        full header strip, optionally nudged by the click column). Mouse-only
+        entry — keyboard ``1-4`` remain the direct panel shortcuts.
+        """
+        dismiss_sheet()
+        self._dismiss_open_modal()
+
+        header = self._header
+        slot = self._tab_slot
+        from .app_tab_picker import (
+            PanelPicker,
+            build_panel_picker_entries,
+            panel_picker_anchor,
+        )
+
+        anchor_row, anchor_col = panel_picker_anchor(
+            header_x=header.x,
+            header_y=header.y,
+            header_height=header._size[1],
+            slot_y=slot.y,
+            click_col=event.col,
+        )
+
+        picker = PanelPicker(
+            entries=build_panel_picker_entries(self._panel_nav),
+            on_select=self._on_panel_picker_select,
+        )
+        popup = Popup(
+            picker,
+            offset=(anchor_row, anchor_col),
+            dismiss_on_miss=True,
+            exit_key=keys.KEY_ESC,
+        )
+        self._panel_picker_popup = popup
+        cols, rows = terminal_size()
+        popup.resize((cols, rows))
+        popup.show()
+        popup.begin_session()
+        if self._root is not None:
+            self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def _dismiss_open_modal(self) -> None:
+        """Close any open MODAL before opening the anchored picker.
+
+        Defensive: TabSlot is unreachable while a modal is open (MODAL misses
+        are swallowed by the root), so this only fires on layer-stack residue —
+        the realistic path is ``dismiss_sheet`` above for non-modal sheets.
+        """
+        root = self._root
+        if root is None:
+            return
+        top = root._layer_stack.top(LayerKind.MODAL)
+        if top is None or not getattr(top, "open", False):
+            return
+        end_session = getattr(top, "end_session", None)
+        if callable(end_session):
+            end_session()
+        hide = getattr(top, "hide", None)
+        if callable(hide):
+            hide()
+        root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def _on_panel_picker_select(self, panel: Component) -> None:
+        """Switch product panel after the picker dismisses itself via toggle."""
+        self._close_detail_if_open()
+        self._panel_nav.focus_destination(panel)
 
     def _add_current_and_switch(self, path: str) -> None:
         """Add ``path`` to ManagedRepos, then switch the TUI session to it."""

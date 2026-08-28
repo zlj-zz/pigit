@@ -73,7 +73,7 @@ class HeaderState:
         )
         self._right = Computed(
             self._make_right,
-            deps=[self._merge_target, self._mode, self._tab, self._tab_key],
+            deps=[self._merge_target, self._mode],
         )
 
     # Signal-backed fields (read/write like normal attributes)
@@ -135,6 +135,7 @@ class HeaderState:
         return segs
 
     def _make_right(self) -> list[Segment]:
+        """Merge/mode badges only; tab label lives in TabSlot."""
         segs: list[Segment] = []
         if self.merge_target:
             segs.append(
@@ -152,21 +153,6 @@ class HeaderState:
                     style_flags=palette.STYLE_BOLD,
                 )
             )
-        segs.append(
-            Segment(
-                self.tab,
-                fg=self._theme.fg_muted,
-                style_flags=palette.STYLE_BOLD,
-            )
-        )
-        if self.tab_key:
-            segs.append(
-                Segment(
-                    f" [{self.tab_key}]",
-                    fg=self._theme.fg_primary,
-                    style_flags=palette.STYLE_BOLD,
-                )
-            )
         return segs
 
     @property
@@ -178,6 +164,16 @@ class HeaderState:
     def repo_signal(self) -> Signal[str]:
         """Expose the underlying repo-name signal for RepoSlot binding."""
         return self._repo
+
+    @property
+    def tab_signal(self) -> Signal[str]:
+        """Expose the underlying tab-name signal for TabSlot binding."""
+        return self._tab
+
+    @property
+    def tab_key_signal(self) -> Signal[str]:
+        """Expose the underlying tab-key signal for TabSlot binding."""
+        return self._tab_key
 
     def bind_to_bus(self, bus: EventBus) -> Callable[[], None]:
         """Subscribe to framework events and update header state.
