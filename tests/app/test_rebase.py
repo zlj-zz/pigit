@@ -48,7 +48,6 @@ class TestRebasePanel:
         assert [i.sha for i in panel._items] == ["a1", "b1"]
         assert all(i.action == "pick" for i in panel._items)
         assert panel.is_mounted()
-        assert panel._footer.is_mounted()
 
     def test_activate_rejects_empty(self):
         panel, _ = _panel([])
@@ -134,27 +133,13 @@ class TestRebasePanel:
         panel._set_action("drop")
         assert panel._items[0].action == "drop"
 
-    def test_render_reserves_last_row_for_hint(self):
-        from pigit.termui.surface import Surface
-
+    def test_footer_hints_advertise_pick_and_squash(self):
+        """Help entries (the app footer's source) advertise the action keys."""
         panel, _ = _panel([_commit("a1"), _commit("b1")])
         panel.mount()
-        panel.resize((120, 5))
-        surface = Surface(120, 5)
-        panel.paint(surface)
-        last_row = "".join(c.char for c in surface._rows[4])
-        assert "pick" in last_row and "squash" in last_row
-
-    def test_footer_click_does_not_change_selection(self):
-        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
-
-        panel, _ = _panel([_commit("a1"), _commit("b1"), _commit("c1")])
-        panel.mount()
-        panel.resize((120, 5))
-        panel.curr_no = 0
-        ev = MouseEvent(col=1, row=5, button=MouseButton.LEFT, kind=MouseKind.PRESS)
-        assert panel.handle_mouse(ev) is True
-        assert panel.curr_no == 0
+        tips = [tip for _key, tip in panel.get_footer_entries()]
+        assert "pick" in tips
+        assert "squash" in tips
 
     def test_activate_blocks_when_cherry_pick_in_progress(self):
         panel, git = _panel([_commit("a")])

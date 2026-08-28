@@ -24,7 +24,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, Footer, OptionList
+from pigit.termui.widgets import AlertDialog, OptionList
 
 from .app_theme import THEME
 from .git.api import GitError
@@ -66,14 +66,12 @@ class RebasePanel(OptionList):
         base: str,
         on_done: Callable[[], None],
     ) -> None:
-        self._footer = Footer()
-        super().__init__(footer=self._footer)
+        super().__init__()
         self._git = git
         self._base = base
         self._on_done = on_done
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
-        self._footer.set_help_provider(self.get_footer_entries)
 
     def preferred_sheet_height(self, term_h: int) -> int:
         """Room for the todo list; host should use max_fraction=0.5."""
