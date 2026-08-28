@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from pigit.termui import Binding, collect_action_bindings
 from pigit.termui.cli_output import get_console
 from .app import PigitApplication
+from .app_bisect import BisectSheet
 from .app_branch import BranchPanel
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
@@ -39,6 +40,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     RecentActionsPanel,
     RepoSwitcherSheet,
     WorktreePickerSheet,
+    BisectSheet,
     LogRefSheet,
     InspectorSheet,
     WelcomeSheet,

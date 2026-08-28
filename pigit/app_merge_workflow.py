@@ -60,7 +60,11 @@ class MergeWorkflow:
 
     def on_merge_request(self, source: str, target: str) -> None:
         """Callback from BranchPanel: confirm then execute merge workflow."""
+        from .app_bisect import guard_bisect_active
+
         git = self._get_git()
+        if guard_bisect_active(git):
+            return
         kind = git.sequencer_in_progress()
         if kind is not None:
             show_toast(

@@ -1,6 +1,6 @@
 """
 Module: pigit/app_list_picker.py
-Description: Shared OptionList picker-sheet wiring for repo / worktree / bisect sheets.
+Description: Shared OptionList picker-sheet wiring for repo / worktree sheets.
 Author: Zev
 Date: 2026-08-28
 """
@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from pigit.termui import Segment, bind_action, dismiss_sheet, keys, show_toast
+from pigit.termui import Segment, bind_action, dismiss_sheet, keys
 from pigit.termui.mouse import MouseEvent
 from pigit.termui.viewport_hit import DOUBLE_CLICK_MS
 from pigit.termui.widgets import OptionList
@@ -25,7 +25,7 @@ _EMPTY_STATE = [
 
 
 class ListPickerSheet(OptionList):
-    """Shared OptionList wiring for picker sheets (repos / worktrees / bisect).
+    """Shared OptionList wiring for picker sheets (repos / worktrees).
 
     Provides the cursor-row selected background, ``j/k`` + filter +
     double-click activation, and ``close`` / ``toggle_mode``. Subclasses

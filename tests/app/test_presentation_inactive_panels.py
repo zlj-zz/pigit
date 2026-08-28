@@ -201,7 +201,7 @@ def test_status_dir_summary_stays_fg_dim() -> None:
 def test_branch_head_remote_keep_local_inactive_under_steal() -> None:
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal([])
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
     panel.branches = [
         Branch("main", "0", "0", True),
         Branch("feature", "0", "0", False),

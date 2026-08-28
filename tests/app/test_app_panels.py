@@ -353,7 +353,7 @@ class TestBranchPanelLifecycle:
         vm.items = Signal([])
         from pigit.app_branch import BranchPanel
 
-        panel = BranchPanel(vm=vm)
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
         panel.mount()
         vm.refresh.assert_called_once()
 
@@ -367,7 +367,7 @@ class TestBranchPanelLifecycle:
         vm.items = Signal([])
         from pigit.app_branch import BranchPanel
 
-        panel = BranchPanel(vm=vm)
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
         panel.mount()
         panel.unmount()
         vm.dispose.assert_not_called()
@@ -385,7 +385,7 @@ class TestBranchPanelLifecycle:
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
 
-        panel = BranchPanel(vm=old_vm)
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm)
         panel.mount()
         old_vm.refresh.reset_mock()
 
@@ -412,7 +412,7 @@ class TestBranchPanelLifecycle:
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
 
-        panel = BranchPanel(vm=old_vm)  # not mounted
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm)  # not mounted
         panel.set_vm(new_vm)
         assert panel._vm is new_vm
         new_vm.refresh.assert_not_called()
@@ -431,7 +431,7 @@ class TestBranchPanelLifecycle:
         vm.items = Signal([])
         from pigit.app_branch import BranchPanel
 
-        panel = BranchPanel(vm=vm)
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
         panel.mount()
         vm.items.set([Branch("main", "0", "0", True)])
         assert len(panel.content) == 1
@@ -450,7 +450,7 @@ class TestBranchPanelLifecycle:
         opened: list[str] = []
         monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
 
-        panel = BranchPanel(vm=vm)
+        panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm)
         panel.mount()
         vm.items.set([Branch("dev", "0", "0", True)])
         panel.create_pull_request()

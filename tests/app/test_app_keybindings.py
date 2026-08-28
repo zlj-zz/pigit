@@ -41,6 +41,7 @@ class TestCollectAllActionBindings:
             "recent",
             "repo_switcher",
             "worktree_picker",
+            "bisect",
             "log_ref",
             "inspector",
             "welcome",

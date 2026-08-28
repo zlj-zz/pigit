@@ -158,6 +158,12 @@ class PigitApplication(Application):
             on_cancel=dismiss_sheet,
             allow_newline=False,
         )
+        self._bisect_start_input = InputLine(
+            prompt="Start bisect (good [bad]; bad defaults to HEAD): ",
+            on_submit=self._on_bisect_start_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
+        )
         self._config = config
         self._observe_host: ObserveHost | None = None
         self._header_reload_token: object | None = None
@@ -253,6 +259,7 @@ class PigitApplication(Application):
             branch_signal=self._branch_signal,
             id="branch",
             on_toggle_preview=self.toggle_side_preview,
+            get_git=lambda: self._git,
         )
         branch_panel = self._branch_panel
 
@@ -539,6 +546,8 @@ class PigitApplication(Application):
 
     def _can_switch(self) -> bool:
         """Block repo switch while network sync or a git sequencer is active."""
+        from .app_bisect import guard_bisect_active
+
         if self._network_git.busy:
             show_toast(
                 "Push/pull in progress…",
@@ -552,6 +561,8 @@ class PigitApplication(Application):
                 duration=2.0,
                 kind=FeedbackKind.ERROR,
             )
+            return False
+        if guard_bisect_active(self._git):
             return False
         return True
 
@@ -1209,6 +1220,101 @@ class PigitApplication(Application):
             )
             return
         self._switch_repo(path)
+
+    @bind_action("bisect", "B", desc="Open bisect sheet", tip="Bisect")
+    def open_bisect_sheet(self) -> None:
+        """Open the bisect status/control sheet (``B``)."""
+        if self._git.sequencer_in_progress() is not None:
+            show_toast(
+                "Merge/rebase/cherry-pick in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_bisect import BisectSheet
+
+        panel = BisectSheet(
+            git=self._git,
+            on_start=self._show_bisect_start_input,
+            on_confirm_reset=self._confirm_bisect_reset,
+            on_operation=self._refresh_after_bisect_operation,
+            on_done=dismiss_sheet,
+        )
+        dismiss_sheet()
+        show_sheet(panel, title="Bisect", edge="bottom")
+        panel.mount()
+
+    def _refresh_after_bisect_operation(self) -> None:
+        """Refresh git VMs and header after a bisect operation moved HEAD."""
+        self._refresh_git_vms()
+        self._schedule_reload_header()
+
+    def _show_bisect_start_input(self) -> None:
+        """Prompt for good/bad refs to start a bisect session."""
+        dismiss_sheet()
+        self._bisect_start_input.clear()
+        show_sheet(self._bisect_start_input, height=3, show_edge_rule=False)
+
+    def _on_bisect_start_submit(self, raw: str) -> None:
+        """Parse refs, start bisect, then reopen the status sheet."""
+        from pigit.git.api import GitError
+        from .app_bisect import parse_bisect_start_input
+
+        raw = raw.strip()
+        if not raw:
+            dismiss_sheet()
+            return
+        try:
+            good, bad = parse_bisect_start_input(raw)
+        except ValueError:
+            show_toast(
+                "Enter a good ref (or 'good bad')",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        if self._git.sequencer_in_progress() is not None:
+            show_toast(
+                "Merge/rebase/cherry-pick in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        try:
+            self._git.bisect_start(good, bad)
+        except GitError as exc:
+            show_toast(str(exc), duration=3.0, kind=FeedbackKind.ERROR)
+            return
+        dismiss_sheet()
+        self._refresh_after_bisect_operation()
+        show_toast("Bisect started", duration=1.5, kind=FeedbackKind.SUCCESS)
+        self.open_bisect_sheet()
+
+    def _confirm_bisect_reset(self) -> None:
+        """Confirm then reset the active bisect session."""
+
+        def on_confirm(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            from pigit.git.api import GitError
+
+            try:
+                self._git.bisect_reset()
+            except GitError as exc:
+                show_toast(
+                    str(exc) or "Failed to reset bisect",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            self._refresh_after_bisect_operation()
+            dismiss_sheet()
+            show_toast("Bisect reset", duration=1.5, kind=FeedbackKind.SUCCESS)
+
+        self._alert_dialog.alert(
+            "Reset bisect and return to the pre-bisect branch?",
+            on_confirm,
+        )
 
     @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
     def open_recent_actions(self) -> None:

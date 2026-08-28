@@ -8,7 +8,7 @@ Date: 2026-08-26
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 from pigit.app_branch import BranchPanel
 from pigit.app_recent_actions import RecentActionsPanel
@@ -26,7 +26,7 @@ def test_branch_panel_rebinds_signal_after_unmount_remount():
     vm = MagicMock()
     vm.items = Signal([_branch("a")])
     vm.refresh = MagicMock()
-    panel = BranchPanel(vm=vm, id="branch")
+    panel = BranchPanel(get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm, id="branch")
     panel.mount()
     vm.items.set([_branch("a"), _branch("b"), _branch("c")])
     assert [b.name for b in panel.branches] == ["a", "b", "c"]

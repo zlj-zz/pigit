@@ -32,6 +32,7 @@ def _panel(
 ) -> tuple[RebasePanel, MagicMock]:
     git = MagicMock()
     git.list_commits_in_range.return_value = commits
+    git.bisect_status.return_value = None
     git.sequencer_in_progress.return_value = "rebase" if in_progress else None
     git.is_rebase_in_progress.return_value = in_progress
     git.is_merge_in_progress.return_value = False

@@ -24,6 +24,7 @@ def _make_session(path: str) -> RepoSession:
     git.get_git_dir = Mock(return_value=f"{path}/.git")
     git.is_merge_in_progress = Mock(return_value=False)
     git.sequencer_in_progress = Mock(return_value=None)
+    git.bisect_status = Mock(return_value=None)
     status = MagicMock()
     commit = MagicMock()
     branch = MagicMock()

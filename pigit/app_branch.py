@@ -38,6 +38,7 @@ from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
+    from pigit.git.api import GitApi
     from .git.model import Branch
 
 
@@ -60,6 +61,7 @@ class BranchPanel(OptionList):
         vm: IBranchViewModel,
         id: str | None = None,
         on_toggle_preview: Callable[[], None] | None = None,
+        get_git: Callable[[], GitApi],
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -70,6 +72,7 @@ class BranchPanel(OptionList):
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
         self._branch_signal = branch_signal
+        self._get_git = get_git
         self.branches: list[Branch] = []
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -212,6 +215,8 @@ class BranchPanel(OptionList):
 
     @bind_action("checkout", "c", desc="Checkout selected branch", tip="Checkout")
     def checkout(self) -> None:
+        from .app_bisect import guard_bisect_active
+
         if not self.branches:
             return
         local_branch = self.branches[self.curr_no]
@@ -226,6 +231,8 @@ class BranchPanel(OptionList):
                 duration=1.5,
                 kind=FeedbackKind.WARNING,
             )
+            return
+        if guard_bisect_active(self._get_git()):
             return
         result = self._vm.checkout(self.curr_no)
         self._handle_result(result)
