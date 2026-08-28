@@ -156,6 +156,9 @@ class DiffViewer(Component):
         self._hunks: list[_Hunk] = []
         self._file_sections: list[_FileSection] = []
         self._file_nav_counter_cols: tuple[int, int] | None = None
+        # Memoized current file index, keyed by ``_line_i`` (rebuilt with sections).
+        self._cached_nav_line_i = -1
+        self._cached_nav_index = -1
         self._on_file_picker = on_file_picker
         self._repo_path = ""
         self._diff_type = DiffType.UNSTAGED
@@ -266,6 +269,8 @@ class DiffViewer(Component):
             )
         self._file_sections = sections
         self._file_nav_counter_cols = None
+        self._cached_nav_line_i = -1
+        self._cached_nav_index = -1
 
     def _tokens_at(
         self, idx: int, line: str, *, strip_diff_prefix: bool
@@ -317,13 +322,18 @@ class DiffViewer(Component):
         Lines before the first ``diff --git`` header (a ``git show`` commit
         subject block) still belong to the first file section, so the top bar
         shows from the start. Returns -1 only when there are no sections.
+        Memoized: the index only changes when ``_line_i`` crosses a boundary.
         """
+        if self._cached_nav_line_i == self._line_i:
+            return self._cached_nav_index
         if not self._file_sections:
             return -1
         best = 0
         for i, section in enumerate(self._file_sections):
             if section.header_start <= self._line_i:
                 best = i
+        self._cached_nav_line_i = self._line_i
+        self._cached_nav_index = best
         return best
 
     def _file_nav_active(self) -> bool:
@@ -334,6 +344,10 @@ class DiffViewer(Component):
             and self._diff_type is DiffType.COMMIT
             and len(self._file_sections) > 0
         )
+
+    def _file_nav_can_step(self) -> bool:
+        """True when file navigation can move between sections (≥2 files)."""
+        return self._file_nav_active() and len(self._file_sections) >= 2
 
     def _jump_to_file_index(self, index: int) -> None:
         """Scroll so the file section at ``index`` is at the top of the viewport."""
@@ -553,17 +567,11 @@ class DiffViewer(Component):
         ",",
         desc="Jump to previous file in the diff",
         tip="Prev file",
-        tip_when=lambda self: (
-            not self._file_history_mode
-            and not self._hunk_mode
-            and len(self._file_sections) >= 2
-        ),
+        tip_when=lambda self: self._file_nav_can_step(),
     )
     def prev_file(self) -> None:
         """Scroll to the previous file section (``,``)."""
-        if self._file_history_mode or self._hunk_mode:
-            return
-        if len(self._file_sections) < 2:
+        if not self._file_nav_can_step():
             return
         cur = self._current_file_index()
         if cur <= 0:
@@ -575,17 +583,11 @@ class DiffViewer(Component):
         ".",
         desc="Jump to next file in the diff",
         tip="Next file",
-        tip_when=lambda self: (
-            not self._file_history_mode
-            and not self._hunk_mode
-            and len(self._file_sections) >= 2
-        ),
+        tip_when=lambda self: self._file_nav_can_step(),
     )
     def next_file(self) -> None:
         """Scroll to the next file section (``.``)."""
-        if self._file_history_mode or self._hunk_mode:
-            return
-        if len(self._file_sections) < 2:
+        if not self._file_nav_can_step():
             return
         cur = self._current_file_index()
         if cur < 0 or cur >= len(self._file_sections) - 1:

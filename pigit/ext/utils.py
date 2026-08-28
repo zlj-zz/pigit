@@ -82,6 +82,24 @@ def strtobool(s: str) -> bool:
         raise ValueError("Not support string.")
 
 
+def split_at_most(raw: str, max_tokens: int, hint: str) -> list[str]:
+    """Split ``raw`` on whitespace honouring quotes; bound the token count.
+
+    Raises:
+        ValueError: When the input is empty, misquoted, or has more than
+            ``max_tokens`` tokens (message hints the expected shape).
+    """
+    try:
+        parts = shlex.split(raw)
+    except ValueError as exc:
+        raise ValueError(f"bad quoting: {exc}") from None
+    if not parts:
+        raise ValueError("empty input")
+    if len(parts) > max_tokens:
+        raise ValueError(f"expected: {hint}")
+    return parts
+
+
 def traceback_info(extra_msg: str = "null") -> str:
     """Get traceback information.
 

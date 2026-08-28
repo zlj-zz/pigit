@@ -551,7 +551,7 @@ class PigitApplication(Application):
 
     def _can_switch(self) -> bool:
         """Block repo switch while network sync or a git sequencer is active."""
-        from .app_bisect import guard_bisect_active
+        from .app_bisect import guard_bisect_active, guard_sequencer_active
 
         if self._network_git.busy:
             show_toast(
@@ -560,12 +560,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.ERROR,
             )
             return False
-        if self._git.sequencer_in_progress():
-            show_toast(
-                "Merge/rebase/cherry-pick in progress…",
-                duration=2.0,
-                kind=FeedbackKind.ERROR,
-            )
+        if guard_sequencer_active(self._git):
             return False
         if guard_bisect_active(self._git):
             return False
@@ -620,40 +615,32 @@ class PigitApplication(Application):
             return
         self._apply_session(result.session)
 
-    def _apply_session(self, session: RepoSession) -> None:
-        """Retarget panels and hosts; commit ``self._session`` only on full success."""
-        old = self._session
+    def _point_at(self, session: RepoSession) -> None:
+        """Swap aliases and retarget panels/hosts at ``session`` (no dispose)."""
         self._git = session.git
         self._repo_path = session.repo_path
         self._repo_name = session.repo_name
         self._status_vm = session.status_vm
         self._commit_vm = session.commit_vm
         self._branch_vm = session.branch_vm
+        self._bind_session_vm_tokens(session)
+        self._retarget_panels(session)
+        if self._observe_host is not None:
+            self._observe_host.rebind_session(session)
+        self._merge_state_store.rebind(session.git)
+        self._header_state.repo = session.repo_name
+        self._schedule_reload_header()
+
+    def _apply_session(self, session: RepoSession) -> None:
+        """Retarget panels and hosts; commit ``self._session`` only on full success."""
+        old = self._session
         try:
-            self._bind_session_vm_tokens(session)
-            self._retarget_panels(session)
-            if self._observe_host is not None:
-                self._observe_host.rebind_session(session)
-            self._merge_state_store.rebind(session.git)
-            self._header_state.repo = session.repo_name
-            self._schedule_reload_header()
+            self._point_at(session)
             self._tab_view.route_to("status")
             self._session_history.attach_repo(session.repo_path)
         except Exception as exc:
-            self._git = old.git
-            self._repo_path = old.repo_path
-            self._repo_name = old.repo_name
-            self._status_vm = old.status_vm
-            self._commit_vm = old.commit_vm
-            self._branch_vm = old.branch_vm
-            self._bind_session_vm_tokens(old)
             try:
-                self._retarget_panels(old)
-                if self._observe_host is not None:
-                    self._observe_host.rebind_session(old)
-                self._merge_state_store.rebind(old.git)
-                self._header_state.repo = old.repo_name
-                self._schedule_reload_header()
+                self._point_at(old)
             except Exception:
                 logging.exception("Failed to restore panels after aborted switch")
             session.dispose()
@@ -1142,9 +1129,6 @@ class PigitApplication(Application):
         full header strip, optionally nudged by the click column). Mouse-only
         entry — keyboard ``1-4`` remain the direct panel shortcuts.
         """
-        dismiss_sheet()
-        self._dismiss_open_modal()
-
         header = self._header
         slot = self._tab_slot
         from .app_tab_picker import (
@@ -1165,27 +1149,13 @@ class PigitApplication(Application):
             entries=build_panel_picker_entries(self._panel_nav),
             on_select=self._on_panel_picker_select,
         )
-        popup = Popup(
-            picker,
-            offset=(anchor_row, anchor_col),
-            dismiss_on_miss=True,
-            exit_key=keys.KEY_ESC,
-        )
-        self._panel_picker_popup = popup
-        cols, rows = terminal_size()
-        popup.resize((cols, rows))
-        popup.show()
-        popup.begin_session()
-        if self._root is not None:
-            self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+        self._show_anchored_popup(picker, (anchor_row, anchor_col))
 
     def open_diff_file_picker(self, global_row: int, global_col: int) -> None:
         """Open an anchored file list popup for the current commit diff."""
         sections = self._diff_panel._file_sections
         if not sections:
             return
-        dismiss_sheet()
-        self._dismiss_open_modal()
         from .app_tab_picker import FilePicker
 
         paths = [section.path for section in sections]
@@ -1195,9 +1165,20 @@ class PigitApplication(Application):
             current_index=max(0, cur),
             on_select=self._on_diff_file_picker_select,
         )
+        self._show_anchored_popup(picker, (global_row, global_col))
+
+    def _show_anchored_popup(self, picker: Component, offset: tuple[int, int]) -> Popup:
+        """Show an anchored modal popup for ``picker`` at a 0-based offset.
+
+        Shared by the panel and file pickers: dismiss existing overlays, build
+        the dismiss-on-miss ``Popup`` shell, and run the resize/show/session
+        lifecycle.
+        """
+        dismiss_sheet()
+        self._dismiss_open_modal()
         popup = Popup(
             picker,
-            offset=(global_row, global_col),
+            offset=offset,
             dismiss_on_miss=True,
             exit_key=keys.KEY_ESC,
         )
@@ -1208,6 +1189,7 @@ class PigitApplication(Application):
         popup.begin_session()
         if self._root is not None:
             self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+        return popup
 
     def _on_diff_file_picker_select(self, index: int) -> None:
         """Jump the DiffViewer to the selected file section after picker dismiss."""
@@ -1263,15 +1245,10 @@ class PigitApplication(Application):
     @bind_action("bisect", "B", desc="Open bisect sheet", tip="Bisect")
     def open_bisect_sheet(self) -> None:
         """Open the bisect status/control sheet (``B``)."""
-        if self._git.sequencer_in_progress() is not None:
-            show_toast(
-                "Merge/rebase/cherry-pick in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        from .app_bisect import BisectSheet
+        from .app_bisect import BisectSheet, guard_sequencer_active
 
+        if guard_sequencer_active(self._git):
+            return
         panel = BisectSheet(
             git=self._git,
             on_start=self._show_bisect_start_input,
@@ -1297,7 +1274,7 @@ class PigitApplication(Application):
     def _on_bisect_start_submit(self, raw: str) -> None:
         """Parse refs, start bisect, then reopen the status sheet."""
         from pigit.git.api import GitError
-        from .app_bisect import parse_bisect_start_input
+        from .app_bisect import guard_sequencer_active, parse_bisect_start_input
 
         raw = raw.strip()
         if not raw:
@@ -1312,12 +1289,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.WARNING,
             )
             return
-        if self._git.sequencer_in_progress() is not None:
-            show_toast(
-                "Merge/rebase/cherry-pick in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
+        if guard_sequencer_active(self._git):
             return
         try:
             self._git.bisect_start(good, bad)

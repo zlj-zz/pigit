@@ -7,12 +7,40 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 # Maximum gap between two left presses that still counts as one double-click.
 # Single source of truth for every widget that detects double-clicks.
 DOUBLE_CLICK_MS = 400
+
+
+class DoubleClickTracker:
+    """Pair consecutive presses on one row into double-click events.
+
+    Each widget owns one tracker; ``is_double(index)`` records the press and
+    reports whether it lands within ``DOUBLE_CLICK_MS`` of the previous press
+    on the same row. ``clear`` forgets the previous press (dismiss/reset).
+    """
+
+    def __init__(self) -> None:
+        self._last_index: int | None = None
+        self._last_time = 0.0
+
+    def is_double(self, index: int) -> bool:
+        now = time.monotonic()
+        is_double = (
+            index == self._last_index
+            and now - self._last_time <= DOUBLE_CLICK_MS / 1000.0
+        )
+        self._last_index = index
+        self._last_time = now
+        return is_double
+
+    def clear(self) -> None:
+        self._last_index = None
+        self._last_time = 0.0
 
 
 @dataclass(frozen=True)

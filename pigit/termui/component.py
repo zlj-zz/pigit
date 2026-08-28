@@ -23,7 +23,6 @@ from .bindings import (
     resolve_instance_bindings,
 )
 from .mouse import MouseEvent
-from .keys import display_key
 from ._runtime_context import (
     get_focus_manager,
     get_overlay_host,
@@ -285,7 +284,13 @@ class Component(ABC):
 
         Subclasses that manage child geometry (e.g. Column, Row, TabView)
         must override this method to propagate the correct size to each child.
+
+        An unchanged size skips ``refresh`` so per-frame relayouts (e.g. a
+        header laying out its slot children on every paint) do not re-request
+        a render and spin the event loop.
         """
+        if self._size == size:
+            return
         self._size = size
         self.refresh()
 

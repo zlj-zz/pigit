@@ -168,20 +168,14 @@ class SequencerControl:
 
     def on_cherry_pick(self, sha: str, is_merge: bool) -> None:
         """Guard, confirm, then copy ``sha`` onto HEAD via exec_external."""
-        from .app_bisect import guard_bisect_active
+        from .app_bisect import guard_bisect_active, guard_sequencer_active
 
         git = self._get_git()
         if guard_bisect_active(git):
             return
+        if guard_sequencer_active(git):
+            return
         try:
-            kind = git.sequencer_in_progress()
-            if kind is not None:
-                show_toast(
-                    f"A {kind} is already in progress",
-                    duration=2.0,
-                    kind=FeedbackKind.WARNING,
-                )
-                return
             if sha == git.resolve_head_sha():
                 show_toast(
                     "Already at this commit",

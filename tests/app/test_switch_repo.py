@@ -74,7 +74,7 @@ def test_can_switch_blocks_when_network_busy():
 def test_can_switch_blocks_when_sequencer_in_progress():
     app = _app_with_panels()
     app._git.sequencer_in_progress.return_value = "rebase"
-    with patch("pigit.app.show_toast") as toast:
+    with patch("pigit.app_bisect.show_toast") as toast:
         assert app._can_switch() is False
         toast.assert_called()
 

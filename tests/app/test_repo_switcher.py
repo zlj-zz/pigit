@@ -251,7 +251,7 @@ def test_switcher_sheet_double_click_activates():
     with (
         patch("pigit.app_repo_switcher.dismiss_sheet"),
         patch(
-            "pigit.app_list_picker.time.monotonic",
+            "pigit.termui.viewport_hit.time.monotonic",
             side_effect=itertools.count(0, 0.2),
         ),
     ):

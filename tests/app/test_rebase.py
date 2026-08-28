@@ -65,7 +65,7 @@ class TestRebasePanel:
 
     def test_activate_rejects_in_progress(self):
         panel, _ = _panel([_commit("a1")], in_progress=True)
-        with patch("pigit.app_rebase.show_toast") as toast:
+        with patch("pigit.app_bisect.show_toast") as toast:
             panel.mount()
             toast.assert_called_once()
         panel._on_done.assert_called_once()
@@ -144,7 +144,7 @@ class TestRebasePanel:
     def test_activate_blocks_when_cherry_pick_in_progress(self):
         panel, git = _panel([_commit("a")])
         git.sequencer_in_progress.return_value = "cherry-pick"
-        with patch("pigit.app_rebase.show_toast") as toast:
+        with patch("pigit.app_bisect.show_toast") as toast:
             panel.mount()
         toast.assert_called()
         panel._on_done.assert_called()

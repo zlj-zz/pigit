@@ -79,16 +79,10 @@ class RebasePanel(OptionList):
 
     def mount(self) -> None:
         """Load the range and validate; dismiss on any guard failure."""
-        from .app_bisect import guard_bisect_active
+        from .app_bisect import guard_bisect_active, guard_sequencer_active
 
         super().mount()
-        kind = self._git.sequencer_in_progress()
-        if kind is not None:
-            show_toast(
-                f"A {kind} is already in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
+        if guard_sequencer_active(self._git):
             self._on_done()
             return
         if guard_bisect_active(self._git):

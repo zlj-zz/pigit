@@ -7,7 +7,6 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
@@ -19,9 +18,9 @@ from pigit.termui.component import Component
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.primitives.frame import BoxFrame
 from pigit.termui.surface import Surface
-from pigit.termui.theme import get_theme
+from pigit.termui.theme import get_theme, selected_row_bg
 from pigit.termui.viewport_hit import (
-    DOUBLE_CLICK_MS,
+    DoubleClickTracker,
     ViewportLayout,
     build_viewport_layout,
     hit_row,
@@ -152,8 +151,12 @@ class _AnchoredListPicker(Component, Generic[T]):
             bg=theme.bg_chrome,
         )
         self._layout: ViewportLayout | None = None
-        self._last_click_index: int | None = None
-        self._last_click_time = 0.0
+        self._double_click = DoubleClickTracker()
+        # Prebuilt row segments (format_row is cursor-independent); paint
+        # reuses them instead of re-allocating segments every frame.
+        self._row_segments = [
+            self.format_row(entry, i) for i, entry in enumerate(self._entries)
+        ]
         self._rebuild_geometry()
 
     def format_row(self, entry: T, index: int) -> list[Segment]:
@@ -259,13 +262,7 @@ class _AnchoredListPicker(Component, Generic[T]):
         idx = hit_row(event.row - origin_row, event.col - origin_col, layout)
         if idx is None:
             return True
-        now = time.monotonic()
-        is_double = (
-            idx == self._last_click_index
-            and now - self._last_click_time <= DOUBLE_CLICK_MS / 1000.0
-        )
-        self._last_click_index = idx
-        self._last_click_time = now
+        is_double = self._double_click.is_double(idx)
         self._cursor = idx
         if is_double:
             self._clear_double_click()
@@ -273,13 +270,11 @@ class _AnchoredListPicker(Component, Generic[T]):
         return True
 
     def _clear_double_click(self) -> None:
-        self._last_click_index = None
-        self._last_click_time = 0.0
+        self._double_click.clear()
 
     def _selected_row_bg(self, theme) -> tuple[int, int, int]:
         """Match the commit panel's selected-row background when available."""
-        selected = getattr(theme, "bg_commit_selected", None)
-        return selected if selected is not None else theme.bg_hover
+        return selected_row_bg(theme)
 
     def paint(self, surface: Surface) -> None:
         """Draw the framed list with the cursor row highlighted."""
@@ -291,9 +286,9 @@ class _AnchoredListPicker(Component, Generic[T]):
         )
         self._frame.draw(surface, 0, 0)
         content_row, content_col, cw, _ch = self._frame.content_rect(0, 0)
-        for i, entry in enumerate(self._entries):
+        for i in range(len(self._entries)):
             row = content_row + i
-            segments = self.format_row(entry, i)
+            segments = self._row_segments[i]
             is_cursor = i == self._cursor
             row_bg = self._selected_row_bg(theme) if is_cursor else theme.bg_chrome
             if is_cursor:

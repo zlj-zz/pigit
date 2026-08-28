@@ -95,6 +95,14 @@ def test_current_file_index_header_belongs_to_following_section():
     assert dv._current_file_index() == 0
 
 
+def test_current_file_index_subject_block_maps_to_first_section():
+    """``git show`` subject lines before the first ``diff --git`` map to section 0."""
+    show = ["commit 3f2a1c9", "Author: zev", "    fix", ""]
+    dv = _viewer_with_commit(show + _multi_file_diff())
+    dv._line_i = 0
+    assert dv._current_file_index() == 0
+
+
 def test_next_prev_file_jump_and_bounds():
     dv = _viewer_with_commit(_multi_file_diff())
     dv._line_i = 4
@@ -231,9 +239,7 @@ def test_mouse_counter_opens_picker_callback():
 def test_picker_wheel_moves_cursor():
     picker = FilePicker(entries=["a.py", "b.py", "c.py"], current_index=0)
     picker._cursor = 0
-    down = MouseEvent(
-        kind=MouseKind.PRESS, button=MouseButton.WHEEL_DOWN, row=1, col=1
-    )
+    down = MouseEvent(kind=MouseKind.PRESS, button=MouseButton.WHEEL_DOWN, row=1, col=1)
     assert picker.handle_mouse(down) is True
     assert picker._cursor == 1
     up = MouseEvent(kind=MouseKind.PRESS, button=MouseButton.WHEEL_UP, row=1, col=1)

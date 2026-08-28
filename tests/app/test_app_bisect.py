@@ -282,11 +282,11 @@ def test_open_bisect_sheet_blocked_by_sequencer(runtime):
     app._git.sequencer_in_progress = Mock(return_value="merge")
     with (
         patch("pigit.app.show_sheet") as show,
-        patch("pigit.app.show_toast") as toast,
+        patch("pigit.app_bisect.show_toast") as toast,
     ):
         app.open_bisect_sheet()
         show.assert_not_called()
-        assert "Merge/rebase/cherry-pick" in toast.call_args[0][0]
+        assert "merge" in toast.call_args[0][0]
 
 
 def test_on_bisect_start_submit_one_and_two_refs(runtime):

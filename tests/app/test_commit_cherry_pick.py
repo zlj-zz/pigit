@@ -69,7 +69,7 @@ def test_rejects_merge_commit(app):
 def test_rejects_revert_in_progress(app):
     app._git.sequencer_in_progress.return_value = "revert"
     with (
-        patch("pigit.app_sequencer.show_toast") as toast,
+        patch("pigit.app_bisect.show_toast") as toast,
         patch("pigit.app_sequencer.exec_external") as ex,
     ):
         app._on_cherry_pick("other", is_merge=False)
