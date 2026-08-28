@@ -20,16 +20,11 @@ from ..segment import Segment
 from ..surface import Surface
 from ..theme import get_theme
 from ..wcwidth_table import truncate_by_width, wcswidth
-from .help_panel import _wrap_text
+from .help_format import build_binding_browser_lines, _CURSOR_COL_W, _CURSOR_GLYPH
 
 _logger = logging.getLogger(__name__)
 
 # Cursor glyph width is reserved on every entry's first render line.
-_CURSOR_GLYPH = "›"
-_CURSOR_COL_W = 2  # glyph + space
-
-
-# Global Help toggle must dismiss without re-opening the browser.
 _DISMISS_ONLY_ACTION = "universal.help"
 
 
@@ -261,56 +256,12 @@ class BindingBrowser(Component):
     def _build_grouped(
         self, groups: list[tuple[str, list[ExecutableBinding]]]
     ) -> list[tuple[list[Segment], int | None]]:
-        if not groups:
-            return []
-        max_key_w = 0
-        for _title, entries in groups:
-            for row in entries:
-                max_key_w = max(max_key_w, wcswidth(row.keys_display))
-
-        group_indent = 2
-        gap = 2
-        desc_avail = max(
-            1, self._inner_w - group_indent - _CURSOR_COL_W - max_key_w - gap
+        return build_binding_browser_lines(
+            groups,
+            inner_width=self._inner_w,
+            key_fg=self._key_fg,
+            show_cursor=True,
         )
-
-        render: list[tuple[list[Segment], int | None]] = []
-        selectable_i = 0
-        for title, entries in groups:
-            if not entries:
-                continue
-            header = f"[{title}]"
-            render.append(([Segment(header, style_flags=palette.STYLE_BOLD)], None))
-            for row in entries:
-                wrapped = _wrap_text(row.desc, desc_avail)
-                for i, desc_line in enumerate(wrapped):
-                    if i == 0:
-                        pad = max_key_w - wcswidth(row.keys_display)
-                        cursor_pad = " " * _CURSOR_COL_W
-                        seg: list[Segment] = [
-                            Segment(" " * group_indent),
-                            Segment(cursor_pad),
-                        ]
-                        if pad:
-                            seg.append(Segment(" " * pad))
-                        if self._key_fg is not None:
-                            seg.append(Segment(row.keys_display, fg=self._key_fg))
-                            seg.append(Segment(" " * gap))
-                        else:
-                            seg.append(Segment(row.keys_display + " " * gap))
-                        seg.append(Segment(desc_line))
-                        render.append((seg, selectable_i))
-                    else:
-                        indent = group_indent + _CURSOR_COL_W + max_key_w + gap
-                        render.append(
-                            (
-                                [Segment(" " * indent), Segment(desc_line)],
-                                selectable_i,
-                            )
-                        )
-                selectable_i += 1
-            render.append(([], None))
-        return render
 
     def _selected_row_bg(self, theme) -> tuple[int, int, int]:
         """Match commit-panel cursor row when ``PigitTheme`` is installed."""

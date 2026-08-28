@@ -387,13 +387,8 @@ class PigitApplication(Application):
                 kind=FeedbackKind.ERROR,
             )
 
-        show_toast(
-            "Welcome to Pigit! Press ? for help.",
-            duration=3.0,
-            position=ToastPosition.BOTTOM_LEFT,
-            kind=FeedbackKind.INFO,
-        )
         self._merge_state_store.try_restore(self._git.is_merge_in_progress)
+        self._maybe_show_welcome_on_first_run()
 
         if self._config.repo_observe and self._observe_host is not None:
             self._observe_host.start()
@@ -402,6 +397,53 @@ class PigitApplication(Application):
         # the event and update header/footer/preview.
         if self._tab_view.visible is not None:
             self._on_tab_switch(self._tab_view.visible)
+
+    def _maybe_show_welcome_on_first_run(self) -> None:
+        """Open Welcome Sheet once when :func:`should_auto_show_welcome` allows."""
+        from .app_welcome import build_welcome_content, should_auto_show_welcome
+        from .welcome_state import save_welcome_seen
+
+        if self._root is None:
+            return
+        rows = build_welcome_content(self)
+        if not should_auto_show_welcome(
+            self._config,
+            self._root,
+            min_terminal_rows=self.min_terminal_size[1],
+            content_rows=len(rows),
+        ):
+            return
+        self._show_welcome(on_dismiss=save_welcome_seen, rows=rows)
+
+    def _show_welcome(
+        self,
+        *,
+        on_dismiss: Callable[[], None],
+        rows: list | None = None,
+    ) -> None:
+        """Open Welcome Sheet with the given dismiss callback."""
+        from .app_welcome import (
+            WELCOME_SHEET_MAX_FRACTION,
+            WelcomeSheet,
+            build_welcome_content,
+        )
+
+        content = rows if rows is not None else build_welcome_content(self)
+        sheet = WelcomeSheet(on_dismiss=on_dismiss, rows=content)
+        show_sheet(
+            sheet,
+            edge="top",
+            title="Welcome to Pigit",
+            max_fraction=WELCOME_SHEET_MAX_FRACTION,
+        )
+        sheet.mount()
+
+    @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
+    def show_welcome(self) -> None:
+        """Open the onboarding Welcome sheet (no-op when another overlay is open)."""
+        if self._root is None or self._root.has_overlay_open():
+            return
+        self._show_welcome(on_dismiss=lambda: None)
 
     def on_exit(self) -> None:
         """Stop repo observation timers and backend before root destroy."""

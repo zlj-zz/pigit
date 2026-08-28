@@ -21,6 +21,7 @@ from .app_log_ref import LogRefSheet
 from .app_rebase import RebasePanel
 from .app_recent_actions import RecentActionsPanel
 from .app_stash import StashPanel
+from .app_welcome import WelcomeSheet
 from .app_status import StatusPanel
 
 # The classes that declare a ``keymap_namespace``; the namespace itself is read
@@ -36,6 +37,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     RecentActionsPanel,
     LogRefSheet,
     InspectorSheet,
+    WelcomeSheet,
 )
 
 _KEY_SYNTAX_HINT = (

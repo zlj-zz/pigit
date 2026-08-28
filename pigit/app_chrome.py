@@ -52,18 +52,18 @@ class AppFooter(Footer):
         return True
 
     def _display_context(self) -> str:
-        if self._open_modal() is not None:
+        if self._presentation_overlay() is not None:
             return ""
         return super()._display_context()
 
     def _help_pairs(self) -> list[tuple[str, str]]:
-        modal = self._open_modal()
-        if modal is not None:
-            return collect_overlay_footer_entries(modal)
+        overlay = self._presentation_overlay()
+        if overlay is not None:
+            return collect_overlay_footer_entries(overlay)
         return super()._help_pairs()
 
-    def _open_modal(self) -> Component | None:
+    def _presentation_overlay(self) -> Component | None:
         host = get_overlay_host()
         if host is None:
             return None
-        return host.open_modal()
+        return host.presentation_overlay()

@@ -170,6 +170,10 @@ class ComponentRoot(Component):
             return top
         return None
 
+    def presentation_overlay(self) -> Component | None:
+        """Return the top open MODAL or SHEET overlay, if any."""
+        return self._top_open_overlay()
+
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
         """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)
@@ -372,6 +376,7 @@ class ComponentRoot(Component):
             title_align=title_align,
             edge=edge,
             bg=bg,
+            height_cap_fraction=Sheet.height_cap_fraction(max_fraction),
         )
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)

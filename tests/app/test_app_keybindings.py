@@ -41,6 +41,7 @@ class TestCollectAllActionBindings:
             "recent",
             "log_ref",
             "inspector",
+            "welcome",
         }
 
     def test_ast_scan_finds_no_unregistered_keymaps(self):
