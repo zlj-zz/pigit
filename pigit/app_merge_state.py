@@ -12,7 +12,7 @@ import os
 from collections.abc import Callable
 
 from pigit.app_header_state import HeaderState
-from pigit.git.api import GitError
+from pigit.git.api import GitApi, GitError
 from pigit.termui import FeedbackKind, show_toast
 
 _MERGE_STATE_FILENAME = "pigit_merge_state"
@@ -115,6 +115,17 @@ class MergeStateStore:
         # Older files omit mode; treat as branch-merge workflow.
         data.setdefault("mode", _DEFAULT_BRANCH_MODE)
         return data
+
+    def rebind(self, git: GitApi) -> None:
+        """Point persistence at ``git``'s directory after a repo session switch.
+
+        Clears in-memory / header merge_target, then restores from the new
+        git dir when a merge is still in progress there.
+        """
+        self._get_git_dir = git.get_git_dir
+        self.set_state(None)
+        if git.is_merge_in_progress():
+            self.try_restore(git.is_merge_in_progress)
 
     def try_restore(self, is_merge_in_progress: Callable[[], bool]) -> None:
         """On startup: recover pending merge state if merge is still in progress.

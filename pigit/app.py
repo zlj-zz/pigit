@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from typing import NamedTuple
+
 from pigit.termui import (
     EventType,
     EVT_GOTO,
@@ -22,6 +24,7 @@ from pigit.termui import (
     dismiss_sheet,
     ExitEventLoop,
     get_renderer,
+    hide_spinner,
     keys,
     AsyncTask,
     request_render,
@@ -30,6 +33,7 @@ from pigit.termui import (
     Segment,
     show_badge,
     show_sheet,
+    show_spinner,
     show_toast,
     ToastPosition,
     set_theme,
@@ -70,6 +74,14 @@ from .config_data import AppConfig
 # toast_bottom_pad (setup_root) both derive from this constant, so growing
 # the footer can never silently overlap bottom-anchored toasts.
 FOOTER_HEIGHT = 2
+
+
+class _SwitchResult(NamedTuple):
+    """Outcome of a background RepoSession.build for repo switch."""
+
+    ok: bool
+    session: RepoSession | None = None
+    error: str = ""
 
 
 class PigitApplication(Application):
@@ -115,6 +127,11 @@ class PigitApplication(Application):
         self._status_vm = self._session.status_vm
         self._commit_vm = self._session.commit_vm
         self._branch_vm = self._session.branch_vm
+        self._repo_token: object = object()
+        # True while a RepoSession.build for a switch is in flight (spinner on).
+        self._switch_in_flight = False
+        self._session_history.attach_repo(self._session.repo_path)
+        self._bind_session_vm_tokens(self._session)
         # Header state
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
@@ -143,6 +160,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_alert_dialog=lambda: self._alert_dialog,
+            guard_async=self._guard_repo_async,
         )
         self._merge_workflow = MergeWorkflow(
             store=self._merge_state_store,
@@ -186,10 +204,12 @@ class PigitApplication(Application):
                 if self._observe_host
                 else None
             ),
+            guard_async=self._guard_repo_async,
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
             vm=self._branch_vm,
+            guard_async=self._guard_repo_async,
         )
 
         self._status_panel = StatusPanel(
@@ -228,7 +248,11 @@ class PigitApplication(Application):
             report_default=self._config.commit_report_default,
         )
         commit_panel = self._commit_panel
-        self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
+        self._diff_panel = DiffViewer(
+            id="diff",
+            word_diff=self._config.word_diff,
+            guard_async=self._guard_repo_async,
+        )
         self._tab_view = TabView(
             children=[
                 status_stack,
@@ -454,6 +478,158 @@ class PigitApplication(Application):
                 self._observe_host.stop()
         finally:
             self._session.dispose()
+
+    def _guard_repo(self, token: object, callback: Callable) -> Callable:
+        """Drop async UI results when ``token`` no longer matches ``_repo_token``."""
+
+        def guarded(result):
+            if token is not self._repo_token:
+                return None
+            return callback(result)
+
+        return guarded
+
+    def _guard_repo_async(self, callback: Callable) -> Callable:
+        """Capture the current repo token and wrap ``callback`` (non-VM loads)."""
+        return self._guard_repo(self._repo_token, callback)
+
+    def _bind_session_vm_tokens(self, session: RepoSession) -> None:
+        """Stamp session VMs with the app's current ``_repo_token``."""
+        for vm in (session.status_vm, session.commit_vm, session.branch_vm):
+            vm.bind_repo_token(self._repo_token)
+
+    def _bump_repo_token(self) -> object:
+        """Advance the repo generation; invalidate in-flight loads on current VMs."""
+        self._repo_token = object()
+        self._bind_session_vm_tokens(self._session)
+        return self._repo_token
+
+    def _can_switch(self) -> bool:
+        """Block repo switch while network sync or a git sequencer is active."""
+        if self._network_git.busy:
+            show_toast(
+                "Push/pull in progress…",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return False
+        if self._git.sequencer_in_progress():
+            show_toast(
+                "Merge/rebase/cherry-pick in progress…",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return False
+        return True
+
+    def _close_overlays(self) -> None:
+        """Close inspector, Diff detail, sheets, and Help before switching repos."""
+        self._cancel_inspector_load()
+        self._close_detail_if_open()
+        dismiss_sheet()
+        popup = getattr(self, "_help_popup", None)
+        if popup is not None and popup.open:
+            popup.toggle()
+
+    def _switch_repo(self, path: str) -> None:
+        """Build a new RepoSession for ``path`` and apply it on the UI thread."""
+        if self._switch_in_flight:
+            return
+        if not self._can_switch():
+            return
+        self._close_overlays()
+        token = self._bump_repo_token()
+        self._switch_in_flight = True
+        show_spinner("Switching repo…", position=ToastPosition.CENTER)
+
+        def work() -> _SwitchResult:
+            try:
+                session = RepoSession.build(
+                    self._git_api, path, self._session_history
+                )
+                if not session.repo_path:
+                    session.dispose()
+                    return _SwitchResult(False, error="Not a git repository")
+                return _SwitchResult(True, session=session)
+            except Exception as exc:
+                return _SwitchResult(False, error=str(exc))
+
+        AsyncTask().start(work, lambda result: self._switch_done(result, token))
+
+    def _switch_done(self, result: _SwitchResult, token: object) -> None:
+        """UI-thread switch completion: hide spinner; apply or toast."""
+        self._switch_in_flight = False
+        hide_spinner()
+        if token is not self._repo_token:
+            if result.ok and result.session is not None:
+                result.session.dispose()
+            return
+        if not result.ok or result.session is None:
+            show_toast(
+                f"Switch failed: {result.error or 'unknown error'}",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._apply_session(result.session)
+
+    def _apply_session(self, session: RepoSession) -> None:
+        """Retarget panels and hosts; commit ``self._session`` only on full success."""
+        old = self._session
+        self._git = session.git
+        self._repo_path = session.repo_path
+        self._repo_name = session.repo_name
+        self._status_vm = session.status_vm
+        self._commit_vm = session.commit_vm
+        self._branch_vm = session.branch_vm
+        try:
+            self._bind_session_vm_tokens(session)
+            self._retarget_panels(session)
+            if self._observe_host is not None:
+                self._observe_host.rebind_session(session)
+            self._merge_state_store.rebind(session.git)
+            self._header_state.repo = session.repo_name
+            self._schedule_reload_header()
+            self._tab_view.route_to("status")
+            self._session_history.attach_repo(session.repo_path)
+        except Exception as exc:
+            self._git = old.git
+            self._repo_path = old.repo_path
+            self._repo_name = old.repo_name
+            self._status_vm = old.status_vm
+            self._commit_vm = old.commit_vm
+            self._branch_vm = old.branch_vm
+            self._bind_session_vm_tokens(old)
+            try:
+                self._retarget_panels(old)
+                if self._observe_host is not None:
+                    self._observe_host.rebind_session(old)
+                self._merge_state_store.rebind(old.git)
+                self._header_state.repo = old.repo_name
+                self._schedule_reload_header()
+            except Exception:
+                logging.exception("Failed to restore panels after aborted switch")
+            session.dispose()
+            show_toast(
+                f"Switch failed: {exc}",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._session = session
+        old.dispose()
+        request_render()
+
+    def _retarget_panels(self, session: RepoSession) -> None:
+        """Point mounted panels at ``session`` ViewModels (no dispose)."""
+        self._status_panel.set_vm(session.status_vm)
+        self._stash_panel.set_vm(session.status_vm)
+        self._branch_panel.set_vm(session.branch_vm)
+        self._commit_panel.set_vm(session.commit_vm)
+        if self._preview_panel is not None:
+            self._preview_panel.set_vm(session.status_vm)
+        if self._log_graph_preview is not None:
+            self._log_graph_preview.set_vm(session.branch_vm)
 
     def _start_repo_observe(self) -> None:
         """Delegate to ObserveHost.start()."""
@@ -819,7 +995,9 @@ class PigitApplication(Application):
             show_sheet(sheet, edge="top", max_fraction=0.5)
             sheet.mount()
 
-        self._inspector_task = run_async(load, apply)
+        self._inspector_task = run_async(
+            load, self._guard_repo(self._repo_token, apply)
+        )
 
     def _cancel_inspector_load(self) -> None:
         """Invalidate any in-flight inspector load so its result is dropped."""

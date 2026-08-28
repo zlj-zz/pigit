@@ -26,6 +26,7 @@ from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 from pigit.termui.widgets import BorderedTextBrowser
 
 from .git.api import GitError
+from .app_types import guard_or_identity
 
 if TYPE_CHECKING:
     from .viewmodels.branch import IBranchViewModel
@@ -43,6 +44,8 @@ class LogGraphPreview(Component):
         self,
         *,
         vm: IBranchViewModel,
+        guard_async: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]]
+        | None = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -50,6 +53,7 @@ class LogGraphPreview(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._vm = vm
+        self._guard_async = guard_async
         self._frame_browser = BorderedTextBrowser(
             title=_EMPTY_TITLE, id="log_graph_browser"
         )
@@ -109,7 +113,7 @@ class LogGraphPreview(Component):
         self._requested_branch = name
         self._load_task = run_async(
             lambda: self._load_graph(name),
-            lambda lines: self._on_graph_loaded(name, lines),
+            guard_or_identity(self._guard_async, lambda lines: self._on_graph_loaded(name, lines)),
         )
         return True
 
@@ -147,7 +151,7 @@ class LogGraphPreview(Component):
         self._requested_branch = name
         self._load_task = run_async(
             lambda: self._load_graph(name),
-            lambda lines: self._on_graph_loaded(name, lines),
+            guard_or_identity(self._guard_async, lambda lines: self._on_graph_loaded(name, lines)),
         )
 
     def set_lines(self, lines: list[str], title: str) -> None:

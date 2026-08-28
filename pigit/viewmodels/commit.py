@@ -125,7 +125,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
 
     def refresh(self) -> None:
         """Start a background load; the result is applied on the UI thread."""
-        self._loader.start(self._load_commits, self._apply_load)
+        self._loader.start(self._load_commits, self._guarded(self._apply_load))
 
     def _load_commits(self) -> _CommitLoad:
         requested = self._log_ref

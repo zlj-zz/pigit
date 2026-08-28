@@ -64,13 +64,30 @@ class ViewModelBase(Generic[T]):
         # Snapshot builds may run on an AsyncTask worker thread while a
         # refresh invalidates the cache on the UI thread.
         self._inspector_lock = threading.Lock()
+        # App bumps this on repo switch; in-flight loads capture the old value.
+        self._repo_token: object | None = None
 
     @property
     def items(self) -> Signal[list[T]]:
         return self._items
 
+    def bind_repo_token(self, token: object | None) -> None:
+        """Point this VM at the app's current repo generation token."""
+        self._repo_token = token
+
     def refresh(self) -> None:
-        self._loader.start(self._do_load, self._on_loaded)
+        self._loader.start(self._do_load, self._guarded(self._on_loaded))
+
+    def _guarded(self, callback: Callable[[_S], None]) -> Callable[[_S], None]:
+        """Wrap a load callback so a superseded repo token drops the result."""
+        token = self._repo_token
+
+        def deliver(data: _S) -> None:
+            if token is not self._repo_token:
+                return
+            callback(data)
+
+        return deliver
 
     def _do_load(self) -> list[T]:
         """Override to perform the actual data fetch."""

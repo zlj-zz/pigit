@@ -50,6 +50,11 @@ class NetworkGit:
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
         get_alert_dialog: Callable[[], AlertDialog],
+        guard_async: Callable[
+            [Callable[[NetworkGitOutcome], None]],
+            Callable[[NetworkGitOutcome], None],
+        ]
+        | None = None,
     ) -> None:
         """
         Args:
@@ -60,6 +65,7 @@ class NetworkGit:
             get_refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             get_schedule_reload_header: Callback to reload header branch/ahead/behind.
             get_alert_dialog: Late-bound AlertDialog for set-upstream confirm.
+            guard_async: Optional repo-token wrapper for the UI-thread done callback.
         """
         self._store = store
         self._get_git = get_git
@@ -68,6 +74,7 @@ class NetworkGit:
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_schedule_reload_header = get_schedule_reload_header
         self._get_alert_dialog = get_alert_dialog
+        self._guard_async = guard_async
         self._busy = False
 
     @property
@@ -198,27 +205,33 @@ class NetworkGit:
                     message=f"Git {action} error: {exc}",
                 )
 
+        def apply_outcome(outcome: NetworkGitOutcome) -> None:
+            if outcome.conflict:
+                self.handle_pull_conflict(outcome.message)
+                return
+            if not outcome.ok:
+                show_toast(
+                    outcome.message or f"Git {action} failed",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            show_toast(
+                f"Git {action} completed",
+                duration=1.5,
+                kind=FeedbackKind.SUCCESS,
+            )
+            self._get_refresh_git_vms()
+            self._get_schedule_reload_header()
+
         def done(outcome: NetworkGitOutcome) -> None:
             self._busy = False
             hide_spinner()
             try:
-                if outcome.conflict:
-                    self.handle_pull_conflict(outcome.message)
-                    return
-                if not outcome.ok:
-                    show_toast(
-                        outcome.message or f"Git {action} failed",
-                        duration=3.0,
-                        kind=FeedbackKind.ERROR,
-                    )
-                    return
-                show_toast(
-                    f"Git {action} completed",
-                    duration=1.5,
-                    kind=FeedbackKind.SUCCESS,
-                )
-                self._get_refresh_git_vms()
-                self._get_schedule_reload_header()
+                apply = apply_outcome
+                if self._guard_async is not None:
+                    apply = self._guard_async(apply_outcome)
+                apply(outcome)
             finally:
                 self._invoke_complete(on_complete)
 
