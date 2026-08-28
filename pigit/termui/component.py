@@ -272,6 +272,22 @@ class Component(ABC):
         """Current (width, height) assigned by the last resize()."""
         return self._size
 
+    def global_origin(self) -> tuple[int, int]:
+        """0-based (row, col) of this component's top-left on the terminal.
+
+        Each ancestor stores a parent-relative 1-based ``x`` (row) / ``y``
+        (col); summing ``coord - 1`` along the parent chain yields the screen
+        position.
+        """
+        row = 0
+        col = 0
+        node: Component | None = self
+        while node is not None:
+            row += max(0, int(getattr(node, "x", 1)) - 1)
+            col += max(0, int(getattr(node, "y", 1)) - 1)
+            node = getattr(node, "parent", None)
+        return row, col
+
     def refresh(self):
         """Fresh content data.
 

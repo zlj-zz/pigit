@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 from pigit.app import PigitApplication, _SwitchResult
 from pigit.config_data import AppConfig
 from pigit.repo_session import RepoSession
-from pigit.session_history import HistoryRecord, ReverseCommand, SessionHistory
+from pigit.session_history import HistoryRecord, ReverseCommand
 from pigit.termui.async_task import AsyncTask
 from pigit.viewmodels.base import ViewModelBase
 
@@ -93,7 +93,7 @@ def test_apply_session_retargets_and_disposes_old():
     app._commit_panel.set_vm.assert_called_with(new.commit_vm)
     app._preview_panel.set_vm.assert_called_with(new.status_vm)
     app._log_graph_preview.set_vm.assert_called_with(new.branch_vm)
-    app._observe_host.rebind_session.assert_called_once_with(new)
+    app._observe_host.rebind_session.assert_called_once_with()
     app._merge_state_store.rebind.assert_called_once_with(new.git)
     app._tab_view.route_to.assert_called_once_with("status")
     old.status_vm.dispose.assert_called()
@@ -211,7 +211,7 @@ def test_observe_rebind_session_stops_then_starts():
     order: list[str] = []
     host.stop = Mock(side_effect=lambda: order.append("stop"))
     host.start = Mock(side_effect=lambda: order.append("start"))
-    host.rebind_session(Mock())
+    host.rebind_session()
     assert order == ["stop", "start"]
 
 
@@ -224,7 +224,7 @@ def test_observe_rebind_session_noop_when_never_started():
     assert host._started is False
     host.stop = Mock()
     host.start = Mock()
-    host.rebind_session(Mock())
+    host.rebind_session()
     host.stop.assert_not_called()
     host.start.assert_not_called()
 

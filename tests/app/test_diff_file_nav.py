@@ -90,9 +90,9 @@ def test_file_sections_single_and_plain():
 def test_current_file_index_header_belongs_to_following_section():
     dv = _viewer_with_commit(_multi_file_diff())
     dv._line_i = 6  # header of b.py
-    assert dv._current_file_index() == 1
+    assert dv.current_file_index() == 1
     dv._line_i = 5  # last line of a.py hunk
-    assert dv._current_file_index() == 0
+    assert dv.current_file_index() == 0
 
 
 def test_current_file_index_subject_block_maps_to_first_section():
@@ -100,7 +100,7 @@ def test_current_file_index_subject_block_maps_to_first_section():
     show = ["commit 3f2a1c9", "Author: zev", "    fix", ""]
     dv = _viewer_with_commit(show + _multi_file_diff())
     dv._line_i = 0
-    assert dv._current_file_index() == 0
+    assert dv.current_file_index() == 0
 
 
 def test_next_prev_file_jump_and_bounds():
@@ -202,7 +202,7 @@ def test_global_origin_sums_parent_chain():
     parent = Component(x=3, y=5, size=(40, 20))
     child = DiffViewer(x=4, y=6, size=(30, 15))
     child.parent = parent
-    assert child._global_origin() == (5, 9)
+    assert child.global_origin() == (5, 9)
 
 
 def test_mouse_counter_opens_picker_callback():

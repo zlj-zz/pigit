@@ -316,7 +316,12 @@ class DiffViewer(Component):
         self._cached_path = result
         return result
 
-    def _current_file_index(self) -> int:
+    @property
+    def file_paths(self) -> list[str]:
+        """Paths of the current diff's file sections (for the file picker)."""
+        return [section.path for section in self._file_sections]
+
+    def current_file_index(self) -> int:
         """Index of the file section owning ``_line_i`` (header belongs to that file).
 
         Lines before the first ``diff --git`` header (a ``git show`` commit
@@ -349,7 +354,7 @@ class DiffViewer(Component):
         """True when file navigation can move between sections (≥2 files)."""
         return self._file_nav_active() and len(self._file_sections) >= 2
 
-    def _jump_to_file_index(self, index: int) -> None:
+    def jump_to_file(self, index: int) -> None:
         """Scroll so the file section at ``index`` is at the top of the viewport."""
         if index < 0 or index >= len(self._file_sections):
             return
@@ -573,10 +578,10 @@ class DiffViewer(Component):
         """Scroll to the previous file section (``,``)."""
         if not self._file_nav_can_step():
             return
-        cur = self._current_file_index()
+        cur = self.current_file_index()
         if cur <= 0:
             return
-        self._jump_to_file_index(cur - 1)
+        self.jump_to_file(cur - 1)
 
     @bind_action(
         "next_file",
@@ -589,10 +594,10 @@ class DiffViewer(Component):
         """Scroll to the next file section (``.``)."""
         if not self._file_nav_can_step():
             return
-        cur = self._current_file_index()
+        cur = self.current_file_index()
         if cur < 0 or cur >= len(self._file_sections) - 1:
             return
-        self._jump_to_file_index(cur + 1)
+        self.jump_to_file(cur + 1)
 
     @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
     def _scroll_left(self) -> None:
@@ -883,26 +888,11 @@ class DiffViewer(Component):
             return True
         if event.button is MouseButton.LEFT and self._hit_file_nav_counter(event):
             if self._on_file_picker is not None:
-                g_row, g_col = self._global_origin()
+                g_row, g_col = self.global_origin()
                 # event.col is 1-based local; Popup offset is 0-based.
                 self._on_file_picker(g_row, g_col + event.col - 1)
             return True
         return False
-
-    def _global_origin(self) -> tuple[int, int]:
-        """0-based global (row, col) of this viewer's top-left on the terminal.
-
-        Each ancestor stores parent-relative 1-based ``x`` (row) / ``y`` (col);
-        convert with ``sum(coord - 1)`` along the parent chain.
-        """
-        row = 0
-        col = 0
-        node: Component | None = self
-        while node is not None:
-            row += max(0, int(getattr(node, "x", 1)) - 1)
-            col += max(0, int(getattr(node, "y", 1)) - 1)
-            node = getattr(node, "parent", None)
-        return row, col
 
     def _hit_file_nav_counter(self, event: MouseEvent) -> bool:
         """True when a press lands on the painted ``▸ cur/total`` columns."""
@@ -1160,7 +1150,7 @@ class DiffViewer(Component):
         self._file_nav_counter_cols = None
         if not self._file_nav_active():
             return
-        cur = self._current_file_index()
+        cur = self.current_file_index()
         if cur < 0:
             return
         total = len(self._file_sections)

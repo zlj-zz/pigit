@@ -32,7 +32,6 @@ from pigit.observe import (
 )
 from pigit.observe.denylist import rel_path_is_denied
 from pigit.observe.digest import hash_porcelain
-from pigit.repo_session import RepoSession
 from pigit.termui import Component, ComponentRoot, resolve_presentation_leaf
 from pigit.termui.containers import TabView
 from pigit.termui.event_loop import AppEventLoop
@@ -179,7 +178,7 @@ class ObserveHost:
             self._observer = None
         self._coordinator = None
 
-    def rebind_session(self, _session: RepoSession) -> None:
+    def rebind_session(self) -> None:
         """Restart observation after the app rebound git/path/status_vm aliases.
 
         Only restarts when observe is already running — a user with

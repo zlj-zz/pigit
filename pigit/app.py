@@ -626,7 +626,7 @@ class PigitApplication(Application):
         self._bind_session_vm_tokens(session)
         self._retarget_panels(session)
         if self._observe_host is not None:
-            self._observe_host.rebind_session(session)
+            self._observe_host.rebind_session()
         self._merge_state_store.rebind(session.git)
         self._header_state.repo = session.repo_name
         self._schedule_reload_header()
@@ -1153,13 +1153,12 @@ class PigitApplication(Application):
 
     def open_diff_file_picker(self, global_row: int, global_col: int) -> None:
         """Open an anchored file list popup for the current commit diff."""
-        sections = self._diff_panel._file_sections
-        if not sections:
+        paths = self._diff_panel.file_paths
+        if not paths:
             return
         from .app_tab_picker import FilePicker
 
-        paths = [section.path for section in sections]
-        cur = self._diff_panel._current_file_index()
+        cur = self._diff_panel.current_file_index()
         picker = FilePicker(
             entries=paths,
             current_index=max(0, cur),
@@ -1193,7 +1192,7 @@ class PigitApplication(Application):
 
     def _on_diff_file_picker_select(self, index: int) -> None:
         """Jump the DiffViewer to the selected file section after picker dismiss."""
-        self._diff_panel._jump_to_file_index(index)
+        self._diff_panel.jump_to_file(index)
 
     def _dismiss_open_modal(self) -> None:
         """Close any open MODAL before opening the anchored picker.
