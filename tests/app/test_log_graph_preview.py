@@ -65,7 +65,9 @@ def _mount(bus: EventBus, preview: LogGraphPreview) -> ComponentRoot:
 
 
 def _branch_panel(vm: Mock, name: str = "feat") -> BranchPanel:
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.branches = [Branch(name, "0", "0", False)]
     panel.curr_no = 0
     return panel
@@ -139,7 +141,9 @@ def test_graph_loads_when_branch_list_arrives(
     bus = EventBus()
     root = ComponentRoot(preview, event_bus=bus)
     preview.mount()
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.parent = root
 
     def _publish(action, **data):
@@ -255,3 +259,17 @@ def test_render_truncates_graph_line_before_border(preview: LogGraphPreview) -> 
     # The right border column (index 19) is preserved on every content row.
     for row in rows[1:-1]:
         assert row[19] == "│", f"border overwritten: {row[19]!r}"
+
+
+def test_set_vm_cancels_inflight_load_and_clears_request() -> None:
+    """set_vm drops a pending graph load so stale content cannot land."""
+    from unittest.mock import Mock
+
+    panel = LogGraphPreview(vm=Mock())
+    task = Mock()
+    panel._load_task = task
+    panel._requested_branch = "stale"
+    panel.set_vm(Mock())
+    task.cancel.assert_called_once()
+    assert panel._load_task is None
+    assert panel._requested_branch is None

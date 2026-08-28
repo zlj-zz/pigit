@@ -8,7 +8,7 @@ Date: 2026-08-19
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -224,7 +224,9 @@ def _br(name, is_head=False, is_remote=False):
 
 def test_enter_emits_show_log():
     vm = MagicMock()
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.branches = [_br("origin/foo", is_remote=True)]
     panel.curr_no = 0
     seen = {}
@@ -239,7 +241,9 @@ def test_enter_emits_show_log():
 
 
 def test_enter_silent_when_empty():
-    panel = BranchPanel(vm=MagicMock())
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=MagicMock()
+    )
     panel.branches = []
     panel.emit = MagicMock()
     panel.show_log()
@@ -249,7 +253,9 @@ def test_enter_silent_when_empty():
 def test_checkout_success_emits_follow_head():
     vm = MagicMock()
     vm.checkout.return_value = ActionResult(True, "ok", True)
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.branches = [_br("feat")]
     panel.curr_no = 0
     seen = []
@@ -266,7 +272,9 @@ def test_checkout_success_emits_follow_head():
 def test_checkout_failure_no_follow_head():
     vm = MagicMock()
     vm.checkout.return_value = ActionResult(False, "no", False)
-    panel = BranchPanel(vm=vm)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
     panel.branches = [_br("feat")]
     panel.curr_no = 0
     panel.emit = MagicMock()

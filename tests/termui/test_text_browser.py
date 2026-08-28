@@ -8,7 +8,7 @@ Date: 2026-08-26
 
 from __future__ import annotations
 
-from pigit.termui.widgets.text_browser import TextBrowser
+from pigit.termui.widgets.text_browser import TextBrowser, block_inset, block_inset_for
 
 
 def test_text_browser_scroll_i_and_replace_lines() -> None:
@@ -41,3 +41,46 @@ def test_resize_preserves_scroll_across_viewport_cycle() -> None:
     assert b.scroll_i == 32
     b.resize((10, 8))
     assert b.scroll_i == 32
+
+
+def test_block_inset_center_align_shifts_paint() -> None:
+    from pigit.termui import Segment
+    from pigit.termui.surface import Surface
+
+    rows = [[Segment("Hello")]]
+    browser = TextBrowser(
+        content=rows,
+        size=(20, 1),
+        bg=None,
+        content_inset=block_inset_for("center"),
+    )
+    surface = Surface(20, 1)
+    browser.paint(surface)
+    inset = block_inset(20, rows, align="center")
+    assert surface.lines()[0].startswith(" " * inset + "Hello")
+
+
+def test_content_valign_centers_short_content() -> None:
+    from pigit.termui import Segment
+    from pigit.termui.surface import Surface
+
+    rows = [[Segment("One")], [Segment("Two")]]
+    browser = TextBrowser(
+        content=rows,
+        size=(20, 6),
+        bg=None,
+        content_valign="center",
+    )
+    surface = Surface(20, 6)
+    browser.paint(surface)
+    assert surface.lines()[2].strip() == "One"
+    assert surface.lines()[3].strip() == "Two"
+
+
+def test_block_inset_alignments() -> None:
+    from pigit.termui import Segment
+
+    rows = [[Segment("Hi")]]
+    assert block_inset(20, rows, align="left") == 2
+    assert block_inset(20, rows, align="center") == 9
+    assert block_inset(20, rows, align="right") == 16

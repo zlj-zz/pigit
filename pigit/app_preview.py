@@ -25,6 +25,7 @@ from pigit.termui import (
 from pigit.termui.types import PreviewPayload
 
 from .app_diff import DiffType, DiffViewer
+from .app_types import guard_or_identity
 
 if TYPE_CHECKING:
     from .viewmodels.status import IStatusViewModel
@@ -57,6 +58,9 @@ class PreviewPanel(Component):
         *,
         status_vm: IStatusViewModel | None = None,
         on_preview_target: Callable[[str | None], None] | None = None,
+        guard_async: (
+            Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None
+        ) = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -65,6 +69,7 @@ class PreviewPanel(Component):
         super().__init__(x, y, size, id=id)
         self._status_vm = status_vm
         self._on_preview_target = on_preview_target
+        self._guard_async = guard_async
         self._diff_viewer = DiffViewer(
             x=1,
             y=1,
@@ -91,10 +96,28 @@ class PreviewPanel(Component):
         self._diff_viewer.unmount()
         super().unmount()
 
-    def _on_selection(self, *, active: Component | None = None, **_) -> bool:
-        """Start an async diff load for the active PreviewPayload panel."""
+    def set_vm(self, vm: IStatusViewModel | None) -> None:
+        """Retarget this panel to a new Status ViewModel (repo session switch).
+
+        Selection subscription stays on the EventBus; only the VM pointer changes.
+        Cancels in-flight loads and clears stale preview content.
+        """
         self._cancel_load()
+        self._request = None
+        self._status_vm = vm
+        if self.is_mounted():
+            self._set_preview_target(None)
+            self.clear()
+
+    def _on_selection(self, *, active: Component | None = None, **_) -> bool:
+        """Start an async diff load for the active PreviewPayload panel.
+
+        Identical re-emissions (same file / stash selected again) keep the
+        current preview — cancel+reload would clear and flicker with no change.
+        Disk updates still refresh via :meth:`reload`.
+        """
         if not isinstance(active, PreviewPayload):
+            self._cancel_load()
             self._request = None
             self._set_preview_target(None)
             self.clear()
@@ -102,11 +125,16 @@ class PreviewPanel(Component):
 
         request = self._capture_request(active)
         if request is None:
+            self._cancel_load()
             self._request = None
             self._set_preview_target(None)
             self.clear()
             return True
 
+        if request == self._request:
+            return True
+
+        self._cancel_load()
         self._request = request
         if request.kind == "status":
             self._set_preview_target(request.key)
@@ -115,7 +143,9 @@ class PreviewPanel(Component):
 
         self._load_task = run_async(
             lambda: self._load_lines(request),
-            lambda lines: self._on_loaded(request, lines),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_loaded(request, lines)
+            ),
         )
         return True
 
@@ -130,7 +160,9 @@ class PreviewPanel(Component):
         self._request = request
         self._load_task = run_async(
             lambda: self._load_lines(request),
-            lambda lines: self._on_loaded(request, lines),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_loaded(request, lines)
+            ),
         )
 
     def _capture_request(self, active: PreviewPayload) -> _PreviewRequest | None:

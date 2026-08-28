@@ -59,6 +59,24 @@ class _MergeOps(_OpsBase):
         if code != 0:
             raise GitError(err or "Push failed")
 
+    def push_set_upstream(
+        self,
+        remote: str,
+        branch: str,
+        path: str | None = None,
+    ) -> None:
+        """Push ``branch`` and set ``remote/branch`` as its upstream."""
+        path = path or self.path
+        cmd = f"git push -u {shlex.quote(remote)} {shlex.quote(branch)}"
+        code, err, _out = self.executor.exec(
+            cmd,
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+            env=_noninteractive_env(),
+        )
+        if code != 0:
+            raise GitError(err or "Push failed")
+
     def merge(self, source: str, path: str | None = None) -> None:
         """Merge ``source`` into the current branch. Raises GitError on failure.
 

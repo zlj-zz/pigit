@@ -64,6 +64,7 @@ class HistoryRecord:
     commands: list[ReverseCommand]
     timestamp: float
     panel_hint: str
+    repo_path: str = ""
 
     def reverse(self, git: GitApi) -> ActionResult:
         """Execute inverses in reverse order."""
@@ -88,8 +89,15 @@ def _estimate_memory(record: HistoryRecord) -> int:
     return cost
 
 
+_FOREIGN_REPO_HISTORY = "History belongs to another repository"
+
+
 class SessionHistory:
-    """LIFO stack of reversible actions for the current session."""
+    """LIFO stack of reversible actions for the current session.
+
+    Records are stamped with :attr:`_active_repo` on push. ``u`` / Recent
+    only reverse or list entries for that path (multi-repo TUI isolation).
+    """
 
     def __init__(self, max_items: int = 100, max_memory_mb: int = 50) -> None:
         self._stack: deque[HistoryRecord] = deque()
@@ -97,55 +105,95 @@ class SessionHistory:
         self._max_memory = max_memory_mb * 1024 * 1024
         self._current_memory = 0
         self._prev_branch: str | None = None
+        self._active_repo: str = ""
+
+    def attach_repo(self, repo_path: str) -> None:
+        """Bind undo visibility to ``repo_path`` (call on session switch)."""
+        self._active_repo = repo_path
 
     def push(self, record: HistoryRecord) -> None:
+        if not record.repo_path:
+            record.repo_path = self._active_repo
         cost = _estimate_memory(record)
         self._evict_if_needed(cost)
         self._stack.append(record)
         self._current_memory += cost
 
     def reverse(self, git: GitApi) -> ActionResult:
-        if not self._stack:
+        """Reverse the newest record for the active repository."""
+        index = self._newest_index_for_active()
+        if index is None:
+            if self._stack:
+                return ActionResult(success=False, message=_FOREIGN_REPO_HISTORY)
             return ActionResult(success=False, message="Nothing to reverse")
-        record = self._stack.pop()
+        record = self._pop_at(index)
+        # Record is removed from the stack either way (truncate on failure),
+        # so its memory cost leaves the budget regardless of outcome.
+        self._current_memory -= _estimate_memory(record)
         result = record.reverse(git)
-        if result.success:
-            self._current_memory -= _estimate_memory(record)
-        # Truncate on failure — timeline is broken.
+        # Truncate on failure — timeline is broken (record already removed).
         return result
 
     def reverse_to(self, index: int, git: GitApi) -> ActionResult:
-        """Rewind: reverse all items from top down to index (inclusive)."""
-        n = len(self._stack)
-        if index < 0 or index >= n:
+        """Rewind active-repo records from newest down to ``index`` (inclusive).
+
+        ``index`` is into :meth:`peek` (0 = newest visible), not the raw stack.
+        """
+        visible = self._records_for_active()
+        if index < 0 or index >= len(visible):
             return ActionResult(success=False, message="Invalid index")
+        to_reverse = visible[: index + 1]
         reversed_count = 0
-        for i, record in enumerate(reversed(self._stack)):
-            if i > index:
-                break
+        for step, record in enumerate(to_reverse):
             result = record.reverse(git)
             if not result.success:
-                # Truncate stack: remove already-reversed items
-                for _ in range(reversed_count):
-                    self._stack.pop()
+                for done in to_reverse[:reversed_count]:
+                    self._remove_record(done)
+                    self._current_memory -= _estimate_memory(done)
                 return ActionResult(
                     success=False,
-                    message=f"Partial reverse at step {i + 1}: {result.message}",
+                    message=f"Partial reverse at step {step + 1}: {result.message}",
                 )
             reversed_count += 1
-        # Remove reversed records from stack
-        for _ in range(reversed_count):
-            popped = self._stack.pop()
-            self._current_memory -= _estimate_memory(popped)
+        for record in to_reverse:
+            self._remove_record(record)
+            self._current_memory -= _estimate_memory(record)
         return ActionResult(
             success=True, message=f"Reversed {reversed_count} action(s)"
         )
 
     def peek(self, n: int = 20) -> list[HistoryRecord]:
-        """Return the N most recent records (newest first)."""
-        from itertools import islice
+        """Return up to N newest records for the active repository."""
+        return self._records_for_active()[:n]
 
-        return list(islice(reversed(self._stack), n))
+    def _records_for_active(self) -> list[HistoryRecord]:
+        """Newest-first records stamped with the active repo path."""
+        return [
+            record
+            for record in reversed(self._stack)
+            if record.repo_path == self._active_repo
+        ]
+
+    def _newest_index_for_active(self) -> int | None:
+        """Stack index (0 = oldest) of the newest active-repo record."""
+        for index in range(len(self._stack) - 1, -1, -1):
+            if self._stack[index].repo_path == self._active_repo:
+                return index
+        return None
+
+    def _pop_at(self, index: int) -> HistoryRecord:
+        """Remove and return ``self._stack[index]`` (0 = oldest)."""
+        self._stack.rotate(-index)
+        record = self._stack.popleft()
+        self._stack.rotate(index)
+        return record
+
+    def _remove_record(self, record: HistoryRecord) -> None:
+        """Remove a specific record instance from the stack."""
+        for index, item in enumerate(self._stack):
+            if item is record:
+                self._pop_at(index)
+                return
 
     def _evict_if_needed(self, incoming_cost: int) -> None:
         while (

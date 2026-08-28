@@ -24,6 +24,7 @@ def app():
     """Create a PigitApplication with mocked git/VMs for cherry-pick."""
     app = PigitApplication(config=AppConfig())
     app._git = MagicMock()
+    app._git.bisect_status.return_value = None
     app._branch_vm = MagicMock()
     app._commit_vm = MagicMock()
     app._status_vm = MagicMock()

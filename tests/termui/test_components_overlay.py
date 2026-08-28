@@ -634,6 +634,38 @@ class TestSheet:
         sub = child.paint.call_args[0][0]
         assert (sub._origin_row, sub._origin_col) == (0, 0)
 
+    def test_sheet_bottom_pad_shifts_origin(self):
+        """bottom_pad lifts the sheet above footer chrome rows."""
+        child = MagicMock()
+        child.paint = MagicMock()
+        sheet = Sheet(child, height=3, bottom_pad=2)
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet.paint(surface)
+        sub = child.paint.call_args[0][0]
+        # No-pad child origin is 8; pad=2 → sheet top 5, child origin 6.
+        assert sheet._origin_row(10, 3) == 5
+        assert (sub._origin_row, sub._origin_col) == (6, 0)
+
+    def test_sheet_top_pad_shifts_origin(self):
+        """top_pad drops a top sheet below header chrome rows."""
+        child = MagicMock()
+        child.paint = MagicMock()
+        sheet = Sheet(child, height=3, edge="top", top_pad=2)
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet.paint(surface)
+        sub = child.paint.call_args[0][0]
+        assert sheet._origin_row(10, 3) == 2
+        assert (sub._origin_row, sub._origin_col) == (2, 0)
+
+    def test_sheet_resize_cap_respects_bottom_pad(self):
+        """Height cap uses (term_h - chrome) so pads shrink the max sheet."""
+        child = MagicMock()
+        sheet = Sheet(child, height=100, bottom_pad=2, height_cap_fraction=0.5)
+        sheet.resize((40, 10))
+        assert sheet._size == (40, 4)
+
     def test_sheet_top_edge_resize_origin(self):
         child = MagicMock()
         sheet = Sheet(child, height=6, edge="top")

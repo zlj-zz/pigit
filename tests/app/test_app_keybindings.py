@@ -39,8 +39,12 @@ class TestCollectAllActionBindings:
             "commit",
             "stash",
             "recent",
+            "repo_switcher",
+            "worktree_picker",
+            "bisect",
             "log_ref",
             "inspector",
+            "welcome",
         }
 
     def test_ast_scan_finds_no_unregistered_keymaps(self):

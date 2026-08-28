@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import tempfile
+from collections.abc import Callable
 
 from pigit.termui import (
     EventType,
@@ -104,6 +105,7 @@ class DiffViewer(Component):
         size: tuple[int, int] | None = None,
         id: str | None = None,
         word_diff: bool = False,
+        guard_async: Callable[..., Callable] | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._lines: list[str] = []
@@ -134,6 +136,7 @@ class DiffViewer(Component):
         self._tokenize_task: AsyncTask[list[_RenderLine]] = AsyncTask()
         self._tokenize_gen: int = 0
         self._patch_gen: int = 0
+        self._guard_async = guard_async
 
         # Word-diff state
         self._word_diff = word_diff
@@ -796,7 +799,10 @@ class DiffViewer(Component):
                     f"Failed: {stderr[:100]}", duration=2.0, kind=FeedbackKind.ERROR
                 )
 
-        self._patch_task.start(_work, _callback)
+        apply = _callback
+        if self._guard_async is not None:
+            apply = self._guard_async(_callback)
+        self._patch_task.start(_work, apply)
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)

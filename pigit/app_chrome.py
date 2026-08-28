@@ -12,8 +12,10 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     by_id,
     Component,
+    get_overlay_host,
     resolve_presentation_leaf,
 )
+from pigit.termui.component import collect_overlay_footer_entries
 from pigit.termui.containers import TabView
 from pigit.termui.widgets import Footer
 
@@ -48,3 +50,20 @@ class AppFooter(Footer):
         provider = getattr(active, "get_footer_entries", None) if active else None
         self.set_help_provider(provider)
         return True
+
+    def _display_context(self) -> str:
+        if self._presentation_overlay() is not None:
+            return ""
+        return super()._display_context()
+
+    def _help_pairs(self) -> list[tuple[str, str]]:
+        overlay = self._presentation_overlay()
+        if overlay is not None:
+            return collect_overlay_footer_entries(overlay)
+        return super()._help_pairs()
+
+    def _presentation_overlay(self) -> Component | None:
+        host = get_overlay_host()
+        if host is None:
+            return None
+        return host.presentation_overlay()

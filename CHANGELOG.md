@@ -1,5 +1,29 @@
 # Changelog of pigit
 
+## 2.4.0 (2026-08-29)
+
+### Features
+
+- **Multi-repo TUI**: clickable Header repo slot opens the switcher sheet; selecting a repo swaps the live session in place (RepoSession abstraction, token-guarded async, undo isolation per repo).
+- **Worktree TUI**: `w` in the repo switcher lists `git worktree` trees and switches to one in place by reusing the repo-switch machinery; `+` adds a linked worktree (branch defaults to HEAD), `-` removes with a dirty `--force` confirm.
+- **Bisect TUI**: `B` opens a status sheet showing the current commit, good/bad refs, and remaining steps; `s` starts (`good [bad]`, bad defaults to HEAD), `g`/`b` mark the current commit, `r` resets. Bisect and sequencers are mutually exclusive through a single gate (merge/rebase/cherry-pick/branch-checkout/repo-switch).
+- **First-run Welcome sheet**: panel map + core keys, pointing at `?` for the full binding catalog.
+- **Executable Help browser**: binding rows are runnable; click selects, double-click runs the bound action.
+- **Anchored panel popup**: clicking a Header tab slot opens a picker anchored to the slot (dismiss on outside press or `esc`).
+- **Push upstream confirm**: pushing a branch with no tracking ref asks before setting it as upstream.
+
+### Bug Fixes
+
+- Anchored picker no longer closes on the opening click's release — only an outside press dismisses it.
+- Side preview stops reloading when the selection is unchanged.
+- Sheets stay within the header/footer chrome: the footer now shows the open sheet's key hints instead of being covered, and the rebase sheet no longer duplicates them in its own footer.
+- Welcome / Inspector top sheets no longer cover the header.
+
+### Refactors
+
+- Extract `RepoSession`; panel ViewModels become retargetable for in-place repo switches.
+- Consolidate toast/sheet chrome reservation into `bottom_chrome_pad` / `top_chrome_pad`, sourced from the `HEADER_HEIGHT` / `FOOTER_HEIGHT` constants.
+
 ## 2.3.1 (2026-08-27)
 
 ### Features

@@ -15,7 +15,10 @@ from collections.abc import Callable, Sequence
 
 from .bindings import (
     BindingsList,
+    derive_executable_bindings,
     derive_help_entries,
+    join_footer_display_pairs,
+    merge_footer_pairs,
     resolve_action_keys,
     resolve_instance_bindings,
 )
@@ -461,6 +464,10 @@ class Component(ABC):
         """
         return get_renderer_strict()
 
+    def get_executable_bindings(self):
+        """Derive executable help rows from ``@bind_action`` bindings."""
+        return derive_executable_bindings(self._action_bindings, self)
+
     def get_help_entries(self) -> list[tuple[str, str]]:
         """Derive help entries from ``@bind_action`` bindings.
 
@@ -480,19 +487,28 @@ class Component(ABC):
         ``handle_key`` (not ``@bind_action``) are intentionally absent — the
         footer shows the always-available, high-frequency keys.
         """
-        grouped: dict[str, list[str]] = {}
-        order: list[str] = []
+        raw: list[tuple[str, str]] = []
         for binding in self._action_bindings:
             if binding.tip is None:
                 continue
             if binding.tip_when is not None and not binding.tip_when(self):
                 continue
-            keys = resolve_action_keys(binding)
-            if binding.tip not in grouped:
-                grouped[binding.tip] = []
-                order.append(binding.tip)
-            grouped[binding.tip].extend(keys)
-        return [("/".join(display_key(k) for k in grouped[tip]), tip) for tip in order]
+            for key in resolve_action_keys(binding):
+                raw.append((key, binding.tip))
+        return merge_footer_pairs(raw)
+
+
+def collect_overlay_footer_entries(overlay: Component) -> list[tuple[str, str]]:
+    """Footer hints for an open modal shell and its inner content.
+
+    Child entries precede shell entries; rows with the same tip are merged.
+    """
+    parts: list[list[tuple[str, str]]] = []
+    child = getattr(overlay, "_child", None)
+    if isinstance(child, Component):
+        parts.append(child.get_footer_entries())
+    parts.append(overlay.get_footer_entries())
+    return join_footer_display_pairs(parts)
 
 
 def bind_signals(

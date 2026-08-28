@@ -147,7 +147,7 @@ def show_toast(
         kind = None
 
     # App chrome (e.g. footer) reserves space below bottom-anchored toasts.
-    bottom_pad = getattr(host, "toast_bottom_pad", 0)
+    bottom_pad = getattr(host, "bottom_chrome_pad", 0)
 
     toast = Toast(
         message,

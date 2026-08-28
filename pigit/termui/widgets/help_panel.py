@@ -22,7 +22,7 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 HelpEntry = tuple[str, str]
 
 
-def _wrap_text(text: str, max_width: int) -> list[str]:
+def wrap_text(text: str, max_width: int) -> list[str]:
     """Wrap *text* into lines no wider than *max_width*.
 
     Breaks at word boundaries when possible; falls back to character
@@ -216,7 +216,7 @@ class HelpPanel(Component):
         lines: list[str] = []
         segments: list[list[Segment]] = []
         for key_disp, desc in entries:
-            wrapped = _wrap_text(desc, desc_avail)
+            wrapped = wrap_text(desc, desc_avail)
             for i, desc_line in enumerate(wrapped):
                 if i == 0:
                     pad = max_key_w - wcswidth(key_disp)
@@ -261,7 +261,7 @@ class HelpPanel(Component):
             lines.append(header)
             segments.append([Segment(header, style_flags=palette.STYLE_BOLD)])
             for key_disp, desc in entries:
-                wrapped = _wrap_text(desc, desc_avail)
+                wrapped = wrap_text(desc, desc_avail)
                 for i, desc_line in enumerate(wrapped):
                     if i == 0:
                         pad = max_key_w - wcswidth(key_disp)

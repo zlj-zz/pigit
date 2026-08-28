@@ -14,7 +14,7 @@ from collections.abc import Callable
 
 from .component import Component, resolve_focus_leaf
 from ._layer import LayerKind, LayerStack
-from .mouse import MouseEvent
+from .mouse import MouseEvent, MouseKind
 from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
@@ -56,8 +56,11 @@ class ComponentRoot(Component):
         self._badge_bg: tuple[int, int, int] | None = None
         self._badge_fg: tuple[int, int, int] | None = None
         self._badge_until = 0
-        # Rows reserved below bottom-anchored toasts (app chrome like footer).
-        self.toast_bottom_pad = 0
+        # Rows reserved at the bottom for app chrome (footer): bottom-anchored
+        # toasts and sheets stay above it.
+        self.bottom_chrome_pad = 0
+        # Rows reserved at the top for app chrome (header): top sheets stay below it.
+        self.top_chrome_pad = 0
         self._event_bus = event_bus
         self._app_on_event: Callable | None = None
         self._event_loop: Any | None = None
@@ -163,6 +166,17 @@ class ComponentRoot(Component):
         """True while an open MODAL or SHEET owns keyboard chrome (not TOAST)."""
         return self._top_open_overlay() is not None
 
+    def open_modal(self) -> Component | None:
+        """Return the open modal overlay, if any."""
+        top = self._layer_stack.top(LayerKind.MODAL)
+        if top is not None and getattr(top, "open", False):
+            return top
+        return None
+
+    def presentation_overlay(self) -> Component | None:
+        """Return the top open MODAL or SHEET overlay, if any."""
+        return self._top_open_overlay()
+
     def try_dispatch_overlay(self, key: str) -> OverlayDispatchResult:
         """Dispatch a keypress to the active overlay, if any."""
         return self._layer_stack.dispatch(key)
@@ -259,7 +273,9 @@ class ComponentRoot(Component):
     def _handle_mouse(self, event: MouseEvent) -> bool:
         """Route a mouse event: overlays first, then body with click-to-focus.
 
-        MODAL swallows clicks that miss it (it is a centered dialog). A SHEET
+        MODAL swallows clicks that miss it by default (centered dialogs). When
+        the top modal sets ``dismiss_on_miss`` (e.g. an anchored picker), a miss
+        ends the session and restores focus, still consuming the click. A SHEET
         is an edge overlay, so a click outside it falls through to the body —
         the rest of the app stays clickable while the sheet is open.
         """
@@ -267,6 +283,21 @@ class ComponentRoot(Component):
         if modal is not None and getattr(modal, "open", False):
             hit = modal._hit_test(event.col, event.row)
             if hit is None:
+                # Only a PRESS outside dismisses: the release that tails the
+                # opening click lands on the header (outside the popup) and must
+                # not immediately close an anchored picker. Exact True keeps
+                # MagicMock stubs in tests from tripping dismiss.
+                if (
+                    getattr(modal, "dismiss_on_miss", False) is True
+                    and event.kind is MouseKind.PRESS
+                ):
+                    end_session = getattr(modal, "end_session", None)
+                    if callable(end_session):
+                        end_session()
+                    hide = getattr(modal, "hide", None)
+                    if callable(hide):
+                        hide()
+                    self._focus_manager.sync_focus_to_overlay_or_leaf()
                 return True
             target, lcol, lrow = hit
             target.handle_mouse(replace(event, col=lcol, row=lrow))
@@ -365,6 +396,9 @@ class ComponentRoot(Component):
             title_align=title_align,
             edge=edge,
             bg=bg,
+            top_pad=self.top_chrome_pad,
+            bottom_pad=self.bottom_chrome_pad,
+            height_cap_fraction=Sheet.height_cap_fraction(max_fraction),
         )
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)

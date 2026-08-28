@@ -24,6 +24,7 @@ def app():
     application = PigitApplication(config=AppConfig())
     application._git = MagicMock()
     application._git.get_git_dir.return_value = "/tmp/.git"
+    application._git.has_upstream.return_value = True
     application._branch_vm = MagicMock()
     application._commit_vm = MagicMock()
     application._status_vm = MagicMock()
@@ -256,3 +257,93 @@ def test_palette_fetch_stays_on_run_git_action(app):
     app._on_palette_execute("fetch")
     app._run_git_action.assert_called_once_with("fetch")
     app._run_network_git.assert_not_called()
+
+
+def test_push_no_upstream_alert_confirm_runs_set_upstream(app):
+    app._git.has_upstream.return_value = False
+    app._git.get_current_branch.return_value = "feature/fxk_api_count"
+    app._git.default_push_remote.return_value = "origin"
+    app._git.push_set_upstream.side_effect = None
+
+    def fake_alert(message, on_result, kind=None):
+        assert "feature/fxk_api_count" in message
+        assert "git push --set-upstream origin feature/fxk_api_count" in message
+        assert kind is FeedbackKind.WARNING
+        on_result(True)
+        return True
+
+    app._alert_dialog.alert = fake_alert
+    with (
+        patch("pigit.app_network_git.dismiss_sheet"),
+        patch("pigit.app_network_git.show_spinner") as spin,
+        patch("pigit.app_network_git.hide_spinner"),
+        patch("pigit.app_network_git.show_toast"),
+    ):
+        app._run_network_git("push")
+    spin.assert_called_once()
+    work, _done = app._network_sync_task.start.call_args.args
+    assert work().ok is True
+    app._git.push_set_upstream.assert_called_once_with(
+        "origin", "feature/fxk_api_count"
+    )
+    app._git.push.assert_not_called()
+
+
+def test_push_no_upstream_alert_cancel_skips_worker(app):
+    app._git.has_upstream.return_value = False
+    app._git.get_current_branch.return_value = "feature/fxk_api_count"
+    app._git.default_push_remote.return_value = "origin"
+    completed = []
+
+    def fake_alert(message, on_result, kind=None):
+        on_result(False)
+        return True
+
+    app._alert_dialog.alert = fake_alert
+    with (
+        patch("pigit.app_network_git.show_spinner") as spin,
+        patch("pigit.app_network_git.show_toast"),
+    ):
+        app._run_network_git("push", on_complete=lambda: completed.append(True))
+    spin.assert_not_called()
+    app._network_sync_task.start.assert_not_called()
+    assert completed == [True]
+
+
+def test_push_no_remote_toasts_without_spinner(app):
+    app._git.has_upstream.return_value = False
+    app._git.get_current_branch.return_value = "dev"
+    app._git.default_push_remote.return_value = None
+    with (
+        patch("pigit.app_network_git.show_spinner") as spin,
+        patch("pigit.app_network_git.show_toast") as toast,
+    ):
+        app._run_network_git("push")
+    spin.assert_not_called()
+    assert "No remote" in toast.call_args.args[0]
+    assert toast.call_args.kwargs.get("kind") is FeedbackKind.WARNING
+
+
+def test_push_detached_head_toasts_without_spinner(app):
+    app._git.has_upstream.return_value = False
+    app._git.get_current_branch.return_value = None
+    with (
+        patch("pigit.app_network_git.show_spinner") as spin,
+        patch("pigit.app_network_git.show_toast") as toast,
+    ):
+        app._run_network_git("push")
+    spin.assert_not_called()
+    assert "Detached HEAD" in toast.call_args.args[0]
+
+
+def test_pull_no_upstream_toasts_without_spinner(app):
+    app._git.has_upstream.return_value = False
+    with (
+        patch("pigit.app_network_git.show_spinner") as spin,
+        patch("pigit.app_network_git.show_toast") as toast,
+    ):
+        app._run_network_git("pull")
+    spin.assert_not_called()
+    app._network_sync_task.start.assert_not_called()
+    assert "No upstream" in toast.call_args.args[0]
+    assert toast.call_args.kwargs.get("kind") is FeedbackKind.WARNING

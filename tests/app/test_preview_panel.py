@@ -144,6 +144,83 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
     assert preview._diff_viewer._lines == ["diff line"]
 
 
+def test_same_selection_does_not_reload(preview: PreviewPanel) -> None:
+    """Re-emitting the same Status selection must not cancel+reload (no flicker)."""
+    bus = EventBus()
+    _mount(bus, preview)
+    vm = preview._status_vm
+    assert isinstance(vm, _FakeStatusVM)
+
+    file = File(
+        name="src/main.py",
+        display_str="src/main.py",
+        short_status="M ",
+        has_staged_change=True,
+        has_unstaged_change=False,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    active = _FakeStatusPanel([file], curr_no=0, source_index=7, vm=vm)
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
+    assert vm.diff_path_calls == ["src/main.py"]
+    first_task = preview._load_task
+    first_lines = list(preview._diff_viewer._lines)
+
+    bus.publish(EVT_SELECTION_CHANGED, active=active)
+    assert vm.diff_path_calls == ["src/main.py"]
+    assert preview._load_task is first_task
+    assert preview._diff_viewer._lines == first_lines
+
+
+def test_different_selection_reloads(preview: PreviewPanel) -> None:
+    """Switching to another file starts a new load."""
+    bus = EventBus()
+    _mount(bus, preview)
+    vm = preview._status_vm
+    assert isinstance(vm, _FakeStatusVM)
+
+    file_a = File(
+        name="a.py",
+        display_str="a.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    file_b = File(
+        name="b.py",
+        display_str="b.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file_a], curr_no=0, source_index=0, vm=vm),
+    )
+    assert vm.diff_path_calls == ["a.py"]
+    vm.diff_return = ["diff b"]
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file_b], curr_no=0, source_index=1, vm=vm),
+    )
+    assert vm.diff_path_calls == ["a.py", "b.py"]
+    assert preview._diff_viewer._lines == ["diff b"]
+    assert "b.py" in preview._diff_viewer._box_title
+
+
 def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
     bus = EventBus()
     _mount(bus, preview)
@@ -382,3 +459,17 @@ def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
     release = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.RELEASE)
     assert preview.handle_mouse(release) is False
     assert preview._diff_viewer.scroll_i == 0
+
+
+def test_set_vm_cancels_inflight_load_and_clears_request() -> None:
+    """set_vm drops a pending diff load so its result never lands (D2 step 4)."""
+    from unittest.mock import Mock
+
+    panel = PreviewPanel()
+    task = Mock()
+    panel._load_task = task
+    panel._request = object()
+    panel.set_vm(Mock())
+    task.cancel.assert_called_once()
+    assert panel._load_task is None
+    assert panel._request is None

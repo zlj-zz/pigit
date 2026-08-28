@@ -5,7 +5,7 @@ import os
 import platform
 
 __project__ = "pigit"
-__version__ = "2.3.1"
+__version__ = "2.4.0"
 __url__ = "https://github.com/zlj-zz/pigit.git"
 __uri__ = __url__
 
@@ -39,6 +39,9 @@ LOG_FILE_PATH: str = f"{PIGIT_HOME}/log/{__project__}.log"
 
 # Config file path
 CONFIG_FILE_PATH: str = f"{PIGIT_HOME}/pigit.toml"
+
+# User runtime state (not user-edited config)
+STATE_FILE_PATH: str = f"{PIGIT_HOME}/state.toml"
 
 # Code counter file path
 COUNTER_DIR_PATH: str = f"{PIGIT_HOME}/Counter"

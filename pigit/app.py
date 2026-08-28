@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from typing import NamedTuple
+
 from pigit.termui import (
     EventType,
     EVT_GOTO,
@@ -22,6 +24,7 @@ from pigit.termui import (
     dismiss_sheet,
     ExitEventLoop,
     get_renderer,
+    hide_spinner,
     keys,
     AsyncTask,
     request_render,
@@ -30,6 +33,7 @@ from pigit.termui import (
     Segment,
     show_badge,
     show_sheet,
+    show_spinner,
     show_toast,
     ToastPosition,
     set_theme,
@@ -37,8 +41,19 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import AlertDialog, Header, HelpPanel, Popup
+from pigit.termui.widgets import (
+    AlertDialog,
+    BindingBrowser,
+    Header,
+    InputLine,
+    Popup,
+    RepoSlot,
+    TabSlot,
+)
+from pigit.termui.bindings import ExecutableBinding
 from pigit.termui.reactive import Signal
+from pigit.termui.mouse import MouseEvent
+from pigit.termui.types import LayerKind
 from .app_header_state import HeaderState
 from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
@@ -61,16 +76,24 @@ from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
-from .viewmodels.status import StatusViewModel
-from .viewmodels.branch import BranchViewModel
-from .viewmodels.commit import CommitViewModel
+from .repo_session import RepoSession
 from .session_history import SessionHistory
 from .config_data import AppConfig
 
-# Footer chrome height in rows. The layout height (build_root) and the
-# toast_bottom_pad (setup_root) both derive from this constant, so growing
-# the footer can never silently overlap bottom-anchored toasts.
+# Chrome heights in rows. The layout heights (build_root) and the
+# top_chrome_pad / bottom_chrome_pad (setup_root) derive from these
+# constants, so growing the chrome can never silently overlap toasts
+# or sheets.
+HEADER_HEIGHT = 2
 FOOTER_HEIGHT = 2
+
+
+class _SwitchResult(NamedTuple):
+    """Outcome of a background RepoSession.build for repo switch."""
+
+    ok: bool
+    session: RepoSession | None = None
+    error: str = ""
 
 
 class PigitApplication(Application):
@@ -104,10 +127,22 @@ class PigitApplication(Application):
         set_theme(THEME)
         self._git_api = git_api or GitApi()
         self._managed_repos = managed_repos
-        self._repo_path, self._repo_conf = self._git_api.confirm_repo()
-        self._git = self._git_api.bind_path(self._repo_path)
+        # Undo stack must exist before RepoSession.build (Status/Branch VMs).
+        self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
+        self._session = RepoSession.build(self._git_api, None, self._session_history)
+        # Aliases keep existing lambdas (get_git=lambda: self._git, …) working.
+        self._git = self._session.git
+        self._repo_path = self._session.repo_path
+        self._repo_name = self._session.repo_name
+        self._status_vm = self._session.status_vm
+        self._commit_vm = self._session.commit_vm
+        self._branch_vm = self._session.branch_vm
+        self._repo_token: object = object()
+        # True while a RepoSession.build for a switch is in flight (spinner on).
+        self._switch_in_flight = False
+        self._session_history.attach_repo(self._session.repo_path)
+        self._bind_session_vm_tokens(self._session)
         # Header state
-        self._repo_name: str = ""
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
@@ -119,15 +154,21 @@ class PigitApplication(Application):
             inner_width=50,
             on_result=lambda _: None,
         )
-        # Session history (undo stack)
-        self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
+        self._add_worktree_input = InputLine(
+            prompt="Add worktree (path [branch], quote paths with spaces): ",
+            on_submit=self._on_add_worktree_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
+        )
+        self._bisect_start_input = InputLine(
+            prompt="Start bisect (good [bad]; bad defaults to HEAD): ",
+            on_submit=self._on_bisect_start_submit,
+            on_cancel=dismiss_sheet,
+            allow_newline=False,
+        )
         self._config = config
         self._observe_host: ObserveHost | None = None
         self._header_reload_token: object | None = None
-        # ViewModels (assigned in build_root, same lifetime as panels)
-        self._status_vm: StatusViewModel
-        self._commit_vm: CommitViewModel
-        self._branch_vm: BranchViewModel
         # Inspector async-load state
         self._inspector_task: AsyncTask | None = None
         self._inspector_token: object = None
@@ -140,6 +181,8 @@ class PigitApplication(Application):
             get_sync_task=lambda: self._network_sync_task,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
+            get_alert_dialog=lambda: self._alert_dialog,
+            guard_async=self._guard_repo_async,
         )
         self._merge_workflow = MergeWorkflow(
             store=self._merge_state_store,
@@ -171,13 +214,10 @@ class PigitApplication(Application):
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
 
-        self._status_vm = StatusViewModel(self._git, history=self._session_history)
-        self._branch_vm = BranchViewModel(self._git, history=self._session_history)
-        self._commit_vm = CommitViewModel(self._git)
-
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
         # the log-graph preview. At most one is in the split pane at a time.
+        # VMs come from self._session (aliases set in __init__).
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
@@ -186,10 +226,12 @@ class PigitApplication(Application):
                 if self._observe_host
                 else None
             ),
+            guard_async=self._guard_repo_async,
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
             vm=self._branch_vm,
+            guard_async=self._guard_repo_async,
         )
 
         self._status_panel = StatusPanel(
@@ -219,6 +261,7 @@ class PigitApplication(Application):
             branch_signal=self._branch_signal,
             id="branch",
             on_toggle_preview=self.toggle_side_preview,
+            get_git=lambda: self._git,
         )
         branch_panel = self._branch_panel
 
@@ -228,7 +271,11 @@ class PigitApplication(Application):
             report_default=self._config.commit_report_default,
         )
         commit_panel = self._commit_panel
-        self._diff_panel = DiffViewer(id="diff", word_diff=self._config.word_diff)
+        self._diff_panel = DiffViewer(
+            id="diff",
+            word_diff=self._config.word_diff,
+            guard_async=self._guard_repo_async,
+        )
         self._tab_view = TabView(
             children=[
                 status_stack,
@@ -261,17 +308,36 @@ class PigitApplication(Application):
             id="palette",
         )
 
-        children = [
-            Header(
-                left=self._header_state.left,
-                right=self._header_state.right,
-                separator=True,
-                sep_fg=THEME.fg_dim,
-                id="header",
+        # Most-recent anchored picker popup. Kept for tests/inspection (asserts
+        # on `.open` right after showing) and replaced on each open; closing is
+        # handled by the Popup shell (esc / dismiss_on_miss), so this may hold a
+        # closed instance between opens.
+        self._panel_picker_popup: Popup | None = None
+        self._tab_slot = TabSlot(
+            tab_name=self._header_state.tab_signal,
+            tab_key=self._header_state.tab_key_signal,
+            on_open=self.open_panel_picker,
+            id="tab_slot",
+        )
+        self._header = Header(
+            left=self._header_state.left,
+            right=self._header_state.right,
+            left_child=RepoSlot(
+                name=self._header_state.repo_signal,
+                on_open=self.open_repo_switcher,
+                fg=THEME.fg_header_repo,
+                id="repo_slot",
             ),
+            right_child=self._tab_slot,
+            separator=True,
+            sep_fg=THEME.fg_dim,
+            id="header",
+        )
+        children = [
+            self._header,
             self._body_view,
         ]
-        heights: list = [2, "flex"]
+        heights: list = [HEADER_HEIGHT, "flex"]
         if self._config.show_footer:
             children.append(footer)
             heights.append(FOOTER_HEIGHT)
@@ -320,31 +386,48 @@ class PigitApplication(Application):
             self._observe_host.on_tab_switch()
 
     def setup_root(self, root: ComponentRoot) -> None:
-        # Footer occupies FOOTER_HEIGHT rows when shown; keep toasts above it.
-        root.toast_bottom_pad = FOOTER_HEIGHT if self._config.show_footer else 0
-        self._help_panel = HelpPanel(
+        # Header is always shown; footer only when show_footer. Sheets and toasts
+        # stay within the body region between them.
+        root.top_chrome_pad = HEADER_HEIGHT
+        root.bottom_chrome_pad = FOOTER_HEIGHT if self._config.show_footer else 0
+        self._help_browser = BindingBrowser(
             key_fg=THEME.fg_info,
+            on_invoke_error=self._on_help_invoke_error,
         )
-        self._help_panel.set_grouped_entries(self.get_help_groups())
+        self._help_browser.set_groups(self.get_help_groups())
         self._help_popup = Popup(
-            self._help_panel,
+            self._help_browser,
             exit_key=keys.KEY_ESC,
         )
 
-    def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+    def _on_help_invoke_error(self, exc: BaseException) -> None:
+        """Toast after Help dismiss when an invoked binding raises."""
+        show_toast(str(exc) or "Action failed", duration=2.5, kind=FeedbackKind.ERROR)
+
+    def get_help_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
         """Help for the active presentation panel, then Global app bindings."""
-        groups: list[tuple[str, list[tuple[str, str]]]] = []
+        groups: list[tuple[str, list[ExecutableBinding]]] = []
         active = self._resolve_active_panel()
         if active is not None:
-            entries = active.get_help_entries()
+            entries = active.get_executable_bindings()
             if entries:
                 title_fn = getattr(active, "get_help_title", None)
                 title = str(title_fn()) if callable(title_fn) else type(active).__name__
                 groups.append((title, entries))
-        universal = self.get_help_entries()
+        universal = self.get_executable_bindings()
         if universal:
             groups.append(("Global", universal))
         return groups
+
+    def _open_help_browser(self) -> None:
+        """Rebuild groups and show Help when the popup is closed."""
+        popup = self._help_popup
+        browser = self._help_browser
+        if popup is None or browser is None:
+            return
+        browser.set_groups(self.get_help_groups())
+        if not popup.open:
+            popup.toggle()
 
     def after_start(self):
         cols, rows = terminal_size()
@@ -370,13 +453,8 @@ class PigitApplication(Application):
                 kind=FeedbackKind.ERROR,
             )
 
-        show_toast(
-            "Welcome to Pigit! Press ? for help.",
-            duration=3.0,
-            position=ToastPosition.BOTTOM_LEFT,
-            kind=FeedbackKind.INFO,
-        )
         self._merge_state_store.try_restore(self._git.is_merge_in_progress)
+        self._maybe_show_welcome_on_first_run()
 
         if self._config.repo_observe and self._observe_host is not None:
             self._observe_host.start()
@@ -386,10 +464,218 @@ class PigitApplication(Application):
         if self._tab_view.visible is not None:
             self._on_tab_switch(self._tab_view.visible)
 
+    def _maybe_show_welcome_on_first_run(self) -> None:
+        """Open Welcome Sheet once when :func:`should_auto_show_welcome` allows."""
+        from .app_welcome import build_welcome_content, should_auto_show_welcome
+        from .welcome_state import save_welcome_seen
+
+        if self._root is None:
+            return
+        rows = build_welcome_content(self)
+        if not should_auto_show_welcome(
+            self._config,
+            self._root,
+            min_terminal_rows=self.min_terminal_size[1],
+            content_rows=len(rows),
+        ):
+            return
+        self._show_welcome(on_dismiss=save_welcome_seen, rows=rows)
+
+    def _show_welcome(
+        self,
+        *,
+        on_dismiss: Callable[[], None],
+        rows: list | None = None,
+    ) -> None:
+        """Open Welcome Sheet with the given dismiss callback."""
+        from .app_welcome import (
+            WELCOME_SHEET_MAX_FRACTION,
+            WelcomeSheet,
+            build_welcome_content,
+        )
+
+        content = rows if rows is not None else build_welcome_content(self)
+        sheet = WelcomeSheet(on_dismiss=on_dismiss, rows=content)
+        show_sheet(
+            sheet,
+            edge="top",
+            title="Welcome to Pigit",
+            max_fraction=WELCOME_SHEET_MAX_FRACTION,
+        )
+        sheet.mount()
+
+    @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
+    def show_welcome(self) -> None:
+        """Open the onboarding Welcome sheet (no-op when another overlay is open)."""
+        if self._root is None or self._root.has_overlay_open():
+            return
+        self._show_welcome(on_dismiss=lambda: None)
+
     def on_exit(self) -> None:
-        """Stop repo observation timers and backend before root destroy."""
-        if self._observe_host is not None:
-            self._observe_host.stop()
+        """Stop repo observation and dispose the current repo session.
+
+        ``observe.stop`` is best-effort cleanup; the session must always be
+        disposed (ObserveHost holds a status_vm items subscription).
+        """
+        try:
+            if self._observe_host is not None:
+                self._observe_host.stop()
+        finally:
+            self._session.dispose()
+
+    def _guard_repo(self, token: object, callback: Callable) -> Callable:
+        """Drop async UI results when ``token`` no longer matches ``_repo_token``."""
+
+        def guarded(result):
+            if token is not self._repo_token:
+                return None
+            return callback(result)
+
+        return guarded
+
+    def _guard_repo_async(self, callback: Callable) -> Callable:
+        """Capture the current repo token and wrap ``callback`` (non-VM loads)."""
+        return self._guard_repo(self._repo_token, callback)
+
+    def _bind_session_vm_tokens(self, session: RepoSession) -> None:
+        """Stamp session VMs with the app's current ``_repo_token``."""
+        for vm in (session.status_vm, session.commit_vm, session.branch_vm):
+            vm.bind_repo_token(self._repo_token)
+
+    def _bump_repo_token(self) -> object:
+        """Advance the repo generation; invalidate in-flight loads on current VMs."""
+        self._repo_token = object()
+        self._bind_session_vm_tokens(self._session)
+        return self._repo_token
+
+    def _can_switch(self) -> bool:
+        """Block repo switch while network sync or a git sequencer is active."""
+        from .app_bisect import guard_bisect_active
+
+        if self._network_git.busy:
+            show_toast(
+                "Push/pull in progress…",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return False
+        if self._git.sequencer_in_progress():
+            show_toast(
+                "Merge/rebase/cherry-pick in progress…",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return False
+        if guard_bisect_active(self._git):
+            return False
+        return True
+
+    def _close_overlays(self) -> None:
+        """Close inspector, Diff detail, sheets, and Help before switching repos."""
+        self._cancel_inspector_load()
+        self._close_detail_if_open()
+        dismiss_sheet()
+        popup = getattr(self, "_help_popup", None)
+        if popup is not None and popup.open:
+            popup.toggle()
+
+    def _switch_repo(self, path: str) -> None:
+        """Build a new RepoSession for ``path`` and apply it on the UI thread."""
+        if self._switch_in_flight:
+            return
+        if not self._can_switch():
+            return
+        self._close_overlays()
+        token = self._bump_repo_token()
+        self._switch_in_flight = True
+        show_spinner("Switching repo…", position=ToastPosition.CENTER)
+
+        def work() -> _SwitchResult:
+            try:
+                session = RepoSession.build(self._git_api, path, self._session_history)
+                if not session.repo_path:
+                    session.dispose()
+                    return _SwitchResult(False, error="Not a git repository")
+                return _SwitchResult(True, session=session)
+            except Exception as exc:
+                return _SwitchResult(False, error=str(exc))
+
+        AsyncTask().start(work, lambda result: self._switch_done(result, token))
+
+    def _switch_done(self, result: _SwitchResult, token: object) -> None:
+        """UI-thread switch completion: hide spinner; apply or toast."""
+        self._switch_in_flight = False
+        hide_spinner()
+        if token is not self._repo_token:
+            if result.ok and result.session is not None:
+                result.session.dispose()
+            return
+        if not result.ok or result.session is None:
+            show_toast(
+                f"Switch failed: {result.error or 'unknown error'}",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._apply_session(result.session)
+
+    def _apply_session(self, session: RepoSession) -> None:
+        """Retarget panels and hosts; commit ``self._session`` only on full success."""
+        old = self._session
+        self._git = session.git
+        self._repo_path = session.repo_path
+        self._repo_name = session.repo_name
+        self._status_vm = session.status_vm
+        self._commit_vm = session.commit_vm
+        self._branch_vm = session.branch_vm
+        try:
+            self._bind_session_vm_tokens(session)
+            self._retarget_panels(session)
+            if self._observe_host is not None:
+                self._observe_host.rebind_session(session)
+            self._merge_state_store.rebind(session.git)
+            self._header_state.repo = session.repo_name
+            self._schedule_reload_header()
+            self._tab_view.route_to("status")
+            self._session_history.attach_repo(session.repo_path)
+        except Exception as exc:
+            self._git = old.git
+            self._repo_path = old.repo_path
+            self._repo_name = old.repo_name
+            self._status_vm = old.status_vm
+            self._commit_vm = old.commit_vm
+            self._branch_vm = old.branch_vm
+            self._bind_session_vm_tokens(old)
+            try:
+                self._retarget_panels(old)
+                if self._observe_host is not None:
+                    self._observe_host.rebind_session(old)
+                self._merge_state_store.rebind(old.git)
+                self._header_state.repo = old.repo_name
+                self._schedule_reload_header()
+            except Exception:
+                logging.exception("Failed to restore panels after aborted switch")
+            session.dispose()
+            show_toast(
+                f"Switch failed: {exc}",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._session = session
+        old.dispose()
+        request_render()
+
+    def _retarget_panels(self, session: RepoSession) -> None:
+        """Point mounted panels at ``session`` ViewModels (no dispose)."""
+        self._status_panel.set_vm(session.status_vm)
+        self._stash_panel.set_vm(session.status_vm)
+        self._branch_panel.set_vm(session.branch_vm)
+        self._commit_panel.set_vm(session.commit_vm)
+        if self._preview_panel is not None:
+            self._preview_panel.set_vm(session.status_vm)
+        if self._log_graph_preview is not None:
+            self._log_graph_preview.set_vm(session.branch_vm)
 
     def _start_repo_observe(self) -> None:
         """Delegate to ObserveHost.start()."""
@@ -503,8 +789,13 @@ class PigitApplication(Application):
     @bind_action("help", "?", desc="Toggle this help panel", tip="Help")
     def toggle_help(self):
         """Toggle help popup visibility. Rebuild groups so Commit's title tracks log_ref."""
-        self._help_panel.set_grouped_entries(self.get_help_groups())
-        self._help_popup.toggle()
+        popup = self._help_popup
+        if popup is None:
+            return
+        if popup.open:
+            popup.toggle()
+            return
+        self._open_help_browser()
 
     @bind_action("palette", ";", desc="Open command palette", tip="Palette")
     def toggle_palette(self):
@@ -660,6 +951,375 @@ class PigitApplication(Application):
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
+    @bind_action("switch_repo", "@", desc="Switch repository", tip="Repos")
+    def open_repo_switcher(self) -> None:
+        """Open the managed-repo switcher sheet (``@`` key or RepoSlot click).
+
+        When search/overlays capture keys, ``@`` may be unreachable — use the
+        Header RepoSlot click path instead (R6).
+        """
+        if self._managed_repos is None:
+            show_toast(
+                "未配置 repos.json（repos.json 未找到）",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_repo_switcher import (
+            RepoSwitcherSheet,
+            build_repo_switcher_entries,
+        )
+
+        repos = self._managed_repos.load_repos()
+        entries = build_repo_switcher_entries(
+            repos,
+            current_path=self._repo_path,
+            cwd=self._repo_path,
+        )
+        panel = RepoSwitcherSheet(
+            entries=entries,
+            on_switch=self._switch_repo,
+            on_add_current=self._add_current_and_switch,
+            on_toggle_mode=self.open_worktree_picker,
+        )
+        # The switcher replaces any open sheet (e.g. RecentActions) — the
+        # Header RepoSlot click is reachable while a sheet is open, so without
+        # this the layer stack would accumulate stacked sheets (M1).
+        dismiss_sheet()
+        show_sheet(
+            panel,
+            title="Switch repo",
+            edge="bottom",
+        )
+        panel.mount()
+
+    def open_worktree_picker(self) -> None:
+        """Open the worktree list sheet (``w`` from repo switcher)."""
+        from pigit.git.api import GitError
+        from .app_worktree_picker import (
+            WorktreePickerSheet,
+            build_worktree_picker_entries,
+        )
+
+        try:
+            worktrees = self._git.list_worktrees()
+        except GitError as exc:
+            show_toast(
+                str(exc) or "Failed to list worktrees",
+                duration=2.5,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        entries = build_worktree_picker_entries(worktrees, current_path=self._repo_path)
+        panel = WorktreePickerSheet(
+            entries=entries,
+            on_switch=self._switch_repo,
+            on_add=self._show_add_worktree_sheet,
+            on_remove=self._confirm_remove_worktree,
+            on_toggle_mode=self.open_repo_switcher,
+        )
+        dismiss_sheet()
+        show_sheet(
+            panel,
+            title="Switch worktree",
+            edge="bottom",
+        )
+        panel.mount()
+
+    def _show_add_worktree_sheet(self) -> None:
+        """Prompt for ``path [branch]`` then create a linked worktree."""
+        dismiss_sheet()
+        self._add_worktree_input.clear()
+        show_sheet(self._add_worktree_input, height=3, show_edge_rule=False)
+
+    def _on_add_worktree_submit(self, raw: str) -> None:
+        from pigit.git.api import GitError
+        from .app_worktree_picker import parse_add_worktree_input
+
+        raw = raw.strip()
+        if not raw:
+            dismiss_sheet()
+            return
+        try:
+            target, branch = parse_add_worktree_input(raw)
+        except ValueError:
+            show_toast("Enter a worktree path", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+        try:
+            self._git.add_worktree(target, branch, new=True)
+        except GitError as exc:
+            show_toast(
+                str(exc) or "Failed to add worktree",
+                duration=3.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        dismiss_sheet()
+        show_toast(f"Added worktree {target}", duration=1.5, kind=FeedbackKind.SUCCESS)
+        self._switch_repo(target)
+
+    def _confirm_remove_worktree(self, info) -> None:
+        """Confirm remove with M1 session guard and dirty --force flow."""
+        from pathlib import Path
+
+        from pigit.git.api import GitError, WorktreeInfo
+
+        if not isinstance(info, WorktreeInfo):
+            return
+        try:
+            session = str(Path(self._repo_path).resolve())
+            target = str(Path(info.path).resolve())
+        except OSError:
+            session = self._repo_path
+            target = info.path
+        if target == session:
+            show_toast(
+                "先切换到其他工作树再移除",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        if info.is_main:
+            show_toast(
+                "不能移除主工作树",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        def _do_remove(*, force: bool) -> None:
+            try:
+                self._git.remove_worktree(info.path, force=force)
+            except GitError as exc:
+                show_toast(
+                    str(exc) or "Failed to remove worktree",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            dismiss_sheet()
+            show_toast(
+                f"Removed worktree {info.path}",
+                duration=1.5,
+                kind=FeedbackKind.SUCCESS,
+            )
+            self.open_worktree_picker()
+
+        dirty = False
+        try:
+            dirty = bool(self._git.is_worktree_dirty(path=info.path))
+        except Exception:
+            dirty = False
+
+        if dirty:
+
+            def on_force(ok: bool) -> None:
+                if ok:
+                    _do_remove(force=True)
+
+            self._alert_dialog.alert(
+                f"Worktree is dirty. Remove with --force?\n{info.path}",
+                on_force,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+
+        def on_confirm(ok: bool) -> None:
+            if ok:
+                _do_remove(force=False)
+
+        self._alert_dialog.alert(
+            f"Remove worktree?\n{info.path}",
+            on_confirm,
+            kind=FeedbackKind.WARNING,
+        )
+
+    def open_panel_picker(self, event: MouseEvent) -> None:
+        """Open the anchored panel picker from a TabSlot click.
+
+        Uses Header + TabSlot geometry for a 0-based Popup offset (below the
+        full header strip, optionally nudged by the click column). Mouse-only
+        entry — keyboard ``1-4`` remain the direct panel shortcuts.
+        """
+        dismiss_sheet()
+        self._dismiss_open_modal()
+
+        header = self._header
+        slot = self._tab_slot
+        from .app_tab_picker import (
+            PanelPicker,
+            build_panel_picker_entries,
+            panel_picker_anchor,
+        )
+
+        anchor_row, anchor_col = panel_picker_anchor(
+            header_x=header.x,
+            header_y=header.y,
+            header_height=header._size[1],
+            slot_y=slot.y,
+            click_col=event.col,
+        )
+
+        picker = PanelPicker(
+            entries=build_panel_picker_entries(self._panel_nav),
+            on_select=self._on_panel_picker_select,
+        )
+        popup = Popup(
+            picker,
+            offset=(anchor_row, anchor_col),
+            dismiss_on_miss=True,
+            exit_key=keys.KEY_ESC,
+        )
+        self._panel_picker_popup = popup
+        cols, rows = terminal_size()
+        popup.resize((cols, rows))
+        popup.show()
+        popup.begin_session()
+        if self._root is not None:
+            self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def _dismiss_open_modal(self) -> None:
+        """Close any open MODAL before opening the anchored picker.
+
+        Defensive: TabSlot is unreachable while a modal is open (MODAL misses
+        are swallowed by the root), so this only fires on layer-stack residue —
+        the realistic path is ``dismiss_sheet`` above for non-modal sheets.
+        """
+        root = self._root
+        if root is None:
+            return
+        top = root._layer_stack.top(LayerKind.MODAL)
+        if top is None or not getattr(top, "open", False):
+            return
+        end_session = getattr(top, "end_session", None)
+        if callable(end_session):
+            end_session()
+        hide = getattr(top, "hide", None)
+        if callable(hide):
+            hide()
+        root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def _on_panel_picker_select(self, panel: Component) -> None:
+        """Switch product panel after the picker dismisses itself via toggle."""
+        self._close_detail_if_open()
+        self._panel_nav.focus_destination(panel)
+
+    def _add_current_and_switch(self, path: str) -> None:
+        """Add ``path`` to ManagedRepos, then switch the TUI session to it."""
+        if self._managed_repos is None:
+            show_toast(
+                "未配置 repos.json（repos.json 未找到）",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        added = self._managed_repos.add_repos([path])
+        if not added and path not in {
+            info.get("path") for info in self._managed_repos.load_repos().values()
+        }:
+            show_toast(
+                "Could not add current repo",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return
+        self._switch_repo(path)
+
+    @bind_action("bisect", "B", desc="Open bisect sheet", tip="Bisect")
+    def open_bisect_sheet(self) -> None:
+        """Open the bisect status/control sheet (``B``)."""
+        if self._git.sequencer_in_progress() is not None:
+            show_toast(
+                "Merge/rebase/cherry-pick in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        from .app_bisect import BisectSheet
+
+        panel = BisectSheet(
+            git=self._git,
+            on_start=self._show_bisect_start_input,
+            on_confirm_reset=self._confirm_bisect_reset,
+            on_operation=self._refresh_after_bisect_operation,
+            on_done=dismiss_sheet,
+        )
+        dismiss_sheet()
+        show_sheet(panel, title="Bisect", edge="bottom")
+        panel.mount()
+
+    def _refresh_after_bisect_operation(self) -> None:
+        """Refresh git VMs and header after a bisect operation moved HEAD."""
+        self._refresh_git_vms()
+        self._schedule_reload_header()
+
+    def _show_bisect_start_input(self) -> None:
+        """Prompt for good/bad refs to start a bisect session."""
+        dismiss_sheet()
+        self._bisect_start_input.clear()
+        show_sheet(self._bisect_start_input, height=3, show_edge_rule=False)
+
+    def _on_bisect_start_submit(self, raw: str) -> None:
+        """Parse refs, start bisect, then reopen the status sheet."""
+        from pigit.git.api import GitError
+        from .app_bisect import parse_bisect_start_input
+
+        raw = raw.strip()
+        if not raw:
+            dismiss_sheet()
+            return
+        try:
+            good, bad = parse_bisect_start_input(raw)
+        except ValueError:
+            show_toast(
+                "Enter a good ref (or 'good bad')",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        if self._git.sequencer_in_progress() is not None:
+            show_toast(
+                "Merge/rebase/cherry-pick in progress",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        try:
+            self._git.bisect_start(good, bad)
+        except GitError as exc:
+            show_toast(str(exc), duration=3.0, kind=FeedbackKind.ERROR)
+            return
+        dismiss_sheet()
+        self._refresh_after_bisect_operation()
+        show_toast("Bisect started", duration=1.5, kind=FeedbackKind.SUCCESS)
+        self.open_bisect_sheet()
+
+    def _confirm_bisect_reset(self) -> None:
+        """Confirm then reset the active bisect session."""
+
+        def on_confirm(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            from pigit.git.api import GitError
+
+            try:
+                self._git.bisect_reset()
+            except GitError as exc:
+                show_toast(
+                    str(exc) or "Failed to reset bisect",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            self._refresh_after_bisect_operation()
+            dismiss_sheet()
+            show_toast("Bisect reset", duration=1.5, kind=FeedbackKind.SUCCESS)
+
+        self._alert_dialog.alert(
+            "Reset bisect and return to the pre-bisect branch?",
+            on_confirm,
+        )
+
     @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
     def open_recent_actions(self) -> None:
         """Open the RecentActionsPanel sheet overlay."""
@@ -750,7 +1410,9 @@ class PigitApplication(Application):
             show_sheet(sheet, edge="top", max_fraction=0.5)
             sheet.mount()
 
-        self._inspector_task = run_async(load, apply)
+        self._inspector_task = run_async(
+            load, self._guard_repo(self._repo_token, apply)
+        )
 
     def _cancel_inspector_load(self) -> None:
         """Invalidate any in-flight inspector load so its result is dropped."""
@@ -763,9 +1425,11 @@ class PigitApplication(Application):
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
         raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
 
-    @bind_action("push", "P", desc="Push current branch to upstream", tip="Push")
+    @bind_action(
+        "push", "P", desc="Push current branch (set upstream if needed)", tip="Push"
+    )
     def push_upstream(self) -> None:
-        """Push HEAD to its configured upstream (non-interactive)."""
+        """Push HEAD; confirm ``git push -u`` when no upstream is configured."""
         self._run_network_git("push")
 
     @bind_action("pull", "F", desc="Pull current branch from upstream", tip="Pull")

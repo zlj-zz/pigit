@@ -32,6 +32,10 @@ def test_resolve_height_respects_higher_max_fraction() -> None:
     assert Sheet.resolve_height(_PrefChild(), 30, max_fraction=0.5) == 15
 
 
+def test_resolve_height_allows_two_thirds_fraction() -> None:
+    assert Sheet.resolve_height(_PrefChild(), 30, max_fraction=2 / 3) == 20
+
+
 def test_resolve_height_explicit_height() -> None:
     assert Sheet.resolve_height(_PlainChild(), 24, height=5) == 5
 

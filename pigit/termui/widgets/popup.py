@@ -39,6 +39,7 @@ class Popup(Component):
         child: Component,
         *,
         offset: tuple[int, int] | None = None,
+        dismiss_on_miss: bool = False,
         exit_key: str = keys.KEY_ESC,
         x: int = 1,
         y: int = 1,
@@ -49,12 +50,20 @@ class Popup(Component):
         if callable(set_on_toggle):
             set_on_toggle(self.toggle)
         self._offset = offset
+        # When True, ComponentRoot closes this modal on a click that misses it.
+        self.dismiss_on_miss = dismiss_on_miss
         self.exit_key = exit_key
         self.open = False
         self._term_size: tuple[int, int] = (80, 24)
 
         self.BINDINGS = [(exit_key, "_on_exit_key")]
         super().__init__(x=x, y=y, size=size)
+
+    def get_footer_entries(self) -> list[tuple[str, str]]:
+        """Footer hint for the modal dismiss key."""
+        from ..keys import display_key
+
+        return [(display_key(self.exit_key), "Close")]
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """
@@ -150,6 +159,9 @@ class Popup(Component):
             col = max(0, (tw - ow) // 2)
         else:
             row, col = int(self._offset[0]), int(self._offset[1])
+            # Keep anchored popups on-screen; centered path above is unchanged.
+            row = max(0, min(row, th - oh))
+            col = max(0, min(col, tw - ow))
         # x/y are 1-based (row/col), consistent with Column/Row child layout.
         self._child.x = row + 1
         self._child.y = col + 1

@@ -21,6 +21,7 @@ from pigit.termui import (
     show_spinner,
     show_toast,
 )
+from pigit.termui.widgets import AlertDialog
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,14 @@ class NetworkGit:
         get_sync_task: Callable[[], AsyncTask[NetworkGitOutcome]],
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
+        get_alert_dialog: Callable[[], AlertDialog],
+        guard_async: (
+            Callable[
+                [Callable[[NetworkGitOutcome], None]],
+                Callable[[NetworkGitOutcome], None],
+            ]
+            | None
+        ) = None,
     ) -> None:
         """
         Args:
@@ -55,8 +64,10 @@ class NetworkGit:
             get_git: Late-bound GitApi accessor.
             navigate_product: Close Diff detail if open, then route product tab.
             get_sync_task: Late-bound AsyncTask for network sync.
-            refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
-            schedule_reload_header: Callback to reload header branch/ahead/behind.
+            get_refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
+            get_schedule_reload_header: Callback to reload header branch/ahead/behind.
+            get_alert_dialog: Late-bound AlertDialog for set-upstream confirm.
+            guard_async: Optional repo-token wrapper for the UI-thread done callback.
         """
         self._store = store
         self._get_git = get_git
@@ -64,6 +75,8 @@ class NetworkGit:
         self._get_sync_task = get_sync_task
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_schedule_reload_header = get_schedule_reload_header
+        self._get_alert_dialog = get_alert_dialog
+        self._guard_async = guard_async
         self._busy = False
 
     @property
@@ -85,7 +98,7 @@ class NetworkGit:
 
         ``on_complete`` runs after the attempt finishes (success or failure), not when
         the busy-guard rejects a second sync. Merge finish uses this to always
-        checkout back to ``source``.
+        checkout back to ``source``. Cancelled set-upstream alerts also invoke it.
         """
         if action not in ("push", "pull"):
             raise ValueError(f"Unsupported network git action: {action}")
@@ -97,6 +110,80 @@ class NetworkGit:
             )
             return
 
+        if action == "push":
+            self._run_push(on_complete=on_complete)
+        else:
+            self._run_pull(on_complete=on_complete)
+
+    def _run_push(self, *, on_complete: Callable[[], None] | None) -> None:
+        """Push with upstream, or confirm ``git push -u`` when none is set."""
+        git = self._get_git()
+        if git.has_upstream():
+            self._start("push", lambda g: g.push(), on_complete=on_complete)
+            return
+
+        branch = git.get_current_branch()
+        if not branch:
+            show_toast(
+                "Detached HEAD: checkout a branch before push",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            self._invoke_complete(on_complete)
+            return
+
+        remote = git.default_push_remote()
+        if not remote:
+            show_toast(
+                "No remote configured",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            self._invoke_complete(on_complete)
+            return
+
+        cmd = f"git push --set-upstream {remote} {branch}"
+        message = f"No upstream for '{branch}'.\n\nPush with:\n  {cmd}"
+
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                self._invoke_complete(on_complete)
+                return
+            self._start(
+                "push",
+                lambda g: g.push_set_upstream(remote, branch),
+                on_complete=on_complete,
+            )
+
+        shown = self._get_alert_dialog().alert(
+            message,
+            on_result,
+            kind=FeedbackKind.WARNING,
+        )
+        if not shown:
+            self._invoke_complete(on_complete)
+
+    def _run_pull(self, *, on_complete: Callable[[], None] | None) -> None:
+        """Pull only when the current branch has an upstream."""
+        git = self._get_git()
+        if not git.has_upstream():
+            show_toast(
+                "No upstream configured for current branch",
+                duration=2.5,
+                kind=FeedbackKind.WARNING,
+            )
+            self._invoke_complete(on_complete)
+            return
+        self._start("pull", lambda g: g.pull(), on_complete=on_complete)
+
+    def _start(
+        self,
+        action: str,
+        op: Callable[[GitApi], None],
+        *,
+        on_complete: Callable[[], None] | None,
+    ) -> None:
+        """Show spinner and run ``op`` on the network sync worker."""
         dismiss_sheet()
 
         self._busy = True
@@ -104,12 +191,8 @@ class NetworkGit:
         show_spinner(label, position=ToastPosition.CENTER)
 
         def work() -> NetworkGitOutcome:
-            git = self._get_git()
             try:
-                if action == "push":
-                    git.push()
-                else:
-                    git.pull()
+                op(self._get_git())
                 return NetworkGitOutcome(ok=True)
             except GitError as exc:
                 msg = str(exc)
@@ -124,32 +207,42 @@ class NetworkGit:
                     message=f"Git {action} error: {exc}",
                 )
 
+        def apply_outcome(outcome: NetworkGitOutcome) -> None:
+            if outcome.conflict:
+                self.handle_pull_conflict(outcome.message)
+                return
+            if not outcome.ok:
+                show_toast(
+                    outcome.message or f"Git {action} failed",
+                    duration=3.0,
+                    kind=FeedbackKind.ERROR,
+                )
+                return
+            show_toast(
+                f"Git {action} completed",
+                duration=1.5,
+                kind=FeedbackKind.SUCCESS,
+            )
+            self._get_refresh_git_vms()
+            self._get_schedule_reload_header()
+
         def done(outcome: NetworkGitOutcome) -> None:
             self._busy = False
             hide_spinner()
             try:
-                if outcome.conflict:
-                    self.handle_pull_conflict(outcome.message)
-                    return
-                if not outcome.ok:
-                    show_toast(
-                        outcome.message or f"Git {action} failed",
-                        duration=3.0,
-                        kind=FeedbackKind.ERROR,
-                    )
-                    return
-                show_toast(
-                    f"Git {action} completed",
-                    duration=1.5,
-                    kind=FeedbackKind.SUCCESS,
-                )
-                self._get_refresh_git_vms()
-                self._get_schedule_reload_header()
+                apply = apply_outcome
+                if self._guard_async is not None:
+                    apply = self._guard_async(apply_outcome)
+                apply(outcome)
             finally:
-                if on_complete is not None:
-                    on_complete()
+                self._invoke_complete(on_complete)
 
         self._get_sync_task().start(work, done)
+
+    @staticmethod
+    def _invoke_complete(on_complete: Callable[[], None] | None) -> None:
+        if on_complete is not None:
+            on_complete()
 
     def handle_pull_conflict(self, message: str) -> None:
         """Persist pull-merge state, show git detail, and route to Status."""

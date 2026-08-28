@@ -351,10 +351,25 @@ class StatusPanel(OptionList):
 
     def unmount(self) -> None:
         super().unmount()
+        self._unbind_vm_signals()
+
+    def set_vm(self, vm: IStatusViewModel) -> None:
+        """Retarget this panel to a new Status ViewModel (repo session switch).
+
+        Session owns VM lifetime; this only rebinds signals and reloads.
+        """
+        self._unbind_vm_signals()
+        self._vm = vm
+        if self.is_mounted():
+            self._bind_vm_signals()
+            self.loading = True
+            self._vm.refresh()
+
+    def _unbind_vm_signals(self) -> None:
+        """Drop subscriptions to the current ViewModel (if any)."""
         for unsub in self._vm_unsubs:
             unsub()
         self._vm_unsubs.clear()
-        self._vm.dispose()
 
     def _bind_vm_signals(self) -> None:
         """Bind vm.items signal; safe to call multiple times (idempotent)."""

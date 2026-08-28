@@ -7,8 +7,19 @@ Date: 2026-06-04
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
+
+
+def guard_or_identity(
+    guard: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None,
+    callback: Callable[[list[str]], None],
+) -> Callable[[list[str]], None]:
+    """Apply an async ``guard`` (repo token) when injected, else pass through."""
+    if guard is None:
+        return callback
+    return guard(callback)
 
 
 @dataclass

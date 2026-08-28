@@ -32,6 +32,7 @@ from pigit.observe import (
 )
 from pigit.observe.denylist import rel_path_is_denied
 from pigit.observe.digest import hash_porcelain
+from pigit.repo_session import RepoSession
 from pigit.termui import Component, ComponentRoot, resolve_presentation_leaf
 from pigit.termui.containers import TabView
 from pigit.termui.event_loop import AppEventLoop
@@ -102,6 +103,9 @@ class ObserveHost:
         self._observe_drain_id: int | None = None
         self._observe_status_unsub: Callable[[], None] | None = None
         self._last_worktree_dirty: bool | None = None
+        # True only while observe is actually running (start() succeeded).
+        # rebind_session must not start observation the user disabled.
+        self._started = False
         # True only while a worktree root is actually attached (Status tab
         # focused); digest values from other tabs are stale and must not be
         # reused for the header dirty dot.
@@ -152,9 +156,11 @@ class ObserveHost:
                 _OBSERVE_DRAIN_INTERVAL_S,
                 self._coordinator.drain,
             )
+        self._started = True
 
     def stop(self) -> None:
         """Remove observe intervals and stop the backend."""
+        self._started = False
         self._worktree_watched = False
         self._last_worktree_dirty = None
         if self._observe_status_unsub is not None:
@@ -172,6 +178,21 @@ class ObserveHost:
             self._observer.stop()
             self._observer = None
         self._coordinator = None
+
+    def rebind_session(self, _session: RepoSession) -> None:
+        """Restart observation after the app rebound git/path/status_vm aliases.
+
+        Only restarts when observe is already running — a user with
+        ``repo_observe=False`` must not have it silently enabled by a repo
+        switch. Order is stop → start only: ``start`` rebuilds ObserveContext
+        from deps lambdas (already following the new aliases) and resyncs
+        roots. Do not call ``resync_roots`` between stop and start — with
+        ``_observer is None`` it is a no-op.
+        """
+        if not self._started:
+            return
+        self.stop()
+        self.start()
 
     def on_tab_switch(self) -> None:
         """Resync watch roots after TabView switches panels."""

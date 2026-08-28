@@ -24,6 +24,55 @@ def test_push_runs_git_push_with_terminal_prompt_disabled() -> None:
     assert kws.get("env", {}).get("GIT_TERMINAL_PROMPT") == "0"
 
 
+def test_push_set_upstream_runs_dash_u_with_terminal_prompt_disabled() -> None:
+    ex = MockExecutor(default=(0, "", ""))
+    git = GitApi(executor=ex, path="/repo")
+    git.push_set_upstream("origin", "feature/fxk_api_count")
+    cmd, _flags, kws = ex.exec_calls[-1]
+    assert cmd == "git push -u origin feature/fxk_api_count"
+    assert kws.get("env", {}).get("GIT_TERMINAL_PROMPT") == "0"
+
+
+def test_has_upstream_true_when_rev_parse_ok() -> None:
+    ex = MockExecutor(
+        responses={"git rev-parse --abbrev-ref @{upstream}": (0, "", "origin/dev\n")}
+    )
+    git = GitApi(executor=ex, path="/repo")
+    assert git.has_upstream() is True
+
+
+def test_has_upstream_false_when_rev_parse_fails() -> None:
+    ex = MockExecutor(
+        responses={"git rev-parse --abbrev-ref @{upstream}": (128, "fatal", "")}
+    )
+    git = GitApi(executor=ex, path="/repo")
+    assert git.has_upstream() is False
+
+
+def test_get_current_branch_none_when_detached() -> None:
+    ex = MockExecutor(responses={"git symbolic-ref -q --short HEAD": (1, "", "")})
+    git = GitApi(executor=ex, path="/repo")
+    assert git.get_current_branch() is None
+
+
+def test_default_push_remote_prefers_origin() -> None:
+    ex = MockExecutor(responses={"git remote show": (0, "", "upstream\norigin\n")})
+    git = GitApi(executor=ex, path="/repo")
+    assert git.default_push_remote() == "origin"
+
+
+def test_default_push_remote_falls_back_to_first() -> None:
+    ex = MockExecutor(responses={"git remote show": (0, "", "fork\n")})
+    git = GitApi(executor=ex, path="/repo")
+    assert git.default_push_remote() == "fork"
+
+
+def test_default_push_remote_none_when_empty() -> None:
+    ex = MockExecutor(responses={"git remote show": (0, "", "")})
+    git = GitApi(executor=ex, path="/repo")
+    assert git.default_push_remote() is None
+
+
 def test_pull_sets_terminal_prompt_disabled() -> None:
     ex = MockExecutor(default=(0, "", ""))
     git = GitApi(executor=ex, path="/repo")

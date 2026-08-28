@@ -17,6 +17,7 @@ from ..wcwidth_table import truncate_by_width, wcswidth
 
 DEFAULT_SHEET_HEIGHT = 8
 DEFAULT_MAX_FRACTION = 1 / 3
+DEFAULT_HARD_CAP_FRACTION = 1 / 2
 MIN_SHEET_HEIGHT = 3
 
 TitleAlign = Literal["left", "center", "right"]
@@ -86,21 +87,39 @@ class Sheet(Component):
     (``show_edge_rule=True``): a full-width ``─`` line, optionally embedding
     `` · title · ``. Callers that need a solid slab or a rule-less one-line
     input pass those explicitly.
+
+    ``top_pad`` / ``bottom_pad`` reserve app chrome rows (header / footer) so
+    the sheet paints in the body region and does not cover those hints.
     """
 
     @staticmethod
-    def clamp_height(rows: list, term_h: int, *, border: int = 1) -> int:
-        """Clamp sheet height to ``[3, term_h // 2]`` including edge-rule row.
+    def height_cap_fraction(max_fraction: float = DEFAULT_MAX_FRACTION) -> float:
+        """Return the terminal-height fraction used as the sheet resize ceiling."""
+        return max(DEFAULT_HARD_CAP_FRACTION, max_fraction)
+
+    @staticmethod
+    def clamp_height(
+        rows: list,
+        term_h: int,
+        *,
+        border: int = 1,
+        max_fraction: float = DEFAULT_HARD_CAP_FRACTION,
+    ) -> int:
+        """Clamp sheet height including edge-rule row.
 
         Args:
             rows: Content rows displayed inside the sheet.
             term_h: Terminal height in rows.
             border: Extra rows reserved for chrome above/below content.
+            max_fraction: Maximum fraction of ``term_h`` (never below half).
 
         Returns:
             Clamped sheet height in terminal rows.
         """
-        return min(max(len(rows) + border, 3), max(3, term_h // 2))
+        cap = max(
+            MIN_SHEET_HEIGHT, int(term_h * Sheet.height_cap_fraction(max_fraction))
+        )
+        return min(max(len(rows) + border, MIN_SHEET_HEIGHT), cap)
 
     @staticmethod
     def resolve_height(
@@ -114,12 +133,14 @@ class Sheet(Component):
 
         When ``height`` is omitted, calls ``child.preferred_sheet_height(term_h)``
         if present (else :data:`DEFAULT_SHEET_HEIGHT`), then clamps to
-        ``[MIN_SHEET_HEIGHT, min(term_h // 2, term_h * max_fraction)]``.
+        ``[MIN_SHEET_HEIGHT, min(term_h * max_fraction, term_h * max(max_fraction, 1/2))]``.
 
-        When ``height`` is given, only clamps to ``[MIN_SHEET_HEIGHT, term_h // 2]``;
-        ``max_fraction`` does not apply.
+        When ``height`` is given, clamps to
+        ``[MIN_SHEET_HEIGHT, term_h * max(max_fraction, 1/2)]``;
+        ``max_fraction`` only affects that ceiling, not the preferred value.
         """
-        hard_cap = max(MIN_SHEET_HEIGHT, term_h // 2)
+        cap_fraction = Sheet.height_cap_fraction(max_fraction)
+        hard_cap = max(MIN_SHEET_HEIGHT, int(term_h * cap_fraction))
         if height is None:
             pref = getattr(child, "preferred_sheet_height", None)
             if callable(pref):
@@ -144,24 +165,30 @@ class Sheet(Component):
         title_align: TitleAlign = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
+        top_pad: int = 0,
+        bottom_pad: int = 0,
+        height_cap_fraction: float = DEFAULT_HARD_CAP_FRACTION,
     ) -> None:
         super().__init__(size=size)
         self._child = child
         child.parent = self
         self._target_height = height
+        self._height_cap_fraction = height_cap_fraction
         self._show_edge_rule = show_edge_rule
         self._title = title
         self._title_align: TitleAlign = title_align
         self._edge = edge
         self._bg = bg
+        self._top_pad = top_pad
+        self._bottom_pad = bottom_pad
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
         self.open = True
 
     def _origin_row(self, term_h: int, sheet_h: int) -> int:
-        """Return 0-based row of the sheet's top edge on a terminal of *term_h*."""
+        """0-based row of the sheet's top edge on a terminal of *term_h*."""
         if self._edge == "top":
-            return 0
-        return term_h - sheet_h
+            return self._top_pad
+        return max(0, term_h - sheet_h - self._bottom_pad)
 
     def _edge_rule_row(self, sheet_h: int) -> int | None:
         """0-based row of the facing-edge rule, or None when disabled."""
@@ -236,8 +263,17 @@ class Sheet(Component):
         self.open = False
 
     def resize(self, size: tuple[int, int]) -> None:
-        """Resize the sheet and its child to the given terminal size."""
-        sheet_h = min(self._target_height, size[1] // 2)
+        """Resize the sheet and its child to the given terminal size.
+
+        The height cap deducts both chrome pads so the sheet always fits in
+        the body region between header and footer, regardless of edge.
+        """
+        body_rows = size[1] - self._top_pad - self._bottom_pad
+        cap_rows = max(
+            MIN_SHEET_HEIGHT,
+            int(body_rows * self._height_cap_fraction),
+        )
+        sheet_h = min(self._target_height, cap_rows)
         new_size = (size[0], sheet_h)
         if getattr(self, "_size", None) == new_size:
             return
