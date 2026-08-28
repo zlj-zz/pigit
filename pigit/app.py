@@ -62,9 +62,7 @@ from .app_status import StatusPanel
 from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
-from .viewmodels.status import StatusViewModel
-from .viewmodels.branch import BranchViewModel
-from .viewmodels.commit import CommitViewModel
+from .repo_session import RepoSession
 from .session_history import SessionHistory
 from .config_data import AppConfig
 
@@ -105,10 +103,19 @@ class PigitApplication(Application):
         set_theme(THEME)
         self._git_api = git_api or GitApi()
         self._managed_repos = managed_repos
-        self._repo_path, self._repo_conf = self._git_api.confirm_repo()
-        self._git = self._git_api.bind_path(self._repo_path)
+        # Undo stack must exist before RepoSession.build (Status/Branch VMs).
+        self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
+        self._session = RepoSession.build(
+            self._git_api, None, self._session_history
+        )
+        # Aliases keep existing lambdas (get_git=lambda: self._git, …) working.
+        self._git = self._session.git
+        self._repo_path = self._session.repo_path
+        self._repo_name = self._session.repo_name
+        self._status_vm = self._session.status_vm
+        self._commit_vm = self._session.commit_vm
+        self._branch_vm = self._session.branch_vm
         # Header state
-        self._repo_name: str = ""
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
@@ -120,15 +127,9 @@ class PigitApplication(Application):
             inner_width=50,
             on_result=lambda _: None,
         )
-        # Session history (undo stack)
-        self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
         self._config = config
         self._observe_host: ObserveHost | None = None
         self._header_reload_token: object | None = None
-        # ViewModels (assigned in build_root, same lifetime as panels)
-        self._status_vm: StatusViewModel
-        self._commit_vm: CommitViewModel
-        self._branch_vm: BranchViewModel
         # Inspector async-load state
         self._inspector_task: AsyncTask | None = None
         self._inspector_token: object = None
@@ -173,13 +174,10 @@ class PigitApplication(Application):
         footer = AppFooter(theme=THEME, id="footer")
         footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
 
-        self._status_vm = StatusViewModel(self._git, history=self._session_history)
-        self._branch_vm = BranchViewModel(self._git, history=self._session_history)
-        self._commit_vm = CommitViewModel(self._git)
-
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
         # the log-graph preview. At most one is in the split pane at a time.
+        # VMs come from self._session (aliases set in __init__).
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
@@ -446,9 +444,16 @@ class PigitApplication(Application):
         self._show_welcome(on_dismiss=lambda: None)
 
     def on_exit(self) -> None:
-        """Stop repo observation timers and backend before root destroy."""
-        if self._observe_host is not None:
-            self._observe_host.stop()
+        """Stop repo observation and dispose the current repo session.
+
+        ``observe.stop`` is best-effort cleanup; the session must always be
+        disposed (ObserveHost holds a status_vm items subscription).
+        """
+        try:
+            if self._observe_host is not None:
+                self._observe_host.stop()
+        finally:
+            self._session.dispose()
 
     def _start_repo_observe(self) -> None:
         """Delegate to ObserveHost.start()."""

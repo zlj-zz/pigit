@@ -96,6 +96,27 @@ class BranchPanel(OptionList):
         self._bind_vm_signals()
         self._vm.refresh()
 
+    def unmount(self) -> None:
+        super().unmount()
+        self._unbind_vm_signals()
+
+    def set_vm(self, vm: IBranchViewModel) -> None:
+        """Retarget this panel to a new Branch ViewModel (repo session switch).
+
+        Session owns VM lifetime; this only rebinds signals and reloads.
+        """
+        self._unbind_vm_signals()
+        self._vm = vm
+        if self.is_mounted():
+            self._bind_vm_signals()
+            self._vm.refresh()
+
+    def _unbind_vm_signals(self) -> None:
+        """Drop subscriptions to the current ViewModel (if any)."""
+        for unsub in self._vm_unsubs:
+            unsub()
+        self._vm_unsubs.clear()
+
     def _bind_vm_signals(self) -> None:
         """Bind vm.items; safe to call multiple times (idempotent)."""
         if not self._vm_unsubs:
@@ -116,13 +137,6 @@ class BranchPanel(OptionList):
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
         self._notify_change()
-
-    def unmount(self) -> None:
-        super().unmount()
-        for unsub in self._vm_unsubs:
-            unsub()
-        self._vm_unsubs.clear()
-        self._vm.dispose()
 
     def _handle_result(self, result: ActionResult) -> None:
         if result.success:

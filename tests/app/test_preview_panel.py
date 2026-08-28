@@ -382,3 +382,17 @@ def test_preview_ignores_left_click_and_release(preview: PreviewPanel) -> None:
     release = MouseEvent(1, 5, MouseButton.WHEEL_DOWN, MouseKind.RELEASE)
     assert preview.handle_mouse(release) is False
     assert preview._diff_viewer.scroll_i == 0
+
+
+def test_set_vm_cancels_inflight_load_and_clears_request() -> None:
+    """set_vm drops a pending diff load so its result never lands (D2 step 4)."""
+    from unittest.mock import Mock
+
+    panel = PreviewPanel()
+    task = Mock()
+    panel._load_task = task
+    panel._request = object()
+    panel.set_vm(Mock())
+    task.cancel.assert_called_once()
+    assert panel._load_task is None
+    assert panel._request is None

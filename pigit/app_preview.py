@@ -91,6 +91,19 @@ class PreviewPanel(Component):
         self._diff_viewer.unmount()
         super().unmount()
 
+    def set_vm(self, vm: IStatusViewModel | None) -> None:
+        """Retarget this panel to a new Status ViewModel (repo session switch).
+
+        Selection subscription stays on the EventBus; only the VM pointer changes.
+        Cancels in-flight loads and clears stale preview content.
+        """
+        self._cancel_load()
+        self._request = None
+        self._status_vm = vm
+        if self.is_mounted():
+            self._set_preview_target(None)
+            self.clear()
+
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
         """Start an async diff load for the active PreviewPayload panel."""
         self._cancel_load()

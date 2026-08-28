@@ -26,7 +26,6 @@ def test_branch_panel_rebinds_signal_after_unmount_remount():
     vm = MagicMock()
     vm.items = Signal([_branch("a")])
     vm.refresh = MagicMock()
-    vm.dispose = MagicMock()
     panel = BranchPanel(vm=vm, id="branch")
     panel.mount()
     vm.items.set([_branch("a"), _branch("b"), _branch("c")])
@@ -36,6 +35,21 @@ def test_branch_panel_rebinds_signal_after_unmount_remount():
     panel.mount()
     vm.items.set([_branch("x"), _branch("y")])
     assert [b.name for b in panel.branches] == ["x", "y"]
+
+
+def test_stash_set_vm_reloads_when_mounted():
+    old_vm = MagicMock()
+    old_vm.load_stashes = MagicMock(return_value=[])
+    new_vm = MagicMock()
+    new_vm.load_stashes = MagicMock(
+        return_value=[Stash(ref="stash@{0}", sha="abc", msg="wip")]
+    )
+    panel = StashPanel(vm=old_vm, id="stash")
+    panel.mount()
+    panel.set_vm(new_vm)
+    assert new_vm.load_stashes.call_count == 1
+    assert len(panel.stashes) == 1
+    assert panel._vm is new_vm
 
 
 def test_mount_sets_is_mounted():

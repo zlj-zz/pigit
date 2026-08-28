@@ -81,6 +81,18 @@ class LogGraphPreview(Component):
         self._frame_browser.unmount()
         super().unmount()
 
+    def set_vm(self, vm: IBranchViewModel) -> None:
+        """Retarget this panel to a new Branch ViewModel (repo session switch).
+
+        Selection subscription stays on the EventBus; only the VM pointer changes.
+        Cancels in-flight loads and clears stale graph content.
+        """
+        self._cancel_load()
+        self._requested_branch = None
+        self._vm = vm
+        if self.is_mounted():
+            self.clear()
+
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
         """Start a background graph load for the selected branch."""
         from .app_branch import BranchPanel

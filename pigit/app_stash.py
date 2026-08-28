@@ -69,6 +69,15 @@ class StashPanel(OptionList):
         """Reload stash list when this panel becomes the focused Column child."""
         self._load_stashes()
 
+    def set_vm(self, vm: IStatusViewModel) -> None:
+        """Retarget this panel to a new Status ViewModel (repo session switch).
+
+        Shares the same status_vm as StatusPanel; session owns VM lifetime.
+        """
+        self._vm = vm
+        if self.is_mounted():
+            self._load_stashes()
+
     def _load_stashes(self) -> None:
         try:
             self.stashes = self._vm.load_stashes()

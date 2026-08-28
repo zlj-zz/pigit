@@ -357,7 +357,8 @@ class TestBranchPanelLifecycle:
         panel.mount()
         vm.refresh.assert_called_once()
 
-    def test_deactivate_disposes_vm(self):
+    def test_unmount_does_not_dispose_vm(self):
+        """Session owns VM lifetime; panel unmount only drops signal bindings."""
         from unittest.mock import Mock
         from pigit.viewmodels.branch import IBranchViewModel
         from pigit.termui.reactive import Signal
@@ -369,7 +370,56 @@ class TestBranchPanelLifecycle:
         panel = BranchPanel(vm=vm)
         panel.mount()
         panel.unmount()
-        vm.dispose.assert_called_once()
+        vm.dispose.assert_not_called()
+
+    def test_set_vm_rebinds_items_and_does_not_dispose(self):
+        """set_vm drops old subscriptions, binds the new VM, and reloads."""
+        from unittest.mock import Mock
+        from pigit.git.model import Branch
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_branch import BranchPanel
+
+        old_vm = Mock(spec=IBranchViewModel)
+        old_vm.items = Signal([])
+        new_vm = Mock(spec=IBranchViewModel)
+        new_vm.items = Signal([])
+
+        panel = BranchPanel(vm=old_vm)
+        panel.mount()
+        old_vm.refresh.reset_mock()
+
+        panel.set_vm(new_vm)
+        new_vm.refresh.assert_called_once()
+        old_vm.dispose.assert_not_called()
+        new_vm.dispose.assert_not_called()
+
+        old_vm.items.set([Branch("stale", "0", "0", False)])
+        assert panel.branches == []
+
+        new_vm.items.set([Branch("fresh", "0", "0", True)])
+        assert [b.name for b in panel.branches] == ["fresh"]
+
+    def test_set_vm_unmounted_swaps_pointer_and_binds_on_mount(self):
+        """set_vm before mount only swaps the pointer; mount binds + refreshes."""
+        from unittest.mock import Mock
+        from pigit.viewmodels.branch import IBranchViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_branch import BranchPanel
+
+        old_vm = Mock(spec=IBranchViewModel)
+        old_vm.items = Signal([])
+        new_vm = Mock(spec=IBranchViewModel)
+        new_vm.items = Signal([])
+
+        panel = BranchPanel(vm=old_vm)  # not mounted
+        panel.set_vm(new_vm)
+        assert panel._vm is new_vm
+        new_vm.refresh.assert_not_called()
+
+        panel.mount()
+        new_vm.refresh.assert_called_once()
+        assert len(panel._vm_unsubs) == 1
 
     def test_items_changed_updates_content(self):
         from unittest.mock import Mock
@@ -424,7 +474,8 @@ class TestCommitPanelLifecycle:
         panel.mount()
         vm.refresh.assert_called_once()
 
-    def test_deactivate_disposes_vm(self):
+    def test_unmount_does_not_dispose_vm(self):
+        """Session owns VM lifetime; panel unmount only drops signal bindings."""
         from unittest.mock import Mock
         from pigit.viewmodels.commit import ICommitViewModel
         from pigit.termui.reactive import Signal
@@ -436,7 +487,43 @@ class TestCommitPanelLifecycle:
         panel = CommitPanel(vm=vm)
         panel.mount()
         panel.unmount()
-        vm.dispose.assert_called_once()
+        vm.dispose.assert_not_called()
+
+    def test_set_vm_rebinds_items_and_does_not_dispose(self):
+        """set_vm drops old subscriptions, binds the new VM, and reloads."""
+        from unittest.mock import Mock
+        from pigit.git.model import Commit
+        from pigit.viewmodels.commit import ICommitViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_commit import CommitPanel
+
+        old_vm = Mock(spec=ICommitViewModel)
+        old_vm.items = Signal([])
+        old_vm.graph_rows = []
+        new_vm = Mock(spec=ICommitViewModel)
+        new_vm.items = Signal([])
+        new_vm.graph_rows = []
+
+        panel = CommitPanel(vm=old_vm)
+        panel.mount()
+        old_vm.refresh.reset_mock()
+
+        panel.set_vm(new_vm)
+        new_vm.refresh.assert_called_once()
+        old_vm.dispose.assert_not_called()
+        new_vm.dispose.assert_not_called()
+
+        # Old signal must no longer drive the panel; the new one must.
+        old_vm.items.set(
+            [Commit("stale", "old", "Zev", 0, "pushed", "", [])]
+        )
+        assert panel.commits == []
+
+        new_vm.items.set(
+            [Commit("fresh", "new", "Zev", 0, "pushed", "", [])]
+        )
+        assert [c.sha for c in panel.commits] == ["fresh"]
+        assert len(panel._vm_unsubs) == 1
 
     def test_items_changed_rebuilds_content(self):
         from unittest.mock import Mock
@@ -515,6 +602,46 @@ class TestCommitPanelLifecycle:
 
         assert "HEAD" in _main_text(0)
         assert "HEAD" not in _main_text(1)
+
+
+class TestStatusPanelLifecycle:
+    def test_set_vm_rebinds_items_and_does_not_dispose(self):
+        """Status set_vm drops old subscriptions, sets loading, reloads.
+
+        Status is the trickiest retarget: it shares ``status_vm`` with Stash,
+        sets a loading skeleton, and carries search-filter state.
+        """
+        from unittest.mock import Mock
+        from pigit.git.model import File
+        from pigit.viewmodels.status import IStatusViewModel
+        from pigit.termui.reactive import Signal
+        from pigit.app_status import StatusPanel
+
+        old_vm = Mock(spec=IStatusViewModel)
+        old_vm.items = Signal([])
+        new_vm = Mock(spec=IStatusViewModel)
+        new_vm.items = Signal([])
+
+        panel = StatusPanel(vm=old_vm, default_view="flat")
+        panel.mount()
+        old_vm.refresh.reset_mock()
+
+        panel.set_vm(new_vm)
+        new_vm.refresh.assert_called_once()
+        assert panel.loading is True
+        old_vm.dispose.assert_not_called()
+        new_vm.dispose.assert_not_called()
+
+        # Old signal must no longer drive the panel; the new one must.
+        old_vm.items.set(
+            [File("stale.py", "stale.py", " M", False, True, True, True, False, False, False)]
+        )
+        assert panel.files == []
+
+        new_vm.items.set(
+            [File("fresh.py", "fresh.py", " M", False, True, True, True, False, False, False)]
+        )
+        assert [f.name for f in panel.files] == ["fresh.py"]
 
 
 class TestCommitReport:
