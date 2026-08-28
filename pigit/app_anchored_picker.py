@@ -1,5 +1,5 @@
 """
-Module: pigit/app_tab_picker.py
+Module: pigit/app_anchored_picker.py
 Description: Anchored popup list pickers for panels and diff files.
 Author: Zev
 Date: 2026-08-28

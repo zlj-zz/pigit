@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for the inline merge-graph layout algorithm."""
 
-from pigit.app_commit_graph import compute_graph_rows, _alloc_lane
+from pigit.app_log_graph import compute_graph_rows, _alloc_lane
 from pigit.git.model import Commit
 
 

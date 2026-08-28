@@ -15,7 +15,7 @@ from pathlib import Path
 from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
 from pigit.app_log_graph_preview import LogGraphPreview
-from pigit.app_preview import PreviewPanel
+from pigit.app_diff_preview import PreviewPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.config_data import AppConfig

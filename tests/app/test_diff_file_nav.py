@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pigit.app import PigitApplication
 from pigit.app_diff import DiffType, DiffViewer
-from pigit.app_tab_picker import FilePicker
+from pigit.app_anchored_picker import FilePicker
 from pigit.config_data import AppConfig
 from pigit.termui import Component
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx, set_overlay_host

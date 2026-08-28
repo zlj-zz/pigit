@@ -1,5 +1,5 @@
 """
-Module: pigit/app_commit_graph.py
+Module: pigit/app_log_graph.py
 Description: Pure algorithm for inline merge-graph layout per commit row.
 Author: Zev
 Date: 2026-05-04

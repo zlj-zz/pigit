@@ -14,7 +14,7 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.app_header_state import HeaderState
-from pigit.app_tab_picker import (
+from pigit.app_anchored_picker import (
     PanelPicker,
     PanelPickerEntry,
     build_panel_picker_entries,

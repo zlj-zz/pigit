@@ -63,13 +63,13 @@ from .app_merge_workflow import MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
 from .app_branch import BranchPanel
-from .app_chrome import AppFooter
+from .app_footer import AppFooter
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
 from .app_command_palette import CommandPalette
-from .app_preview import PreviewPanel
+from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
@@ -1122,7 +1122,7 @@ class PigitApplication(Application):
         """
         header = self._header
         slot = self._tab_slot
-        from .app_tab_picker import (
+        from .app_anchored_picker import (
             PanelPicker,
             build_panel_picker_entries,
             panel_picker_anchor,
@@ -1147,7 +1147,7 @@ class PigitApplication(Application):
         paths = self._diff_panel.file_paths
         if not paths:
             return
-        from .app_tab_picker import FilePicker
+        from .app_anchored_picker import FilePicker
 
         cur = self._diff_panel.current_file_index()
         picker = FilePicker(

@@ -41,7 +41,7 @@ from pigit.termui.widgets import (
 )
 
 from .app_diff import DiffType, DiffViewer
-from .app_preview import PreviewPanel
+from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
 from .app_theme import THEME
 from .ext.utils import adjudgment_type, copy_to_clipboard, get_file_icon
