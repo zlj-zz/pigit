@@ -97,3 +97,38 @@ def test_dismiss_on_miss_false_keeps_modal_open():
         assert root._layer_stack.top(LayerKind.MODAL) is popup
     finally:
         _runtime_ctx.reset(token)
+
+
+def test_dismiss_on_miss_release_does_not_close():
+    """The release tailing the opening click must not dismiss the picker.
+
+    Regression: clicking the Header tab slot opens the anchored popup on the
+    press; the same click's release lands outside it and was closing it at
+    once. Only an outside PRESS dismisses.
+    """
+    token = _runtime_ctx.set(RuntimeContext())
+    try:
+        body = _Body()
+        body.resize((40, 20))
+        root = ComponentRoot(body)
+        root.resize((40, 20))
+        root.mount()
+
+        child = _FramedChild(10, 4)
+        popup = Popup(child, offset=(2, 2), dismiss_on_miss=True)
+        _open_modal(root, popup)
+        assert popup.open is True
+
+        release = MouseEvent(
+            col=39, row=19, button=MouseButton.LEFT, kind=MouseKind.RELEASE
+        )
+        assert root._handle_mouse(release) is True
+        assert popup.open is True  # release miss is swallowed, not dismissed
+
+        press = MouseEvent(
+            col=39, row=19, button=MouseButton.LEFT, kind=MouseKind.PRESS
+        )
+        assert root._handle_mouse(press) is True
+        assert popup.open is False  # a real outside press closes
+    finally:
+        _runtime_ctx.reset(token)

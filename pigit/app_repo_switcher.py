@@ -145,7 +145,10 @@ def build_repo_switcher_entries(
 class RepoSwitcherSheet(OptionList):
     """Bottom sheet listing managed repos for in-TUI session switch."""
 
-    CURSOR = "●"
+    # No cursor column: the ``●`` in ``format_repo_switcher_row`` already marks
+    # the current repo, so a second ● would be ambiguous. The cursor row is
+    # identified by the commit-panel selected background instead.
+    CURSOR = ""
     keymap_namespace = "repo_switcher"
 
     def __init__(
@@ -201,10 +204,21 @@ class RepoSwitcherSheet(OptionList):
         item_idx: int | None = None,
         sub_row: int = 0,
     ) -> tuple[list[Segment], list[Segment] | None, list[Segment]]:
-        """Paint pre-built switcher segments for the visible row."""
+        """Paint pre-built switcher segments for the visible row.
+
+        The cursor row uses the commit panel's selected background so every
+        selectable surface shares the same highlight tone.
+        """
         source_idx = self.visible_to_source(idx)
         if 0 <= source_idx < len(self._row_segments):
-            return ([], self._row_segments[source_idx], [])
+            if not is_cursor:
+                return ([], self._row_segments[source_idx], [])
+            bg = getattr(THEME, "bg_commit_selected", None) or THEME.bg_hover
+            segs = [
+                Segment(s.text, fg=s.fg, bg=bg, style_flags=s.style_flags)
+                for s in self._row_segments[source_idx]
+            ]
+            return ([], segs, [])
         return super().describe_row(idx, is_cursor, item_idx=item_idx, sub_row=sub_row)
 
     @bind_action("next", "j", "down", desc="Next repo", tip="Navigate")

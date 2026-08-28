@@ -248,6 +248,11 @@ class PanelPicker(Component):
         self._last_click_index = None
         self._last_click_time = 0.0
 
+    def _selected_row_bg(self, theme) -> tuple[int, int, int]:
+        """Match the commit panel's selected-row background when available."""
+        selected = getattr(theme, "bg_commit_selected", None)
+        return selected if selected is not None else theme.bg_hover
+
     def paint(self, surface: Surface) -> None:
         """Draw the framed list with the cursor row highlighted."""
         theme = get_theme()
@@ -262,7 +267,7 @@ class PanelPicker(Component):
             row = content_row + i
             segments = format_panel_picker_row(entry)
             is_cursor = i == self._cursor
-            row_bg = theme.bg_hover if is_cursor else theme.bg_chrome
+            row_bg = self._selected_row_bg(theme) if is_cursor else theme.bg_chrome
             if is_cursor:
                 surface.fill_rect_rgb(row, content_col, cw, 1, row_bg)
             x = content_col

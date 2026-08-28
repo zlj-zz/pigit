@@ -14,7 +14,7 @@ from collections.abc import Callable
 
 from .component import Component, resolve_focus_leaf
 from ._layer import LayerKind, LayerStack
-from .mouse import MouseEvent
+from .mouse import MouseEvent, MouseKind
 from .event_bus import EventBus
 from .types import OverlayDispatchResult
 from ._runtime_context import FocusManager
@@ -280,8 +280,14 @@ class ComponentRoot(Component):
         if modal is not None and getattr(modal, "open", False):
             hit = modal._hit_test(event.col, event.row)
             if hit is None:
-                # Exact True: MagicMock stubs in tests must not trip dismiss.
-                if getattr(modal, "dismiss_on_miss", False) is True:
+                # Only a PRESS outside dismisses: the release that tails the
+                # opening click lands on the header (outside the popup) and must
+                # not immediately close an anchored picker. Exact True keeps
+                # MagicMock stubs in tests from tripping dismiss.
+                if (
+                    getattr(modal, "dismiss_on_miss", False) is True
+                    and event.kind is MouseKind.PRESS
+                ):
                     end_session = getattr(modal, "end_session", None)
                     if callable(end_session):
                         end_session()
