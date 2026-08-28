@@ -44,8 +44,9 @@ class LogGraphPreview(Component):
         self,
         *,
         vm: IBranchViewModel,
-        guard_async: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]]
-        | None = None,
+        guard_async: (
+            Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None
+        ) = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -113,7 +114,9 @@ class LogGraphPreview(Component):
         self._requested_branch = name
         self._load_task = run_async(
             lambda: self._load_graph(name),
-            guard_or_identity(self._guard_async, lambda lines: self._on_graph_loaded(name, lines)),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_graph_loaded(name, lines)
+            ),
         )
         return True
 
@@ -151,7 +154,9 @@ class LogGraphPreview(Component):
         self._requested_branch = name
         self._load_task = run_async(
             lambda: self._load_graph(name),
-            guard_or_identity(self._guard_async, lambda lines: self._on_graph_loaded(name, lines)),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_graph_loaded(name, lines)
+            ),
         )
 
     def set_lines(self, lines: list[str], title: str) -> None:

@@ -73,7 +73,9 @@ def test_build_entries_marks_current_and_add_row():
 
 def test_repo_slot_click_invokes_on_open():
     opened: list[int] = []
-    slot = RepoSlot(name="pigit", on_open=lambda: opened.append(1), fg=THEME.fg_header_repo)
+    slot = RepoSlot(
+        name="pigit", on_open=lambda: opened.append(1), fg=THEME.fg_header_repo
+    )
     slot.resize((20, 1))
     assert slot.handle_mouse(
         MouseEvent(col=1, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS)
@@ -84,7 +86,9 @@ def test_repo_slot_click_invokes_on_open():
 
 def test_header_left_child_paint_and_hit_delegate():
     opened: list[int] = []
-    slot = RepoSlot(name="pigit", on_open=lambda: opened.append(1), fg=THEME.fg_header_repo)
+    slot = RepoSlot(
+        name="pigit", on_open=lambda: opened.append(1), fg=THEME.fg_header_repo
+    )
     header = Header(
         left=[Segment(" · "), Segment("*"), Segment("dev")],
         left_child=slot,
@@ -231,7 +235,10 @@ def test_switcher_sheet_double_click_activates():
     switched: list[str] = []
     entries = [
         RepoSwitcherEntry(
-            kind="repo", name="alpha", path="/a", meta={"branch": "main"},
+            kind="repo",
+            name="alpha",
+            path="/a",
+            meta={"branch": "main"},
             is_current=False,
         ),
     ]
@@ -262,11 +269,17 @@ def test_switcher_sheet_activate_add_current_row():
     added: list[str] = []
     entries = [
         RepoSwitcherEntry(
-            kind="add_current", name="", path="/cwd", meta={}, is_current=False,
+            kind="add_current",
+            name="",
+            path="/cwd",
+            meta={},
+            is_current=False,
         ),
     ]
     sheet = RepoSwitcherSheet(
-        entries=entries, on_add_current=lambda p: added.append(p), on_switch=lambda p: None
+        entries=entries,
+        on_add_current=lambda p: added.append(p),
+        on_switch=lambda p: None,
     )
     sheet.mount()
     with patch("pigit.app_repo_switcher.dismiss_sheet"):
@@ -277,7 +290,11 @@ def test_switcher_sheet_activate_add_current_row():
 def test_switcher_sheet_invalid_path_toasts():
     entries = [
         RepoSwitcherEntry(
-            kind="repo", name="broken", path="", meta={}, is_current=False,
+            kind="repo",
+            name="broken",
+            path="",
+            meta={},
+            is_current=False,
         ),
     ]
     sheet = RepoSwitcherSheet(entries=entries, on_switch=lambda p: None)
@@ -361,7 +378,9 @@ def test_add_current_and_switch_success_calls_switch():
             vm.bind_repo_token = Mock()
             vm.dispose = Mock()
         build.return_value = session
-        app = PigitApplication(config=AppConfig(repo_observe=False), managed_repos=managed)
+        app = PigitApplication(
+            config=AppConfig(repo_observe=False), managed_repos=managed
+        )
     with patch.object(app, "_switch_repo") as sw:
         app._add_current_and_switch("/cwd")
     managed.add_repos.assert_called_once_with(["/cwd"])
@@ -385,7 +404,9 @@ def test_add_current_and_switch_failure_toasts():
             vm.bind_repo_token = Mock()
             vm.dispose = Mock()
         build.return_value = session
-        app = PigitApplication(config=AppConfig(repo_observe=False), managed_repos=managed)
+        app = PigitApplication(
+            config=AppConfig(repo_observe=False), managed_repos=managed
+        )
     with (
         patch("pigit.app.show_toast") as toast,
         patch.object(app, "_switch_repo") as sw,

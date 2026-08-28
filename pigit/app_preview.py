@@ -58,8 +58,9 @@ class PreviewPanel(Component):
         *,
         status_vm: IStatusViewModel | None = None,
         on_preview_target: Callable[[str | None], None] | None = None,
-        guard_async: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]]
-        | None = None,
+        guard_async: (
+            Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None
+        ) = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -132,7 +133,9 @@ class PreviewPanel(Component):
 
         self._load_task = run_async(
             lambda: self._load_lines(request),
-            guard_or_identity(self._guard_async, lambda lines: self._on_loaded(request, lines)),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_loaded(request, lines)
+            ),
         )
         return True
 
@@ -147,7 +150,9 @@ class PreviewPanel(Component):
         self._request = request
         self._load_task = run_async(
             lambda: self._load_lines(request),
-            guard_or_identity(self._guard_async, lambda lines: self._on_loaded(request, lines)),
+            guard_or_identity(
+                self._guard_async, lambda lines: self._on_loaded(request, lines)
+            ),
         )
 
     def _capture_request(self, active: PreviewPayload) -> _PreviewRequest | None:

@@ -137,7 +137,9 @@ class Header(Component):
             width, height = child._size
             if width <= 0 or height <= 0:
                 continue
-            if not (child.y <= col < child.y + width and child.x <= row < child.x + height):
+            if not (
+                child.y <= col < child.y + width and child.x <= row < child.x + height
+            ):
                 continue
             hit = child._hit_test(col - (child.y - 1), row - (child.x - 1))
             if hit is not None:

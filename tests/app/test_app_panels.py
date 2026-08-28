@@ -514,14 +514,10 @@ class TestCommitPanelLifecycle:
         new_vm.dispose.assert_not_called()
 
         # Old signal must no longer drive the panel; the new one must.
-        old_vm.items.set(
-            [Commit("stale", "old", "Zev", 0, "pushed", "", [])]
-        )
+        old_vm.items.set([Commit("stale", "old", "Zev", 0, "pushed", "", [])])
         assert panel.commits == []
 
-        new_vm.items.set(
-            [Commit("fresh", "new", "Zev", 0, "pushed", "", [])]
-        )
+        new_vm.items.set([Commit("fresh", "new", "Zev", 0, "pushed", "", [])])
         assert [c.sha for c in panel.commits] == ["fresh"]
         assert len(panel._vm_unsubs) == 1
 
@@ -634,12 +630,38 @@ class TestStatusPanelLifecycle:
 
         # Old signal must no longer drive the panel; the new one must.
         old_vm.items.set(
-            [File("stale.py", "stale.py", " M", False, True, True, True, False, False, False)]
+            [
+                File(
+                    "stale.py",
+                    "stale.py",
+                    " M",
+                    False,
+                    True,
+                    True,
+                    True,
+                    False,
+                    False,
+                    False,
+                )
+            ]
         )
         assert panel.files == []
 
         new_vm.items.set(
-            [File("fresh.py", "fresh.py", " M", False, True, True, True, False, False, False)]
+            [
+                File(
+                    "fresh.py",
+                    "fresh.py",
+                    " M",
+                    False,
+                    True,
+                    True,
+                    True,
+                    False,
+                    False,
+                    False,
+                )
+            ]
         )
         assert [f.name for f in panel.files] == ["fresh.py"]
 

@@ -50,11 +50,13 @@ class NetworkGit:
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
         get_alert_dialog: Callable[[], AlertDialog],
-        guard_async: Callable[
-            [Callable[[NetworkGitOutcome], None]],
-            Callable[[NetworkGitOutcome], None],
-        ]
-        | None = None,
+        guard_async: (
+            Callable[
+                [Callable[[NetworkGitOutcome], None]],
+                Callable[[NetworkGitOutcome], None],
+            ]
+            | None
+        ) = None,
     ) -> None:
         """
         Args:

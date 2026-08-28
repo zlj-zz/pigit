@@ -279,7 +279,9 @@ def test_switch_done_toasts_on_failure_and_resets_in_flight():
         patch("pigit.app.hide_spinner"),
         patch("pigit.app.show_toast") as toast,
     ):
-        app._switch_done(_SwitchResult(False, error="Not a git repository"), app._repo_token)
+        app._switch_done(
+            _SwitchResult(False, error="Not a git repository"), app._repo_token
+        )
     toast.assert_called()
     assert app._switch_in_flight is False
     assert app._session.repo_path == "/repo/a"

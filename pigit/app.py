@@ -41,7 +41,14 @@ from pigit.termui import (
 from pigit.termui.cli_output import Console
 from pigit.termui.containers import Column, SplitPane, TabView, ExclusiveView
 from pigit.termui.tty_io import terminal_size
-from pigit.termui.widgets import AlertDialog, BindingBrowser, Header, Popup, RepoSlot, TabSlot
+from pigit.termui.widgets import (
+    AlertDialog,
+    BindingBrowser,
+    Header,
+    Popup,
+    RepoSlot,
+    TabSlot,
+)
 from pigit.termui.bindings import ExecutableBinding
 from pigit.termui.reactive import Signal
 from pigit.termui.mouse import MouseEvent
@@ -119,9 +126,7 @@ class PigitApplication(Application):
         self._managed_repos = managed_repos
         # Undo stack must exist before RepoSession.build (Status/Branch VMs).
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
-        self._session = RepoSession.build(
-            self._git_api, None, self._session_history
-        )
+        self._session = RepoSession.build(self._git_api, None, self._session_history)
         # Aliases keep existing lambdas (get_git=lambda: self._git, …) working.
         self._git = self._session.git
         self._repo_path = self._session.repo_path
@@ -565,9 +570,7 @@ class PigitApplication(Application):
 
         def work() -> _SwitchResult:
             try:
-                session = RepoSession.build(
-                    self._git_api, path, self._session_history
-                )
+                session = RepoSession.build(self._git_api, path, self._session_history)
                 if not session.repo_path:
                     session.dispose()
                     return _SwitchResult(False, error="Not a git repository")

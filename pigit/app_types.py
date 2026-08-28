@@ -13,8 +13,7 @@ from typing import Protocol, runtime_checkable
 
 
 def guard_or_identity(
-    guard: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]]
-    | None,
+    guard: Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None,
     callback: Callable[[list[str]], None],
 ) -> Callable[[list[str]], None]:
     """Apply an async ``guard`` (repo token) when injected, else pass through."""

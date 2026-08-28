@@ -231,7 +231,9 @@ class RepoSwitcherSheet(OptionList):
         """Apply the search query as a substring filter over row text."""
         self.set_filter(self.search_query)
 
-    @bind_action("confirm", keys.KEY_ENTER, desc="Switch to selected repo", tip="Switch")
+    @bind_action(
+        "confirm", keys.KEY_ENTER, desc="Switch to selected repo", tip="Switch"
+    )
     def confirm(self) -> None:
         """Activate the highlighted row (switch or add-current)."""
         self._activate_index(self.curr_no)
