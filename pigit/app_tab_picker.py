@@ -241,9 +241,15 @@ class _AnchoredListPicker(Component, Generic[T]):
             self._on_select(self._select_value())
 
     def handle_mouse(self, event: MouseEvent) -> bool:
-        """Left click moves cursor; double-click activates (viewport_hit)."""
+        """Wheel moves cursor; left click moves it; double-click activates."""
         if event.kind is not MouseKind.PRESS:
             return False
+        if event.button is MouseButton.WHEEL_UP:
+            self.move_up()
+            return True
+        if event.button is MouseButton.WHEEL_DOWN:
+            self.move_down()
+            return True
         if event.button is not MouseButton.LEFT:
             return False
         layout = self._layout

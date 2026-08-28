@@ -228,6 +228,21 @@ def test_mouse_counter_opens_picker_callback():
     assert picked == []
 
 
+def test_picker_wheel_moves_cursor():
+    picker = FilePicker(entries=["a.py", "b.py", "c.py"], current_index=0)
+    picker._cursor = 0
+    down = MouseEvent(
+        kind=MouseKind.PRESS, button=MouseButton.WHEEL_DOWN, row=1, col=1
+    )
+    assert picker.handle_mouse(down) is True
+    assert picker._cursor == 1
+    up = MouseEvent(kind=MouseKind.PRESS, button=MouseButton.WHEEL_UP, row=1, col=1)
+    assert picker.handle_mouse(up) is True
+    assert picker._cursor == 0
+    assert picker.handle_mouse(up) is True  # clamps at the first row
+    assert picker._cursor == 0
+
+
 def test_file_picker_lists_and_selects():
     selected: list[int] = []
     picker = FilePicker(
