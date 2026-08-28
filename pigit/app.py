@@ -275,6 +275,7 @@ class PigitApplication(Application):
             id="diff",
             word_diff=self._config.word_diff,
             guard_async=self._guard_repo_async,
+            on_file_picker=self.open_diff_file_picker,
         )
         self._tab_view = TabView(
             children=[
@@ -1177,6 +1178,40 @@ class PigitApplication(Application):
         popup.begin_session()
         if self._root is not None:
             self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def open_diff_file_picker(self, global_row: int, global_col: int) -> None:
+        """Open an anchored file list popup for the current commit diff."""
+        sections = self._diff_panel._file_sections
+        if not sections:
+            return
+        dismiss_sheet()
+        self._dismiss_open_modal()
+        from .app_tab_picker import FilePicker
+
+        paths = [section.path for section in sections]
+        cur = self._diff_panel._current_file_index()
+        picker = FilePicker(
+            entries=paths,
+            current_index=max(0, cur),
+            on_select=self._on_diff_file_picker_select,
+        )
+        popup = Popup(
+            picker,
+            offset=(global_row, global_col),
+            dismiss_on_miss=True,
+            exit_key=keys.KEY_ESC,
+        )
+        self._panel_picker_popup = popup
+        cols, rows = terminal_size()
+        popup.resize((cols, rows))
+        popup.show()
+        popup.begin_session()
+        if self._root is not None:
+            self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+
+    def _on_diff_file_picker_select(self, index: int) -> None:
+        """Jump the DiffViewer to the selected file section after picker dismiss."""
+        self._diff_panel._jump_to_file_index(index)
 
     def _dismiss_open_modal(self) -> None:
         """Close any open MODAL before opening the anchored picker.

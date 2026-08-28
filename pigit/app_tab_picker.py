@@ -1,6 +1,6 @@
 """
 Module: pigit/app_tab_picker.py
-Description: Anchored popup UI for switching among the four product panels.
+Description: Anchored popup list pickers for panels and diff files.
 Author: Zev
 Date: 2026-08-28
 """
@@ -8,8 +8,9 @@ Date: 2026-08-28
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
 
 from pigit.app_panel_nav import PanelNavigator
 from pigit.app_theme import THEME
@@ -28,7 +29,11 @@ from pigit.termui.viewport_hit import (
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 _INNER_W = 28
-_TITLE = "Switch panel"
+_PANEL_TITLE = "Switch panel"
+_FILE_TITLE = "Files"
+_FILE_INNER_W = 40
+
+T = TypeVar("T")
 
 
 def panel_picker_anchor(
@@ -94,12 +99,12 @@ def format_panel_picker_row(entry: PanelPickerEntry) -> list[Segment]:
     return segs
 
 
-class PanelPicker(Component):
-    """Framed four-row panel list for an anchored ``Popup`` (BindingBrowser chrome).
+class _AnchoredListPicker(Component, Generic[T]):
+    """Framed list for an anchored ``Popup`` (shared by panel / file pickers).
 
-    Manages ``_outer_w`` / ``outer_row_count`` itself so ``Popup.resize`` (full
-    terminal) does not leave a bare OptionList at screen size. No ``/`` filter —
-    four rows use ``j/k`` + Enter / double-click only.
+    Manages ``_outer_w`` / ``outer_row_count`` so ``Popup.resize`` (full
+    terminal) does not stretch the list. Subclasses supply row formatting and
+    current-row marking; ``on_select`` receives the typed entry.
     """
 
     BINDINGS = [
@@ -113,29 +118,36 @@ class PanelPicker(Component):
     def __init__(
         self,
         *,
-        entries: list[PanelPickerEntry],
-        on_select: Callable[[Component], None] | None = None,
+        entries: Sequence[T],
+        on_select: Callable[[Any], None] | None = None,
         on_toggle: Callable[[], None] | None = None,
+        title: str,
+        inner_w: int = _INNER_W,
         id: str | None = None,
+        initial_cursor: int | None = None,
     ) -> None:
         super().__init__(id=id)
-        self._entries = list(entries)
+        self._entries: list[T] = list(entries)
         self._on_select = on_select
         self._on_toggle = on_toggle
+        self._title = title
+        self._inner_w = inner_w
         self._cursor = 0
-        for i, entry in enumerate(self._entries):
-            if entry.is_current:
-                self._cursor = i
-                break
-        self._inner_w = _INNER_W
+        if initial_cursor is not None and self._entries:
+            self._cursor = max(0, min(initial_cursor, len(self._entries) - 1))
+        else:
+            for i in range(len(self._entries)):
+                if self.is_current_at(i):
+                    self._cursor = i
+                    break
         self._scroll_h = max(1, len(self._entries) or 1)
-        self._outer_w = _INNER_W + 2
+        self._outer_w = inner_w + 2
         self.outer_row_count = self._scroll_h + 2
         theme = get_theme()
         self._frame = BoxFrame(
             self._inner_w,
             self._scroll_h,
-            title=_TITLE,
+            title=title,
             fg=theme.fg_primary,
             bg=theme.bg_chrome,
         )
@@ -143,6 +155,14 @@ class PanelPicker(Component):
         self._last_click_index: int | None = None
         self._last_click_time = 0.0
         self._rebuild_geometry()
+
+    def format_row(self, entry: T, index: int) -> list[Segment]:
+        """Segments for one list row (subclass implements)."""
+        raise NotImplementedError
+
+    def is_current_at(self, index: int) -> bool:
+        """Return True when ``index`` is the session's current item."""
+        return False
 
     def set_on_toggle(self, cb: Callable[[], None] | None) -> None:
         """Wire the wrapping Popup's toggle (called from Popup.__init__)."""
@@ -177,7 +197,6 @@ class PanelPicker(Component):
     def _rebuild_geometry(self) -> None:
         n = max(1, len(self._entries))
         self._scroll_h = n
-        self._inner_w = _INNER_W
         self._frame.set_inner_size(self._inner_w, self._scroll_h)
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
@@ -192,18 +211,22 @@ class PanelPicker(Component):
         )
 
     def move_down(self) -> None:
-        """Move cursor to the next panel row."""
+        """Move cursor to the next row."""
         if not self._entries:
             return
         self._clear_double_click()
         self._cursor = min(self._cursor + 1, len(self._entries) - 1)
 
     def move_up(self) -> None:
-        """Move cursor to the previous panel row."""
+        """Move cursor to the previous row."""
         if not self._entries:
             return
         self._clear_double_click()
         self._cursor = max(self._cursor - 1, 0)
+
+    def _select_value(self) -> Any:
+        """Value passed to ``on_select`` for the cursor row (subclass hook)."""
+        return self._entries[self._cursor]
 
     def activate_selected(self) -> None:
         """Dismiss the popup, then invoke ``on_select`` for the cursor row."""
@@ -211,12 +234,11 @@ class PanelPicker(Component):
             return
         if self._cursor < 0 or self._cursor >= len(self._entries):
             return
-        entry = self._entries[self._cursor]
         self._clear_double_click()
         if self._on_toggle is not None:
             self._on_toggle()
         if self._on_select is not None:
-            self._on_select(entry.panel)
+            self._on_select(self._select_value())
 
     def handle_mouse(self, event: MouseEvent) -> bool:
         """Left click moves cursor; double-click activates (viewport_hit)."""
@@ -265,7 +287,7 @@ class PanelPicker(Component):
         content_row, content_col, cw, _ch = self._frame.content_rect(0, 0)
         for i, entry in enumerate(self._entries):
             row = content_row + i
-            segments = format_panel_picker_row(entry)
+            segments = self.format_row(entry, i)
             is_cursor = i == self._cursor
             row_bg = self._selected_row_bg(theme) if is_cursor else theme.bg_chrome
             if is_cursor:
@@ -286,3 +308,77 @@ class PanelPicker(Component):
                     style_flags=seg.style_flags,
                 )
                 x += wcswidth(text)
+
+
+class PanelPicker(_AnchoredListPicker[PanelPickerEntry]):
+    """Framed four-row panel list for an anchored ``Popup``."""
+
+    def __init__(
+        self,
+        *,
+        entries: list[PanelPickerEntry],
+        on_select: Callable[[Component], None] | None = None,
+        on_toggle: Callable[[], None] | None = None,
+        id: str | None = None,
+    ) -> None:
+        self._panel_on_select = on_select
+
+        def _select_panel(entry: PanelPickerEntry) -> None:
+            if self._panel_on_select is not None:
+                self._panel_on_select(entry.panel)
+
+        super().__init__(
+            entries=entries,
+            on_select=_select_panel,
+            on_toggle=on_toggle,
+            title=_PANEL_TITLE,
+            inner_w=_INNER_W,
+            id=id,
+        )
+
+    def format_row(self, entry: PanelPickerEntry, index: int) -> list[Segment]:
+        return format_panel_picker_row(entry)
+
+    def is_current_at(self, index: int) -> bool:
+        if index < 0 or index >= len(self._entries):
+            return False
+        return self._entries[index].is_current
+
+
+class FilePicker(_AnchoredListPicker[str]):
+    """Framed file-path list for the diff file-nav anchored ``Popup``."""
+
+    def __init__(
+        self,
+        *,
+        entries: list[str],
+        current_index: int = 0,
+        on_select: Callable[[int], None] | None = None,
+        on_toggle: Callable[[], None] | None = None,
+        id: str | None = None,
+    ) -> None:
+        self._current_index = current_index
+        super().__init__(
+            entries=entries,
+            on_select=on_select,
+            on_toggle=on_toggle,
+            title=_FILE_TITLE,
+            inner_w=_FILE_INNER_W,
+            id=id,
+            initial_cursor=current_index,
+        )
+
+    def format_row(self, entry: str, index: int) -> list[Segment]:
+        is_current = self.is_current_at(index)
+        marker = "● " if is_current else "  "
+        return [
+            Segment(marker, fg=THEME.fg_success if is_current else THEME.fg_dim),
+            Segment(entry, fg=THEME.fg_muted, style_flags=palette.STYLE_BOLD),
+        ]
+
+    def is_current_at(self, index: int) -> bool:
+        return index == self._current_index
+
+    def _select_value(self) -> int:
+        """Select by cursor index (stable with duplicate paths)."""
+        return self._cursor

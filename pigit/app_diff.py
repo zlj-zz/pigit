@@ -42,7 +42,31 @@ from .diff_content import DiffContent, Hunk, RenderLine
 
 _logger = logging.getLogger(__name__)
 
-_DIFF_GIT_RE = re.compile(r"^diff --git a/(.+) b/(.+)$")
+# Plain ``a/path b/path`` or quoted ``"a/my file" "b/my file"`` (git quotes
+# paths that contain spaces). Alternate groups keep a single match object.
+_DIFF_GIT_RE = re.compile(r'^diff --git (?:"a/(.+)"|a/(.+)) (?:"b/(.+)"|b/(.+))$')
+
+
+def _path_from_diff_git_match(match: re.Match[str]) -> str:
+    """Return the real file path from a ``_DIFF_GIT_RE`` match (quoted or plain).
+
+    ``git`` uses ``dev/null`` for the missing side of a diff: a deletion has
+    ``b/dev/null`` and an addition has ``a/dev/null``. Fall back to the other
+    side so a deleted file reads as its real path.
+    """
+    raw = (match.group(3) or match.group(4) or "").strip('"')
+    if raw == "dev/null":
+        raw = (match.group(1) or match.group(2) or "").strip('"')
+    return raw
+
+
+@dataclasses.dataclass(frozen=True)
+class _FileSection:
+    """One file span in a multi-file unified diff (from a ``diff --git`` line)."""
+
+    path: str
+    first_hunk_start: int
+    header_start: int
 
 
 @dataclasses.dataclass
@@ -106,6 +130,7 @@ class DiffViewer(Component):
         id: str | None = None,
         word_diff: bool = False,
         guard_async: Callable[..., Callable] | None = None,
+        on_file_picker: Callable[[int, int], None] | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._lines: list[str] = []
@@ -129,6 +154,9 @@ class DiffViewer(Component):
         self._hunk_mode = False
         self._hunk_index = 0
         self._hunks: list[_Hunk] = []
+        self._file_sections: list[_FileSection] = []
+        self._file_nav_counter_cols: tuple[int, int] | None = None
+        self._on_file_picker = on_file_picker
         self._repo_path = ""
         self._diff_type = DiffType.UNSTAGED
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
@@ -202,6 +230,42 @@ class DiffViewer(Component):
         self._word_diff_segments = doc.word_diff_segments
         self._render_tokens = [] if tokens is None else tokens
         self._compute_max_col_offset()
+        self._rebuild_file_sections()
+
+    def _path_from_header(self, idx: int) -> str | None:
+        """Extract the ``b/`` path from a ``diff --git`` line at ``idx``."""
+        if idx < 0 or idx >= len(self._lines):
+            return None
+        m = _DIFF_GIT_RE.match(self._lines[idx])
+        if not m:
+            return None
+        path = _path_from_diff_git_match(m)
+        return path or None
+
+    def _rebuild_file_sections(self) -> None:
+        """Rebuild ``_file_sections`` from ``diff --git`` lines (incl. binary)."""
+        sections: list[_FileSection] = []
+        headers: list[int] = []
+        for i, line in enumerate(self._lines):
+            if _DIFF_GIT_RE.match(line):
+                headers.append(i)
+        for hi, header_start in enumerate(headers):
+            path = self._path_from_header(header_start) or ""
+            next_header = headers[hi + 1] if hi + 1 < len(headers) else len(self._lines)
+            first_hunk = header_start
+            for hunk in self._hunks:
+                if header_start <= hunk.start < next_header:
+                    first_hunk = hunk.start
+                    break
+            sections.append(
+                _FileSection(
+                    path=path,
+                    first_hunk_start=first_hunk,
+                    header_start=header_start,
+                )
+            )
+        self._file_sections = sections
+        self._file_nav_counter_cols = None
 
     def _tokens_at(
         self, idx: int, line: str, *, strip_diff_prefix: bool
@@ -241,19 +305,49 @@ class DiffViewer(Component):
             self._cached_path_hunks_id = hunks_id
             self._cached_path = None
             return None
-        header_idx = target_hunk.file_header_start
-        if header_idx >= len(self._lines):
-            self._cached_path_i = self._line_i
-            self._cached_path_hunks_id = hunks_id
-            self._cached_path = None
-            return None
-        line = self._lines[header_idx]
-        m = _DIFF_GIT_RE.match(line)
-        result = m.group(2).strip('"') if m else None
+        result = self._path_from_header(target_hunk.file_header_start)
         self._cached_path_i = self._line_i
         self._cached_path_hunks_id = hunks_id
         self._cached_path = result
         return result
+
+    def _current_file_index(self) -> int:
+        """Index of the file section owning ``_line_i`` (header belongs to that file).
+
+        Lines before the first ``diff --git`` header (a ``git show`` commit
+        subject block) still belong to the first file section, so the top bar
+        shows from the start. Returns -1 only when there are no sections.
+        """
+        if not self._file_sections:
+            return -1
+        best = 0
+        for i, section in enumerate(self._file_sections):
+            if section.header_start <= self._line_i:
+                best = i
+        return best
+
+    def _file_nav_active(self) -> bool:
+        """True when the top file bar and ``,``/``.`` navigation apply."""
+        return (
+            not self._file_history_mode
+            and not self._hunk_mode
+            and self._diff_type is DiffType.COMMIT
+            and len(self._file_sections) > 0
+        )
+
+    def _jump_to_file_index(self, index: int) -> None:
+        """Scroll so the file section at ``index`` is at the top of the viewport."""
+        if index < 0 or index >= len(self._file_sections):
+            return
+        section = self._file_sections[index]
+        if section.first_hunk_start != section.header_start:
+            for hi, hunk in enumerate(self._hunks):
+                if hunk.start == section.first_hunk_start:
+                    self._scroll_to_hunk(hi)
+                    return
+            self._line_i = max(0, section.first_hunk_start)
+            return
+        self._line_i = max(0, section.header_start)
 
     def _set_plain_content(self, lines: list[str]) -> None:
         """Set plain file content (no diff parsing) for File History mode."""
@@ -453,6 +547,50 @@ class DiffViewer(Component):
         pos = bisect.bisect_left(self._hunk_starts, self._line_i) - 1
         if pos >= 0:
             self._line_i = self._hunk_starts[pos]
+
+    @bind_action(
+        "prev_file",
+        ",",
+        desc="Jump to previous file in the diff",
+        tip="Prev file",
+        tip_when=lambda self: (
+            not self._file_history_mode
+            and not self._hunk_mode
+            and len(self._file_sections) >= 2
+        ),
+    )
+    def prev_file(self) -> None:
+        """Scroll to the previous file section (``,``)."""
+        if self._file_history_mode or self._hunk_mode:
+            return
+        if len(self._file_sections) < 2:
+            return
+        cur = self._current_file_index()
+        if cur <= 0:
+            return
+        self._jump_to_file_index(cur - 1)
+
+    @bind_action(
+        "next_file",
+        ".",
+        desc="Jump to next file in the diff",
+        tip="Next file",
+        tip_when=lambda self: (
+            not self._file_history_mode
+            and not self._hunk_mode
+            and len(self._file_sections) >= 2
+        ),
+    )
+    def next_file(self) -> None:
+        """Scroll to the next file section (``.``)."""
+        if self._file_history_mode or self._hunk_mode:
+            return
+        if len(self._file_sections) < 2:
+            return
+        cur = self._current_file_index()
+        if cur < 0 or cur >= len(self._file_sections) - 1:
+            return
+        self._jump_to_file_index(cur + 1)
 
     @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
     def _scroll_left(self) -> None:
@@ -732,7 +870,7 @@ class DiffViewer(Component):
         super().unmount()
 
     def handle_mouse(self, event: MouseEvent) -> bool:
-        """Scroll on wheel via the diff viewport."""
+        """Scroll on wheel; open the file picker when the top counter is clicked."""
         if event.kind is not MouseKind.PRESS:
             return False
         if event.button is MouseButton.WHEEL_UP:
@@ -741,7 +879,42 @@ class DiffViewer(Component):
         if event.button is MouseButton.WHEEL_DOWN:
             self.scroll_down(self.WHEEL_SCROLL_LINES)
             return True
+        if event.button is MouseButton.LEFT and self._hit_file_nav_counter(event):
+            if self._on_file_picker is not None:
+                g_row, g_col = self._global_origin()
+                # event.col is 1-based local; Popup offset is 0-based.
+                self._on_file_picker(g_row, g_col + event.col - 1)
+            return True
         return False
+
+    def _global_origin(self) -> tuple[int, int]:
+        """0-based global (row, col) of this viewer's top-left on the terminal.
+
+        Each ancestor stores parent-relative 1-based ``x`` (row) / ``y`` (col);
+        convert with ``sum(coord - 1)`` along the parent chain.
+        """
+        row = 0
+        col = 0
+        node: Component | None = self
+        while node is not None:
+            row += max(0, int(getattr(node, "x", 1)) - 1)
+            col += max(0, int(getattr(node, "y", 1)) - 1)
+            node = getattr(node, "parent", None)
+        return row, col
+
+    def _hit_file_nav_counter(self, event: MouseEvent) -> bool:
+        """True when a press lands on the painted ``▸ cur/total`` columns."""
+        if not self._file_nav_active():
+            return False
+        cols = self._file_nav_counter_cols
+        if cols is None:
+            return False
+        # MouseEvent row/col are 1-based local; paint columns are 0-based.
+        if event.row != 1:
+            return False
+        start, end = cols
+        local_col0 = event.col - 1
+        return start <= local_col0 < end
 
     def _apply_patch(self, patch: str, action: str) -> None:
         """Apply or reverse-apply a patch in background thread."""
@@ -954,6 +1127,64 @@ class DiffViewer(Component):
             surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=effective_bg)
             col += token_width
 
+    def _draw_top_bar(
+        self,
+        surface: Surface,
+        text: str,
+        *,
+        fg: tuple[int, int, int],
+        bg: tuple[int, int, int] | None,
+        style_flags: int = 0,
+        col: int = 2,
+        trailing_space_when_truncated: bool = False,
+    ) -> None:
+        """Paint a single-line overlay on row 0 (over the top border)."""
+        w = surface.width
+        budget = max(0, w - 4)
+        if wcswidth(text) > budget:
+            trim = truncate_by_width(text, budget)
+            if trailing_space_when_truncated:
+                trim = trim + " "
+        else:
+            trim = text
+        surface.draw_text_rgb(0, col, trim, fg=fg, bg=bg, style_flags=style_flags)
+
+    def _draw_file_nav_bar(self, surface: Surface) -> None:
+        """Paint ``▸ cur/total path`` on row 0; record counter hit columns.
+
+        The counter renders in the accent color so it reads as the clickable
+        control; the path stays muted as content.
+        """
+        self._file_nav_counter_cols = None
+        if not self._file_nav_active():
+            return
+        cur = self._current_file_index()
+        if cur < 0:
+            return
+        total = len(self._file_sections)
+        path = self._file_sections[cur].path
+        counter = f"▸ {cur + 1}/{total}"
+        col = 2
+        w = surface.width
+        budget = max(0, w - 4)
+        counter_w = wcswidth(counter)
+        if counter_w > budget:
+            # Counter itself is truncated away; there is no clickable region.
+            self._file_nav_counter_cols = None
+            return
+        self._draw_top_bar(
+            surface, counter, fg=THEME.fg_accent, bg=THEME.bg_chrome, col=col
+        )
+        rest = f" {path}"
+        rest_budget = budget - counter_w
+        if rest_budget > 0 and wcswidth(rest) > rest_budget:
+            rest = truncate_by_width(rest, rest_budget)
+        if rest_budget > 0:
+            surface.draw_text_rgb(
+                0, col + counter_w, rest, fg=THEME.fg_muted, bg=THEME.bg_chrome
+            )
+        self._file_nav_counter_cols = (col, col + counter_w)
+
     def _file_history_header(self) -> str:
         """Build the header line for File History view."""
         if not self._file_history_commits:
@@ -981,18 +1212,13 @@ class DiffViewer(Component):
 
         # Header row (overwrites top border)
         header = self._file_history_header()
-        header_trim = (
-            truncate_by_width(header, w - 4) + " "
-            if wcswidth(header) > w - 4
-            else header
-        )
-        surface.draw_text_rgb(
-            0,
-            2,
-            header_trim,
+        self._draw_top_bar(
+            surface,
+            header,
             fg=THEME.fg_file_history_header,
             bg=THEME.bg_file_history_header,
             style_flags=palette.STYLE_BOLD,
+            trailing_space_when_truncated=True,
         )
 
         # Content area
@@ -1058,6 +1284,7 @@ class DiffViewer(Component):
     def paint(self, surface: Surface) -> None:
         w = surface.width
         h = surface.height
+        self._file_nav_counter_cols = None
         can_draw_box = w > self.LINE_NO_WIDTH + 3 and h >= self.BORDER_ROWS + 1
         if not self._lines:
             # Keep chrome when cleared so Preview stays a framed region, not a void.
@@ -1105,16 +1332,7 @@ class DiffViewer(Component):
                 THEME.bg_diff_context,
             )
 
-        if self._diff_type is DiffType.COMMIT and not self._hunk_mode:
-            path = self._current_file_path()
-            if path:
-                path_badge = f" {path} "
-                path_trim = (
-                    truncate_by_width(path_badge, w - 4)
-                    if wcswidth(path_badge) > w - 4
-                    else path_badge
-                )
-                surface.draw_text_rgb(h - 1, 1, path_trim, fg=THEME.fg_muted)
+        self._draw_file_nav_bar(surface)
 
         # Horizontal scroll indicator
         if self._max_col_offset > 0:
