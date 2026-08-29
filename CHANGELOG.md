@@ -1,5 +1,21 @@
 # Changelog of pigit
 
+## 2.5.0 (2026-08-29)
+
+### Features
+
+- **Command palette parameter completion**: `;` lists parameterized commands (checkout/merge/stage/gitignore) whose branch/file arguments complete from in-memory lists; typing a command + space switches the list to arg candidates, and Tab fills the selected candidate into the input.
+- **Undo for merge/rebase/cherry-pick**: `u`/`U` now reverse a completed merge, rebase, or cherry-pick by resetting to the recorded pre-operation HEAD; every undo asks for confirmation showing what it reverses and the git command it runs, and refuses a hard reset while the worktree has uncommitted changes.
+- **Nerd Font detection + fallback**: `icons: auto|on|off` replaces `file_icons`; `auto` enables glyphs on known Nerd Font terminals (kitty/WezTerm/Alacritty/Ghostty) and otherwise falls back to 1-cell plain symbols (also fixing the misalignment when icons were disabled). The generated config template emits the quoted `icons = "auto"` key with a regression test that parses the whole template.
+
+### Improvements
+
+- Command palette hint shows Tab completion; `u`/`U`/`@` help text reflects confirmation, undo scope, and in-place repo/worktree switching; `;` is no longer in the footer (still in Help and the Welcome sheet).
+
+### Refactors
+
+- Session history's reverse dispatchers become a single `_ReverseSpec(exec, describe)` registry; icon rendering converges on `resolve_icon` with the dir glyph moved into `ext.utils`.
+
 ## 2.4.0 (2026-08-29)
 
 ### Features
