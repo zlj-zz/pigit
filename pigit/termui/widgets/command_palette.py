@@ -8,9 +8,11 @@ Date: 2026-08-20
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from .. import keys, palette
+from .._runtime_context import request_render
 from ..theme import get_theme
 from ..component import Component
 from ..surface import Surface
@@ -27,11 +29,20 @@ _HINT_GAP = 2
 _SHEET_CHROME_ROWS = 2
 
 
+@dataclass(frozen=True)
+class PaletteArgs:
+    """Argument-completion descriptor for a parameterized palette command."""
+
+    label: str
+    fetch: Callable[[str], list[str]]
+
+
 class PaletteItem(NamedTuple):
     """One palette entry: executable id plus short description."""
 
     id: str
     desc: str = ""
+    args: PaletteArgs | None = None
 
 
 def list_slots_for_term(term_h: int) -> int:
@@ -47,15 +58,18 @@ def list_slots_for_term(term_h: int) -> int:
 
 
 def _coerce_items(
-    items: Sequence[str | tuple[str, str] | PaletteItem],
+    items: Sequence[str | tuple | PaletteItem],
 ) -> list[PaletteItem]:
-    """Normalize legacy strings and (id, desc) pairs into PaletteItem."""
+    """Normalize legacy strings and tuples into PaletteItem (args optional)."""
     out: list[PaletteItem] = []
     for item in items:
         if isinstance(item, PaletteItem):
             out.append(item)
         elif isinstance(item, tuple):
-            out.append(PaletteItem(item[0], item[1] if len(item) > 1 else ""))
+            if len(item) >= 3:
+                out.append(PaletteItem(item[0], item[1], item[2]))
+            else:
+                out.append(PaletteItem(item[0], item[1] if len(item) > 1 else ""))
         else:
             out.append(PaletteItem(str(item)))
     return out
@@ -73,7 +87,7 @@ class CommandPalette(Component):
     def __init__(
         self,
         *,
-        items: Sequence[str | tuple[str, str] | PaletteItem],
+        items: Sequence[str | tuple | PaletteItem],
         on_execute: Callable[[str], None] | None = None,
         on_dismiss: Callable[[], None] | None = None,
         match: Callable[[str, PaletteItem], bool] | None = None,
@@ -98,6 +112,7 @@ class CommandPalette(Component):
         self._selected = 0  # index into _matched
         self._scroll = 0  # window start into _matched
         self._active = False
+        self._arg_mode: str | None = None
 
     @property
     def is_active(self) -> bool:
@@ -124,7 +139,7 @@ class CommandPalette(Component):
     def open(
         self,
         *,
-        items: Sequence[str | tuple[str, str] | PaletteItem] | None = None,
+        items: Sequence[str | tuple | PaletteItem] | None = None,
         list_slots: int | None = None,
     ) -> None:
         """Activate the palette; optionally refresh catalog and list budget."""
@@ -133,6 +148,7 @@ class CommandPalette(Component):
         if list_slots is not None:
             self._list_slots = max(MIN_LIST_SLOTS, list_slots)
         self._active = True
+        self._arg_mode = None
         self._input_line.clear()
         self._update_candidates()
         self._selected = 0
@@ -141,12 +157,20 @@ class CommandPalette(Component):
     def close(self) -> None:
         """Close the palette and invoke the dismiss callback."""
         self._active = False
+        self._arg_mode = None
         self._input_line.clear()
         self._matched = []
         self._selected = 0
         self._scroll = 0
         if self._on_dismiss is not None:
             self._on_dismiss()
+
+    def refresh_candidates(self) -> None:
+        """Recompute the matched list while open (e.g. after async data arrives)."""
+        if not self._active:
+            return
+        self._update_candidates()
+        request_render()
 
     def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult:
         """Route key to palette while active on a sheet layer."""
@@ -160,6 +184,8 @@ class CommandPalette(Component):
                 self.close()
             case keys.KEY_ENTER:
                 self._submit()
+            case keys.KEY_TAB:
+                self._complete_selected()
             case keys.KEY_UP:
                 if self._matched:
                     self._selected = max(0, self._selected - 1)
@@ -171,6 +197,12 @@ class CommandPalette(Component):
             case _:
                 self._input_line.handle_key(key)
         return True
+
+    def _complete_selected(self) -> None:
+        """Fill the input with the selected candidate id (Tab completion)."""
+        if self._matched and 0 <= self._selected < len(self._matched):
+            self._input_line.set_value(self._matched[self._selected].id)
+            self._update_candidates()
 
     def _item_slots(self) -> int:
         """How many command rows the list band may show (terminal budget)."""
@@ -209,8 +241,18 @@ class CommandPalette(Component):
         return visible, below, start
 
     def _submit(self) -> None:
-        """Execute selected or typed id, then close."""
-        if self._matched and 0 <= self._selected < len(self._matched):
+        """Execute selected or typed id, then close.
+
+        In argument-completion mode (``_arg_mode`` set), selection 0 keeps the
+        raw input so a partial token does not silently pick the first match.
+        Template mode keeps the legacy ``matched[selected]`` / typed fallback.
+        """
+        if self._arg_mode is not None:
+            if self._selected > 0 and 0 <= self._selected < len(self._matched):
+                value = self._matched[self._selected].id
+            else:
+                value = self._input_line.value.strip()
+        elif self._matched and 0 <= self._selected < len(self._matched):
             value = self._matched[self._selected].id
         else:
             value = self._input_line.value.strip()
@@ -223,14 +265,48 @@ class CommandPalette(Component):
         self._update_candidates()
 
     def _update_candidates(self) -> None:
-        """Refresh matched catalog (full list when needle is empty)."""
-        needle = self._input_line.value.strip()
-        if not needle:
-            self._matched = self._items[:MAX_MATCHED]
-        else:
-            self._matched = [item for item in self._items if self._match(needle, item)][
-                :MAX_MATCHED
-            ]
+        """Refresh matched catalog; switch to arg completion after a space."""
+        value = self._input_line.value
+        idx = value.find(" ")
+        if idx < 0:
+            self._arg_mode = None
+            needle = value.strip()
+            if not needle:
+                self._matched = self._items[:MAX_MATCHED]
+            else:
+                self._matched = [
+                    item for item in self._items if self._match(needle, item)
+                ][:MAX_MATCHED]
+            self._selected = 0
+            self._scroll = 0
+            return
+
+        prefix = value[:idx].rstrip()
+        rest = value[idx + 1 :]
+        hit: PaletteItem | None = None
+        for item in self._items:
+            if item.args is not None and item.id.lower() == prefix.lower():
+                hit = item
+                break
+        if hit is None or hit.args is None:
+            self._arg_mode = None
+            needle = value.strip()
+            if not needle:
+                self._matched = self._items[:MAX_MATCHED]
+            else:
+                self._matched = [
+                    item for item in self._items if self._match(needle, item)
+                ][:MAX_MATCHED]
+            self._selected = 0
+            self._scroll = 0
+            return
+
+        self._arg_mode = hit.id
+        try:
+            values = hit.args.fetch(rest)
+        except Exception:
+            values = []
+        self._matched = [PaletteItem(f"{hit.id} {v}") for v in values][:MAX_MATCHED]
         self._selected = 0
         self._scroll = 0
 

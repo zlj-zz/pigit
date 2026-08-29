@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from .bordered_text_browser import BorderedTextBrowser
 from .check_list import CheckList
-from .command_palette import CommandPalette, PaletteItem, list_slots_for_term
+from .command_palette import (
+    CommandPalette,
+    PaletteArgs,
+    PaletteItem,
+    list_slots_for_term,
+)
 from .footer import Footer
 from .graph import HeatmapGrid, StepLineChart
 from .header import Header
@@ -38,6 +43,7 @@ __all__ = [
     "AlertDialog",
     "AlertDialogBody",
     "CommandPalette",
+    "PaletteArgs",
     "PaletteItem",
     "list_slots_for_term",
     "Footer",

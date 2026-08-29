@@ -41,6 +41,8 @@ class IStatusViewModel(IListViewModel["File"]):
     @property
     def repo_path(self) -> str: ...
 
+    def needs_stage(self, idx: int) -> bool: ...
+
     def stage(self, idx: int) -> ActionResult: ...
 
     def discard(self, idx: int) -> ActionResult: ...
@@ -142,6 +144,13 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return ActionResult(
             success=True, message=msg_template.format(count), should_refresh=count > 0
         )
+
+    def needs_stage(self, idx: int) -> bool:
+        """Return True when staging *idx* would run ``git add`` (not unstage)."""
+        f = self.item_at(idx)
+        if f is None:
+            return False
+        return _needs_stage(f)
 
     def stage(self, idx: int) -> ActionResult:
         f = self.item_at(idx)

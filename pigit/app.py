@@ -137,6 +137,7 @@ class PigitApplication(Application):
         self._status_vm = self._session.status_vm
         self._commit_vm = self._session.commit_vm
         self._branch_vm = self._session.branch_vm
+        self._palette_vm_unsubs: list[Callable[[], None]] = []
         self._repo_token: object = object()
         # True while a RepoSession.build for a switch is in flight (spinner on).
         self._switch_in_flight = False
@@ -792,7 +793,7 @@ class PigitApplication(Application):
         if self._palette.is_active:
             self._palette.close()
         else:
-            from pigit.app_command_palette import catalog_for_context
+            from pigit.app_command_palette import build_catalog
             from pigit.termui.widgets import list_slots_for_term
 
             # Same height source as Sheet.resolve_height (root size, not a
@@ -806,10 +807,26 @@ class PigitApplication(Application):
             except Exception:
                 sequencer = None
             self._palette.open(
-                items=catalog_for_context(sequencer),
+                items=build_catalog(
+                    sequencer,
+                    branch_names=lambda: [b.name for b in self._branch_vm.items.value],
+                    file_names=lambda: [
+                        f.get_file_str() for f in self._status_vm.items.value
+                    ],
+                ),
                 list_slots=slots,
             )
             self._root.show_sheet(self._palette, title="Commands")
+            # Branch/status lists may be empty until their panels mount; load
+            # both and refresh arg candidates when the Signals update.
+            self._branch_vm.refresh()
+            self._status_vm.refresh()
+            self._palette_vm_unsubs.append(
+                self._branch_vm.items.subscribe(self._on_palette_vm_items_changed)
+            )
+            self._palette_vm_unsubs.append(
+                self._status_vm.items.subscribe(self._on_palette_vm_items_changed)
+            )
 
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
@@ -1428,8 +1445,15 @@ class PigitApplication(Application):
         """Pull into HEAD from its configured upstream (non-interactive)."""
         self._run_network_git("pull")
 
+    def _on_palette_vm_items_changed(self, _items: object) -> None:
+        """Refresh palette arg candidates when branch/status lists update."""
+        self._palette.refresh_candidates()
+
     def _dismiss_palette(self) -> None:
-        """Dismiss the palette sheet from the root."""
+        """Dismiss the palette sheet from the root and drop VM subscriptions."""
+        for unsub in self._palette_vm_unsubs:
+            unsub()
+        self._palette_vm_unsubs.clear()
         if self._root is not None:
             self._root.dismiss_sheet()
 
@@ -1549,9 +1573,20 @@ class PigitApplication(Application):
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
-        from pigit.app_command_palette import KNOWN_COMMAND_IDS
+        from pigit.app_command_palette import KNOWN_COMMAND_IDS, PARAMETERIZED_ACTIONS
 
-        lower = cmd.lower().strip()
+        stripped = cmd.strip()
+        space = stripped.find(" ")
+        if space < 0:
+            action, arg = stripped.lower(), ""
+        else:
+            action, arg = stripped[:space].lower(), stripped[space + 1 :].lstrip()
+
+        if action in PARAMETERIZED_ACTIONS:
+            self._dispatch_parameterized_palette(action, arg)
+            return
+
+        lower = stripped.lower()
         if lower not in KNOWN_COMMAND_IDS:
             show_toast(
                 f"Unknown command: {cmd}",
@@ -1586,6 +1621,70 @@ class PigitApplication(Application):
             "cherry-pick-skip",
         ):
             self._run_cherry_pick_control(lower)
+            return
+
+    def _resolve_index(
+        self,
+        items: list,
+        key_fn: Callable[[object], str],
+        arg: str,
+    ) -> int | None:
+        """Return the first index whose key equals *arg*, or None."""
+        for idx, item in enumerate(items):
+            if key_fn(item) == arg:
+                return idx
+        return None
+
+    def _toast_palette_result(self, result) -> None:
+        """Show action result and refresh VMs when the action asks for it."""
+        kind = FeedbackKind.SUCCESS if result.success else FeedbackKind.ERROR
+        show_toast(result.message, duration=1.5 if result.success else 2.0, kind=kind)
+        if result.success and result.should_refresh:
+            self._refresh_git_vms()
+            self._schedule_reload_header()
+
+    def _dispatch_parameterized_palette(self, action: str, arg: str) -> None:
+        """Route checkout/merge/stage/gitignore with a resolved argument."""
+        if action in ("checkout", "merge"):
+            kind = "branch"
+            idx = self._resolve_index(
+                self._branch_vm.items.value, lambda b: b.name, arg
+            )
+        else:
+            kind = "file"
+            idx = self._resolve_index(
+                self._status_vm.items.value, lambda f: f.get_file_str(), arg
+            )
+
+        if idx is None:
+            show_toast(
+                f"No matching {kind}: {arg}",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        if action == "checkout":
+            result = self._branch_vm.checkout(idx)
+            self._toast_palette_result(result)
+            return
+        if action == "merge":
+            self._on_merge_request(arg, self._branch_vm.current_branch())
+            return
+        if action == "stage":
+            if not self._status_vm.needs_stage(idx):
+                show_toast(
+                    "already staged",
+                    duration=1.5,
+                    kind=FeedbackKind.WARNING,
+                )
+                return
+            result = self._status_vm.stage(idx)
+            self._toast_palette_result(result)
+            return
+        if action == "gitignore":
+            result = self._status_vm.ignore(idx)
+            self._toast_palette_result(result)
             return
 
     @property

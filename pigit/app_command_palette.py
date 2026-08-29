@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from pigit.termui import widgets as termui_widgets
-from pigit.termui.widgets import PaletteItem
+from pigit.termui.widgets import PaletteArgs, PaletteItem
 
 # Priority order: navigation → network → quit → sequencer controls.
 DEFAULT_COMMANDS: list[PaletteItem] = [
@@ -34,6 +34,61 @@ DEFAULT_COMMANDS: list[PaletteItem] = [
 KNOWN_COMMAND_IDS: frozenset[str] = frozenset(item.id for item in DEFAULT_COMMANDS)
 
 
+class _CatalogAccessors:
+    """Late-bound name sources for parameterized ``args.fetch`` closures."""
+
+    branch_names: Callable[[], list[str]] = staticmethod(lambda: [])
+    file_names: Callable[[], list[str]] = staticmethod(lambda: [])
+
+
+_ACCESSORS = _CatalogAccessors()
+
+PARAMETERIZED_ITEMS: list[PaletteItem] = [
+    PaletteItem(
+        "checkout",
+        "Checkout branch",
+        args=PaletteArgs(
+            label="<Branch>",
+            fetch=lambda rest: [
+                b for b in _ACCESSORS.branch_names() if rest.lower() in b.lower()
+            ],
+        ),
+    ),
+    PaletteItem(
+        "merge",
+        "Merge branch",
+        args=PaletteArgs(
+            label="<Branch>",
+            fetch=lambda rest: [
+                b for b in _ACCESSORS.branch_names() if rest.lower() in b.lower()
+            ],
+        ),
+    ),
+    PaletteItem(
+        "stage",
+        "Stage file",
+        args=PaletteArgs(
+            label="<File>",
+            fetch=lambda rest: [
+                f for f in _ACCESSORS.file_names() if rest.lower() in f.lower()
+            ],
+        ),
+    ),
+    PaletteItem(
+        "gitignore",
+        "Ignore file",
+        args=PaletteArgs(
+            label="<File>",
+            fetch=lambda rest: [
+                f for f in _ACCESSORS.file_names() if rest.lower() in f.lower()
+            ],
+        ),
+    ),
+]
+
+PARAMETERIZED_ACTIONS: frozenset[str] = frozenset(i.id for i in PARAMETERIZED_ITEMS)
+
+
 def catalog_for_context(sequencer: str | None) -> list[PaletteItem]:
     """Return priority-ordered commands for the current git sequencer state.
 
@@ -50,6 +105,22 @@ def catalog_for_context(sequencer: str | None) -> list[PaletteItem]:
             continue
         out.append(item)
     return out
+
+
+def build_catalog(
+    sequencer: str | None,
+    *,
+    branch_names: Callable[[], list[str]],
+    file_names: Callable[[], list[str]],
+) -> list[PaletteItem]:
+    """Return static context catalog plus parameterized command entries.
+
+    Static sequencer filtering is unchanged. Parameterized items always appear;
+    their ``args.fetch`` closures call the accessors lazily on each keystroke.
+    """
+    _ACCESSORS.branch_names = branch_names
+    _ACCESSORS.file_names = file_names
+    return catalog_for_context(sequencer) + PARAMETERIZED_ITEMS
 
 
 class CommandPalette(termui_widgets.CommandPalette):
