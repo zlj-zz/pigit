@@ -62,6 +62,7 @@ from .app_network_git import NetworkGit, NetworkGitOutcome
 from .app_merge_workflow import MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
+from .ext.utils import resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
@@ -242,7 +243,7 @@ class PigitApplication(Application):
             id="status_panel",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
-            file_icons=self._config.file_icons,
+            nerd_icons=resolve_nerd_icons(self._config.icons),
         )
         self._stash_panel = StashPanel(
             vm=self._status_vm,

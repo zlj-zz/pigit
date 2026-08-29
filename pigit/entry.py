@@ -15,7 +15,7 @@ from .const import (
 from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
 from .ext.func import dynamic_default_attrs
-from .ext.utils import get_file_icon
+from .ext.utils import resolve_icon, resolve_nerd_icons
 from .git import create_gitignore
 from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
 from .hook import before_hook
@@ -193,10 +193,14 @@ def pigit(args: Namespace, _) -> None:
                 (len(f"{v[LINES_CHANGE]:+}") if v.get(LINES_CHANGE, 0) != 0 else 0)
                 for v in diff_result.values()
             )
+            # Resolve once outside the loop; icon choice is per-render-strategy.
+            nerd = resolve_nerd_icons(config.app.icons)
 
             for k, v in diff_result.items():
                 f_type_str = (
-                    f"@cyan({get_file_icon(k)} {k})" if config.counter.show_icon else k
+                    f"@cyan({resolve_icon(nerd, k)} {k})"
+                    if config.counter.show_icon
+                    else k
                 )
 
                 f_color = _color_index(v[FILES_NUM])

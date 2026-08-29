@@ -179,17 +179,17 @@ def test_stash_submit_strips_message_and_pushes() -> None:
         vm.stash_push.assert_called_once_with("wip")
 
 
-def test_file_icon_name_prefix_when_enabled_and_disabled() -> None:
-    """file_icons=True prefixes the name with a Nerd Font icon; False keeps
-    the plain name."""
-    from pigit.ext.utils import adjudgment_type, get_file_icon
+def test_file_icon_name_prefix_when_enabled_and_fallback() -> None:
+    """nerd_icons=True prefixes the name with a Nerd Font icon; False uses
+    the 1-cell fallback symbol (never blank)."""
+    from pigit.ext.utils import adjudgment_type, get_file_icon, resolve_icon
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([_file("main.py")])
     vm.repo_path = "/tmp/repo"
     file = _file("main.py")
 
-    panel = StatusPanel(vm=vm, default_view="flat", file_icons=True)
+    panel = StatusPanel(vm=vm, default_view="flat", nerd_icons=True)
     panel.files = [file]
     panel.set_content(["main.py"])
     left, main, _right = panel.describe_row(0, False)
@@ -198,11 +198,12 @@ def test_file_icon_name_prefix_when_enabled_and_disabled() -> None:
     assert left[0].text == " "
     assert left[2].text == "M"  # unstaged column
 
-    panel_off = StatusPanel(vm=vm, default_view="flat", file_icons=False)
+    panel_off = StatusPanel(vm=vm, default_view="flat", nerd_icons=False)
     panel_off.files = [file]
     panel_off.set_content(["main.py"])
     _left, main_off, _r = panel_off.describe_row(0, False)
-    assert main_off[0].text == "main.py"
+    fallback = resolve_icon(False, adjudgment_type("main.py"))
+    assert main_off[0].text == f"{fallback} main.py"
 
 
 def test_clean_tree_refresh_completion_clears_loading() -> None:
@@ -261,3 +262,23 @@ def test_stash_submit_empty_message_still_pushes() -> None:
     ):
         panel._on_stash_submit("   ")
         vm.stash_push.assert_called_once_with("")
+
+
+def test_status_panel_receives_resolved_nerd_icons() -> None:
+    """app.py wires config.icons through resolve_nerd_icons to StatusPanel."""
+    from pigit.app import PigitApplication
+    from pigit.config_data import AppConfig
+
+    app_off = PigitApplication(config=AppConfig(icons="off", repo_observe=False))
+    app_off.build_root()
+    assert app_off._status_panel._nerd_icons is False
+
+    app_on = PigitApplication(config=AppConfig(icons="on", repo_observe=False))
+    app_on.build_root()
+    assert app_on._status_panel._nerd_icons is True
+
+    with patch("pigit.app.resolve_nerd_icons", return_value=True) as detect:
+        app_auto = PigitApplication(config=AppConfig(icons="auto", repo_observe=False))
+        app_auto.build_root()
+    detect.assert_called_once_with("auto")
+    assert app_auto._status_panel._nerd_icons is True

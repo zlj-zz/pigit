@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from functools import lru_cache
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -297,6 +297,68 @@ def get_file_icon(file_type: str) -> str:
     """
     #     
     return FILE_ICONS.get(file_type, "")
+
+
+# ── Nerd Font detection and fallback ──
+# PUA glyphs render as tofu blocks on terminals without a Nerd Font, so the
+# icons policy defaults to ``auto``: enable only when the terminal advertises
+# NF support, else fall back to single-cell plain symbols.
+
+_DIR_ICON = "\uf07b"  # nf-fa-folder (PUA block, width 1)
+# Fallback symbols are single-cell (wcswidth 1, pinned by tests). They are
+# East Asian Ambiguous (A) class; pigit's wcwidth_table renders them 1 cell.
+_FALLBACK_DIR = "▸"  # U+25B8
+_FALLBACK_FILE = "·"  # U+00B7
+
+_NF_MARKER_ENV = (
+    "KITTY_WINDOW_ID",  # kitty
+    "WEZTERM_EXECUTABLE",  # WezTerm
+    "ALACRITTY_WINDOW_ID",  # Alacritty
+    "GHOSTTY_RESOURCES_DIR",  # Ghostty
+)
+_NF_TERM_PROGRAMS = {"WezTerm", "ghostty", "kitty"}
+
+
+def resolve_nerd_icons(policy: str, env: Mapping | None = None) -> bool:
+    """Resolve the icons policy to a concrete on/off decision.
+
+    ``on`` / ``off`` force the outcome; ``auto`` uses env-marker heuristics —
+    terminals known to ship a Nerd Font (kitty/WezTerm/Alacritty/Ghostty)
+    opt in, everything else falls back to plain symbols (tofu is worse than
+    a plain glyph). ``env`` is injectable for tests; defaults to os.environ.
+
+    Args:
+        policy: "auto", "on" or "off".
+        env: Environment mapping to probe, or None for os.environ.
+
+    Returns:
+        True when Nerd Font glyphs should be rendered.
+    """
+    if policy == "on":
+        return True
+    if policy == "off":
+        return False
+    env = os.environ if env is None else env
+    return any(env.get(m) for m in _NF_MARKER_ENV) or (
+        env.get("TERM_PROGRAM") in _NF_TERM_PROGRAMS
+    )
+
+
+def resolve_icon(nerd_enabled: bool, file_type: str, is_dir: bool = False) -> str:
+    """Return a 1-cell icon prefix: NF glyph when available, else a plain
+    fallback symbol. Single resolution point over ``get_file_icon``.
+
+    Args:
+        nerd_enabled: Whether Nerd Font glyphs are usable.
+        file_type: File type string (see :func:`adjudgment_type`).
+        is_dir: True for directory rows.
+
+    Returns:
+        The icon glyph or fallback symbol (never empty).
+    """
+    if nerd_enabled:
+        return _DIR_ICON if is_dir else get_file_icon(file_type)
+    return _FALLBACK_DIR if is_dir else _FALLBACK_FILE
 
 
 def page_output(text: str | Iterator[str]) -> None:

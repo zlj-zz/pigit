@@ -36,6 +36,23 @@ def _flatten_keybindings(raw: dict, prefix: str = "") -> dict:
     return out
 
 
+def _resolve_icons_policy(app_raw: dict) -> str:
+    """Resolve the Nerd Font icons policy from raw ``[app]`` values.
+
+    Priority: ``PIGIT_ICONS=0`` env (off) > validated ``icons`` key > legacy
+    ``file_icons`` (true→on / false→off) > ``auto``.
+    """
+    if os.environ.get("PIGIT_ICONS", "") == "0":
+        return "off"
+    icons = app_raw.get("icons")
+    if icons in ("auto", "on", "off"):
+        return icons
+    legacy = app_raw.get("file_icons")
+    if legacy is not None:
+        return "on" if legacy else "off"
+    return "auto"
+
+
 class Config(metaclass=Singleton):
     """PIGIT configuration class."""
 
@@ -130,9 +147,10 @@ class Config(metaclass=Singleton):
         # To see Welcome again: delete welcome_seen from state.toml (see STATE_FILE_PATH).
         show_welcome = {app_show_welcome}
 
-        # (bool) Show Nerd Font file icons in the Status list. Needs a
-        # Nerd Font terminal; set PIGIT_ICONS=0 to force off.
-        file_icons = {app_file_icons}
+        # (str) Nerd Font icons in the Status list: auto (detect), on, off.
+        # auto enables glyphs on Nerd Font terminals (kitty/WezTerm/…), else
+        # falls back to plain symbols. Set PIGIT_ICONS=0 to force off.
+        icons = "auto"
         {keybindings}
         """)
 
@@ -317,10 +335,9 @@ class Config(metaclass=Singleton):
             commit_report_default=app_raw.get("commit_report_default", True),
             show_footer=app_raw.get("show_footer", True),
             show_welcome=app_raw.get("show_welcome", True),
-            # PIGIT_ICONS=0 forces icons off regardless of config (first
-            # UI-class env override; kept here so it lives next to parsing).
-            file_icons=os.environ.get("PIGIT_ICONS", "") != "0"
-            and app_raw.get("file_icons", True),
+            # PIGIT_ICONS=0 forces icons off regardless of config; see
+            # _resolve_icons_policy for the full priority ladder.
+            icons=_resolve_icons_policy(app_raw),
             keybindings=_flatten_keybindings(kb_raw),
         )
 
@@ -401,7 +418,6 @@ class Config(metaclass=Singleton):
                         ).lower(),
                         app_show_footer=str(data.app.show_footer).lower(),
                         app_show_welcome=str(data.app.show_welcome).lower(),
-                        app_file_icons=str(data.app.file_icons).lower(),
                         keybindings=keybindings_block,
                     )
                 )
