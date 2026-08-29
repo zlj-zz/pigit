@@ -72,6 +72,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `Enter` | select / open | all |
 | `q` / `Esc` | back / quit | all |
 | `?` | help | all |
+| `;` | open command palette (type a command; space + fragment completes branch/file args) | all |
 | `I` | inspect selection (top sheet; `j`/`k` scroll, `Esc`/`I` close) | Status, Stash, Branch, Commit |
 | `a` / `d` / `i` | stage / discard / ignore | Status |
 | `c` | inline commit editor | Status |
@@ -79,7 +80,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `o` | show another branch’s log | Commit |
 | `Enter` | show that branch’s commits (no checkout) | Branch |
 | `H` | toggle hunk staging | Diff |
-| `u` / `U` | undo / undo stack | all |
+| `u` / `U` | undo last action (confirm) / undo stack — also reverses merge, rebase, cherry-pick | all |
 | `z` / `Z` | stash push / pop | Status |
 
 Press `?` for the full per-panel list. Every key is remappable via `[app.keybindings]` — see [Keybindings](#keybindings).
@@ -225,7 +226,7 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[app]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
 | `[app]` | `commit_report_default` | bool | `True` | show the Commit contribution-graph report below the list when the panel is taller than 19 rows (Ctrl+r toggles) |
 | `[app]` | `show_footer` | bool | `True` | show the footer key-hint bar |
-| `[app]` | `file_icons` | bool | `True` | show Nerd Font file icons in the Status list (requires Nerd Font; `PIGIT_ICONS=0` forces off) |
+| `[app]` | `icons` | str | `auto` | Nerd Font icon policy in the Status list: `auto` (detect kitty/WezTerm/Alacritty/Ghostty), `on`, `off` (fall back to plain symbols; `PIGIT_ICONS=0` forces off) |
 
 ### Keybindings
 
@@ -281,7 +282,8 @@ User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias
 
 **TUI**
 
-- **Session history / undo** — one-key reversal (`u`) and a browsable undo stack (`U`).
+- **Session history / undo** — one-key reversal with confirmation (`u`), a browsable undo stack (`U`), and undo for merge, rebase, and cherry-pick.
+- **Command palette** — `;` opens a filterable command list; parameterized commands (checkout/merge/stage/gitignore) complete branch/file arguments.
 - **Hunk staging** — stage or unstage individual hunks directly in the diff viewer (`H`).
 - **Inline commit editor** — subject/body fields with lint bar inside the TUI.
 - **Stash management** — push, pop, and drop stashes from the status panel.
