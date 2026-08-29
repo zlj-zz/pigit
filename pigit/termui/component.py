@@ -23,7 +23,6 @@ from .bindings import (
     resolve_instance_bindings,
 )
 from .mouse import MouseEvent
-from .keys import display_key
 from ._runtime_context import (
     get_focus_manager,
     get_overlay_host,
@@ -273,6 +272,22 @@ class Component(ABC):
         """Current (width, height) assigned by the last resize()."""
         return self._size
 
+    def global_origin(self) -> tuple[int, int]:
+        """0-based (row, col) of this component's top-left on the terminal.
+
+        Each ancestor stores a parent-relative 1-based ``x`` (row) / ``y``
+        (col); summing ``coord - 1`` along the parent chain yields the screen
+        position.
+        """
+        row = 0
+        col = 0
+        node: Component | None = self
+        while node is not None:
+            row += max(0, int(getattr(node, "x", 1)) - 1)
+            col += max(0, int(getattr(node, "y", 1)) - 1)
+            node = getattr(node, "parent", None)
+        return row, col
+
     def refresh(self):
         """Fresh content data.
 
@@ -285,7 +300,13 @@ class Component(ABC):
 
         Subclasses that manage child geometry (e.g. Column, Row, TabView)
         must override this method to propagate the correct size to each child.
+
+        An unchanged size skips ``refresh`` so per-frame relayouts (e.g. a
+        header laying out its slot children on every paint) do not re-request
+        a render and spin the event loop.
         """
+        if self._size == size:
+            return
         self._size = size
         self.refresh()
 

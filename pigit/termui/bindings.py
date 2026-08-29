@@ -196,6 +196,22 @@ def bind_action(
     return decorator
 
 
+def _merge_by_tip(
+    groups: Sequence[Sequence[tuple[str, str]]],
+    transform: Callable[[str], str],
+) -> list[tuple[str, str]]:
+    """Group ``(key, tip)`` rows sharing a tip, joining keys with ``/``."""
+    grouped: dict[str, list[str]] = {}
+    order: list[str] = []
+    for entries in groups:
+        for key, tip in entries:
+            if tip not in grouped:
+                grouped[tip] = []
+                order.append(tip)
+            grouped[tip].append(key)
+    return [("/".join(transform(k) for k in grouped[tip]), tip) for tip in order]
+
+
 def merge_footer_pairs(
     entries: Sequence[tuple[str, str]],
 ) -> list[tuple[str, str]]:
@@ -204,29 +220,14 @@ def merge_footer_pairs(
     Keys are rendered with :func:`~pigit.termui.keys.display_key` and joined
     with ``/`` (e.g. ``j/k/down/up Navigate``).
     """
-    grouped: dict[str, list[str]] = {}
-    order: list[str] = []
-    for key, tip in entries:
-        if tip not in grouped:
-            grouped[tip] = []
-            order.append(tip)
-        grouped[tip].append(key)
-    return [("/".join(display_key(k) for k in grouped[tip]), tip) for tip in order]
+    return _merge_by_tip([entries], display_key)
 
 
 def join_footer_display_pairs(
     parts: Sequence[Sequence[tuple[str, str]]],
 ) -> list[tuple[str, str]]:
     """Merge already-displayed ``(key, tip)`` rows that share a tip."""
-    grouped: dict[str, list[str]] = {}
-    order: list[str] = []
-    for entries in parts:
-        for key, tip in entries:
-            if tip not in grouped:
-                grouped[tip] = []
-                order.append(tip)
-            grouped[tip].append(key)
-    return [("/".join(grouped[tip]), tip) for tip in order]
+    return _merge_by_tip(parts, lambda key: key)
 
 
 def collect_action_bindings(cls: type, namespace: str = "") -> list[Binding]:

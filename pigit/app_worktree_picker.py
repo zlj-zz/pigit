@@ -7,11 +7,11 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from pigit.ext.utils import split_at_most
 from pigit.git.api import WorktreeInfo
 from pigit.termui import (
     FeedbackKind,
@@ -83,14 +83,7 @@ def parse_add_worktree_input(raw: str) -> tuple[str, str]:
     quoted; an unquoted third token is an explicit error instead of a silent
     mis-split into ``path``/``branch``.
     """
-    try:
-        parts = shlex.split(raw)
-    except ValueError as exc:
-        raise ValueError(f"bad quoting: {exc}") from None
-    if not parts:
-        raise ValueError("empty input")
-    if len(parts) > 2:
-        raise ValueError("expected: path [branch] (quote paths with spaces)")
+    parts = split_at_most(raw, 2, "path [branch] (quote paths with spaces)")
     target = parts[0]
     if len(parts) == 2 and parts[1].strip():
         branch = parts[1].strip()

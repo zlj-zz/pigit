@@ -8,10 +8,9 @@ Date: 2026-08-27
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Callable, Sequence
 
-from .. import keys, palette
+from .. import keys
 from ..bindings import ExecutableBinding
 from ..component import Component
 from .._layout import Padding
@@ -19,9 +18,9 @@ from ..mouse import MouseButton, MouseEvent, MouseKind
 from ..primitives.frame import BoxFrame
 from ..segment import Segment
 from ..surface import Surface
-from ..theme import get_theme
+from ..theme import get_theme, selected_row_bg
 from ..viewport_hit import (
-    DOUBLE_CLICK_MS,
+    DoubleClickTracker,
     ViewportLayout,
     build_viewport_layout,
     hit_row,
@@ -96,9 +95,8 @@ class BindingBrowser(Component):
         self._render: list[tuple[list[Segment], int | None]] = []
         # Viewport hit geometry rebuilt alongside ``_render`` (see _rebuild).
         self._layout: ViewportLayout | None = None
-        # Last left press, for double-click detection (cleared on dismiss/reset).
-        self._last_click_index: int | None = None
-        self._last_click_time = 0.0
+        # Pair left presses into double-clicks (cleared on dismiss/reset).
+        self._double_click = DoubleClickTracker()
 
     def set_on_toggle(self, cb: Callable[[], None] | None) -> None:
         """Set the callback invoked by :meth:`toggle` (Popup wires this)."""
@@ -212,13 +210,7 @@ class BindingBrowser(Component):
         idx = hit_row(event.row - origin_row, event.col - origin_col, layout)
         if idx is None:
             return True
-        now = time.monotonic()
-        is_double = (
-            idx == self._last_click_index
-            and now - self._last_click_time <= DOUBLE_CLICK_MS / 1000.0
-        )
-        self._last_click_index = idx
-        self._last_click_time = now
+        is_double = self._double_click.is_double(idx)
         self._cursor = idx
         self._ensure_cursor_visible()
         if is_double:
@@ -228,8 +220,7 @@ class BindingBrowser(Component):
 
     def _clear_double_click(self) -> None:
         """Forget the previous left press (used on dismiss and content reset)."""
-        self._last_click_index = None
-        self._last_click_time = 0.0
+        self._double_click.clear()
 
     def _scroll_down(self, line: int = 1) -> None:
         max_off = max(0, len(self._render) - self._scroll_h)
@@ -350,10 +341,7 @@ class BindingBrowser(Component):
 
     def _selected_row_bg(self, theme) -> tuple[int, int, int]:
         """Match commit-panel cursor row when ``PigitTheme`` is installed."""
-        selected = getattr(theme, "bg_commit_selected", None)
-        if selected is not None:
-            return selected
-        return theme.bg_hover
+        return selected_row_bg(theme)
 
     def paint(self, surface: Surface) -> None:
         theme = get_theme()

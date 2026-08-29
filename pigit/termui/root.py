@@ -374,6 +374,10 @@ class ComponentRoot(Component):
     ) -> Sheet:
         """Display a sheet on the SHEET layer and move focus to its leaf.
 
+        The new sheet replaces any open sheet (no stacking, mirroring how
+        ``show_toast`` replaces a toast) and the child is mounted here, so
+        callers just open — no ``dismiss_sheet()`` / ``child.mount()`` dance.
+
         Height resolution matches :func:`~pigit.termui.overlay.show_sheet`:
         omitted ``height`` uses the child's preferred height and
         ``max_fraction``; an explicit ``height`` only gets the half-terminal
@@ -381,6 +385,9 @@ class ComponentRoot(Component):
         """
         from .widgets import Sheet
 
+        # Replace every open sheet so a new one can never stack underneath.
+        while self._pop_layer(LayerKind.SHEET) is not None:
+            pass
         term_h = self._size[1] if self._size[1] > 0 else 24
         resolved = Sheet.resolve_height(
             child,
@@ -402,6 +409,7 @@ class ComponentRoot(Component):
         )
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)
+        child.mount()
         # Focus must track the stack here so body panels dim on the first frame
         # (is_focus_leaf), including AsyncTask / non-key open paths.
         self._focus_manager.sync_focus_to_overlay_or_leaf()

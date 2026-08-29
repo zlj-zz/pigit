@@ -7,9 +7,17 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from pigit.termui import keys
 from pigit.termui.surface import Surface
-from pigit.termui.widgets import CommandPalette, PaletteItem, list_slots_for_term
+from pigit.termui.widgets import (
+    CommandPalette,
+    PaletteArgs,
+    PaletteItem,
+    list_slots_for_term,
+)
+from pigit.termui.widgets.command_palette import MAX_MATCHED
 
 _ITEMS = [
     PaletteItem("alpha", "First"),
@@ -20,6 +28,11 @@ _ITEMS = [
 
 def _ids(palette: CommandPalette) -> list[str]:
     return [c.id for c in palette._candidates]
+
+
+def _type(palette: CommandPalette, text: str) -> None:
+    for ch in text:
+        palette.handle_key(ch)
 
 
 class TestListSlots:
@@ -183,3 +196,200 @@ class TestCommandPalette:
         palette.paint(surface)
         overlay = get_theme().bg_overlay
         assert surface.rows()[-1][0].bg != overlay
+
+
+class TestPaletteArgsMode:
+    def _checkout_item(self, fetch) -> PaletteItem:
+        return PaletteItem(
+            "checkout",
+            "Checkout branch",
+            args=PaletteArgs(label="<branch>", fetch=fetch),
+        )
+
+    def test_no_space_keeps_template_filter(self):
+        calls: list[str] = []
+        items = [
+            PaletteItem("stash", "Focus stash"),
+            self._checkout_item(lambda rest: calls.append(rest) or ["dev"]),
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "sta")
+        assert _ids(palette) == ["stash"]
+        assert palette._arg_mode is None
+        assert calls == []
+
+    def test_prefix_space_switches_to_fetch_candidates(self):
+        calls: list[str] = []
+        items = [
+            self._checkout_item(lambda rest: calls.append(rest) or ["dev", "main"])
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout ")
+        assert palette._arg_mode == "checkout"
+        assert calls == [""]
+        assert _ids(palette) == ["checkout dev", "checkout main"]
+
+    def test_space_then_fragment_passes_rest_unstripped(self):
+        calls: list[str] = []
+        items = [self._checkout_item(lambda rest: calls.append(rest) or [])]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout  x")
+        assert calls[-1] == " x"
+
+    def test_fetch_lazy_per_keystroke(self):
+        calls: list[str] = []
+        items = [self._checkout_item(lambda rest: calls.append(rest) or ["ab"])]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout a")
+        assert calls == ["", "a"]
+
+    def test_max_matched_slices_fetch_results(self):
+        values = [f"b{i}" for i in range(MAX_MATCHED + 10)]
+        items = [self._checkout_item(lambda rest: values)]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout ")
+        assert len(palette._matched) == MAX_MATCHED
+
+    def test_fetch_exception_yields_empty_candidates(self):
+        def boom(_rest: str) -> list[str]:
+            raise RuntimeError("boom")
+
+        items = [self._checkout_item(boom)]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout ")
+        assert palette._arg_mode == "checkout"
+        assert palette._matched == []
+
+    def test_submit_arg_mode_selected_zero_uses_input(self):
+        executed: list[str] = []
+        items = [
+            self._checkout_item(lambda rest: ["develop", "dev"]),
+        ]
+        palette = CommandPalette(
+            items=items,
+            list_slots=10,
+            on_execute=lambda item: executed.append(item),
+        )
+        palette.open()
+        _type(palette, "checkout dev")
+        assert palette._selected == 0
+        palette.handle_key(keys.KEY_ENTER)
+        assert executed == ["checkout dev"]
+
+    def test_submit_arg_mode_selected_positive_uses_matched(self):
+        executed: list[str] = []
+        items = [self._checkout_item(lambda rest: ["develop", "dev"])]
+        palette = CommandPalette(
+            items=items,
+            list_slots=10,
+            on_execute=lambda item: executed.append(item),
+        )
+        palette.open()
+        _type(palette, "checkout d")
+        palette.handle_key(keys.KEY_DOWN)
+        assert palette._selected == 1
+        palette.handle_key(keys.KEY_ENTER)
+        assert executed == ["checkout dev"]
+
+    def test_submit_template_mode_sta_still_picks_stash(self):
+        executed: list[str] = []
+        items = [
+            PaletteItem("status", "Status"),
+            PaletteItem("stash", "Stash"),
+            self._checkout_item(lambda rest: ["dev"]),
+        ]
+        palette = CommandPalette(
+            items=items,
+            list_slots=10,
+            on_execute=lambda item: executed.append(item),
+        )
+        palette.open()
+        _type(palette, "stas")
+        assert palette._arg_mode is None
+        assert _ids(palette) == ["stash"]
+        palette.handle_key(keys.KEY_ENTER)
+        assert executed == ["stash"]
+
+    def test_coerce_three_tuple_passes_args(self):
+        args = PaletteArgs(label="<x>", fetch=lambda rest: ["a"])
+        palette = CommandPalette(items=[("checkout", "Checkout", args)], list_slots=10)
+        palette.open()
+        assert palette._items[0].args is args
+        _type(palette, "checkout ")
+        assert _ids(palette) == ["checkout a"]
+
+    def test_refresh_candidates_noop_when_inactive(self):
+        source = ["dev"]
+        items = [
+            PaletteItem(
+                "checkout",
+                args=PaletteArgs(label="<b>", fetch=lambda rest: list(source)),
+            )
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        with patch("pigit.termui.widgets.command_palette.request_render") as render:
+            palette.refresh_candidates()
+        assert not palette.is_active
+        assert palette._matched == []
+        render.assert_not_called()
+
+    def test_refresh_candidates_recomputes_and_renders(self):
+        source = ["old"]
+        items = [
+            PaletteItem(
+                "checkout",
+                args=PaletteArgs(label="<b>", fetch=lambda rest: list(source)),
+            )
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout ")
+        assert _ids(palette) == ["checkout old"]
+        source[:] = ["new"]
+        with patch("pigit.termui.widgets.command_palette.request_render") as render:
+            palette.refresh_candidates()
+        assert _ids(palette) == ["checkout new"]
+        render.assert_called_once()
+
+    def test_tab_fills_selected_candidate_id(self):
+        items = [self._checkout_item(lambda rest: ["develop", "dev"])]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout d")
+        palette.handle_key(keys.KEY_DOWN)
+        assert palette._selected == 1
+        palette.handle_key(keys.KEY_TAB)
+        assert palette.is_active
+        assert palette._input_line.value == "checkout dev"
+        assert palette._selected == 0
+        assert "checkout dev" in _ids(palette)
+
+    def test_tab_noop_when_no_candidates(self):
+        items = [self._checkout_item(lambda rest: [])]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "checkout ")
+        assert palette._matched == []
+        palette.handle_key(keys.KEY_TAB)
+        assert palette._input_line.value == "checkout "
+        assert palette.is_active
+
+    def test_tab_completes_template_command_id(self):
+        items = [
+            PaletteItem("status", "Status"),
+            PaletteItem("stash", "Stash"),
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "stas")
+        assert _ids(palette) == ["stash"]
+        palette.handle_key(keys.KEY_TAB)
+        assert palette._input_line.value == "stash"
+        assert palette.is_active
+        assert _ids(palette) == ["stash"]

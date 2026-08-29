@@ -209,7 +209,7 @@ class TestBindingBrowserMouse:
         browser, owner, closed = self._browser()
         ev = _click_row(browser, 0)
         with mock.patch(
-            "pigit.termui.widgets.binding_browser.time.monotonic",
+            "pigit.termui.viewport_hit.time.monotonic",
             side_effect=[100.0, 100.5],
         ):
             browser.handle_mouse(ev)
@@ -225,7 +225,7 @@ class TestBindingBrowserMouse:
         # (a 100.0 -> 100.4 pair would round above 0.4).
         threshold = DOUBLE_CLICK_MS / 1000.0
         with mock.patch(
-            "pigit.termui.widgets.binding_browser.time.monotonic",
+            "pigit.termui.viewport_hit.time.monotonic",
             side_effect=[0.0, threshold],
         ):
             browser.handle_mouse(ev)
@@ -239,7 +239,7 @@ class TestBindingBrowserMouse:
         ev = _click_row(browser, 0)
         threshold = DOUBLE_CLICK_MS / 1000.0
         with mock.patch(
-            "pigit.termui.widgets.binding_browser.time.monotonic",
+            "pigit.termui.viewport_hit.time.monotonic",
             side_effect=[0.0, threshold + 0.001],
         ):
             browser.handle_mouse(ev)

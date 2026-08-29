@@ -8,10 +8,10 @@ Date: 2026-08-28
 from __future__ import annotations
 
 import math
-import shlex
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from pigit.ext.utils import split_at_most
 from pigit.git.api import GitError
 from pigit.termui import (
     FeedbackKind,
@@ -37,6 +37,19 @@ def guard_bisect_active(git: GitApi) -> bool:
     return False
 
 
+def guard_sequencer_active(git: GitApi) -> bool:
+    """Return True when a merge/rebase/cherry-pick is running; block the caller."""
+    kind = git.sequencer_in_progress()
+    if kind is not None:
+        show_toast(
+            f"A {kind} is already in progress",
+            duration=2.0,
+            kind=FeedbackKind.WARNING,
+        )
+        return True
+    return False
+
+
 def parse_bisect_start_input(raw: str) -> tuple[str, str | None]:
     """Parse ``good [bad]``; omit bad to default to HEAD at the git layer.
 
@@ -49,14 +62,7 @@ def parse_bisect_start_input(raw: str) -> tuple[str, str | None]:
     Raises:
         ValueError: When input is empty or has more than two tokens.
     """
-    try:
-        parts = shlex.split(raw)
-    except ValueError as exc:
-        raise ValueError(f"bad quoting: {exc}") from None
-    if not parts:
-        raise ValueError("empty input")
-    if len(parts) > 2:
-        raise ValueError("expected: good [bad]")
+    parts = split_at_most(raw, 2, "good [bad]")
     good = parts[0]
     bad = parts[1] if len(parts) == 2 else None
     return good, bad

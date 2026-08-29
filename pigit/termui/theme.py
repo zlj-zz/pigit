@@ -93,3 +93,13 @@ def set_theme(theme: Theme) -> None:
         theme: Theme instance to use for subsequent widget rendering.
     """
     _theme_var.set(theme)
+
+
+def selected_row_bg(theme: Theme) -> tuple[int, int, int]:
+    """Cursor-row background: the commit panel's selected bg when present.
+
+    ``PigitTheme`` extends the framework theme with ``bg_commit_selected``;
+    other themes fall back to the hover background.
+    """
+    selected = getattr(theme, "bg_commit_selected", None)
+    return selected if selected is not None else theme.bg_hover

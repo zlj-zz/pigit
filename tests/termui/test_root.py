@@ -166,6 +166,28 @@ class TestComponentRoot:
         assert root._layer_stack.top(LayerKind.SHEET) is sheet
         assert sheet._child is inner
         assert inner.parent is sheet
+        assert inner.is_mounted()
+
+    def test_show_sheet_replaces_existing_and_mounts_child(self):
+        from pigit.termui.component import Component
+
+        class _Inner(Component):
+            def paint(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+        a = _Inner()
+        root = ComponentRoot(DummyBody())
+        root.resize((80, 24))
+        first = root.show_sheet(a, height=6)
+        b = _Inner()
+        second = root.show_sheet(b, height=6)
+        # The second sheet replaces the first: only ``second`` stays open.
+        assert root._layer_stack.top(LayerKind.SHEET) is second
+        assert first.open is False
+        assert a.is_mounted() and b.is_mounted()
 
     def test_show_sheet_threads_chrome_pads(self):
         from pigit.termui.component import Component

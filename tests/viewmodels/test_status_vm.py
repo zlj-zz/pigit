@@ -47,6 +47,13 @@ def test_stage_unstaged_file(status_vm):
     assert result.should_refresh is True
 
 
+def test_needs_stage_public_guard(status_vm):
+    assert status_vm.needs_stage(0) is True
+    assert status_vm.needs_stage(1) is False
+    assert status_vm.needs_stage(2) is True
+    assert status_vm.needs_stage(99) is False
+
+
 def test_stage_staged_file(status_vm):
     result = status_vm.stage(1)
     assert result.success is True

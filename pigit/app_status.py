@@ -41,10 +41,10 @@ from pigit.termui.widgets import (
 )
 
 from .app_diff import DiffType, DiffViewer
-from .app_preview import PreviewPanel
+from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
 from .app_theme import THEME
-from .ext.utils import adjudgment_type, copy_to_clipboard, get_file_icon
+from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
 
@@ -276,8 +276,6 @@ class StatusPanel(OptionList):
     keymap_namespace = "status"
     TAB_NAME = "Status"
     tab_key = "1"
-    # nf-fa-folder (PUA block, width 1).
-    _DIR_ICON = "\uf07b"
 
     def __init__(
         self,
@@ -288,7 +286,7 @@ class StatusPanel(OptionList):
         default_view: str = "tree",
         id: str | None = None,
         on_toggle_preview: Callable[[], None] | None = None,
-        file_icons: bool = True,
+        nerd_icons: bool = True,
     ) -> None:
         super().__init__(
             on_selection_changed=on_selection_changed,
@@ -310,7 +308,7 @@ class StatusPanel(OptionList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
-        self._file_icons = file_icons
+        self._nerd_icons = nerd_icons
         self.files: list[File] = []
         self._all_files: list[File] = []
         self._source_map: list[int] = []
@@ -582,7 +580,6 @@ class StatusPanel(OptionList):
             on_cancel=dismiss_sheet,
         )
         show_sheet(editor, max_fraction=0.5, title="Commit")
-        editor.mount()
 
     @bind_action(
         "commit_editor",
@@ -912,16 +909,13 @@ class StatusPanel(OptionList):
         return self._describe_flat_row(idx, is_cursor)
 
     def _file_icon_glyph(self, name: str, *, is_dir: bool) -> str:
-        """Nerd Font icon glyph for a row, or '' when icons are disabled.
+        """Icon glyph for a row: Nerd Font glyph or a 1-cell fallback symbol.
 
         The icon is a name prefix (same color as the name), so off-focus
-        dimming and selection colors follow automatically.
+        dimming and selection colors follow automatically. Always returns a
+        symbol — the fallback keeps alignment without tofu blocks.
         """
-        if not self._file_icons:
-            return ""
-        if is_dir:
-            return self._DIR_ICON
-        return get_file_icon(adjudgment_type(name))
+        return resolve_icon(self._nerd_icons, adjudgment_type(name), is_dir=is_dir)
 
     def _describe_flat_row(
         self, idx: int, is_cursor: bool

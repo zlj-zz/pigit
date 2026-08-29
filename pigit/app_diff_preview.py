@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module: pigit/app_preview.py
+Module: pigit/app_diff_preview.py
 Description: Large-screen Status/Stash side panel hosting DiffViewer with async loads.
 Author: Zev
 Date: 2026-05-26

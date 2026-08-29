@@ -1,5 +1,5 @@
 """
-Module: pigit/app_chrome.py
+Module: pigit/app_footer.py
 Description: Application chrome components (header, footer).
 Author: Zev
 Date: 2026-04-23

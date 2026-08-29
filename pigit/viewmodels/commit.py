@@ -142,7 +142,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
                 ref = self._head
                 commits = self._git.load_commits(ref)
         remotes = tuple(self._git.get_remotes())
-        from pigit.app_commit_graph import compute_graph_rows
+        from pigit.app_log_graph import compute_graph_rows
 
         graph_rows = compute_graph_rows(commits) if commits else []
         return _CommitLoad(

@@ -282,11 +282,11 @@ def test_open_bisect_sheet_blocked_by_sequencer(runtime):
     app._git.sequencer_in_progress = Mock(return_value="merge")
     with (
         patch("pigit.app.show_sheet") as show,
-        patch("pigit.app.show_toast") as toast,
+        patch("pigit.app_bisect.show_toast") as toast,
     ):
         app.open_bisect_sheet()
         show.assert_not_called()
-        assert "Merge/rebase/cherry-pick" in toast.call_args[0][0]
+        assert "merge" in toast.call_args[0][0]
 
 
 def test_on_bisect_start_submit_one_and_two_refs(runtime):
@@ -406,6 +406,7 @@ def test_merge_request_blocked_during_bisect():
         get_alert_dialog=lambda: alert,
         get_refresh_git_vms=Mock(),
         get_schedule_reload_header=Mock(),
+        get_record_rewind=lambda: Mock(),
     )
     with patch("pigit.app_bisect.show_toast"):
         workflow.on_merge_request("feat", "main")
@@ -417,7 +418,7 @@ def test_rebase_mount_blocked_during_bisect():
     git.sequencer_in_progress.return_value = None
     git.bisect_status.return_value = _state()
     done = Mock()
-    panel = RebasePanel(git, "main", on_done=done)
+    panel = RebasePanel(git, "main", on_done=done, get_record_rewind=lambda: Mock())
     with patch("pigit.app_bisect.show_toast"):
         panel.mount()
     done.assert_called_once()
@@ -435,6 +436,7 @@ def test_cherry_pick_blocked_during_bisect():
         get_alert_dialog=lambda: alert,
         get_refresh_git_vms=Mock(),
         get_refresh_active_panel=Mock(),
+        get_record_rewind=lambda: Mock(),
     )
     with patch("pigit.app_bisect.show_toast"):
         ctrl.on_cherry_pick("abcdef0", False)

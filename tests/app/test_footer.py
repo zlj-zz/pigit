@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Tests for pigit.app_chrome components."""
+"""Tests for pigit.app_footer components."""
 
 from __future__ import annotations
 
-from pigit.app_chrome import AppFooter
+from pigit.app_footer import AppFooter
 from pigit.app_theme import THEME
 from pigit.termui import Component, ComponentRoot, Segment
 from pigit.termui.types import LayerKind

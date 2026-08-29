@@ -14,7 +14,7 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.app_header_state import HeaderState
-from pigit.app_tab_picker import (
+from pigit.app_anchored_picker import (
     PanelPicker,
     PanelPickerEntry,
     build_panel_picker_entries,
@@ -152,7 +152,7 @@ def test_panel_picker_double_click_activates():
         kind=MouseKind.PRESS,
     )
     with patch(
-        "pigit.app_tab_picker.time.monotonic",
+        "pigit.termui.viewport_hit.time.monotonic",
         side_effect=[0.0, 0.1],
     ):
         picker.handle_mouse(ev)

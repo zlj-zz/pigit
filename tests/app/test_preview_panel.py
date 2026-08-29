@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from pigit.app_diff import DiffType, DiffViewer
-from pigit.app_preview import PreviewPanel
+from pigit.app_diff_preview import PreviewPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.git.model import File, Stash
@@ -89,7 +89,7 @@ def _run_sync(work, callback):
 
 @pytest.fixture(autouse=True)
 def _sync_async(monkeypatch):
-    monkeypatch.setattr("pigit.app_preview.run_async", _run_sync)
+    monkeypatch.setattr("pigit.app_diff_preview.run_async", _run_sync)
 
 
 @pytest.fixture
@@ -257,7 +257,7 @@ def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
         pending.append((work, callback))
         return _FakeTask()
 
-    monkeypatch.setattr("pigit.app_preview.run_async", _defer)
+    monkeypatch.setattr("pigit.app_diff_preview.run_async", _defer)
 
     file_a = File(
         name="a.py",

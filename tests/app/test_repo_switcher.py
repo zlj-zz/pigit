@@ -251,7 +251,7 @@ def test_switcher_sheet_double_click_activates():
     with (
         patch("pigit.app_repo_switcher.dismiss_sheet"),
         patch(
-            "pigit.app_list_picker.time.monotonic",
+            "pigit.termui.viewport_hit.time.monotonic",
             side_effect=itertools.count(0, 0.2),
         ),
     ):
@@ -333,7 +333,7 @@ def test_repo_slot_paint_truncates_long_name():
     assert len(line.rstrip()) <= 10
 
 
-def test_open_repo_switcher_dismisses_existing_sheet_first():
+def test_open_repo_switcher_no_manual_dismiss():
     """M1 regression: opening the switcher replaces, never stacks, a sheet."""
     managed = Mock()
     managed.load_repos.return_value = {
@@ -355,12 +355,8 @@ def test_open_repo_switcher_dismisses_existing_sheet_first():
         app = PigitApplication(
             config=AppConfig(repo_observe=False), managed_repos=managed
         )
-    with (
-        patch("pigit.app.dismiss_sheet") as dismiss,
-        patch("pigit.app.show_sheet") as show,
-    ):
+    with patch("pigit.app.show_sheet") as show:
         app.open_repo_switcher()
-    dismiss.assert_called_once()
     assert show.call_count == 1
 
 

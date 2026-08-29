@@ -269,6 +269,9 @@ class GitApi:
     def soft_reset_head1(self, path=None):
         return self._worktree.soft_reset_head1(path)
 
+    def hard_reset_head(self, sha, path=None):
+        return self._worktree.hard_reset_head(sha, path)
+
     # ── _wt_ops (git worktree feature; not working-tree file ops) ──
     def list_worktrees(self, path=None):
         return self._wt_ops.list_worktrees(path)

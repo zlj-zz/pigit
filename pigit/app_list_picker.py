@@ -7,13 +7,13 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Sequence
 from typing import Any
 
 from pigit.termui import Segment, bind_action, dismiss_sheet, keys
+from pigit.termui.theme import selected_row_bg
 from pigit.termui.mouse import MouseEvent
-from pigit.termui.viewport_hit import DOUBLE_CLICK_MS
+from pigit.termui.viewport_hit import DoubleClickTracker
 from pigit.termui.widgets import OptionList
 
 from .app_theme import THEME
@@ -58,8 +58,7 @@ class ListPickerSheet(OptionList):
         self._on_switch = on_switch
         self._on_toggle_mode = on_toggle_mode
         self._on_dismiss = on_dismiss
-        self._last_click_index: int | None = None
-        self._last_click_time: float = 0.0
+        self._double_click = DoubleClickTracker()
         self._row_segments: list[list[Segment]] = []
         self._rebuild_rows()
 
@@ -93,7 +92,7 @@ class ListPickerSheet(OptionList):
         if 0 <= source_idx < len(self._row_segments):
             if not is_cursor:
                 return ([], self._row_segments[source_idx], [])
-            bg = getattr(THEME, "bg_commit_selected", None) or THEME.bg_hover
+            bg = selected_row_bg(THEME)
             segs = [
                 Segment(s.text, fg=s.fg, bg=bg, style_flags=s.style_flags)
                 for s in self._row_segments[source_idx]
@@ -179,13 +178,7 @@ class ListPickerSheet(OptionList):
             item_index, _sub = self.row_to_item(content_index)
         if item_index in self._skip_indices:
             return False
-        now = time.monotonic()
-        is_double = (
-            item_index == self._last_click_index
-            and now - self._last_click_time <= DOUBLE_CLICK_MS / 1000.0
-        )
-        self._last_click_index = item_index
-        self._last_click_time = now
+        is_double = self._double_click.is_double(item_index)
         self._select_row(item_index)
         if is_double:
             self._clear_double_click()
@@ -193,5 +186,4 @@ class ListPickerSheet(OptionList):
         return True
 
     def _clear_double_click(self) -> None:
-        self._last_click_index = None
-        self._last_click_time = 0.0
+        self._double_click.clear()

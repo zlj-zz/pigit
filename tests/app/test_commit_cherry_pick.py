@@ -69,7 +69,7 @@ def test_rejects_merge_commit(app):
 def test_rejects_revert_in_progress(app):
     app._git.sequencer_in_progress.return_value = "revert"
     with (
-        patch("pigit.app_sequencer.show_toast") as toast,
+        patch("pigit.app_bisect.show_toast") as toast,
         patch("pigit.app_sequencer.exec_external") as ex,
     ):
         app._on_cherry_pick("other", is_merge=False)
@@ -213,3 +213,38 @@ def test_cherry_pick_silent_when_empty():
     panel.emit = MagicMock()
     panel.cherry_pick()
     panel.emit.assert_not_called()
+
+
+def test_success_records_rewind_point(app):
+    from types import SimpleNamespace
+
+    app._git.sequencer_in_progress.return_value = None
+    app._git.resolve_head_sha.return_value = "headsha123456789"
+    _auto_confirm(app, confirmed=True)
+    ok = SimpleNamespace(returncode=0)
+    with (
+        patch("pigit.app_sequencer.show_badge"),
+        patch("pigit.app_sequencer.exec_external", return_value=ok),
+    ):
+        app._on_cherry_pick("deadbeefcafebabe", is_merge=False)
+    records = app._session_history.peek(1)
+    assert len(records) == 1
+    assert records[0].description == "Cherry-pick deadbee"
+    assert records[0].commands[0].op_type == "rewind"
+    assert records[0].commands[0].payload == {"pre_sha": "headsha123456789"}
+
+
+def test_conflict_does_not_record_rewind(app):
+    from types import SimpleNamespace
+
+    app._git.resolve_head_sha.return_value = "headsha123456789"
+    app._git.sequencer_in_progress.side_effect = [None, "cherry-pick"]
+    app._git.has_unmerged_paths.return_value = True
+    failed = SimpleNamespace(returncode=1)
+    _auto_confirm(app, confirmed=True)
+    with (
+        patch("pigit.app_sequencer.show_toast"),
+        patch("pigit.app_sequencer.exec_external", return_value=failed),
+    ):
+        app._on_cherry_pick("abc", is_merge=False)
+    assert app._session_history.peek(1) == []

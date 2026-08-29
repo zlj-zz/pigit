@@ -251,7 +251,6 @@ class CommitPanel(OptionList):
             on_done=dismiss_sheet,
         )
         show_sheet(sheet, max_fraction=0.5, title="Log ref")
-        sheet.mount()
 
     def _on_log_ref_picked(self, name: str) -> None:
         """Apply a ref chosen in the log-ref sheet."""

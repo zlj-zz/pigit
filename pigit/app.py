@@ -62,14 +62,15 @@ from .app_network_git import NetworkGit, NetworkGitOutcome
 from .app_merge_workflow import MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
+from .ext.utils import resolve_nerd_icons
 from .app_branch import BranchPanel
-from .app_chrome import AppFooter
+from .app_footer import AppFooter
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
 from .app_command_palette import CommandPalette
-from .app_preview import PreviewPanel
+from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
@@ -77,7 +78,7 @@ from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
-from .session_history import SessionHistory
+from .session_history import HistoryRecord, SessionHistory, push_rewind
 from .config_data import AppConfig
 
 # Chrome heights in rows. The layout heights (build_root) and the
@@ -137,6 +138,7 @@ class PigitApplication(Application):
         self._status_vm = self._session.status_vm
         self._commit_vm = self._session.commit_vm
         self._branch_vm = self._session.branch_vm
+        self._palette_vm_unsubs: list[Callable[[], None]] = []
         self._repo_token: object = object()
         # True while a RepoSession.build for a switch is in flight (spinner on).
         self._switch_in_flight = False
@@ -193,6 +195,7 @@ class PigitApplication(Application):
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
+            get_record_rewind=lambda: self._record_rewind,
         )
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
@@ -201,6 +204,7 @@ class PigitApplication(Application):
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_refresh_active_panel=lambda: self._refresh_active_panel(),
+            get_record_rewind=lambda: self._record_rewind,
         )
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
@@ -212,7 +216,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
+        footer.set_global_help([("I", "Inspector"), ("Q", "Quit")])
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
@@ -239,7 +243,7 @@ class PigitApplication(Application):
             id="status_panel",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
-            file_icons=self._config.file_icons,
+            nerd_icons=resolve_nerd_icons(self._config.icons),
         )
         self._stash_panel = StashPanel(
             vm=self._status_vm,
@@ -275,6 +279,7 @@ class PigitApplication(Application):
             id="diff",
             word_diff=self._config.word_diff,
             guard_async=self._guard_repo_async,
+            on_file_picker=self.open_diff_file_picker,
         )
         self._tab_view = TabView(
             children=[
@@ -502,7 +507,6 @@ class PigitApplication(Application):
             title="Welcome to Pigit",
             max_fraction=WELCOME_SHEET_MAX_FRACTION,
         )
-        sheet.mount()
 
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
     def show_welcome(self) -> None:
@@ -550,7 +554,7 @@ class PigitApplication(Application):
 
     def _can_switch(self) -> bool:
         """Block repo switch while network sync or a git sequencer is active."""
-        from .app_bisect import guard_bisect_active
+        from .app_bisect import guard_bisect_active, guard_sequencer_active
 
         if self._network_git.busy:
             show_toast(
@@ -559,12 +563,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.ERROR,
             )
             return False
-        if self._git.sequencer_in_progress():
-            show_toast(
-                "Merge/rebase/cherry-pick in progress…",
-                duration=2.0,
-                kind=FeedbackKind.ERROR,
-            )
+        if guard_sequencer_active(self._git):
             return False
         if guard_bisect_active(self._git):
             return False
@@ -619,40 +618,32 @@ class PigitApplication(Application):
             return
         self._apply_session(result.session)
 
-    def _apply_session(self, session: RepoSession) -> None:
-        """Retarget panels and hosts; commit ``self._session`` only on full success."""
-        old = self._session
+    def _point_at(self, session: RepoSession) -> None:
+        """Swap aliases and retarget panels/hosts at ``session`` (no dispose)."""
         self._git = session.git
         self._repo_path = session.repo_path
         self._repo_name = session.repo_name
         self._status_vm = session.status_vm
         self._commit_vm = session.commit_vm
         self._branch_vm = session.branch_vm
+        self._bind_session_vm_tokens(session)
+        self._retarget_panels(session)
+        if self._observe_host is not None:
+            self._observe_host.rebind_session()
+        self._merge_state_store.rebind(session.git)
+        self._header_state.repo = session.repo_name
+        self._schedule_reload_header()
+
+    def _apply_session(self, session: RepoSession) -> None:
+        """Retarget panels and hosts; commit ``self._session`` only on full success."""
+        old = self._session
         try:
-            self._bind_session_vm_tokens(session)
-            self._retarget_panels(session)
-            if self._observe_host is not None:
-                self._observe_host.rebind_session(session)
-            self._merge_state_store.rebind(session.git)
-            self._header_state.repo = session.repo_name
-            self._schedule_reload_header()
+            self._point_at(session)
             self._tab_view.route_to("status")
             self._session_history.attach_repo(session.repo_path)
         except Exception as exc:
-            self._git = old.git
-            self._repo_path = old.repo_path
-            self._repo_name = old.repo_name
-            self._status_vm = old.status_vm
-            self._commit_vm = old.commit_vm
-            self._branch_vm = old.branch_vm
-            self._bind_session_vm_tokens(old)
             try:
-                self._retarget_panels(old)
-                if self._observe_host is not None:
-                    self._observe_host.rebind_session(old)
-                self._merge_state_store.rebind(old.git)
-                self._header_state.repo = old.repo_name
-                self._schedule_reload_header()
+                self._point_at(old)
             except Exception:
                 logging.exception("Failed to restore panels after aborted switch")
             session.dispose()
@@ -797,7 +788,7 @@ class PigitApplication(Application):
             return
         self._open_help_browser()
 
-    @bind_action("palette", ";", desc="Open command palette", tip="Palette")
+    @bind_action("palette", ";", desc="Open command palette")
     def toggle_palette(self):
         """Toggle command palette visibility."""
         if self._root is None:
@@ -805,7 +796,7 @@ class PigitApplication(Application):
         if self._palette.is_active:
             self._palette.close()
         else:
-            from pigit.app_command_palette import catalog_for_context
+            from pigit.app_command_palette import build_catalog
             from pigit.termui.widgets import list_slots_for_term
 
             # Same height source as Sheet.resolve_height (root size, not a
@@ -819,10 +810,26 @@ class PigitApplication(Application):
             except Exception:
                 sequencer = None
             self._palette.open(
-                items=catalog_for_context(sequencer),
+                items=build_catalog(
+                    sequencer,
+                    branch_names=lambda: [b.name for b in self._branch_vm.items.value],
+                    file_names=lambda: [
+                        f.get_file_str() for f in self._status_vm.items.value
+                    ],
+                ),
                 list_slots=slots,
             )
             self._root.show_sheet(self._palette, title="Commands")
+            # Branch/status lists may be empty until their panels mount; load
+            # both and refresh arg candidates when the Signals update.
+            self._branch_vm.refresh()
+            self._status_vm.refresh()
+            self._palette_vm_unsubs.append(
+                self._branch_vm.items.subscribe(self._on_palette_vm_items_changed)
+            )
+            self._palette_vm_unsubs.append(
+                self._status_vm.items.subscribe(self._on_palette_vm_items_changed)
+            )
 
     @bind_action("goto_status", "1", desc="Switch to Status panel", tip="Status")
     def goto_status(self):
@@ -933,25 +940,52 @@ class PigitApplication(Application):
             return True
         return was_detail_open
 
-    @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
+    @bind_action(
+        "undo",
+        "u",
+        desc="Undo last action with confirmation (also reverses merge/rebase/cherry-pick)",
+        tip="Undo",
+    )
     def reverse_last_action(self) -> None:
-        """Reverse the most recent session action."""
+        """Confirm, then reverse the most recent session action."""
+        recent = self._session_history.peek(1)
+        if not recent:
+            show_toast("Nothing to reverse", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+        record = recent[0]
+        self._alert_dialog.alert(
+            f"Undo: {record.description}\nRun:  {record.describe_commands()}",
+            lambda ok: self._do_reverse_last() if ok else None,
+            kind=FeedbackKind.WARNING,
+        )
+
+    def _do_reverse_last(self) -> None:
+        """Execute the reversal of the most recent session action."""
         recent = self._session_history.peek(1)
         was_checkout = bool(
             recent
-            and any(cmd.op_type == "checkout_branch" for cmd in recent[0].commands)
+            and any(
+                cmd.op_type in ("checkout_branch", "rewind")
+                for cmd in recent[0].commands
+            )
         )
         result = self._session_history.reverse(self._git)
         if result.success:
             show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
             if was_checkout:
-                # Undoing a checkout moved HEAD; point the commit list at it.
+                # Undoing a checkout/rewind moved HEAD; point the commit list
+                # at the new checkout.
                 self._on_follow_head(self._git.get_head() or "HEAD")
             self._refresh_active_panel()
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
-    @bind_action("switch_repo", "@", desc="Switch repository", tip="Repos")
+    @bind_action(
+        "switch_repo",
+        "@",
+        desc="Switch repo or worktree in place (switcher sheet)",
+        tip="Repos",
+    )
     def open_repo_switcher(self) -> None:
         """Open the managed-repo switcher sheet (``@`` key or RepoSlot click).
 
@@ -982,16 +1016,11 @@ class PigitApplication(Application):
             on_add_current=self._add_current_and_switch,
             on_toggle_mode=self.open_worktree_picker,
         )
-        # The switcher replaces any open sheet (e.g. RecentActions) — the
-        # Header RepoSlot click is reachable while a sheet is open, so without
-        # this the layer stack would accumulate stacked sheets (M1).
-        dismiss_sheet()
         show_sheet(
             panel,
             title="Switch repo",
             edge="bottom",
         )
-        panel.mount()
 
     def open_worktree_picker(self) -> None:
         """Open the worktree list sheet (``w`` from repo switcher)."""
@@ -1018,17 +1047,14 @@ class PigitApplication(Application):
             on_remove=self._confirm_remove_worktree,
             on_toggle_mode=self.open_repo_switcher,
         )
-        dismiss_sheet()
         show_sheet(
             panel,
             title="Switch worktree",
             edge="bottom",
         )
-        panel.mount()
 
     def _show_add_worktree_sheet(self) -> None:
         """Prompt for ``path [branch]`` then create a linked worktree."""
-        dismiss_sheet()
         self._add_worktree_input.clear()
         show_sheet(self._add_worktree_input, height=3, show_edge_rule=False)
 
@@ -1141,12 +1167,9 @@ class PigitApplication(Application):
         full header strip, optionally nudged by the click column). Mouse-only
         entry — keyboard ``1-4`` remain the direct panel shortcuts.
         """
-        dismiss_sheet()
-        self._dismiss_open_modal()
-
         header = self._header
         slot = self._tab_slot
-        from .app_tab_picker import (
+        from .app_anchored_picker import (
             PanelPicker,
             build_panel_picker_entries,
             panel_picker_anchor,
@@ -1164,9 +1187,35 @@ class PigitApplication(Application):
             entries=build_panel_picker_entries(self._panel_nav),
             on_select=self._on_panel_picker_select,
         )
+        self._show_anchored_popup(picker, (anchor_row, anchor_col))
+
+    def open_diff_file_picker(self, global_row: int, global_col: int) -> None:
+        """Open an anchored file list popup for the current commit diff."""
+        paths = self._diff_panel.file_paths
+        if not paths:
+            return
+        from .app_anchored_picker import FilePicker
+
+        cur = self._diff_panel.current_file_index()
+        picker = FilePicker(
+            entries=paths,
+            current_index=max(0, cur),
+            on_select=self._on_diff_file_picker_select,
+        )
+        self._show_anchored_popup(picker, (global_row, global_col))
+
+    def _show_anchored_popup(self, picker: Component, offset: tuple[int, int]) -> Popup:
+        """Show an anchored modal popup for ``picker`` at a 0-based offset.
+
+        Shared by the panel and file pickers: dismiss existing overlays, build
+        the dismiss-on-miss ``Popup`` shell, and run the resize/show/session
+        lifecycle.
+        """
+        dismiss_sheet()
+        self._dismiss_open_modal()
         popup = Popup(
             picker,
-            offset=(anchor_row, anchor_col),
+            offset=offset,
             dismiss_on_miss=True,
             exit_key=keys.KEY_ESC,
         )
@@ -1177,6 +1226,11 @@ class PigitApplication(Application):
         popup.begin_session()
         if self._root is not None:
             self._root._focus_manager.sync_focus_to_overlay_or_leaf()
+        return popup
+
+    def _on_diff_file_picker_select(self, index: int) -> None:
+        """Jump the DiffViewer to the selected file section after picker dismiss."""
+        self._diff_panel.jump_to_file(index)
 
     def _dismiss_open_modal(self) -> None:
         """Close any open MODAL before opening the anchored picker.
@@ -1228,15 +1282,10 @@ class PigitApplication(Application):
     @bind_action("bisect", "B", desc="Open bisect sheet", tip="Bisect")
     def open_bisect_sheet(self) -> None:
         """Open the bisect status/control sheet (``B``)."""
-        if self._git.sequencer_in_progress() is not None:
-            show_toast(
-                "Merge/rebase/cherry-pick in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
-            return
-        from .app_bisect import BisectSheet
+        from .app_bisect import BisectSheet, guard_sequencer_active
 
+        if guard_sequencer_active(self._git):
+            return
         panel = BisectSheet(
             git=self._git,
             on_start=self._show_bisect_start_input,
@@ -1244,9 +1293,7 @@ class PigitApplication(Application):
             on_operation=self._refresh_after_bisect_operation,
             on_done=dismiss_sheet,
         )
-        dismiss_sheet()
         show_sheet(panel, title="Bisect", edge="bottom")
-        panel.mount()
 
     def _refresh_after_bisect_operation(self) -> None:
         """Refresh git VMs and header after a bisect operation moved HEAD."""
@@ -1255,14 +1302,13 @@ class PigitApplication(Application):
 
     def _show_bisect_start_input(self) -> None:
         """Prompt for good/bad refs to start a bisect session."""
-        dismiss_sheet()
         self._bisect_start_input.clear()
         show_sheet(self._bisect_start_input, height=3, show_edge_rule=False)
 
     def _on_bisect_start_submit(self, raw: str) -> None:
         """Parse refs, start bisect, then reopen the status sheet."""
         from pigit.git.api import GitError
-        from .app_bisect import parse_bisect_start_input
+        from .app_bisect import guard_sequencer_active, parse_bisect_start_input
 
         raw = raw.strip()
         if not raw:
@@ -1277,12 +1323,7 @@ class PigitApplication(Application):
                 kind=FeedbackKind.WARNING,
             )
             return
-        if self._git.sequencer_in_progress() is not None:
-            show_toast(
-                "Merge/rebase/cherry-pick in progress",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
+        if guard_sequencer_active(self._git):
             return
         try:
             self._git.bisect_start(good, bad)
@@ -1320,7 +1361,12 @@ class PigitApplication(Application):
             on_confirm,
         )
 
-    @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
+    @bind_action(
+        "recent",
+        "U",
+        desc="Open recent actions sheet (confirm before reversing)",
+        tip="Recent",
+    )
     def open_recent_actions(self) -> None:
         """Open the RecentActionsPanel sheet overlay."""
         from .app_recent_actions import RecentActionsPanel
@@ -1329,9 +1375,36 @@ class PigitApplication(Application):
             dismiss_sheet()
             self._refresh_active_panel()
 
-        panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
+        panel = RecentActionsPanel(
+            self._session_history,
+            self._git,
+            on_done=_on_done,
+            confirm_reverse=self._confirm_reverse_range,
+        )
         show_sheet(panel, title="Recent")
-        panel.mount()
+
+    def _confirm_reverse_range(
+        self, records: list[HistoryRecord], do_reverse: Callable[[], None]
+    ) -> None:
+        """Confirm reversing ``records`` (newest-first) before executing.
+
+        One record shows the action and its reversal command; a range shows
+        the count plus one line per record so the user sees the full blast
+        radius.
+        """
+        if len(records) == 1:
+            record = records[0]
+            message = f"Undo: {record.description}\nRun:  {record.describe_commands()}"
+        else:
+            lines = "\n".join(
+                f"  - {r.description}: {r.describe_commands()}" for r in records
+            )
+            message = f"Undo {len(records)} actions:\n{lines}"
+        self._alert_dialog.alert(
+            message,
+            lambda ok: do_reverse() if ok else None,
+            kind=FeedbackKind.WARNING,
+        )
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
@@ -1387,7 +1460,6 @@ class PigitApplication(Application):
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
         placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
-        placeholder.mount()
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -1408,7 +1480,6 @@ class PigitApplication(Application):
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
             show_sheet(sheet, edge="top", max_fraction=0.5)
-            sheet.mount()
 
         self._inspector_task = run_async(
             load, self._guard_repo(self._repo_token, apply)
@@ -1437,8 +1508,15 @@ class PigitApplication(Application):
         """Pull into HEAD from its configured upstream (non-interactive)."""
         self._run_network_git("pull")
 
+    def _on_palette_vm_items_changed(self, _items: object) -> None:
+        """Refresh palette arg candidates when branch/status lists update."""
+        self._palette.refresh_candidates()
+
     def _dismiss_palette(self) -> None:
-        """Dismiss the palette sheet from the root."""
+        """Dismiss the palette sheet from the root and drop VM subscriptions."""
+        for unsub in self._palette_vm_unsubs:
+            unsub()
+        self._palette_vm_unsubs.clear()
         if self._root is not None:
             self._root.dismiss_sheet()
 
@@ -1558,9 +1636,20 @@ class PigitApplication(Application):
 
     def _on_palette_execute(self, cmd: str) -> None:
         """Handle command palette execution."""
-        from pigit.app_command_palette import KNOWN_COMMAND_IDS
+        from pigit.app_command_palette import KNOWN_COMMAND_IDS, PARAMETERIZED_ACTIONS
 
-        lower = cmd.lower().strip()
+        stripped = cmd.strip()
+        space = stripped.find(" ")
+        if space < 0:
+            action, arg = stripped.lower(), ""
+        else:
+            action, arg = stripped[:space].lower(), stripped[space + 1 :].lstrip()
+
+        if action in PARAMETERIZED_ACTIONS:
+            self._dispatch_parameterized_palette(action, arg)
+            return
+
+        lower = stripped.lower()
         if lower not in KNOWN_COMMAND_IDS:
             show_toast(
                 f"Unknown command: {cmd}",
@@ -1595,6 +1684,70 @@ class PigitApplication(Application):
             "cherry-pick-skip",
         ):
             self._run_cherry_pick_control(lower)
+            return
+
+    def _resolve_index(
+        self,
+        items: list,
+        key_fn: Callable[[object], str],
+        arg: str,
+    ) -> int | None:
+        """Return the first index whose key equals *arg*, or None."""
+        for idx, item in enumerate(items):
+            if key_fn(item) == arg:
+                return idx
+        return None
+
+    def _toast_palette_result(self, result) -> None:
+        """Show action result and refresh VMs when the action asks for it."""
+        kind = FeedbackKind.SUCCESS if result.success else FeedbackKind.ERROR
+        show_toast(result.message, duration=1.5 if result.success else 2.0, kind=kind)
+        if result.success and result.should_refresh:
+            self._refresh_git_vms()
+            self._schedule_reload_header()
+
+    def _dispatch_parameterized_palette(self, action: str, arg: str) -> None:
+        """Route checkout/merge/stage/gitignore with a resolved argument."""
+        if action in ("checkout", "merge"):
+            kind = "branch"
+            idx = self._resolve_index(
+                self._branch_vm.items.value, lambda b: b.name, arg
+            )
+        else:
+            kind = "file"
+            idx = self._resolve_index(
+                self._status_vm.items.value, lambda f: f.get_file_str(), arg
+            )
+
+        if idx is None:
+            show_toast(
+                f"No matching {kind}: {arg}",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+
+        if action == "checkout":
+            result = self._branch_vm.checkout(idx)
+            self._toast_palette_result(result)
+            return
+        if action == "merge":
+            self._on_merge_request(arg, self._branch_vm.current_branch())
+            return
+        if action == "stage":
+            if not self._status_vm.needs_stage(idx):
+                show_toast(
+                    "already staged",
+                    duration=1.5,
+                    kind=FeedbackKind.WARNING,
+                )
+                return
+            result = self._status_vm.stage(idx)
+            self._toast_palette_result(result)
+            return
+        if action == "gitignore":
+            result = self._status_vm.ignore(idx)
+            self._toast_palette_result(result)
             return
 
     @property
@@ -1653,13 +1806,13 @@ class PigitApplication(Application):
         """Delegate to SequencerControl.exec_cherry_pick()."""
         self._sequencer.exec_cherry_pick(sha)
 
-    def _finish_cherry_pick(self, result, sha: str) -> None:
-        """Delegate to SequencerControl.finish_cherry_pick()."""
-        self._sequencer.finish_cherry_pick(result, sha)
-
     def _on_merge_request(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.on_merge_request()."""
         self._merge_workflow.on_merge_request(source, target)
+
+    def _record_rewind(self, description: str, pre_sha: str) -> None:
+        """Record a HEAD-moving operation for later ``u`` reversal."""
+        push_rewind(self._session_history, description, pre_sha, panel_hint="Branch")
 
     def _do_merge_workflow(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.do_merge_workflow()."""

@@ -29,7 +29,7 @@ def commit_vm():
     # Simulate _do_load side effects and items population
     commits = git.load_commits.return_value
     vm._items.set(commits)
-    from pigit.app_commit_graph import compute_graph_rows
+    from pigit.app_log_graph import compute_graph_rows
 
     vm._graph_rows.set(compute_graph_rows(commits))
     vm._remotes.set(("origin",))
