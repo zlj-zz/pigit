@@ -77,7 +77,7 @@ from .app_theme import THEME
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
-from .session_history import SessionHistory
+from .session_history import HistoryRecord, SessionHistory, push_rewind
 from .config_data import AppConfig
 
 # Chrome heights in rows. The layout heights (build_root) and the
@@ -194,6 +194,7 @@ class PigitApplication(Application):
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
+            get_record_rewind=lambda: self._record_rewind,
         )
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
@@ -202,6 +203,7 @@ class PigitApplication(Application):
             get_alert_dialog=lambda: self._alert_dialog,
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_refresh_active_panel=lambda: self._refresh_active_panel(),
+            get_record_rewind=lambda: self._record_rewind,
         )
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
@@ -939,17 +941,34 @@ class PigitApplication(Application):
 
     @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
     def reverse_last_action(self) -> None:
-        """Reverse the most recent session action."""
+        """Confirm, then reverse the most recent session action."""
+        recent = self._session_history.peek(1)
+        if not recent:
+            show_toast("Nothing to reverse", duration=2.0, kind=FeedbackKind.WARNING)
+            return
+        record = recent[0]
+        self._alert_dialog.alert(
+            f"Undo: {record.description}\nRun:  {record.describe_commands()}",
+            lambda ok: self._do_reverse_last() if ok else None,
+            kind=FeedbackKind.WARNING,
+        )
+
+    def _do_reverse_last(self) -> None:
+        """Execute the reversal of the most recent session action."""
         recent = self._session_history.peek(1)
         was_checkout = bool(
             recent
-            and any(cmd.op_type == "checkout_branch" for cmd in recent[0].commands)
+            and any(
+                cmd.op_type in ("checkout_branch", "rewind")
+                for cmd in recent[0].commands
+            )
         )
         result = self._session_history.reverse(self._git)
         if result.success:
             show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
             if was_checkout:
-                # Undoing a checkout moved HEAD; point the commit list at it.
+                # Undoing a checkout/rewind moved HEAD; point the commit list
+                # at the new checkout.
                 self._on_follow_head(self._git.get_head() or "HEAD")
             self._refresh_active_panel()
         else:
@@ -1340,8 +1359,36 @@ class PigitApplication(Application):
             dismiss_sheet()
             self._refresh_active_panel()
 
-        panel = RecentActionsPanel(self._session_history, self._git, on_done=_on_done)
+        panel = RecentActionsPanel(
+            self._session_history,
+            self._git,
+            on_done=_on_done,
+            confirm_reverse=self._confirm_reverse_range,
+        )
         show_sheet(panel, title="Recent")
+
+    def _confirm_reverse_range(
+        self, records: list[HistoryRecord], do_reverse: Callable[[], None]
+    ) -> None:
+        """Confirm reversing ``records`` (newest-first) before executing.
+
+        One record shows the action and its reversal command; a range shows
+        the count plus one line per record so the user sees the full blast
+        radius.
+        """
+        if len(records) == 1:
+            record = records[0]
+            message = f"Undo: {record.description}\nRun:  {record.describe_commands()}"
+        else:
+            lines = "\n".join(
+                f"  - {r.description}: {r.describe_commands()}" for r in records
+            )
+            message = f"Undo {len(records)} actions:\n{lines}"
+        self._alert_dialog.alert(
+            message,
+            lambda ok: do_reverse() if ok else None,
+            kind=FeedbackKind.WARNING,
+        )
 
     def toggle_side_preview(self) -> None:
         """Toggle the side preview that belongs to the focused panel."""
@@ -1743,13 +1790,13 @@ class PigitApplication(Application):
         """Delegate to SequencerControl.exec_cherry_pick()."""
         self._sequencer.exec_cherry_pick(sha)
 
-    def _finish_cherry_pick(self, result, sha: str) -> None:
-        """Delegate to SequencerControl.finish_cherry_pick()."""
-        self._sequencer.finish_cherry_pick(result, sha)
-
     def _on_merge_request(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.on_merge_request()."""
         self._merge_workflow.on_merge_request(source, target)
+
+    def _record_rewind(self, description: str, pre_sha: str) -> None:
+        """Record a HEAD-moving operation for later ``u`` reversal."""
+        push_rewind(self._session_history, description, pre_sha, panel_hint="Branch")
 
     def _do_merge_workflow(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.do_merge_workflow()."""

@@ -39,11 +39,13 @@ class RecentActionsPanel(OptionList):
         history: SessionHistory,
         git: GitApi,
         on_done: Callable[[], None],
+        confirm_reverse: Callable[[list[HistoryRecord], Callable[[], None]], None],
     ) -> None:
         super().__init__(on_selection_changed=None)
         self._history = history
         self._git = git
         self._on_done = on_done
+        self._confirm_reverse = confirm_reverse
         self._records: list[HistoryRecord] = []
 
     def preferred_sheet_height(self, term_h: int) -> int:
@@ -72,6 +74,14 @@ class RecentActionsPanel(OptionList):
         if not self._records:
             return
         target_idx = self.curr_no
+        # The newest ``target_idx + 1`` records are the reversal range; ask
+        # for confirmation (app wires the dialog) before touching anything.
+        self._confirm_reverse(
+            self._records[: target_idx + 1], lambda: self._do_reverse(target_idx)
+        )
+
+    def _do_reverse(self, target_idx: int) -> None:
+        """Reverse the selected range and refresh; called after confirmation."""
         result = self._history.reverse_to(target_idx, self._git)
         if result.success:
             show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)

@@ -37,7 +37,9 @@ def _panel(
     git.is_rebase_in_progress.return_value = in_progress
     git.is_merge_in_progress.return_value = False
     git.path = "/repo"
-    panel = RebasePanel(git, "main", on_done=MagicMock())
+    panel = RebasePanel(
+        git, "main", on_done=MagicMock(), get_record_rewind=lambda: MagicMock()
+    )
     return panel, git
 
 
@@ -149,3 +151,62 @@ class TestRebasePanel:
         toast.assert_called()
         panel._on_done.assert_called()
         git.list_commits_in_range.assert_not_called()
+
+    def test_execute_records_rewind_on_success(self):
+        from types import SimpleNamespace
+
+        panel, git = _panel([_commit("a1")])
+        panel.mount()
+        git.resolve_head_sha.return_value = "pre-rebase-sha"
+        git.is_rebase_in_progress.return_value = False
+        record = MagicMock()
+        panel._get_record_rewind = lambda: record
+        with (
+            patch(
+                "pigit.app_rebase.exec_external",
+                return_value=SimpleNamespace(returncode=0),
+            ) as ex,
+            patch("pigit.app_rebase.show_badge"),
+        ):
+            panel._execute()
+        ex.assert_called_once()
+        record.assert_called_once_with("Rebase onto main", "pre-rebase-sha")
+        panel._on_done.assert_called_once()
+
+    def test_execute_paused_does_not_record(self):
+        from types import SimpleNamespace
+
+        panel, git = _panel([_commit("a1")])
+        panel.mount()
+        git.resolve_head_sha.return_value = "pre-rebase-sha"
+        git.is_rebase_in_progress.return_value = True
+        record = MagicMock()
+        panel._get_record_rewind = lambda: record
+        with (
+            patch(
+                "pigit.app_rebase.exec_external",
+                return_value=SimpleNamespace(returncode=0),
+            ),
+            patch("pigit.app_rebase.show_toast"),
+        ):
+            panel._execute()
+        record.assert_not_called()
+
+    def test_execute_failed_does_not_record(self):
+        from types import SimpleNamespace
+
+        panel, git = _panel([_commit("a1")])
+        panel.mount()
+        git.resolve_head_sha.return_value = "pre-rebase-sha"
+        git.is_rebase_in_progress.return_value = False
+        record = MagicMock()
+        panel._get_record_rewind = lambda: record
+        with (
+            patch(
+                "pigit.app_rebase.exec_external",
+                return_value=SimpleNamespace(returncode=1),
+            ),
+            patch("pigit.app_rebase.show_toast"),
+        ):
+            panel._execute()
+        record.assert_not_called()

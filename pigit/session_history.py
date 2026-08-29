@@ -9,15 +9,19 @@ from __future__ import annotations
 
 import base64
 import logging
+import time
 from collections import deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NamedTuple
 from collections.abc import Callable
 
-from pigit.viewmodels.base import ActionResult
-
 if TYPE_CHECKING:
+    # ``pigit.viewmodels`` eagerly imports session_history (via the branch
+    # VM), so ActionResult must not be a module-level name here: every
+    # function that builds one imports it lazily to avoid a runtime
+    # circular import (session_history → viewmodels → session_history).
     from pigit.git.api import GitApi
+    from pigit.viewmodels.base import ActionResult
 
 _logger = logging.getLogger(__name__)
 
@@ -33,6 +37,7 @@ OpType = Literal[
     "rename_branch",
     "stash_push",
     "stash_pop",
+    "rewind",
 ]
 
 
@@ -44,16 +49,28 @@ class ReverseCommand:
     payload: dict  # plain dict — no object references
 
     def execute(self, git: GitApi) -> ActionResult:
-        dispatcher = _REVERSE_DISPATCHERS.get(self.op_type)
-        if dispatcher is None:
+        from pigit.viewmodels.base import ActionResult
+
+        spec = _REVERSE_SPECS.get(self.op_type)
+        if spec is None:
             return ActionResult(
                 success=False, message=f"No reverse dispatcher for {self.op_type}"
             )
         try:
-            return dispatcher(self.payload, git)
+            return spec.exec(self.payload, git)
         except Exception as e:
             _logger.exception("Reverse command failed: %s", self.op_type)
             return ActionResult(success=False, message=str(e))
+
+    def describe(self) -> str:
+        """Render the git command this reversal will run (payload only).
+
+        No git calls — the confirm dialog must not spawn subprocesses.
+        """
+        spec = _REVERSE_SPECS.get(self.op_type)
+        if spec is None:
+            return f"reverse {self.op_type}"
+        return spec.describe(self.payload)
 
 
 @dataclass
@@ -68,6 +85,8 @@ class HistoryRecord:
 
     def reverse(self, git: GitApi) -> ActionResult:
         """Execute inverses in reverse order."""
+        from pigit.viewmodels.base import ActionResult
+
         for cmd in reversed(self.commands):
             result = cmd.execute(git)
             if not result.success:
@@ -76,6 +95,10 @@ class HistoryRecord:
                     message=f"Partial reverse failed at {cmd.op_type}: {result.message}",
                 )
         return ActionResult(success=True, message=f"Reversed: {self.description}")
+
+    def describe_commands(self) -> str:
+        """Join the commands this reversal will run, for confirm dialogs."""
+        return "、".join(cmd.describe() for cmd in self.commands)
 
 
 def _estimate_memory(record: HistoryRecord) -> int:
@@ -121,6 +144,8 @@ class SessionHistory:
 
     def reverse(self, git: GitApi) -> ActionResult:
         """Reverse the newest record for the active repository."""
+        from pigit.viewmodels.base import ActionResult
+
         index = self._newest_index_for_active()
         if index is None:
             if self._stack:
@@ -139,6 +164,8 @@ class SessionHistory:
 
         ``index`` is into :meth:`peek` (0 = newest visible), not the raw stack.
         """
+        from pigit.viewmodels.base import ActionResult
+
         visible = self._records_for_active()
         if index < 0 or index >= len(visible):
             return ActionResult(success=False, message="Invalid index")
@@ -221,18 +248,24 @@ class SessionHistory:
 
 
 def _stage_file(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     path = payload["path"]
     git.add_file(path)
     return ActionResult(success=True, message=f"Restored (staged) {path}")
 
 
 def _unstage_file(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     path = payload["path"]
     git.reset_head_file(path)
     return ActionResult(success=True, message=f"Restored (unstaged) {path}")
 
 
 def _restore_file(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     path = payload["path"]
     if payload.get("tracked"):
         blob_sha = payload.get("blob_sha")
@@ -253,29 +286,39 @@ def _restore_file(payload: dict, git: GitApi) -> ActionResult:
 
 
 def _ignore_file(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     path = payload["path"]
     git.ignore_file(path)
     return ActionResult(success=True, message=f"Restored (ignored) {path}")
 
 
 def _unignore_file(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     path = payload["path"]
     git.unignore_file(path)
     return ActionResult(success=True, message=f"Restored (unignored) {path}")
 
 
 def _soft_reset_head1(_payload: dict, git: GitApi) -> ActionResult:  # noqa: ARG001
+    from pigit.viewmodels.base import ActionResult
+
     git.soft_reset_head1()
     return ActionResult(success=True, message="Uncommitted (changes re-staged)")
 
 
 def _checkout_branch(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     branch = payload["branch"]
     git.checkout_branch(branch)
     return ActionResult(success=True, message=f"Restored branch: {branch}")
 
 
 def _create_branch(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     name = payload["name"]
     sha = payload.get("sha")
     if sha:
@@ -286,6 +329,8 @@ def _create_branch(payload: dict, git: GitApi) -> ActionResult:
 
 
 def _rename_branch(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     old_name = payload["old_name"]
     new_name = payload["new_name"]
     git.rename_branch(new_name, old_name)
@@ -293,26 +338,106 @@ def _rename_branch(payload: dict, git: GitApi) -> ActionResult:
 
 
 def _stash_pop(_payload: dict, git: GitApi) -> ActionResult:  # noqa: ARG001
+    from pigit.viewmodels.base import ActionResult
+
     git.stash_pop("stash@{0}")
     return ActionResult(success=True, message="Restored stash")
 
 
 def _stash_store(payload: dict, git: GitApi) -> ActionResult:
+    from pigit.viewmodels.base import ActionResult
+
     sha = payload["stash_sha"]
     git.stash_store(sha)
     return ActionResult(success=True, message="Restored stash")
 
 
-_REVERSE_DISPATCHERS: dict[OpType, Callable[[dict, GitApi], ActionResult]] = {
-    "stage": _stage_file,
-    "unstage": _unstage_file,
-    "discard": _restore_file,
-    "ignore": _ignore_file,
-    "unignore": _unignore_file,
-    "commit": _soft_reset_head1,
-    "checkout_branch": _checkout_branch,
-    "delete_branch": _create_branch,
-    "rename_branch": _rename_branch,
-    "stash_push": _stash_pop,
-    "stash_pop": _stash_store,
+def _rewind_head(payload: dict, git: GitApi) -> ActionResult:
+    """Reset HEAD to a recorded SHA; refuse when the worktree is dirty.
+
+    ``git reset --hard`` would discard uncommitted changes made after the
+    operation, so guard on ``status_porcelain`` before touching HEAD.
+    """
+    from pigit.viewmodels.base import ActionResult
+
+    if git.status_porcelain().strip():
+        return ActionResult(
+            success=False,
+            message="Undo would discard uncommitted changes — commit or stash first",
+        )
+    git.hard_reset_head(payload["pre_sha"])
+    return ActionResult(success=True, message=f"Rewound to {payload['pre_sha'][:7]}")
+
+
+def push_rewind(
+    history: SessionHistory,
+    description: str,
+    pre_sha: str,
+    panel_hint: str,
+) -> None:
+    """Record one HEAD-moving operation for later ``u`` reversal."""
+    history.push(
+        HistoryRecord(
+            description=description,
+            commands=[ReverseCommand(op_type="rewind", payload={"pre_sha": pre_sha})],
+            timestamp=time.time(),
+            panel_hint=panel_hint,
+        )
+    )
+
+
+class _ReverseSpec(NamedTuple):
+    """How to reverse an op and how to describe the reversal command.
+
+    One registry entry per op keeps the execution logic and the confirm-dialog
+    description in lockstep — no duplicate dictionary to drift.
+    """
+
+    exec: Callable[[dict, GitApi], ActionResult]
+    describe: Callable[[dict], str]
+
+
+_REVERSE_SPECS: dict[OpType, _ReverseSpec] = {
+    "stage": _ReverseSpec(_stage_file, lambda p: f"git add {p['path']}"),
+    "unstage": _ReverseSpec(_unstage_file, lambda p: f"git reset HEAD {p['path']}"),
+    # Discard restores tracked files from HEAD unless a blob backup exists;
+    # describe the actual branch so the confirm dialog cannot mislead.
+    "discard": _ReverseSpec(
+        _restore_file,
+        lambda p: (
+            f"git checkout HEAD -- {p['path']}"
+            if p.get("tracked") and not p.get("blob_sha")
+            else f"restore {p['path']} (from backup)"
+        ),
+    ),
+    # git has no .gitignore subcommand; the semantic text is clearer than a
+    # fabricated command.
+    "ignore": _ReverseSpec(_ignore_file, lambda p: f"add {p['path']} to .gitignore"),
+    "unignore": _ReverseSpec(
+        _unignore_file, lambda p: f"remove {p['path']} from .gitignore"
+    ),
+    "commit": _ReverseSpec(_soft_reset_head1, lambda _p: "git reset --soft HEAD~1"),
+    "checkout_branch": _ReverseSpec(
+        _checkout_branch,
+        lambda p: f"git checkout {p['branch']}",
+    ),
+    "delete_branch": _ReverseSpec(_create_branch, lambda p: f"git branch {p['name']}"),
+    "rename_branch": _ReverseSpec(
+        _rename_branch,
+        lambda p: f"git branch -m {p['new_name']} {p['old_name']}",
+    ),
+    "stash_push": _ReverseSpec(_stash_pop, lambda _p: "git stash pop stash@{0}"),
+    # Stash restore needs the stashed SHA (not yet captured on push); render
+    # the real short SHA when present so the confirm dialog shows the truth.
+    "stash_pop": _ReverseSpec(
+        _stash_store,
+        lambda p: (
+            f"git stash store {p['stash_sha'][:7]}"
+            if p.get("stash_sha")
+            else "git stash store <sha>"
+        ),
+    ),
+    "rewind": _ReverseSpec(
+        _rewind_head, lambda p: f"git reset --hard {p['pre_sha'][:7]}"
+    ),
 }

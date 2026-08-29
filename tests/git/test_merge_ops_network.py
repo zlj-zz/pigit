@@ -96,3 +96,18 @@ def test_push_failure_raises_git_error() -> None:
     git = GitApi(executor=ex, path="/repo")
     with pytest.raises(GitError, match="rejected"):
         git.push()
+
+
+def test_hard_reset_head_runs_git_reset_hard() -> None:
+    ex = MockExecutor(default=(0, "", ""))
+    git = GitApi(executor=ex, path="/repo")
+    git.hard_reset_head("0123456789abcdef")
+    cmd, _flags, _kws = ex.exec_calls[-1]
+    assert cmd == "git reset --hard 0123456789abcdef"
+
+
+def test_hard_reset_head_failure_raises_git_error() -> None:
+    ex = MockExecutor(default=(1, "fatal: bad revision", ""))
+    git = GitApi(executor=ex, path="/repo")
+    with pytest.raises(GitError, match="bad revision"):
+        git.hard_reset_head("nope")

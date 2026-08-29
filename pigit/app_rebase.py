@@ -65,11 +65,13 @@ class RebasePanel(OptionList):
         git: "GitApi",
         base: str,
         on_done: Callable[[], None],
+        get_record_rewind: Callable[[], Callable[[str, str], None]],
     ) -> None:
         super().__init__()
         self._git = git
         self._base = base
         self._on_done = on_done
+        self._get_record_rewind = get_record_rewind
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
 
@@ -293,6 +295,7 @@ class RebasePanel(OptionList):
         tmp.write("\n".join(todo_lines))
         tmp.close()
         try:
+            pre_sha = self._git.resolve_head_sha()
             result = exec_external(
                 ["git", "rebase", "-i", self._base],
                 cwd=self._git.path,
@@ -311,6 +314,9 @@ class RebasePanel(OptionList):
                 show_toast("Rebase failed", duration=2.0, kind=FeedbackKind.ERROR)
             else:
                 show_badge("Rebase complete", duration=1.5, kind=FeedbackKind.SUCCESS)
+                # A completed rebase moved HEAD; record a rewind point so ``u``
+                # can return to the pre-rebase commit.
+                self._get_record_rewind()(f"Rebase onto {self._base}", pre_sha)
         except Exception as e:
             show_toast(f"Rebase error: {e}", duration=3.0, kind=FeedbackKind.ERROR)
         finally:

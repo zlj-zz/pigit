@@ -44,6 +44,7 @@ class SequencerControl:
         get_alert_dialog: Callable[[], AlertDialog],
         get_refresh_git_vms: Callable[[], None],
         get_refresh_active_panel: Callable[[], None],
+        get_record_rewind: Callable[[], Callable[[str, str], None]],
     ) -> None:
         """
         Args:
@@ -53,6 +54,7 @@ class SequencerControl:
             get_alert_dialog: Late-bound AlertDialog accessor.
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             refresh_active_panel: Callback after rebase sheet completes.
+            get_record_rewind: Late-bound recorder for successful HEAD moves.
         """
         self._get_git = get_git
         self._get_repo_path = get_repo_path
@@ -60,6 +62,7 @@ class SequencerControl:
         self._get_alert_dialog = get_alert_dialog
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_refresh_active_panel = get_refresh_active_panel
+        self._get_record_rewind = get_record_rewind
 
     def on_rebase_request(self, target: str) -> None:
         """Open the interactive-rebase todo panel for ``target``."""
@@ -69,7 +72,12 @@ class SequencerControl:
             dismiss_sheet()
             self._get_refresh_active_panel()
 
-        panel = RebasePanel(self._get_git(), target, on_done=_on_done)
+        panel = RebasePanel(
+            self._get_git(),
+            target,
+            on_done=_on_done,
+            get_record_rewind=self._get_record_rewind,
+        )
         show_sheet(panel, max_fraction=0.5, title="Rebase")
 
     def run_git_action(self, action: str) -> None:
@@ -205,6 +213,7 @@ class SequencerControl:
     def exec_cherry_pick(self, sha: str) -> None:
         """Run ``git cherry-pick`` after the user confirmed."""
         try:
+            pre_sha = self._get_git().resolve_head_sha()
             result = exec_external(
                 ["git", "cherry-pick", sha], cwd=self._get_repo_path()
             )
@@ -213,15 +222,16 @@ class SequencerControl:
                 f"Cherry-pick error: {exc}", duration=3.0, kind=FeedbackKind.ERROR
             )
             return
-        self.finish_cherry_pick(result, sha)
+        self.finish_cherry_pick(result, sha, pre_sha)
 
-    def finish_cherry_pick(self, result, sha: str) -> None:
+    def finish_cherry_pick(self, result, sha: str, pre_sha: str) -> None:
         """Toast or badge the outcome of a just-run cherry-pick."""
         git = self._get_git()
         try:
             kind = git.sequencer_in_progress()
             if result.returncode == 0:
                 show_badge(f"Cherry-picked {sha[:7]}")
+                self._get_record_rewind()(f"Cherry-pick {sha[:7]}", pre_sha)
                 self._get_refresh_git_vms()
                 return
             if kind == "cherry-pick":

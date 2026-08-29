@@ -37,6 +37,7 @@ class MergeWorkflow:
         get_alert_dialog: Callable[[], AlertDialog],
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
+        get_record_rewind: Callable[[], Callable[[str, str], None]],
     ) -> None:
         """
         Args:
@@ -48,6 +49,7 @@ class MergeWorkflow:
             get_alert_dialog: Late-bound AlertDialog accessor.
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             schedule_reload_header: Callback to reload header branch/ahead/behind.
+            get_record_rewind: Late-bound recorder for successful HEAD moves.
         """
         self._store = store
         self._network = network
@@ -57,6 +59,7 @@ class MergeWorkflow:
         self._get_alert_dialog = get_alert_dialog
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_schedule_reload_header = get_schedule_reload_header
+        self._get_record_rewind = get_record_rewind
 
     def on_merge_request(self, source: str, target: str) -> None:
         """Callback from BranchPanel: confirm then execute merge workflow."""
@@ -100,13 +103,14 @@ class MergeWorkflow:
     def do_merge_workflow(self, source: str, target: str) -> None:
         """Atomically: checkout target → pull → merge source.
 
-        On any step failure, best-effort checkout back to source then raise.
+        A successful merge records a rewind point (pre-merge target HEAD) so
+        ``u`` can return to it. On any step failure, best-effort checkout back
+        to source then raise.
         """
         git = self._get_git()
         steps = [
             (f"Checking out {target}", lambda: git.checkout_branch(target)),
             (f"Pulling {target}", lambda: git.pull()),
-            (f"Merging {source}", lambda: git.merge(source)),
         ]
         for msg, step in steps:
             show_spinner(msg)
@@ -120,7 +124,23 @@ class MergeWorkflow:
                 hide_spinner()
                 self._try_checkout_back(source)
                 raise
+        # The merge is the one HEAD-moving step: capture the pre-merge SHA
+        # so the whole operation stays reversible. Conflicts abort through
+        # the existing checkout-back + raise path and are never recorded.
+        show_spinner(f"Merging {source}")
+        try:
+            pre_sha = git.resolve_head_sha()
+            git.merge(source)
+        except GitError:
+            hide_spinner()
+            self._try_checkout_back(source)
+            raise
+        except Exception:
+            hide_spinner()
+            self._try_checkout_back(source)
+            raise
         hide_spinner()
+        self._get_record_rewind()(f"Merge {source} into {target}", pre_sha)
 
     def confirm_push_and_finish(self, target: str, source: str) -> None:
         """Alert confirm push, then checkout back to source branch after push completes."""

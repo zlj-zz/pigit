@@ -209,3 +209,18 @@ class _WorktreeOps(_OpsBase):
         )
         if code != 0:
             raise GitError(err or "soft reset HEAD~1 failed")
+
+    def hard_reset_head(self, sha: str, path: str | None = None) -> None:
+        """git reset --hard <sha> (move HEAD, discard worktree changes).
+
+        Only safe on a clean worktree; callers guard on ``status_porcelain``
+        before invoking (see ``session_history._rewind_head``).
+        """
+        path = path or self.path
+        code, err, _ = self.executor.exec(
+            f"git reset --hard {shlex.quote(sha)}",
+            cwd=path,
+            flags=WAITING | REPLY | DECODE,
+        )
+        if code != 0:
+            raise GitError(err or "hard reset HEAD failed")
