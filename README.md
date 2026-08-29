@@ -8,13 +8,17 @@
 |_|  |___\____|___| |_|
 </pre>
 
-![Python 3](https://img.shields.io/badge/Python-v3.11%5E-green?logo=python)
-[![pypi_version](https://img.shields.io/pypi/v/pigit?label=pypi)](https://pypi.org/project/pigit)
+## ⚡ A terminal UI for Git — short commands · multi-repo management
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://www.python.org)
+[![PyPI](https://img.shields.io/pypi/v/pigit?label=PyPI&color=orange&logo=pypi&logoColor=white)](https://pypi.org/project/pigit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Coverage](https://codecov.io/gh/zlj-zz/pigit/branch/main/graph/badge.svg)](https://codecov.io/gh/zlj-zz/pigit)
+[![macOS](https://img.shields.io/badge/macOS-✓-000000?logo=apple&logoColor=white)]()
+[![Linux](https://img.shields.io/badge/Linux-✓-9cf?logo=linux&logoColor=white)]()
 
-**A terminal UI for Git** — short commands and multi-repo management.
+`pigit` — a Git assistant for the terminal: **TUI panels** 🖥️ · **short commands** ⌨️ · **multi-repo management** 📚
 
 </div>
 
@@ -22,7 +26,7 @@
   <img src="./docs/resources/demo_interaction.gif" width="80%" alt="interaction demo">
 </div>
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 $ pip install -U pigit
@@ -34,9 +38,13 @@ $ pigit repo ll         # summary across repos
 $ pigit open            # open remote in browser
 ```
 
-## Installation
+> 💡 **The TUI opens on the first `pigit` run** — `1/2/3/4` switch panels, `;` opens the command palette (type a command, then space to complete branch/file arguments), `?` shows every key binding.
 
-### Source
+---
+
+## 📦 Installation
+
+### From source
 
 ```bash
 git clone https://github.com/zlj-zz/pigit.git --depth=1
@@ -52,17 +60,19 @@ python setup.py install
 pip install -e ".[dev]"
 ```
 
-## TUI Mode
+---
 
-Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments to enter it.
+## 🖥️ TUI Mode
+
+Pigit's primary interface is a terminal UI. Simply run `pigit` to enter it — four core panels plus a global command palette:
 
 | panel | what you can do |
 |-------|------------------|
-| Status | stage / unstage / discard / ignore files; inline diff; copy path (`Y`); stash list; file preview on wide terminals |
-| Diff | stage individual hunks; browse file history (`v`, `p`/`n`) |
-| Commit | inline subject/body editor with lint feedback |
-| History | undo the last action, browse and reverse multiple steps |
-| Branch | checkout, create, rename, delete branches; scope to a sub-directory (`R`) |
+| **Status** 📂 | stage / unstage / discard / ignore files; inline diff; copy path (`Y`); stash list; file preview on wide terminals |
+| **Diff** 🎭 | stage individual hunks; browse file history (`v`, `p`/`n`); word-diff + syntax highlighting |
+| **Commit** 🗂️ | inline subject/body editor with lint feedback |
+| **History** ↩️ | undo the last action, browse and reverse multiple steps |
+| **Branch** 🌿 | checkout, create, rename, delete branches; scope to a sub-directory (`R`) |
 
 ### Key bindings
 
@@ -72,7 +82,7 @@ Pigit's primary interface is a terminal UI. Simply run `pigit` with no arguments
 | `Enter` | select / open | all |
 | `q` / `Esc` | back / quit | all |
 | `?` | help | all |
-| `;` | open command palette (type a command; space + fragment completes branch/file args) | all |
+| `;` | open command palette (type a command; space + fragment completes branch/file args, `Tab` fills) | all |
 | `I` | inspect selection (top sheet; `j`/`k` scroll, `Esc`/`I` close) | Status, Stash, Branch, Commit |
 | `a` / `d` / `i` | stage / discard / ignore | Status |
 | `c` | inline commit editor | Status |
@@ -90,7 +100,9 @@ For operations that are cumbersome on the command line—such as staging individ
 > [!NOTE]
 > The TUI runs on macOS / Linux and requires an interactive terminal (both stdin and stdout must be TTYs). It will not launch in CI pipelines, scripts, or when piped. On Windows, only the CLI sub-commands are available.
 
-## CLI Usage
+---
+
+## ⌨️ CLI Usage
 
 For scripting, CI, or quick tasks, Pigit exposes sub-commands and flags.
 
@@ -102,7 +114,7 @@ usage: pigit [-h] [-i] [-f] [-r] [-v] [-c [PATH]] [--create-ignore TYPE]
 Pigit TUI is called automatically if no parameters are followed.
 ```
 
-### `cmd`
+### `cmd` — short commands
 
 Short aliases for common git operations.
 
@@ -132,15 +144,9 @@ These are short commands that can replace git operations:
 ......
 ```
 
-### `repo`
+### `repo` — multi-repo management
 
 Manage multiple repositories at once.
-
-<div align="center">
-  <img src="./docs/resources/demo_repo_1.png" width="80%" alt="demo display"><br>
-  <img src="./docs/resources/demo_repo_2.png" width="80%" alt="demo display"><br>
-  <img src="./docs/resources/demo_repo_3.png" width="80%" alt="demo display">
-</div>
 
 - `pigit repo add <path>` — add repo(s) to the managed list.
 - `pigit repo rm <name>` — remove repo(s).
@@ -150,7 +156,7 @@ Manage multiple repositories at once.
 - `pigit repo cd --output-file <path>` — write the selected path to a file instead (for scripts/CI).
 - `pigit repo fetch|pull|push [<name>...]` — run git operations across repos in parallel.
 
-### `open`
+### `open` — open remote in browser
 
 Open the current repository's remote URL in a web browser.
 
@@ -174,7 +180,9 @@ pigit open -p           # print URL instead of opening
 | `--create-config` | create a config file at `~/.config/pigit/pigit.toml` |
 | `--with-keybindings` | with `--create-config`, dump commented keybinding defaults into the config |
 
-## Shell Integration
+---
+
+## 🔌 Shell Integration
 
 `pigit --init` generates shell completion scripts **and** a `pigit` wrapper function.
 
@@ -196,7 +204,9 @@ After sourcing the init script, `pigit repo cd -p` automatically changes your sh
 
 For scripts and CI, use `--output-file <path>` to write the selected directory to a file instead.
 
-## Configuration
+---
+
+## 🛠️ Configuration
 
 Create a template config with `pigit --create-config`. The config lives at:
 
@@ -251,7 +261,9 @@ checkout = "C"  # default: "c"
 Actions are scoped by namespace: `universal`, `status`, `diff`, `rebase`,
 `branch`, `commit`, `stash`, `recent`.
 
-## Custom Commands
+---
+
+## 🧩 Custom Commands
 
 Define aliases and scripts in `pigit.cmds.toml` inside the pigit home directory.
 
@@ -278,34 +290,44 @@ quick-check = ["status", "diff --cached"]
 
 User-defined entries appear in `pigit cmd -l`, search, and `--pick` with `[alias]` or `[script]` prefixes.
 
-## Features
+---
 
-**TUI**
+## ✨ Features
 
-- **Session history / undo** — one-key reversal with confirmation (`u`), a browsable undo stack (`U`), and undo for merge, rebase, and cherry-pick.
-- **Command palette** — `;` opens a filterable command list; parameterized commands (checkout/merge/stage/gitignore) complete branch/file arguments.
-- **Hunk staging** — stage or unstage individual hunks directly in the diff viewer (`H`).
-- **Inline commit editor** — subject/body fields with lint bar inside the TUI.
-- **Stash management** — push, pop, and drop stashes from the status panel.
-- **Auto refresh** — periodic background refresh of the active panel while the TUI is idle.
-- **Syntax highlighting** — diff and file-history views tokenize source code by language.
-- **Adaptive layout** — side-by-side preview panel on large terminals.
-- **Inspector sheet** — `I` opens a frozen selection snapshot as a top overlay (not a layout column).
+**🖥️ TUI**
 
-**CLI**
+- **Session history / undo** ↩️ — one-key reversal with confirmation (`u`), a browsable undo stack (`U`), and undo for merge, rebase, and cherry-pick.
+- **Command palette** 🎯 — `;` opens a filterable command list; parameterized commands (checkout/merge/stage/gitignore) complete branch/file arguments.
+- **Hunk staging** 🔪 — stage or unstage individual hunks directly in the diff viewer (`H`).
+- **Inline commit editor** ✍️ — subject/body fields with lint bar inside the TUI.
+- **Stash management** 🗄️ — push, pop, and drop stashes from the status panel.
+- **Auto refresh** 🔄 — periodic background refresh of the active panel while the TUI is idle.
+- **Syntax highlighting** 🎨 — diff and file-history views tokenize source code by language (word-diff included).
+- **Adaptive layout** 📐 — side-by-side preview panel on large terminals.
+- **Inspector sheet** 🔍 — `I` opens a frozen selection snapshot as a top overlay (not a layout column).
 
-- **Short commands** — aliases like `pigit cmd st` for `git status --short`.
-- **Command correction** — suggests the right command when you typo.
-- **Code statistics** — count lines/files by type with table or simple output.
-- **`.gitignore` templates** — generate from common types.
-- **Quick open remote** — open repo/commit/issue in browser.
+**⌨️ CLI**
 
-**Multi-repo & shell**
+- **Short commands** ⚡ — aliases like `pigit cmd st` for `git status --short`.
+- **Command correction** 🔧 — suggests the right command when you typo.
+- **Code statistics** 📊 — count lines/files by type with table or simple output.
+- **`.gitignore` templates** 🧹 — generate from common types.
+- **Quick open remote** 🌐 — open repo/commit/issue in browser.
 
-- **Multi-repo management** — `repo` sub-commands for bulk operations across projects.
-- **Shell completion** — bash/zsh/fish with `pigit --init`.
-- **Auto `cd`** — shell wrapper enables `pigit repo cd -p` to change directory after picking.
+**📚 Multi-repo & shell**
 
-**Customization**
+- **Multi-repo management** 🗂️ — `repo` sub-commands for bulk operations across projects.
+- **Shell completion** 🐚 — bash/zsh/fish with `pigit --init`.
+- **Auto `cd`** 📁 — shell wrapper enables `pigit repo cd -p` to change directory after picking.
 
-- **Custom keybindings** — remap any app action via `[app.keybindings]`; dump defaults with `--create-config --with-keybindings`.
+**🎛️ Customization**
+
+- **Custom keybindings** 🎹 — remap any app action via `[app.keybindings]`; dump defaults with `--create-config --with-keybindings`.
+
+---
+
+<div align="center">
+
+**pigit** — terminal Git, all in one · ⭐ Star the repo if you find it useful!
+
+</div>
