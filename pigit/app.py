@@ -216,7 +216,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([(";", "Palette"), ("I", "Inspector"), ("Q", "Quit")])
+        footer.set_global_help([("I", "Inspector"), ("Q", "Quit")])
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
@@ -788,7 +788,7 @@ class PigitApplication(Application):
             return
         self._open_help_browser()
 
-    @bind_action("palette", ";", desc="Open command palette", tip="Palette")
+    @bind_action("palette", ";", desc="Open command palette")
     def toggle_palette(self):
         """Toggle command palette visibility."""
         if self._root is None:
@@ -940,7 +940,12 @@ class PigitApplication(Application):
             return True
         return was_detail_open
 
-    @bind_action("undo", "u", desc="Reverse last action", tip="Undo")
+    @bind_action(
+        "undo",
+        "u",
+        desc="Undo last action with confirmation (also reverses merge/rebase/cherry-pick)",
+        tip="Undo",
+    )
     def reverse_last_action(self) -> None:
         """Confirm, then reverse the most recent session action."""
         recent = self._session_history.peek(1)
@@ -975,7 +980,12 @@ class PigitApplication(Application):
         else:
             show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
-    @bind_action("switch_repo", "@", desc="Switch repository", tip="Repos")
+    @bind_action(
+        "switch_repo",
+        "@",
+        desc="Switch repo or worktree in place (switcher sheet)",
+        tip="Repos",
+    )
     def open_repo_switcher(self) -> None:
         """Open the managed-repo switcher sheet (``@`` key or RepoSlot click).
 
@@ -1351,7 +1361,12 @@ class PigitApplication(Application):
             on_confirm,
         )
 
-    @bind_action("recent", "U", desc="Open recent actions sheet", tip="Recent")
+    @bind_action(
+        "recent",
+        "U",
+        desc="Open recent actions sheet (confirm before reversing)",
+        tip="Recent",
+    )
     def open_recent_actions(self) -> None:
         """Open the RecentActionsPanel sheet overlay."""
         from .app_recent_actions import RecentActionsPanel

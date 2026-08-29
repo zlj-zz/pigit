@@ -23,7 +23,7 @@ from .input_line import InputLine
 MAX_MATCHED = 32
 MIN_LIST_SLOTS = 3
 MAX_LIST_SLOTS = 10
-_HINT = "↑↓ enter · esc"
+_HINT = "↑↓ enter tab · esc"
 _HINT_GAP = 2
 # Child rows below Sheet border: list/input rule + prompt.
 _SHEET_CHROME_ROWS = 2
