@@ -148,7 +148,7 @@ class DiffViewer(Component):
         self._tokenizer = SyntaxTokenizer()
         self._line_langs: list[str] = []
         self._multiline_mask: list[str | None] = []
-        # _render_tokens holds (text, fg_color, display_width, word_diff_bg_or_None)
+        # _render_tokens holds (text, fg_color, display_width, word_diff_bg_or_None, style_flags)
         self._render_tokens: list[_RenderLine] = []
         self._hunk_starts: list[int] = []
         self._hunk_mode = False
@@ -282,7 +282,7 @@ class DiffViewer(Component):
             code = line[1:]
         else:
             code = line
-        return [(code, THEME.fg_primary, wcswidth(code), None)]
+        return [(code, THEME.fg_primary, wcswidth(code), None, 0)]
 
     def _heatmap_at(self, idx: int) -> tuple[str, tuple[int, int, int]]:
         """Heatmap glyph/color for ``idx``; dim space if structure is shorter."""
@@ -1038,8 +1038,9 @@ class DiffViewer(Component):
                     THEME.fg_diff_hunk if fg == THEME.fg_primary else fg,
                     width,
                     bg,
+                    style,
                 )
-                for text, fg, width, bg in self._tokens_at(
+                for text, fg, width, bg, style in self._tokens_at(
                     idx, line, strip_diff_prefix=True
                 )
             ]
@@ -1089,7 +1090,7 @@ class DiffViewer(Component):
         A token straddling *clip_left* is drawn from *clip_left* onward
         (the hidden left portion is discarded via character clipping).
         """
-        for token_text, token_fg, token_width, token_bg in tokens:
+        for token_text, token_fg, token_width, token_bg, token_style in tokens:
             effective_bg = token_bg if token_bg is not None else bg
 
             # Skip tokens fully to the left of the visible area.
@@ -1113,10 +1114,22 @@ class DiffViewer(Component):
                 if avail > 1:
                     token_text = truncate_by_width(token_text, avail - 1) + "…"
                     surface.draw_text_rgb(
-                        row, col, token_text, fg=token_fg, bg=effective_bg
+                        row,
+                        col,
+                        token_text,
+                        fg=token_fg,
+                        bg=effective_bg,
+                        style_flags=token_style,
                     )
                 break
-            surface.draw_text_rgb(row, col, token_text, fg=token_fg, bg=effective_bg)
+            surface.draw_text_rgb(
+                row,
+                col,
+                token_text,
+                fg=token_fg,
+                bg=effective_bg,
+                style_flags=token_style,
+            )
             col += token_width
 
     def _draw_top_bar(

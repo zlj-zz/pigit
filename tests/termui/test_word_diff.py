@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pigit.app_diff import DiffViewer
 from pigit.diff_content import DiffContent
+from pigit.termui import palette
 
 
 class TestWordDiffRanges:
@@ -209,8 +210,8 @@ class TestDrawTokensWithPerTokenBackground:
         dv = DiffViewer()
         surface = Surface(20, 1)
         tokens = [
-            ("a", THEME.fg_primary, 1, THEME.bg_word_diff_add),
-            ("b", THEME.fg_primary, 1, None),
+            ("a", THEME.fg_primary, 1, THEME.bg_word_diff_add, palette.STYLE_UNDERLINE),
+            ("b", THEME.fg_primary, 1, None, 0),
         ]
         dv._draw_tokens(surface, 0, 0, 20, tokens, bg=THEME.bg_diff_context)
 

@@ -89,8 +89,8 @@ class PigitTheme(Theme):
     )
     fg_diff_hunk: tuple[int, int, int] = palette.PEARL
     bg_diff_context: tuple[int, int, int] = palette.INK
-    bg_word_diff_add: tuple[int, int, int] = (50, 105, 60)
-    bg_word_diff_del: tuple[int, int, int] = (120, 50, 50)
+    bg_word_diff_add: tuple[int, int, int] = (58, 118, 68)
+    bg_word_diff_del: tuple[int, int, int] = (148, 58, 55)
 
     # Overlay
     bg_overlay_dim: tuple[int, int, int] = palette.NAVY_GRAY

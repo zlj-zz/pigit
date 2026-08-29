@@ -12,6 +12,7 @@ import difflib
 import logging
 import re
 
+from pigit.termui import palette
 from pigit.termui.primitives import (
     format_line_number,
     merge_ranges,
@@ -27,8 +28,8 @@ _logger = logging.getLogger(__name__)
 
 _HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
-# A render token is (text, fg_rgb, display_width, word_diff_bg_or_None).
-RenderToken = tuple[str, tuple[int, int, int], int, tuple[int, int, int] | None]
+# A render token is (text, fg_rgb, display_width, word_diff_bg_or_None, style_flags).
+RenderToken = tuple[str, tuple[int, int, int], int, tuple[int, int, int] | None, int]
 RenderLine = list[RenderToken]
 WordDiffSegment = tuple[str, str | None, int]
 
@@ -174,6 +175,7 @@ class DiffContent:
                         ),
                         wcswidth(text),
                         None,
+                        0,
                     )
                     for text, ttype in tokens
                 ]
@@ -267,6 +269,7 @@ class DiffContent:
                             ),
                             wcswidth(text),
                             None,
+                            0,
                         )
                         for text, ttype in tokens
                     ]
@@ -313,7 +316,15 @@ class DiffContent:
                             if ttype == "plain"
                             else tokenizer.resolve_color(ttype, lang)
                         )
-                        line_result.append((text, fg, wcswidth(text), seg_bg))
+                        line_result.append(
+                            (
+                                text,
+                                fg,
+                                wcswidth(text),
+                                seg_bg,
+                                palette.STYLE_ITALIC if seg_bg is not None else 0,
+                            )
+                        )
                 result.append(line_result)
                 continue
 
@@ -336,6 +347,7 @@ class DiffContent:
                         ),
                         wcswidth(text),
                         None,
+                        0,
                     )
                     for text, ttype in tokens
                 ]
