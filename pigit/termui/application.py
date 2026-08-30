@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from .bindings import (
     BindingsList,
+    ExecutableBinding,
     derive_executable_bindings,
     derive_help_entries,
     resolve_instance_bindings,
@@ -46,7 +47,7 @@ class Application:
     BINDINGS: BindingsList | None = None
 
     # Declarative lifecycle configuration (override in subclass)
-    min_terminal_size: tuple[int, int] | None = None
+    min_terminal_size: tuple[int, int] = (0, 0)
     help_popup_class: type[Component] | None = None
     help_binding: str = "?"
 
@@ -66,7 +67,7 @@ class Application:
         """Derive app-level (universal) help entries from ``@bind_action``."""
         return derive_help_entries(self._action_bindings, self)
 
-    def get_help_groups(self) -> list[tuple[str, list[tuple[str, str]]]]:
+    def get_help_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
         """Return grouped help entries for the help popup.
 
         Default: a single ``Global`` group when universal entries exist.
@@ -74,7 +75,7 @@ class Application:
         Returns:
             List of ``(group_title, entries)`` tuples.
         """
-        universal = self.get_help_entries()
+        universal = self.get_executable_bindings()
         if universal:
             return [("Global", universal)]
         return []
@@ -135,14 +136,13 @@ class Application:
 
     def _auto_after_start(self) -> None:
         """Inject framework-level checks after user ``after_start`` runs."""
-        if self.min_terminal_size is not None:
-            from .tty_io import terminal_size
+        from .tty_io import terminal_size
 
-            cols, rows = terminal_size()
-            min_cols, min_rows = self.min_terminal_size
-            if cols < min_cols or rows < min_rows:
-                self.quit(
-                    exit_code=1,
+        cols, rows = terminal_size()
+        min_cols, min_rows = self.min_terminal_size
+        if cols < min_cols or rows < min_rows:
+            self.quit(
+                exit_code=1,
                     result_message=f"Terminal too small (need {min_cols}x{min_rows})",
                 )
 

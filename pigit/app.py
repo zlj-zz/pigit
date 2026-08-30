@@ -10,7 +10,9 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
+
+T = TypeVar("T")
 
 from pigit.termui import (
     EventType,
@@ -101,7 +103,7 @@ class PigitApplication(Application):
     """Pigit TUI application entry."""
 
     keymap_namespace = "universal"
-    min_terminal_size = (65, 10)
+    min_terminal_size: tuple[int, int] = (65, 10)
     LARGE_SCREEN_COLS = 120
 
     # Body tree — assigned in build_root; required for a live TUI session.
@@ -1690,8 +1692,8 @@ class PigitApplication(Application):
 
     def _resolve_index(
         self,
-        items: list,
-        key_fn: Callable[[object], str],
+        items: list[T],
+        key_fn: Callable[[T], str],
         arg: str,
     ) -> int | None:
         """Return the first index whose key equals *arg*, or None."""
