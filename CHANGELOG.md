@@ -1,5 +1,26 @@
 # Changelog of pigit
 
+## 2.5.1 (2026-08-30)
+
+### Features
+
+- **Brand-color sheet edge rule**: every sheet (repo/worktree switcher, command palette, commit, rebase, log ref, bisect, recent, inspector, welcome) paints its facing-edge rule with the theme's brand accent, so pickers and drawers read as part of the product chrome. The ` · title · ` decoration is now a single app-side `sheet_core()` helper.
+
+### Bug Fixes
+
+- **Observe treats the Status tab as one unit**: the Status and Stash panels refresh together while the Status tab is active, so stash create/pop operations appear immediately instead of being ignored as a non-focused presentation leaf (fixes #79).
+
+### Improvements
+
+- **Word-diff highlights stand out**: intra-line additions/deletions render with italic plus a brighter background so they read at a glance against the base diff tint.
+- README restyled with emoji section headers, hero badges, and freshly recorded interaction demos.
+
+### Refactors
+
+- **Sheet title becomes a verbatim slot**: the framework `Sheet` paints a caller-composed center slot (`title_core`) instead of wrapping ` · title · ` itself, keeping the format decision in the app layer.
+- **ext/ slimming**: dropped the hand-rolled `Singleton` metaclass for a module-level `get_config()`, shrank `time_it` to a plain elapsed counter, deleted the dead `_do_*` delegates, and turned `ExecutorFactory` into module-level functions.
+- Resolved pyright diagnostics across `PigitApplication` and the `Application` base (`min_terminal_size`, generic `_resolve_index`, `get_help_groups` typing).
+
 ## 2.5.0 (2026-08-29)
 
 ### Features
