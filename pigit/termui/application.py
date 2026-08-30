@@ -143,8 +143,8 @@ class Application:
         if cols < min_cols or rows < min_rows:
             self.quit(
                 exit_code=1,
-                    result_message=f"Terminal too small (need {min_cols}x{min_rows})",
-                )
+                result_message=f"Terminal too small (need {min_cols}x{min_rows})",
+            )
 
     def quit(self, *, exit_code: int = 0, result_message: str | None = None) -> None:
         """Request graceful exit from the event loop."""
