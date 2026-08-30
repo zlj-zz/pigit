@@ -23,46 +23,36 @@ MIN_SHEET_HEIGHT = 3
 TitleAlign = Literal["left", "center", "right"]
 
 _RULE_CHAR = "─"
-_TITLE_SIDE = " · "
 _ELLIPSIS = "…"
 
 
 def compose_edge_rule(
     width: int,
-    title: str | None = None,
+    core: str | None = None,
     *,
     align: TitleAlign = "right",
 ) -> tuple[str, str, str]:
     """Build one facing-edge rule as ``(left_fill, core, right_fill)``.
 
-    With a title the core is `` · {title} · ``; fills are ``─``. At least one
-    fill cell is kept on each side when width allows. Oversized titles are
-    truncated with an ellipsis. When the title cannot fit, returns a plain
-    rule (empty core).
+    ``core`` is a caller-composed center slot (e.g. `` · title · ``) painted
+    verbatim; fills are ``─``. At least one fill cell is kept on each side
+    when width allows. Oversized cores are truncated with an ellipsis. When
+    the core cannot fit, returns a plain rule (empty core).
     """
     if width <= 0:
         return "", "", ""
     plain = (_RULE_CHAR * width, "", "")
-    if not title:
+    if not core:
         return plain
 
-    side_w = wcswidth(_TITLE_SIDE)
-    overhead = side_w * 2
     # Reserve one rule cell on each side when possible.
     max_core = width - 2 if width >= 2 else 0
-    if max_core < overhead + 1:
-        return plain
-
-    title_budget = max_core - overhead
-    label = title
-    if wcswidth(label) > title_budget:
-        if title_budget <= 1:
-            return plain
-        label = truncate_by_width(label, title_budget - 1) + _ELLIPSIS
-    core = f"{_TITLE_SIDE}{label}{_TITLE_SIDE}"
     core_w = wcswidth(core)
-    if core_w > max_core or core_w > width:
-        return plain
+    if core_w > max_core:
+        if max_core <= 1:
+            return plain
+        core = truncate_by_width(core, max_core - 1) + _ELLIPSIS
+        core_w = wcswidth(core)
 
     fill = width - core_w
     if align == "left":
@@ -84,8 +74,11 @@ class Sheet(Component):
 
     Default chrome: no fill color (``bg=None`` — cells keep the terminal
     default background, not a theme slab) and a facing-edge rule
-    (``show_edge_rule=True``): a full-width ``─`` line, optionally embedding
-    `` · title · ``. Callers that need a solid slab or a rule-less one-line
+    (``show_edge_rule=True``): a full-width ``─`` line with an optional
+    center slot. ``title_core`` is a caller-composed slot painted verbatim
+    (e.g. `` · Switch repo · ``). The rule paints with ``edge_fg`` when
+    given (a brand accent, for instance), otherwise the theme's dim/muted
+    foregrounds. Callers that need a solid slab or a rule-less one-line
     input pass those explicitly.
 
     ``top_pad`` / ``bottom_pad`` reserve app chrome rows (header / footer) so
@@ -161,13 +154,14 @@ class Sheet(Component):
         size: tuple[int, int] | None = None,
         *,
         show_edge_rule: bool = True,
-        title: str | None = None,
+        title_core: str | None = None,
         title_align: TitleAlign = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
         top_pad: int = 0,
         bottom_pad: int = 0,
         height_cap_fraction: float = DEFAULT_HARD_CAP_FRACTION,
+        edge_fg: tuple[int, int, int] | None = None,
     ) -> None:
         super().__init__(size=size)
         self._child = child
@@ -175,10 +169,11 @@ class Sheet(Component):
         self._target_height = height
         self._height_cap_fraction = height_cap_fraction
         self._show_edge_rule = show_edge_rule
-        self._title = title
+        self._title_core = title_core
         self._title_align: TitleAlign = title_align
         self._edge = edge
         self._bg = bg
+        self._edge_fg = edge_fg
         self._top_pad = top_pad
         self._bottom_pad = bottom_pad
         self._child_dispatch = getattr(child, "dispatch_overlay_key", None)
@@ -242,10 +237,14 @@ class Sheet(Component):
     def _draw_rule(self, sub: Surface, row: int) -> None:
         """Draw the facing-edge rule as a full-width line, optional title core."""
         theme = get_theme()
-        fg_rule, fg_title, bg = theme.fg_dim, theme.fg_muted, self._sheet_bg()
+        accent = self._edge_fg
+        fg_rule, fg_title = (
+            (accent, accent) if accent is not None else (theme.fg_dim, theme.fg_muted)
+        )
+        bg = self._sheet_bg()
         left, core, right = compose_edge_rule(
             sub.width,
-            self._title,
+            self._title_core,
             align=self._title_align,
         )
         col = 0

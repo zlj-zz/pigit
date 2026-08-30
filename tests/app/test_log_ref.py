@@ -194,7 +194,7 @@ def test_open_log_ref_shows_sheet():
     child = sheet.call_args.args[0]
     assert isinstance(child, LogRefSheet)
     assert sheet.call_args.kwargs.get("max_fraction") == 0.5
-    assert sheet.call_args.kwargs.get("title") == "Log ref"
+    assert sheet.call_args.kwargs.get("title_core") == " · Log ref · "
 
 
 def test_on_pick_sets_ref_and_toasts():

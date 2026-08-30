@@ -518,6 +518,32 @@ class TestSheet:
         assert surface._rows[7][0].char == "─"
         assert surface._rows[7][19].char == "─"
 
+    def test_sheetpaint_edge_fg_colors_rule_and_title(self):
+        child = MagicMock()
+        child.paint = MagicMock()
+        accent = (150, 200, 255)
+        sheet = Sheet(child, height=3, edge_fg=accent, title_core=" · Hi · ")
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet.paint(surface)
+        row = surface._rows[7]
+        text = "".join(c.char for c in row)
+        assert "Hi" in text
+        # Rule fill and title core both take the accent when edge_fg is set.
+        assert row[0].fg == accent
+        assert row[text.index("Hi")].fg == accent
+
+    def test_sheetpaint_default_rule_uses_theme_dim(self):
+        child = MagicMock()
+        child.paint = MagicMock()
+        sheet = Sheet(child, height=3)
+        sheet._size = (20, 3)
+        surface = Surface(20, 10)
+        sheet.paint(surface)
+        from pigit.termui.theme import get_theme
+
+        assert surface._rows[7][0].fg == get_theme().fg_dim
+
     def test_sheet_top_edge_border_is_on_last_row(self):
         child = MagicMock()
         child.paint = MagicMock()
@@ -689,7 +715,7 @@ class TestSheet:
     def test_sheet_title_right_aligned_by_default(self):
         child = MagicMock()
         child.paint = MagicMock()
-        sheet = Sheet(child, height=3, title="Commands")
+        sheet = Sheet(child, height=3, title_core=" · Commands · ")
         sheet._size = (24, 3)
         surface = Surface(24, 10)
         sheet.paint(surface)
@@ -700,26 +726,26 @@ class TestSheet:
     def test_compose_edge_rule_alignments(self):
         from pigit.termui.widgets.sheet import compose_edge_rule
 
-        left, core, right = compose_edge_rule(20, "Hi", align="left")
+        left, core, right = compose_edge_rule(20, " · Hi · ", align="left")
         assert left == "─"
         assert core == " · Hi · "
         assert right.startswith("─")
 
-        left, core, right = compose_edge_rule(20, "Hi", align="right")
+        left, core, right = compose_edge_rule(20, " · Hi · ", align="right")
         assert right == "─"
         assert core == " · Hi · "
         assert left.startswith("─")
 
-        left, core, right = compose_edge_rule(21, "Hi", align="center")
+        left, core, right = compose_edge_rule(21, " · Hi · ", align="center")
         assert core == " · Hi · "
         assert abs(len(left) - len(right)) <= 1
 
-    def test_compose_edge_rule_truncates_long_title(self):
+    def test_compose_edge_rule_truncates_long_core(self):
         from pigit.termui.widgets.sheet import compose_edge_rule
 
-        left, core, right = compose_edge_rule(12, "VeryLongTitle")
+        left, core, right = compose_edge_rule(12, " · VeryLongTitle · ")
         assert left == "─" and right == "─"
-        assert core.startswith(" · ") and core.endswith(" · ")
+        assert core.startswith(" · ")
         assert "…" in core
 
 

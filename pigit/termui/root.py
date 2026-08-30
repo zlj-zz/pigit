@@ -367,10 +367,11 @@ class ComponentRoot(Component):
         *,
         max_fraction: float = DEFAULT_MAX_FRACTION,
         show_edge_rule: bool = True,
-        title: str | None = None,
+        title_core: str | None = None,
         title_align: Literal["left", "center", "right"] = "right",
         edge: Literal["top", "bottom"] = "bottom",
         bg: tuple[int, int, int] | None = None,
+        edge_fg: tuple[int, int, int] | None = None,
     ) -> Sheet:
         """Display a sheet on the SHEET layer and move focus to its leaf.
 
@@ -381,7 +382,10 @@ class ComponentRoot(Component):
         Height resolution matches :func:`~pigit.termui.overlay.show_sheet`:
         omitted ``height`` uses the child's preferred height and
         ``max_fraction``; an explicit ``height`` only gets the half-terminal
-        safety clamp. Optional ``title`` embeds in the facing-edge rule.
+        safety clamp. Optional ``title_core`` is the pre-rendered center slot
+        (e.g. `` · Switch repo · ``) painted in the facing-edge rule;
+        ``edge_fg`` colors that rule (falling back to the theme's dim/muted
+        foregrounds when ``None``).
         """
         from .widgets import Sheet
 
@@ -399,13 +403,14 @@ class ComponentRoot(Component):
             child,
             resolved,
             show_edge_rule=show_edge_rule,
-            title=title,
+            title_core=title_core,
             title_align=title_align,
             edge=edge,
             bg=bg,
             top_pad=self.top_chrome_pad,
             bottom_pad=self.bottom_chrome_pad,
             height_cap_fraction=Sheet.height_cap_fraction(max_fraction),
+            edge_fg=edge_fg,
         )
         sheet.resize(self._size)
         self._layer_stack.push(LayerKind.SHEET, sheet)

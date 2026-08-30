@@ -84,10 +84,11 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
-            title=None,
+            title_core=None,
             title_align="right",
             edge="bottom",
             bg=None,
+            edge_fg=None,
         )
         assert result is host.show_sheet.return_value
 
@@ -105,10 +106,11 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
-            title=None,
+            title_core=None,
             title_align="right",
             edge="top",
             bg=None,
+            edge_fg=None,
         )
         assert result is host.show_sheet.return_value
 
@@ -126,10 +128,11 @@ class TestOverlayHelpers:
             4,
             max_fraction=1 / 3,
             show_edge_rule=True,
-            title=None,
+            title_core=None,
             title_align="right",
             edge="top",
             bg=None,
+            edge_fg=None,
         )
 
     def test_dismiss_sheet(self):

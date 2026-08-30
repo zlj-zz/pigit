@@ -210,7 +210,7 @@ def test_open_repo_switcher_shows_sheet():
         app.open_repo_switcher()
         show.assert_called_once()
         args, kwargs = show.call_args
-        assert kwargs.get("title") == "Switch repo"
+        assert kwargs.get("title_core") == " · Switch repo · "
         assert isinstance(args[0], RepoSwitcherSheet)
 
 

@@ -76,7 +76,7 @@ from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
-from .app_theme import THEME
+from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
@@ -508,8 +508,9 @@ class PigitApplication(Application):
         show_sheet(
             sheet,
             edge="top",
-            title="Welcome to Pigit",
+            title_core=sheet_core("Welcome to Pigit"),
             max_fraction=WELCOME_SHEET_MAX_FRACTION,
+            edge_fg=THEME.fg_accent,
         )
 
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
@@ -823,7 +824,11 @@ class PigitApplication(Application):
                 ),
                 list_slots=slots,
             )
-            self._root.show_sheet(self._palette, title="Commands")
+            self._root.show_sheet(
+                self._palette,
+                title_core=sheet_core("Commands"),
+                edge_fg=THEME.fg_accent,
+            )
             # Branch/status lists may be empty until their panels mount; load
             # both and refresh arg candidates when the Signals update.
             self._branch_vm.refresh()
@@ -1022,8 +1027,9 @@ class PigitApplication(Application):
         )
         show_sheet(
             panel,
-            title="Switch repo",
+            title_core=sheet_core("Switch repo"),
             edge="bottom",
+            edge_fg=THEME.fg_accent,
         )
 
     def open_worktree_picker(self) -> None:
@@ -1053,8 +1059,9 @@ class PigitApplication(Application):
         )
         show_sheet(
             panel,
-            title="Switch worktree",
+            title_core=sheet_core("Switch worktree"),
             edge="bottom",
+            edge_fg=THEME.fg_accent,
         )
 
     def _show_add_worktree_sheet(self) -> None:
@@ -1297,7 +1304,12 @@ class PigitApplication(Application):
             on_operation=self._refresh_after_bisect_operation,
             on_done=dismiss_sheet,
         )
-        show_sheet(panel, title="Bisect", edge="bottom")
+        show_sheet(
+            panel,
+            title_core=sheet_core("Bisect"),
+            edge="bottom",
+            edge_fg=THEME.fg_accent,
+        )
 
     def _refresh_after_bisect_operation(self) -> None:
         """Refresh git VMs and header after a bisect operation moved HEAD."""
@@ -1385,7 +1397,7 @@ class PigitApplication(Application):
             on_done=_on_done,
             confirm_reverse=self._confirm_reverse_range,
         )
-        show_sheet(panel, title="Recent")
+        show_sheet(panel, title_core=sheet_core("Recent"), edge_fg=THEME.fg_accent)
 
     def _confirm_reverse_range(
         self, records: list[HistoryRecord], do_reverse: Callable[[], None]
@@ -1463,7 +1475,9 @@ class PigitApplication(Application):
         token = object()
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
-        placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
+        placeholder_sheet = show_sheet(
+            placeholder, height=3, edge="top", edge_fg=THEME.fg_accent
+        )
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -1483,7 +1497,7 @@ class PigitApplication(Application):
                 return
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
-            show_sheet(sheet, edge="top", max_fraction=0.5)
+            show_sheet(sheet, edge="top", max_fraction=0.5, edge_fg=THEME.fg_accent)
 
         self._inspector_task = run_async(
             load, self._guard_repo(self._repo_token, apply)

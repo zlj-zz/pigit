@@ -147,3 +147,13 @@ class PigitTheme(Theme):
 
 # Global singleton theme instance.
 THEME = PigitTheme()
+
+
+def sheet_core(name: str) -> str:
+    """Compose a sheet's edge-rule title slot, e.g. `` · Switch repo · ``.
+
+    Single source for the `` · {name} · `` chrome the app paints into the
+    facing-edge rule of ``Sheet`` (the framework keeps ``title_core`` a
+    verbatim slot).
+    """
+    return f" · {name} · "
