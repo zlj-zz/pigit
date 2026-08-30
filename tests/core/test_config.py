@@ -1,19 +1,9 @@
 from unittest.mock import patch
 
-import pytest
-
 from pigit.config import Config
 from pigit.config_data import ConfigData
 
 from paths import TEST_CONFIG
-
-
-@pytest.fixture(autouse=True)
-def _reset_config_singleton():
-    """Reset Config singleton between tests."""
-    Config._instances.clear()
-    yield
-    Config._instances.clear()
 
 
 def test_commit_report_default_read_from_toml(tmp_path):

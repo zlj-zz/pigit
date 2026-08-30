@@ -171,7 +171,9 @@ class TestAppFooter:
 
         rows = [[Segment(f"line {i}")] for i in range(30)]
         welcome = WelcomeSheet(on_dismiss=lambda: None, rows=rows)
-        sheet_shell = Sheet(welcome, height=8, edge="top", title="Welcome to Pigit")
+        sheet_shell = Sheet(
+            welcome, height=8, edge="top", title_core=" · Welcome to Pigit · "
+        )
         tips = {tip for _key, tip in welcome.get_footer_entries()}
         assert "Navigate" in tips
         assert "Close" in tips

@@ -43,7 +43,7 @@ from pigit.termui.widgets import (
 from .app_diff import DiffType, DiffViewer
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
-from .app_theme import THEME
+from .app_theme import THEME, sheet_core
 from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
@@ -579,7 +579,12 @@ class StatusPanel(OptionList):
             on_submit=_do_commit,
             on_cancel=dismiss_sheet,
         )
-        show_sheet(editor, max_fraction=0.5, title="Commit")
+        show_sheet(
+            editor,
+            max_fraction=0.5,
+            title_core=sheet_core("Commit"),
+            edge_fg=THEME.fg_accent,
+        )
 
     @bind_action(
         "commit_editor",

@@ -73,7 +73,7 @@ class Context:
     ) -> Context:
         """Build default context: logging, shared executor, git helpers, and named logger."""
         from .const import LOG_FILE_PATH
-        from .ext.executor_factory import ExecutorFactory, LocalExecutor
+        from .ext.executor_factory import LocalExecutor, set_executor
         from .ext.log import logger, setup_logging
         from .git.api import GitApi
         from .git.managed_repos import ManagedRepos
@@ -85,7 +85,7 @@ class Context:
 
         app_log = logger(log_name)
         executor = LocalExecutor(log=app_log)
-        ExecutorFactory.set_strategy(executor)
+        set_executor(executor)
         git_api = GitApi(executor=executor)
         managed_repos = ManagedRepos(executor=executor, repo_json_path=repo_json_path)
         return cls(

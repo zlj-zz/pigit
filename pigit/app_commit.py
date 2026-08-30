@@ -35,7 +35,7 @@ from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
 from .app_diff import DiffType
-from .app_theme import THEME
+from .app_theme import THEME, sheet_core
 from .app_contribution_graph import ContributionGraph
 from .viewmodels.base import ActionResult
 from .viewmodels.commit import ICommitViewModel
@@ -250,7 +250,12 @@ class CommitPanel(OptionList):
             on_pick=self._on_log_ref_picked,
             on_done=dismiss_sheet,
         )
-        show_sheet(sheet, max_fraction=0.5, title="Log ref")
+        show_sheet(
+            sheet,
+            max_fraction=0.5,
+            title_core=sheet_core("Log ref"),
+            edge_fg=THEME.fg_accent,
+        )
 
     def _on_log_ref_picked(self, name: str) -> None:
         """Apply a ref chosen in the log-ref sheet."""

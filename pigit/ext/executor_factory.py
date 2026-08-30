@@ -1,8 +1,9 @@
 """Global executor selection for subprocess-backed git and helpers.
 
-Production uses :class:`LocalExecutor` (subclass of :class:`~pigit.ext.executor.Executor`).
-Tests may :meth:`ExecutorFactory.set_strategy` with a :class:`MockExecutor` or custom
-:class:`ExecutorStrategy`, then :meth:`ExecutorFactory.reset` to restore defaults.
+Production uses :func:`get_executor` which builds a :class:`LocalExecutor`
+(subclass of :class:`~pigit.ext.executor.Executor`) on first use. Tests may
+:func:`set_executor` with a :class:`MockExecutor` or custom
+:class:`ExecutorStrategy`, then :func:`reset_executor` to restore defaults.
 """
 
 from __future__ import annotations
@@ -102,20 +103,24 @@ class MockExecutor(ExecutorStrategy):
         return out
 
 
-class ExecutorFactory:
-    _instance: ExecutorStrategy | None = None
+_executor: ExecutorStrategy | None = None
 
-    @classmethod
-    def reset(cls) -> None:
-        cls._instance = None
 
-    @classmethod
-    def set_strategy(cls, strategy: ExecutorStrategy | None) -> None:
-        """Replace the global executor; ``None`` clears so next ``get()`` builds default."""
-        cls._instance = strategy
+def get_executor() -> ExecutorStrategy:
+    """Return the global executor, building the default on first use."""
+    global _executor
+    if _executor is None:
+        _executor = LocalExecutor()
+    return _executor
 
-    @classmethod
-    def get(cls) -> ExecutorStrategy:
-        if cls._instance is None:
-            cls._instance = LocalExecutor()
-        return cls._instance
+
+def set_executor(strategy: ExecutorStrategy | None) -> None:
+    """Replace the global executor; ``None`` clears so the next call builds default."""
+    global _executor
+    _executor = strategy
+
+
+def reset_executor() -> None:
+    """Clear the global executor so the next :func:`get_executor` rebuilds it."""
+    global _executor
+    _executor = None

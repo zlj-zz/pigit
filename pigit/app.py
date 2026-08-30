@@ -10,7 +10,9 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
+
+T = TypeVar("T")
 
 from pigit.termui import (
     EventType,
@@ -74,7 +76,7 @@ from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
-from .app_theme import THEME
+from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
@@ -101,7 +103,7 @@ class PigitApplication(Application):
     """Pigit TUI application entry."""
 
     keymap_namespace = "universal"
-    min_terminal_size = (65, 10)
+    min_terminal_size: tuple[int, int] = (65, 10)
     LARGE_SCREEN_COLS = 120
 
     # Body tree — assigned in build_root; required for a live TUI session.
@@ -362,6 +364,8 @@ class PigitApplication(Application):
                 get_config=lambda: self._config,
                 get_status_vm=lambda: self._status_vm,
                 get_tab_view=lambda: tab_view,
+                get_status_panel=lambda: status_panel,
+                get_stash_panel=lambda: stash_panel,
                 get_preview_panel=lambda: self._preview_panel,
                 get_log_graph_preview=lambda: self._log_graph_preview,
                 get_diff_preview_wanted=lambda: self._diff_preview_wanted,
@@ -504,8 +508,9 @@ class PigitApplication(Application):
         show_sheet(
             sheet,
             edge="top",
-            title="Welcome to Pigit",
+            title_core=sheet_core("Welcome to Pigit"),
             max_fraction=WELCOME_SHEET_MAX_FRACTION,
+            edge_fg=THEME.fg_accent,
         )
 
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
@@ -819,7 +824,11 @@ class PigitApplication(Application):
                 ),
                 list_slots=slots,
             )
-            self._root.show_sheet(self._palette, title="Commands")
+            self._root.show_sheet(
+                self._palette,
+                title_core=sheet_core("Commands"),
+                edge_fg=THEME.fg_accent,
+            )
             # Branch/status lists may be empty until their panels mount; load
             # both and refresh arg candidates when the Signals update.
             self._branch_vm.refresh()
@@ -1018,8 +1027,9 @@ class PigitApplication(Application):
         )
         show_sheet(
             panel,
-            title="Switch repo",
+            title_core=sheet_core("Switch repo"),
             edge="bottom",
+            edge_fg=THEME.fg_accent,
         )
 
     def open_worktree_picker(self) -> None:
@@ -1049,8 +1059,9 @@ class PigitApplication(Application):
         )
         show_sheet(
             panel,
-            title="Switch worktree",
+            title_core=sheet_core("Switch worktree"),
             edge="bottom",
+            edge_fg=THEME.fg_accent,
         )
 
     def _show_add_worktree_sheet(self) -> None:
@@ -1293,7 +1304,12 @@ class PigitApplication(Application):
             on_operation=self._refresh_after_bisect_operation,
             on_done=dismiss_sheet,
         )
-        show_sheet(panel, title="Bisect", edge="bottom")
+        show_sheet(
+            panel,
+            title_core=sheet_core("Bisect"),
+            edge="bottom",
+            edge_fg=THEME.fg_accent,
+        )
 
     def _refresh_after_bisect_operation(self) -> None:
         """Refresh git VMs and header after a bisect operation moved HEAD."""
@@ -1381,7 +1397,7 @@ class PigitApplication(Application):
             on_done=_on_done,
             confirm_reverse=self._confirm_reverse_range,
         )
-        show_sheet(panel, title="Recent")
+        show_sheet(panel, title_core=sheet_core("Recent"), edge_fg=THEME.fg_accent)
 
     def _confirm_reverse_range(
         self, records: list[HistoryRecord], do_reverse: Callable[[], None]
@@ -1459,7 +1475,9 @@ class PigitApplication(Application):
         token = object()
         self._inspector_token = token
         placeholder = InspectorSheet([[Segment("Inspecting…", fg=THEME.fg_dim)]])
-        placeholder_sheet = show_sheet(placeholder, height=3, edge="top")
+        placeholder_sheet = show_sheet(
+            placeholder, height=3, edge="top", edge_fg=THEME.fg_accent
+        )
 
         def load() -> InspectorSnapshot | None:
             return active.get_inspector_snapshot()
@@ -1479,7 +1497,7 @@ class PigitApplication(Application):
                 return
             lines = InspectorSheet.format(snapshot)
             sheet = InspectorSheet(lines)
-            show_sheet(sheet, edge="top", max_fraction=0.5)
+            show_sheet(sheet, edge="top", max_fraction=0.5, edge_fg=THEME.fg_accent)
 
         self._inspector_task = run_async(
             load, self._guard_repo(self._repo_token, apply)
@@ -1501,12 +1519,12 @@ class PigitApplication(Application):
     )
     def push_upstream(self) -> None:
         """Push HEAD; confirm ``git push -u`` when no upstream is configured."""
-        self._run_network_git("push")
+        self._network_git.run("push")
 
     @bind_action("pull", "F", desc="Pull current branch from upstream", tip="Pull")
     def pull_upstream(self) -> None:
         """Pull into HEAD from its configured upstream (non-interactive)."""
-        self._run_network_git("pull")
+        self._network_git.run("pull")
 
     def _on_palette_vm_items_changed(self, _items: object) -> None:
         """Refresh palette arg candidates when branch/status lists update."""
@@ -1667,29 +1685,29 @@ class PigitApplication(Application):
             self.navigate_product(lower)
             return
         if lower in ("pull", "push"):
-            self._run_network_git(lower)
+            self._network_git.run(lower)
             return
         if lower == "fetch":
-            self._run_git_action("fetch")
+            self._sequencer.run_git_action("fetch")
             return
         if lower == "continue-merge":
             self._continue_merge()
             return
         if lower in ("rebase-continue", "rebase-abort", "rebase-skip"):
-            self._run_rebase_control(lower)
+            self._sequencer.run_rebase_control(lower)
             return
         if lower in (
             "cherry-pick-continue",
             "cherry-pick-abort",
             "cherry-pick-skip",
         ):
-            self._run_cherry_pick_control(lower)
+            self._sequencer.run_cherry_pick_control(lower)
             return
 
     def _resolve_index(
         self,
-        items: list,
-        key_fn: Callable[[object], str],
+        items: list[T],
+        key_fn: Callable[[T], str],
         arg: str,
     ) -> int | None:
         """Return the first index whose key equals *arg*, or None."""
@@ -1759,44 +1777,15 @@ class PigitApplication(Application):
     def _network_sync_busy(self, value: bool) -> None:
         self._network_git.busy = value
 
-    def _run_network_git(
-        self,
-        action: str,
-        *,
-        on_complete: Callable[[], None] | None = None,
-    ) -> None:
-        """Delegate to NetworkGit.run()."""
-        self._network_git.run(action, on_complete=on_complete)
-
     def _handle_pull_conflict(self, message: str) -> None:
         """Delegate to NetworkGit.handle_pull_conflict()."""
         self._network_git.handle_pull_conflict(message)
-
-    def _run_git_action(self, action: str) -> None:
-        """Delegate to SequencerControl.run_git_action()."""
-        self._sequencer.run_git_action(action)
-
-    def _run_rebase_control(self, action: str) -> None:
-        """Delegate to SequencerControl.run_rebase_control()."""
-        self._sequencer.run_rebase_control(action)
 
     def _refresh_git_vms(self) -> None:
         """Refresh Status, Branch, and Commit VMs (safe while a palette overlay is open)."""
         self._status_vm.refresh()
         self._branch_vm.refresh()
         self._commit_vm.refresh()
-
-    def _do_rebase_control(self, flag: str) -> None:
-        """Delegate to SequencerControl.do_rebase_control()."""
-        self._sequencer.do_rebase_control(flag)
-
-    def _run_cherry_pick_control(self, action: str) -> None:
-        """Delegate to SequencerControl.run_cherry_pick_control()."""
-        self._sequencer.run_cherry_pick_control(action)
-
-    def _do_cherry_pick_control(self, flag: str) -> None:
-        """Delegate to SequencerControl.do_cherry_pick_control()."""
-        self._sequencer.do_cherry_pick_control(flag)
 
     def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
         """Delegate to SequencerControl.on_cherry_pick()."""

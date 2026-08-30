@@ -8,6 +8,8 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from unittest.mock import Mock, patch
 
 import pytest

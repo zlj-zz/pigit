@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pigit.ext.executor import REPLY, DECODE
-from pigit.ext.executor_factory import ExecutorFactory
+from pigit.ext.executor_factory import get_executor
 
 from .ignore import get_ignore_source, create_gitignore
 from .api import GitApi, GitError, RepoError
@@ -21,7 +21,7 @@ __all__ = (
 def git_version() -> str:
     """Get Git version."""
 
-    _, _, version = ExecutorFactory.get().exec("git --version", flags=REPLY | DECODE)
+    _, _, version = get_executor().exec("git --version", flags=REPLY | DECODE)
     if version is None:
         return ""
     if isinstance(version, bytes):

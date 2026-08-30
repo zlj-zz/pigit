@@ -13,7 +13,7 @@ import pytest
 
 from pigit.config import Config
 from pigit.context import Context
-from pigit.ext.executor_factory import ExecutorFactory, MockExecutor
+from pigit.ext.executor_factory import MockExecutor, reset_executor
 from pigit.handlers.cmd_picker_data import (
     build_context_signals,
     context_score,
@@ -28,10 +28,10 @@ from pigit.git.managed_repos import ManagedRepos
 @pytest.fixture(autouse=True)
 def _isolate_context_and_factory():
     Context.detach()
-    ExecutorFactory.reset()
+    reset_executor()
     yield
     Context.detach()
-    ExecutorFactory.reset()
+    reset_executor()
 
 
 class TestBuildContextSignals:

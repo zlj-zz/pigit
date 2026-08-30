@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from pigit.app_theme import THEME, sheet_core
 from pigit.git.api import GitApi, GitError, RepoError
 from pigit.termui import (
     FeedbackKind,
@@ -78,7 +79,12 @@ class SequencerControl:
             on_done=_on_done,
             get_record_rewind=self._get_record_rewind,
         )
-        show_sheet(panel, max_fraction=0.5, title="Rebase")
+        show_sheet(
+            panel,
+            max_fraction=0.5,
+            title_core=sheet_core("Rebase"),
+            edge_fg=THEME.fg_accent,
+        )
 
     def run_git_action(self, action: str) -> None:
         """Run a git action via exec_external and show result toast."""
