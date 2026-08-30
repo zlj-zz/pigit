@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from pigit.ext.executor import Executor, WAITING
-from pigit.ext.executor_factory import ExecutorFactory
+from pigit.ext.executor_factory import get_executor
 
 
 class SecurityError(Exception):
@@ -59,7 +59,7 @@ class SecureExecutor:
     _MAX_AUDIT_LOG_SIZE = 1000
 
     def __init__(self, base_executor: Executor | None = None):
-        self._base = base_executor or ExecutorFactory.get()
+        self._base = base_executor or get_executor()
         self._audit_log: deque[dict] = deque(maxlen=self._MAX_AUDIT_LOG_SIZE)
 
     def exec(

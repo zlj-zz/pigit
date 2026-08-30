@@ -16,8 +16,25 @@ from .config_data import (
     LogConfig,
     AppConfig,
 )
-from .ext.singleton import Singleton
 from .ext.utils import confirm, traceback_info
+
+_config_instance: Config | None = None
+
+
+def get_config(
+    path: str = "",
+    version: str = "",
+    auto_load: bool = True,
+) -> Config:
+    """Return the process-wide :class:`Config` instance (first call wins).
+
+    The CLI bootstrap is the only production caller; tests construct
+    ``Config(...)`` directly and need no reset.
+    """
+    global _config_instance
+    if _config_instance is None:
+        _config_instance = Config(path=path, version=version, auto_load=auto_load)
+    return _config_instance
 
 
 class ConfigError(Exception):
@@ -53,7 +70,7 @@ def _resolve_icons_policy(app_raw: dict) -> str:
     return "auto"
 
 
-class Config(metaclass=Singleton):
+class Config:
     """PIGIT configuration class."""
 
     CONFIG_TEMPLATE: str = textwrap.dedent("""\

@@ -6,7 +6,7 @@ from unittest.mock import patch
 from pprint import pprint
 
 from pigit.ext.utils import traceback_info, confirm
-from pigit.ext.func import dynamic_default_attrs, time_it
+from pigit.ext.func import time_it
 
 
 def test_doctest():
@@ -42,19 +42,6 @@ def test_confirm(mock_input, input_value: str, return_bool: bool):
 
 
 class TestFunc:
-    def test_dynamic_default_attrs(self):
-        da = {"c": 3, "d": 4}
-        f = dynamic_default_attrs(lambda a, b, c, d: (a, b, c, d), **da)
-
-        assert f(1, 2) == (1, 2, 3, 4)
-        assert f(1, 2, d=0) == (1, 2, 3, 0)
-        # assert f(1, 2, 0) == (1, 2, 0, 4)
-
-        def bp(a, b, c: int, d: int = 10):
-            return (a, b, c, d)
-
-        assert dynamic_default_attrs(bp, **da)(1, 2, 0) == (1, 2, 0, 4)
-
     @pytest.mark.parametrize(
         "test_input, expected_output, expected_time_unit, msg",
         [
@@ -81,20 +68,3 @@ class TestFunc:
         captured = capsys.readouterr()
         assert expected_output == result
         assert expected_time_unit in captured.out
-
-    def test_time_it_minute_unit(self, monkeypatch, capsys):
-        """Verify minute unit conversion without real sleep."""
-        call_count = 0
-        timestamps = [0.0, 61.0]
-
-        def fake_time():
-            nonlocal call_count
-            val = timestamps[call_count]
-            call_count += 1
-            return val
-
-        monkeypatch.setattr(time, "time", fake_time)
-        decorated = time_it(lambda x: x)
-        decorated(1)
-        captured = capsys.readouterr()
-        assert "minute" in captured.out

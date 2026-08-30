@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from pigit.ext.executor import Executor
-from pigit.ext.executor_factory import ExecutorFactory, ExecutorStrategy
+from pigit.ext.executor_factory import ExecutorStrategy, get_executor
 
 from ._errors import GitError, RepoError
 from ._core import _CoreOps
@@ -41,7 +41,7 @@ class GitApi:
         path: str | None = None,
         log: logging.Logger | None = None,
     ) -> None:
-        self.executor = executor or ExecutorFactory.get()
+        self.executor = executor or get_executor()
         self.log = log or logging.getLogger(__name__)
         self.path = path
         self._core = _CoreOps(self)

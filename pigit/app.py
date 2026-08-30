@@ -1503,12 +1503,12 @@ class PigitApplication(Application):
     )
     def push_upstream(self) -> None:
         """Push HEAD; confirm ``git push -u`` when no upstream is configured."""
-        self._run_network_git("push")
+        self._network_git.run("push")
 
     @bind_action("pull", "F", desc="Pull current branch from upstream", tip="Pull")
     def pull_upstream(self) -> None:
         """Pull into HEAD from its configured upstream (non-interactive)."""
-        self._run_network_git("pull")
+        self._network_git.run("pull")
 
     def _on_palette_vm_items_changed(self, _items: object) -> None:
         """Refresh palette arg candidates when branch/status lists update."""
@@ -1669,23 +1669,23 @@ class PigitApplication(Application):
             self.navigate_product(lower)
             return
         if lower in ("pull", "push"):
-            self._run_network_git(lower)
+            self._network_git.run(lower)
             return
         if lower == "fetch":
-            self._run_git_action("fetch")
+            self._sequencer.run_git_action("fetch")
             return
         if lower == "continue-merge":
             self._continue_merge()
             return
         if lower in ("rebase-continue", "rebase-abort", "rebase-skip"):
-            self._run_rebase_control(lower)
+            self._sequencer.run_rebase_control(lower)
             return
         if lower in (
             "cherry-pick-continue",
             "cherry-pick-abort",
             "cherry-pick-skip",
         ):
-            self._run_cherry_pick_control(lower)
+            self._sequencer.run_cherry_pick_control(lower)
             return
 
     def _resolve_index(
@@ -1761,44 +1761,15 @@ class PigitApplication(Application):
     def _network_sync_busy(self, value: bool) -> None:
         self._network_git.busy = value
 
-    def _run_network_git(
-        self,
-        action: str,
-        *,
-        on_complete: Callable[[], None] | None = None,
-    ) -> None:
-        """Delegate to NetworkGit.run()."""
-        self._network_git.run(action, on_complete=on_complete)
-
     def _handle_pull_conflict(self, message: str) -> None:
         """Delegate to NetworkGit.handle_pull_conflict()."""
         self._network_git.handle_pull_conflict(message)
-
-    def _run_git_action(self, action: str) -> None:
-        """Delegate to SequencerControl.run_git_action()."""
-        self._sequencer.run_git_action(action)
-
-    def _run_rebase_control(self, action: str) -> None:
-        """Delegate to SequencerControl.run_rebase_control()."""
-        self._sequencer.run_rebase_control(action)
 
     def _refresh_git_vms(self) -> None:
         """Refresh Status, Branch, and Commit VMs (safe while a palette overlay is open)."""
         self._status_vm.refresh()
         self._branch_vm.refresh()
         self._commit_vm.refresh()
-
-    def _do_rebase_control(self, flag: str) -> None:
-        """Delegate to SequencerControl.do_rebase_control()."""
-        self._sequencer.do_rebase_control(flag)
-
-    def _run_cherry_pick_control(self, action: str) -> None:
-        """Delegate to SequencerControl.run_cherry_pick_control()."""
-        self._sequencer.run_cherry_pick_control(action)
-
-    def _do_cherry_pick_control(self, flag: str) -> None:
-        """Delegate to SequencerControl.do_cherry_pick_control()."""
-        self._sequencer.do_cherry_pick_control(flag)
 
     def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
         """Delegate to SequencerControl.on_cherry_pick()."""

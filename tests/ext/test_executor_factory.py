@@ -4,40 +4,42 @@ import pytest
 
 from pigit.ext.executor import REPLY, WAITING
 from pigit.ext.executor_factory import (
-    ExecutorFactory,
     LocalExecutor,
     MockExecutor,
+    get_executor,
+    reset_executor,
+    set_executor,
 )
 from pigit.git.api import GitApi
 
 
 @pytest.fixture(autouse=True)
 def _reset_executor_factory():
-    ExecutorFactory.reset()
+    reset_executor()
     yield
-    ExecutorFactory.reset()
+    reset_executor()
 
 
 def test_get_returns_local_executor():
-    ex = ExecutorFactory.get()
+    ex = get_executor()
     assert isinstance(ex, LocalExecutor)
 
 
 def test_get_reuses_singleton():
-    assert ExecutorFactory.get() is ExecutorFactory.get()
+    assert get_executor() is get_executor()
 
 
 def test_reset_builds_fresh_singleton():
-    a = ExecutorFactory.get()
-    ExecutorFactory.reset()
-    b = ExecutorFactory.get()
+    a = get_executor()
+    reset_executor()
+    b = get_executor()
     assert a is not b
 
 
 def test_set_strategy_mock():
     mock = MockExecutor()
-    ExecutorFactory.set_strategy(mock)
-    assert ExecutorFactory.get() is mock
+    set_executor(mock)
+    assert get_executor() is mock
 
 
 def test_mock_exec_records_and_responds():
@@ -45,9 +47,9 @@ def test_mock_exec_records_and_responds():
         responses={"git status": (0, "", " M foo\n")},
         default=(1, "e", ""),
     )
-    ExecutorFactory.set_strategy(mock)
-    assert ExecutorFactory.get().exec("git status", flags=REPLY) == (0, "", " M foo\n")
-    assert ExecutorFactory.get().exec("other", flags=REPLY) == (1, "e", "")
+    set_executor(mock)
+    assert get_executor().exec("git status", flags=REPLY) == (0, "", " M foo\n")
+    assert get_executor().exec("other", flags=REPLY) == (1, "e", "")
     assert len(mock.exec_calls) == 2
     assert mock.exec_calls[0][0] == "git status"
 
@@ -75,7 +77,7 @@ def test_mock_exec_stream_empty_on_stderr():
 
 def test_mock_exec_parallel_merges_orders():
     mock = MockExecutor(responses={"a": (0, "", "A"), "b": (0, "", "B")})
-    ExecutorFactory.set_strategy(mock)
+    set_executor(mock)
     out = mock.exec_parallel("a", "b", orders=[{"cwd": "/x"}, {}], flags=WAITING)
     assert out == [(0, "", "A"), (0, "", "B")]
     assert mock.exec_calls[0][2].get("cwd") == "/x"
@@ -91,7 +93,7 @@ def test_repo_uses_factory_executor(tmp_path):
             "git rev-parse --git-dir": (0, "", ".git\n"),
         }
     )
-    ExecutorFactory.set_strategy(mock)
+    set_executor(mock)
     repo = GitApi(path=root_s)
     out_root, gd = repo.confirm_repo(root_s)
     assert out_root == root_s

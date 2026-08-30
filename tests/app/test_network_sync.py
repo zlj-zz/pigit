@@ -43,7 +43,7 @@ def test_busy_guard_blocks_second_sync(app):
         patch("pigit.app_network_git.show_toast") as toast,
         patch("pigit.app_network_git.show_spinner") as spin,
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     spin.assert_not_called()
     app._network_sync_task.start.assert_not_called()
     assert "already in progress" in toast.call_args.args[0].lower()
@@ -56,7 +56,7 @@ def test_run_network_git_starts_worker_with_center_spinner(app):
         patch("pigit.app_network_git.hide_spinner"),
         patch("pigit.app_network_git.show_toast"),
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     dismiss.assert_called_once()
     spin.assert_called_once()
     assert spin.call_args.kwargs.get("position") is ToastPosition.CENTER
@@ -81,7 +81,7 @@ def test_done_success_refreshes_and_clears_busy(app):
         patch("pigit.app_network_git.hide_spinner") as hide,
         patch("pigit.app_network_git.show_toast") as toast,
     ):
-        app._run_network_git("pull")
+        app._network_git.run("pull")
         app._schedule_reload_header = MagicMock()
         app._refresh_git_vms = MagicMock()
         captured["done"](NetworkGitOutcome(ok=True))
@@ -109,7 +109,7 @@ def test_pull_conflict_routes_to_status(app):
         patch("pigit.app_network_git.show_toast") as toast,
     ):
         app._refresh_git_vms = MagicMock()
-        app._run_network_git("pull")
+        app._network_git.run("pull")
         captured["done"](
             NetworkGitOutcome(
                 ok=False,
@@ -160,7 +160,7 @@ def test_work_captures_git_error(app):
         patch("pigit.app_network_git.hide_spinner"),
         patch("pigit.app_network_git.show_toast"),
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     work, _done = app._network_sync_task.start.call_args.args
     outcome = work()
     assert outcome.ok is False
@@ -176,7 +176,7 @@ def test_work_captures_non_git_error_so_done_can_clear_busy(app):
         patch("pigit.app_network_git.hide_spinner"),
         patch("pigit.app_network_git.show_toast"),
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     work, done = app._network_sync_task.start.call_args.args
     outcome = work()
     assert outcome.ok is False
@@ -246,17 +246,17 @@ def test_merge_push_still_checkouts_back_on_push_failure(app):
 
 
 def test_palette_routes_push_to_network_git(app):
-    app._run_network_git = MagicMock()
+    app._network_git = MagicMock()
     app._on_palette_execute("push")
-    app._run_network_git.assert_called_once_with("push")
+    app._network_git.run.assert_called_once_with("push")
 
 
 def test_palette_fetch_stays_on_run_git_action(app):
-    app._run_git_action = MagicMock()
-    app._run_network_git = MagicMock()
+    app._sequencer = MagicMock()
+    app._network_git = MagicMock()
     app._on_palette_execute("fetch")
-    app._run_git_action.assert_called_once_with("fetch")
-    app._run_network_git.assert_not_called()
+    app._sequencer.run_git_action.assert_called_once_with("fetch")
+    app._network_git.run.assert_not_called()
 
 
 def test_push_no_upstream_alert_confirm_runs_set_upstream(app):
@@ -279,7 +279,7 @@ def test_push_no_upstream_alert_confirm_runs_set_upstream(app):
         patch("pigit.app_network_git.hide_spinner"),
         patch("pigit.app_network_git.show_toast"),
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     spin.assert_called_once()
     work, _done = app._network_sync_task.start.call_args.args
     assert work().ok is True
@@ -304,7 +304,7 @@ def test_push_no_upstream_alert_cancel_skips_worker(app):
         patch("pigit.app_network_git.show_spinner") as spin,
         patch("pigit.app_network_git.show_toast"),
     ):
-        app._run_network_git("push", on_complete=lambda: completed.append(True))
+        app._network_git.run("push", on_complete=lambda: completed.append(True))
     spin.assert_not_called()
     app._network_sync_task.start.assert_not_called()
     assert completed == [True]
@@ -318,7 +318,7 @@ def test_push_no_remote_toasts_without_spinner(app):
         patch("pigit.app_network_git.show_spinner") as spin,
         patch("pigit.app_network_git.show_toast") as toast,
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     spin.assert_not_called()
     assert "No remote" in toast.call_args.args[0]
     assert toast.call_args.kwargs.get("kind") is FeedbackKind.WARNING
@@ -331,7 +331,7 @@ def test_push_detached_head_toasts_without_spinner(app):
         patch("pigit.app_network_git.show_spinner") as spin,
         patch("pigit.app_network_git.show_toast") as toast,
     ):
-        app._run_network_git("push")
+        app._network_git.run("push")
     spin.assert_not_called()
     assert "Detached HEAD" in toast.call_args.args[0]
 
@@ -342,7 +342,7 @@ def test_pull_no_upstream_toasts_without_spinner(app):
         patch("pigit.app_network_git.show_spinner") as spin,
         patch("pigit.app_network_git.show_toast") as toast,
     ):
-        app._run_network_git("pull")
+        app._network_git.run("pull")
     spin.assert_not_called()
     app._network_sync_task.start.assert_not_called()
     assert "No upstream" in toast.call_args.args[0]

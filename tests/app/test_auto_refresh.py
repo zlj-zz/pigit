@@ -30,7 +30,6 @@ class TestObserveConfig:
     )
     def test_repo_observe_flags(self, toml_content, repo_observe, observe_worktree):
         """Config file can set repo_observe and observe_worktree."""
-        Config._instances.clear()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             path = f.name
@@ -43,11 +42,9 @@ class TestObserveConfig:
             assert not hasattr(app, "auto_refresh_interval")
         finally:
             os.unlink(path)
-            Config._instances.clear()
 
     def test_legacy_auto_refresh_interval_warns_and_is_ignored(self):
         """Legacy auto_refresh_interval is ignored with a warning."""
-        Config._instances.clear()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write("[app]\nauto_refresh_interval = 30.0\nrepo_observe = true\n")
             path = f.name
@@ -58,7 +55,6 @@ class TestObserveConfig:
             assert any("auto_refresh_interval" in w for w in cfg._warnings)
         finally:
             os.unlink(path)
-            Config._instances.clear()
 
 
 @pytest.fixture

@@ -29,7 +29,7 @@ def app():
 
 
 def _run(app, flag: str, returncode: int = 0, in_progress: bool = False) -> tuple:
-    """Run _do_rebase_control and return the captured show_toast call."""
+    """Run SequencerControl.do_rebase_control and return the captured toast."""
     app._git.is_rebase_in_progress.return_value = in_progress
     app._git.sequencer_in_progress.return_value = "rebase" if in_progress else None
     with (
@@ -37,7 +37,7 @@ def _run(app, flag: str, returncode: int = 0, in_progress: bool = False) -> tupl
         patch("pigit.app_sequencer.show_toast") as toast,
     ):
         ex.return_value.returncode = returncode
-        app._do_rebase_control(flag)
+        app._sequencer.do_rebase_control(flag)
     return toast.call_args
 
 
@@ -76,7 +76,7 @@ class TestRebaseControl:
             patch("pigit.app_sequencer.show_toast"),
         ):
             ex.return_value.returncode = 0
-            app._do_rebase_control("continue")
+            app._sequencer.do_rebase_control("continue")
         assert ex.call_args.args[0] == ["git", "rebase", "--continue"]
 
 
@@ -99,7 +99,7 @@ class TestCherryPickControl:
             patch("pigit.app_sequencer.show_toast"),
         ):
             ex.return_value.returncode = 0
-            app._do_cherry_pick_control("continue")
+            app._sequencer.do_cherry_pick_control("continue")
         assert ex.call_args.args[0] == [
             "git",
             "cherry-pick",
@@ -114,7 +114,7 @@ class TestCherryPickControl:
             patch("pigit.app_sequencer.show_toast"),
         ):
             ex.return_value.returncode = 0
-            app._do_cherry_pick_control("skip")
+            app._sequencer.do_cherry_pick_control("skip")
         assert ex.call_args.args[0] == ["git", "cherry-pick", "--skip"]
 
     def test_abort_argv(self, app):
@@ -124,5 +124,5 @@ class TestCherryPickControl:
             patch("pigit.app_sequencer.show_toast"),
         ):
             ex.return_value.returncode = 0
-            app._do_cherry_pick_control("abort")
+            app._sequencer.do_cherry_pick_control("abort")
         assert ex.call_args.args[0] == ["git", "cherry-pick", "--abort"]

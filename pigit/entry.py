@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from .config import Config
+from .config import get_config
 from .context import Context
 from .const import (
     CONFIG_FILE_PATH,
@@ -14,7 +14,6 @@ from .const import (
 )
 from .cmdparse.parser import argument, command
 from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .ext.func import dynamic_default_attrs
 from .ext.utils import resolve_icon, resolve_nerd_icons
 from .git import create_gitignore
 from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
@@ -31,7 +30,7 @@ _TOOLS_GROUP = "tools"
 
 
 def _bootstrap() -> Context:
-    conf = Config(
+    conf = get_config(
         path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
     ).output_warnings()
     set_key_overrides(conf.get().app.keybindings)
@@ -445,16 +444,26 @@ repo_options = {
     "pull": {"cmd": "git pull", "allow_all": True, "help": "pull remote updates"},
     "push": {"cmd": "git push", "allow_all": True, "help": "push the local updates"},
 }
+
+
+def _bulk_cmd_handler(cmd: str):
+    """Build a repo sub-command handler with ``cmd`` baked in.
+
+    The parser calls handlers as ``(args, parser_self)``; bulk_cmd needs the
+    pre-configured git command string from ``repo_options``.
+    """
+
+    def handler(args, _parser):
+        RepoCommandHandler(ctx.current()).bulk_cmd(args, cmd)
+
+    return handler
+
+
 for sub_cmd, prop in repo_options.items():
     help_string = f"{h.strip()} for repo(s)." if (h := prop.get("help")) else "NULL"
     repo.sub_parser(sub_cmd, help=help_string)(
         argument("repos", nargs="*", arg_completion="repos", help="name of repo(s).")(
-            dynamic_default_attrs(
-                lambda args, _, cmd: RepoCommandHandler(ctx.current()).bulk_cmd(
-                    args, cmd
-                ),
-                cmd=prop["cmd"],
-            )
+            _bulk_cmd_handler(prop["cmd"])
         )
     )
 
