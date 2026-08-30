@@ -53,6 +53,8 @@ class ObserveDeps:
         get_config: Callable returning AppConfig (observe flags).
         get_status_vm: Late-bound StatusViewModel accessor.
         get_tab_view: Late-bound TabView accessor.
+        get_status_panel: Late-bound StatusPanel accessor (may be None).
+        get_stash_panel: Late-bound StashPanel accessor (may be None).
         get_preview_panel: Late-bound PreviewPanel accessor (may be None).
         get_log_graph_preview: Late-bound LogGraphPreview accessor (may be None).
         get_diff_preview_wanted: Whether diff side preview is visible.
@@ -70,6 +72,8 @@ class ObserveDeps:
     get_config: Callable[[], AppConfig]
     get_status_vm: Callable[[], StatusViewModel]
     get_tab_view: Callable[[], TabView]
+    get_status_panel: Callable[[], StatusPanel | None]
+    get_stash_panel: Callable[[], StashPanel | None]
     get_preview_panel: Callable[[], PreviewPanel | None]
     get_log_graph_preview: Callable[[], LogGraphPreview | None]
     get_diff_preview_wanted: Callable[[], bool]
@@ -204,7 +208,11 @@ class ObserveHost:
         self._observe_ctx = replace(self._observe_ctx, preview_target=rel)
 
     def build_roots(self) -> list[WatchRoot]:
-        """Build watch roots; attach worktree only when Status is focused."""
+        """Build watch roots; attach worktree when the Status tab is focused.
+
+        Stash is the Status panel's Column sibling (one tab), so its focus
+        also needs the worktree root — stash pop restores worktree changes.
+        """
         ctx = self._observe_ctx
         if ctx is None:
             return []
@@ -216,7 +224,7 @@ class ObserveHost:
         if not self._deps.get_config().observe_worktree:
             return roots
         active = resolve_presentation_leaf(self._deps.get_tab_view().visible)
-        if not isinstance(active, StatusPanel):
+        if not isinstance(active, (StatusPanel, StashPanel)):
             return roots
         self._worktree_watched = True
         roots.append(WatchRoot(kind="worktree", path=ctx.repo_root))
@@ -257,9 +265,18 @@ class ObserveHost:
         if active is None:
             return
 
-        if isinstance(active, StatusPanel):
+        if isinstance(active, (StatusPanel, StashPanel)):
+            # The Status tab owns two sibling panels: worktree/index changes
+            # refresh Status, stash/ref changes refresh the Stash list —
+            # regardless of which sibling currently holds focus.
             if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
-                self._deps.refresh_list_panel(active)
+                status = self._deps.get_status_panel()
+                if status is not None:
+                    self._deps.refresh_list_panel(status)
+            if ChangeKind.STASH in kinds or ChangeKind.REFS in kinds:
+                stash = self._deps.get_stash_panel()
+                if stash is not None:
+                    self._deps.refresh_list_panel(stash)
             if ChangeKind.PREVIEW_FILE in kinds:
                 preview = self._deps.get_preview_panel()
                 if (
@@ -287,10 +304,6 @@ class ObserveHost:
                 self._deps.refresh_list_panel(active)
             return
 
-        if isinstance(active, StashPanel):
-            if ChangeKind.STASH in kinds or ChangeKind.REFS in kinds:
-                self._deps.refresh_list_panel(active)
-
     def _worktree_digest(self) -> str | None:
         """Return a porcelain digest while Status worktree observe is active.
 
@@ -310,8 +323,9 @@ class ObserveHost:
     def worktree_dirty(self) -> bool | None:
         """Most recent worktree dirty flag while worktree observe is active.
 
-        None when observe is inactive or a non-Status tab is focused, so
-        callers fall back to a direct probe instead of a stale digest.
+        None when observe is inactive or a non-Status-tab leaf is focused
+        (the worktree root is not mounted then), so callers fall back to a
+        direct probe instead of a stale digest.
         """
         if not self._worktree_watched:
             return None

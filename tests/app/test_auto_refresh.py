@@ -193,7 +193,9 @@ class TestObserveBatchSinks:
                 )
             )
 
-        refresh.assert_called_once_with(panel)
+        # Worktree changes refresh the Status panel (the tab's Status sibling),
+        # not the presentation leaf object as such.
+        refresh.assert_called_once_with(app._status_panel)
         # Pure worktree edits only move the dirty dot; branch tracking does
         # not need a two-subprocess reload per batch.
         dirty.assert_called_once()

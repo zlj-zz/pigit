@@ -362,6 +362,8 @@ class PigitApplication(Application):
                 get_config=lambda: self._config,
                 get_status_vm=lambda: self._status_vm,
                 get_tab_view=lambda: tab_view,
+                get_status_panel=lambda: status_panel,
+                get_stash_panel=lambda: stash_panel,
                 get_preview_panel=lambda: self._preview_panel,
                 get_log_graph_preview=lambda: self._log_graph_preview,
                 get_diff_preview_wanted=lambda: self._diff_preview_wanted,
