@@ -62,6 +62,15 @@ python setup.py install
 pip install -e ".[dev]"
 ```
 
+### Optional short aliases
+
+`pigit` only installs the `pigit` command. If you want one-letter shortcuts, add them to your shell yourself (they are intentionally not registered globally, since names like `g` collide with common user aliases):
+
+```bash
+alias g='pigit cmd'
+alias r='pigit repo'
+```
+
 ---
 
 ## 🖥️ TUI Mode

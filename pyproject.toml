@@ -30,6 +30,10 @@ dynamic = ["version"]
 dependencies = []
 
 [project.optional-dependencies]
+# `binary` = local PyInstaller onedir build (GitHub Releases artifact).
+binary = [
+    "pyinstaller",
+]
 dev = [
     "setuptools>=64",
     "black",
@@ -48,7 +52,6 @@ Homepage = "https://github.com/zlj-zz/pigit.git"
 
 [project.scripts]
 pigit = "pigit.console_scripts:main"
-g = "pigit.console_scripts:g"
 
 [tool.setuptools]
 include-package-data = true

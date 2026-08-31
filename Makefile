@@ -42,6 +42,13 @@ release: del
 	$(PY) setup.py sdist bdist_wheel
 	twine upload dist/*
 
+# Local PyInstaller onedir build (pigit/g/r). Work/dist paths are dedicated
+# dotdirs so a stale root-owned build/ or dist/ (e.g. a sudo build) can never
+# block the build; CI uses default paths in .github/workflows/binary.yml.
+binary:
+	$(PY) -m PyInstaller pigit.spec --noconfirm --workpath .pyinstaller-work --distpath .pyinstaller-dist
+	@echo "Built: ./.pyinstaller-dist/pigit/pigit"
+
 install: del
 	$(PY) -m pip uninstall -y pigit 2>/dev/null || true
 	$(PY) setup.py install
@@ -52,4 +59,4 @@ todo:
 uml:
 	pyreverse -ASmy -o png pigit -d docs
 
-.PHONY: run lint clear del install release todo test cov uml
+.PHONY: run lint clear del install release todo test cov uml binary
