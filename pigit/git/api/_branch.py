@@ -13,7 +13,7 @@ from typing import cast
 
 from pigit.ext.executor import WAITING, REPLY, DECODE
 
-from ..model import Branch
+from ..model import Branch, ReflogEntry
 from ._base import _OpsBase
 from ._errors import GitError
 from ._util import _RE_BRANCH_AHEAD, _RE_BRANCH_BEHIND
@@ -212,6 +212,47 @@ class _BranchOps(_OpsBase):
             return time.strftime("%Y-%m-%d", time.localtime(ts))
         except ValueError:
             return "?"
+
+    def list_reflog(
+        self, limit: int = 50, path: str | None = None
+    ) -> list[ReflogEntry]:
+        """Return the newest ``limit`` HEAD reflog entries (newest first).
+
+        Parses ``git reflog -n <limit> --format=%H%x09%gD%x09%gs%x09%at``:
+        full sha / ``HEAD@{n}`` / reflog message / unix seconds. The reflog
+        message may itself contain tabs, so each line is split at most three
+        times to keep the message whole. An empty reflog returns ``[]``.
+
+        Args:
+            limit: How many most-recent entries to fetch.
+            path: Repo path; defaults to ``self.path``.
+
+        Returns:
+            Parsed entries, newest first.
+        """
+        path = path or self.path
+        _code, _err, out = self.executor.exec(
+            f"git reflog -n {limit} --format=%H%x09%gD%x09%gs%x09%at",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if not out:
+            return []
+        entries: list[ReflogEntry] = []
+        for line in out.splitlines():
+            # ``when`` is always the final tab field; split it off first so a
+            # tab inside %gs cannot shift it, then split the head at most
+            # twice to keep the message whole.
+            head, _, when = line.rpartition("\t")
+            fields = head.split("\t", 2)
+            if len(fields) < 3:
+                continue
+            sha, refish, message = fields
+            try:
+                entries.append(ReflogEntry(sha, refish, message, int(when)))
+            except ValueError:
+                continue
+        return entries
 
     def get_branch_recent_commit(
         self, branch_name: str, path: str | None = None

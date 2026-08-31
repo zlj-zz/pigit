@@ -51,10 +51,53 @@ class TestCoreEdgeCases:
         with pytest.raises(GitError):
             git.get_git_dir()
 
+    def test_get_git_dir_absolute(self):
+        ex = MockExecutor(
+            responses={"git rev-parse --absolute-git-dir": (0, "", "/repo/.git\n")}
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_git_dir() == "/repo/.git"
+        # No confirm_repo fallback probe — one command only.
+        assert [c[0] for c in ex.exec_calls] == ["git rev-parse --absolute-git-dir"]
+
+    def test_get_git_common_dir_relative_fallback(self):
+        """Old git without --path-format: plain command + Path(path) join."""
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --path-format=absolute --git-common-dir": (
+                    129,
+                    "unknown option",
+                    "",
+                ),
+                "git rev-parse --git-common-dir": (0, "", ".git\n"),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo")
+        assert git.get_git_common_dir() == "/repo/.git"
+
+    def test_get_git_common_dir_relative_from_subdir(self):
+        """A relative ``--git-common-dir`` is relative to the executor cwd."""
+        ex = MockExecutor(
+            responses={
+                "git rev-parse --path-format=absolute --git-common-dir": (
+                    129,
+                    "unknown option",
+                    "",
+                ),
+                "git rev-parse --git-common-dir": (0, "", "../.git\n"),
+            }
+        )
+        git = GitApi(executor=ex, path="/repo/pkg")
+        assert git.get_git_common_dir() == "/repo/.git"
+
     def test_get_git_common_dir_absolute(self):
         ex = MockExecutor(
             responses={
-                "git rev-parse --git-common-dir": (0, "", "/repo/.git\n"),
+                "git rev-parse --path-format=absolute --git-common-dir": (
+                    0,
+                    "",
+                    "/repo/.git\n",
+                ),
             }
         )
         git = GitApi(executor=ex, path="/repo")
@@ -287,7 +330,7 @@ class TestSequencerDetect:
             else:
                 p.write_text("x\n")
         ex = MockExecutor(
-            responses={"git rev-parse --git-dir": (0, "", str(git_dir) + "\n")}
+            responses={"git rev-parse --absolute-git-dir": (0, "", str(git_dir) + "\n")}
         )
         return GitApi(executor=ex, path=str(tmp_path))
 

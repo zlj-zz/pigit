@@ -24,7 +24,9 @@ def _verify_response(sha: str) -> tuple[int, str, str]:
 def test_bisect_status_none_without_log(tmp_path: Path):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
-    ex = MockExecutor(responses={"git rev-parse --git-dir": (0, "", f"{git_dir}\n")})
+    ex = MockExecutor(
+        responses={"git rev-parse --absolute-git-dir": (0, "", f"{git_dir}\n")}
+    )
     git = GitApi(executor=ex, path=str(tmp_path))
     assert git.bisect_status() is None
 
@@ -43,7 +45,7 @@ def test_bisect_status_parses_log_and_counts(tmp_path: Path):
     )
     ex = MockExecutor(
         responses={
-            "git rev-parse --git-dir": (0, "", f"{git_dir}\n"),
+            "git rev-parse --absolute-git-dir": (0, "", f"{git_dir}\n"),
             f"git rev-parse --verify --end-of-options 'HEAD^{{commit}}'": (
                 _verify_response(head)
             ),
@@ -75,7 +77,7 @@ def test_bisect_status_uses_latest_good_bad_marks(tmp_path: Path):
     bad = "3333333333333333333333333333333333333333"
     ex = MockExecutor(
         responses={
-            "git rev-parse --git-dir": (0, "", f"{git_dir}\n"),
+            "git rev-parse --absolute-git-dir": (0, "", f"{git_dir}\n"),
             f"git rev-parse --verify --end-of-options 'HEAD^{{commit}}'": (
                 _verify_response(head)
             ),

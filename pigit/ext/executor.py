@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import dataclasses
 import logging
@@ -294,6 +293,8 @@ class Executor:
         Returns:
             Tuple: Same shape as :meth:`exec` for the active flags.
         """
+        import asyncio  # lazy: only the async exec path needs the event loop
+
         use_shell = cur_kws["shell"] if "shell" in cur_kws else isinstance(cmd, str)
         sk = self._asyncio_spawn_kw(cur_kws)
 
@@ -352,6 +353,8 @@ class Executor:
         Returns:
             list[Tuple]: One result per command, in the same order as ``cmds``.
         """
+        import asyncio  # lazy: only the async exec path needs the event loop
+
         popen_orders = list(orders) if orders is not None else []
         # len of order not enough, will completion.
         if len(popen_orders) < len(cmds):
@@ -394,6 +397,8 @@ class Executor:
         Returns:
             list[Tuple]: Same as :meth:`exec_async`.
         """
+        import asyncio  # lazy: only the async exec path needs the event loop
+
         return asyncio.run(
             self.exec_async(
                 *cmds,

@@ -352,7 +352,7 @@ def _stash_store(payload: dict, git: GitApi) -> ActionResult:
     return ActionResult(success=True, message="Restored stash")
 
 
-def _rewind_head(payload: dict, git: GitApi) -> ActionResult:
+def rewind_head(payload: dict, git: GitApi) -> ActionResult:
     """Reset HEAD to a recorded SHA; refuse when the worktree is dirty.
 
     ``git reset --hard`` would discard uncommitted changes made after the
@@ -438,6 +438,6 @@ _REVERSE_SPECS: dict[OpType, _ReverseSpec] = {
         ),
     ),
     "rewind": _ReverseSpec(
-        _rewind_head, lambda p: f"git reset --hard {p['pre_sha'][:7]}"
+        rewind_head, lambda p: f"git reset --hard {p['pre_sha'][:7]}"
     ),
 }

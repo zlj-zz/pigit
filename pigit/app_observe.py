@@ -115,7 +115,24 @@ class ObserveHost:
         self._worktree_watched = False
 
     def start(self) -> None:
-        """Start StatMtime observation of git metadata (and Status worktree)."""
+        """Start StatMtime observation of git metadata (and Status worktree).
+
+        UI-thread entry: resolves git dirs, then attaches the backend and
+        loop intervals. Callers that want the git probes off the first frame
+        may run :meth:`resolve_ctx` on a worker and :meth:`attach` on the
+        UI thread instead.
+        """
+        ctx = self.resolve_ctx()
+        if ctx is None:
+            return
+        self.attach(ctx)
+
+    def resolve_ctx(self) -> ObserveContext | None:
+        """Resolve the git dirs into an :class:`ObserveContext` (worker-safe).
+
+        Runs the two git probes only; safe off the UI thread. Returns None
+        when the dirs cannot be resolved (observe stays disabled).
+        """
         git = self._deps.get_git()
         try:
             git_dir = git.get_git_dir()
@@ -124,13 +141,20 @@ class ObserveHost:
             logging.warning(
                 "Repo observe disabled: cannot resolve git dirs", exc_info=True
             )
-            return
+            return None
         repo_root = self._deps.get_repo_path() or ""
-        self._observe_ctx = ObserveContext(
+        return ObserveContext(
             repo_root=repo_root,
             git_dir=git_dir,
             common_dir=common_dir,
         )
+
+    def attach(self, ctx: ObserveContext) -> None:
+        """Attach backend, roots, and loop intervals for a resolved context.
+
+        Must run on the UI thread (Signal subscription + loop timers).
+        """
+        self._observe_ctx = ctx
         backend = StatMtimeBackend(worktree_digest=self._worktree_digest)
         observer = RepoObserver(backend=backend)
         self._observer = observer

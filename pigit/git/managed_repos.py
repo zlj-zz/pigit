@@ -245,14 +245,22 @@ class ManagedRepos:
                 if meta:
                     yield self._format_repo_row(repo_name, repo_path, meta)
 
-    def add_repos(self, paths: list[str], dry_run: bool = False) -> list:
+    def add_repos(
+        self,
+        paths: list[str],
+        dry_run: bool = False,
+        *,
+        confirm: bool = True,
+    ) -> list:
         """Traverse the incoming paths. If it is not saved and is a git
         directory, add it to repos.
 
         Args:
             paths (list[str]): incoming paths.
             dry_run (bool, optional): Show but not really execute. Defaults to False.
-            silent (bool, optional): No output. Defaults to False.
+            confirm (bool, optional): Re-probe each path with confirm_repo.
+                Callers that already confirmed the path (e.g. ``before_hook``)
+                pass False to skip the duplicate probe. Defaults to True.
         """
 
         exist_repos = self.load_repos()
@@ -260,7 +268,10 @@ class ManagedRepos:
 
         new_git_paths = []
         for path in paths:
-            repo_path, _ = self._git.confirm_repo(path)
+            if confirm:
+                repo_path, _ = self._git.confirm_repo(path)
+            else:
+                repo_path = str(Path(path).resolve())
             if repo_path and repo_path not in exist_paths_set:
                 new_git_paths.append(repo_path)
 
