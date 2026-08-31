@@ -14,8 +14,6 @@ from pathlib import Path
 _SYNC_MAP = (
     ("resources/demo_interaction.gif", "demo_interaction.gif"),
     ("resources/demo.gif", "demo.gif"),
-    ("resources/architecture-runtime.png", "archify/runtime-preview.png"),
-    ("resources/sequencer-lifecycle.png", "archify/sequencer-preview.png"),
     (
         "archify/pigit-runtime.architecture.html",
         "archify/pigit-runtime.architecture.html",
