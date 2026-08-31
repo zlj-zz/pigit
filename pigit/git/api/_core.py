@@ -249,27 +249,42 @@ class _CoreOps(_OpsBase):
             cur = parent
 
     def get_git_dir(self, path: str | None = None) -> str:
-        """Return the git directory path via ``git rev-parse --git-dir``."""
+        """Return the absolute git directory path.
+
+        ``git rev-parse --absolute-git-dir`` (git >= 2.13) is natively absolute,
+        so no ``confirm_repo`` fallback probe is needed.
+        """
         path = path or self.path
         code, err, out = self.executor.exec(
-            "git rev-parse --git-dir",
+            "git rev-parse --absolute-git-dir",
             flags=REPLY | DECODE,
             cwd=path,
         )
         if code != 0 or not out:
             raise GitError(err or "Failed to get git directory")
-        git_dir_raw = cast(str, out).strip()
-        if Path(git_dir_raw).is_absolute():
-            return str(Path(git_dir_raw).resolve())
-        repo_root, _ = self.confirm_repo(path)
-        return str((Path(repo_root) / git_dir_raw).resolve())
+        return str(Path(cast(str, out).strip()).resolve())
 
     def get_git_common_dir(self, path: str | None = None) -> str:
-        """Return the common git directory via ``git rev-parse --git-common-dir``.
+        """Return the absolute common git directory.
 
-        Equals ``get_git_dir`` for a normal repo; differs for linked worktrees.
+        Primary: ``git rev-parse --path-format=absolute --git-common-dir``
+        (git >= 2.31). Older git lacks ``--path-format``; fall back to the
+        plain command and join its (cwd-relative) output with ``path`` — one
+        subprocess, no ``confirm_repo`` probe.
         """
         path = path or self.path
+        code, err, out = self.executor.exec(
+            "git rev-parse --path-format=absolute --git-common-dir",
+            flags=REPLY | DECODE,
+            cwd=path,
+        )
+        if code == 0 and out:
+            raw = cast(str, out).strip()
+            if Path(raw).is_absolute():
+                return str(Path(raw).resolve())
+            # Defensive: relative output — join with the working directory.
+            return str((Path(path) / raw).resolve())
+        # Old git without --path-format: run the plain command (1 subprocess).
         code, err, out = self.executor.exec(
             "git rev-parse --git-common-dir",
             flags=REPLY | DECODE,
@@ -277,11 +292,7 @@ class _CoreOps(_OpsBase):
         )
         if code != 0 or not out:
             raise GitError(err or "Failed to get git common directory")
-        raw = cast(str, out).strip()
-        if Path(raw).is_absolute():
-            return str(Path(raw).resolve())
-        repo_root, _ = self.confirm_repo(path)
-        return str((Path(repo_root) / raw).resolve())
+        return str((Path(path) / cast(str, out).strip()).resolve())
 
     def get_head_tracking(self, path: str | None = None) -> tuple[str, int, int]:
         """Return ``(branch_or_label, ahead, behind)`` for the current HEAD.

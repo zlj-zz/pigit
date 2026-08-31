@@ -754,3 +754,24 @@ class TestSwitchRepos:
         assert ok is True
         assert blockers == []
         assert results == []
+
+
+def test_add_repos_confirm_false_skips_confirm_repo(tmp_repos_json):
+    """before_hook passes confirm=False: already-confirmed paths are not re-probed."""
+    ex = MockExecutor()
+    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    with patch.object(mr, "_fetch_repo_meta", return_value=None):
+        added = mr.add_repos(["/already/confirmed"], confirm=False)
+    assert added == ["/already/confirmed"]
+    assert ex.exec_calls == []  # no confirm_repo probe, no meta probes
+
+
+def test_add_repos_confirm_default_probes(tmp_path, tmp_repos_json):
+    root = tmp_path / "gr"
+    root.mkdir()
+    ex = MockExecutor(responses=_rev_parse_responses(root))
+    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    with patch.object(mr, "_fetch_repo_meta", return_value=None):
+        added = mr.add_repos([str(root)])
+    assert added == [str(root.resolve())]
+    assert any("--show-toplevel" in str(c[0]) for c in ex.exec_calls)

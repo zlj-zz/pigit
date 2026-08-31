@@ -469,12 +469,28 @@ class PigitApplication(Application):
         self._maybe_show_welcome_on_first_run()
 
         if self._config.repo_observe and self._observe_host is not None:
-            self._observe_host.start()
+            self._start_observe_async()
 
         # Initial sync: all components are mounted now, so subscribers receive
         # the event and update header/footer/preview.
         if self._tab_view.visible is not None:
             self._on_tab_switch(self._tab_view.visible)
+
+    def _start_observe_async(self) -> None:
+        """Start repo observation off the first frame.
+
+        The two git-dir probes run on a worker; the backend and loop timers
+        attach on the UI thread (Signal subscription + ``add_interval`` are
+        not worker-safe), then re-render so the observe state appears.
+        """
+        host = self._observe_host
+
+        def done(ctx) -> None:
+            if ctx is not None and not host._started:
+                host.attach(ctx)
+                request_render()
+
+        AsyncTask().start(host.resolve_ctx, done)
 
     def _maybe_show_welcome_on_first_run(self) -> None:
         """Open Welcome Sheet once when :func:`should_auto_show_welcome` allows."""

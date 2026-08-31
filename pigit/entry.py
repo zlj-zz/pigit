@@ -13,14 +13,6 @@ from .const import (
     VERSION,
 )
 from .cmdparse.parser import argument, command
-from .ext.lcstat import LINES_CHANGE, LINES_NUM, FILES_CHANGE, FILES_NUM, Counter
-from .ext.utils import resolve_icon, resolve_nerd_icons
-from .git import create_gitignore
-from .handlers import OpenHandler, RepoCommandHandler, TuiHandler
-from .hook import before_hook
-from .info import introduce, show_gitconfig
-from .termui import set_key_overrides
-from .termui.cli_output import get_console
 
 if TYPE_CHECKING:
     from .cmdparse.parser import Namespace
@@ -29,19 +21,47 @@ if TYPE_CHECKING:
 _TOOLS_GROUP = "tools"
 
 
-def _bootstrap() -> Context:
+def _bootstrap_config() -> Context:
+    """Module-level bootstrap: config + Context only (no git probes).
+
+    The repo layer (``before_hook`` auto-append) and the TUI key overrides
+    are deferred to :func:`_ensure_repo_bootstrap` / the TUI branch, so
+    light commands like ``-v`` neither probe the repository nor import termui.
+    """
     conf = get_config(
         path=CONFIG_FILE_PATH, version=VERSION, auto_load=True
     ).output_warnings()
-    set_key_overrides(conf.get().app.keybindings)
     ctx = Context.bootstrap(config=conf, repo_json_path=REPOS_PATH)
     Context.install(ctx)
-    before_hook(ctx)
     return ctx
 
 
-ctx = _bootstrap()
-console = get_console()
+ctx = _bootstrap_config()
+
+_repo_bootstrapped = False
+
+
+def _ensure_repo_bootstrap() -> None:
+    """Run the repo-layer bootstrap (auto-append) once, on demand.
+
+    Only repo-touching commands (TUI / counter / repo) reach this; ``-v``
+    and config/report/create_config never probe git here.
+    """
+    global _repo_bootstrapped
+    if _repo_bootstrapped:
+        return
+    _repo_bootstrapped = True
+    from .hook import before_hook
+
+    before_hook(ctx)
+
+
+def _repo_handler():
+    """Build the repo command handler, running the deferred repo bootstrap."""
+    from .handlers import RepoCommandHandler
+
+    _ensure_repo_bootstrap()
+    return RepoCommandHandler(ctx.current())
 
 
 def _color_index(count: int) -> str:
@@ -150,11 +170,18 @@ def pigit(args: Namespace, _) -> None:
         ctx.config.create_config_template(keybindings_block=block)
         return
 
-    elif args.report:
+    from .termui.cli_output import get_console
+
+    console = get_console()
+
+    if args.report:
+        from .info import introduce
+
         console.echo(introduce())
 
     elif args.config:
         from .ext.utils import page_output
+        from .info import show_gitconfig
 
         page_output(console.render(show_gitconfig()))
 
@@ -164,10 +191,22 @@ def pigit(args: Namespace, _) -> None:
         )
 
     elif args.ignore_type:
+        from .git import create_gitignore
+
         _, msg = create_gitignore(args.ignore_type, writing=True)
         console.echo(msg)
 
     elif args.count:
+        from .ext.lcstat import (
+            LINES_CHANGE,
+            LINES_NUM,
+            FILES_CHANGE,
+            FILES_NUM,
+            Counter,
+        )
+        from .ext.utils import resolve_icon, resolve_nerd_icons
+
+        _ensure_repo_bootstrap()
         path = os.path.abspath(args.count) if args.count != "." else os.getcwd()
         config = ctx.config.get()
         total_size, diff_result, invalids = Counter(
@@ -251,6 +290,11 @@ def pigit(args: Namespace, _) -> None:
         return None
 
     else:
+        from .termui import set_key_overrides
+        from .handlers import TuiHandler
+
+        _ensure_repo_bootstrap()
+        set_key_overrides(ctx.config.get().app.keybindings)
         handler = TuiHandler(ctx)
         if handler.preprocess():
             handler.execute()
@@ -327,14 +371,14 @@ repo = pigit.sub_parser("repo", help="repos options.")(lambda _, __: repo.print_
 @argument("--dry-run", action="store_true", help="dry run.")
 @argument("paths", nargs="+", help="path of reps(s).")
 def repo_add(args, _):
-    RepoCommandHandler(ctx.current()).add(args)
+    _repo_handler().add(args)
 
 
 @repo.sub_parser("rm", help="remove repo(s).")
 @argument("--path", action="store_true", help="remove follow path, default is name.")
 @argument("repos", nargs="+", arg_completion="repos", help="name or path of repo(s).")
 def repo_rm(args, _):
-    RepoCommandHandler(ctx.current()).rm(args)
+    _repo_handler().rm(args)
 
 
 @repo.sub_parser("update", help="refresh cached metadata for repo(s).")
@@ -345,14 +389,14 @@ def repo_rm(args, _):
     help="name(s) of repo(s) to refresh. refreshes all if omitted.",
 )
 def repo_update(args, _):
-    RepoCommandHandler(ctx.current()).update(args)
+    _repo_handler().update(args)
 
 
 @repo.sub_parser("rename", help="rename a repo.")
 @argument("new_name", help="the new name of repo.")
 @argument("repo", arg_completion="repos", help="the name of repo.")
 def repo_rename(args, _):
-    RepoCommandHandler(ctx.current()).rename(args)
+    _repo_handler().rename(args)
 
 
 @repo.sub_parser("ll", help="display summary of all repos.")
@@ -360,12 +404,12 @@ def repo_rename(args, _):
 @argument("--reverse", action="store_true", help="reverse to display invalid repo.")
 @argument("filter", nargs="?", default="", help="filter repos by fuzzy name match.")
 def repo_ll(args, _):
-    RepoCommandHandler(ctx.current()).ll(args)
+    _repo_handler().ll(args)
 
 
 @repo.sub_parser("clear", help="clear the all repos.")
 def repo_clear(_, __):
-    RepoCommandHandler(ctx.current()).clear()
+    _repo_handler().clear()
 
 
 @repo.sub_parser("report", help="genereate report of all repos.")
@@ -373,7 +417,7 @@ def repo_clear(_, __):
 @argument("--since", type=str, default="", help="start range of commits.")
 @argument("--until", type=str, default="", help="end range of commits.")
 def repo_report(args, _):
-    RepoCommandHandler(ctx.current()).report(args)
+    _repo_handler().report(args)
 
 
 @repo.sub_parser("cd", help="jump to a repo dir.")
@@ -391,7 +435,7 @@ def repo_report(args, _):
 )
 @argument("repo", nargs="?", arg_completion="repos", help="the name of repo.")
 def _(args, _):
-    RepoCommandHandler(ctx.current()).cd(args)
+    _repo_handler().cd(args)
 
 
 @repo.sub_parser("mkbranch", help="batch create new branch across managed repos.")
@@ -414,7 +458,7 @@ def _(args, _):
     "--filter-regex", type=str, default="", help="pre-filter repos in interactive mode."
 )
 def repo_mkbranch(args, _):
-    RepoCommandHandler(ctx.current()).mkbranch(args)
+    _repo_handler().mkbranch(args)
 
 
 @repo.sub_parser("switch", help="batch switch branch across managed repos.")
@@ -436,7 +480,7 @@ def repo_mkbranch(args, _):
     "--filter-regex", type=str, default="", help="pre-filter repos in interactive mode."
 )
 def repo_switch(args, _):
-    RepoCommandHandler(ctx.current()).switch(args)
+    _repo_handler().switch(args)
 
 
 repo_options = {
@@ -454,7 +498,7 @@ def _bulk_cmd_handler(cmd: str):
     """
 
     def handler(args, _parser):
-        RepoCommandHandler(ctx.current()).bulk_cmd(args, cmd)
+        _repo_handler().bulk_cmd(args, cmd)
 
     return handler
 
@@ -477,6 +521,8 @@ for sub_cmd, prop in repo_options.items():
 @argument("-i --issue", help="the given issue of the repository.")
 @argument("branch", nargs="?", default=None, help="the branch of repository.")
 def _(args: Namespace, _):
+    from .handlers import OpenHandler
+
     OpenHandler(ctx.current()).open_browser(args)
 
 # yapf: enable

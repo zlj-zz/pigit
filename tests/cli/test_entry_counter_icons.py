@@ -23,14 +23,16 @@ def _config(*, icons: str) -> SimpleNamespace:
             show_invalid=False,
             use_gitignore=False,
         ),
+        repo=SimpleNamespace(auto_append=False),
         app=SimpleNamespace(icons=icons),
     )
 
 
 def _run_count(icons: str) -> list[str]:
     """Run the counter table branch and return the echoed strings."""
-    ctx = SimpleNamespace(config=MagicMock())
+    ctx = SimpleNamespace(config=MagicMock(), git_api=MagicMock())
     ctx.config.get.return_value = _config(icons=icons)
+    ctx.git_api.confirm_repo.return_value = ("", "")
     echo = MagicMock()
     counter = MagicMock()
     counter.diff_count.return_value = (
@@ -40,8 +42,8 @@ def _run_count(icons: str) -> list[str]:
     )
     with (
         patch("pigit.entry.ctx", ctx),
-        patch("pigit.entry.console", MagicMock(echo=echo)),
-        patch("pigit.entry.Counter", return_value=counter),
+        patch("pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)),
+        patch("pigit.ext.lcstat.Counter", return_value=counter),
     ):
         pigit.main(["--count", "."])
     return [c.args[0] for c in echo.call_args_list if c.args]

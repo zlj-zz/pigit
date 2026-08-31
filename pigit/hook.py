@@ -14,7 +14,8 @@ def before_hook(ctx) -> None:
     repo_path = ctx.git_api.confirm_repo()[0]
     if repo_path and ctx.config.get().repo.auto_append:
         try:
-            ctx.managed_repos.add_repos([repo_path])
+            # The path was just confirmed above; skip the duplicate probe.
+            ctx.managed_repos.add_repos([repo_path], confirm=False)
         except Exception:
             ctx.log.debug("auto_append failed", exc_info=True)
 

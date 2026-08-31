@@ -17,10 +17,15 @@ from typing import (
 )
 from collections.abc import Callable, Iterable, Sequence
 
-from ..termui.cli_output import styled
-
 if TYPE_CHECKING:
     from argparse import FileType
+
+
+def _styled(*args, **kwargs):
+    """Lazy :func:`styled` — keeps parser import free of termui for ``-v``."""
+    from ..termui.cli_output import styled
+
+    return styled(*args, **kwargs)
 
 
 class ParserOptions(TypedDict, total=False):
@@ -56,6 +61,12 @@ class ColorHelpFormatter(HelpFormatter):
 
         super().__init__(prog, indent_increment, max_help_position, width)
 
+    def _set_color(self, color):
+        """Record the color state; argparse disables it for the registration-
+        time ``prog`` computation so plain text is returned there."""
+        super()._set_color(color)
+        self._pigit_color = color
+
     def _format_usage(
         self,
         usage: str | None,
@@ -63,10 +74,19 @@ class ColorHelpFormatter(HelpFormatter):
         groups: Iterable,
         prefix: str | None,
     ) -> str:
-        return styled(super()._format_usage(usage, actions, groups, prefix), bold=True)
+        plain = super()._format_usage(usage, actions, groups, prefix)
+        # argparse registers subparsers with color disabled to keep ``prog``
+        # free of ANSI codes; respect that (also skips the termui import
+        # during module registration).
+        if getattr(self, "_pigit_color", None) is False:
+            return plain
+        return _styled(plain, bold=True)
 
     def _format_text(self, text: str) -> str:
-        return styled(super()._format_text(text), fg="sky_blue", italic=True)
+        plain = super()._format_text(text)
+        if getattr(self, "_pigit_color", None) is False:
+            return plain
+        return _styled(plain, fg="sky_blue", italic=True)
 
     def _format_action(self, action: Action) -> str:
         # determine the required width and the entry label
@@ -95,7 +115,13 @@ class ColorHelpFormatter(HelpFormatter):
 
         # collect the pieces of the action help
         # @Overwrite
-        parts = [styled(action_header, fg="green")]
+        # Match _format_usage/_format_text: argparse disables color during
+        # registration-time ``prog`` computation, so stay plain there and
+        # avoid the termui import (and any ANSI leak into ``prog``).
+        color_enabled = getattr(self, "_pigit_color", None) is not False
+        parts = [
+            _styled(action_header, fg="green") if color_enabled else action_header
+        ]
 
         # if there was help for the action, add lines of help text
         if action.help:
@@ -105,7 +131,10 @@ class ColorHelpFormatter(HelpFormatter):
             help_parts.extend(
                 "%*s%s\n" % (help_position, "", line) for line in help_lines[1:]
             )
-            parts.append(styled(self._join_parts(help_parts), fg="yellow", italic=True))
+            joined = self._join_parts(help_parts)
+            parts.append(
+                _styled(joined, fg="yellow", italic=True) if color_enabled else joined
+            )
 
         elif not action_header.endswith("\n"):
             parts.append("\n")
