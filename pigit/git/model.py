@@ -130,4 +130,14 @@ class Stash:
     msg: str
 
 
+@dataclass(slots=True)
+class ReflogEntry:
+    """One HEAD reflog line: target sha, refish, message, and unix timestamp."""
+
+    sha: str
+    refish: str
+    message: str
+    when: int
+
+
 GitFuncT = Callable[[File], None]

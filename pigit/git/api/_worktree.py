@@ -214,7 +214,7 @@ class _WorktreeOps(_OpsBase):
         """git reset --hard <sha> (move HEAD, discard worktree changes).
 
         Only safe on a clean worktree; callers guard on ``status_porcelain``
-        before invoking (see ``session_history._rewind_head``).
+        before invoking (see ``session_history.rewind_head``).
         """
         path = path or self.path
         code, err, _ = self.executor.exec(

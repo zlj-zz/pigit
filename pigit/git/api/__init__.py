@@ -138,6 +138,9 @@ class GitApi:
     def get_branch_recent_commit(self, branch_name, path=None):
         return self._branch.get_branch_recent_commit(branch_name, path)
 
+    def list_reflog(self, limit=50, path=None):
+        return self._branch.list_reflog(limit, path)
+
     # ── _commit ──
     def load_log(
         self,

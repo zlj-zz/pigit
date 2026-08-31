@@ -64,7 +64,8 @@ from .app_network_git import NetworkGit, NetworkGitOutcome
 from .app_merge_workflow import MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
-from .ext.utils import resolve_nerd_icons
+from .git.model import ReflogEntry
+from .ext.utils import relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
@@ -80,7 +81,12 @@ from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
-from .session_history import HistoryRecord, SessionHistory, push_rewind
+from .session_history import (
+    HistoryRecord,
+    SessionHistory,
+    push_rewind,
+    rewind_head,
+)
 from .config_data import AppConfig
 
 # Chrome heights in rows. The layout heights (build_root) and the
@@ -821,6 +827,7 @@ class PigitApplication(Application):
                     file_names=lambda: [
                         f.get_file_str() for f in self._status_vm.items.value
                     ],
+                    reflog_entries=lambda: self._git.list_reflog(),
                 ),
                 list_slots=slots,
             )
@@ -959,7 +966,11 @@ class PigitApplication(Application):
         """Confirm, then reverse the most recent session action."""
         recent = self._session_history.peek(1)
         if not recent:
-            show_toast("Nothing to reverse", duration=2.0, kind=FeedbackKind.WARNING)
+            show_toast(
+                "Nothing to reverse — use '; reflog' to recover from reflog",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
             return
         record = recent[0]
         self._alert_dialog.alert(
@@ -1725,7 +1736,10 @@ class PigitApplication(Application):
             self._schedule_reload_header()
 
     def _dispatch_parameterized_palette(self, action: str, arg: str) -> None:
-        """Route checkout/merge/stage/gitignore with a resolved argument."""
+        """Route parameterized palette commands with a resolved argument."""
+        if action == "reflog":
+            self._recover_from_reflog(arg)
+            return
         if action in ("checkout", "merge"):
             kind = "branch"
             idx = self._resolve_index(
@@ -1767,6 +1781,70 @@ class PigitApplication(Application):
             result = self._status_vm.ignore(idx)
             self._toast_palette_result(result)
             return
+
+    def _resolve_reflog_entry(self, arg: str) -> ReflogEntry | None:
+        """Resolve a reflog dispatch arg to one entry.
+
+        Accepted forms, in order: exact refish (``HEAD@{n}``), exact/7-char sha
+        prefix, then the shortest message containing the needle.
+        """
+        entries = self._git.list_reflog()
+        if not entries:
+            return None
+        needle = arg.strip().lower()
+        if not needle:
+            return None
+        for entry in entries:
+            if entry.refish.lower() == needle:
+                return entry
+        for entry in entries:
+            if entry.sha.lower() == needle or entry.sha[:7].lower() == needle:
+                return entry
+        matches = [e for e in entries if needle in e.message.lower()]
+        if matches:
+            return min(matches, key=lambda e: len(e.message))
+        return None
+
+    def _recover_from_reflog(self, arg: str) -> None:
+        """Confirm, then hard-reset HEAD to a reflog entry (u-reversible)."""
+        entry = self._resolve_reflog_entry(arg)
+        if entry is None:
+            show_toast(
+                f"No reflog entry matches: {arg}",
+                duration=1.5,
+                kind=FeedbackKind.WARNING,
+            )
+            return
+        self._alert_dialog.alert(
+            f"Recover to {entry.sha[:7]}（{entry.message} · "
+            f"{relative_time(entry.when)}）\n"
+            f"Run: git reset --hard {entry.sha[:7]}\n"
+            "之后的 commit 将从分支移除（reflog 可找回）",
+            lambda ok: self._do_recover_reflog(entry) if ok else None,
+            kind=FeedbackKind.ERROR,
+        )
+
+    def _do_recover_reflog(self, entry: ReflogEntry) -> None:
+        """Execute a reflog recovery: dirty guard + hard reset + rewind record.
+
+        Reuses ``rewind_head`` for the dirty guard and hard reset, then
+        records a rewind point so the recovery itself is ``u``-reversible.
+        """
+        git = self._git
+        pre_sha = git.resolve_head_sha()
+        result = rewind_head({"pre_sha": entry.sha}, git)
+        if not result.success:
+            show_toast(result.message, duration=3.0, kind=FeedbackKind.ERROR)
+            return
+        push_rewind(
+            self._session_history,
+            f"Recover to {entry.sha[:7]}",
+            pre_sha,
+            panel_hint="Branch",
+        )
+        self._on_follow_head(git.get_head() or "HEAD")
+        self._refresh_active_panel()
+        show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)
 
     @property
     def _network_sync_busy(self) -> bool:

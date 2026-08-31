@@ -31,10 +31,15 @@ _SHEET_CHROME_ROWS = 2
 
 @dataclass(frozen=True)
 class PaletteArgs:
-    """Argument-completion descriptor for a parameterized palette command."""
+    """Argument-completion descriptor for a parameterized palette command.
+
+    ``fetch`` returns candidate entries: a plain ``str`` (used as both value
+    and display) or a ``(value, display)`` tuple whose display string is
+    shown on the row while the id keeps the clean, parseable value.
+    """
 
     label: str
-    fetch: Callable[[str], list[str]]
+    fetch: Callable[[str], list[str | tuple[str, str]]]
 
 
 class PaletteItem(NamedTuple):
@@ -306,7 +311,14 @@ class CommandPalette(Component):
             values = hit.args.fetch(rest)
         except Exception:
             values = []
-        self._matched = [PaletteItem(f"{hit.id} {v}") for v in values][:MAX_MATCHED]
+        # A tuple carries a pretty display string (e.g. reflog rows); the id
+        # stays the clean value so submit/Tab dispatch resolves exactly.
+        self._matched = [
+            PaletteItem(f"{hit.id} {v[0]}", v[1])
+            if isinstance(v, tuple)
+            else PaletteItem(f"{hit.id} {v}")
+            for v in values
+        ][:MAX_MATCHED]
         self._selected = 0
         self._scroll = 0
 

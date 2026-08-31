@@ -8,9 +8,14 @@ Date: 2026-04-23
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
 
+from pigit.ext.utils import relative_time
 from pigit.termui import widgets as termui_widgets
 from pigit.termui.widgets import PaletteArgs, PaletteItem
+
+if TYPE_CHECKING:
+    from pigit.git.model import ReflogEntry
 
 # Priority order: navigation → network → quit → sequencer controls.
 DEFAULT_COMMANDS: list[PaletteItem] = [
@@ -39,6 +44,7 @@ class _CatalogAccessors:
 
     branch_names: Callable[[], list[str]] = staticmethod(lambda: [])
     file_names: Callable[[], list[str]] = staticmethod(lambda: [])
+    reflog_entries: Callable[[], list[ReflogEntry]] = staticmethod(lambda: [])
 
 
 _ACCESSORS = _CatalogAccessors()
@@ -84,6 +90,19 @@ PARAMETERIZED_ITEMS: list[PaletteItem] = [
             ],
         ),
     ),
+    PaletteItem(
+        "reflog",
+        "Recover from reflog",
+        args=PaletteArgs(
+            label="<Entry>",
+            fetch=lambda rest: [
+                (e.sha, f"{e.sha[:7]} {e.message} · {relative_time(e.when)}")
+                for e in _ACCESSORS.reflog_entries()
+                if rest.lower()
+                in f"{e.sha} {e.refish} {e.message}".lower()
+            ],
+        ),
+    ),
 ]
 
 PARAMETERIZED_ACTIONS: frozenset[str] = frozenset(i.id for i in PARAMETERIZED_ITEMS)
@@ -112,14 +131,18 @@ def build_catalog(
     *,
     branch_names: Callable[[], list[str]],
     file_names: Callable[[], list[str]],
+    reflog_entries: Callable[[], list[ReflogEntry]] = lambda: [],
 ) -> list[PaletteItem]:
     """Return static context catalog plus parameterized command entries.
 
     Static sequencer filtering is unchanged. Parameterized items always appear;
     their ``args.fetch`` closures call the accessors lazily on each keystroke.
+    All accessors are reassigned on every call so a stale closure can never
+    survive a later catalog rebuild.
     """
     _ACCESSORS.branch_names = branch_names
     _ACCESSORS.file_names = file_names
+    _ACCESSORS.reflog_entries = reflog_entries
     return catalog_for_context(sequencer) + PARAMETERIZED_ITEMS
 
 
