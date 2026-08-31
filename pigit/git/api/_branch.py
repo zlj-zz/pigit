@@ -213,7 +213,9 @@ class _BranchOps(_OpsBase):
         except ValueError:
             return "?"
 
-    def list_reflog(self, limit: int = 50, path: str | None = None) -> list[ReflogEntry]:
+    def list_reflog(
+        self, limit: int = 50, path: str | None = None
+    ) -> list[ReflogEntry]:
         """Return the newest ``limit`` HEAD reflog entries (newest first).
 
         Parses ``git reflog -n <limit> --format=%H%x09%gD%x09%gs%x09%at``:

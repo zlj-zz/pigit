@@ -314,9 +314,11 @@ class CommandPalette(Component):
         # A tuple carries a pretty display string (e.g. reflog rows); the id
         # stays the clean value so submit/Tab dispatch resolves exactly.
         self._matched = [
-            PaletteItem(f"{hit.id} {v[0]}", v[1])
-            if isinstance(v, tuple)
-            else PaletteItem(f"{hit.id} {v}")
+            (
+                PaletteItem(f"{hit.id} {v[0]}", v[1])
+                if isinstance(v, tuple)
+                else PaletteItem(f"{hit.id} {v}")
+            )
             for v in values
         ][:MAX_MATCHED]
         self._selected = 0

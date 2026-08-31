@@ -98,8 +98,7 @@ PARAMETERIZED_ITEMS: list[PaletteItem] = [
             fetch=lambda rest: [
                 (e.sha, f"{e.sha[:7]} {e.message} · {relative_time(e.when)}")
                 for e in _ACCESSORS.reflog_entries()
-                if rest.lower()
-                in f"{e.sha} {e.refish} {e.message}".lower()
+                if rest.lower() in f"{e.sha} {e.refish} {e.message}".lower()
             ],
         ),
     ),

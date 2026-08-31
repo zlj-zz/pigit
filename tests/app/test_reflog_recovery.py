@@ -70,9 +70,7 @@ def _auto_confirm(app, *, confirmed: bool = True) -> None:
 def test_catalog_includes_reflog_parameterized_item():
     from pigit.app_command_palette import build_catalog
 
-    catalog = build_catalog(
-        None, branch_names=lambda: [], file_names=lambda: []
-    )
+    catalog = build_catalog(None, branch_names=lambda: [], file_names=lambda: [])
     by_id = {i.id: i for i in catalog}
     assert "reflog" in by_id
     assert by_id["reflog"].desc == "Recover from reflog"
