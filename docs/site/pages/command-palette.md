@@ -2,6 +2,22 @@
 
 Press **`;`** anywhere in the TUI to open the command palette.
 
+## How checkout runs
+
+`;` → type `checkout` + space → pick a branch → **Enter**. The App then calls
+`GitApi` / `git`.
+
+[Open fullscreen](assets/archify/pigit-palette.sequence.html){ target=_blank .md-button }
+
+<div class="archify-embed" markdown="0">
+  <iframe
+    class="archify-frame"
+    src="../assets/archify/pigit-palette.sequence.html"
+    title="Command palette checkout sequence"
+    loading="lazy"
+    referrerpolicy="no-referrer"></iframe>
+</div>
+
 ## Static commands
 
 Type to filter by command id or description. Press **Enter** to run the

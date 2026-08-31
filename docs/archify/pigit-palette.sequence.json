@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Command Palette Checkout Sequence",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [980, 600],
+    "column_fit": "spread",
+    "views": [
+      {
+        "id": "open-filter",
+        "label": "Open and filter",
+        "focus": ["user", "app", "palette"],
+        "note": "Semicolon opens the sheet; typing moves into argument completion."
+      },
+      {
+        "id": "complete-run",
+        "label": "Complete and run",
+        "focus": ["palette", "branch_vm", "app", "gitapi", "git"],
+        "note": "After branch candidates, Enter runs checkout."
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "focus": ["git", "gitapi", "app", "user"],
+        "note": "Result returns via toast and header update."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "User",
+      "sublabel": "keyboard"
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "PigitApplication",
+      "sublabel": "bind ;"
+    },
+    {
+      "id": "palette",
+      "type": "frontend",
+      "label": "CommandPalette",
+      "sublabel": "sheet"
+    },
+    {
+      "id": "branch_vm",
+      "type": "backend",
+      "label": "BranchVM",
+      "sublabel": "branch names"
+    },
+    {
+      "id": "gitapi",
+      "type": "backend",
+      "label": "GitApi",
+      "sublabel": "checkout"
+    },
+    {
+      "id": "git",
+      "type": "external",
+      "label": "git",
+      "sublabel": "CLI"
+    }
+  ],
+  "segments": [
+    { "from": 160, "to": 250, "label": "Open" },
+    { "from": 268, "to": 388, "label": "Args" },
+    { "from": 406, "to": 520, "label": "Run + feedback" }
+  ],
+  "messages": [
+    {
+      "id": "press-semi",
+      "from": "user",
+      "to": "app",
+      "y": 175,
+      "label": "press ;",
+      "variant": "emphasis"
+    },
+    {
+      "id": "show-sheet",
+      "from": "app",
+      "to": "palette",
+      "y": 205,
+      "label": "show_sheet",
+      "variant": "default"
+    },
+    {
+      "id": "type-checkout",
+      "from": "user",
+      "to": "palette",
+      "y": 235,
+      "label": "checkout␠",
+      "variant": "default"
+    },
+    {
+      "id": "fetch-branches",
+      "from": "palette",
+      "to": "branch_vm",
+      "y": 290,
+      "label": "args.fetch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "branch-list",
+      "from": "branch_vm",
+      "to": "palette",
+      "y": 320,
+      "label": "candidates",
+      "variant": "return"
+    },
+    {
+      "id": "enter-run",
+      "from": "user",
+      "to": "palette",
+      "y": 350,
+      "label": "Enter",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dispatch",
+      "from": "palette",
+      "to": "app",
+      "y": 380,
+      "label": "on_execute",
+      "variant": "emphasis"
+    },
+    {
+      "id": "do-checkout",
+      "from": "app",
+      "to": "gitapi",
+      "y": 430,
+      "label": "checkout",
+      "variant": "default"
+    },
+    {
+      "id": "git-exec",
+      "from": "gitapi",
+      "to": "git",
+      "y": 460,
+      "label": "git checkout",
+      "variant": "emphasis"
+    },
+    {
+      "id": "toast",
+      "from": "app",
+      "to": "user",
+      "y": 500,
+      "label": "toast + header",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    { "participant": "app", "from": 175, "to": 505, "type": "frontend" },
+    { "participant": "palette", "from": 200, "to": 385, "type": "frontend" },
+    { "participant": "branch_vm", "from": 285, "to": 325, "type": "backend" },
+    { "participant": "gitapi", "from": 425, "to": 480, "type": "backend" },
+    { "participant": "git", "from": 455, "to": 480, "type": "external" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Main path",
+      "items": [
+        "Semicolon opens the Commands sheet",
+        "Enter returns to the App for real git"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Completion",
+      "items": [
+        "checkout / merge complete branch names",
+        "stage / gitignore complete paths"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Guards",
+      "items": [
+        "Dirty tree and sequencer mutex live in the App",
+        "Closing the sheet unsubscribes VM refresh"
+      ]
+    }
+  ]
+}

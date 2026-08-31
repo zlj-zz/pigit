@@ -65,6 +65,7 @@ nav:
   - Workflows: workflows.md
   - CLI: cli.md
   - Configuration: configuration.md
+  - Architecture: architecture.md
   - Troubleshooting: troubleshooting.md
   - Changelog: changelog.md
 
