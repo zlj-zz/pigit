@@ -1,5 +1,28 @@
 # Changelog of pigit
 
+## 2.6.0 (2026-08-31)
+
+### Features
+
+- **Reflog lightweight recovery**: `; reflog` in the command palette lists the last 50 HEAD reflog entries; picking one confirms then hard-resets to it (same dirty-worktree guard as undo), records a rewind point so the recovery itself is `u`-reversible, and the empty-undo toast now points at `; reflog`.
+
+### Performance
+
+- **Startup up to 54% faster**: `pigit -v` drops from ~210ms to ~97ms with zero git subprocesses spawned at import (termui modules loaded: 61 → 0). Repo bootstrap moves to the TUI/count/repo commands, `get_git_dir`/`get_git_common_dir` use git's absolute-path commands, observe initialization moves off the first frame (two-phase resolve/attach), and `asyncio` imports lazily in the async executor.
+
+### Bug Fixes
+
+- **AlertDialog wraps by display width**: full-width CJK characters no longer overflow the content box and paint over the dialog border (visible in the reflog confirm dialog).
+
+### Refactors
+
+- AlertDialog width is now terminal-derived (`max(40, term_cols*3//7)`) instead of scattered hardcoded 50/40 values.
+- `add_repos(confirm=False)` skips re-confirming an already-validated path; `auto_append` now triggers only for TUI/count/repo commands.
+
+### Docs
+
+- New MkDocs user site with pigit-themed styling, published via GitHub Pages CI.
+
 ## 2.5.1 (2026-08-30)
 
 ### Features
