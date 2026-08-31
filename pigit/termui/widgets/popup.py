@@ -20,7 +20,7 @@ from ..segment import Segment
 from ..surface import Surface
 from ..primitives.text import sanitize_for_display
 from ..theme import get_theme
-from ..wcwidth_table import wcswidth
+from ..wcwidth_table import truncate_by_width, wcswidth
 from ..types import LayerKind, OverlayDispatchResult
 
 _logger = logging.getLogger(__name__)
@@ -352,16 +352,33 @@ class AlertDialogBody(Component):
                 )
 
     def _build_content_rows(self) -> list[list[Segment]]:
-        """Build message and footer rows as styled segments."""
+        """Build message and footer rows as styled segments.
+
+        Lines are wrapped and padded by *display width* (``wcswidth``), so a
+        line containing full-width CJK characters can never exceed ``inner``
+        cells and paint over the frame border.
+        """
         theme = get_theme()
         inner = self._inner_w
         body = sanitize_for_display(self._message)
         wrapped: list[str] = []
         for raw in body.splitlines() or [body]:
             chunk = raw
-            while chunk:
-                wrapped.append(chunk[:inner])
-                chunk = chunk[inner:]
+            while wcswidth(chunk) > inner:
+                take = 0
+                width = 0
+                for ch in chunk:
+                    w = wcswidth(ch)
+                    if width + w > inner:
+                        break
+                    width += w
+                    take += 1
+                if take == 0:
+                    take = 1  # a single wide char alone exceeds inner
+                wrapped.append(chunk[:take])
+                chunk = chunk[take:]
+            if chunk:
+                wrapped.append(chunk)
         if not wrapped:
             wrapped = [""]
 
@@ -370,7 +387,7 @@ class AlertDialogBody(Component):
             rows.append(
                 [
                     Segment(
-                        line[:inner].ljust(inner),
+                        self._pad_cells(line, inner),
                         fg=theme.fg_primary,
                         bg=theme.bg_chrome,
                     )
@@ -379,25 +396,30 @@ class AlertDialogBody(Component):
         rows.append([Segment(" " * inner, fg=theme.fg_primary, bg=theme.bg_chrome)])
         footer = self._footer_segments()
         plain = "".join(seg.text for seg in footer)
-        if len(plain) > inner:
+        if wcswidth(plain) > inner:
             # Keep hit-testing stable: prefer a single clipped footer row.
             rows.append(
                 [
                     Segment(
-                        plain[:inner].ljust(inner),
+                        self._pad_cells(truncate_by_width(plain, inner), inner),
                         fg=theme.fg_muted,
                         bg=theme.bg_chrome,
                     )
                 ]
             )
         else:
-            pad = inner - len(plain)
+            pad = inner - wcswidth(plain)
             if pad:
                 footer = footer + [
                     Segment(" " * pad, fg=theme.fg_muted, bg=theme.bg_chrome)
                 ]
             rows.append(footer)
         return rows
+
+    @staticmethod
+    def _pad_cells(text: str, width: int) -> str:
+        """Pad *text* (display width ≤ *width*) to exactly ``width`` cells."""
+        return text + " " * max(0, width - wcswidth(text))
 
     def _footer_plain(self) -> str:
         """Return the footer as plain text for mouse hit-testing."""
