@@ -55,8 +55,11 @@ _Users_*
 
 # mkdocs output (docs/site/mkdocs.yml → site/)
 /site/
-# synced from docs/resources/ by docs/site/hooks.py on build
+# synced by docs/site/hooks.py on build
 docs/site/pages/assets/demo*.gif
+docs/site/pages/assets/archify/
+# Archify visual-check sidecars (previews live in docs/resources/)
+docs/archify/*.visual-check.*
 
 .cursor/
 .claude/

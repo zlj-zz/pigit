@@ -6,6 +6,8 @@ on:
     paths:
       - 'docs/site/**'
       - 'docs/resources/*.gif'
+      - 'docs/resources/*.png'
+      - 'docs/archify/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 

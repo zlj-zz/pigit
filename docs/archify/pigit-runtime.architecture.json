@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "pigit Runtime Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 640],
+    "views": [
+      {
+        "id": "tui-path",
+        "label": "TUI main path",
+        "focus": ["user", "entry", "context", "tui", "termui", "gitapi", "git"],
+        "note": "From the terminal entry to panels and the git subprocess."
+      },
+      {
+        "id": "cli-path",
+        "label": "CLI side path",
+        "focus": ["user", "entry", "context", "cli", "gitapi", "repos"],
+        "note": "Short commands (cmd / repo / open) and multi-repo management."
+      },
+      {
+        "id": "observe",
+        "label": "Repo observe",
+        "focus": ["tui", "observe", "gitapi", "git"],
+        "note": "StatMtime observe and panel refresh without blocking the first frame."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "User",
+      "sublabel": "Terminal / TTY",
+      "pos": [40, 300],
+      "size": [120, 60]
+    },
+    {
+      "id": "entry",
+      "type": "backend",
+      "label": "entry",
+      "sublabel": "pigit / g / r",
+      "tag": "layered bootstrap",
+      "pos": [220, 300],
+      "size": [130, 64]
+    },
+    {
+      "id": "context",
+      "type": "backend",
+      "label": "Context",
+      "sublabel": "config · executor",
+      "pos": [400, 300],
+      "size": [130, 60]
+    },
+    {
+      "id": "tui",
+      "type": "frontend",
+      "label": "PigitApplication",
+      "sublabel": "panels · palette · undo",
+      "pos": [580, 220],
+      "size": [150, 64]
+    },
+    {
+      "id": "termui",
+      "type": "frontend",
+      "label": "termui",
+      "sublabel": "Component · AsyncTask",
+      "pos": [900, 120],
+      "size": [140, 60]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "CLI handlers",
+      "sublabel": "cmd · repo · open",
+      "pos": [580, 420],
+      "size": [150, 60]
+    },
+    {
+      "id": "gitapi",
+      "type": "backend",
+      "label": "GitApi",
+      "sublabel": "rev-parse · porcelain",
+      "pos": [780, 300],
+      "size": [140, 60]
+    },
+    {
+      "id": "observe",
+      "type": "messagebus",
+      "label": "ObserveHost",
+      "sublabel": "StatMtime · batch",
+      "pos": [400, 100],
+      "size": [150, 56]
+    },
+    {
+      "id": "repos",
+      "type": "database",
+      "label": "ManagedRepos",
+      "sublabel": "repos.json",
+      "pos": [780, 460],
+      "size": [140, 56]
+    },
+    {
+      "id": "git",
+      "type": "external",
+      "label": "git CLI",
+      "sublabel": "subprocess",
+      "pos": [980, 300],
+      "size": [120, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "pigit process",
+      "wraps": ["entry", "context", "tui", "termui", "cli", "gitapi", "observe", "repos"]
+    },
+    {
+      "kind": "security-group",
+      "label": "TUI presentation",
+      "wraps": ["tui", "termui", "observe"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-entry",
+      "from": "user",
+      "to": "entry",
+      "label": "keys / args",
+      "variant": "emphasis"
+    },
+    {
+      "id": "entry-context",
+      "from": "entry",
+      "to": "context"
+    },
+    {
+      "id": "context-tui",
+      "from": "context",
+      "to": "tui",
+      "label": "TUI",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "context-cli",
+      "from": "context",
+      "to": "cli",
+      "label": "CLI",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "tui-termui",
+      "from": "tui",
+      "to": "termui",
+      "label": "paint / focus",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "tui-observe",
+      "from": "tui",
+      "to": "observe",
+      "label": "after_start",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "bottom"
+    },
+    {
+      "id": "tui-gitapi",
+      "from": "tui",
+      "to": "gitapi",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cli-gitapi",
+      "from": "cli",
+      "to": "gitapi"
+    },
+    {
+      "id": "cli-repos",
+      "from": "cli",
+      "to": "repos",
+      "label": "repo *"
+    },
+    {
+      "id": "gitapi-git",
+      "from": "gitapi",
+      "to": "git",
+      "label": "exec",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Layered entry",
+      "items": [
+        "Module load only bootstraps config + Context",
+        "before_hook runs for TUI / count / repo only"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Shared core",
+      "items": [
+        "TUI and CLI share GitApi and the executor",
+        "termui owns keyboard, overlay, and AsyncTask"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Boundaries",
+      "items": [
+        "Real git always runs outside the process",
+        "Observe attaches via App after start — no frozen first frame"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Sequencer Lifecycle",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [980, 660],
+    "views": [
+      {
+        "id": "happy",
+        "label": "Happy path",
+        "focus": ["idle", "running", "resolving", "continuing", "done"],
+        "note": "Clean merge / rebase / cherry-pick through to completion."
+      },
+      {
+        "id": "waits",
+        "label": "Conflict and mutex",
+        "focus": ["resolving", "conflict", "continuing", "blocked"],
+        "note": "Pause on conflict; block when bisect / dirty tree conflicts."
+      },
+      {
+        "id": "exit",
+        "label": "Recovery and exits",
+        "focus": ["resolving", "retry", "blocked", "aborted", "stale"],
+        "note": "Retry continue failures; abort or stale ends the session."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Main phases" },
+    { "id": "wait", "label": "Waiting" },
+    { "id": "recovery", "label": "Recovery" },
+    { "id": "terminal", "label": "Terminal" }
+  ],
+  "states": [
+    {
+      "id": "idle",
+      "type": "start",
+      "label": "Idle",
+      "sublabel": "no sequencer",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "entry"
+    },
+    {
+      "id": "running",
+      "type": "active",
+      "label": "Start",
+      "sublabel": "merge / rebase / cp",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "git"
+    },
+    {
+      "id": "resolving",
+      "type": "active",
+      "label": "In progress",
+      "sublabel": "index / tree writes",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "work"
+    },
+    {
+      "id": "continuing",
+      "type": "decision",
+      "label": "Continue",
+      "sublabel": "palette / bindings",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "gate"
+    },
+    {
+      "id": "done",
+      "type": "success",
+      "label": "Done",
+      "sublabel": "undo with u",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "success"
+    },
+    {
+      "id": "conflict",
+      "type": "waiting",
+      "label": "Conflict",
+      "sublabel": "unresolved files",
+      "lane": "wait",
+      "col": 0,
+      "tag": "pause"
+    },
+    {
+      "id": "blocked",
+      "type": "waiting",
+      "label": "Mutex block",
+      "sublabel": "bisect / dirty",
+      "lane": "wait",
+      "col": 1,
+      "tag": "guard"
+    },
+    {
+      "id": "retry",
+      "type": "failure",
+      "label": "Recoverable fail",
+      "sublabel": "retry continue",
+      "lane": "recovery",
+      "col": 0,
+      "yOffset": 78,
+      "tag": "retryable"
+    },
+    {
+      "id": "aborted",
+      "type": "failure",
+      "label": "Aborted",
+      "sublabel": "abort",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "terminal"
+    },
+    {
+      "id": "stale",
+      "type": "failure",
+      "label": "Stale",
+      "sublabel": "session expired",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "hit-conflict",
+      "from": "resolving",
+      "to": "conflict",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight"
+    },
+    {
+      "id": "guard-block",
+      "from": "continuing",
+      "to": "blocked",
+      "variant": "dashed",
+      "route": "drop"
+    },
+    {
+      "id": "continue-fail",
+      "from": "resolving",
+      "to": "retry",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [[320, 157], [320, 385]]
+    },
+    {
+      "id": "retry-again",
+      "from": "retry",
+      "to": "resolving",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "top",
+      "via": [[20, 385], [20, 80], [402, 80]]
+    },
+    {
+      "id": "block-stale",
+      "from": "blocked",
+      "to": "stale",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight"
+    },
+    {
+      "id": "abort-conflict",
+      "from": "conflict",
+      "to": "aborted",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [[480, 336], [480, 432], [402, 432]]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Main path",
+      "items": [
+        "Idle → Start → In progress → Continue → Done",
+        "After Done, session undo (u) can reverse HEAD"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Waits and exits",
+      "items": [
+        "Conflict / mutex are non-terminal; continue can retry",
+        "Abort or stale are terminal — no return to active work"
+      ]
+    }
+  ]
+}

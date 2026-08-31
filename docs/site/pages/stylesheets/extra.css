@@ -13,7 +13,8 @@
   --pg-slate: #787882;
   --pg-muted: #a5a5ac;
   --pg-accent: #96c8ff;
-  --pg-accent-dim: rgba(150, 200, 255, 0.14);
+  --pg-accent-dim: rgba(150, 200, 255, 0.08);
+  --pg-accent-soft: #7a8aa0; /* muted link / chrome — less shouty than accent */
   --pg-green: #89d185;
   --pg-amber: #ffaf50;
   --pg-red: #f48771;
@@ -34,11 +35,11 @@
   --md-default-fg-color--lighter: var(--pg-muted);
   --md-primary-fg-color: var(--pg-charcoal);
   --md-primary-bg-color: var(--pg-pearl);
-  --md-accent-fg-color: var(--pg-accent);
+  --md-accent-fg-color: var(--pg-accent-soft);
   --md-accent-fg-color--transparent: var(--pg-accent-dim);
-  --md-accent-bg-color: var(--pg-accent);
+  --md-accent-bg-color: var(--pg-accent-soft);
   --md-typeset-color: var(--pg-pearl);
-  --md-typeset-a-color: var(--pg-accent);
+  --md-typeset-a-color: var(--pg-accent-soft);
   --md-code-fg-color: var(--pg-pearl);
   --md-code-bg-color: var(--pg-graphite);
   --md-footer-bg-color: var(--pg-charcoal);
@@ -73,7 +74,7 @@
 }
 
 [data-md-color-scheme="slate"] .md-tabs__link--active {
-  color: var(--pg-accent);
+  color: var(--pg-pearl);
   opacity: 1;
 }
 
@@ -89,7 +90,7 @@
 
 /* ── Sidebar ── */
 [data-md-color-scheme="slate"] .md-nav__link--active {
-  color: var(--pg-accent);
+  color: var(--pg-pearl);
 }
 
 [data-md-color-scheme="slate"] .md-nav__link:hover {
@@ -102,42 +103,48 @@
 
 /* ── Content typography ── */
 .md-typeset {
-  font-size: 0.94rem;
-  line-height: 1.65;
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 .md-typeset h1 {
   font-family: var(--pg-font-mono);
-  font-weight: 650;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  font-size: 1.45em;
+  letter-spacing: -0.02em;
   color: var(--pg-pearl);
   border-bottom: 1px solid var(--pg-gunmetal);
-  padding-bottom: 0.35em;
-  margin-bottom: 0.8em;
+  padding-bottom: 0.3em;
+  margin-bottom: 0.7em;
   position: relative;
 }
 
 [data-md-color-scheme="slate"] .md-typeset h1::after {
   content: "";
   display: block;
-  width: min(12rem, 40%);
-  height: 2px;
-  background: linear-gradient(90deg, var(--pg-accent), transparent);
-  margin-top: 0.45rem;
+  width: min(8rem, 28%);
+  height: 1px;
+  background: var(--pg-steel);
+  margin-top: 0.4rem;
 }
 
 .md-typeset h2 {
   font-family: var(--pg-font-mono);
   font-weight: 600;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   color: var(--pg-pearl);
-  margin-top: 1.6em;
+  margin-top: 1.45em;
 }
 
 .md-typeset h3 {
   font-family: var(--pg-font-body);
-  font-weight: 650;
+  font-weight: 600;
+  font-size: 0.95rem;
   color: var(--pg-pearl);
+}
+
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: var(--pg-accent);
 }
 
 /* ── Code ── */
@@ -145,8 +152,8 @@
   background: var(--pg-graphite);
   border: 1px solid var(--pg-gunmetal);
   border-radius: 4px;
-  color: var(--pg-accent);
-  font-size: 0.84em;
+  color: var(--pg-muted);
+  font-size: 0.88em;
   padding: 0.05em 0.35em;
 }
 
@@ -159,7 +166,7 @@
   background: var(--pg-graphite);
   border: 1px solid var(--pg-gunmetal);
   border-radius: var(--pg-radius);
-  border-top: 2px solid var(--pg-accent);
+  border-top: 1px solid var(--pg-steel);
 }
 
 /* ── Tables (TUI panel feel) ── */
@@ -167,15 +174,15 @@
   border: 1px solid var(--pg-gunmetal);
   border-radius: var(--pg-radius);
   overflow: hidden;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
 }
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
   background: var(--pg-graphite);
-  color: var(--pg-accent);
+  color: var(--pg-muted);
   font-family: var(--pg-font-mono);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--pg-steel);
@@ -186,7 +193,7 @@
 }
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover td {
-  background: rgba(150, 200, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* ── Admonitions ── */
@@ -200,8 +207,8 @@
 
 [data-md-color-scheme="slate"] .md-typeset .admonition.tip,
 [data-md-color-scheme="slate"] .md-typeset details.tip {
-  border-left-color: var(--pg-accent);
-  background: rgba(150, 200, 255, 0.06);
+  border-left-color: var(--pg-steel);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 [data-md-color-scheme="slate"] .md-typeset .admonition.note,
@@ -245,12 +252,12 @@
   content: "──────────────── · pigit docs · ────────────────";
   display: block;
   font-family: var(--pg-font-mono);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 400;
-  color: var(--pg-accent);
-  opacity: 0.5;
+  color: var(--pg-slate);
+  opacity: 0.7;
   letter-spacing: 0.04em;
-  margin-bottom: 1.1rem;
+  margin-bottom: 0.9rem;
   overflow: hidden;
   white-space: nowrap;
   max-width: 100%;
@@ -445,5 +452,42 @@
 
   .md-typeset kbd {
     border-bottom-width: 1px;
+  }
+}
+
+/* ── Archify embeds (architecture page) ── */
+.md-typeset:has(.archify-frame) > h1 {
+  margin-top: 0.2rem;
+  margin-bottom: 0.4rem;
+  font-size: 1.35rem;
+}
+
+.md-typeset:has(.archify-frame) .tabbed-set {
+  margin-top: 0.5rem;
+}
+
+.archify-embed {
+  margin: 0.75rem 0 0;
+  border: 1px solid var(--pg-gunmetal, #2a2d2e);
+  border-radius: var(--pg-radius, 6px);
+  overflow: hidden;
+  background: var(--pg-ink, #121216);
+  width: 100%;
+  max-width: 100%;
+}
+
+.archify-frame {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - 10rem);
+  min-height: 720px;
+  border: 0;
+  background: var(--pg-ink, #121216);
+}
+
+@media (max-width: 959px) {
+  .archify-frame {
+    height: calc(100dvh - 8rem);
+    min-height: 560px;
   }
 }
