@@ -53,6 +53,11 @@ _Users_*
 # worktrees
 .worktrees/
 
+# mkdocs output (docs/site/mkdocs.yml → site/)
+/site/
+# synced from docs/resources/ by docs/site/hooks.py on build
+docs/site/pages/assets/demo*.gif
+
 .cursor/
 .claude/
 .specify/

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="pigit-home">
+    <style>
+      .pigit-home {
+        --ink: #121216;
+        --charcoal: #181818;
+        --graphite: #1e1e1e;
+        --gunmetal: #2a2d2e;
+        --steel: #37373d;
+        --pearl: #dcdce6;
+        --slate: #787882;
+        --accent: #96c8ff;
+        --green: #89d185;
+        --amber: #ffaf50;
+        --magenta: #f082c8;
+        --mono: 'JetBrains Mono', ui-monospace, monospace;
+        --body: 'Source Sans 3', system-ui, sans-serif;
+        font-family: var(--body);
+        color: var(--pearl);
+        background:
+          radial-gradient(ellipse 80% 50% at 50% -10%, rgba(150, 200, 255, 0.08), transparent),
+          linear-gradient(180deg, var(--ink) 0%, #0e0e12 100%);
+        line-height: 1.6;
+        min-height: 70vh;
+      }
+      .pigit-home * { box-sizing: border-box; }
+
+      /* subtle terminal grid */
+      .pigit-home::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.35;
+        background-image:
+          linear-gradient(rgba(150, 200, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(150, 200, 255, 0.03) 1px, transparent 1px);
+        background-size: 24px 24px;
+        mask-image: linear-gradient(180deg, black 0%, transparent 85%);
+      }
+      .pigit-home { position: relative; }
+
+      .pg-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+      /* sheet edge rule — same motif as TUI sheets */
+      .pg-edge {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 0.02em;
+        margin-bottom: 28px;
+        opacity: 0.9;
+      }
+      .pg-edge-line { flex: 1; height: 1px; background: var(--gunmetal); position: relative; }
+      .pg-edge-line::after {
+        content: "";
+        position: absolute;
+        left: 0; top: 0; height: 1px; width: 35%;
+        background: linear-gradient(90deg, var(--accent), transparent);
+      }
+      .pg-edge-line.right::after { left: auto; right: 0; background: linear-gradient(270deg, var(--accent), transparent); }
+      .pg-edge-core { padding: 0 12px; white-space: nowrap; }
+
+      .pg-hero {
+        display: grid;
+        grid-template-columns: 1fr 1.05fr;
+        gap: 48px;
+        align-items: center;
+        padding: 40px 0 32px;
+      }
+      @media (max-width: 920px) { .pg-hero { grid-template-columns: 1fr; } }
+
+      .pg-ascii {
+        font-family: var(--mono);
+        font-size: clamp(10px, 1.4vw, 13px);
+        line-height: 1.15;
+        color: var(--accent);
+        margin: 0 0 20px;
+        white-space: pre;
+        letter-spacing: 0;
+      }
+      .pg-ascii dim { color: var(--steel); }
+
+      .pg-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+      .pg-chip {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        border: 1px solid var(--gunmetal);
+        background: var(--graphite);
+        color: var(--slate);
+      }
+      .pg-chip strong { color: var(--pearl); font-weight: 600; }
+      .pg-chip.repo { border-color: rgba(255, 175, 80, 0.35); color: var(--amber); }
+
+      .pg-title {
+        font-family: var(--mono);
+        font-size: clamp(2rem, 4vw, 2.75rem);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        margin: 0 0 12px;
+        border: none;
+        padding: 0;
+      }
+      .pg-title span { color: var(--accent); }
+
+      .pg-lead {
+        font-size: 1.125rem;
+        color: var(--slate);
+        max-width: 34rem;
+        margin: 0 0 28px;
+        text-wrap: pretty;
+      }
+
+      .pg-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .pg-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 11px 20px;
+        border-radius: 6px;
+        font-weight: 650;
+        font-size: 0.92rem;
+        text-decoration: none;
+        transition: 0.18s ease;
+        font-family: var(--mono);
+      }
+      .pg-btn-primary {
+        background: var(--accent);
+        color: var(--ink) !important;
+        box-shadow: 0 0 0 1px rgba(150, 200, 255, 0.3);
+      }
+      .pg-btn-primary:hover {
+        filter: brightness(1.06);
+        transform: translateY(-1px);
+        text-decoration: none;
+      }
+      .pg-btn-ghost {
+        border: 1px solid var(--gunmetal);
+        color: var(--slate) !important;
+        background: var(--charcoal);
+      }
+      .pg-btn-ghost:hover {
+        border-color: var(--accent);
+        color: var(--accent) !important;
+        text-decoration: none;
+      }
+
+      /* macOS terminal window + live demo GIF */
+      .pg-window {
+        border: 1px solid var(--gunmetal);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--charcoal);
+        box-shadow:
+          0 24px 64px rgba(0, 0, 0, 0.45),
+          0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+      }
+      .pg-titlebar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        background: linear-gradient(180deg, #2a2a30 0%, var(--graphite) 100%);
+        border-bottom: 1px solid var(--gunmetal);
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--slate);
+      }
+      .pg-dots { display: flex; gap: 7px; flex-shrink: 0; }
+      .pg-dot { width: 11px; height: 11px; border-radius: 50%; }
+      .pg-dot-r { background: #ff5f57; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+      .pg-dot-y { background: #febc2e; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+      .pg-dot-g { background: #28c840; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+      .pg-wintitle {
+        flex: 1;
+        text-align: center;
+        color: var(--slate);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding-right: 52px;
+      }
+      .pg-window-body {
+        background: var(--ink);
+        line-height: 0;
+      }
+      .pg-window-body img {
+        display: block;
+        width: 100%;
+        height: auto;
+        vertical-align: top;
+      }
+
+      /* feature strip */
+      .pg-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--gunmetal);
+        border: 1px solid var(--gunmetal);
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 8px 0 56px;
+      }
+      @media (max-width: 720px) { .pg-strip { grid-template-columns: 1fr; } }
+
+      .pg-cell {
+        background: var(--charcoal);
+        padding: 22px 20px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+      }
+      .pg-cell::before {
+        content: "";
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        background: var(--accent);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .pg-cell:hover::before { opacity: 1; }
+      .pg-cell:hover { background: #1a1a20; }
+
+      .pg-cell h3 {
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        font-weight: 650;
+        margin: 0 0 6px;
+        color: var(--pearl);
+        letter-spacing: -0.02em;
+      }
+      .pg-cell p {
+        margin: 0;
+        flex: 1;
+        font-size: 0.86rem;
+        color: var(--slate);
+        line-height: 1.5;
+      }
+      .pg-cell a {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        margin-top: 12px;
+      }
+      .pg-cell a:hover { text-decoration: underline; }
+      .pg-cell code {
+        font-size: 0.78rem;
+        color: var(--accent);
+        background: var(--graphite);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+    </style>
+
+    <div class="pg-wrap">
+      <div class="pg-edge">
+        <div class="pg-edge-line"></div>
+        <div class="pg-edge-core"> · pigit docs · </div>
+        <div class="pg-edge-line right"></div>
+      </div>
+
+      <section class="pg-hero">
+        <div>
+          <pre class="pg-ascii" aria-hidden="true"> ____ ___ ____ ___ _____
+|  _ \_ _/ ___|_ _|_   _|
+| |_) | | |  _ | |  | |
+|  __/| | |_| || |  | |
+|_|  |___\____|___| |_|</pre>
+
+          <div class="pg-chip-row">
+            <span class="pg-chip"><strong>1</strong> Status</span>
+            <span class="pg-chip"><strong>2</strong> Stash</span>
+            <span class="pg-chip"><strong>3</strong> Branch</span>
+            <span class="pg-chip"><strong>4</strong> Commit</span>
+            <span class="pg-chip repo">~/projects/pigit</span>
+          </div>
+
+          <h1 class="pg-title">Terminal <span>Git</span>, all in one</h1>
+          <p class="pg-lead">
+            TUI panels, parameterized command palette, session undo, and CLI
+            short-commands — built for daily repo work on macOS and Linux.
+          </p>
+          <div class="pg-actions">
+            <a class="pg-btn pg-btn-primary" href="getting-started/">Get started</a>
+            <a class="pg-btn pg-btn-ghost" href="tui-guide/">TUI guide</a>
+            <a class="pg-btn pg-btn-ghost" href="https://github.com/zlj-zz/pigit">GitHub</a>
+          </div>
+        </div>
+
+        <figure class="pg-window" aria-label="pigit TUI interaction demo">
+          <div class="pg-titlebar">
+            <div class="pg-dots" aria-hidden="true">
+              <div class="pg-dot pg-dot-r"></div>
+              <div class="pg-dot pg-dot-y"></div>
+              <div class="pg-dot pg-dot-g"></div>
+            </div>
+            <span class="pg-wintitle">pigit — ~/projects/pigit</span>
+          </div>
+          <div class="pg-window-body">
+            <img
+              src="assets/demo_interaction.gif"
+              alt="pigit TUI: panel navigation, staging, and command palette"
+              width="720"
+              loading="lazy"
+            />
+          </div>
+        </figure>
+      </section>
+
+      <section class="pg-strip">
+        <div class="pg-cell">
+          <h3>TUI workflows</h3>
+          <p>Status, diff hunks, commit editor, branch ops, undo stack.</p>
+          <a href="tui-guide/">Open guide →</a>
+        </div>
+        <div class="pg-cell">
+          <h3>Command palette</h3>
+          <p><code>;</code> + space for branch/file completion, Tab fill, reflog recovery.</p>
+          <a href="command-palette/">Palette reference →</a>
+        </div>
+        <div class="pg-cell">
+          <h3>Keyboard reference</h3>
+          <p>Every panel binding in one table — printable.</p>
+          <a href="keyboard-reference/">Full key map →</a>
+        </div>
+        <div class="pg-cell">
+          <h3>CLI &amp; multi-repo</h3>
+          <p>Short commands, parallel <code>repo</code> ops, shell completion.</p>
+          <a href="cli/">CLI reference →</a>
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

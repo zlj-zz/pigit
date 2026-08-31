@@ -1,0 +1,92 @@
+site_name: pigit
+site_description: A terminal UI for Git — short commands and multi-repo management
+site_url: https://zlj-zz.github.io/pigit/
+repo_url: https://github.com/zlj-zz/pigit
+repo_name: zlj-zz/pigit
+copyright: Copyright &copy; 2021 pigit contributors
+
+docs_dir: pages
+site_dir: ../../site
+
+hooks:
+  - hooks.py
+
+theme:
+  name: material
+  custom_dir: overrides
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  font:
+    text: Source Sans 3
+    code: JetBrains Mono
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/zlj-zz/pigit
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/pigit/
+  generator: false
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - TUI Guide: tui-guide.md
+  - Keyboard Reference: keyboard-reference.md
+  - Command Palette: command-palette.md
+  - Workflows: workflows.md
+  - CLI: cli.md
+  - Configuration: configuration.md
+  - Troubleshooting: troubleshooting.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.keys
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true

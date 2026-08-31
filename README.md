@@ -20,6 +20,8 @@
 
 `pigit` — a Git assistant for the terminal: **TUI panels** 🖥️ · **short commands** ⌨️ · **multi-repo management** 📚
 
+📖 **[User documentation](https://zlj-zz.github.io/pigit/)** · build locally: `mkdocs serve --config-file docs/site/mkdocs.yml`
+
 </div>
 
 <div align="center">
