@@ -88,10 +88,7 @@ class BranchPanel(OptionList):
             on_cancel=dismiss_sheet,
             allow_newline=False,
         )
-        self._alert_dialog = AlertDialog(
-            inner_width=40,
-            on_result=lambda _: None,
-        )
+        self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self._vm_unsubs: list[Callable[[], None]] = []
 
     def mount(self) -> None:

@@ -291,7 +291,7 @@ class AlertDialogBody(Component):
         inner_w = (
             self._inner_w_cfg
             if self._inner_w_cfg is not None
-            else max(20, self._term_cols // 2)
+            else max(40, self._term_cols * 3 // 7)
         )
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w

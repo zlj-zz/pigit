@@ -73,7 +73,7 @@ class RebasePanel(OptionList):
         self._on_done = on_done
         self._get_record_rewind = get_record_rewind
         self._items: list[_TodoItem] = []
-        self._alert = AlertDialog(inner_width=50, on_result=lambda _: None)
+        self._alert = AlertDialog(on_result=lambda _: None)
 
     def preferred_sheet_height(self, term_h: int) -> int:
         """Room for the todo list; host should use max_fraction=0.5."""

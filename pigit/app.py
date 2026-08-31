@@ -160,10 +160,7 @@ class PigitApplication(Application):
             self._header_state,
             get_git_dir=self._git.get_git_dir,
         )
-        self._alert_dialog = AlertDialog(
-            inner_width=50,
-            on_result=lambda _: None,
-        )
+        self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self._add_worktree_input = InputLine(
             prompt="Add worktree (path [branch], quote paths with spaces): ",
             on_submit=self._on_add_worktree_submit,

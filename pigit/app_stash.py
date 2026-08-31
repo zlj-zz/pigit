@@ -55,10 +55,7 @@ class StashPanel(OptionList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
-        self._alert_dialog = AlertDialog(
-            inner_width=40,
-            on_result=lambda _: None,
-        )
+        self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self.stashes: list[Stash] = []
 
     def mount(self) -> None:

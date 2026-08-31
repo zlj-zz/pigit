@@ -1060,6 +1060,19 @@ class TestAlertDialogBody:
         ok = next(seg for seg in footer if seg.text == "OK")
         assert ok.fg == get_theme().fg_danger
 
+    def test_alert_body_default_width_is_three_sevenths_of_terminal(self):
+        body = AlertDialogBody(
+            shell=MagicMock(),
+            message="m",
+            on_result=lambda x: None,
+        )
+        body.resize((100, 20))  # term_cols = 100 → 3/7 = 42, above the floor
+        body._rebuild_frame()
+        assert body._inner_w == 100 * 3 // 7
+        body.resize((60, 20))  # 3/7 = 25, but the 40-cell floor wins
+        body._rebuild_frame()
+        assert body._inner_w == 40
+
     def test_alert_body_wraps_fullwidth_chars_by_display_width(self):
         from pigit.termui.wcwidth_table import wcswidth
 
