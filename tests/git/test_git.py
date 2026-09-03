@@ -139,6 +139,32 @@ class TestRepo:
 
         assert not os.path.isfile(untracked)
 
+    def test_load_status_returns_raw_chinese_path(self):
+        """Non-ASCII names come back unquoted (core.quotepath=false).
+
+        A quoted name would keep git's octal escapes; tree building then
+        turns those literal backslashes into separators (fake directories).
+        """
+        git = self.git
+        test_repo = self.test_repo
+        subdir = os.path.join(test_repo, "docs-dev", "design")
+        os.makedirs(subdir, exist_ok=True)
+        zh_path = os.path.join(subdir, "技术方案.md")
+        with open(zh_path, "w", encoding="utf-8") as f:
+            f.write("x")
+
+        try:
+            files = git.load_status(path=test_repo)
+            hit = next((f for f in files if "技术方案" in f.name), None)
+            assert hit is not None
+            assert hit.display_str.endswith("技术方案.md")
+            # No octal escapes / literal backslashes that tree building
+            # would turn into directory separators.
+            assert "\\" not in hit.name
+        finally:
+            os.remove(zh_path)
+            os.removedirs(subdir) if subdir != test_repo else None
+
     def test_discard_untracked_missing_no_raise(self):
         git = self.git
         test_repo = self.test_repo
