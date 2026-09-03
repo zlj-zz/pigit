@@ -199,9 +199,23 @@ class DiffViewer(Component):
         )
         self._frame.title = self._box_title or None
 
+    def _border_fg(self) -> tuple[int, int, int]:
+        """Return the diff border color from the presentation state.
+
+        The brand accent marks the diff as the current full-screen view;
+        when an overlay steals presentation the border recedes to the
+        inactive tone instead of staying bright.
+        """
+        if self.is_presentation_active():
+            return THEME.fg_accent
+        if self.is_presentation_stolen():
+            return THEME.fg_inactive
+        return THEME.fg_dim
+
     def _draw_frame(self, surface: Surface) -> None:
         """Draw the bordered chrome for the current surface size."""
         self._sync_frame(surface.width, surface.height)
+        self._frame.fg = self._border_fg()
         self._frame.draw(surface, 0, 0)
 
     def _drop_pending_tokenize(self) -> None:
@@ -1213,7 +1227,7 @@ class DiffViewer(Component):
             self._render_file_history_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=THEME.fg_dim)
+        surface.draw_box_rgb(0, 0, w, h, fg=self._border_fg())
 
         # Header row (overwrites top border)
         header = self._file_history_header()

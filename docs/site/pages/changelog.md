@@ -3,6 +3,25 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.6.1 (2026-09-03)
+
+### Features
+
+- **Brand-accent diff border**: the full-screen diff viewer's border renders in the theme's brand accent while the diff is the active view, receding to the inactive tone when an overlay takes focus (fixes #81).
+- **Onedir binary distribution**: a PyInstaller build (`pigit.spec` + `binary.yml`) ships macOS/Linux bundles attached to the GitHub Release on version tags. The bundle carries a single `pigit` executable; `g`/`r` become opt-in shell aliases (`alias g='pigit cmd'`, `alias r='pigit repo'`).
+
+### Bug Fixes
+
+- **Chinese filenames in tree mode**: git status now runs with `core.quotepath=false`, so non-ASCII paths arrive raw instead of octal-escaped strings that tree view then split into fake directories.
+
+### Docs
+
+- MkDocs site gains Archify runtime, sequencer, and palette diagrams.
+
+### CI
+
+- Docs deploy uses `actions/deploy-pages` v5, dropping the Node 20 deprecation warning.
+
 ## 2.6.0 (2026-08-31)
 
 ### Features

@@ -119,9 +119,7 @@ class ColorHelpFormatter(HelpFormatter):
         # registration-time ``prog`` computation, so stay plain there and
         # avoid the termui import (and any ANSI leak into ``prog``).
         color_enabled = getattr(self, "_pigit_color", None) is not False
-        parts = [
-            _styled(action_header, fg="green") if color_enabled else action_header
-        ]
+        parts = [_styled(action_header, fg="green") if color_enabled else action_header]
 
         # if there was help for the action, add lines of help text
         if action.help:

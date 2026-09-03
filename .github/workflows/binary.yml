@@ -1,0 +1,79 @@
+name: Binary distribution
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# softprops/action-gh-release needs write access to upload artifacts.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Build on 3.14 so the frozen binary gets argparse's colored help
+      # (a 3.14+ feature); the frozen interpreter is a fixed runtime.
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install PyInstaller and pigit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller .
+
+      # Mirror ci.yaml's publish guard so a mis-tagged release cannot ship a
+      # binary whose reported version differs from the tag.
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(python -c "from pigit.const import __version__; print(__version__)")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match package version ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Build onedir bundle
+        run: pyinstaller pigit.spec --noconfirm
+
+      # CI runners have no interactive TTY, so the TUI smoke stays local;
+      # here we verify the frozen binary answers non-interactive commands.
+      # ``pigit cmd`` is what the ``g`` alias expands to.
+      - name: Smoke test binary (non-interactive)
+        run: |
+          ./dist/pigit/pigit --version
+          ./dist/pigit/pigit cmd -l | head -5
+
+      - name: Package artifact
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          os_name="$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m)"
+          name="pigit-${version}-${os_name}-${arch}"
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            (cd dist && zip -qr "../${name}.zip" pigit)
+            artifact="${name}.zip"
+          else
+            tar -czf "${name}.tar.gz" -C dist pigit
+            artifact="${name}.tar.gz"
+          fi
+          echo "artifact=${artifact}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.artifact }}

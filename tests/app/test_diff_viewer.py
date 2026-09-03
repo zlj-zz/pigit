@@ -5,8 +5,31 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pigit.app_diff import DiffViewer, DiffType
+from pigit.app_theme import THEME
 
 _LOCALGIT_PATH = "pigit.git.api.GitApi"
+
+
+class TestBorderFg:
+    """Diff border uses brand accent while the active view (issue #81)."""
+
+    def test_active_border_is_brand_accent(self):
+        dv = DiffViewer()
+        with patch.object(dv, "is_presentation_active", return_value=True):
+            assert dv._border_fg() == THEME.fg_accent
+
+    def test_stolen_border_recedes_to_inactive(self):
+        dv = DiffViewer()
+        with (
+            patch.object(dv, "is_presentation_active", return_value=False),
+            patch.object(dv, "is_presentation_stolen", return_value=True),
+        ):
+            assert dv._border_fg() == THEME.fg_inactive
+
+    def test_inactive_border_stays_dim(self):
+        dv = DiffViewer()
+        with patch.object(dv, "is_presentation_active", return_value=False):
+            assert dv._border_fg() == THEME.fg_dim
 
 
 class TestCurrentFilePath:

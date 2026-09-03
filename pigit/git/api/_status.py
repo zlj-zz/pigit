@@ -16,7 +16,7 @@ from pigit.ext.executor import SILENT, REPLY, DECODE
 from ..model import File
 from ._base import _OpsBase
 from ._errors import RepoError
-from ._util import byte_str2str, _LOAD_STATUS_CACHE_TTL
+from ._util import _LOAD_STATUS_CACHE_TTL
 
 
 class _StatusOps(_OpsBase):
@@ -87,8 +87,13 @@ class _StatusOps(_OpsBase):
 
         file_items = []
 
+        # core.quotepath=false makes git emit raw UTF-8 paths instead of
+        # quoting non-ASCII names with C-style octal escapes, which would
+        # otherwise collide with tree building (backslashes become separators).
         _, err, files = self.executor.exec(
-            "git status -s -u --porcelain", flags=REPLY | DECODE, cwd=workdir
+            "git -c core.quotepath=false status -s -u --porcelain",
+            flags=REPLY | DECODE,
+            cwd=workdir,
         )
         if err or files is None:
             return file_items
@@ -101,9 +106,6 @@ class _StatusOps(_OpsBase):
             staged_change = file[:1]
             unstaged_change = file[1:2]
             porcelain_name = file[3:]
-            if porcelain_name.endswith('"'):
-                # may is chinese char code.
-                porcelain_name = byte_str2str(porcelain_name[1:-1])
             name = File.resolve_status_path(porcelain_name)
             untracked = change == "??"
             has_no_staged_change = staged_change in [" ", "U", "?"]
