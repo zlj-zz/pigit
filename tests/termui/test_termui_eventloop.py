@@ -512,16 +512,18 @@ def test_loop_mouse_event_requests_render(mock_renderer):
     loop.get_term_size = Mock(return_value=(80, 24))
     loop.render = Mock()
     loop._input_handle = Mock()
+    # None drains the batch (render fires), then the sentinel stops the loop.
     loop._input_handle.get_key.side_effect = [
         MouseEvent(col=1, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS),
+        None,
         ExitEventLoop("stop"),
     ]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
 
-    # Initial render (start -> resize) plus a render after the mouse event.
-    assert loop.render.call_count >= 2
+    # Initial render (start -> resize) plus one batched render for the batch.
+    assert loop.render.call_count == 2
 
 
 def test_quit_raises_exit_event_loop():
@@ -622,3 +624,133 @@ def test_stop_clears_timers(mock_renderer):
     assert len(loop._timers) == 1
     loop.stop()
     assert len(loop._timers) == 0
+
+
+# ---- Batched input rendering (mouse-wheel ghost-scroll fix) ----
+
+
+def _wheel(row: int = 1) -> "object":
+    from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+    return MouseEvent(
+        col=1, row=row, button=MouseButton.WHEEL_DOWN, kind=MouseKind.PRESS
+    )
+
+
+def _render_counting_loop(renderer, **kwargs):
+    """A _Leaf loop with a mocked render and mocked input handle."""
+    from pigit.termui.event_loop import AppEventLoop
+
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_Leaf(), alt=False)
+
+    loop = _Hooked()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.render = Mock()
+    loop._input_handle = Mock()
+    for k, v in kwargs.items():
+        setattr(loop, k, v)
+    return loop
+
+
+def test_wheel_burst_renders_once(mock_renderer):
+    """A backlog of wheel events drains in one batch with a single render."""
+    loop = _render_counting_loop(mock_renderer)
+    loop._input_handle.get_key.side_effect = (
+        [_wheel()] * 8 + [None, ExitEventLoop("stop")]
+    )
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    # Initial resize render + exactly one batched render for all 8 wheels.
+    assert loop.render.call_count == 2
+
+
+def test_wheel_burst_drains_every_event(mock_renderer):
+    """Batching merges renders, never drops events."""
+    loop = _render_counting_loop(mock_renderer)
+    loop._child._handle_mouse = Mock()
+    loop._input_handle.get_key.side_effect = (
+        [_wheel()] * 8 + [None, ExitEventLoop("stop")]
+    )
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert loop._child._handle_mouse.call_count == 8  # every wheel reached the child
+
+
+def test_wheel_batch_idle_does_not_render_again(mock_renderer):
+    """停滚即停: once the backlog drains, idle polls add no render."""
+    loop = _render_counting_loop(mock_renderer)
+    loop._input_handle.get_key.side_effect = [
+        _wheel(),
+        None,  # batch 1 drains → one render
+        None,  # idle poll — nothing to render
+        ExitEventLoop("stop"),
+    ]
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    # Initial resize render + the single batch render; idle poll adds none.
+    assert loop.render.call_count == 2
+
+
+def test_exit_event_loop_mid_batch_stops_draining(mock_renderer):
+    """S1: quit raised while draining propagates and drops the rest of the batch."""
+
+    class _Quitting(_Leaf):
+        def __init__(self) -> None:
+            super().__init__()
+            self.handled = 0
+
+        def _handle_mouse(self, event) -> None:
+            self.handled += 1
+            if self.handled >= 2:
+                raise ExitEventLoop("stop")
+
+    class _Hooked(AppEventLoop):
+        def __init__(self) -> None:
+            super().__init__(_Quitting(), alt=False)
+
+    loop = _Hooked()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.render = Mock()
+    loop._input_handle = Mock()
+    # No None between wheels: quit must interrupt the drain itself.
+    loop._input_handle.get_key.side_effect = [_wheel()] * 5
+
+    with pytest.raises(ExitEventLoop, match="stop"):
+        loop._run_impl()
+
+    assert loop._child.handled == 2  # remaining 3 wheels are dropped
+
+
+def test_single_key_press_renders_once(mock_renderer):
+    """Regression: one key press still renders exactly once (no per-event lag)."""
+
+    class _Hooked(AppEventLoop):
+        BINDINGS = [("z", "on_z")]
+
+        def __init__(self) -> None:
+            super().__init__(_Leaf(), alt=False)
+            self.pressed = 0
+
+        def on_z(self) -> None:
+            self.pressed += 1
+
+    loop = _Hooked()
+    loop.get_term_size = Mock(return_value=(80, 24))
+    loop.render = Mock()
+    loop._input_handle = Mock()
+    loop._input_handle.get_key.side_effect = ["z", None, ExitEventLoop("stop")]
+
+    with pytest.raises(ExitEventLoop):
+        loop._run_impl()
+
+    assert loop.pressed == 1
+    # Initial resize render + one batched render for the single key.
+    assert loop.render.call_count == 2

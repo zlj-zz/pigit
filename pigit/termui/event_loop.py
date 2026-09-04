@@ -218,27 +218,35 @@ class AppEventLoop:
         self._input_handle.start()
         try:
             while True:
-                # 1. Process all keyboard input that has arrived.
-                while True:
-                    event = self._input_handle.get_key()
-                    if event is None:
-                        break
-                    if isinstance(event, MouseEvent):
-                        self.before_mouse_event(event)
-                        self._child._handle_mouse(event)
+                # 1. Process all pending input: update state only, then render
+                #    once when the queue drains. Rendering per event lets a
+                #    slow frame fall behind a mouse-wheel burst (the backlog
+                #    then scrolls on after the user stopped — ghost scrolling).
+                try:
+                    while True:
+                        event = self._input_handle.get_key()
+                        if event is None:
+                            break
+                        if isinstance(event, MouseEvent):
+                            self.before_mouse_event(event)
+                            self._child._handle_mouse(event)
+                        else:
+                            _logger.debug("[RENDER] _loop: dispatch key=%r", event)
+                            outcome = self._dispatch_semantic_string(event)
+                            self.after_dispatch_key(event, outcome)
+                            if outcome == "resize":
+                                # resize() already rendered synchronously;
+                                # a batch-end render would duplicate it.
+                                continue
                         self.request_render()
-                        if self._render_requested:
-                            _logger.debug("[RENDER] _loop: render (after mouse)")
-                            self._render_requested = False
-                            self.render()
-                        continue
-                    _logger.debug("[RENDER] _loop: dispatch key=%r", event)
-                    outcome = self._dispatch_semantic_string(event)
-                    self.after_dispatch_key(event, outcome)
-                    if self._render_requested:
-                        _logger.debug("[RENDER] _loop: render (after dispatch)")
-                        self._render_requested = False
-                        self.render()
+                except ExitEventLoop:
+                    # Quit mid-batch: stop draining the remaining backlog and
+                    # propagate (no batch-end render needed — we are exiting).
+                    raise
+                if self._render_requested:
+                    _logger.debug("[RENDER] _loop: render (input batch)")
+                    self._render_requested = False
+                    self.render()
 
                 # 2. Process AsyncTask results.
                 AsyncTask.poll_all()
