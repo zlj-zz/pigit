@@ -657,9 +657,10 @@ def _render_counting_loop(renderer, **kwargs):
 def test_wheel_burst_renders_once(mock_renderer):
     """A backlog of wheel events drains in one batch with a single render."""
     loop = _render_counting_loop(mock_renderer)
-    loop._input_handle.get_key.side_effect = (
-        [_wheel()] * 8 + [None, ExitEventLoop("stop")]
-    )
+    loop._input_handle.get_key.side_effect = [_wheel()] * 8 + [
+        None,
+        ExitEventLoop("stop"),
+    ]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
@@ -672,9 +673,10 @@ def test_wheel_burst_drains_every_event(mock_renderer):
     """Batching merges renders, never drops events."""
     loop = _render_counting_loop(mock_renderer)
     loop._child._handle_mouse = Mock()
-    loop._input_handle.get_key.side_effect = (
-        [_wheel()] * 8 + [None, ExitEventLoop("stop")]
-    )
+    loop._input_handle.get_key.side_effect = [_wheel()] * 8 + [
+        None,
+        ExitEventLoop("stop"),
+    ]
 
     with pytest.raises(ExitEventLoop):
         loop._run_impl()
