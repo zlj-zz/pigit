@@ -338,7 +338,12 @@ class ManagedRepos:
 
         def _fetch_one(item: tuple[str, str]) -> tuple[str, dict | None]:
             name, repo_path = item
-            return name, self._fetch_repo_meta(repo_path)
+            try:
+                return name, self._fetch_repo_meta(repo_path)
+            except Exception:
+                # A single repo (e.g. a vanished git binary or unreadable
+                # path) must not abort the batch; skip it like a failed fetch.
+                return name, None
 
         refreshed: list[str] = []
         try:
@@ -1014,16 +1019,23 @@ class ManagedRepos:
             return os.path.join(repo_path, ".git")
 
     def _is_meta_fresh(self, repo_path: str, meta: dict) -> bool:
-        """Check whether cached metadata is still valid by comparing .git/index mtime."""
-        cached_mtime = meta.get("index_mtime")
-        if not isinstance(cached_mtime, int):
+        """Check whether cached metadata is still valid.
+
+        Both ``.git/index`` and ``.git/HEAD`` mtimes must match the cached
+        values: the index covers stage/status changes while HEAD covers
+        branch switches (``git checkout`` does not touch the index).
+        """
+        cached_index = meta.get("index_mtime")
+        cached_head = meta.get("head_mtime")
+        if not isinstance(cached_index, int) or not isinstance(cached_head, int):
             return False
         git_dir = self._resolve_git_dir(repo_path)
-        index_path = os.path.join(git_dir, "index")
         try:
-            return int(os.path.getmtime(index_path)) == cached_mtime
+            index_mtime = int(os.path.getmtime(os.path.join(git_dir, "index")))
+            head_mtime = int(os.path.getmtime(os.path.join(git_dir, "HEAD")))
         except OSError:
             return False
+        return index_mtime == cached_index and head_mtime == cached_head
 
     def _fetch_repo_meta(self, repo_path: str) -> dict | None:
         """Fetch git metadata for a single repo and return a cacheable dict."""
@@ -1083,6 +1095,10 @@ class ManagedRepos:
             index_mtime = int(os.path.getmtime(os.path.join(git_dir, "index")))
         except OSError:
             index_mtime = 0
+        try:
+            head_mtime = int(os.path.getmtime(os.path.join(git_dir, "HEAD")))
+        except OSError:
+            head_mtime = 0
 
         return {
             "branch": head,
@@ -1098,4 +1114,5 @@ class ManagedRepos:
             "staged": bool(has_staged),
             "untracked": bool(has_untracked),
             "index_mtime": index_mtime,
+            "head_mtime": head_mtime,
         }
