@@ -261,6 +261,28 @@ def test_j_scrolls_sheet_not_status_list(runtime):
     assert browser.scroll_i == 1
 
 
+def test_mouse_wheel_scrolls_inspector(runtime):
+    """A wheel over the inspector sheet scrolls the snapshot (issue: no scroll)."""
+    from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+    app, root = _mount(runtime)
+    with (
+        patch.object(
+            app._status_panel, "get_inspector_snapshot", return_value=_tall_commit()
+        ),
+        patch("pigit.app.run_async", side_effect=lambda work, cb: cb(work())),
+    ):
+        app.open_inspector()
+    inspector = root._layer_stack.top(LayerKind.SHEET)._child
+    browser = inspector._browser
+    assert browser.scroll_i == 0
+
+    inspector.handle_mouse(
+        MouseEvent(col=5, row=5, button=MouseButton.WHEEL_DOWN, kind=MouseKind.PRESS)
+    )
+    assert browser.scroll_i == 1
+
+
 def test_esc_and_i_dismiss_inspector(runtime):
     app, root = _mount(runtime)
     with (
