@@ -775,3 +775,79 @@ def test_add_repos_confirm_default_probes(tmp_path, tmp_repos_json):
         added = mr.add_repos([str(root)])
     assert added == [str(root.resolve())]
     assert any("--show-toplevel" in str(c[0]) for c in ex.exec_calls)
+
+
+# ---- meta freshness: index + HEAD mtimes (branch-switch detection) ----
+
+
+def _freshness_setup(tmp_path, tmp_repos_json):
+    """Fake repo (index + HEAD) with stored meta; returns (mr, meta, index, head, root)."""
+    repo_root = tmp_path / "gr"
+    git_dir = repo_root / ".git"
+    git_dir.mkdir(parents=True)
+    index = git_dir / "index"
+    head = git_dir / "HEAD"
+    index.write_text("")
+    head.write_text("ref: refs/heads/dev\n")
+    os.utime(index, (1000, 1000))
+    os.utime(head, (1000, 1000))
+
+    ex = MockExecutor(
+        responses={"git rev-parse --absolute-git-dir": (0, "", str(git_dir) + "\n")}
+    )
+    mr = ManagedRepos(ex, repo_json_path=str(tmp_repos_json))
+    meta = {"branch": "dev", "index_mtime": 1000, "head_mtime": 1000}
+    tmp_repos_json.write_text(
+        json.dumps({"gr": {"path": str(repo_root), "meta": meta}})
+    )
+    return mr, meta, index, head, repo_root
+
+
+def test_is_meta_fresh_when_index_and_head_match(tmp_path, tmp_repos_json):
+    mr, meta, _index, _head, repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    assert mr._is_meta_fresh(str(repo_root), meta) is True
+
+
+def test_head_mtime_change_marks_meta_stale(tmp_path, tmp_repos_json):
+    """`git checkout` rewrites HEAD but not the index — meta must go stale."""
+    mr, meta, index, head, repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    os.utime(head, (2000, 2000))  # HEAD rewritten, index untouched
+    assert mr._is_meta_fresh(str(repo_root), meta) is False
+
+
+def test_index_mtime_change_marks_meta_stale(tmp_path, tmp_repos_json):
+    mr, meta, index, head, repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    os.utime(index, (2000, 2000))  # HEAD untouched
+    assert mr._is_meta_fresh(str(repo_root), meta) is False
+
+
+def test_refresh_meta_skips_fresh_repo(tmp_path, tmp_repos_json):
+    mr, _meta, _index, _head, _repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    with patch.object(mr, "_fetch_repo_meta") as fetch:
+        assert list(mr.refresh_meta()) == []
+    fetch.assert_not_called()
+
+
+def test_refresh_meta_skips_repo_whose_fetch_raises(tmp_path, tmp_repos_json):
+    """A per-repo fetch error must not abort the batch (switcher stays open)."""
+    mr, _meta, _index, head, _repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    os.utime(head, (2000, 2000))  # stale → refresh triggers
+    with patch.object(mr, "_fetch_repo_meta", side_effect=RuntimeError("boom")):
+        assert list(mr.refresh_meta()) == []  # repo skipped, no crash
+
+
+def test_refresh_meta_refetches_branch_after_head_change(tmp_path, tmp_repos_json):
+    """Stale meta (HEAD moved) → refresh_meta re-fetches and dumps the branch."""
+    mr, _meta, index, head, repo_root = _freshness_setup(tmp_path, tmp_repos_json)
+    # Simulate `git checkout main`: HEAD rewritten, index untouched.
+    head.write_text("ref: refs/heads/main\n")
+    os.utime(head, (2000, 2000))
+
+    new_meta = {"branch": "main", "index_mtime": 1000, "head_mtime": 2000}
+    with patch.object(mr, "_fetch_repo_meta", return_value=new_meta) as fetch:
+        refreshed = list(mr.refresh_meta())
+
+    fetch.assert_called_once_with(str(repo_root))
+    assert refreshed == ["gr"]
+    data = json.loads(tmp_repos_json.read_text())
+    assert data["gr"]["meta"]["branch"] == "main"

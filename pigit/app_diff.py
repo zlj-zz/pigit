@@ -12,7 +12,6 @@ import dataclasses
 import enum
 import logging
 import os
-import re
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -38,26 +37,17 @@ from pigit.termui.widgets import AlertDialog
 from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
 
 from .app_theme import THEME
-from .diff_content import DiffContent, Hunk, RenderLine
+from .diff_content import (
+    DIFF_GIT_RE,
+    DiffContent,
+    Hunk,
+    RenderLine,
+    needs_full_source,
+    path_from_diff_git_line,
+)
+from .git.api import parse_index_hashes
 
 _logger = logging.getLogger(__name__)
-
-# Plain ``a/path b/path`` or quoted ``"a/my file" "b/my file"`` (git quotes
-# paths that contain spaces). Alternate groups keep a single match object.
-_DIFF_GIT_RE = re.compile(r'^diff --git (?:"a/(.+)"|a/(.+)) (?:"b/(.+)"|b/(.+))$')
-
-
-def _path_from_diff_git_match(match: re.Match[str]) -> str:
-    """Return the real file path from a ``_DIFF_GIT_RE`` match (quoted or plain).
-
-    ``git`` uses ``dev/null`` for the missing side of a diff: a deletion has
-    ``b/dev/null`` and an addition has ``a/dev/null``. Fall back to the other
-    side so a deleted file reads as its real path.
-    """
-    raw = (match.group(3) or match.group(4) or "").strip('"')
-    if raw == "dev/null":
-        raw = (match.group(1) or match.group(2) or "").strip('"')
-    return raw
 
 
 @dataclasses.dataclass(frozen=True)
@@ -89,6 +79,12 @@ class DiffType(enum.Enum):
 # Compat aliases for tests / local type hints.
 _Hunk = Hunk
 _RenderLine = RenderLine
+
+# loader(repo_path, path, old_sha, new_sha, diff_type) -> (old_lines, new_lines) | None
+DiffSourceLoader = Callable[
+    [str, str, str | None, str | None, DiffType],
+    tuple[list[str] | None, list[str] | None] | None,
+]
 
 
 class DiffViewer(Component):
@@ -131,6 +127,7 @@ class DiffViewer(Component):
         word_diff: bool = False,
         guard_async: Callable[..., Callable] | None = None,
         on_file_picker: Callable[[int, int], None] | None = None,
+        source_loader: DiffSourceLoader | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._lines: list[str] = []
@@ -162,9 +159,14 @@ class DiffViewer(Component):
         self._on_file_picker = on_file_picker
         self._repo_path = ""
         self._diff_type = DiffType.UNSTAGED
+        # Full-file side-source loader (see DiffSourceLoader); None keeps the
+        # (string-aware) fragment fallback for the multi-line mask.
+        self._source_loader = source_loader
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self._patch_task: AsyncTask[tuple[int, str, str, str, str]] = AsyncTask()
-        self._tokenize_task: AsyncTask[list[_RenderLine]] = AsyncTask()
+        self._tokenize_task: AsyncTask[tuple[list[_RenderLine], list[str | None]]] = (
+            AsyncTask()
+        )
         self._tokenize_gen: int = 0
         self._patch_gen: int = 0
         self._guard_async = guard_async
@@ -253,10 +255,7 @@ class DiffViewer(Component):
         """Extract the ``b/`` path from a ``diff --git`` line at ``idx``."""
         if idx < 0 or idx >= len(self._lines):
             return None
-        m = _DIFF_GIT_RE.match(self._lines[idx])
-        if not m:
-            return None
-        path = _path_from_diff_git_match(m)
+        path = path_from_diff_git_line(self._lines[idx])
         return path or None
 
     def _rebuild_file_sections(self) -> None:
@@ -264,7 +263,7 @@ class DiffViewer(Component):
         sections: list[_FileSection] = []
         headers: list[int] = []
         for i, line in enumerate(self._lines):
-            if _DIFF_GIT_RE.match(line):
+            if DIFF_GIT_RE.match(line):
                 headers.append(i)
         for hi, header_start in enumerate(headers):
             path = self._path_from_header(header_start) or ""
@@ -459,17 +458,32 @@ class DiffViewer(Component):
         multiline_mask = list(doc.multiline_mask)
         word_diff_segments = list(doc.word_diff_segments)
         tokenizer = self._tokenizer
+        source_requests = self._source_requests()
 
-        def _work() -> list[_RenderLine]:
-            return DiffContent.pre_tokenize_with(
-                content, line_langs, multiline_mask, tokenizer, word_diff_segments
+        def _work() -> tuple[list[_RenderLine], list[str | None]]:
+            mask = multiline_mask
+            if source_requests and self._source_loader is not None:
+                # Worker: per-file cat-file / disk reads; the mask is then
+                # looked up from the real side sources instead of the fragment.
+                sources = self._load_sources(source_requests)
+                if sources:
+                    mask = DiffContent.multiline_mask_from_sources(
+                        content, line_langs, tokenizer, sources
+                    )
+            tokens = DiffContent.pre_tokenize_with(
+                content, line_langs, mask, tokenizer, word_diff_segments
             )
+            return tokens, mask
 
         def _callback(
-            tokens: list[_RenderLine],
+            result: tuple[list[_RenderLine], list[str | None]],
         ) -> None:
             if not self.is_mounted() or current_gen != self._tokenize_gen:
                 return
+            tokens, mask = result
+            # Expose the resolved (fragment or full-source) mask — asserted by
+            # the diff-content end-to-end tests; not read by painting.
+            self._multiline_mask = mask
             self._render_tokens = tokens
             if is_on_visible_paint_path(self):
                 request_render()
@@ -487,6 +501,72 @@ class DiffViewer(Component):
     def set_diff_type(self, diff_type: DiffType) -> None:
         """Set the diff type (unstaged, staged, or commit)."""
         self._diff_type = diff_type
+
+    def set_repo_path(self, repo_path: str) -> None:
+        """Set the repository root used by the source loader.
+
+        The main viewer receives this via :meth:`update` (EVT_GOTO); embedded
+        viewers (e.g. the Status preview) never see EVT_GOTO and must be
+        supplied through here.
+        """
+        self._repo_path = repo_path
+
+    def _section_language(self, section: _FileSection) -> str | None:
+        """Language of a file section's first content line, or None."""
+        start = section.first_hunk_start + 1
+        for i in range(start, min(start + 4, len(self._line_langs))):
+            lang = self._line_langs[i]
+            if lang != "plain":
+                return lang
+        return None
+
+    def _source_requests(
+        self,
+    ) -> list[tuple[str, str, str | None, str | None, DiffType]]:
+        """Per-file full-source requests (sync; repo context captured here).
+
+        Only files whose language tracks multi-line state — the same predicate
+        the scanner uses — and that carry an ``index`` header produce a
+        request. Sections without hunks (pure rename / binary) are skipped.
+        """
+        requests: list[tuple[str, str, str | None, str | None, DiffType]] = []
+        for section in self._file_sections:
+            if section.first_hunk_start == section.header_start:
+                continue  # no hunks: pure rename / binary
+            path = section.path
+            if not path:
+                continue
+            old_sha = new_sha = None
+            header_end = min(section.first_hunk_start, len(self._lines))
+            for i in range(section.header_start, header_end):
+                hashes = parse_index_hashes(self._lines[i])
+                if hashes is not None:
+                    old_sha, new_sha = hashes
+                    break
+            lang = self._section_language(section)
+            if lang is None or not needs_full_source(lang):
+                continue
+            requests.append((self._repo_path, path, old_sha, new_sha, self._diff_type))
+        return requests
+
+    def _load_sources(
+        self,
+        requests: list[tuple[str, str, str | None, str | None, DiffType]],
+    ) -> dict[str, tuple[list[str] | None, list[str] | None]]:
+        """Worker: fetch full-file side sources via the injected loader."""
+        loader = self._source_loader
+        sources: dict[str, tuple[list[str] | None, list[str] | None]] = {}
+        if loader is None:
+            return sources
+        for repo_path, path, old_sha, new_sha, diff_type in requests:
+            result = loader(repo_path, path, old_sha, new_sha, diff_type)
+            if result is None:
+                continue
+            old_lines, new_lines = result
+            if old_lines is None and new_lines is None:
+                continue
+            sources[path] = (old_lines, new_lines)
+        return sources
 
     def set_box_title(self, title: str) -> None:
         """Set the optional label drawn on the viewer's own box border."""

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import re
+from collections.abc import Callable
 
 from . import palette
 from .theme import get_theme
@@ -41,6 +42,7 @@ _DEFAULT_COLORS: dict[str, tuple[int, int, int]] = {
     "diff_meta": palette.BLUE,
     "diff_lineno": palette.YELLOW,
     "diff_count": palette.PURPLE,
+    "conflict": palette.YELLOW,
 }
 
 # Public color table used by tests for palette-only keys.
@@ -53,6 +55,178 @@ def _resolve_base_syntax_color(token_type: str) -> tuple[int, int, int]:
     if attr is not None:
         return getattr(get_theme(), attr)
     return _DEFAULT_COLORS.get(token_type, _DEFAULT_COLORS["variable"])
+
+
+def _resolve_base_language(lang: str) -> str:
+    """Resolve language aliases (``ts`` -> ``js`` …) to the base config key."""
+    seen: set[str] = set()
+    while lang in _LANGUAGE_CONFIGS and "_alias" in _LANGUAGE_CONFIGS[lang]:
+        if lang in seen:
+            break
+        seen.add(lang)
+        lang = _LANGUAGE_CONFIGS[lang]["_alias"]
+    return lang
+
+
+def tracks_multiline(lang: str) -> bool:
+    """True when *lang* tracks multi-line comment/docstring state.
+
+    Single source for both :func:`scan_multiline` (scan enablement) and the
+    diff side-source fetch predicate — the two can never diverge.
+    """
+    base = _resolve_base_language(lang)
+    if base == "py":
+        return True
+    return _LANGUAGE_CONFIGS.get(base, {}).get("block_comment") == ("/*", "*/")
+
+
+# Git merge-conflict markers, treated as first-class tokens (never lexed).
+_CONFLICT_PREFIXES = ("<<<<<<< ", "=======", ">>>>>>> ")
+
+
+def conflict_kind(code: str) -> str | None:
+    """Classify a (diff-prefix-stripped) conflict-marker line.
+
+    Returns ``"conflict_ours"`` / ``"conflict_sep"`` / ``"conflict_theirs"``
+    or ``None``. ``<<<<<<<`` / ``>>>>>>>`` allow a trailing label; the seven-
+    equals separator must not grow extra equals (a markdown setext underline
+    made of 8+ ``=`` stays unstyled — accepted trade-off, reviewed m4).
+    """
+    ours, sep, theirs = _CONFLICT_PREFIXES
+    if code.startswith(ours) or code.rstrip() == ours.strip():
+        return "conflict_ours"
+    if code.rstrip() == sep:
+        return "conflict_sep"
+    if code.startswith(theirs) or code.rstrip() == theirs.strip():
+        return "conflict_theirs"
+    return None
+
+
+def _code_line_opens_block(
+    content: str,
+    *,
+    strings: set[str],
+    line_comment: str | None,
+) -> bool:
+    """True when *content* (code state) opens an unclosed ``/*`` block.
+
+    Character-level scan: string literals and line comments are skipped, so
+    a ``/*`` inside ``"…"`` / ``'…'`` / ``…`` or after ``//`` / ``#`` never
+    opens a block.
+    """
+    i = 0
+    n = len(content)
+    while i < n:
+        ch = content[i]
+        if ch in strings:
+            i += 1
+            while i < n:
+                if content[i] == "\\":
+                    i += 2
+                    continue
+                if content[i] == ch:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if line_comment and content.startswith(line_comment, i):
+            break  # rest of the line is a comment — no opener possible
+        if content.startswith("/*", i):
+            end = content.find("*/", i + 2)
+            if end == -1:
+                return True
+            i = end + 2
+            continue
+        i += 1
+    return False
+
+
+# Multi-line scan states.
+_SCAN_CODE = "code"
+_SCAN_BLOCK = "block"
+_SCAN_DOC = "doc"
+
+
+def scan_multiline(
+    lines: list[str],
+    lang: str,
+    *,
+    strip_prefix: bool,
+    reset_lines: Callable[[str], bool],
+) -> list[str | None]:
+    """Scan a line sequence for multi-line comment/docstring membership.
+
+    Character-level state machine aware of string literals and line comments
+    (a ``/*`` inside ``"…"`` never opens a block) and of git conflict markers
+    (a ``<<<<<<<`` line neither opens nor closes anything). Whole-line
+    granularity: the opener and closer lines are part of the block.
+
+    Only languages with ``block_comment == ("/*", "*/")`` and Python
+    docstrings track state; any other language yields an all-``None`` mask.
+
+    Args:
+        lines: Lines in file order (a full file or a diff fragment).
+        lang: Language key; aliases resolved internally.
+        strip_prefix: Strip a leading diff ``+``/``-``/`` `` marker.
+        reset_lines: Predicate marking lines that reset all state (diff hunk
+            and file boundaries — a fragment is not contiguous source).
+
+    Returns:
+        Per-line ``None | "comment" | "docstring"``.
+    """
+    if not tracks_multiline(lang):
+        return [None] * len(lines)
+
+    base = _resolve_base_language(lang)
+    config = _LANGUAGE_CONFIGS.get(base, {})
+    strings: set[str] = config.get("strings", set())
+    line_comment = config.get("comment")
+    is_block_lang = config.get("block_comment") == ("/*", "*/")
+    is_py = base == "py"
+
+    mask: list[str | None] = [None] * len(lines)
+    state = _SCAN_CODE
+    quote = ""
+    for i, line in enumerate(lines):
+        if reset_lines(line):
+            state = _SCAN_CODE
+            quote = ""
+            continue
+        if line.startswith("\\"):
+            # ``\ No newline`` marker: transparent, never part of a block.
+            continue
+        content = line[1:] if strip_prefix and line and line[0] in "+- " else line
+
+        if state == _SCAN_CODE:
+            if is_py:
+                stripped = content.lstrip()
+                if stripped.startswith(('"""', "'''")):
+                    quote = stripped[:3]
+                    if stripped.find(quote, 3) == -1:
+                        state = _SCAN_DOC
+                        mask[i] = "docstring"
+                continue
+            if is_block_lang and _code_line_opens_block(
+                content, strings=strings, line_comment=line_comment
+            ):
+                state = _SCAN_BLOCK
+                mask[i] = "comment"
+        elif state == _SCAN_BLOCK:
+            # Closer line also counts as comment (existing semantics); the
+            # first ``*/`` closes, then a trailing unclosed ``/*`` re-opens.
+            mask[i] = "comment"
+            if "*/" in content:
+                rest = content[content.find("*/") + 2 :]
+                if not _code_line_opens_block(
+                    rest, strings=strings, line_comment=line_comment
+                ):
+                    state = _SCAN_CODE
+        else:  # _SCAN_DOC
+            mask[i] = "docstring"
+            if quote in content:
+                state = _SCAN_CODE
+                quote = ""
+    return mask
 
 
 # ── Static tokenize rules (language-agnostic, priority-ordered) ──
@@ -308,78 +482,39 @@ class SyntaxTokenizer:
 
         When *strip_diff_prefix* is ``False`` (plain file content), diff prefix
         stripping is skipped so leading whitespace in source code is preserved.
+
+        The scan is string/comment aware (see :func:`scan_multiline`), so a
+        ``/*`` inside a string literal no longer poisons the rest of the
+        fragment. Lines are grouped into same-language runs; hunk boundaries
+        reset state inside a run.
         """
-
-        def _resolve_base(lang: str) -> str:
-            seen = set()
-            while lang in _LANGUAGE_CONFIGS and "_alias" in _LANGUAGE_CONFIGS[lang]:
-                if lang in seen:
-                    break
-                seen.add(lang)
-                lang = _LANGUAGE_CONFIGS[lang]["_alias"]
-            return lang
-
         mask: list[str | None] = [None] * len(lines)
 
-        in_docstring = False
-        in_block = False
-        quote = ""
+        def _reset(line: str) -> bool:
+            return line.startswith(("diff --git", "+++ ", "@@ "))
 
-        for i, line in enumerate(lines):
-            # File boundary resets all multi-line state.
-            if line.startswith("diff --git") or line.startswith("+++ "):
-                in_docstring = False
-                in_block = False
-                quote = ""
+        total = len(lines)
+        i = 0
+        while i < total:
+            if _reset(lines[i]):
+                # Boundary lines never carry multi-line state; handle inline
+                # so the run splitter always advances (no empty-run stall).
+                i += 1
                 continue
-
-            if line.startswith("@@"):
-                in_docstring = False
-                in_block = False
-                quote = ""
-                continue
-
-            if line.startswith("\\"):
-                continue
-
             lang = line_langs[i] if i < len(line_langs) else "generic"
-            base_lang = _resolve_base(lang)
-
-            if strip_diff_prefix and line and line[0] in "+- ":
-                content = line[1:]
-            else:
-                content = line
-            stripped = content.lstrip()
-
-            if base_lang == "py":
-                if not in_docstring:
-                    if stripped.startswith('"""') or stripped.startswith("'''"):
-                        quote = '"""' if stripped.startswith('"""') else "'''"
-                        if stripped.find(quote, len(quote)) == -1:
-                            in_docstring = True
-                            mask[i] = "docstring"
-                else:
-                    mask[i] = "docstring"
-                    if quote in content:
-                        in_docstring = False
-                        quote = ""
-
-            elif _LANGUAGE_CONFIGS.get(base_lang, {}).get("block_comment") == (
-                "/*",
-                "*/",
-            ):
-                if not in_block:
-                    start = content.find("/*")
-                    if start != -1:
-                        end = content.find("*/", start + 2)
-                        if end == -1:
-                            in_block = True
-                            mask[i] = "comment"
-                else:
-                    mask[i] = "comment"
-                    if "*/" in content:
-                        in_block = False
-
+            j = i + 1
+            while j < total:
+                run_lang = line_langs[j] if j < len(line_langs) else "generic"
+                if run_lang != lang or _reset(lines[j]):
+                    break
+                j += 1
+            mask[i:j] = scan_multiline(
+                lines[i:j],
+                lang,
+                strip_prefix=strip_diff_prefix,
+                reset_lines=_reset,
+            )
+            i = j
         return mask
 
     # ── internal tokenize implementation ──

@@ -97,6 +97,9 @@ class OptionList(Component):
         # is the row index where item ``i`` begins. ``curr_no`` then tracks the
         # ITEM index, not the row index. ``None`` keeps legacy 1:1 behaviour.
         self._item_starts: list[int] | None = None
+        # Sub-row offset inside the current item (multi-row mode only): the
+        # cursor can rest on any row of an expanded item, not just its top.
+        self._cursor_sub = 0
         # Content indices that should be skipped during navigation (e.g. separators).
         self._skip_indices: set[int] = set()
         # Filter view: source content and mapping from visible index to source index.
@@ -212,6 +215,7 @@ class OptionList(Component):
         self.content = content
         self._source_content = list(content)
         self._item_starts = None
+        self._cursor_sub = 0
         self._visible_to_source = list(range(len(content)))
         if not content:
             self._r_start = 0
@@ -349,6 +353,7 @@ class OptionList(Component):
             self._visible_to_source = visible_to_source
         self.content = filtered
         self._item_starts = None
+        self._cursor_sub = 0
         if not filtered:
             self._r_start = 0
             self.curr_no = 0
@@ -381,9 +386,13 @@ class OptionList(Component):
         to revert to 1:1 row-per-item rendering.
 
         After calling this, :attr:`curr_no` represents the ITEM index;
-        :meth:`next` / :meth:`previous` step by items, and the renderer
-        uses :meth:`row_to_item` to dispatch sub-rows to ``describe_row``.
+        :meth:`next` / :meth:`previous` step by rows (sub-row navigation), and
+        the renderer uses :meth:`row_to_item` to dispatch sub-rows to
+        ``describe_row``.
         """
+        # S1: reset the sub-row cursor on every layout change — old subs can
+        # point past a shrunken item span (expand/filter re-set starts).
+        self._cursor_sub = 0
         if not starts:
             self._item_starts = None
             return
@@ -394,13 +403,24 @@ class OptionList(Component):
             self.curr_no = 0
         self._scroll_into_view()
 
+    def _item_span(self, item_idx: int) -> int:
+        """Rows spanned by ``item_idx`` (multi-row mode); 1 in compact mode."""
+        starts = self._item_starts
+        if not starts or item_idx < 0 or item_idx >= len(starts):
+            return 1
+        start = starts[item_idx]
+        end = starts[item_idx + 1] if item_idx + 1 < len(starts) else len(self.content)
+        return max(1, end - start)
+
     def cursor_row(self) -> int:
         """Return the terminal-row index where the cursor lives."""
         if self._item_starts is None:
             return self.curr_no
         if not self._item_starts:
             return 0
-        return self._item_starts[min(self.curr_no, len(self._item_starts) - 1)]
+        idx = min(self.curr_no, len(self._item_starts) - 1)
+        sub = max(0, min(self._cursor_sub, self._item_span(idx) - 1))
+        return self._item_starts[idx] + sub
 
     def row_to_item(self, row: int) -> tuple[int, int]:
         """Translate a row index to ``(item_idx, sub_row)``.
@@ -826,13 +846,50 @@ class OptionList(Component):
         else:
             self.emit(EVT_SELECTION_CHANGED, index=self.curr_no)
 
+    def _next_non_skip_item(self, item: int, *, forward: bool) -> int | None:
+        """Nearest non-separator item from ``item`` (exclusive), or None."""
+        starts = self._item_starts
+        n_total = len(starts) if starts is not None else len(self.content)
+        step = 1 if forward else -1
+        idx = item + step
+        while 0 <= idx < n_total and idx in self._skip_indices:
+            idx += step
+        return idx if 0 <= idx < n_total else None
+
+    def _move_multi_row(self, delta: int) -> None:
+        """Move the cursor ``delta`` rows across multi-row items.
+
+        Row arithmetic makes crossing symmetric (S2): forward lands on the
+        target item's first sub-row, backward on its last. Separator items
+        are skipped whole — the cursor never rests on them.
+        """
+        row = self.cursor_row() + delta
+        if row < 0 or row >= len(self.content):
+            return
+        item, sub = self.row_to_item(row)
+        if item in self._skip_indices:
+            target = self._next_non_skip_item(item, forward=delta > 0)
+            if target is None:
+                return
+            self._cursor_sub = 0 if delta > 0 else self._item_span(target) - 1
+            self.curr_no = target
+        else:
+            self._cursor_sub = sub
+            self.curr_no = item
+        self._scroll_into_view()
+        self._notify_change()
+
     def next(self, step: int = 1):
-        """Move the selection forward by the given step, skipping separators."""
-        n_total = (
-            len(self._item_starts)
-            if self._item_starts is not None
-            else len(self.content)
-        )
+        """Move forward, skipping separators.
+
+        Multi-row mode steps by rows: sub-rows within the current item, then
+        the next item's first sub-row; backward lands on the previous item's
+        last sub-row.
+        """
+        if self._item_starts is not None:
+            self._move_multi_row(step)
+            return
+        n_total = len(self.content)
         tmp_no = self.curr_no + step
         while 0 <= tmp_no < n_total and tmp_no in self._skip_indices:
             tmp_no += 1
@@ -843,12 +900,11 @@ class OptionList(Component):
         self._notify_change()
 
     def previous(self, step: int = 1):
-        """Move the selection backward by the given step, skipping separators."""
-        n_total = (
-            len(self._item_starts)
-            if self._item_starts is not None
-            else len(self.content)
-        )
+        """Move backward, skipping separators (multi-row mode steps by rows)."""
+        if self._item_starts is not None:
+            self._move_multi_row(-step)
+            return
+        n_total = len(self.content)
         tmp_no = self.curr_no - step
         while 0 <= tmp_no < n_total and tmp_no in self._skip_indices:
             tmp_no -= 1
@@ -858,8 +914,8 @@ class OptionList(Component):
         self._scroll_into_view()
         self._notify_change()
 
-    def _select_row(self, item_index: int) -> None:
-        """Select ``item_index`` (clamped) and notify listeners."""
+    def _select_row(self, item_index: int, sub: int = 0) -> None:
+        """Select ``item_index`` (clamped) at ``sub`` row and notify listeners."""
         n_total = (
             len(self._item_starts)
             if self._item_starts is not None
@@ -867,6 +923,7 @@ class OptionList(Component):
         )
         if item_index < 0 or item_index >= n_total:
             return
+        self._cursor_sub = max(0, min(sub, self._item_span(item_index) - 1))
         self.curr_no = item_index
         self._scroll_into_view()
         self._notify_change()
@@ -944,11 +1001,8 @@ class OptionList(Component):
         content_index = self._r_start + row0
         if content_index >= len(self.content):
             return False
-        if self._item_starts is not None:
-            item_index, _sub = self.row_to_item(content_index)
-        else:
-            item_index = content_index
+        item_index, sub = self.row_to_item(content_index)
         if item_index in self._skip_indices:
             return False
-        self._select_row(item_index)
+        self._select_row(item_index, sub)
         return True

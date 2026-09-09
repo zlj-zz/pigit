@@ -66,6 +66,11 @@ class ListPickerSheet(OptionList):
         """Prefer up to 14 rows; host clamps to the sheet max fraction."""
         return min(14, max(6, len(self._entries) + 2))
 
+    def set_entries(self, entries: Sequence[Any]) -> None:
+        """Replace the row list (e.g. after an async meta refresh) and repaint."""
+        self._entries = list(entries)
+        self._rebuild_rows()
+
     def _rebuild_rows(self) -> None:
         self._row_segments = []
         texts: list[str] = []

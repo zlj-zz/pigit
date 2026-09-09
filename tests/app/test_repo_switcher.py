@@ -190,6 +190,7 @@ def test_open_repo_switcher_shows_sheet():
     managed.load_repos.return_value = {
         "pigit": {"path": "/work/pigit", "meta": {"branch": "dev"}},
     }
+    managed.refresh_meta.return_value = iter([])
     with patch("pigit.repo_session.RepoSession.build") as build:
         session = MagicMock()
         session.git = Mock()
@@ -339,6 +340,7 @@ def test_open_repo_switcher_no_manual_dismiss():
     managed.load_repos.return_value = {
         "pigit": {"path": "/work/pigit", "meta": {"branch": "dev"}},
     }
+    managed.refresh_meta.return_value = iter([])
     with patch("pigit.repo_session.RepoSession.build") as build:
         session = MagicMock()
         session.git = Mock()
@@ -412,3 +414,51 @@ def test_add_current_and_switch_failure_toasts():
         app._add_current_and_switch("/nope")
     toast.assert_called()
     sw.assert_not_called()
+
+
+def test_open_repo_switcher_refreshes_async_and_updates_rows():
+    """Switcher opens instantly with stored meta; async refresh corrects rows."""
+    managed = Mock()
+    managed.load_repos.side_effect = [
+        # Instant open reads the stored branch...
+        {"pigit": {"path": "/work/pigit", "meta": {"branch": "dev"}}},
+        # ...the background refresh then re-reads the live branch.
+        {"pigit": {"path": "/work/pigit", "meta": {"branch": "main"}}},
+    ]
+    managed.refresh_meta.return_value = iter(["pigit"])
+    with patch("pigit.repo_session.RepoSession.build") as build:
+        session = MagicMock()
+        session.git = Mock()
+        session.git.get_git_dir = Mock(return_value="/work/pigit/.git")
+        session.repo_path = "/work/pigit"
+        session.repo_name = "pigit"
+        session.status_vm = MagicMock()
+        session.commit_vm = MagicMock()
+        session.branch_vm = MagicMock()
+        for vm in (session.status_vm, session.commit_vm, session.branch_vm):
+            vm.bind_repo_token = Mock()
+            vm.dispose = Mock()
+        build.return_value = session
+        app = PigitApplication(
+            config=AppConfig(repo_observe=False), managed_repos=managed
+        )
+    with (
+        patch("pigit.app.show_sheet") as show,
+        patch("pigit.app.run_async") as ra,
+    ):
+        app.open_repo_switcher()
+
+    # The sheet opened immediately from stored meta — no blocking refresh.
+    show.assert_called_once()
+    assert managed.load_repos.call_count == 1
+    assert show.call_args.kwargs.get("title_core") == " · Switch repo · "
+
+    # An async refresh was scheduled; run it and its UI callback.
+    ra.assert_called_once()
+    work, callback = ra.call_args[0]
+    work()
+    panel = show.call_args.args[0]
+    callback(["pigit"])
+
+    assert managed.load_repos.call_count == 2
+    assert panel._entries[0].meta["branch"] == "main"

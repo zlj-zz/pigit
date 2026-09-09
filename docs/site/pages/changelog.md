@@ -3,6 +3,22 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.7.0 (2026-09-09)
+
+### Features
+
+- **Sub-row navigation in expanded commit messages**: a `z`-expanded commit item that spans multiple rows now moves the cursor sub-row by sub-row, so long commit bodies can be read line by line instead of jumping straight to the next commit. Enter-actions still act on the commit under the cursor.
+
+### Bug Fixes
+
+- **Multi-line comment & conflict-marker highlighting in diffs**: the cross-line comment/docstring state is now resolved from the full old and new file content (git blob, or the worktree file for unstaged sides) instead of the truncated `-U3` fragment, so an edit in the middle of a block comment no longer gets colored as code, and real code after a `*/` that falls outside the hunk is no longer dimmed. The state scanner is also string-aware: a `/*` inside a string literal (e.g. a Go raw string) no longer dims the rest of a new file. Conflict markers (`<<<<<<<` / `=======` / `>>>>>>>`) render as markers in their own color instead of being tokenized as code, and no longer bleed comment state across sides.
+- **Inspector and Welcome sheets scroll with the mouse wheel**.
+- **Repo switcher shows live branch names**: the branch column reflects the repository's current branch and refreshes without blocking while the switcher is open.
+
+### Performance
+
+- **Render once per input batch**: the event loop redraws after a burst of queued input instead of once per event, removing ghost wheel scroll and redundant frame renders.
+
 ## 2.6.1 (2026-09-03)
 
 ### Features

@@ -12,6 +12,7 @@ from pigit.termui import (
     Component,
     dismiss_sheet,
     palette,
+    MouseEvent,
     Segment,
     Surface,
 )
@@ -80,6 +81,10 @@ class InspectorSheet(Component):
     @bind_action("previous", "k", "up", desc="Scroll up")
     def scroll_up(self) -> None:
         self._browser.scroll_up(1)
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """Wheel over the sheet scrolls the snapshot (delegated to the browser)."""
+        return self._browser.handle_mouse(event)
 
     @bind_action("close", "esc", "I", desc="Close")
     def close(self) -> None:

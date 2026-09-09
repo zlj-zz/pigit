@@ -69,7 +69,7 @@ from .ext.utils import relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
-from .app_diff import DiffViewer
+from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
 from .app_command_palette import CommandPalette
@@ -236,6 +236,8 @@ class PigitApplication(Application):
                 else None
             ),
             guard_async=self._guard_repo_async,
+            source_loader=self._load_diff_source,
+            get_repo_path=lambda: self._repo_path,
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
@@ -285,6 +287,7 @@ class PigitApplication(Application):
             word_diff=self._config.word_diff,
             guard_async=self._guard_repo_async,
             on_file_picker=self.open_diff_file_picker,
+            source_loader=self._load_diff_source,
         )
         self._tab_view = TabView(
             children=[
@@ -1037,6 +1040,10 @@ class PigitApplication(Application):
             build_repo_switcher_entries,
         )
 
+        # Open instantly with the stored branch list, then refresh the meta in
+        # the background — a synchronous full refresh (several git probes per
+        # stale repo) would otherwise block the sheet from appearing. The
+        # freshness-filtered refresh corrects rows once it lands.
         repos = self._managed_repos.load_repos()
         entries = build_repo_switcher_entries(
             repos,
@@ -1049,12 +1056,33 @@ class PigitApplication(Application):
             on_add_current=self._add_current_and_switch,
             on_toggle_mode=self.open_worktree_picker,
         )
-        show_sheet(
+        sheet = show_sheet(
             panel,
             title_core=sheet_core("Switch repo"),
             edge="bottom",
             edge_fg=THEME.fg_accent,
         )
+
+        token = self._repo_token
+
+        def refresh_worker() -> list[str]:
+            return list(self._managed_repos.refresh_meta())
+
+        def apply_refresh(_names: list[str]) -> None:
+            if token is not self._repo_token:
+                return  # repo switched under the refresh
+            if sheet is None or not sheet.open:
+                return  # switcher closed or replaced before the refresh landed
+            fresh = self._managed_repos.load_repos()
+            panel.set_entries(
+                build_repo_switcher_entries(
+                    fresh,
+                    current_path=self._repo_path,
+                    cwd=self._repo_path,
+                )
+            )
+
+        run_async(refresh_worker, apply_refresh)
 
     def open_worktree_picker(self) -> None:
         """Open the worktree list sheet (``w`` from repo switcher)."""
@@ -1893,6 +1921,30 @@ class PigitApplication(Application):
     def _record_rewind(self, description: str, pre_sha: str) -> None:
         """Record a HEAD-moving operation for later ``u`` reversal."""
         push_rewind(self._session_history, description, pre_sha, panel_hint="Branch")
+
+    def _load_diff_source(
+        self,
+        repo_path: str,
+        path: str,
+        old_sha: str | None,
+        new_sha: str | None,
+        _diff_type: DiffType,
+    ) -> tuple[list[str] | None, list[str] | None] | None:
+        """Fetch full-file side sources for one diff file (worker thread).
+
+        Generic composition: ``cat-file`` first for any side whose blob hash
+        is in the object store, falling back to a worktree disk read — which
+        only fires for the new side of an unstaged diff (the worktree blob is
+        not stored). All-zero / unloaded sides yield ``None``.
+        """
+        git = GitApi(path=repo_path) if repo_path else self._git
+        old_lines = git.load_blob(old_sha) if old_sha else None
+        new_lines = git.load_blob(new_sha) if new_sha else None
+        # Disk fallback only when the new side genuinely exists (hashes are
+        # stored for staged/commit sides; a deleted file has no new side).
+        if new_lines is None and new_sha is not None and path:
+            new_lines = git.load_worktree_file(path)
+        return old_lines, new_lines
 
     def _do_merge_workflow(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.do_merge_workflow()."""
