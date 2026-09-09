@@ -69,7 +69,7 @@ from .ext.utils import relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
-from .app_diff import DiffViewer
+from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
 from .app_command_palette import CommandPalette
@@ -236,6 +236,8 @@ class PigitApplication(Application):
                 else None
             ),
             guard_async=self._guard_repo_async,
+            source_loader=self._load_diff_source,
+            get_repo_path=lambda: self._repo_path,
         )
         self._log_graph_preview = LogGraphPreview(
             id="log_graph_preview",
@@ -285,6 +287,7 @@ class PigitApplication(Application):
             word_diff=self._config.word_diff,
             guard_async=self._guard_repo_async,
             on_file_picker=self.open_diff_file_picker,
+            source_loader=self._load_diff_source,
         )
         self._tab_view = TabView(
             children=[
@@ -1918,6 +1921,30 @@ class PigitApplication(Application):
     def _record_rewind(self, description: str, pre_sha: str) -> None:
         """Record a HEAD-moving operation for later ``u`` reversal."""
         push_rewind(self._session_history, description, pre_sha, panel_hint="Branch")
+
+    def _load_diff_source(
+        self,
+        repo_path: str,
+        path: str,
+        old_sha: str | None,
+        new_sha: str | None,
+        _diff_type: DiffType,
+    ) -> tuple[list[str] | None, list[str] | None] | None:
+        """Fetch full-file side sources for one diff file (worker thread).
+
+        Generic composition: ``cat-file`` first for any side whose blob hash
+        is in the object store, falling back to a worktree disk read — which
+        only fires for the new side of an unstaged diff (the worktree blob is
+        not stored). All-zero / unloaded sides yield ``None``.
+        """
+        git = GitApi(path=repo_path) if repo_path else self._git
+        old_lines = git.load_blob(old_sha) if old_sha else None
+        new_lines = git.load_blob(new_sha) if new_sha else None
+        # Disk fallback only when the new side genuinely exists (hashes are
+        # stored for staged/commit sides; a deleted file has no new side).
+        if new_lines is None and new_sha is not None and path:
+            new_lines = git.load_worktree_file(path)
+        return old_lines, new_lines
 
     def _do_merge_workflow(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.do_merge_workflow()."""

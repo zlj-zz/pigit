@@ -18,7 +18,7 @@ from ._branch import _BranchOps
 from ._commit import _CommitOps, _DEFAULT_LOG_FORMAT, LOG_GRAPH_LIMIT
 from ._status import _StatusOps
 from ._stash import _StashOps
-from ._diff import _DiffOps
+from ._diff import _DiffOps, parse_index_hashes
 from ._worktree import _WorktreeOps
 from ._worktrees import WorktreeInfo, _WorktreesOps
 from ._bisect import BisectState, _BisectOps
@@ -26,7 +26,14 @@ from ._merge import _MergeOps
 from ._fileio import _FileioOps
 from ._display import _DisplayOps
 
-__all__ = ("GitApi", "GitError", "RepoError", "WorktreeInfo", "BisectState")
+__all__ = (
+    "GitApi",
+    "GitError",
+    "RepoError",
+    "WorktreeInfo",
+    "BisectState",
+    "parse_index_hashes",
+)
 
 
 class GitApi:
@@ -240,6 +247,12 @@ class GitApi:
 
     def get_file_at_commit(self, commit_sha, path, repo_path=None, max_size=1_048_576):
         return self._diff.get_file_at_commit(commit_sha, path, repo_path, max_size)
+
+    def load_blob(self, sha, repo_path=None, max_size=1_048_576):
+        return self._diff.load_blob(sha, repo_path, max_size)
+
+    def load_worktree_file(self, path, repo_path=None, max_size=1_048_576):
+        return self._diff.load_worktree_file(path, repo_path, max_size)
 
     # ── _worktree ──
     def switch_file_status(self, file, path=None):

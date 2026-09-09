@@ -24,7 +24,7 @@ from pigit.termui import (
 )
 from pigit.termui.types import PreviewPayload
 
-from .app_diff import DiffType, DiffViewer
+from .app_diff import DiffSourceLoader, DiffType, DiffViewer
 from .app_types import guard_or_identity
 
 if TYPE_CHECKING:
@@ -61,6 +61,8 @@ class PreviewPanel(Component):
         guard_async: (
             Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None
         ) = None,
+        source_loader: DiffSourceLoader | None = None,
+        get_repo_path: Callable[[], str] | None = None,
         x: int = 1,
         y: int = 1,
         size: tuple[int, int] | None = None,
@@ -70,11 +72,13 @@ class PreviewPanel(Component):
         self._status_vm = status_vm
         self._on_preview_target = on_preview_target
         self._guard_async = guard_async
+        self._get_repo_path = get_repo_path
         self._diff_viewer = DiffViewer(
             x=1,
             y=1,
             id="preview_diff",
             word_diff=True,
+            source_loader=source_loader,
         )
         self._unsubs: list[Callable[[], None]] = []
         self._load_task: AsyncTask[list[str]] | None = None
@@ -224,8 +228,18 @@ class PreviewPanel(Component):
             self.clear()
             return
         self.set_diff_type(request.diff_type)
+        self._sync_repo_context()
         self._diff_viewer.set_box_title(request.title)
         self._diff_viewer.set_content(lines)
+
+    def _sync_repo_context(self) -> None:
+        """Push the current repo root into the inner viewer.
+
+        The embedded viewer never receives EVT_GOTO, so its ``repo_path``
+        (used by the source loader) must be supplied here.
+        """
+        if self._get_repo_path is not None:
+            self._diff_viewer.set_repo_path(self._get_repo_path())
 
     def _cancel_load(self) -> None:
         """Invalidate any in-flight load so its result is dropped."""
@@ -243,6 +257,7 @@ class PreviewPanel(Component):
     ) -> None:
         """Load diff lines and put ``title`` / ``subtitle`` on the viewer's box."""
         label = title if not subtitle else f"{title}  {subtitle}"
+        self._sync_repo_context()
         self._diff_viewer.set_box_title(label)
         self._diff_viewer.set_content(diff_lines)
 

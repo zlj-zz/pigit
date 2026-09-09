@@ -19,7 +19,12 @@ from pigit.termui.primitives import (
     plain,
     tokenize_with_positions,
 )
-from pigit.termui.syntax import SyntaxTokenizer
+from pigit.termui.syntax import (
+    SyntaxTokenizer,
+    conflict_kind,
+    scan_multiline,
+    tracks_multiline,
+)
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_theme import THEME
@@ -27,6 +32,37 @@ from .app_theme import THEME
 _logger = logging.getLogger(__name__)
 
 _HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+# Plain ``a/path b/path`` or quoted ``"a/my file" "b/my file"`` (git quotes
+# paths that contain spaces). Alternate groups keep a single match object.
+DIFF_GIT_RE = re.compile(r'^diff --git (?:"a/(.+)"|a/(.+)) (?:"b/(.+)"|b/(.+))$')
+
+
+def path_from_diff_git_line(line: str) -> str:
+    """Return the real (new-side) file path from a ``diff --git`` line.
+
+    ``git`` uses ``dev/null`` for the missing side of a diff: a deletion has
+    ``b/dev/null`` and an addition has ``a/dev/null``. Fall back to the other
+    side so a deleted file reads as its real path.
+    """
+    m = DIFF_GIT_RE.match(line)
+    if not m:
+        return ""
+    raw = (m.group(3) or m.group(4) or "").strip('"')
+    if raw == "dev/null":
+        raw = (m.group(1) or m.group(2) or "").strip('"')
+    return raw
+
+
+def needs_full_source(lang: str) -> bool:
+    """True when *lang* needs full-file side sources for accurate masking.
+
+    Single-source predicate with the scanner (``syntax.tracks_multiline``):
+    side sources are only fetched for languages whose multi-line scan is
+    enabled, so the fetch list and the scan can never diverge.
+    """
+    return tracks_multiline(lang)
+
 
 # A render token is (text, fg_rgb, display_width, word_diff_bg_or_None, style_flags).
 RenderToken = tuple[str, tuple[int, int, int], int, tuple[int, int, int] | None, int]
@@ -82,8 +118,19 @@ class DiffContent:
         *,
         word_diff: bool,
         tokenizer: SyntaxTokenizer,
+        sources: dict[str, tuple[list[str] | None, list[str] | None]] | None = None,
     ) -> DiffContent:
-        """Build structure from a unified diff (tabs expanded, CR stripped)."""
+        """Build structure from a unified diff (tabs expanded, CR stripped).
+
+        Args:
+            diff_lines: Unified diff text lines.
+            word_diff: Compute intra-line change segments.
+            tokenizer: Shared syntax tokenizer.
+            sources: Optional full-file side sources keyed by the new-side
+                path (``{path: (old_lines | None, new_lines | None)}``). When
+                present, the multi-line mask is looked up from the real file
+                content instead of being derived from the diff fragment.
+        """
         lines: list[str] = []
         for line in diff_lines:
             cleaned = plain(line).replace("\r", "")
@@ -101,7 +148,12 @@ class DiffContent:
 
         line_numbers = cls._compute_line_numbers(lines)
         line_langs = cls._detect_line_languages(lines, tokenizer)
-        multiline_mask = tokenizer.compute_multiline_mask(lines, line_langs)
+        if sources:
+            multiline_mask = cls.multiline_mask_from_sources(
+                lines, line_langs, tokenizer, sources
+            )
+        else:
+            multiline_mask = tokenizer.compute_multiline_mask(lines, line_langs)
         word_diff_segments: list[list[WordDiffSegment]] = [[] for _ in lines]
         if word_diff:
             cls._fill_word_diff_segments(lines, hunks, word_diff_segments)
@@ -155,6 +207,19 @@ class DiffContent:
         result: list[RenderLine] = []
         for i, line in enumerate(self.lines):
             lang = self.line_langs[i] if i < len(self.line_langs) else "generic"
+            if lang != "plain" and conflict_kind(line) is not None:
+                result.append(
+                    [
+                        (
+                            line,
+                            tokenizer.resolve_color("conflict", lang),
+                            wcswidth(line),
+                            None,
+                            0,
+                        )
+                    ]
+                )
+                continue
             ml_type = self.multiline_mask[i] if i < len(self.multiline_mask) else None
             if lang == "plain":
                 tokens = [(line, "plain")]
@@ -285,6 +350,22 @@ class DiffContent:
                 code = line[1:]
             else:
                 code = line
+
+            # Conflict markers are first-class tokens: never lexed, even when
+            # they fall inside a real multi-line comment region.
+            if lang != "plain" and conflict_kind(code) is not None:
+                result.append(
+                    [
+                        (
+                            code,
+                            tokenizer.resolve_color("conflict", lang),
+                            wcswidth(code),
+                            None,
+                            0,
+                        )
+                    ]
+                )
+                continue
             ml_type = multiline_mask[i] if i < len(multiline_mask) else None
 
             segments = (
@@ -489,6 +570,114 @@ class DiffContent:
         if length < cls.DENSITY_LONG:
             return 2
         return 3
+
+    @classmethod
+    def diff_line_sides(cls, content: list[str]) -> list[tuple[int | None, int | None]]:
+        """Per-line ``(old_no, new_no)`` (1-based) from unified-diff counters.
+
+        ``-`` lines carry only the old number, ``+`` lines only the new,
+        context lines both. Headers, ``@@`` markers, and ``\\ No newline``
+        lines are ``(None, None)``. A malformed ``@@`` header resets both
+        counters to zero (mirrors :meth:`_compute_line_numbers`).
+        """
+        sides: list[tuple[int | None, int | None]] = []
+        old_line = 0
+        new_line = 0
+        in_hunk = False
+        for line in content:
+            if line.startswith("diff --git"):
+                in_hunk = False
+                sides.append((None, None))
+            elif line.startswith("@@"):
+                m = _HUNK_HEADER_RE.search(line)
+                if m:
+                    old_line = int(m.group(1))
+                    new_line = int(m.group(2))
+                else:
+                    _logger.warning("Unexpected @@ line format: %r", line)
+                    old_line = 0
+                    new_line = 0
+                in_hunk = True
+                sides.append((None, None))
+            elif not in_hunk:
+                # File-header block: index / modes / --- / +++ / rename info.
+                sides.append((None, None))
+            elif line.startswith("\\"):
+                sides.append((None, None))
+            elif cls.is_add_line(line):
+                sides.append((None, new_line))
+                new_line += 1
+            elif cls.is_del_line(line):
+                sides.append((old_line, None))
+                old_line += 1
+            else:
+                sides.append((old_line, new_line))
+                old_line += 1
+                new_line += 1
+        return sides
+
+    @classmethod
+    def multiline_mask_from_sources(
+        cls,
+        content: list[str],
+        line_langs: list[str],
+        tokenizer: SyntaxTokenizer,
+        sources: dict[str, tuple[list[str] | None, list[str] | None]],
+    ) -> list[str | None]:
+        """Per-line multi-line mask resolved from full-file side sources.
+
+        Each side is scanned once as a contiguous whole file; diff lines then
+        look up their own side — ``-`` reads the old mask, ``+``/context the
+        new mask (context shows the current new-side state). Lines whose file
+        has no sources or whose language does not track multi-line state are
+        ``None``.
+        """
+        sides = cls.diff_line_sides(content)
+        mask: list[str | None] = [None] * len(content)
+        old_masks: dict[str, list[str | None]] = {}
+        new_masks: dict[str, list[str | None]] = {}
+        current_path: str | None = None
+
+        for i, line in enumerate(content):
+            if line.startswith("diff --git"):
+                current_path = path_from_diff_git_line(line)
+                continue
+            if line.startswith("@@") or line.startswith("\\"):
+                continue
+            if cls.is_file_header(line):
+                continue
+
+            lang = line_langs[i] if i < len(line_langs) else "generic"
+            if not needs_full_source(lang):
+                continue
+            source = sources.get(current_path or "")
+            if source is None:
+                continue
+            old_lines, new_lines = source
+            old_no, new_no = sides[i]
+
+            if cls.is_del_line(line):
+                side_lines, side_no, cache = old_lines, old_no, old_masks
+            else:
+                side_lines, side_no, cache = new_lines, new_no, new_masks
+            if (
+                side_lines is None
+                or side_no is None
+                or not 1 <= side_no <= len(side_lines)
+            ):
+                continue
+
+            scanned = cache.get(current_path or "")
+            if scanned is None:
+                scanned = scan_multiline(
+                    side_lines,
+                    lang,
+                    strip_prefix=False,
+                    reset_lines=lambda _line: False,
+                )
+                cache[current_path or ""] = scanned
+            mask[i] = scanned[side_no - 1]
+        return mask
 
     @classmethod
     def _compute_line_numbers(cls, content: list[str]) -> list[str]:

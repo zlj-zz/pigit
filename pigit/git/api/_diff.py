@@ -7,13 +7,33 @@ Date: 2026-08-13
 
 from __future__ import annotations
 
+import re
 import shlex
+from pathlib import Path
 from typing import cast
 
 from pigit.ext.executor import REPLY, DECODE
 
 from ._base import _OpsBase
 from ._util import _SHA_RE
+
+# ``index <old>..<new>`` header: hashes are variable-length abbreviated hex.
+_INDEX_HASH_RE = re.compile(r"^index ([0-9a-f]+)\.\.([0-9a-f]+)")
+
+
+def parse_index_hashes(line: str) -> tuple[str | None, str | None] | None:
+    """Parse ``index <old>..<new>`` blob hashes from a diff header line.
+
+    Hashes are variable-length abbreviated hex (7+ chars). A missing side
+    (all-zero ``0000000``) maps to ``None``. Returns ``None`` when *line*
+    carries no ``index`` header.
+    """
+    m = _INDEX_HASH_RE.match(line)
+    if not m:
+        return None
+    old_sha = None if set(m.group(1)) == {"0"} else m.group(1)
+    new_sha = None if set(m.group(2)) == {"0"} else m.group(2)
+    return old_sha, new_sha
 
 
 class _DiffOps(_OpsBase):
@@ -136,3 +156,90 @@ class _DiffOps(_OpsBase):
             if isinstance(out, str)
             else out.decode("utf-8", errors="replace")
         )
+
+    def load_blob(
+        self,
+        sha: str,
+        repo_path: str | None = None,
+        max_size: int = 1_048_576,
+    ) -> list[str] | None:
+        """Return blob content lines by object hash, or ``None``.
+
+        Mirrors the :meth:`get_file_at_commit` protections (size cap via
+        ``cat-file -s``, then binary skip) but returns ``None`` instead of a
+        sentinel: the diff highlighter simply falls back when a side cannot
+        be loaded.
+
+        Args:
+            sha: Blob hash (abbreviated hashes are accepted by git).
+            repo_path: Repository root; defaults to ``self.path``.
+            max_size: Size cap in bytes.
+
+        Returns:
+            Content split into lines, or ``None`` for missing/oversized/binary.
+        """
+        repo_path = repo_path or self.path
+        size_code, _, size_out = self.executor.exec(
+            f"git cat-file -s {shlex.quote(sha)}",
+            flags=REPLY | DECODE,
+            cwd=repo_path,
+        )
+        if size_code != 0:
+            return None  # object not in this repository's store
+        try:
+            size = int(cast(str, size_out).strip())
+        except ValueError:
+            return None
+        if size > max_size:
+            return None
+
+        code, err, out = self.executor.exec(
+            f"git cat-file blob {shlex.quote(sha)}",
+            flags=REPLY | DECODE,
+            cwd=repo_path,
+        )
+        if code != 0:
+            # Missing objects are the normal case for the worktree side of an
+            # unstaged diff (its blob is never stored); log at debug level.
+            self.log.debug("git cat-file blob failed: %s", err)
+            return None
+        if out is None:
+            return []
+        raw = cast(str, out).encode("utf-8") if isinstance(out, str) else out
+        if b"\x00" in raw[:8192]:
+            return None  # binary
+        text = (
+            cast(str, out)
+            if isinstance(out, str)
+            else out.decode("utf-8", errors="replace")
+        )
+        return text.splitlines()
+
+    def load_worktree_file(
+        self,
+        path: str,
+        repo_path: str | None = None,
+        max_size: int = 1_048_576,
+    ) -> list[str] | None:
+        """Read a worktree file from disk (uncommitted new-side source).
+
+        Args:
+            path: Repo-relative file path.
+            repo_path: Repository root; defaults to ``self.path``.
+            max_size: Size cap in bytes.
+
+        Returns:
+            Content split into lines, or ``None`` when
+            missing/oversized/binary.
+        """
+        repo_path = repo_path or self.path
+        file_path = Path(repo_path) / path
+        try:
+            if file_path.stat().st_size > max_size:
+                return None
+            raw = file_path.read_bytes()
+        except OSError:
+            return None
+        if b"\x00" in raw[:8192]:
+            return None  # binary
+        return raw.decode("utf-8", errors="replace").splitlines()
