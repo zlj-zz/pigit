@@ -91,7 +91,7 @@ class _SubRow(Enum):
 
     COMMIT = auto()  # SHA + refs + subject
     MERGE = auto()  # ``Merge: p1[:7] p2[:7] ...`` (only for merges)
-    AUTHOR = auto()  # ``Author: <name>``
+    AUTHOR = auto()  # ``Author: <name> <email>`` (email omitted when absent)
     DATE = auto()  # ``Date:   <localized abs time>``
     BLANK = auto()  # blank separator before message body
     MESSAGE = auto()  # one body line; payload is line index
@@ -758,6 +758,9 @@ class CommitPanel(OptionList):
                 Segment("Author: ", fg=fg_muted),
                 Segment(commit.author, fg=fg_primary),
             ]
+            # Email is optional metadata (absent on synthetic commits).
+            if commit.author_email:
+                main.append(Segment(f" <{commit.author_email}>", fg=fg_muted))
         elif kind is _SubRow.DATE:
             text = self._abs_time_cache.get(commit.sha) or self._format_abs_time(
                 commit.unix_timestamp

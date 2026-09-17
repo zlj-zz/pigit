@@ -186,6 +186,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
             sha=c.sha,
             msg=c.msg,
             author=c.author,
+            author_email=c.author_email,
             when=relative_time(c.unix_timestamp),
             status=c.status,
             tags=", ".join(c.tag) if c.tag else "none",

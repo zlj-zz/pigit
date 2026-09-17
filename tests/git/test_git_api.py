@@ -702,3 +702,28 @@ class TestInspectorGitReads:
             path="/repo",
         )
         assert git.stash_meta(ref) == ("Jane | Doe", 1700000000, ["abc", "def"])
+
+
+class TestIterCommitsAuthorEmail:
+    def test_parses_author_email_and_log_format_carries_it(self):
+        # Subject keeps its ``|`` characters (maxsplit parse).
+        out = (
+            "abc123|1700000000|Zev|zev@example.com| (HEAD -> main)|p1 p2|"
+            "fix: thing|with pipe\n"
+        )
+        ex = MockExecutor(default=(0, "", out))
+        git = GitApi(executor=ex, path="/repo")
+
+        commits = list(git.iter_commits("main", limit=False))
+
+        assert len(commits) == 1
+        commit = commits[0]
+        assert commit.author == "Zev"
+        assert commit.author_email == "zev@example.com"
+        assert commit.parents == ["p1", "p2"]
+        assert commit.msg == "fix: thing|with pipe"
+
+        log_cmd = next(
+            str(cmd) for cmd, _flags, _kws in ex.exec_calls if str(cmd).startswith("git log")
+        )
+        assert "%ae" in log_cmd and "%aN" in log_cmd
