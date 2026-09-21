@@ -7,17 +7,23 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
+import re
+
+# ``git diff --word-diff`` splits on whitespace: a run of non-whitespace is one
+# word. Whitespace itself is a separator, never a word, so it is not tokenised
+# and can never be marked on its own.
+_WORD_RE = re.compile(r"\S+")
+
 
 def tokenize_with_positions(
     text: str,
 ) -> tuple[list[str], list[tuple[int, int]]]:
-    """Split ``text`` into tokens at whitespace and word-boundary points.
+    """Split ``text`` into whitespace-delimited word tokens.
 
-    A word character is ``[a-zA-Z0-9_]`` (``str.isalnum()`` plus underscore);
-    transitions between word and non-word characters produce a split.  This
-    matches ``diff-highlight`` tokenisation so that e.g.
-    ``foo.bar`` → ``["foo", ".", "bar"]`` and only the truly changed
-    sub-tokens are highlighted.
+    Matches ``git diff --word-diff``'s default word splitting: a run of
+    non-whitespace is a single token, so ``foo.bar`` changes as one unit (as
+    it does in git) and indentation alone never produces a token — and thus
+    never a highlight.
 
     Args:
         text: Source string to tokenize.
@@ -25,36 +31,9 @@ def tokenize_with_positions(
     Returns:
         Tuple of token strings and ``(start, end)`` spans in ``text``.
     """
-
-    def _is_word(character: str) -> bool:
-        return character.isalnum() or character == "_"
-
-    tokens: list[str] = []
-    positions: list[tuple[int, int]] = []
-    index = 0
-    length = len(text)
-    while index < length:
-        if text[index].isspace():
-            start = index
-            while index < length and text[index].isspace():
-                index += 1
-            tokens.append(text[start:index])
-            positions.append((start, index))
-            continue
-
-        start = index
-        if _is_word(text[index]):
-            while index < length and _is_word(text[index]):
-                index += 1
-        else:
-            while (
-                index < length
-                and not text[index].isspace()
-                and not _is_word(text[index])
-            ):
-                index += 1
-        tokens.append(text[start:index])
-        positions.append((start, index))
+    matches = list(_WORD_RE.finditer(text))
+    tokens = [match.group(0) for match in matches]
+    positions = [(match.start(), match.end()) for match in matches]
     return tokens, positions
 
 

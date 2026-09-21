@@ -92,6 +92,13 @@ class DiffContent:
     """
 
     TAB_WIDTH = 8
+    # Word-diffing a change group joins both sides and runs SequenceMatcher
+    # once (quadratic in tokens: measured ~3ms at 80 tokens/side, ~26ms at
+    # 400, ~80ms at 600 — all-rewritten lines being the worst case). Above
+    # this many tokens the group counts as a rewrite and keeps only the
+    # line-level +/- background, so a large diff cannot stall the UI thread
+    # that builds the structure.
+    WORD_DIFF_MAX_TOKENS = 800
     LINE_NO_STR_WIDTH = 4
     DENSITY_SHORT = 10
     DENSITY_MEDIUM = 30
@@ -266,9 +273,87 @@ class DiffContent:
     def word_diff_ranges(
         old: str, new: str
     ) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-        """Return changed (start, end) ranges in ``old`` and ``new``."""
-        old_tokens, old_positions = tokenize_with_positions(old)
-        new_tokens, new_positions = tokenize_with_positions(new)
+        """Return changed ``(start, end)`` ranges for a single line pair."""
+        del_lines, add_lines = DiffContent.word_diff_ranges_for_lines([old], [new])
+        return del_lines[0], add_lines[0]
+
+    @staticmethod
+    def word_diff_ranges_for_lines(
+        old_lines: list[str], new_lines: list[str]
+    ) -> tuple[list[list[tuple[int, int]]], list[list[tuple[int, int]]]]:
+        """Per-line changed ranges for one change group, diffed as one stream.
+
+        A group's old and new text is joined with newlines and diffed once, as
+        ``git diff --word-diff`` does, instead of pairing lines by index: when
+        the two sides have different lengths the words still line up with their
+        counterparts rather than being compared to an unrelated neighbour.
+
+        Args:
+            old_lines: Removed line bodies (diff prefix already stripped).
+            new_lines: Added line bodies (diff prefix already stripped).
+
+        Returns:
+            ``(per_old_line_ranges, per_new_line_ranges)`` — each a list with
+            one range list per input line, in that line's own coordinates.
+            Ranges are freed of leading/trailing whitespace, so indentation is
+            never highlighted (a range that bridges two lines would otherwise
+            start at column 0 of the following line).
+        """
+        if not old_lines or not new_lines:
+            return [[] for _ in old_lines], [[] for _ in new_lines]
+        del_ranges, add_ranges = DiffContent._stream_word_ranges(
+            "\n".join(old_lines), "\n".join(new_lines)
+        )
+        return (
+            DiffContent.trim_range_padding(
+                old_lines, DiffContent.split_ranges_by_line(old_lines, del_ranges)
+            ),
+            DiffContent.trim_range_padding(
+                new_lines, DiffContent.split_ranges_by_line(new_lines, add_ranges)
+            ),
+        )
+
+    @staticmethod
+    def trim_range_padding(
+        lines: list[str],
+        per_line_ranges: list[list[tuple[int, int]]],
+    ) -> list[list[tuple[int, int]]]:
+        """Drop whitespace at both ends of every range, discarding empties.
+
+        Indentation is never part of a change: a range that only pads into a
+        line's leading whitespace would paint a run of blank cells.
+        """
+        trimmed: list[list[tuple[int, int]]] = []
+        for line, ranges in zip(lines, per_line_ranges):
+            kept: list[tuple[int, int]] = []
+            for start, end in ranges:
+                while start < end and line[start].isspace():
+                    start += 1
+                while end > start and line[end - 1].isspace():
+                    end -= 1
+                if end > start:
+                    kept.append((start, end))
+            trimmed.append(kept)
+        return trimmed
+
+    @staticmethod
+    def _stream_word_ranges(
+        old_text: str, new_text: str
+    ) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        """Changed ranges over two (possibly multi-line) texts.
+
+        Tokens are whitespace-delimited words (see
+        :func:`~pigit.termui.primitives.word_diff.tokenize_with_positions`),
+        so no range can consist of whitespace alone: an indentation-only edit
+        is not a word change and paints nothing.
+        """
+        old_tokens, old_positions = tokenize_with_positions(old_text)
+        new_tokens, new_positions = tokenize_with_positions(new_text)
+        if len(old_tokens) + len(new_tokens) > DiffContent.WORD_DIFF_MAX_TOKENS:
+            # Wholesale rewrites cost seconds in SequenceMatcher (quadratic) and
+            # would gain nothing: the line-level +/- background already marks
+            # them. Skipped so a large diff cannot freeze the UI thread.
+            return [], []
 
         matcher = difflib.SequenceMatcher(None, old_tokens, new_tokens, autojunk=False)
         matches = matcher.get_matching_blocks()
@@ -289,9 +374,32 @@ class DiffContent:
             old_tok = m.a + m.size
             new_tok = m.b + m.size
 
-        del_ranges = merge_ranges(del_ranges)
-        add_ranges = merge_ranges(add_ranges)
-        return del_ranges, add_ranges
+        return merge_ranges(del_ranges), merge_ranges(add_ranges)
+
+    @staticmethod
+    def split_ranges_by_line(
+        lines: list[str], ranges: list[tuple[int, int]]
+    ) -> list[list[tuple[int, int]]]:
+        """Map ``"\\n"``-joined-text ranges back to per-line local ranges.
+
+        A range spanning a newline yields one clamped range per line it covers;
+        a range covering only the newline itself contributes nothing.
+        """
+        per_line: list[list[tuple[int, int]]] = [[] for _ in lines]
+        offset = 0
+        for idx, line in enumerate(lines):
+            line_end = offset + len(line)
+            for start, end in ranges:
+                if end <= offset:
+                    continue
+                if start >= line_end:
+                    break  # ranges are sorted; nothing left for this line
+                local_start = max(start, offset) - offset
+                local_end = min(end, line_end) - offset
+                if local_end > local_start:
+                    per_line[idx].append((local_start, local_end))
+            offset = line_end + 1  # + the joining newline
+        return per_line
 
     @staticmethod
     def ranges_to_segments(
@@ -719,23 +827,53 @@ class DiffContent:
         hunks: list[Hunk],
         segments: list[list[WordDiffSegment]],
     ) -> None:
-        """Pair ``-``/``+`` lines inside each hunk and fill word segments."""
-        for hunk in hunks:
-            minus_idxs: list[int] = []
-            plus_idxs: list[int] = []
-            for idx in range(hunk.start + 1, hunk.end):
-                line = content[idx]
-                if line.startswith("-") and not line.startswith("--- "):
-                    minus_idxs.append(idx)
-                elif line.startswith("+") and not line.startswith("+++ "):
-                    plus_idxs.append(idx)
+        """Word-diff each ``-``/``+`` change group and fill word segments.
 
-            paired = min(len(minus_idxs), len(plus_idxs))
-            for i in range(paired):
-                old_idx = minus_idxs[i]
-                new_idx = plus_idxs[i]
-                old_code = content[old_idx][1:]
-                new_code = content[new_idx][1:]
-                del_ranges, add_ranges = cls.word_diff_ranges(old_code, new_code)
-                segments[old_idx] = cls.ranges_to_segments(old_code, del_ranges, "del")
-                segments[new_idx] = cls.ranges_to_segments(new_code, add_ranges, "add")
+        Groups are per change run (a ``-`` run and the ``+`` run that follows),
+        not the whole hunk: pairing across unrelated groups compares a deletion
+        with an insertion from another place in the file.
+        """
+        for hunk in hunks:
+            for minus_idxs, plus_idxs in cls._change_groups(content, hunk):
+                old_lines = [content[idx][1:] for idx in minus_idxs]
+                new_lines = [content[idx][1:] for idx in plus_idxs]
+                del_lines, add_lines = cls.word_diff_ranges_for_lines(
+                    old_lines, new_lines
+                )
+                for idx, ranges in zip(minus_idxs, del_lines):
+                    segments[idx] = cls.ranges_to_segments(
+                        content[idx][1:], ranges, "del"
+                    )
+                for idx, ranges in zip(plus_idxs, add_lines):
+                    segments[idx] = cls.ranges_to_segments(
+                        content[idx][1:], ranges, "add"
+                    )
+
+    @staticmethod
+    def _change_groups(
+        content: list[str], hunk: Hunk
+    ) -> list[tuple[list[int], list[int]]]:
+        """Split a hunk into ``(removed idxs, added idxs)`` change runs.
+
+        ``git`` emits each change run as its removals followed by its
+        additions, with context lines between runs. Only runs with both sides
+        produce segments: word-diff needs a counterpart to compare against, and
+        a pure insertion or deletion is already marked by the line background.
+        """
+        groups: list[tuple[list[int], list[int]]] = []
+        idx = hunk.start + 1
+        while idx < hunk.end:
+            if not DiffContent.is_del_line(content[idx]):
+                idx += 1
+                continue
+            minus_idxs: list[int] = []
+            while idx < hunk.end and DiffContent.is_del_line(content[idx]):
+                minus_idxs.append(idx)
+                idx += 1
+            plus_idxs: list[int] = []
+            while idx < hunk.end and DiffContent.is_add_line(content[idx]):
+                plus_idxs.append(idx)
+                idx += 1
+            if plus_idxs:
+                groups.append((minus_idxs, plus_idxs))
+        return groups
