@@ -3,6 +3,17 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.8.0 (2026-09-17)
+
+### Features
+
+- **Commit author email**: the expanded (`z`) Author row and the Inspector commit snapshot now show the author's email beside the name (`Zev <zev@example.com>`). The email is carried through the commit log listing; authors without one still render name-only.
+
+### Bug Fixes
+
+- **Python multi-line strings**: an assigned or prefixed triple-quoted string (`ROW_SQL = """`, `f"""`, `r"""`) is recognised wherever it starts on the line, not only at the start of a line. Its body highlights as a string, and its own closing quotes no longer flip the rest of the file into docstring colour.
+- **Word-level diff**: removals and additions are paired per change run instead of by index across the whole hunk (two runs in one hunk no longer compare across the context line between them), each run's two sides are diffed as one text stream so unequal counts still line words up with their counterparts, words are tokenised as whitespace-delimited runs like `git diff --word-diff` (a dotted name changes as a unit), and indentation is never marked.
+
 ## 2.7.0 (2026-09-09)
 
 ### Features
