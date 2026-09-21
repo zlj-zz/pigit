@@ -18,9 +18,11 @@ from ._base import _OpsBase
 from ._errors import GitError
 from ._util import _RE_COMMIT_TAG, parse_numstat
 
-# Default pretty format for git log output (shared with the facade).
+# Default pretty format for git log output (shared with the facade and the
+# streaming iterator, so the field list and its parser have one source).
+# Fields: sha | unix time | author name | author email | refs | parents | subject
 _DEFAULT_LOG_FORMAT = (
-    '--oneline --pretty=format:"%H|%at|%aN|%d|%p|%s" --abbrev=20 --date=unix'
+    '--oneline --pretty=format:"%H|%at|%aN|%ae|%d|%P|%s" --abbrev=20 --date=unix'
 )
 
 # Native `git log --decorate --graph` preview: bounded, no `--all`.
@@ -114,24 +116,25 @@ class _CommitOps(_OpsBase):
         limit_part = f"-n {max_commits}" if limit else ""
         filter_part = f"--follow -- {shlex.quote(filter_path)}" if filter_path else ""
         command = (
-            f"git log {branch_part} --oneline "
-            f'--pretty=format:"%H|%at|%aN|%d|%P|%s" '
-            f"{limit_part} --abbrev=20 --date=unix {filter_part}"
+            f"git log {branch_part} {_DEFAULT_LOG_FORMAT} "
+            f"{limit_part} {filter_part}"
         ).strip()
 
         for line in self.executor.exec_stream(command, cwd=path):
             if not line.strip():
                 continue
-            split_ = line.split("|")
-            if len(split_) < 6:
+            # maxsplit keeps any ``|`` characters inside the subject intact.
+            split_ = line.split("|", 6)
+            if len(split_) < 7:
                 continue
 
             sha = split_[0]
             unix_timestamp = int(split_[1])
             author = split_[2]
-            extra_info = (split_[3]).strip()
-            parent_str = split_[4].strip()
-            message = "|".join(split_[5:])
+            author_email = split_[3]
+            extra_info = (split_[4]).strip()
+            parent_str = split_[5].strip()
+            message = split_[6]
 
             parents = parent_str.split() if parent_str else []
 
@@ -148,6 +151,7 @@ class _CommitOps(_OpsBase):
                 sha=sha,
                 msg=message,
                 author=author,
+                author_email=author_email,
                 unix_timestamp=unix_timestamp,
                 status=status,
                 extra_info=extra_info,

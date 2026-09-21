@@ -114,3 +114,54 @@ def test_expanded_long_message_reads_row_by_row():
 
     # The viewport followed so the tail of the message was actually reachable.
     assert panel._r_start == 17 - 6 + 1
+
+
+def _expanded_author_row_text(commit: Commit) -> str:
+    """Text of the expanded AUTHOR sub-row for a single non-merge commit."""
+    vm = Mock(spec=ICommitViewModel)
+    vm.items = Signal([])
+    vm.remotes = ()
+    vm.graph_rows = [
+        GraphRow(
+            lanes_before=[],
+            commit_lane=0,
+            closed_lanes=[],
+            opened_lanes=[],
+            lanes_after=[commit.sha],
+        )
+    ]
+    panel = CommitPanel(vm=vm)
+    panel.commits = [commit]
+    panel._expanded = True
+    lines, starts = panel._build_expanded()
+    panel.set_content(lines)
+    panel.set_item_starts(starts)
+
+    left, mid, right = panel.describe_row(
+        starts[0] + 1,  # COMMIT, AUTHOR (no merge row)
+        is_cursor=False,
+        item_idx=0,
+        sub_row=1,
+    )
+    return "".join(seg.text for seg in [*left, *(mid or ()), *right])
+
+
+def test_expanded_author_row_shows_email():
+    commit = Commit(
+        "deadbeef",
+        "msg",
+        "Zev",
+        0,
+        "pushed",
+        "",
+        [],
+        author_email="zev@example.com",
+    )
+    assert "Author: Zev <zev@example.com>" in _expanded_author_row_text(commit)
+
+
+def test_expanded_author_row_omits_absent_email():
+    commit = Commit("deadbeef", "msg", "Zev", 0, "pushed", "", [])
+    text = _expanded_author_row_text(commit)
+    assert "Author: Zev" in text
+    assert "<" not in text

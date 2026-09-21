@@ -261,13 +261,38 @@ class TestMultilineMask:
         assert mask == [None, "comment", "comment", None]
 
     def test_hunk_header_resets_state(self, tok):
+        """@@ clears state; the trailing quote re-opens (a fragment cannot
+        tell a string's closer from a new opener, and the next hunk boundary
+        bounds the damage either way)."""
         lines = [
             '+    """Docstring part 1',
             "@@ -10,5 +12,7 @@",
             '+    part 2"""',
         ]
         mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
-        assert mask == ["docstring", None, None]
+        assert mask == ["docstring", None, "docstring"]
+
+    def test_python_assigned_multiline_string(self, tok):
+        """An opener anywhere at code position opens, not only at line start."""
+        lines = [
+            '+ROW_SQL = """',
+            "+SELECT 1",
+            '+"""',
+            "+x = 1",
+        ]
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
+        assert mask == ["docstring", "docstring", "docstring", None]
+
+    def test_python_prefixed_multiline_string(self, tok):
+        """``f`` / ``r`` prefixes are code characters before the quote."""
+        lines = ['+sql = f"""', "+{where}", '+"""', "+y = 2"]
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
+        assert mask == ["docstring", "docstring", "docstring", None]
+
+    def test_python_quote_inside_string_does_not_open(self, tok):
+        lines = ["+s = '\"\"\"'", "+t = 1"]
+        mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
+        assert mask == [None, None]
 
     def test_alias_language_uses_base_config(self, tok):
         """ts aliases js, but compute_multiline_mask should still work via base_lang resolution."""

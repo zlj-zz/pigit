@@ -102,43 +102,58 @@ def conflict_kind(code: str) -> str | None:
     return None
 
 
-def _code_line_opens_block(
+def _open_multiline_delimiter(
     content: str,
     *,
     strings: set[str],
     line_comment: str | None,
-) -> bool:
-    """True when *content* (code state) opens an unclosed ``/*`` block.
+    delimiters: tuple[tuple[str, str], ...],
+) -> str | None:
+    """Return the opener that leaves a multi-line run unclosed, or ``None``.
 
-    Character-level scan: string literals and line comments are skipped, so
-    a ``/*`` inside ``"…"`` / ``'…'`` / ``…`` or after ``//`` / ``#`` never
-    opens a block.
+    Character-level scan at code positions only: string literals and line
+    comments are skipped, so an opener inside ``"…"`` / ``'…'`` / ``…`` or
+    after ``//`` / ``#`` never counts. ``delimiters`` pairs an opener with its
+    closer (``/*``/``*/``, ``\"\"\"``/``\"\"\"``, ``'''``/``'''``); an opener whose
+    closer is on the same line closes again and scanning continues, so only a
+    genuinely unterminated run is reported — regardless of where on the line
+    it starts (``ROW_SQL = \"\"\"`` opens just like a bare ``\"\"\"``).
     """
     i = 0
     n = len(content)
     while i < n:
-        ch = content[i]
-        if ch in strings:
-            i += 1
-            while i < n:
-                if content[i] == "\\":
-                    i += 2
-                    continue
-                if content[i] == ch:
-                    i += 1
-                    break
-                i += 1
-            continue
-        if line_comment and content.startswith(line_comment, i):
-            break  # rest of the line is a comment — no opener possible
-        if content.startswith("/*", i):
-            end = content.find("*/", i + 2)
+        # Multi-line delimiters win over single-line quote runs: a triple quote
+        # must open a block instead of being read as an empty ``""`` string.
+        for opener, closer in delimiters:
+            if not content.startswith(opener, i):
+                continue
+            end = content.find(closer, i + len(opener))
             if end == -1:
-                return True
-            i = end + 2
-            continue
-        i += 1
-    return False
+                return opener
+            i = end + len(closer)
+            break
+        else:
+            ch = content[i]
+            if ch in strings:
+                i += 1
+                while i < n:
+                    if content[i] == "\\":
+                        i += 2
+                        continue
+                    if content[i] == ch:
+                        i += 1
+                        break
+                    i += 1
+                continue
+            if line_comment and content.startswith(line_comment, i):
+                break  # rest of the line is a comment — no opener possible
+            i += 1
+    return None
+
+
+# Multi-line delimiters per language family.
+_BLOCK_DELIMITERS: tuple[tuple[str, str], ...] = (("/*", "*/"),)
+_PY_DELIMITERS: tuple[tuple[str, str], ...] = (('"""', '"""'), ("'''", "'''"))
 
 
 # Multi-line scan states.
@@ -161,6 +176,11 @@ def scan_multiline(
     (a ``<<<<<<<`` line neither opens nor closes anything). Whole-line
     granularity: the opener and closer lines are part of the block.
 
+    Openers are found at any code position, not only at the start of a line —
+    an assigned triple-quoted string (a variable followed by the quote) or a
+    prefixed one (``f`` / ``r`` immediately before it) opens exactly like a
+    bare docstring quote; both report the same ``"docstring"`` token type.
+
     Only languages with ``block_comment == ("/*", "*/")`` and Python
     docstrings track state; any other language yields an all-``None`` mask.
 
@@ -181,7 +201,7 @@ def scan_multiline(
     config = _LANGUAGE_CONFIGS.get(base, {})
     strings: set[str] = config.get("strings", set())
     line_comment = config.get("comment")
-    is_block_lang = config.get("block_comment") == ("/*", "*/")
+    # tracks_multiline() guarantees one of the two families past this point.
     is_py = base == "py"
 
     mask: list[str | None] = [None] * len(lines)
@@ -198,17 +218,22 @@ def scan_multiline(
         content = line[1:] if strip_prefix and line and line[0] in "+- " else line
 
         if state == _SCAN_CODE:
-            if is_py:
-                stripped = content.lstrip()
-                if stripped.startswith(('"""', "'''")):
-                    quote = stripped[:3]
-                    if stripped.find(quote, 3) == -1:
-                        state = _SCAN_DOC
-                        mask[i] = "docstring"
+            # An opener counts at any code position (``ROW_SQL = """`` opens
+            # like a bare ``"""``); prefixes such as ``f``/``r`` are plain
+            # code characters, so ``f"""`` is found by the same scan.
+            opener = _open_multiline_delimiter(
+                content,
+                strings=strings,
+                line_comment=line_comment,
+                delimiters=_PY_DELIMITERS if is_py else _BLOCK_DELIMITERS,
+            )
+            if opener is None:
                 continue
-            if is_block_lang and _code_line_opens_block(
-                content, strings=strings, line_comment=line_comment
-            ):
+            if is_py:
+                quote = opener
+                state = _SCAN_DOC
+                mask[i] = "docstring"
+            else:
                 state = _SCAN_BLOCK
                 mask[i] = "comment"
         elif state == _SCAN_BLOCK:
@@ -217,9 +242,13 @@ def scan_multiline(
             mask[i] = "comment"
             if "*/" in content:
                 rest = content[content.find("*/") + 2 :]
-                if not _code_line_opens_block(
-                    rest, strings=strings, line_comment=line_comment
-                ):
+                reopened = _open_multiline_delimiter(
+                    rest,
+                    strings=strings,
+                    line_comment=line_comment,
+                    delimiters=_BLOCK_DELIMITERS,
+                )
+                if reopened is None:
                     state = _SCAN_CODE
         else:  # _SCAN_DOC
             mask[i] = "docstring"

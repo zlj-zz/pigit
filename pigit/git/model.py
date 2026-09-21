@@ -89,6 +89,9 @@ class Commit:
 
     action: str = ""
 
+    # The author email; optional metadata, empty when unavailable.
+    author_email: str = ""
+
     def is_pushed(self) -> bool:
         return self.status == "pushed"
 

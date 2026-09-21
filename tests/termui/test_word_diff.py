@@ -30,23 +30,29 @@ class TestWordDiffRanges:
         assert len(add_r) == 2
 
     def test_range_addition_at_end(self):
+        """The separating space is not part of the added word."""
         del_r, add_r = DiffContent.word_diff_ranges("foo", "foo bar")
-        assert add_r == [(3, 7)]
+        assert add_r == [(4, 7)]
 
     def test_range_deletion_at_end(self):
         del_r, add_r = DiffContent.word_diff_ranges("foo bar", "foo")
-        assert del_r == [(3, 7)]
+        assert del_r == [(4, 7)]
+
+    def test_indentation_only_change_marks_nothing(self):
+        del_r, add_r = DiffContent.word_diff_ranges(
+            "        return 1", "            return 1"
+        )
+        assert (del_r, add_r) == ([], [])
 
 
-class TestWordBoundaryTokenization:
-    """GitHub-style word-boundary splits produce fine-grained tokens."""
+class TestWordTokenization:
+    """Whitespace-delimited words, matching ``git diff --word-diff``."""
 
-    def test_punctuation_splits(self):
-        """``foo.bar()`` → ``["foo", ".", "bar", "(", ")"]``."""
+    def test_dotted_name_is_one_word(self):
+        """``foo.bar()`` is a single word, so it changes as a whole."""
         del_r, add_r = DiffContent.word_diff_ranges("func foo.bar()", "func fooBar()")
-        # ".bar()" → "Bar()": only the changed sub-range highlighted.
-        assert del_r == [(5, 12)]  # "foo.bar"
-        assert add_r == [(5, 11)]  # "fooBar"
+        assert del_r == [(5, 14)]  # "foo.bar()"
+        assert add_r == [(5, 13)]  # "fooBar()"
 
     def test_camelCase_not_split(self):
         """Word characters [a-zA-Z0-9_] stay together."""
@@ -133,21 +139,153 @@ class TestSetContentLocalWordDiff:
         assert "-old hello world" in patch
         assert "+old new world" in patch
 
-    def test_unpaired_lines_no_word_diff(self):
-        """Pure additions / deletions get no word-diff (line bg is enough)."""
+    def test_one_sided_runs_get_no_word_diff(self):
+        """No counterpart means nothing to compare: line bg marks the change."""
+        inserted = DiffViewer(word_diff=True)
+        inserted.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,1 +1,3 @@",
+                " ctx",
+                "+new1",
+                "+new2",
+            ]
+        )
+        for idx in (3, 4):
+            assert [s for s in inserted._word_diff_segments[idx] if s[1]] == []
+
+        deleted = DiffViewer(word_diff=True)
+        deleted.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,3 +1,1 @@",
+                "-gone1",
+                "-gone2",
+                " ctx",
+            ]
+        )
+        for idx in (2, 3):
+            assert [s for s in deleted._word_diff_segments[idx] if s[1]] == []
+
+    def test_only_changed_words_are_marked(self):
+        """Matched words stay unmarked even when most of the line changed."""
         dv = DiffViewer(word_diff=True)
         dv.set_content(
             [
                 "diff --git a/f.py b/f.py",
-                "@@ -1,2 +1,3 @@",
-                " ctx",
-                "-old1",
-                "-old2",
-                "+new1",
+                "@@ -1,1 +1,1 @@",
+                "-resp.BaseModel.BaseCode = 400",
+                "+resp.SkipCode = skipCodeContractNotMatched",
             ]
         )
-        # old1 paired (with new1), old2 unpaired -> no word-diff segments.
-        assert dv._word_diff_segments[4] == []  # unpaired "-old2"
+        removed = [t for t, k, _ in dv._word_diff_segments[2] if k == "del"]
+        added = [t for t, k, _ in dv._word_diff_segments[3] if k == "add"]
+        assert " = " not in "".join(removed)  # shared text stays unmarked
+        assert " = " not in "".join(added)
+        assert "".join(removed).strip() and "".join(added).strip()
+
+    def test_unequal_run_diffs_as_one_stream(self):
+        """Removals and additions in a run diff as one text stream.
+
+        Pairing by index would compare "y = 2" with "x2 = 101"; the stream
+        keeps every word aligned with its counterpart instead.
+        """
+        dv = DiffViewer(word_diff=True)
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,4 +1,4 @@",
+                "-x = 1",
+                "-y = 2",
+                "-z = 3",
+                "+x = 100",
+                "+x2 = 101",
+                "+y = 200",
+            ]
+        )
+
+        def changed(i):
+            return "".join(t for t, k, _ in dv._word_diff_segments[i] if k)
+
+        assert changed(2) == "1"  # -x = 1
+        assert changed(3) == "2"  # -y = 2  (not the whole line)
+        assert changed(4) == "z = 3"  # -z = 3 replaced by the x2 line
+        assert changed(5) == "100"
+        assert changed(6) == "x2 = 101"
+        assert changed(7) == "200"
+
+    def test_groups_do_not_pair_across_context(self):
+        """Two change runs in one hunk keep their own counterparts."""
+        dv = DiffViewer(word_diff=True)
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,5 +1,6 @@",
+                " a = 1",
+                "-b = 2",
+                "+b = 20",
+                "+b2 = 21",
+                " c = 3",
+                "-d = 4",
+                "+d = 40",
+                " e = 5",
+            ]
+        )
+
+        def changed(i):
+            return "".join(t for t, k, _ in dv._word_diff_segments[i] if k)
+
+        assert changed(3) == "2"  # -b = 2 vs +b = 20
+        assert changed(7) == "4"  # -d = 4 vs +d = 40 (not +b2 = 21)
+
+    def test_huge_rewrite_skips_word_diff(self):
+        """Wholesale rewrites stay bounded: only the line background marks them."""
+        count = 300
+        removed = [f"-value_{i} = compute({i})" for i in range(count)]
+        added = [f"+value_{i} = compute({i + 1})" for i in range(count)]
+        dv = DiffViewer(word_diff=True)
+        dv.set_content(
+            [
+                "diff --git a/b.py b/b.py",
+                f"@@ -1,{count} +1,{count} @@",
+                *removed,
+                *added,
+            ]
+        )
+        assert [t for segs in dv._word_diff_segments for t, k, _ in segs if k] == []
+
+    def test_marks_never_include_leading_or_trailing_whitespace(self):
+        """A range bridging two lines must not paint the next line's indent."""
+        dv = DiffViewer(word_diff=True)
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,3 +1,3 @@",
+                "-    resp.BaseModel.BaseCode = 400",
+                "-    resp.BaseModel.BaseMsg = reason",
+                "+    resp.SkipCode = skipCodeContractNotMatched",
+                "+    resp.SkipReason = reason",
+            ]
+        )
+        for idx in (2, 3, 4, 5):
+            for text, kind, _ in dv._word_diff_segments[idx]:
+                if kind:
+                    assert not text[:1].isspace(), (idx, text)
+                    assert not text[-1:].isspace(), (idx, text)
+
+    def test_whitespace_only_change_has_no_marks(self):
+        """Indentation is not a word change (git word-diff semantics)."""
+        dv = DiffViewer(word_diff=True)
+        dv.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "@@ -1,2 +1,2 @@",
+                "-        return 1",
+                "+            return 1",
+            ]
+        )
+        for idx in (2, 3):
+            assert [t for t, k, _ in dv._word_diff_segments[idx] if k] == []
 
     def test_help_entries_no_w_key(self):
         dv = DiffViewer()

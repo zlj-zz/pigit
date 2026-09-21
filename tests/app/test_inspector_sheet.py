@@ -134,6 +134,7 @@ def test_format_commit_includes_metadata():
     assert lines[0] == "Inspector · commit · abc1234"
     assert "Fix layout" in text
     assert "Zev" in text
+    assert "<" not in text  # no email on the snapshot -> no empty <>
     assert "2 days ago" in text
     assert "unpushed" in text
     assert "v1.0" in text
@@ -149,6 +150,32 @@ def test_format_commit_includes_metadata():
     status_row = rows[4]
     assert status_row[1].text == "unpushed"
     assert status_row[1].fg == THEME.fg_unpushed_commit
+
+
+def test_format_commit_shows_author_email_when_present():
+    rows = InspectorSheet.format(
+        CommitSnapshot(
+            identity="abc1234",
+            sha="abc1234deadbeef",
+            msg="Fix layout",
+            author="Zev",
+            when="2 days ago",
+            status="pushed",
+            tags="none",
+            parents=[],
+            files=[],
+            total_add=0,
+            total_del=0,
+            author_email="zev@example.com",
+        )
+    )
+    text = "\n".join(_plain(rows))
+    assert "Zev <zev@example.com>" in text
+    author_row = next(r for r in rows if r[0].text.startswith("author"))
+    assert author_row[1].text == "Zev"
+    assert author_row[1].fg == THEME.fg_primary
+    assert author_row[2].text == " <zev@example.com>"
+    assert author_row[2].fg == THEME.fg_muted
 
 
 def test_format_stash_includes_numstat():

@@ -62,6 +62,9 @@ class CommitSnapshot:
     total_add: int
     total_del: int
 
+    # Author email; optional metadata, empty when unavailable.
+    author_email: str = ""
+
 
 @dataclass
 class StashSnapshot:

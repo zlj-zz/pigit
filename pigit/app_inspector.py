@@ -205,10 +205,13 @@ def _format_commit(data: CommitSnapshot) -> list[list[Segment]]:
         status_fg = THEME.fg_success
     else:
         status_fg = THEME.fg_unpushed_commit
+    author_value = _plain(data.author)
+    if data.author_email:
+        author_value.append(Segment(f" <{data.author_email}>", fg=THEME.fg_muted))
     rows = [
         _title("commit", data.identity),
         _labeled("msg", _plain(data.msg)),
-        _labeled("author", _plain(data.author)),
+        _labeled("author", author_value),
         _labeled("when", _plain(data.when, THEME.fg_muted)),
         _labeled("status", _plain(data.status, status_fg)),
         _labeled("tags", _plain(data.tags, THEME.fg_tag)),
