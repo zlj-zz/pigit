@@ -64,7 +64,7 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++enter++ | Show commits without checkout |
 | ++c++ | Checkout |
 | ++n++ | New branch |
-| ++m++ | Merge into current |
+| ++m++ | Merge current into selected |
 | ++r++ | Interactive rebase onto selected branch |
 | ++shift+r++ | Rename |
 | ++d++ | Delete |

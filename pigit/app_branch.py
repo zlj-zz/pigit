@@ -251,7 +251,7 @@ class BranchPanel(OptionList):
     @bind_action(
         "merge",
         "m",
-        desc="Merge selected branch into current (requires clean worktree; may conflict)",
+        desc="Merge current branch into selected (requires clean worktree; may conflict)",
         tip="Merge",
     )
     def merge(self) -> None:
