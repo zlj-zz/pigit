@@ -11,19 +11,32 @@ from unittest.mock import Mock
 
 import pytest
 
+from pigit.app_log_graph import compute_graph_rows
 from pigit.git.api import GitError
 from pigit.git.model import Branch, Commit
 from pigit.viewmodels.commit import CommitViewModel
+
+_COMMITS = [
+    Commit("abc1234", "first", "Zev", 1700000000, "pushed", "", [], ["parent1"]),
+    Commit("def5678", "second", "Zev", 1700000100, "unpushed", "", [], ["abc1234"]),
+]
+
+
+def _drain(vm) -> list:
+    """Run the commit stream synchronously, applying every batch."""
+    batches: list = []
+    vm._stream_commits(lambda batch: (batches.append(batch), True)[1])
+    for batch in batches:
+        vm._apply_batch(batch)
+    return batches
 
 
 @pytest.fixture
 def commit_vm():
     git = Mock()
     git.get_head.return_value = "main"
-    git.load_commits.return_value = [
-        Commit("abc1234", "first", "Zev", 1700000000, "pushed", "", [], ["parent1"]),
-        Commit("def5678", "second", "Zev", 1700000100, "unpushed", "", [], ["abc1234"]),
-    ]
+    git.load_commits.return_value = _COMMITS
+    git.iter_commits.return_value = iter(_COMMITS)
     git.get_remotes.return_value = ["origin"]
     vm = CommitViewModel(git)
     # Simulate _do_load side effects and items population
@@ -76,13 +89,11 @@ def test_load_diff_invalid_index(commit_vm):
     assert commit_vm.load_diff(99) == []
 
 
-def test_get_bodies_caches_result(commit_vm):
+def test_get_commit_bodies_requests_only_asked_shas(commit_vm):
     commit_vm._git.get_commit_bodies.return_value = {"abc1234": "subject\n\nbody"}
-    bodies1 = commit_vm.get_bodies()
-    bodies2 = commit_vm.get_bodies()
-    assert bodies1 is bodies2
-    assert bodies1 == {"abc1234": "subject\n\nbody"}
-    commit_vm._git.get_commit_bodies.assert_called_once()
+    bodies = commit_vm.get_commit_bodies(["abc1234"])
+    assert bodies == {"abc1234": "subject\n\nbody"}
+    commit_vm._git.get_commit_bodies.assert_called_once_with(["abc1234"])
 
 
 def test_init_log_ref_follows_head(commit_vm):
@@ -96,19 +107,17 @@ def test_init_detached_uses_HEAD():
     assert vm.log_ref == "HEAD"
 
 
-def test_load_commits_uses_log_ref_not_head(commit_vm):
+def test_stream_reads_the_pinned_ref(commit_vm):
     commit_vm._log_ref = "origin/foo"
-    commit_vm._git.load_commits.return_value = []
-    commit_vm._git.get_remotes.return_value = []
-    commit_vm._load_commits()
-    commit_vm._git.load_commits.assert_called_with("origin/foo")
+    commit_vm._git.iter_commits.return_value = iter([])
+    _drain(commit_vm)
+    # No configured limit means no ``-n``: the whole ref is read.
+    commit_vm._git.iter_commits.assert_called_with("origin/foo", limit=False)
 
 
-def test_get_bodies_uses_log_ref(commit_vm):
-    commit_vm._log_ref = "feat"
+def test_get_commit_bodies_empty_request_is_a_call(commit_vm):
     commit_vm._git.get_commit_bodies.return_value = {}
-    commit_vm.get_bodies()
-    commit_vm._git.get_commit_bodies.assert_called_with("feat")
+    assert commit_vm.get_commit_bodies([]) == {}
 
 
 def test_set_log_ref_assigns_and_refresh_without_verify(commit_vm):
@@ -142,32 +151,76 @@ def test_follow_head_without_pin_is_not_reset(commit_vm):
     assert commit_vm.log_ref == "main"
 
 
-def test_load_falls_back_when_pinned_ref_dangles(commit_vm):
+def test_stream_falls_back_when_pinned_ref_dangles(commit_vm):
     commit_vm._git.verify_commitish.side_effect = GitError("bad ref")
-    commit_vm.set_log_ref("feature")
-    from unittest.mock import Mock as _Mock
+    commit_vm._log_ref = "feature"
+    commit_vm._git.iter_commits.side_effect = [
+        iter([]),  # "feature" is dangling: nothing streams
+        iter(_COMMITS),  # fallback to the checkout
+    ]
 
-    commit_vm._git.load_commits = _Mock(return_value=[])
-    result = commit_vm._load_commits()
+    batches = _drain(commit_vm)
+
     # Fell back to the cached checkout; the list is HEAD's, not stale.
-    assert result.requested == "feature"
-    assert result.resolved == "main"
-    assert commit_vm.log_ref == "feature"  # worker never mutates _log_ref
-    commit_vm._apply_load(result)
+    assert [b.requested for b in batches] == ["feature"]
+    assert batches[0].resolved == "main"
     assert commit_vm.log_ref == "main"
 
 
-def test_apply_load_drops_stale_result(commit_vm):
-    """A load for an old ref must not clobber a newer pin."""
+def test_apply_batch_drops_stale_result(commit_vm):
+    """Batches for an old ref must not clobber a newer pin."""
     commit_vm._log_ref = "origin/foo"
-    stale = commit_vm._load_commits()
+    stale = _batches_only(commit_vm)[0]
     assert stale.requested == "origin/foo"
-    commit_vm._log_ref = "origin/bar"  # user re-pins before load lands
-    commit_vm._apply_load(stale)
+    commit_vm._log_ref = "origin/bar"  # user re-pins before the batch lands
+    commit_vm._apply_batch(stale)
     assert commit_vm.log_ref == "origin/bar"
+    assert list(commit_vm.items.value) == list(_COMMITS)  # untouched
 
 
-def test_apply_load_publishes_graph_before_items():
+def _batches_only(vm) -> list:
+    """Collect the stream's batches without applying them."""
+    batches: list = []
+    vm._stream_commits(lambda batch: (batches.append(batch), True)[1])
+    return batches
+
+
+def test_first_batch_replaces_and_later_batches_append(commit_vm):
+    """A refresh must replace the previous stream's rows, then grow."""
+    # A previous stream left three commits on screen.
+    old = [Commit(f"old{i}", f"s{i}", "A", i, "", "", []) for i in range(3)]
+    commit_vm._items.set(old)
+    commit_vm._graph_rows.set(compute_graph_rows(old))
+
+    commits = [Commit(f"{i:04x}", f"s{i}", "A", i, "", "", []) for i in range(3)]
+    commit_vm._git.iter_commits.return_value = iter(commits)
+    commit_vm.STREAM_BATCH = 2  # two batches: replace, then append
+
+    _drain(commit_vm)
+
+    assert [c.sha for c in commit_vm.items.value] == [c.sha for c in commits]
+    assert len(commit_vm.graph_rows) == 3
+
+
+def test_superseded_stream_stops_pulling(commit_vm):
+    """emit() returning False must abandon the generator (closes the pipe)."""
+    pulled: list[str] = []
+
+    def _gen():
+        for i in range(1000):
+            pulled.append(f"{i:04x}")
+            yield Commit(f"{i:04x}", "s", "A", i, "", "", [])
+
+    commit_vm.STREAM_BATCH = 10
+    commit_vm._git.iter_commits.return_value = _gen()
+
+    commit_vm._stream_commits(lambda batch: False)  # superseded immediately
+
+    # Only the first batch was pulled; the rest of the history is untouched.
+    assert len(pulled) == 10
+
+
+def test_batches_publish_graph_before_items():
     """items subscribers must see graph_rows already updated (row-cache rails)."""
     git = Mock()
     git.get_head.return_value = "main"
@@ -176,7 +229,7 @@ def test_apply_load_publishes_graph_before_items():
         Commit("b", "mid", "Zev", 0, "pushed", "", [], ["a"]),
         Commit("a", "root", "Zev", 0, "pushed", "", [], []),
     ]
-    git.load_commits.return_value = commits
+    git.iter_commits.return_value = iter(commits)
     git.get_remotes.return_value = ["origin"]
     vm = CommitViewModel(git)
     seen: list[tuple[int, int]] = []
@@ -187,19 +240,18 @@ def test_apply_load_publishes_graph_before_items():
 
     watcher = _Watcher()
     vm.items.subscribe(watcher.on_items)
-    result = vm._load_commits()
-    vm._apply_load(result)
+    _drain(vm)
 
     assert seen == [(3, 3)]
     assert vm.graph_rows[0].lanes_after == ["b"]
     assert vm.remotes == ("origin",)
 
 
-def test_load_skips_verify_when_commits_present(commit_vm):
+def test_stream_skips_verify_when_commits_present(commit_vm):
     """Auto-refresh must not pay a rev-parse when the ref already resolves."""
     commit_vm._log_ref = "origin/foo"
-    commit_vm._git.load_commits.return_value = [commit_vm._items.value[0]]  # non-empty
-    commit_vm._load_commits()
+    commit_vm._git.iter_commits.return_value = iter([commit_vm._items.value[0]])
+    _drain(commit_vm)
     commit_vm._git.verify_commitish.assert_not_called()
 
 
@@ -233,3 +285,16 @@ def test_list_log_ref_names_head_first(commit_vm):
         Branch("origin/foo", "?", "?", False, is_remote=True),
     ]
     assert commit_vm.list_log_ref_names() == ["HEAD", "main", "origin/foo"]
+
+
+def test_log_limit_caps_the_read(commit_vm):
+    """A configured limit becomes ``git log -n``; no limit means no ``-n``."""
+    commit_vm._log_limit = 5000
+    _drain(commit_vm)
+    commit_vm._git.iter_commits.assert_called_with("main", max_commits=5000)
+
+
+def test_zero_log_limit_reads_everything(commit_vm):
+    commit_vm._log_limit = 0
+    _drain(commit_vm)
+    commit_vm._git.iter_commits.assert_called_with("main", limit=False)

@@ -74,6 +74,43 @@ class AsyncTask(Generic[T]):
 
         _executor.submit(_run)
 
+    def start_stream(
+        self,
+        work: Callable[[Callable[[T], bool]], None],
+        callback: Callable[[T], None],
+    ) -> None:
+        """Start a streaming task whose result arrives in batches.
+
+        ``work`` receives an ``emit`` callable and may call it any number of
+        times from the worker thread; each batch reaches ``callback`` on the
+        main thread, exactly like :meth:`start`. ``emit`` returns ``False``
+        once the task has been superseded (``cancel`` or a newer
+        ``start``/``start_stream``), and the worker is expected to stop
+        producing — which is what actually cancels a long read such as a
+        ``git log`` generator: dropping it closes the pipe.
+
+        Batches already queued when the stream is superseded are still
+        delivered, so the callback must also validate what it applies.
+        """
+        with self._lock:
+            self._gen += 1
+            current_gen = self._gen
+
+        def emit(batch: T) -> bool:
+            with self._lock:
+                if current_gen != self._gen:
+                    return False
+            _GLOBAL_QUEUE.put((callback, batch))
+            return True
+
+        def _run() -> None:
+            try:
+                work(emit)
+            except Exception:
+                _logger.debug("AsyncTask stream failed", exc_info=True)
+
+        _executor.submit(_run)
+
     def cancel(self) -> None:
         """Mark the current task as cancelled.
 

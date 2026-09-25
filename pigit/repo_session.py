@@ -38,11 +38,16 @@ class RepoSession:
         git_api: GitApi,
         path: str | None,
         history: SessionHistory,
+        *,
+        commit_log_limit: int | None = None,
     ) -> RepoSession:
         """Confirm ``path`` (or cwd), bind git, and construct the three VMs.
 
         Args:
             git_api: Unbound (or previously bound) GitApi factory.
+            commit_log_limit: Max commits the Commit panel reads; ``None``/``0``
+                means no limit. Passed in from app config so view models never
+                depend on the config layer.
             path: Path to confirm; ``None`` uses the same discovery as
                 ``GitApi.confirm_repo()`` with no argument.
             history: Shared session undo stack passed to Status/Branch VMs.
@@ -58,7 +63,7 @@ class RepoSession:
             repo_path=repo_path,
             repo_name=repo_name,
             status_vm=StatusViewModel(git, history=history),
-            commit_vm=CommitViewModel(git),
+            commit_vm=CommitViewModel(git, log_limit=commit_log_limit),
             branch_vm=BranchViewModel(git, history=history),
         )
 

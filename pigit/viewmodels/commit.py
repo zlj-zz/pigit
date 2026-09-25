@@ -7,6 +7,7 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -22,14 +23,17 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class _CommitLoad:
-    """Result of a background commit-log load, applied on the UI thread."""
+class _CommitBatch:
+    """One streamed slice of the commit log, applied on the UI thread."""
 
     commits: list[Commit]
     requested: str
     resolved: str
     graph_rows: list[GraphRow]
     remotes: tuple[str, ...]
+    # True for a stream's first batch, which replaces whatever the previous
+    # stream left on screen; later batches extend the list.
+    first: bool
 
 
 class ICommitViewModel(IListViewModel["Commit"]):
@@ -59,21 +63,32 @@ class ICommitViewModel(IListViewModel["Commit"]):
 
     def load_diff(self, idx: int) -> list[str]: ...
 
-    def get_bodies(self) -> dict[str, str] | None: ...
+    def get_commit_bodies(self, shas: Sequence[str]) -> dict[str, str]: ...
 
 
 class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     """Concrete ViewModel for commit log."""
 
-    def __init__(self, git: GitApi) -> None:
+    # Commits per streamed batch: the first one paints, the rest follow.
+    STREAM_BATCH = 500
+
+    def __init__(self, git: GitApi, log_limit: int | None = None) -> None:
+        """Wire the view model.
+
+        Args:
+            git: Git facade bound to the repository.
+            log_limit: Max commits to read from ``git log``; ``None`` or ``0``
+                means no limit. The caller supplies this from app config so the
+                view-model layer stays free of a config dependency.
+        """
         super().__init__()
         self._git = git
+        self._log_limit = log_limit
         head = git.get_head() or "HEAD"
         self._head: str = head
         self._log_ref: str = head
         self._graph_rows: Signal[list[GraphRow]] = Signal([])
         self._remotes: Signal[tuple[str, ...]] = Signal(())
-        self._bodies: dict[str, str] | None = None
 
     @property
     def repo_path(self) -> str:
@@ -97,7 +112,6 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         if not ref:
             return
         self._log_ref = ref
-        self._bodies = None
         self.refresh()
 
     def follow_head(self, ref: str) -> bool:
@@ -124,49 +138,108 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         return names
 
     def refresh(self) -> None:
-        """Start a background load; the result is applied on the UI thread."""
-        self._loader.start(self._load_commits, self._guarded(self._apply_load))
-
-    def _load_commits(self) -> _CommitLoad:
-        requested = self._log_ref
-        ref = requested
-        commits = self._git.load_commits(ref)
-        if not commits and not self.viewing_checkout_log():
-            # An empty pinned log is either an unborn/empty branch or a
-            # dangling ref (deleted/renamed). Verify only then, so the
-            # common auto-refresh path (ref unchanged, commits present)
-            # never pays for an extra rev-parse.
-            try:
-                self._git.verify_commitish(ref)
-            except GitError:
-                ref = self._head
-                commits = self._git.load_commits(ref)
-        remotes = tuple(self._git.get_remotes())
-        from pigit.app_log_graph import compute_graph_rows
-
-        graph_rows = compute_graph_rows(commits) if commits else []
-        return _CommitLoad(
-            commits=commits,
-            requested=requested,
-            resolved=ref,
-            graph_rows=graph_rows,
-            remotes=remotes,
+        """Start a background stream; batches are applied on the UI thread."""
+        self._loader.start_stream(
+            self._stream_commits, self._guarded(self._apply_batch)
         )
 
-    def _apply_load(self, result: _CommitLoad) -> None:
-        """Apply a load result on the UI thread, unless superseded.
+    def _iter(self, ref: str) -> Iterator[Commit]:
+        """Read ``ref`` as a generator, honouring the configured limit."""
+        if self._log_limit and self._log_limit > 0:
+            return self._git.iter_commits(ref, max_commits=self._log_limit)
+        return self._git.iter_commits(ref, limit=False)
 
-        ``_load_commits`` runs on the AsyncTask worker; it never writes shared
-        state. Derived ``graph_rows`` / ``remotes`` must be published before
-        ``items`` so list subscribers rebuild row caches with rails ready.
+    def _stream_commits(self, emit: Callable[[_CommitBatch], bool]) -> None:
+        """Worker: read the log in batches and emit each one.
+
+        The history is read once; a pinned ref that yields nothing is verified
+        and retried against the checkout, so the common auto-refresh path never
+        pays for a rev-parse.
         """
-        if result.requested != self._log_ref:
+        requested = self._log_ref
+        remotes = tuple(self._git.get_remotes())
+        if self._stream_ref(emit, requested, requested, remotes):
             return
-        self._log_ref = result.resolved
-        self._graph_rows.set(result.graph_rows)
-        self._remotes.set(result.remotes)
-        self._bodies = None
-        super()._on_loaded(result.commits)
+        if self.viewing_checkout_log():
+            return
+        try:
+            self._git.verify_commitish(requested)
+        except GitError:
+            self._stream_ref(emit, requested, self._head, remotes)
+
+    def _stream_ref(
+        self,
+        emit: Callable[[_CommitBatch], bool],
+        requested: str,
+        ref: str,
+        remotes: tuple[str, ...],
+    ) -> bool:
+        """Emit ``ref`` in batches; True once any batch was delivered.
+
+        Stops pulling the moment ``emit`` reports the stream is superseded:
+        abandoning the generator closes the git pipe instead of walking the
+        rest of the history in the background.
+        """
+        from pigit.app_log_graph import GraphLayout
+
+        layout = GraphLayout()
+        pending: list[Commit] = []
+        first = True
+        delivered = False
+        for commit in self._iter(ref):
+            pending.append(commit)
+            if len(pending) < self.STREAM_BATCH:
+                continue
+            if not self._emit_batch(
+                emit, pending, layout, requested, ref, remotes, first
+            ):
+                return True
+            delivered, first, pending = True, False, []
+        if pending:
+            self._emit_batch(emit, pending, layout, requested, ref, remotes, first)
+            delivered = True
+        return delivered
+
+    @staticmethod
+    def _emit_batch(
+        emit: Callable[[_CommitBatch], bool],
+        commits: list[Commit],
+        layout,
+        requested: str,
+        ref: str,
+        remotes: tuple[str, ...],
+        first: bool,
+    ) -> bool:
+        """Hand one batch (with its own graph rows) to the emitter."""
+        return emit(
+            _CommitBatch(
+                commits=commits,
+                requested=requested,
+                resolved=ref,
+                graph_rows=layout.extend(commits),
+                remotes=remotes,
+                first=first,
+            )
+        )
+
+    def _apply_batch(self, batch: _CommitBatch) -> None:
+        """Apply one batch on the UI thread, unless superseded.
+
+        The stream's first batch replaces the list (a refresh must not append
+        onto the previous stream's rows); later batches extend it. Derived
+        ``graph_rows`` / ``remotes`` are published before ``items`` so list
+        subscribers rebuild row caches with rails ready.
+        """
+        if batch.requested != self._log_ref:
+            return
+        self._log_ref = batch.resolved
+        if batch.first:
+            self._graph_rows.set(batch.graph_rows)
+            self._remotes.set(batch.remotes)
+            super()._on_loaded(batch.commits)
+            return
+        self._graph_rows.set(self._graph_rows.value + batch.graph_rows)
+        self._items.set(self._items.value + batch.commits)
 
     def get_inspector_snapshot(self, idx: int):
         c = self.item_at(idx)
@@ -203,10 +276,6 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
         text = self._git.load_commit_info(c.sha, plain=True)
         return text.splitlines()
 
-    def get_bodies(self) -> dict[str, str] | None:
-        if self._bodies is not None:
-            return self._bodies
-        if not self._items.value:
-            return None
-        self._bodies = self._git.get_commit_bodies(self._log_ref)
-        return self._bodies
+    def get_commit_bodies(self, shas: Sequence[str]) -> dict[str, str]:
+        """Return ``{sha: full body}`` for exactly the requested commits."""
+        return self._git.get_commit_bodies(list(shas))

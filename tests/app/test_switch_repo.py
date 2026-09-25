@@ -130,7 +130,7 @@ def test_switch_repo_async_applies_on_poll():
     app = _app_with_panels()
     new = _make_session("/repo/b")
 
-    def fake_build(git_api, path, history):
+    def fake_build(git_api, path, history, **kwargs):
         assert path == "/repo/b"
         return new
 

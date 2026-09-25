@@ -226,6 +226,42 @@ class OptionList(Component):
         self._scroll_into_view()
         self._request_render()
 
+    def append_rows(
+        self, lines: Sequence[str], starts_suffix: Sequence[int] = ()
+    ) -> None:
+        """Append rows to a list that only grows.
+
+        The append counterpart of :meth:`set_content` + :meth:`set_item_starts`
+        (used by streamed lists): content and layout are extended, while the
+        cursor — including its sub-row — and the scroll offset stay where the
+        reader left them. Filtering is the caller's concern: appended rows are
+        assumed to be visible.
+        """
+        if not lines:
+            return
+        if not self._source_content:
+            # Nothing has been laid out yet: the base class's placeholder row
+            # is not content, so the first append replaces it.
+            self.content = list(lines)
+            self._source_content = list(lines)
+            self._visible_to_source = list(range(len(lines)))
+            if starts_suffix:
+                self._item_starts = list(starts_suffix)
+            self._request_render()
+            return
+        first_new = len(self.content)
+        self.content = [*self.content, *lines]
+        self._source_content = [*self._source_content, *lines]
+        self._visible_to_source = [
+            *self._visible_to_source,
+            *range(first_new, len(self.content)),
+        ]
+        if self._item_starts is not None and starts_suffix:
+            self._item_starts = [*self._item_starts, *starts_suffix]
+        if first_new == 0:
+            self.curr_no = 0
+        self._request_render()
+
     def set_source_items(
         self,
         items: Sequence[Any],

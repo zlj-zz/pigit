@@ -176,8 +176,8 @@ class GitApi:
             branch_name, limit, filter_path, path, max_commits
         )
 
-    def get_commit_bodies(self, branch_name, max_commits=300, path=None):
-        return self._commit.get_commit_bodies(branch_name, max_commits, path)
+    def get_commit_bodies(self, shas, path=None):
+        return self._commit.get_commit_bodies(shas, path)
 
     def list_commits_in_range(self, base, path=None):
         return self._commit.list_commits_in_range(base, path)

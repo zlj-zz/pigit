@@ -138,7 +138,12 @@ class PigitApplication(Application):
         self._managed_repos = managed_repos
         # Undo stack must exist before RepoSession.build (Status/Branch VMs).
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
-        self._session = RepoSession.build(self._git_api, None, self._session_history)
+        self._session = RepoSession.build(
+            self._git_api,
+            None,
+            self._session_history,
+            commit_log_limit=config.commit_log_limit,
+        )
         # Aliases keep existing lambdas (get_git=lambda: self._git, …) working.
         self._git = self._session.git
         self._repo_path = self._session.repo_path
@@ -618,7 +623,12 @@ class PigitApplication(Application):
 
         def work() -> _SwitchResult:
             try:
-                session = RepoSession.build(self._git_api, path, self._session_history)
+                session = RepoSession.build(
+                    self._git_api,
+                    path,
+                    self._session_history,
+                    commit_log_limit=self._config.commit_log_limit,
+                )
                 if not session.repo_path:
                     session.dispose()
                     return _SwitchResult(False, error="Not a git repository")

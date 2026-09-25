@@ -8,6 +8,7 @@ Date: 2026-04-23
 from __future__ import annotations
 
 import datetime
+from collections import OrderedDict
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from collections.abc import Callable
 from pigit.ext.utils import copy_to_clipboard, relative_time
 from pigit.termui import (
     EVT_GOTO,
+    MouseEvent,
     EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
@@ -179,14 +181,20 @@ class CommitPanel(OptionList):
         self._max_meta_w = 0
         self._refs_cache: dict[str, tuple[str, list[str], list[str]]] = {}
         self._expanded = False
-        self._bodies: dict[str, str] | None = None
-        self._body_lines_cache: dict[str, list[str]] = {}
+        # Parsed body lines per sha, bounded: bodies are read on demand for the
+        # cursor's neighbourhood, never prefetched for the whole history.
+        self._body_lines_cache: OrderedDict[str, list[str]] = OrderedDict()
         self._vm_unsubs: list[Callable[[], None]] = []
         # Active (non-stolen) left/main Segments; cursor + steal rebuild live.
         self._row_cache: list[tuple[tuple[Segment, ...], tuple[Segment, ...]]] = []
 
     keymap_namespace = "commit"
     tab_key = "4"
+    # Commit bodies are read for the cursor's neighbourhood (one ``git show``
+    # for the batch) instead of prefetching a whole history; entries are
+    # immutable per sha, so the cache only needs a size bound.
+    BODY_WINDOW = 40
+    BODY_CACHE_MAX = 256
 
     @property
     def tab_name(self) -> str:
@@ -200,10 +208,21 @@ class CommitPanel(OptionList):
     @bind_action("next", "j", "down", desc="Navigate commit list", tip="Navigate")
     def next(self, step: int = 1) -> None:
         super().next(step)
+        self._load_bodies_after_move()
 
     @bind_action("previous", "k", "up", desc="Navigate commit list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         super().previous(step)
+        self._load_bodies_after_move()
+
+    def _load_bodies_after_move(self) -> None:
+        """Top up bodies around the cursor in expanded mode (then re-lay out)."""
+        if not self._expanded or not self._ensure_bodies_near(self.curr_no):
+            return
+        saved_idx = self.curr_no
+        self._rebuild_rows()
+        if self.commits:
+            self.curr_no = max(0, min(saved_idx, len(self.commits) - 1))
 
     @bind_action("view_diff", "enter", desc="View commit diff", tip="View")
     def view_diff(self) -> None:
@@ -271,7 +290,7 @@ class CommitPanel(OptionList):
         """Toggle compact (single-line) and expanded (git-log style) commit rows."""
         self._expanded = not self._expanded
         if self._expanded:
-            self._ensure_bodies()
+            self._ensure_bodies_near(self.curr_no)
         saved_idx = self.curr_no
         self._rebuild_rows()
         if self.commits:
@@ -347,7 +366,18 @@ class CommitPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Signals only fire on change: a stream that finished while this panel
+        # was unmounted must be replayed, or the list stays stale.
+        if self._vm.items.value:
+            self._on_items_changed()
         self._vm.refresh()
+
+    def handle_mouse(self, event: MouseEvent) -> bool:
+        """A click or wheel move tops up bodies around the new cursor."""
+        handled = super().handle_mouse(event)
+        if handled:
+            self._load_bodies_after_move()
+        return handled
 
     def unmount(self) -> None:
         super().unmount()
@@ -380,15 +410,52 @@ class CommitPanel(OptionList):
     def _on_items_changed(self) -> None:
         if not self.is_mounted():
             return
-        commits = self._vm.items.value
-        self._all_commits = list(commits)
-        # Clear decoration / body caches BEFORE rebuild so row templates
-        # re-parse ``extra_info`` (e.g. HEAD moved off a former tip).
-        self._bodies = None
-        self._body_lines_cache.clear()
+        commits = list(self._vm.items.value)
+        # Clear decoration caches BEFORE rebuild so row templates re-parse
+        # ``extra_info`` (e.g. HEAD moved off a former tip). Body lines are
+        # keyed by sha and immutable, so that cache survives a refresh.
         self._refs_cache.clear()
+        if self._extends_current(commits):
+            self._append_commits(commits)
+            return
+        self._all_commits = commits
         self._apply_filter()
         self._contrib_graph.set_commits(commits)
+
+    def _extends_current(self, commits: list[Commit]) -> bool:
+        """True when *commits* only adds to what is already listed.
+
+        Streamed batches arrive this way; anything else (refresh, re-pin,
+        filter change) goes through the full rebuild.
+        """
+        current = self._all_commits
+        return (
+            not self.search_query
+            and len(commits) > len(current)
+            and all(new is old for new, old in zip(commits, current))
+        )
+
+    def _append_commits(self, commits: list[Commit]) -> None:
+        """Add a streamed batch without re-laying out the rows already shown."""
+        added = commits[len(self._all_commits) :]
+        self._all_commits = commits
+        self.commits = [*self.commits, *added]
+        self._source_map = list(range(len(self.commits)))
+        for commit in added:
+            self._rel_time_cache[commit.sha] = relative_time(commit.unix_timestamp)
+            self._abs_time_cache[commit.sha] = self._format_abs_time(
+                commit.unix_timestamp
+            )
+        if self._expanded:
+            lines, starts = self._build_expanded(added, row_offset=len(self.content))
+            self.append_rows(lines, starts)
+        else:
+            lines, max_meta_w = self._build_compact(added)
+            self._max_meta_w = max(self._max_meta_w, max_meta_w)
+            self.append_rows(lines)
+        self._build_row_cache(from_index=len(commits) - len(added))
+        self._contrib_graph.add_commits(added)
+        self._notify_change()
 
     def _apply_filter(self) -> None:
         """Filter commits by query and rebuild display state."""
@@ -423,7 +490,7 @@ class CommitPanel(OptionList):
                 commit.unix_timestamp
             )
         if self._expanded:
-            self._ensure_bodies()
+            self._ensure_bodies_near(self.curr_no)
         self._rebuild_rows()
         self._build_row_cache()
         self._notify_change()
@@ -436,27 +503,55 @@ class CommitPanel(OptionList):
         if result.should_refresh:
             self._vm.refresh()
 
-    def _ensure_bodies(self) -> None:
-        if self._bodies is not None or not self.commits:
-            return
-        self._bodies = self._vm.get_bodies()
-        self._body_lines_cache.clear()
+    def _ensure_bodies_near(self, index: int) -> bool:
+        """Read bodies for commits around *index*; True when new ones arrived.
 
-    def _body_lines(self, commit: Commit) -> list[str]:
-        """Return body lines for ``commit`` (subject excluded), cached per-sha."""
-        cached = self._body_lines_cache.get(commit.sha)
-        if cached is not None:
-            return cached
-        body = (self._bodies or {}).get(commit.sha, "")
-        # ``%B`` packs ``Subject\n\nBody...`` so we drop everything up to the
-        # first blank line; the subject already lives on the COMMIT row.
+        Called from discrete user actions (expand, navigate, list change) — one
+        ``git show`` per batch, never per frame — so rendering stays off the
+        subprocess path.
+        """
+        if not self.commits:
+            return False
+        low = max(0, index - self.BODY_WINDOW)
+        high = min(len(self.commits), index + self.BODY_WINDOW + 1)
+        wanted = [
+            commit.sha
+            for commit in self.commits[low:high]
+            if commit.sha not in self._body_lines_cache
+        ]
+        if not wanted:
+            return False
+        bodies = self._vm.get_commit_bodies(wanted)
+        if not bodies:
+            # Nothing came back: the batch read failed (one bad object fails
+            # the whole ``git log --no-walk``). Leave those shas uncached so the
+            # next action retries instead of showing empty bodies until eviction.
+            return False
+        for commit in self.commits[low:high]:
+            if commit.sha in self._body_lines_cache:
+                continue
+            self._body_lines_cache[commit.sha] = self._parse_body(
+                bodies.get(commit.sha, "")
+            )
+        while len(self._body_lines_cache) > self.BODY_CACHE_MAX:
+            self._body_lines_cache.popitem(last=False)
+        return True
+
+    @staticmethod
+    def _parse_body(body: str) -> list[str]:
+        """Return body lines after the subject (``%B`` packs both).
+
+        ``%B`` is ``Subject\\n\\nBody...``; the subject already lives on the
+        COMMIT row, so everything up to the first blank line is dropped.
+        """
         parts = body.split("\n\n", 1)
         if len(parts) < 2 or not parts[1].strip():
-            lines: list[str] = []
-        else:
-            lines = parts[1].rstrip("\n").split("\n")
-        self._body_lines_cache[commit.sha] = lines
-        return lines
+            return []
+        return parts[1].rstrip("\n").split("\n")
+
+    def _body_lines(self, commit: Commit) -> list[str]:
+        """Return cached body lines for ``commit`` (never runs git)."""
+        return self._body_lines_cache.get(commit.sha, [])
 
     @staticmethod
     def _format_abs_time(unix_ts: int) -> str:
@@ -477,11 +572,14 @@ class CommitPanel(OptionList):
             self.set_content(lines)
             self._max_meta_w = max_meta_w
 
-    def _build_compact(self) -> tuple[list[str], int]:
-        """One row per commit; return ``(lines, max_meta_width)``."""
+    def _build_compact(
+        self, commits: list[Commit] | None = None
+    ) -> tuple[list[str], int]:
+        """One row per commit (default: the whole list); ``(lines, max_meta_w)``."""
+        source = self.commits if commits is None else commits
         lines: list[str] = []
         max_meta_w = 0
-        for commit in self.commits:
+        for commit in source:
             rel = self._rel_time_cache.get(commit.sha) or relative_time(
                 commit.unix_timestamp
             )
@@ -490,16 +588,21 @@ class CommitPanel(OptionList):
             max_meta_w = max(max_meta_w, wcswidth(meta))
         return lines, max_meta_w
 
-    def _build_expanded(self) -> tuple[list[str], list[int]]:
-        """Multi-row layout per commit; return ``(lines, item_starts)``.
+    def _build_expanded(
+        self, commits: list[Commit] | None = None, *, row_offset: int = 0
+    ) -> tuple[list[str], list[int]]:
+        """Multi-row layout for *commits* (default: the whole list).
 
         ``lines`` are placeholder empty strings — ``describe_row`` produces the
         rich rendering. The framework only needs ``len(lines)`` for row bounds.
+        ``row_offset`` shifts the reported item starts, so a slice appended to
+        the list can be laid out on its own.
         """
+        source = self.commits if commits is None else commits
         lines: list[str] = []
         starts: list[int] = []
-        for commit in self.commits:
-            starts.append(len(lines))
+        for commit in source:
+            starts.append(row_offset + len(lines))
             lines.extend([""] * len(self._schema_for(commit)))
         return lines, starts
 
@@ -685,13 +788,16 @@ class CommitPanel(OptionList):
         )
         return left, main
 
-    def _build_row_cache(self) -> None:
+    def _build_row_cache(self, from_index: int = 0) -> None:
         """Pre-build per-commit (left, main) Segments for full-strength presentation.
 
         Cursor styling, steal, and non-leaf soften are excluded; those rebuild live.
+        ``from_index`` keeps an appended batch from re-baking rows already built.
         """
-        self._row_cache = []
-        for idx, commit in enumerate(self.commits):
+        if from_index == 0:
+            self._row_cache = []
+        for idx in range(from_index, len(self.commits)):
+            commit = self.commits[idx]
             left, main = self._commit_left_main(
                 commit, idx, is_cursor=False, bake_active=True
             )

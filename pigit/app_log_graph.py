@@ -16,66 +16,82 @@ if TYPE_CHECKING:
     from pigit.git.model import Commit
 
 
-def compute_graph_rows(commits: Sequence[Commit]) -> list[GraphRow]:
-    """Compute graph layout for ``commits`` (newest-first, as ``git log`` emits).
+class GraphLayout:
+    """Incremental merge-graph layout for commits in ``git log`` order.
 
-    For each commit:
-
-    1. Find lanes whose expected SHA matches the commit (``incoming``).
-       The smallest is the commit's own lane; the rest close on this row.
-    2. Replace the commit lane with the commit's first parent (or clear it).
-    3. For each additional parent (merge), open a new lane to the right of
-       ``commit_lane``.
-    4. Trim trailing ``None`` slots so column count tracks the active set.
+    The lane state is carried across calls, so history that arrives in batches
+    (the commit panel streams it) extends the same layout instead of
+    recomputing it from the first commit.
     """
-    lanes: list[str | None] = []
-    rows: list[GraphRow] = []
 
-    for commit in commits:
-        sha = commit.sha
-        parents = list(commit.parents)
+    def __init__(self) -> None:
+        self._lanes: list[str | None] = []
 
-        lanes_before = list(lanes)
+    def extend(self, commits: Sequence[Commit]) -> list[GraphRow]:
+        """Append rows for the next *commits* (newest-first, as ``git log`` emits).
 
-        incoming = [i for i, s in enumerate(lanes) if s == sha]
-        if incoming:
-            commit_lane = min(incoming)
-            closed_lanes = sorted(set(incoming) - {commit_lane})
-        else:
-            commit_lane = _alloc_lane(lanes, prefer_after=0)
-            closed_lanes = []
+        For each commit:
 
-        lanes[commit_lane] = parents[0] if parents else None
-        excluded: set[int] = set()
-        for i in closed_lanes:
-            lanes[i] = None
-            excluded.add(i)
+        1. Find lanes whose expected SHA matches the commit (``incoming``).
+           The smallest is the commit's own lane; the rest close on this row.
+        2. Replace the commit lane with the commit's first parent (or clear it).
+        3. For each additional parent (merge), open a new lane to the right of
+           ``commit_lane``.
+        4. Trim trailing ``None`` slots so column count tracks the active set.
+        """
+        lanes = self._lanes
+        rows: list[GraphRow] = []
 
-        opened_lanes: list[int] = []
-        for parent_sha in parents[1:]:
-            slot = _alloc_lane(
-                lanes,
-                prefer_after=commit_lane + 1,
-                exclude=excluded,
+        for commit in commits:
+            sha = commit.sha
+            parents = list(commit.parents)
+
+            lanes_before = list(lanes)
+
+            incoming = [i for i, s in enumerate(lanes) if s == sha]
+            if incoming:
+                commit_lane = min(incoming)
+                closed_lanes = sorted(set(incoming) - {commit_lane})
+            else:
+                commit_lane = _alloc_lane(lanes, prefer_after=0)
+                closed_lanes = []
+
+            lanes[commit_lane] = parents[0] if parents else None
+            excluded: set[int] = set()
+            for i in closed_lanes:
+                lanes[i] = None
+                excluded.add(i)
+
+            opened_lanes: list[int] = []
+            for parent_sha in parents[1:]:
+                slot = _alloc_lane(
+                    lanes,
+                    prefer_after=commit_lane + 1,
+                    exclude=excluded,
+                )
+                lanes[slot] = parent_sha
+                opened_lanes.append(slot)
+                excluded.add(slot)
+
+            while lanes and lanes[-1] is None:
+                lanes.pop()
+
+            rows.append(
+                GraphRow(
+                    lanes_before=lanes_before,
+                    commit_lane=commit_lane,
+                    closed_lanes=closed_lanes,
+                    opened_lanes=opened_lanes,
+                    lanes_after=list(lanes),
+                )
             )
-            lanes[slot] = parent_sha
-            opened_lanes.append(slot)
-            excluded.add(slot)
 
-        while lanes and lanes[-1] is None:
-            lanes.pop()
+        return rows
 
-        rows.append(
-            GraphRow(
-                lanes_before=lanes_before,
-                commit_lane=commit_lane,
-                closed_lanes=closed_lanes,
-                opened_lanes=opened_lanes,
-                lanes_after=list(lanes),
-            )
-        )
 
-    return rows
+def compute_graph_rows(commits: Sequence[Commit]) -> list[GraphRow]:
+    """Graph rows for a whole commit list (see :class:`GraphLayout`)."""
+    return GraphLayout().extend(commits)
 
 
 def _alloc_lane(

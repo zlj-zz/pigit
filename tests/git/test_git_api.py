@@ -724,6 +724,8 @@ class TestIterCommitsAuthorEmail:
         assert commit.msg == "fix: thing|with pipe"
 
         log_cmd = next(
-            str(cmd) for cmd, _flags, _kws in ex.exec_calls if str(cmd).startswith("git log")
+            str(cmd)
+            for cmd, _flags, _kws in ex.exec_calls
+            if str(cmd).startswith("git log")
         )
         assert "%ae" in log_cmd and "%aN" in log_cmd

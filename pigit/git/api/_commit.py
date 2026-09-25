@@ -8,7 +8,7 @@ Date: 2026-08-13
 from __future__ import annotations
 
 import shlex
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import cast
 
 from pigit.ext.executor import REPLY, DECODE
@@ -220,21 +220,29 @@ class _CommitOps(_OpsBase):
 
     def get_commit_bodies(
         self,
-        branch_name: str,
-        max_commits: int = 300,
+        shas: Sequence[str],
         path: str | None = None,
     ) -> dict[str, str]:
-        """Return a ``{sha: full body}`` map for ``branch_name``.
+        """Return a ``{sha: full body}`` map for the requested commits.
 
-        ``%B`` in ``git log`` includes the subject and any extra lines from
-        ``git commit -m`` separated by blank lines, so callers needing the
-        full message must read it instead of ``%s``. Records are framed with
-        ASCII RS (``\\x1e``) and SHA/body split with US (``\\x1f``) so multi-line
-        bodies survive shell parsing without ambiguity.
+        ``%B`` includes the subject and any extra lines from ``git commit -m``
+        separated by blank lines, so callers needing the full message must read
+        it instead of ``%s``. Records are framed with ASCII RS (``\\x1e``) and
+        SHA/body split with US (``\\x1f``) so multi-line bodies survive shell
+        parsing without ambiguity.
+
+        Only the commits asked for are read: the caller fetches the window it
+        is about to render instead of prefetching a whole history. An unknown
+        or dangling sha (``git show`` exits non-zero) simply has no entry.
         """
         path = path or self.path
-        branch_part = shlex.quote(branch_name) if branch_name else ""
-        cmd = (f"git log {branch_part} --format=%H%x1f%B%x1e -n {max_commits}").strip()
+        wanted = [sha for sha in shas if sha]
+        if not wanted:
+            return {}
+        sha_part = " ".join(shlex.quote(sha) for sha in wanted)
+        # ``--no-walk`` formats the listed commits without walking history:
+        # measurably cheaper than ``git show`` per rev for the same output.
+        cmd = f"git log --no-walk=unsorted --format=%H%x1f%B%x1e {sha_part}"
         _, _, resp = self.executor.exec(cmd, flags=REPLY | DECODE, cwd=path)
 
         bodies: dict[str, str] = {}
