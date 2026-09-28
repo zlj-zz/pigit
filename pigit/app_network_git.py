@@ -22,6 +22,7 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.widgets import AlertDialog
+from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE, WorktreeGate
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class NetworkGit:
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
         get_alert_dialog: Callable[[], AlertDialog],
+        get_worktree_gate: Callable[[], WorktreeGate],
         guard_async: (
             Callable[
                 [Callable[[NetworkGitOutcome], None]],
@@ -77,7 +79,11 @@ class NetworkGit:
         self._get_schedule_reload_header = get_schedule_reload_header
         self._get_alert_dialog = get_alert_dialog
         self._guard_async = guard_async
+        self._get_worktree_gate = get_worktree_gate
         self._busy = False
+        #: True only while THIS push/pull holds the session worktree gate.
+        #: ``done`` must never release a gate another operation is holding.
+        self._holds_worktree_gate = False
 
     @property
     def busy(self) -> bool:
@@ -111,9 +117,21 @@ class NetworkGit:
             return
 
         if action == "push":
+            # Push only moves refs on the remote; it does not rewrite the
+            # working tree, so it does not take the worktree gate.
             self._run_push(on_complete=on_complete)
-        else:
-            self._run_pull(on_complete=on_complete)
+            return
+
+        # Pull merges or fast-forwards, rewriting the working tree.
+        gate = self._get_worktree_gate()
+        if not gate.acquire():
+            show_toast(
+                WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR
+            )
+            self._invoke_complete(on_complete)
+            return
+        self._holds_worktree_gate = True
+        self._run_pull(on_complete=on_complete)
 
     def _run_push(self, *, on_complete: Callable[[], None] | None) -> None:
         """Push with upstream, or confirm ``git push -u`` when none is set."""
@@ -228,6 +246,12 @@ class NetworkGit:
 
         def done(outcome: NetworkGitOutcome) -> None:
             self._busy = False
+            # Only drop a gate this task actually took: push never takes it,
+            # and releasing unconditionally would free the gate a concurrent
+            # checkout is holding.
+            if self._holds_worktree_gate:
+                self._holds_worktree_gate = False
+                self._get_worktree_gate().release()
             hide_spinner()
             try:
                 apply = apply_outcome

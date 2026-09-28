@@ -255,19 +255,35 @@ class Surface:
         A glyph writes only when its full cell span survives the clip (no
         half-wide characters). Glyphs that start left of the view are skipped;
         drawing stops once the cursor passes the right edge.
+
+        Zero-width marks (combining accents, for instance) are appended to the
+        cell of the glyph they modify, which is held in ``base_cell`` rather
+        than looked up in the row: reaching back into the row would risk
+        editing a cell that is still the shared blank/spacer singleton — those
+        are laid into every row and rewritten by :meth:`clear` each frame, so
+        an edit there would render the mark on every blank cell for the rest
+        of the process. A mark whose base was clipped, or that opens the
+        string, has nothing to attach to and is dropped. Mutating ``char``
+        leaves the cached ``_hash`` stale, which is harmless: cells are only
+        ever compared, never used as dict keys or set members.
         """
         cur_col = col
+        base_cell: FlatCell | None = None
         for ch in text:
             w = _char_width(ord(ch)) if not ch.isascii() else 1
             if cur_col >= self.width:
                 return
+            if w == 0:
+                if base_cell is not None:
+                    base_cell.char += ch
+                continue
+            base_cell = None
             clipped = self._clip_and_translate(row, cur_col, w, 1)
             if clipped is not None:
                 root_r, root_c, cw, _ = clipped
                 if cw == w:
-                    self._rows[root_r][root_c] = FlatCell(
-                        ch, fg=fg, bg=bg, style_flags=style_flags
-                    )
+                    base_cell = FlatCell(ch, fg=fg, bg=bg, style_flags=style_flags)
+                    self._rows[root_r][root_c] = base_cell
                     if w == 2:
                         self._rows[root_r][root_c + 1] = _SPACER_CELL
             cur_col += w

@@ -189,3 +189,37 @@ class TestDetectColorMode:
         ):
             adapter = ColorAdapter()
             assert adapter.mode == ColorMode.COLOR_256
+
+
+    def test_no_color_env_disables_color(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "TERM": "xterm-256color",
+                "COLORTERM": "truecolor",
+                "NO_COLOR": "1",
+                "PIGIT_COLOR_MODE": "",
+            },
+        ):
+            assert ColorAdapter().mode == ColorMode.NONE
+
+    def test_explicit_mode_beats_no_color(self):
+        """The NO_COLOR convention defers to an explicit request for colour."""
+        with mock.patch.dict(
+            os.environ,
+            {
+                "TERM": "xterm",
+                "COLORTERM": "",
+                "NO_COLOR": "1",
+                "PIGIT_COLOR_MODE": "truecolor",
+            },
+        ):
+            assert ColorAdapter().mode == ColorMode.TRUECOLOR
+
+    def test_empty_no_color_is_ignored(self):
+        """The spec disables colour only when NO_COLOR is non-empty."""
+        with mock.patch.dict(
+            os.environ,
+            {"TERM": "xterm", "COLORTERM": "", "NO_COLOR": "", "PIGIT_COLOR_MODE": ""},
+        ):
+            assert ColorAdapter().mode == ColorMode.COLOR_16

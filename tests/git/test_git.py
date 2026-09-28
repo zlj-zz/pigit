@@ -4,8 +4,6 @@ import shutil
 import pytest
 from unittest.mock import patch
 
-from paths import TEST_PATH
-
 from pigit.ext.executor import WAITING, Executor
 from pigit.git import git_version
 from pigit.git.model import File
@@ -59,19 +57,25 @@ def create_repo(test_repo: str):
         f.write("""print('This is test py file.')""")
 
 
+@pytest.fixture(scope="class", autouse=True)
+def _fixture_repo(tmp_path_factory):
+    """Build this class's repo in a per-process temp dir.
+
+    This used to live at the fixed ``tests/test_repo`` path: two concurrent
+    pytest processes would rmtree and re-init the same directory underneath
+    each other, so one would read HEAD ``D`` while the other sat between
+    ``checkout -b D`` and ``checkout A``.
+    """
+    if not git_version():
+        pytest.skip("git unavailable")
+    test_repo = str(tmp_path_factory.mktemp("test_repo"))
+    create_repo(test_repo)
+    TestRepo.test_repo = test_repo
+    TestRepo.git = GitApi()
+    TestRepo.git.path = test_repo
+
+
 class TestRepo:
-    @classmethod
-    def setup_class(cls):
-        if not git_version():
-            exit(1)
-
-        # create test repo
-        cls.test_repo = test_repo = os.path.join(TEST_PATH, "test_repo")
-        create_repo(test_repo)
-
-        # create git handle
-        cls.git = GitApi()
-        cls.git.path = test_repo
 
     def test(self):
         git = self.git

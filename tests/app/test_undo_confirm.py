@@ -224,7 +224,7 @@ def test_recent_panel_reversal_defers_to_a_running_rewrite():
     panel.mount()
     panel.curr_no = 0
 
-    with patch("pigit.app_recent_actions.show_toast") as toast:
+    with patch("pigit.app_bisect.show_toast") as toast:
         panel.reverse()
         seen["do_reverse"]()
 
@@ -239,7 +239,7 @@ def test_undo_refuses_while_a_rewrite_is_running(app):
     push_rewind(app._session_history, "Checked out feat", "aa", "Branch")
     app._session.worktree_gate.acquire()
 
-    with patch("pigit.app.show_toast") as toast:
+    with patch("pigit.app_bisect.show_toast") as toast:
         app._do_reverse_last()
 
     assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE

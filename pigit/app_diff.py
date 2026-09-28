@@ -34,7 +34,11 @@ from pigit.termui.syntax import SyntaxTokenizer
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.primitives.frame import BoxFrame
 from pigit.termui.widgets import AlertDialog
-from pigit.termui.wcwidth_table import truncate_by_width, wcswidth
+from pigit.termui.wcwidth_table import (
+    slice_left_by_width,
+    truncate_by_width,
+    wcswidth,
+)
 
 from .app_theme import THEME
 from .diff_content import (
@@ -621,14 +625,14 @@ class DiffViewer(Component):
                     self.set_content(content.splitlines())
             self._line_i = self.i_cache.get(self.i_cache_key, 0)
 
-    @bind_action("down", "j", desc="Navigate diff lines down", tip="Navigate")
+    @bind_action("down", "j", "down", desc="Navigate diff lines down", tip="Navigate")
     def _on_j(self) -> None:
         if self._hunk_mode:
             self._next_hunk_nav()
         else:
             self.scroll_down()
 
-    @bind_action("up", "k", desc="Navigate diff lines up", tip="Navigate")
+    @bind_action("up", "k", "up", desc="Navigate diff lines up", tip="Navigate")
     def _on_k(self) -> None:
         if self._hunk_mode:
             self._prev_hunk_nav()
@@ -693,11 +697,11 @@ class DiffViewer(Component):
             return
         self.jump_to_file(cur + 1)
 
-    @bind_action("scroll_left", "h", desc="Scroll diff left", tip="Scroll")
+    @bind_action("scroll_left", "h", "left", desc="Scroll diff left", tip="Scroll")
     def _scroll_left(self) -> None:
         self._col_offset = max(self._col_offset - self.SCROLL_COL_STEP, 0)
 
-    @bind_action("scroll_right", "l", desc="Scroll diff right", tip="Scroll")
+    @bind_action("scroll_right", "l", "right", desc="Scroll diff right", tip="Scroll")
     def _scroll_right(self) -> None:
         self._col_offset = min(
             self._col_offset + self.SCROLL_COL_STEP, self._max_col_offset
@@ -1192,14 +1196,17 @@ class DiffViewer(Component):
                 col += token_width
                 continue
 
-            # Clip token that straddles the left edge.
+            # Clip token that straddles the left edge. ``skip`` is a column
+            # count, so it must be applied by width — slicing by character
+            # index over-clips any token starting with a wide glyph, and the
+            # width bookkeeping below then disagrees with what is drawn.
             if col < clip_left:
                 skip = clip_left - col
-                if skip >= len(token_text):
+                if skip >= token_width:
                     col += token_width
                     continue
-                token_text = token_text[skip:]
-                token_width -= skip
+                token_text = slice_left_by_width(token_text, skip)
+                token_width = wcswidth(token_text)
                 col = clip_left
 
             # Right-edge truncation.
@@ -1291,10 +1298,11 @@ class DiffViewer(Component):
         sha, subject = self._file_history_commits[self._file_history_index]
         short_sha = sha[:8]
         pos = f"({self._file_history_index + 1}/{len(self._file_history_commits)})"
-        # Truncate subject if too long
+        # Cap by display width, not character count: a wide-glyph subject
+        # would otherwise be cut at an arbitrary column boundary.
         max_subj = 40
-        if len(subject) > max_subj:
-            subject = subject[: max_subj - 1] + "…"
+        if wcswidth(subject) > max_subj:
+            subject = truncate_by_width(subject, max_subj - 1) + "…"
         return f' {self._file_history_path}  @  {short_sha}  "{subject}"  {pos} '
 
     def _render_file_history(self, surface) -> None:

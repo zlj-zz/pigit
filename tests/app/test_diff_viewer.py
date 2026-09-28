@@ -548,3 +548,12 @@ def test_line_i_survives_resize_after_pre_resize_assignment() -> None:
     dv.resize((80, 20))
     assert dv.scroll_i == 85
     assert dv._max_viewport_i() == 82
+
+
+def test_navigation_accepts_arrow_keys() -> None:
+    """Every other list panel takes arrows; the diff viewer only had j/k."""
+    keys = {b.action: b.keys for b in DiffViewer()._action_bindings}
+    assert {"j", "down"} <= set(keys["diff.down"])
+    assert {"k", "up"} <= set(keys["diff.up"])
+    assert {"h", "left"} <= set(keys["diff.scroll_left"])
+    assert {"l", "right"} <= set(keys["diff.scroll_right"])

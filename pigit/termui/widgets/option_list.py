@@ -21,7 +21,7 @@ from ..segment import Segment
 from ..surface import Surface
 from ..reactive import Signal
 from ..types import EVT_SELECTION_CHANGED
-from ..wcwidth_table import truncate_by_width, wcswidth
+from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
 
 _logger = logging.getLogger(__name__)
 
@@ -338,7 +338,9 @@ class OptionList(Component):
             text = f"filter: {self._search_query}"
             fg = theme.fg_muted
             flags = 0
-        text = text.ljust(surface.width)[: surface.width]
+        # Fill the row exactly, in display columns: a CJK query would be cut
+        # and padded by the wrong amount under ljust/slice.
+        text = pad_by_width(truncate_by_width(text, surface.width), surface.width)
         surface.draw_text_rgb(row, 0, text, fg=fg, style_flags=flags)
 
     def set_source_content(self, content: list[str]) -> None:

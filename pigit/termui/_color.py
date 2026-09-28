@@ -86,6 +86,12 @@ def _detect_color_mode() -> ColorMode:
         except ValueError:
             _logger.warning("Invalid PIGIT_COLOR_MODE=%r, using auto-detect", force)
 
+    # The NO_COLOR convention (https://no-color.org) says an explicit request
+    # for colour wins, so this sits after PIGIT_COLOR_MODE but before the
+    # TERM/COLORTERM heuristics it is meant to override.
+    if os.environ.get("NO_COLOR"):
+        return ColorMode.NONE
+
     term = os.environ.get("TERM", "")
     colorterm = os.environ.get("COLORTERM", "")
 

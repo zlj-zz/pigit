@@ -112,7 +112,7 @@ class TestExecutor:
                 import time
 
                 print({0}, end='')
-                time.sleep(int({0}) / 10)
+                time.sleep(int({0}) * 0.4)
                 print({0}, end='')
             """)
 
@@ -131,7 +131,12 @@ class TestExecutor:
         # results = self.executor.exec_async(*cmds, flags=REPLY)
         # results = self.executor.exec_async(*cmds, flags=REPLY | SILENT)
         end_t = time.time()
-        assert end_t - start_t < 0.5
+        # Three children sleeping 1.2/0.8/0.4s cost 2.4s serially and 1.2s
+        # concurrently. The budget is derived from that instead of a fixed
+        # 0.5s, which left only 0.2s of headroom over the longest child and
+        # flaked whenever the machine was loaded.
+        serial_total = 0.4 * sum(range(1, 4))
+        assert end_t - start_t < serial_total * 0.8
 
         results2 = self.executor.exec_parallel(*cmds, flags=REPLY | DECODE)
         assert results2 == [(0, "", "{0}{0}".format(i)) for i in range(3, 0, -1)]

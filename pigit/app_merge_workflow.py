@@ -17,6 +17,12 @@ from pigit.git.api import GitApi, GitError, RepoError
 from pigit.termui import FeedbackKind, hide_spinner, show_spinner, show_toast
 from pigit.termui.widgets import AlertDialog
 
+from .app_bisect import (
+    guard_bisect_active,
+    guard_sequencer_active,
+    guard_worktree_busy,
+)
+
 
 class MergeWorkflow:
     """Branch merge request, continue-merge, and finish/push confirmation.
@@ -38,6 +44,7 @@ class MergeWorkflow:
         get_refresh_git_vms: Callable[[], None],
         get_schedule_reload_header: Callable[[], None],
         get_record_rewind: Callable[[], Callable[[str, str], None]],
+        get_worktree_busy: Callable[[], bool],
     ) -> None:
         """
         Args:
@@ -50,6 +57,7 @@ class MergeWorkflow:
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             schedule_reload_header: Callback to reload header branch/ahead/behind.
             get_record_rewind: Late-bound recorder for successful HEAD moves.
+            get_worktree_busy: True while another working-tree rewrite runs.
         """
         self._store = store
         self._network = network
@@ -60,15 +68,18 @@ class MergeWorkflow:
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_schedule_reload_header = get_schedule_reload_header
         self._get_record_rewind = get_record_rewind
+        self._get_worktree_busy = get_worktree_busy
 
     def on_merge_request(self, source: str, target: str) -> None:
         """Callback from BranchPanel: confirm then execute merge workflow."""
-        from .app_bisect import guard_bisect_active, guard_sequencer_active
-
         git = self._get_git()
         if guard_bisect_active(git):
             return
         if guard_sequencer_active(git):
+            return
+        # A merge is three subprocesses and a HEAD move; starting it on top of
+        # a checkout that is still running leaves the worktree half of each.
+        if guard_worktree_busy(self._get_worktree_busy()):
             return
 
         def on_confirm(confirmed: bool) -> None:
@@ -159,6 +170,11 @@ class MergeWorkflow:
 
     def finish_merge_checkout(self, target: str, source: str) -> None:
         """Checkout back to source and clear merge state after merge push step."""
+        # Reached after the push worker finished, so the event loop has been
+        # running again in between: another rewrite may have started since the
+        # entry check in on_merge_request.
+        if guard_worktree_busy(self._get_worktree_busy()):
+            return
         git = self._get_git()
         try:
             git.checkout_branch(source)

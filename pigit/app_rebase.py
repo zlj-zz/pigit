@@ -26,6 +26,7 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import AlertDialog, OptionList
 
+from .app_bisect import guard_worktree_busy
 from .app_theme import THEME
 from .git.api import GitError
 
@@ -66,12 +67,14 @@ class RebasePanel(OptionList):
         base: str,
         on_done: Callable[[], None],
         get_record_rewind: Callable[[], Callable[[str, str], None]],
+        get_worktree_busy: Callable[[], bool],
     ) -> None:
         super().__init__()
         self._git = git
         self._base = base
         self._on_done = on_done
         self._get_record_rewind = get_record_rewind
+        self._get_worktree_busy = get_worktree_busy
         self._items: list[_TodoItem] = []
         self._alert = AlertDialog(on_result=lambda _: None)
 
@@ -288,6 +291,11 @@ class RebasePanel(OptionList):
 
     def _execute(self) -> None:
         """Write the todo and run the rebase; always dismiss on completion."""
+        # Checked at execution, not at mount: opening the sheet rewrites
+        # nothing, and the user may sit on it for a while.
+        if guard_worktree_busy(self._get_worktree_busy()):
+            self._on_done()
+            return
         todo_lines = [
             f"{item.action} {item.sha} {item.subject}" for item in self._items
         ]

@@ -38,7 +38,11 @@ def _panel(
     git.is_merge_in_progress.return_value = False
     git.path = "/repo"
     panel = RebasePanel(
-        git, "main", on_done=MagicMock(), get_record_rewind=lambda: MagicMock()
+        git,
+        "main",
+        on_done=MagicMock(),
+        get_record_rewind=lambda: MagicMock(),
+        get_worktree_busy=lambda: False,
     )
     return panel, git
 

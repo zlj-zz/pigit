@@ -52,7 +52,11 @@ from pigit.termui.widgets import (
     RepoSlot,
     TabSlot,
 )
-from pigit.termui.bindings import ExecutableBinding
+from pigit.termui.bindings import (
+    ExecutableBinding,
+    merge_footer_pairs,
+    resolve_action_keys,
+)
 from pigit.termui.reactive import Signal
 from pigit.termui.mouse import MouseEvent
 from pigit.termui.types import LayerKind
@@ -80,8 +84,8 @@ from .app_status import StatusPanel
 from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
+from .app_bisect import guard_worktree_busy
 from .repo_session import RepoSession
-from .viewmodels.base import WORKTREE_BUSY_MESSAGE
 from .session_history import (
     HistoryRecord,
     SessionHistory,
@@ -96,6 +100,12 @@ from .config_data import AppConfig
 # or sheets.
 HEADER_HEIGHT = 2
 FOOTER_HEIGHT = 2
+
+# Universal actions that earn a permanent footer slot. Deliberately a short
+# list rather than "every universal binding with a tip": the tab jumps,
+# bisect, recent, push, pull and welcome all carry tips and would crowd out
+# the panel hints the footer exists to show.
+FOOTER_ACTIONS = ("universal.inspector", "universal.quit")
 
 
 class _SwitchResult(NamedTuple):
@@ -195,6 +205,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_alert_dialog=lambda: self._alert_dialog,
+            get_worktree_gate=lambda: self._session.worktree_gate,
             guard_async=self._guard_repo_async,
         )
         self._merge_workflow = MergeWorkflow(
@@ -207,6 +218,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_record_rewind=lambda: self._record_rewind,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
@@ -216,6 +228,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_refresh_active_panel=lambda: self._refresh_active_panel(),
             get_record_rewind=lambda: self._record_rewind,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
@@ -227,7 +240,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("I", "Inspector"), ("Q", "Quit")])
+        footer.set_global_help(self._global_footer_entries())
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
@@ -542,6 +555,11 @@ class PigitApplication(Application):
             edge_fg=THEME.fg_accent,
         )
 
+    # Deliberately keyless. The guide opens itself on first run
+    # (``_maybe_show_welcome_on_first_run``); after that it is reached from the
+    # Help panel (``?``), which lists every action including the keyless ones
+    # and runs the selected row. A global shortcut would be one more key to
+    # keep clear for a screen most people read once.
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
     def show_welcome(self) -> None:
         """Open the onboarding Welcome sheet (no-op when another overlay is open)."""
@@ -586,6 +604,22 @@ class PigitApplication(Application):
         self._bind_session_vm_tokens(self._session)
         return self._repo_token
 
+    def _global_footer_entries(self) -> list[tuple[str, str]]:
+        """Resolve the app's permanent footer hints from their bindings.
+
+        Resolving the keys instead of hardcoding the letters means a remapped
+        key shows what the user actually has to press; the previous literal
+        ``[("I", "Inspector"), ("Q", "Quit")]`` also hid that ``q`` works.
+        """
+        wanted = set(FOOTER_ACTIONS)
+        raw = [
+            (key, binding.tip)
+            for binding in self._action_bindings
+            if binding.action in wanted and binding.tip is not None
+            for key in resolve_action_keys(binding)
+        ]
+        return merge_footer_pairs(raw)
+
     def _can_switch(self) -> bool:
         """Block repo switch while network sync or a git sequencer is active."""
         from .app_bisect import guard_bisect_active, guard_sequencer_active
@@ -599,12 +633,7 @@ class PigitApplication(Application):
             return False
         # Abandoning a checkout/stash mid-rewrite to open another repo would
         # leave this one half-applied, so hold the switch until it finishes.
-        if self._session.worktree_gate.busy:
-            show_toast(
-                WORKTREE_BUSY_MESSAGE,
-                duration=2.0,
-                kind=FeedbackKind.ERROR,
-            )
+        if guard_worktree_busy(self._session.worktree_gate.busy):
             return False
         if guard_sequencer_active(self._git):
             return False
@@ -1022,8 +1051,7 @@ class PigitApplication(Application):
         # they take the same gate as the panel actions. Undoing a checkout
         # while another rewrite is mid-flight is how a `reset --hard` guard
         # reads a half-written tree and passes.
-        if self._session.worktree_gate.busy:
-            show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+        if guard_worktree_busy(self._session.worktree_gate.busy):
             return
         recent = self._session_history.peek(1)
         was_checkout = bool(
@@ -1938,10 +1966,6 @@ class PigitApplication(Application):
     def _on_cherry_pick(self, sha: str, is_merge: bool) -> None:
         """Delegate to SequencerControl.on_cherry_pick()."""
         self._sequencer.on_cherry_pick(sha, is_merge)
-
-    def _exec_cherry_pick(self, sha: str) -> None:
-        """Delegate to SequencerControl.exec_cherry_pick()."""
-        self._sequencer.exec_cherry_pick(sha)
 
     def _on_merge_request(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.on_merge_request()."""

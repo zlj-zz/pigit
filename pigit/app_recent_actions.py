@@ -20,7 +20,7 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.widgets import OptionList
-from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE
+from .app_bisect import guard_worktree_busy
 
 from .app_theme import THEME
 
@@ -87,8 +87,7 @@ class RecentActionsPanel(OptionList):
         """Reverse the selected range and refresh; called after confirmation."""
         # Reversals write the working tree; they take the same gate as the
         # panel actions so they cannot overlap a running rewrite.
-        if self._get_worktree_busy():
-            show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+        if guard_worktree_busy(self._get_worktree_busy()):
             return
         result = self._history.reverse_to(target_idx, self._git)
         if result.success:

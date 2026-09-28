@@ -24,6 +24,10 @@ keys. Everything below is remappable — see
 Header clicks: repo name opens the switcher; tab slots open an anchored panel
 picker.
 
+The welcome guide opens itself on first run. To see it again, run
+"Show welcome guide" from Help (`?`), which lists keyless actions too — it has
+no shortcut of its own on purpose.
+
 ## Status
 
 | Key | Action |
@@ -88,8 +92,9 @@ Push stash from **Status** with ++s++ (optional message prompt).
 
 | Key | Action |
 |-----|--------|
-| ++j++ / ++k++ | Line up / down |
+| ++j++ / ++k++ / arrows | Line up / down |
 | ++shift+j++ / ++shift+k++ | Page up / down |
+| ++h++ / ++l++ / left / right | Scroll columns |
 | `[` / `]` | Previous / next hunk |
 | ++h++ | Toggle hunk mode |
 | ++s++ / ++d++ | Stage / discard hunk (hunk mode) |

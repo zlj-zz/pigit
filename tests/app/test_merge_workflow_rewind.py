@@ -27,6 +27,7 @@ def _workflow(*, git: Mock, record: Mock) -> MergeWorkflow:
         get_refresh_git_vms=Mock(),
         get_schedule_reload_header=Mock(),
         get_record_rewind=lambda: record,
+        get_worktree_busy=lambda: False,
     )
 
 
