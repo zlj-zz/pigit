@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 import time
 
+from pigit.termui import run_with_spinner
 from pigit.termui.async_task import AsyncTask
 from pigit.termui.component import Component
 from pigit.termui.event_loop import AppEventLoop
@@ -104,6 +105,86 @@ def test_async_task_multiple_polls_are_safe():
     AsyncTask.poll_all()
     AsyncTask.poll_all()  # second poll should be no-op
     assert received == ["x"]
+
+
+# --- Failure visibility ---
+#
+# A worker that raises used to be logged at DEBUG and dropped, so the panel
+# simply kept whatever it had — indistinguishable from "nothing more to show".
+
+
+def _spy_failures(monkeypatch) -> list[tuple[str, BaseException]]:
+    from pigit.termui import overlay
+
+    seen: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(overlay, "report_async_failure", seen.append)
+    return seen
+
+
+def test_failed_work_is_reported_on_the_main_thread(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+    received: list[str] = []
+
+    def boom():
+        raise RuntimeError("git blew up")
+
+    AsyncTask().start(boom, received.append, label="Commit history")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert received == []
+    assert len(seen) == 1
+    label, exc = seen[0]
+    assert isinstance(exc, RuntimeError)
+    assert (label, str(exc)) == ("Commit history", "git blew up")
+
+
+def test_failure_label_is_the_caller_supplied_one(monkeypatch):
+    """The label must not be derived from ``callback``: every VM wraps its
+    callback in ``ViewModelBase._guarded``, whose closure is named ``deliver``
+    — so every failure would read "deliver failed"."""
+    seen = _spy_failures(monkeypatch)
+
+    def deliver(_data):
+        raise AssertionError("the success callback must not run")
+
+    def boom():
+        raise ValueError("nope")
+
+    AsyncTask().start(boom, deliver, label="Branches")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert [label for label, _ in seen] == ["Branches"]
+
+
+def test_superseded_failure_is_not_reported(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+
+    def slow_boom():
+        time.sleep(0.05)
+        raise RuntimeError("stale")
+
+    task = AsyncTask()
+    task.start(slow_boom, lambda _r: None, label="Branches")
+    task.cancel()
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert seen == []
+
+
+def test_stream_failure_is_reported(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+
+    def work(_emit):
+        raise RuntimeError("stream died")
+
+    AsyncTask().start_stream(work, lambda _b: None, label="Commit history")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert [label for label, _ in seen] == ["Commit history"]
 
 
 # --- Integration with AppEventLoop ---
@@ -242,6 +323,29 @@ def test_run_async_clipboard_callback(mocker):
         time.sleep(0.01)
 
     assert received == [True]
+
+
+def test_run_with_spinner_hides_the_spinner_before_on_done(mocker):
+    """``on_done`` must run with the spinner already gone, so a toast it shows
+    is not the thing the spinner teardown dismisses."""
+    from pigit.termui import overlay
+
+    order: list[str] = []
+    mocker.patch.object(overlay, "show_spinner", lambda *a, **k: order.append("show"))
+    mocker.patch.object(overlay, "hide_spinner", lambda: order.append("hide"))
+
+    run_with_spinner(
+        lambda: "ok", lambda result: order.append(f"done:{result}"), label="Checking out"
+    )
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if any(step.startswith("done:") for step in order):
+            break
+        time.sleep(0.01)
+
+    assert order == ["show", "hide", "done:ok"]
 
 
 def test_run_async_dedup(mocker):

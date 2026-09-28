@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 from pigit.app import PigitApplication, _SwitchResult
 from pigit.config_data import AppConfig
 from pigit.repo_session import RepoSession
+from pigit.viewmodels.base import WorktreeGate
 from pigit.session_history import HistoryRecord, ReverseCommand
 from pigit.termui.async_task import AsyncTask
 from pigit.viewmodels.base import ViewModelBase
@@ -39,6 +40,7 @@ def _make_session(path: str) -> RepoSession:
         status_vm=status,
         commit_vm=commit,
         branch_vm=branch,
+        worktree_gate=WorktreeGate(),
     )
 
 

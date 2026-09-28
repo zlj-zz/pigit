@@ -65,6 +65,24 @@ def test_merge_conflict_does_not_record():
     git.checkout_branch.assert_has_calls([call("main"), call("feat")])
 
 
+def test_failed_checkout_back_says_so():
+    """The caller re-raises the original error, so a failed return to source
+    must be reported — otherwise the user believes they are back on it."""
+    record = Mock()
+    git = Mock()
+    git.pull.side_effect = GitError("Pull failed")
+    git.checkout_branch.side_effect = [None, GitError("worktree locked")]
+    workflow = _workflow(git=git, record=record)
+    with (
+        patch("pigit.app_merge_workflow.show_spinner"),
+        patch("pigit.app_merge_workflow.hide_spinner"),
+        patch("pigit.app_merge_workflow.show_toast") as toast,
+    ):
+        with pytest.raises(GitError, match="Pull failed"):
+            workflow.do_merge_workflow("feat", "main")
+    assert any("Could not return to feat" in str(c) for c in toast.call_args_list)
+
+
 def test_pull_failure_does_not_record():
     record = Mock()
     git = Mock()

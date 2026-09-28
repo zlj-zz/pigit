@@ -33,11 +33,13 @@ class _StashOps(_OpsBase):
             path: Repository path. Uses ``self.path`` if None.
 
         Returns:
-            List of Stash objects ordered newest first.
+            List of Stash objects ordered newest first. ``Stash.sha`` is the
+            full commit id so it can be handed back to :meth:`stash_store`
+            (a short id may not resolve once the entry is gone).
         """
         path = path or self.path
         _, err, resp = self.executor.exec(
-            'git stash list --format="%gd|%h|%s"',
+            'git stash list --format="%gd|%H|%s"',
             flags=REPLY | DECODE,
             cwd=path,
         )

@@ -56,6 +56,7 @@ REQUIRED_ROOT: frozenset[str] = frozenset(
         "get_badge_signal",
         "show_spinner",
         "hide_spinner",
+        "run_with_spinner",
         "exec_external",
         "request_render",
         "by_id",

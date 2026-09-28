@@ -58,6 +58,7 @@ from .overlay import (
     get_badge,
     get_badge_signal,
     hide_spinner,
+    run_with_spinner,
     show_badge,
     show_sheet,
     show_spinner,
@@ -140,6 +141,7 @@ __all__ = [
     "get_badge_signal",
     "show_spinner",
     "hide_spinner",
+    "run_with_spinner",
     "request_render",
     # Session context
     "exec_external",

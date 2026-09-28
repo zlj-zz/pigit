@@ -8,6 +8,8 @@ Date: 2026-08-19
 
 from __future__ import annotations
 
+import threading
+import time
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -19,7 +21,19 @@ from pigit.app_log_ref import LogRefSheet
 from pigit.config_data import AppConfig
 from pigit.git.model import Branch
 from pigit.termui import EventType, FeedbackKind
+from pigit.termui.async_task import AsyncTask
 from pigit.viewmodels.base import ActionResult
+
+
+@pytest.fixture(autouse=True)
+def _inline_spinner(monkeypatch):
+    """Run spinner-wrapped work inline so panel assertions stay synchronous."""
+
+    def _run(work, on_done, *, label):
+        on_done(work())
+        return Mock()
+
+    monkeypatch.setattr("pigit.app_branch.run_with_spinner", _run)
 
 
 def _sheet(names=None, current="HEAD", on_pick=None, on_done=None):
@@ -267,6 +281,71 @@ def test_checkout_success_emits_follow_head():
     with patch("pigit.app_branch.show_badge"):
         panel.checkout()
     assert {"cmd": "follow-head", "ref": "feat"} in seen
+
+
+def test_checkout_captures_the_cursor_before_the_worker_runs(monkeypatch):
+    """The worker must check out the branch the user picked, not wherever the
+    cursor drifted to while it ran."""
+    vm = MagicMock()
+    vm.checkout.return_value = ActionResult(True, "ok", True)
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
+    panel.branches = [_br("feat"), _br("other")]
+    panel.curr_no = 0
+    captured: list = []
+
+    def _capture(work, on_done, *, label):
+        captured.append(work)
+        return Mock()
+
+    monkeypatch.setattr("pigit.app_branch.run_with_spinner", _capture)
+    panel.emit = lambda *args, **kwargs: None
+    with patch("pigit.app_branch.show_badge"):
+        panel.checkout()
+
+    panel.curr_no = 1  # the user moves on while the worker is still running
+    captured[0]()
+    vm.checkout.assert_called_once_with(0)
+
+
+def test_checkout_runs_off_the_ui_thread_and_applies_on_poll(mocker, monkeypatch):
+    """End-to-end through the real ``run_with_spinner``: the VM call happens on
+    a worker thread and the follow-up lands on the main thread via poll_all."""
+    from pigit.termui import run_with_spinner
+
+    # This file's autouse fixture inlines the spinner; put the real one back.
+    monkeypatch.setattr("pigit.app_branch.run_with_spinner", run_with_spinner)
+    worker: dict = {}
+
+    def _checkout(_idx):
+        worker["thread"] = threading.current_thread()
+        return ActionResult(True, "ok", True)
+
+    vm = MagicMock()
+    vm.checkout.side_effect = _checkout
+    panel = BranchPanel(
+        get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
+    )
+    panel.branches = [_br("feat")]
+    panel.curr_no = 0
+    seen: list = []
+    panel.emit = lambda action, **data: seen.append(data)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+
+    panel.checkout()
+    assert seen == []  # nothing applied synchronously
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if seen:
+            break
+        time.sleep(0.01)
+
+    assert worker["thread"] is not threading.main_thread()
+    assert seen == [{"cmd": "follow-head", "ref": "feat"}]
 
 
 def test_checkout_failure_no_follow_head():

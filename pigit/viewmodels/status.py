@@ -13,7 +13,13 @@ import time
 from typing import TYPE_CHECKING
 from collections.abc import Callable
 
-from .base import ActionResult, IListViewModel, ViewModelBase
+from .base import (
+    ActionResult,
+    IListViewModel,
+    ViewModelBase,
+    WorktreeGate,
+    run_gated,
+)
 
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 from pigit.git.model import File
@@ -90,10 +96,19 @@ class IStatusViewModel(IListViewModel["File"]):
 class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
     """Concrete ViewModel for working tree status."""
 
-    def __init__(self, git: GitApi, history: SessionHistory | None = None) -> None:
+    load_label = "Working tree status"
+
+    def __init__(
+        self,
+        git: GitApi,
+        history: SessionHistory | None = None,
+        *,
+        worktree_gate: WorktreeGate,
+    ) -> None:
         super().__init__()
         self._git = git
         self._history = history
+        self._worktree_gate = worktree_gate
 
     @property
     def repo_path(self) -> str:
@@ -178,6 +193,9 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def discard(self, idx: int) -> ActionResult:
+        return run_gated(self._worktree_gate, lambda: self._discard(idx))
+
+    def _discard(self, idx: int) -> ActionResult:
         f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
@@ -234,6 +252,12 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def checkout_ours(self, idx: int) -> ActionResult:
+        return run_gated(self._worktree_gate, lambda: self._checkout_ours(idx))
+
+    def checkout_theirs(self, idx: int) -> ActionResult:
+        return run_gated(self._worktree_gate, lambda: self._checkout_theirs(idx))
+
+    def _checkout_ours(self, idx: int) -> ActionResult:
         def _op(f: File) -> None:
             self._git.checkout_ours(f)
             self._git.add_file(f)
@@ -245,7 +269,7 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
             guard=lambda f: f.has_merged_conflicts,
         )
 
-    def checkout_theirs(self, idx: int) -> ActionResult:
+    def _checkout_theirs(self, idx: int) -> ActionResult:
         def _op(f: File) -> None:
             self._git.checkout_theirs(f)
             self._git.add_file(f)
@@ -384,6 +408,12 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         )
 
     def discard_indices(self, indices: set[int]) -> ActionResult:
+        # The whole body is gated, not just the discard loop: the per-file
+        # backup reads below are part of the same rewrite, and the worktree is
+        # inconsistent until both finish.
+        return run_gated(self._worktree_gate, lambda: self._discard_indices(indices))
+
+    def _discard_indices(self, indices: set[int]) -> ActionResult:
         items = self._items.value
         commands: list[ReverseCommand] = []
         count = 0
@@ -459,6 +489,9 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
             return ActionResult(success=False, message=str(e))
 
     def stash_push(self, message: str = "") -> ActionResult:
+        return run_gated(self._worktree_gate, lambda: self._stash_push(message))
+
+    def _stash_push(self, message: str) -> ActionResult:
         result = self._stash_op(
             lambda: self._git.stash_push(message=message), "Stashed"
         )
@@ -474,11 +507,24 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
             )
         return result
 
-    def stash_pop(self, ref: str = "stash@{0}") -> ActionResult:
-        result = self._stash_op(lambda: self._git.stash_pop(ref), "Popped stash")
-        if result.success and self._history is not None:
-            # TODO: capture stash SHA for restore
-            cmd = ReverseCommand(op_type="stash_pop", payload={})
+    def stash_pop(self, ref: str = "stash@{0}", sha: str = "") -> ActionResult:
+        """Pop *ref* onto the working tree.
+
+        Args:
+            ref: Stash ref to pop, e.g. ``stash@{0}``.
+            sha: The stash commit id, captured **before** the pop. Popping
+                drops the entry and leaves the commit unreferenced (gc
+                fodder), so this is the only way back. Without it the action
+                is not recorded at all: a record whose reversal cannot run
+                would still be consumed from the undo stack, silently eating
+                the user's one chance to reverse.
+        """
+        result = run_gated(
+            self._worktree_gate,
+            lambda: self._stash_op(lambda: self._git.stash_pop(ref), "Popped stash"),
+        )
+        if result.success and self._history is not None and sha:
+            cmd = ReverseCommand(op_type="stash_pop", payload={"stash_sha": sha})
             self._history.push(
                 HistoryRecord(
                     description=f"Popped {ref}",
@@ -490,7 +536,10 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def stash_apply(self, ref: str) -> ActionResult:
-        return self._stash_op(lambda: self._git.stash_apply(ref), "Applied stash")
+        return run_gated(
+            self._worktree_gate,
+            lambda: self._stash_op(lambda: self._git.stash_apply(ref), "Applied stash"),
+        )
 
     def stash_drop(self, ref: str) -> ActionResult:
         return self._stash_op(lambda: self._git.stash_drop(ref), "Dropped stash")
@@ -535,10 +584,22 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
 
     def amend(self) -> ActionResult:
         """Amend HEAD with currently staged changes (``--amend --no-edit``)."""
+        pre_sha: str | None = None
         try:
+            if self._history is not None:
+                pre_sha = self._git.resolve_head_sha()
             self._git.amend_head()
-            return ActionResult(
-                success=True, message="Amended HEAD", should_refresh=True
-            )
         except Exception as e:
             return ActionResult(success=False, message=str(e))
+        if self._history is not None and pre_sha:
+            self._history.push(
+                HistoryRecord(
+                    description="Amended HEAD",
+                    commands=[
+                        ReverseCommand(op_type="amend", payload={"pre_sha": pre_sha})
+                    ],
+                    timestamp=time.time(),
+                    panel_hint="status",
+                )
+            )
+        return ActionResult(success=True, message="Amended HEAD", should_refresh=True)

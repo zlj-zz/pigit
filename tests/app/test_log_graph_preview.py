@@ -46,7 +46,7 @@ class _FakeTask:
         pass
 
 
-def _run_sync(work, callback):
+def _run_sync(work, callback, **_kwargs):
     """Run a background load inline so tests can assert its effect synchronously."""
     callback(work())
     return _FakeTask()
@@ -222,7 +222,7 @@ def test_stale_async_result_is_dropped(
     """A load superseded by a newer selection is never applied."""
     captured: list[tuple] = []
 
-    def _capture(work, callback):
+    def _capture(work, callback, **_kwargs):
         captured.append((work, callback))
         return _FakeTask()
 

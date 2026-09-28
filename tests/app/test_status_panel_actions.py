@@ -8,6 +8,7 @@ Date: 2026-08-18
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import Mock, patch
 
 from pigit.app_status import StatusPanel
@@ -17,12 +18,24 @@ from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.status import IStatusViewModel
 
 
+@pytest.fixture(autouse=True)
+def _inline_spinner(monkeypatch):
+    """Run spinner-wrapped work inline so panel assertions stay synchronous."""
+
+    def _run(work, on_done, *, label):
+        on_done(work())
+        return Mock()
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", _run)
+
+
 def _file(
     name: str,
     *,
     short_status: str = " M",
     has_staged: bool = False,
     has_unstaged: bool = True,
+    conflicts: bool = False,
 ) -> File:
     return File(
         name=name,
@@ -33,7 +46,7 @@ def _file(
         tracked=True,
         deleted=False,
         added=False,
-        has_merged_conflicts=False,
+        has_merged_conflicts=conflicts,
         has_inline_merged_conflicts=False,
     )
 
@@ -122,6 +135,67 @@ def test_discard_on_dir_confirms_then_discards_children() -> None:
     vm.discard_indices.assert_not_called()
     captured["on_result"](True)
     vm.discard_indices.assert_called_once_with({0, 1})
+
+
+def test_checkout_ours_confirms_before_discarding_theirs() -> None:
+    """Taking one side of a conflict destroys the other with no backup."""
+    files = [_file("a.py", short_status="UU", conflicts=True)]
+    panel, vm = _panel(files, tree=False)
+    captured: dict = {}
+
+    def fake_alert(text, on_result, kind=None):
+        captured["text"] = text
+        captured["on_result"] = on_result
+        return True
+
+    panel._alert_dialog.alert = fake_alert
+    panel.checkout_ours()
+
+    assert captured["text"] == "Discard theirs, keep ours in 'a.py' ?"
+    vm.checkout_ours.assert_not_called()
+    captured["on_result"](True)
+    vm.checkout_ours.assert_called_once_with(0)
+
+
+def test_checkout_ours_cancel_touches_nothing() -> None:
+    files = [_file("a.py", short_status="UU", conflicts=True)]
+    panel, vm = _panel(files, tree=False)
+    captured: dict = {}
+    panel._alert_dialog.alert = lambda text, on_result, kind=None: (
+        captured.update(on_result=on_result) or True
+    )
+
+    panel.checkout_ours()
+    captured["on_result"](False)
+    vm.checkout_ours.assert_not_called()
+
+
+def test_checkout_theirs_on_a_clean_file_does_not_confirm() -> None:
+    """A non-conflicted row must not raise a dialog that leads nowhere."""
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    alerts: list = []
+    panel._alert_dialog.alert = lambda *a, **k: alerts.append(a) or True
+
+    with patch("pigit.app_status.show_toast") as toast:
+        panel.checkout_theirs()
+
+    assert alerts == []
+    vm.checkout_theirs.assert_not_called()
+    assert toast.call_args[0][0] == "No conflicts"
+
+
+def test_confirm_says_so_when_a_modal_blocks_the_dialog() -> None:
+    """``alert`` returns False while another modal is open; the action then
+    silently never runs, which is indistinguishable from a dead key."""
+    files = [_file("a.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel._alert_dialog.alert = lambda *a, **k: False
+
+    with patch("pigit.app_status.show_toast") as toast:
+        panel._confirm("Discard?", lambda _ok: None)
+
+    assert toast.call_args[0][0] == "Close the open dialog first"
 
 
 def test_stage_all_stages_every_listed_file() -> None:

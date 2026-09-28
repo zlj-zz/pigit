@@ -71,6 +71,7 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
 
     # Commits per streamed batch: the first one paints, the rest follow.
     STREAM_BATCH = 500
+    load_label = "Commit history"
 
     def __init__(self, git: GitApi, log_limit: int | None = None) -> None:
         """Wire the view model.
@@ -140,7 +141,9 @@ class CommitViewModel(ViewModelBase["Commit"], ICommitViewModel):
     def refresh(self) -> None:
         """Start a background stream; batches are applied on the UI thread."""
         self._loader.start_stream(
-            self._stream_commits, self._guarded(self._apply_batch)
+            self._stream_commits,
+            self._guarded(self._apply_batch),
+            label=self.load_label,
         )
 
     def _iter(self, ref: str) -> Iterator[Commit]:

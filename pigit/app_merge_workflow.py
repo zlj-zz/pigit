@@ -222,8 +222,17 @@ class MergeWorkflow:
         self.confirm_push_and_finish(target, source)
 
     def _try_checkout_back(self, source: str) -> None:
-        """Best-effort checkout back to source branch on failure."""
+        """Best-effort checkout back to source branch on failure.
+
+        The caller re-raises the original error right after, so staying silent
+        here would leave the user believing they are back on *source* when they
+        are not — the worst possible moment to hide a second failure.
+        """
         try:
             self._get_git().checkout_branch(source)
-        except GitError:
-            pass
+        except GitError as exc:
+            show_toast(
+                f"Could not return to {source}: {exc}",
+                duration=4.0,
+                kind=FeedbackKind.ERROR,
+            )

@@ -70,6 +70,7 @@ def _make_host(
         get_is_large_screen=lambda: False,
         get_root=lambda: None,
         get_loop=lambda: None,
+        get_worktree_busy=lambda: False,
         schedule_reload_header=Mock(),
         refresh_header_dirty=Mock(),
         refresh_list_panel=refresh or app._refresh_list_panel,

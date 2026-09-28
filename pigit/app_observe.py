@@ -81,6 +81,9 @@ class ObserveDeps:
     get_is_large_screen: Callable[[], bool]
     get_root: Callable[[], ComponentRoot | None]
     get_loop: Callable[[], AppEventLoop | None]
+    #: True while a working-tree rewrite runs; refresh flushes are held back
+    #: so ``git status`` never samples a half-written tree.
+    get_worktree_busy: Callable[[], bool]
     schedule_reload_header: Callable[[], None]
     refresh_header_dirty: Callable[[], None]
     refresh_list_panel: Callable[[Component], None]
@@ -160,7 +163,10 @@ class ObserveHost:
         self._observer = observer
         self._coordinator = RefreshCoordinator(
             observer.queue,
-            defer_fn=lambda: should_defer_repo_refresh(self._deps.get_root()),
+            defer_fn=lambda: (
+                should_defer_repo_refresh(self._deps.get_root())
+                or self._deps.get_worktree_busy()
+            ),
             on_batch=self.on_batch,
             ctx_provider=self._context,
         )

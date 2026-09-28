@@ -22,6 +22,7 @@ from pigit.session_history import (
     SessionHistory,
     push_rewind,
 )
+from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE
 
 
 @pytest.fixture
@@ -188,7 +189,11 @@ def test_recent_panel_enter_confirms_range_then_reverses():
         seen["do_reverse"] = do_reverse
 
     panel = RecentActionsPanel(
-        history, git, on_done=MagicMock(), confirm_reverse=confirm
+        history,
+        git,
+        on_done=MagicMock(),
+        confirm_reverse=confirm,
+        get_worktree_busy=lambda: False,
     )
     panel.mount()
     panel.curr_no = 0  # newest record
@@ -196,3 +201,46 @@ def test_recent_panel_enter_confirms_range_then_reverses():
     assert [r.description for r in seen["records"]] == ["Rebase onto main"]
     seen["do_reverse"]()
     git.hard_reset_head.assert_called_once_with("bb")
+
+
+def test_recent_panel_reversal_defers_to_a_running_rewrite():
+    """Reversals write the working tree too, so they take the same gate."""
+    history = SessionHistory()
+    history.attach_repo("/repo")
+    push_rewind(history, "Rebase onto main", "bb", "Branch")
+    git = MagicMock()
+    seen: dict = {}
+
+    def confirm(_records, do_reverse):
+        seen["do_reverse"] = do_reverse
+
+    panel = RecentActionsPanel(
+        history,
+        git,
+        on_done=MagicMock(),
+        confirm_reverse=confirm,
+        get_worktree_busy=lambda: True,
+    )
+    panel.mount()
+    panel.curr_no = 0
+
+    with patch("pigit.app_recent_actions.show_toast") as toast:
+        panel.reverse()
+        seen["do_reverse"]()
+
+    git.hard_reset_head.assert_not_called()
+    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert history.peek() != []  # the record survives a refused reversal
+
+
+def test_undo_refuses_while_a_rewrite_is_running(app):
+    """Undoing into a half-written tree is how a `reset --hard` guard reads a
+    transient state and passes."""
+    push_rewind(app._session_history, "Checked out feat", "aa", "Branch")
+    app._session.worktree_gate.acquire()
+
+    with patch("pigit.app.show_toast") as toast:
+        app._do_reverse_last()
+
+    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert app._session_history.peek() != []  # record not consumed

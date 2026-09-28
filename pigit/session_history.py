@@ -33,8 +33,10 @@ OpType = Literal[
     "unignore",
     "commit",
     "checkout_branch",
+    "create_branch",
     "delete_branch",
     "rename_branch",
+    "amend",
     "stash_push",
     "stash_pop",
     "rewind",
@@ -328,6 +330,34 @@ def _create_branch(payload: dict, git: GitApi) -> ActionResult:
     return ActionResult(success=True, message=f"Restored branch: {name}")
 
 
+def _drop_branch(payload: dict, git: GitApi) -> ActionResult:
+    """Reverse ``create_branch``: delete the branch that was just created.
+
+    Deliberately not ``--force``. If commits landed on it since, ``git branch
+    -d`` refuses and the user keeps them — an undo must never destroy work it
+    did not create.
+    """
+    from pigit.viewmodels.base import ActionResult
+
+    name = payload["name"]
+    git.delete_branch(name)
+    return ActionResult(success=True, message=f"Removed branch: {name}")
+
+
+def _unamend(payload: dict, git: GitApi) -> ActionResult:
+    """Reverse ``amend``: move HEAD back, leaving the index alone.
+
+    ``--soft`` is what makes this exact. After the amend the index matches the
+    amended commit, so resetting only HEAD reproduces the pre-amend state —
+    old commit back, its changes staged again.
+    """
+    from pigit.viewmodels.base import ActionResult
+
+    sha = payload["pre_sha"]
+    git.soft_reset_head(sha)
+    return ActionResult(success=True, message=f"Un-amended to {sha[:7]}")
+
+
 def _rename_branch(payload: dict, git: GitApi) -> ActionResult:
     from pigit.viewmodels.base import ActionResult
 
@@ -421,18 +451,26 @@ _REVERSE_SPECS: dict[OpType, _ReverseSpec] = {
         _checkout_branch,
         lambda p: f"git checkout {p['branch']}",
     ),
+    # create and delete are each other's inverse, so they share nothing but
+    # the payload shape; the record for a create carries two commands and
+    # relies on reverse() running them backwards (checkout back, then delete —
+    # deleting the branch you are standing on would fail).
+    "create_branch": _ReverseSpec(_drop_branch, lambda p: f"git branch -d {p['name']}"),
     "delete_branch": _ReverseSpec(_create_branch, lambda p: f"git branch {p['name']}"),
     "rename_branch": _ReverseSpec(
         _rename_branch,
         lambda p: f"git branch -m {p['new_name']} {p['old_name']}",
     ),
     "stash_push": _ReverseSpec(_stash_pop, lambda _p: "git stash pop stash@{0}"),
-    # Stash restore needs the stashed SHA (not yet captured on push); render
-    # the real short SHA when present so the confirm dialog shows the truth.
+    # Reversing a pop re-stores the stash commit captured before the pop. Two
+    # things the description must not oversell: the entry comes back at
+    # stash@{0} (not its original index), and the working tree keeps the
+    # changes the pop applied. ``.get`` rather than ``[]`` because describe
+    # renders inside the confirm dialog — it must not raise.
     "stash_pop": _ReverseSpec(
         _stash_store,
         lambda p: (
-            f"git stash store {p['stash_sha'][:7]}"
+            f"git stash store {p['stash_sha'][:7]} (as stash@{{0}})"
             if p.get("stash_sha")
             else "git stash store <sha>"
         ),
@@ -440,4 +478,5 @@ _REVERSE_SPECS: dict[OpType, _ReverseSpec] = {
     "rewind": _ReverseSpec(
         rewind_head, lambda p: f"git reset --hard {p['pre_sha'][:7]}"
     ),
+    "amend": _ReverseSpec(_unamend, lambda p: f"git reset --soft {p['pre_sha'][:7]}"),
 }

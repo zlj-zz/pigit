@@ -343,6 +343,7 @@ class CommitPanel(OptionList):
                     kind=FeedbackKind.ERROR,
                 )
             ),
+            label="Copy commit sha",
         )
 
     def get_help_title(self) -> str:

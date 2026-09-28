@@ -30,7 +30,7 @@ def app():
     yield application
 
 
-def _make_host(app, *, visible, refresh=None) -> ObserveHost:
+def _make_host(app, *, visible, refresh=None, worktree_busy=None) -> ObserveHost:
     status_vm = Mock(spec=IStatusViewModel)
     status_vm.items.value = []
     stash_vm = Mock(spec=IStatusViewModel)
@@ -50,6 +50,7 @@ def _make_host(app, *, visible, refresh=None) -> ObserveHost:
         get_is_large_screen=lambda: False,
         get_root=lambda: None,
         get_loop=lambda: None,
+        get_worktree_busy=worktree_busy or (lambda: False),
         schedule_reload_header=Mock(),
         refresh_header_dirty=Mock(),
         refresh_list_panel=refresh or app._refresh_list_panel,
@@ -74,6 +75,20 @@ def test_commit_focused_head_batch_reloads_commit_panel(app):
     host.on_batch(_batch(ChangeKind.HEAD, ChangeKind.REFS))
 
     refresh.assert_called_once_with(commit)
+
+
+def test_observe_defers_while_a_worktree_rewrite_runs(app):
+    """Polling ``git status`` against a half-written tree would publish a
+    half-applied state, so refresh flushes wait for the rewrite to finish."""
+    ctx = ObserveContext(repo_root="/repo", git_dir="/repo/.git", common_dir="/repo/.git")
+
+    busy = _make_host(app, visible=CommitPanel(vm=Mock()), worktree_busy=lambda: True)
+    busy.attach(ctx)
+    assert busy._coordinator._defer_fn() is True
+
+    idle = _make_host(app, visible=CommitPanel(vm=Mock()))
+    idle.attach(ctx)
+    assert idle._coordinator._defer_fn() is False
 
 
 def test_commit_focused_refs_batch_reloads_commit_panel(app):

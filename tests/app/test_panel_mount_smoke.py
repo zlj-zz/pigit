@@ -62,6 +62,7 @@ def test_mount_sets_is_mounted():
         git=MagicMock(),
         on_done=lambda: None,
         confirm_reverse=lambda _records, do_reverse: do_reverse(),
+        get_worktree_busy=lambda: False,
     )
     assert not panel.is_mounted()
     panel.mount()

@@ -12,7 +12,15 @@ from unittest.mock import Mock
 import pytest
 
 from pigit.git.model import File
+from pigit.session_history import SessionHistory
+from pigit.viewmodels.base import WorktreeGate
 from pigit.viewmodels.status import StatusViewModel
+
+
+def _history() -> SessionHistory:
+    history = SessionHistory()
+    history.attach_repo("/tmp/repo")
+    return history
 
 
 @pytest.fixture
@@ -24,7 +32,7 @@ def status_vm():
         File("b.py", "b.py", "M ", True, False, True, True, False, False, False),
         File("c.py", "c.py", "UU", True, True, True, True, False, True, True),
     ]
-    vm = StatusViewModel(git)
+    vm = StatusViewModel(git, worktree_gate=WorktreeGate())
     vm._items.set(vm._git.load_status.return_value)
     return vm
 
@@ -36,7 +44,7 @@ def test_repo_path(status_vm):
 def test_repo_path_falls_back_to_empty():
     git = Mock()
     git.path = None
-    vm = StatusViewModel(git)
+    vm = StatusViewModel(git, worktree_gate=WorktreeGate())
     assert vm.repo_path == ""
 
 
@@ -251,6 +259,20 @@ def test_amend_calls_git_amend_head(status_vm):
     status_vm._git.amend_head.assert_called_once_with()
 
 
+def test_amend_records_the_pre_amend_sha(status_vm):
+    """``--soft`` back to the pre-amend HEAD reproduces the staged state."""
+    status_vm._git.resolve_head_sha.return_value = "pre0123456789abcdef"
+    vm = StatusViewModel(
+        status_vm._git, history=_history(), worktree_gate=WorktreeGate()
+    )
+
+    assert vm.amend().success is True
+
+    records = vm._history.peek()
+    assert len(records) == 1
+    assert records[0].commands[0].payload == {"pre_sha": "pre0123456789abcdef"}
+
+
 def test_amend_failure(status_vm):
     status_vm._git.amend_head.side_effect = RuntimeError("amend failed")
     result = status_vm.amend()
@@ -263,6 +285,29 @@ def test_stash_push_passes_message(status_vm):
     assert result.success is True
     assert result.message == "Stashed"
     status_vm._git.stash_push.assert_called_once_with(message="wip")
+
+
+def test_stash_pop_records_the_captured_sha(status_vm):
+    """The pop drops the entry, so the recorded reversal carries the sha."""
+    vm = StatusViewModel(
+        status_vm._git, history=_history(), worktree_gate=WorktreeGate()
+    )
+    result = vm.stash_pop("stash@{0}", "0123456789abcdef")
+    assert result.success is True
+    records = vm._history.peek()
+    assert len(records) == 1
+    assert records[0].commands[0].payload == {"stash_sha": "0123456789abcdef"}
+
+
+def test_stash_pop_without_sha_records_nothing(status_vm):
+    """A record whose reversal cannot run would still be consumed from the
+    stack, silently eating the undo slot — so record nothing instead."""
+    vm = StatusViewModel(
+        status_vm._git, history=_history(), worktree_gate=WorktreeGate()
+    )
+    result = vm.stash_pop("stash@{0}")
+    assert result.success is True
+    assert vm._history.peek() == []
 
 
 def test_stash_apply_keeps_entry(status_vm):

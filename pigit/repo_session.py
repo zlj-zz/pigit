@@ -11,6 +11,7 @@ import os
 from dataclasses import dataclass
 
 from .git.api import GitApi
+from .viewmodels.base import WorktreeGate
 from .viewmodels.branch import BranchViewModel
 from .viewmodels.commit import CommitViewModel
 from .viewmodels.status import StatusViewModel
@@ -32,6 +33,9 @@ class RepoSession:
     status_vm: StatusViewModel
     commit_vm: CommitViewModel
     branch_vm: BranchViewModel
+    #: Shared by the Status and Branch view models so two panels cannot rewrite
+    #: the working tree at once; read by the observe coordinator's defer_fn.
+    worktree_gate: WorktreeGate
 
     @staticmethod
     def build(
@@ -58,13 +62,15 @@ class RepoSession:
         repo_path, _conf = git_api.confirm_repo(path)
         git = git_api.bind_path(repo_path)
         repo_name = os.path.basename(repo_path) if repo_path else ""
+        gate = WorktreeGate()
         return RepoSession(
             git=git,
             repo_path=repo_path,
             repo_name=repo_name,
-            status_vm=StatusViewModel(git, history=history),
+            status_vm=StatusViewModel(git, history=history, worktree_gate=gate),
             commit_vm=CommitViewModel(git, log_limit=commit_log_limit),
-            branch_vm=BranchViewModel(git, history=history),
+            branch_vm=BranchViewModel(git, history=history, worktree_gate=gate),
+            worktree_gate=gate,
         )
 
     def dispose(self) -> None:

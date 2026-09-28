@@ -28,6 +28,58 @@ class ActionResult:
     should_refresh: bool = False
 
 
+WORKTREE_BUSY_MESSAGE = "Another working-tree operation is still running"
+
+
+class WorktreeGate:
+    """Single-flight guard for operations that rewrite the working tree.
+
+    One instance per session, shared by every ViewModel: a checkout started on
+    the Branch panel and a stash pop on Status would otherwise rewrite the same
+    working tree at once. The observe coordinator also reads :attr:`busy` — its
+    ``defer_fn`` pauses repo refresh while a rewrite is in flight, because
+    polling ``git status`` against a half-written tree flickers the Status
+    panel and can publish a half-applied state as if it were final.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._busy = False
+
+    @property
+    def busy(self) -> bool:
+        """True while a working-tree rewrite is running."""
+        return self._busy
+
+    def acquire(self) -> bool:
+        """Claim the gate; False when another rewrite already holds it."""
+        with self._lock:
+            if self._busy:
+                return False
+            self._busy = True
+            return True
+
+    def release(self) -> None:
+        """Release the gate."""
+        with self._lock:
+            self._busy = False
+
+
+def run_gated(gate: WorktreeGate, op: Callable[[], ActionResult]) -> ActionResult:
+    """Run a working-tree rewrite under the session gate, or refuse it.
+
+    Every path that writes the working tree goes through here, so a checkout
+    still running on a worker can never overlap a discard or a conflict
+    resolution started from the keyboard.
+    """
+    if not gate.acquire():
+        return ActionResult(success=False, message=WORKTREE_BUSY_MESSAGE)
+    try:
+        return op()
+    finally:
+        gate.release()
+
+
 @runtime_checkable
 class IListViewModel(Protocol, Generic[T]):
     """Protocol for list-based panel ViewModels."""
@@ -55,6 +107,10 @@ class ViewModelBase(Generic[T]):
 
     _NO_SNAPSHOT = object()
 
+    #: Human name for this VM's background load, reported if the worker
+    #: raises. Subclasses override it; the default is a fallback only.
+    load_label: str = "Data"
+
     def __init__(self) -> None:
         self._loader = AsyncTask()
         self._items: Signal[list[T]] = Signal([])
@@ -76,7 +132,11 @@ class ViewModelBase(Generic[T]):
         self._repo_token = token
 
     def refresh(self) -> None:
-        self._loader.start(self._do_load, self._guarded(self._on_loaded))
+        self._loader.start(
+            self._do_load,
+            self._guarded(self._on_loaded),
+            label=self.load_label,
+        )
 
     def _guarded(self, callback: Callable[[_S], None]) -> Callable[[_S], None]:
         """Wrap a load callback so a superseded repo token drops the result."""

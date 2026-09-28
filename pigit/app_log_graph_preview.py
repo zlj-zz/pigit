@@ -117,6 +117,7 @@ class LogGraphPreview(Component):
             guard_or_identity(
                 self._guard_async, lambda lines: self._on_graph_loaded(name, lines)
             ),
+            label="Branch graph preview",
         )
         return True
 
@@ -157,6 +158,7 @@ class LogGraphPreview(Component):
             guard_or_identity(
                 self._guard_async, lambda lines: self._on_graph_loaded(name, lines)
             ),
+            label="Branch graph preview",
         )
 
     def set_lines(self, lines: list[str], title: str) -> None:

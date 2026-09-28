@@ -81,6 +81,7 @@ from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .repo_session import RepoSession
+from .viewmodels.base import WORKTREE_BUSY_MESSAGE
 from .session_history import (
     HistoryRecord,
     SessionHistory,
@@ -384,6 +385,7 @@ class PigitApplication(Application):
                 get_is_large_screen=lambda: self._is_large_screen,
                 get_root=lambda: self._root,
                 get_loop=lambda: self._loop,
+                get_worktree_busy=lambda: self._session.worktree_gate.busy,
                 schedule_reload_header=self._schedule_reload_header,
                 refresh_header_dirty=self._refresh_header_dirty,
                 refresh_list_panel=self._refresh_list_panel,
@@ -591,6 +593,15 @@ class PigitApplication(Application):
         if self._network_git.busy:
             show_toast(
                 "Push/pull in progress…",
+                duration=2.0,
+                kind=FeedbackKind.ERROR,
+            )
+            return False
+        # Abandoning a checkout/stash mid-rewrite to open another repo would
+        # leave this one half-applied, so hold the switch until it finishes.
+        if self._session.worktree_gate.busy:
+            show_toast(
+                WORKTREE_BUSY_MESSAGE,
                 duration=2.0,
                 kind=FeedbackKind.ERROR,
             )
@@ -1007,6 +1018,13 @@ class PigitApplication(Application):
 
     def _do_reverse_last(self) -> None:
         """Execute the reversal of the most recent session action."""
+        # Reversals write the working tree too (restore/checkout/rewind), so
+        # they take the same gate as the panel actions. Undoing a checkout
+        # while another rewrite is mid-flight is how a `reset --hard` guard
+        # reads a half-written tree and passes.
+        if self._session.worktree_gate.busy:
+            show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+            return
         recent = self._session_history.peek(1)
         was_checkout = bool(
             recent
@@ -1458,6 +1476,7 @@ class PigitApplication(Application):
             self._git,
             on_done=_on_done,
             confirm_reverse=self._confirm_reverse_range,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         show_sheet(panel, title_core=sheet_core("Recent"), edge_fg=THEME.fg_accent)
 

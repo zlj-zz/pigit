@@ -31,6 +31,7 @@ from ._runtime_context import (
 )
 
 if TYPE_CHECKING:
+    from .async_task import AsyncTask
     from .component import Component
     from .segment import Segment
     from .widgets import Sheet, Toast
@@ -167,6 +168,22 @@ def show_toast(
     return toast
 
 
+def report_async_failure(info: tuple[str, BaseException]) -> None:
+    """Default sink for a background task that raised.
+
+    Called on the main thread by ``AsyncTask.poll_all``. Without it a failed
+    load is invisible: the panel keeps whatever it had, which reads as "there
+    was nothing more to show". Repeats collapse into one visible toast because
+    :func:`show_toast` dismisses the previous one.
+    """
+    label, exc = info
+    show_toast(
+        f"{label} failed: {exc}",
+        duration=3.0,
+        kind=FeedbackKind.ERROR,
+    )
+
+
 def show_sheet(
     child: Component,
     height: int | None = None,
@@ -278,6 +295,30 @@ def show_spinner(
         position=position,
         spin=True,
     )
+
+
+def run_with_spinner(
+    work: Callable[[], _R],
+    on_done: Callable[[_R], None],
+    *,
+    label: str,
+) -> AsyncTask[_R]:
+    """Run ``work`` on the background pool with a spinner on screen.
+
+    ``on_done`` runs on the main thread after the spinner is dismissed. A
+    worker failure needs no handler here: the failure toast takes the spinner's
+    place through the single-slot toast layer (see
+    :func:`report_async_failure`), so the spinner cannot be left behind.
+    """
+    from .async_task import run_async
+
+    show_spinner(label, position=ToastPosition.CENTER)
+
+    def done(result: _R) -> None:
+        hide_spinner()
+        on_done(result)
+
+    return run_async(work, done, label=label)
 
 
 def dismiss_toast() -> None:

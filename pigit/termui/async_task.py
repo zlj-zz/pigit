@@ -27,6 +27,8 @@ _executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 # Global queue for delivering async results back to the main thread.
 _GLOBAL_QUEUE: queue.Queue[tuple[Callable[[Any], None], Any]] = queue.Queue()
 
+_DEFAULT_LABEL = "Background task"
+
 
 class AsyncTask(Generic[T]):
     """Cancellable background task that delivers results to the main thread.
@@ -55,8 +57,20 @@ class AsyncTask(Generic[T]):
         self,
         work: Callable[[], T],
         callback: Callable[[T], None],
+        *,
+        label: str = _DEFAULT_LABEL,
     ) -> None:
-        """Start a new background task, cancelling any previous one."""
+        """Start a new background task, cancelling any previous one.
+
+        Args:
+            work: Blocking callable executed on the worker thread.
+            callback: Invoked on the main thread with the result.
+            label: Human name for the task, used when reporting a failure.
+                Resolve it here — at the call site — rather than deriving it
+                from ``callback``: callers overwhelmingly pass a
+                ``ViewModelBase._guarded`` wrapper, whose ``__name__`` is
+                ``deliver`` for every task in the app.
+        """
         with self._lock:
             self._gen += 1
             current_gen = self._gen
@@ -64,8 +78,9 @@ class AsyncTask(Generic[T]):
         def _run() -> None:
             try:
                 result = work()
-            except Exception:
-                _logger.debug("AsyncTask work failed", exc_info=True)
+            except Exception as exc:
+                _logger.exception("AsyncTask work failed: %s", label)
+                self._put_failure(current_gen, label, exc)
                 return
             with self._lock:
                 if current_gen != self._gen:
@@ -78,6 +93,8 @@ class AsyncTask(Generic[T]):
         self,
         work: Callable[[Callable[[T], bool]], None],
         callback: Callable[[T], None],
+        *,
+        label: str = _DEFAULT_LABEL,
     ) -> None:
         """Start a streaming task whose result arrives in batches.
 
@@ -106,10 +123,25 @@ class AsyncTask(Generic[T]):
         def _run() -> None:
             try:
                 work(emit)
-            except Exception:
-                _logger.debug("AsyncTask stream failed", exc_info=True)
+            except Exception as exc:
+                _logger.exception("AsyncTask stream failed: %s", label)
+                self._put_failure(current_gen, label, exc)
 
         _executor.submit(_run)
+
+    def _put_failure(self, current_gen: int, label: str, exc: BaseException) -> None:
+        """Hand a worker failure to the main thread, unless superseded.
+
+        Rides the same ``(callback, result)`` queue as successful results, so
+        ``poll_all`` needs no type branch. The import is lazy because the
+        overlay layer sits above this one.
+        """
+        from .overlay import report_async_failure
+
+        with self._lock:
+            if current_gen != self._gen:
+                return
+            _GLOBAL_QUEUE.put((report_async_failure, (label, exc)))
 
     def cancel(self) -> None:
         """Mark the current task as cancelled.
@@ -150,16 +182,19 @@ class AsyncTask(Generic[T]):
 def run_async(
     work: Callable[[], T],
     callback: Callable[[T], Any],
+    *,
+    label: str = _DEFAULT_LABEL,
 ) -> AsyncTask[T]:
     """Run blocking work in a background thread; deliver result to main thread.
 
     Args:
         work: Blocking function executed in ThreadPoolExecutor.
         callback: Invoked on the main thread with the result.
+        label: Human name for the task, used when reporting a failure.
 
     Returns:
         AsyncTask handle; caller can ``.cancel()`` to drop the result.
     """
     task = AsyncTask[T]()
-    task.start(work, callback)
+    task.start(work, callback, label=label)
     return task

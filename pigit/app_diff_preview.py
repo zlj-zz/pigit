@@ -150,6 +150,7 @@ class PreviewPanel(Component):
             guard_or_identity(
                 self._guard_async, lambda lines: self._on_loaded(request, lines)
             ),
+            label="Diff preview",
         )
         return True
 
@@ -167,6 +168,7 @@ class PreviewPanel(Component):
             guard_or_identity(
                 self._guard_async, lambda lines: self._on_loaded(request, lines)
             ),
+            label="Diff preview",
         )
 
     def _capture_request(self, active: PreviewPayload) -> _PreviewRequest | None:

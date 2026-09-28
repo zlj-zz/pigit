@@ -18,6 +18,7 @@ from pigit.termui import (
     by_id,
     dismiss_sheet,
     palette,
+    run_with_spinner,
     Segment,
     show_badge,
     show_sheet,
@@ -231,16 +232,23 @@ class BranchPanel(OptionList):
             return
         if guard_bisect_active(self._get_git()):
             return
-        result = self._vm.checkout(self.curr_no)
+        # Capture the index now: the worker must check out the branch the user
+        # chose, not wherever the cursor drifted to while it ran.
+        index = self.curr_no
+        run_with_spinner(
+            lambda: self._vm.checkout(index),
+            lambda result: self._after_checkout(result, local_branch.name),
+            label=f"Checking out {local_branch.name}",
+        )
+
+    def _after_checkout(self, result, name: str) -> None:
+        """Apply a finished checkout on the main thread."""
         self._handle_result(result)
-        if result.success and self._branch_signal is not None:
-            self._branch_signal.set(local_branch.name)
-        if result.success:
-            self.emit(
-                EventType("action_requested"),
-                cmd="follow-head",
-                ref=local_branch.name,
-            )
+        if not result.success:
+            return
+        if self._branch_signal is not None:
+            self._branch_signal.set(name)
+        self.emit(EventType("action_requested"), cmd="follow-head", ref=name)
 
     @bind_action(
         "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
@@ -478,18 +486,25 @@ class BranchPanel(OptionList):
         if not name:
             dismiss_sheet()
             return
-        result = self._vm.create_branch(name)
+        # `git checkout -b` rewrites the worktree like any other checkout.
+        # The sheet stays open until it succeeds, so a rejected name can be
+        # corrected without retyping it.
+        run_with_spinner(
+            lambda: self._vm.create_branch(name),
+            lambda result: self._after_create_branch(result, name),
+            label=f"Creating {name}",
+        )
+
+    def _after_create_branch(self, result, name: str) -> None:
+        """Apply a finished branch creation on the main thread."""
         self._handle_result(result)
-        if result.success:
-            dismiss_sheet()
-            if self._branch_signal is not None:
-                self._branch_signal.set(name)
-            # HEAD moved to the new branch (git checkout -b).
-            self.emit(
-                EventType("action_requested"),
-                cmd="follow-head",
-                ref=name,
-            )
+        if not result.success:
+            return
+        dismiss_sheet()
+        if self._branch_signal is not None:
+            self._branch_signal.set(name)
+        # HEAD moved to the new branch (git checkout -b).
+        self.emit(EventType("action_requested"), cmd="follow-head", ref=name)
 
     def _show_rename_sheet(self, branch_name: str) -> None:
         self._rename_branch_name = branch_name
