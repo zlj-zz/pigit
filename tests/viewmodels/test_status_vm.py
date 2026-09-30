@@ -13,7 +13,7 @@ import pytest
 
 from pigit.git.model import File
 from pigit.session_history import SessionHistory
-from pigit.viewmodels.base import WorktreeGate
+from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE, WorktreeGate
 from pigit.viewmodels.status import StatusViewModel
 
 
@@ -308,6 +308,34 @@ def test_stash_pop_without_sha_records_nothing(status_vm):
     result = vm.stash_pop("stash@{0}")
     assert result.success is True
     assert vm._history.peek() == []
+
+
+def test_ignore_refuses_while_the_gate_is_held(status_vm):
+    """`.gitignore` lives in the working tree, so appending to it while a
+    checkout rewrites that tree can land the entry on the branch being
+    switched away from."""
+    assert status_vm._worktree_gate.acquire() is True
+
+    result = status_vm.ignore(0)
+
+    assert result.success is False
+    assert result.message == WORKTREE_BUSY_MESSAGE
+    status_vm._git.ignore_file.assert_not_called()
+
+
+def test_ignore_indices_refuses_while_the_gate_is_held(status_vm):
+    assert status_vm._worktree_gate.acquire() is True
+
+    result = status_vm.ignore_indices({0, 1})
+
+    assert result.success is False
+    assert result.message == WORKTREE_BUSY_MESSAGE
+    status_vm._git.ignore_file.assert_not_called()
+
+
+def test_ignore_releases_the_gate(status_vm):
+    assert status_vm.ignore(0).success is True
+    assert status_vm._worktree_gate.busy is False
 
 
 def test_stash_apply_keeps_entry(status_vm):

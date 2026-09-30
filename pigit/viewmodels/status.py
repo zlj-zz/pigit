@@ -228,6 +228,12 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return result
 
     def ignore(self, idx: int) -> ActionResult:
+        # Appends to `.gitignore`, which lives in the working tree — a checkout
+        # running on a worker would otherwise let the entry land on the branch
+        # that is being switched away from.
+        return run_gated(self._worktree_gate, lambda: self._ignore(idx))
+
+    def _ignore(self, idx: int) -> ActionResult:
         f = self.item_at(idx)
         if f is None:
             return ActionResult(success=False, message="Invalid index")
@@ -451,6 +457,10 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         )
 
     def ignore_indices(self, indices: set[int]) -> ActionResult:
+        # Same working-tree write as :meth:`ignore`, once per file.
+        return run_gated(self._worktree_gate, lambda: self._ignore_indices(indices))
+
+    def _ignore_indices(self, indices: set[int]) -> ActionResult:
         items = self._items.value
         commands: list[ReverseCommand] = []
         count = 0
