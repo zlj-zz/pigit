@@ -153,9 +153,7 @@ def test_alert_on_result_may_quit():
     dialog.end_session = lambda: None
     dialog.hide = lambda: None
     dialog._pane.reset_state = lambda: None
-    dialog._pane._on_result = Mock(
-        side_effect=ExitEventLoop("Quit", force=True)
-    )
+    dialog._pane._on_result = Mock(side_effect=ExitEventLoop("Quit", force=True))
 
     with pytest.raises(ExitEventLoop):
         dialog._finish_alert(True)

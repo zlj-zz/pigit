@@ -1403,9 +1403,7 @@ class StatusPanel(OptionList):
             if not confirmed:
                 self._vm.refresh()
                 return
-            self._run_file_action(
-                lambda: callee(source_idx), label=label, after=after
-            )
+            self._run_file_action(lambda: callee(source_idx), label=label, after=after)
 
         return self._confirm(text, on_result, kind=kind)
 

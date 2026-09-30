@@ -12,6 +12,9 @@ import pytest
 
 from pigit.termui.wcwidth_table import slice_left_by_width, wcswidth
 
+#: "e" + U+0301 (combining acute), used to check marks stay with their base.
+ACCENTED = "é"
+
 CASES = [
     ("中文abc", 2, "文abc"),
     ("中文abc", 4, "abc"),
@@ -22,6 +25,10 @@ CASES = [
     ("abc", 5, ""),
     ("abc", 3, ""),
     ("", 3, ""),
+    # Combining marks
+    (f"{ACCENTED}x", 1, "x"),  # base dropped, mark goes with it
+    ("中́x", 2, "x"),  # same, after a half-cut wide glyph
+    (f"a{ACCENTED}x", 1, f"{ACCENTED}x"),  # mark keeps its base
 ]
 
 
@@ -40,7 +47,19 @@ def test_slice_preserves_the_width_invariant(text, skip, _expected):
 
 
 def test_slice_keeps_a_combining_mark_with_its_base():
-    assert slice_left_by_width("éx", 1) == "́x"
+    """A mark survives whenever the cut lands before its base."""
+    assert slice_left_by_width(f"a{ACCENTED}x", 1) == f"{ACCENTED}x"
+
+
+def test_slice_drops_a_mark_whose_base_was_cut_away():
+    """This used to return the bare mark. A terminal then draws it over
+    the blank or the previous word, which reads as a stray accent."""
+    assert slice_left_by_width(f"{ACCENTED}x", 1) == "x"
+
+
+def test_slice_drops_a_mark_left_behind_by_a_half_cut_glyph():
+    """The blank that replaces a half-cut wide glyph is not a base either."""
+    assert slice_left_by_width("中́x", 2) == "x"
 
 
 def test_negative_skip_returns_text_unchanged():

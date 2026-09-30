@@ -75,9 +75,12 @@ class TestDiffViewer:
         s = Surface(30, 5)
         d.paint(s)
         row = "".join(c.char for c in s.rows()[1])
-        # scrolled past the leading "@@ -1,"; the rest shifts left, so the
-        # header is NOT pinned at the fixed text-start column.
-        assert "20 +1,20 @@" in row
+        # The marker reserves column 6, so the header is scrolled by 7 rather
+        # than by the raw offset of 6: past "@@ -1,2" instead of "@@ -1,".
+        assert row[6] == "\u2039"
+        assert "0 +1,20 @@" in row
+        # NOT pinned at the fixed text-start column \u2014 that is the point.
+        assert "@@ -1,20 +1,20 @@" not in row
         assert row[0] == "\u2502"  # border intact, nothing overwrites it
 
     def test_hunk_header_uses_accent_tone(self):
@@ -771,3 +774,48 @@ class TestCommitReport:
         # List rows occupy the top 35; report cells fill the bottom 15.
         assert any("msg" in row for row in rows[:35])
         assert any("■" in row for row in rows[35:])
+
+
+class TestScrollLeftMarker:
+    """The right edge has always said "…"; the left edge said nothing."""
+
+    def _row(self, d, s):
+        return "".join(c.char for c in s.rows()[1])
+
+    def test_no_marker_while_unscrolled(self):
+        d = DiffViewer()
+        d.set_content(["+added line here"])
+        d.resize((30, 5))
+        s = Surface(30, 5)
+        d.paint(s)
+        assert "‹" not in self._row(d, s)
+
+    def test_marker_appears_once_scrolled_left(self):
+        d = DiffViewer()
+        d.set_content(["+added line here"])
+        d.resize((30, 5))
+        d._max_col_offset = 10
+        d._col_offset = 4
+        s = Surface(30, 5)
+        d.paint(s)
+        row = self._row(d, s)
+        # Column 6 = 1 (border) + 4 (gutter) + 1 (prefix); the +/- sign owns
+        # column 5, so the marker reserves the first column of the text area.
+        assert row[6] == "‹"
+        assert row[5] == "+"  # the prefix is not borrowed
+
+    def test_the_marker_reserves_a_column_rather_than_overlaying_text(self):
+        """The marker costs one column of content, exactly like the right-edge
+        "…" — it must not sit on top of the first character of the line."""
+        d = DiffViewer()
+        d.set_content(["abcdefghijklmnopqrstuvwxyz"])
+        d.resize((30, 5))
+        d._max_col_offset = 20
+        d._col_offset = 6
+        s = Surface(30, 5)
+        d.paint(s)
+        row = self._row(d, s)
+        assert row[6] == "‹"
+        # A plain scroll by 6 would put "g" here (line[6]); the marker shifts
+        # the content one column further, so line[7] leads instead.
+        assert row[7] == "h"

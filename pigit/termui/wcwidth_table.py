@@ -94,6 +94,18 @@ def truncate_by_width(text: str, max_width: int) -> str:
     return "".join(parts)
 
 
+def _drop_orphan_marks(text: str, index: int) -> str:
+    """Return ``text[index:]`` without the combining marks that lead it.
+
+    The cut at *index* just dropped the base character those marks attach to.
+    Keeping them re-attaches them to whatever is now to their left — the blank
+    left behind by a half-cut wide glyph, or the previous word.
+    """
+    while index < len(text) and _char_width(ord(text[index])) == 0:
+        index += 1
+    return text[index:]
+
+
 def slice_left_by_width(text: str, skip: int) -> str:
     """Drop *skip* display columns from the left of *text*.
 
@@ -110,10 +122,10 @@ def slice_left_by_width(text: str, skip: int) -> str:
     for index, cp in enumerate(text):
         w = _char_width(ord(cp))
         if width + w > skip:
-            return " " * (w - (skip - width)) + text[index + 1 :]
+            return " " * (w - (skip - width)) + _drop_orphan_marks(text, index + 1)
         width += w
         if width == skip:
-            return text[index + 1 :]
+            return _drop_orphan_marks(text, index + 1)
     return ""
 
 

@@ -212,8 +212,12 @@ class TestForcedExit:
         from pigit.termui import application
 
         order: list[str] = []
-        monkeypatch.setattr(application.logging, "shutdown", lambda: order.append("flush"))
-        monkeypatch.setattr(application.os, "_exit", lambda code: order.append(f"exit:{code}"))
+        monkeypatch.setattr(
+            application.logging, "shutdown", lambda: order.append("flush")
+        )
+        monkeypatch.setattr(
+            application.os, "_exit", lambda code: order.append(f"exit:{code}")
+        )
 
         application._exit_without_joining(2)
 
