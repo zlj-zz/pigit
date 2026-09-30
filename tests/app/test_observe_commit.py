@@ -80,7 +80,9 @@ def test_commit_focused_head_batch_reloads_commit_panel(app):
 def test_observe_defers_while_a_worktree_rewrite_runs(app):
     """Polling ``git status`` against a half-written tree would publish a
     half-applied state, so refresh flushes wait for the rewrite to finish."""
-    ctx = ObserveContext(repo_root="/repo", git_dir="/repo/.git", common_dir="/repo/.git")
+    ctx = ObserveContext(
+        repo_root="/repo", git_dir="/repo/.git", common_dir="/repo/.git"
+    )
 
     busy = _make_host(app, visible=CommitPanel(vm=Mock()), worktree_busy=lambda: True)
     busy.attach(ctx)

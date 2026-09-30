@@ -10,10 +10,9 @@ from __future__ import annotations
 
 from unittest.mock import Mock, call, patch
 
-import pytest
-
 from pigit.app_merge_workflow import MergeWorkflow
 from pigit.git.api import GitError
+from pigit.viewmodels.base import WorktreeGate
 
 
 def _workflow(*, git: Mock, record: Mock) -> MergeWorkflow:
@@ -27,7 +26,8 @@ def _workflow(*, git: Mock, record: Mock) -> MergeWorkflow:
         get_refresh_git_vms=Mock(),
         get_schedule_reload_header=Mock(),
         get_record_rewind=lambda: record,
-        get_worktree_busy=lambda: False,
+        get_worktree_gate=lambda: WorktreeGate(),
+        get_merge_task=lambda: Mock(),
     )
 
 
@@ -36,11 +36,10 @@ def test_merge_success_records_rewind_with_pre_merge_sha():
     git = Mock()
     git.resolve_head_sha.return_value = "premerge0123456789"
     workflow = _workflow(git=git, record=record)
-    with (
-        patch("pigit.app_merge_workflow.show_spinner"),
-        patch("pigit.app_merge_workflow.hide_spinner"),
-    ):
-        workflow.do_merge_workflow("feat", "main")
+    outcome = workflow._merge_worker("feat", "main")
+    assert outcome.ok is True
+    with patch("pigit.app_merge_workflow.show_spinner"):
+        workflow._apply_merge_outcome(outcome, "feat", "main")
     git.checkout_branch.assert_called_once_with("main")
     git.pull.assert_called_once()
     git.merge.assert_called_once_with("feat")
@@ -59,8 +58,8 @@ def test_merge_conflict_does_not_record():
         patch("pigit.app_merge_workflow.hide_spinner"),
         patch("pigit.app_merge_workflow.show_toast"),
     ):
-        with pytest.raises(GitError):
-            workflow.do_merge_workflow("feat", "main")
+        outcome = workflow._merge_worker("feat", "main")
+        assert outcome.ok is False and outcome.conflict is True
     record.assert_not_called()
     # Failure path best-effort checks out back to source.
     git.checkout_branch.assert_has_calls([call("main"), call("feat")])
@@ -74,13 +73,10 @@ def test_failed_checkout_back_says_so():
     git.pull.side_effect = GitError("Pull failed")
     git.checkout_branch.side_effect = [None, GitError("worktree locked")]
     workflow = _workflow(git=git, record=record)
-    with (
-        patch("pigit.app_merge_workflow.show_spinner"),
-        patch("pigit.app_merge_workflow.hide_spinner"),
-        patch("pigit.app_merge_workflow.show_toast") as toast,
-    ):
-        with pytest.raises(GitError, match="Pull failed"):
-            workflow.do_merge_workflow("feat", "main")
+    outcome = workflow._merge_worker("feat", "main")
+    assert outcome.ok is False and outcome.step == "pull"
+    with patch("pigit.app_merge_workflow.show_toast") as toast:
+        workflow._apply_merge_outcome(outcome, "feat", "main")
     assert any("Could not return to feat" in str(c) for c in toast.call_args_list)
 
 
@@ -89,12 +85,11 @@ def test_pull_failure_does_not_record():
     git = Mock()
     git.pull.side_effect = GitError("Pull failed")
     workflow = _workflow(git=git, record=record)
-    with (
-        patch("pigit.app_merge_workflow.show_spinner"),
-        patch("pigit.app_merge_workflow.hide_spinner"),
-    ):
-        with pytest.raises(GitError):
-            workflow.do_merge_workflow("feat", "main")
+    with patch("pigit.app_merge_workflow.show_toast"):
+        outcome = workflow._merge_worker("feat", "main")
+        assert outcome.ok is False and outcome.step == "pull"
+        assert outcome.conflict is False
+        workflow._apply_merge_outcome(outcome, "feat", "main")
     record.assert_not_called()
     git.merge.assert_not_called()
     git.resolve_head_sha.assert_not_called()

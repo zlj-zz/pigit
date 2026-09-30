@@ -190,7 +190,6 @@ class TestDetectColorMode:
             adapter = ColorAdapter()
             assert adapter.mode == ColorMode.COLOR_256
 
-
     def test_no_color_env_disables_color(self):
         with mock.patch.dict(
             os.environ,

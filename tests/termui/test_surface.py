@@ -385,7 +385,11 @@ class TestCombiningMarks:
         reach back and edit whatever the row already held."""
         s = Surface(10, 1)
         s.draw_text_rgb(0, 3, "AB")
-        s.draw_text_rgb(0, 0, "́", )  # mark with no base at this position
+        s.draw_text_rgb(
+            0,
+            0,
+            "́",
+        )  # mark with no base at this position
         assert [c.char for c in s._rows[0][:5]] == [" ", " ", " ", "A", "B"]
 
     def test_shared_blank_singleton_is_never_mutated(self):

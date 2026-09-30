@@ -20,6 +20,7 @@ from pigit.app_bisect import (
 )
 from pigit.app_branch import BranchPanel
 from pigit.app_merge_workflow import MergeWorkflow
+from pigit.viewmodels.base import WorktreeGate
 from pigit.app_rebase import RebasePanel
 from pigit.app_sequencer import SequencerControl
 from pigit.config_data import AppConfig
@@ -406,7 +407,8 @@ def test_merge_request_blocked_during_bisect():
         get_alert_dialog=lambda: alert,
         get_refresh_git_vms=Mock(),
         get_schedule_reload_header=Mock(),
-        get_worktree_busy=lambda: False,
+        get_worktree_gate=lambda: WorktreeGate(),
+        get_merge_task=lambda: Mock(),
         get_record_rewind=lambda: Mock(),
     )
     with patch("pigit.app_bisect.show_toast"):

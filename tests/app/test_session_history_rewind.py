@@ -164,9 +164,9 @@ def test_create_branch_reverse_deletes_without_force():
     """Non-force on purpose: if commits landed on the branch since, git
     refuses and the user keeps them."""
     git = _git()
-    result = ReverseCommand(
-        op_type="create_branch", payload={"name": "feat"}
-    ).execute(git)
+    result = ReverseCommand(op_type="create_branch", payload={"name": "feat"}).execute(
+        git
+    )
     assert result.success
     git.delete_branch.assert_called_once_with("feat")
 

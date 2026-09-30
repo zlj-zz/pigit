@@ -125,9 +125,7 @@ class NetworkGit:
         # Pull merges or fast-forwards, rewriting the working tree.
         gate = self._get_worktree_gate()
         if not gate.acquire():
-            show_toast(
-                WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR
-            )
+            show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
             self._invoke_complete(on_complete)
             return
         self._holds_worktree_gate = True

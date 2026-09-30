@@ -335,7 +335,9 @@ def test_run_with_spinner_hides_the_spinner_before_on_done(mocker):
     mocker.patch.object(overlay, "hide_spinner", lambda: order.append("hide"))
 
     run_with_spinner(
-        lambda: "ok", lambda result: order.append(f"done:{result}"), label="Checking out"
+        lambda: "ok",
+        lambda result: order.append(f"done:{result}"),
+        label="Checking out",
     )
 
     deadline = time.monotonic() + 2.0

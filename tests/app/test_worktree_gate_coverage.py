@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-import pytest
-
 from pigit.app_merge_workflow import MergeWorkflow
 from pigit.app_network_git import NetworkGit, NetworkGitOutcome
 from pigit.app_rebase import RebasePanel
@@ -29,6 +27,9 @@ def _idle_git() -> Mock:
 
 def _merge_workflow(git: Mock, *, busy: bool) -> tuple[MergeWorkflow, Mock]:
     dialog = Mock()
+    gate = WorktreeGate()
+    if busy:
+        gate.acquire()
     workflow = MergeWorkflow(
         store=Mock(),
         network=Mock(),
@@ -39,7 +40,8 @@ def _merge_workflow(git: Mock, *, busy: bool) -> tuple[MergeWorkflow, Mock]:
         get_refresh_git_vms=Mock(),
         get_schedule_reload_header=Mock(),
         get_record_rewind=lambda: Mock(),
-        get_worktree_busy=lambda: busy,
+        get_worktree_gate=lambda: gate,
+        get_merge_task=lambda: Mock(),
     )
     return workflow, dialog
 
@@ -201,3 +203,85 @@ def test_cherry_pick_entry_refuses_while_a_rewrite_runs():
 
     external.assert_not_called()
     assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+
+
+def _capturing_merge_workflow(git: Mock, gate: WorktreeGate, calls: list):
+    task = Mock()
+    dialog = Mock()
+    task.start.side_effect = lambda work, done, **kw: calls.append((work, done))
+    workflow = MergeWorkflow(
+        store=Mock(),
+        network=Mock(),
+        get_git=lambda: git,
+        navigate_product=Mock(),
+        get_branch_panel=Mock(),
+        get_alert_dialog=lambda: dialog,
+        get_refresh_git_vms=Mock(),
+        get_schedule_reload_header=Mock(),
+        get_record_rewind=lambda: Mock(),
+        get_worktree_gate=lambda: gate,
+        get_merge_task=lambda: task,
+    )
+    return workflow, task, dialog
+
+
+def test_merge_worker_never_raises():
+    """AsyncTask reports a failure to its error callback rather than to
+    ``done``, so an escaping exception would leave the gate held and repo
+    switching locked for the rest of the session."""
+    git = _idle_git()
+    git.checkout_branch.side_effect = RuntimeError("boom")
+    workflow, _ = _merge_workflow(git, busy=False)
+
+    outcome = workflow._merge_worker("feat", "main")  # must not raise
+
+    assert outcome.ok is False
+    assert outcome.step == "checkout"
+    assert "boom" in outcome.message
+
+
+def test_merge_holds_the_gate_then_releases_it():
+    gate = WorktreeGate()
+    calls: list = []
+    workflow, _task, dialog = _capturing_merge_workflow(_idle_git(), gate, calls)
+
+    workflow.on_merge_request("feat", "main")
+    dialog.alert.call_args[0][1](True)  # confirm
+
+    assert gate.busy is True  # held for the whole sequence
+    work, done = calls[0]
+    done(work())
+    assert gate.busy is False
+
+
+def test_merge_refuses_when_the_gate_is_taken():
+    gate = WorktreeGate()
+    assert gate.acquire() is True
+    calls: list = []
+    workflow, _task, dialog = _capturing_merge_workflow(_idle_git(), gate, calls)
+
+    with patch("pigit.app_bisect.show_toast"):
+        # Refused at the entry probe, so the confirm dialog never opens.
+        workflow.on_merge_request("feat", "main")
+
+    dialog.alert.assert_not_called()
+    assert calls == []  # no worker started
+    assert gate.busy is True  # the other operation keeps its gate
+
+
+def test_merge_refuses_when_the_gate_is_taken_after_the_entry_check():
+    """The entry probe can pass and the gate still be gone by the time the
+    user answers the confirm dialog."""
+    gate = WorktreeGate()
+    calls: list = []
+    workflow, _task, dialog = _capturing_merge_workflow(_idle_git(), gate, calls)
+
+    workflow.on_merge_request("feat", "main")
+    assert gate.acquire() is True  # another rewrite slips in before the answer
+
+    with patch("pigit.app_bisect.show_toast") as toast:
+        dialog.alert.call_args[0][1](True)  # confirm
+
+    assert calls == []  # no worker started
+    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert gate.busy is True  # the other operation keeps its gate

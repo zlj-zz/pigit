@@ -65,7 +65,7 @@ from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
 from .app_panel_nav import PanelNavigator
 from .app_network_git import NetworkGit, NetworkGitOutcome
-from .app_merge_workflow import MergeWorkflow
+from .app_merge_workflow import MergeStepOutcome, MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
 from .git.model import ReflogEntry
@@ -197,6 +197,7 @@ class PigitApplication(Application):
         self._inspector_token: object = None
         # Background push/pull (must not use exec_external on the worker)
         self._network_sync_task: AsyncTask[NetworkGitOutcome] = AsyncTask()
+        self._merge_task: AsyncTask[MergeStepOutcome] = AsyncTask()
         self._network_git = NetworkGit(
             store=self._merge_state_store,
             get_git=lambda: self._git,
@@ -218,7 +219,8 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_record_rewind=lambda: self._record_rewind,
-            get_worktree_busy=lambda: self._session.worktree_gate.busy,
+            get_worktree_gate=lambda: self._session.worktree_gate,
+            get_merge_task=lambda: self._merge_task,
         )
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
@@ -1998,10 +2000,6 @@ class PigitApplication(Application):
         if new_lines is None and new_sha is not None and path:
             new_lines = git.load_worktree_file(path)
         return old_lines, new_lines
-
-    def _do_merge_workflow(self, source: str, target: str) -> None:
-        """Delegate to MergeWorkflow.do_merge_workflow()."""
-        self._merge_workflow.do_merge_workflow(source, target)
 
     def _confirm_push_and_finish(self, target: str, source: str) -> None:
         """Delegate to MergeWorkflow.confirm_push_and_finish()."""
