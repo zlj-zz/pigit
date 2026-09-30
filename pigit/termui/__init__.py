@@ -82,7 +82,12 @@ from . import palette
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from .mouse import MouseButton, MouseEvent, MouseKind
-from .async_task import AsyncTask, run_async
+from .async_task import (
+    AsyncTask,
+    pending_count,
+    run_async,
+    shutdown_pending_tasks,
+)
 
 __all__ = [
     # Types
@@ -130,7 +135,9 @@ __all__ = [
     "MouseEvent",
     "MouseKind",
     "AsyncTask",
+    "pending_count",
     "run_async",
+    "shutdown_pending_tasks",
     # Overlay context
     "show_toast",
     "show_sheet",

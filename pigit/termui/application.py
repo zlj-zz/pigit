@@ -7,6 +7,8 @@ Date: 2026-08-20
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from .bindings import (
@@ -25,6 +27,22 @@ from . import keys
 
 if TYPE_CHECKING:
     from .input import InputTerminal
+
+
+def _exit_without_joining(exit_code: int) -> None:
+    """Leave the process without waiting for background worker threads.
+
+    Interpreter shutdown joins every non-daemon thread, and a network call
+    against an unreachable remote has no upper bound — so once the user has
+    confirmed they want to quit anyway, returning normally would still hang
+    with the terminal already restored. ``os._exit`` skips that join, and with
+    it the ``atexit`` handlers, so logging is flushed by hand first.
+
+    Only reached when cleanup is finished: the terminal is restored and the
+    component tree destroyed before this runs.
+    """
+    logging.shutdown()
+    os._exit(exit_code)
 
 
 class LoopKwargs(TypedDict, total=False):
@@ -151,11 +169,16 @@ class Application:
         raise ExitEventLoop("quit", exit_code=exit_code, result_message=result_message)
 
     def _run_body(self) -> None:
-        """Assemble root, create loop, and start TUI. Does NOT catch ExitEventLoop."""
+        """Assemble root, create loop, and start TUI.
+
+        ``ExitEventLoop`` is recorded and re-raised rather than handled — the
+        callers :meth:`run` / :meth:`run_with_result` own the exit contract.
+        """
         from ._runtime_context import RuntimeContext, _runtime_ctx
 
         runtime = RuntimeContext()
         token = _runtime_ctx.set(runtime)
+        forced: ExitEventLoop | None = None
         try:
             body = self.build_root()
 
@@ -183,15 +206,27 @@ class Application:
             self.setup_root(root)
             root.mount()
             self._loop.run()
+        except ExitEventLoop as exc:
+            forced = exc
+            raise
         finally:
+            # Cleanup in the inner block, the forced exit in the outermost
+            # one, so a failure anywhere in cleanup cannot skip it.
             try:
-                if self._root is not None:
-                    self.on_exit()
+                try:
+                    if self._root is not None:
+                        self.on_exit()
+                finally:
+                    if self._root is not None:
+                        self._root.destroy()
+                        self._root = None
+                    _runtime_ctx.reset(token)
             finally:
-                if self._root is not None:
-                    self._root.destroy()
-                    self._root = None
-                _runtime_ctx.reset(token)
+                # Deliberately inside a finally rather than after the `try`:
+                # on the ExitEventLoop path nothing past that statement ever
+                # runs, so a forced quit placed there would silently wait.
+                if forced is not None and forced.force:
+                    _exit_without_joining(forced.exit_code)
 
     def run(self) -> None:
         """Long-lived TUI entry. Swallows ExitEventLoop for backward compatibility.

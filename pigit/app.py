@@ -29,7 +29,9 @@ from pigit.termui import (
     hide_spinner,
     keys,
     AsyncTask,
+    pending_count,
     request_render,
+    shutdown_pending_tasks,
     resolve_presentation_leaf,
     run_async,
     Segment,
@@ -1623,7 +1625,44 @@ class PigitApplication(Application):
 
     @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
-        raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
+        """Quit, asking first when background work is still running.
+
+        Quitting is not instant: the interpreter joins every worker thread on
+        the way out, so a pull against an unreachable remote would leave the
+        process hanging with the terminal already restored and nothing saying
+        why. Asking turns that into a choice.
+        """
+        pending = pending_count()
+        if not pending:
+            raise ExitEventLoop(
+                "Quit", exit_code=exit_code, result_message=result_message
+            )
+
+        def on_answer(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            shutdown_pending_tasks()
+            # Raises from inside the dialog callback: the exception unwinds
+            # through the event loop exactly as it would from the key handler.
+            raise ExitEventLoop(
+                "Quit",
+                exit_code=exit_code,
+                result_message=result_message,
+                force=True,
+            )
+
+        if not self._alert_dialog.alert(
+            f"{pending} background operation(s) still running. Quit anyway?",
+            on_answer,
+            kind=FeedbackKind.WARNING,
+        ):
+            # Another modal owns the screen, so the question cannot be asked.
+            # Refusing to quit would strand the user behind it; quit normally
+            # instead — that is the pre-existing behaviour, not a new hang.
+            logging.warning("Quit confirmation blocked by another modal")
+            raise ExitEventLoop(
+                "Quit", exit_code=exit_code, result_message=result_message
+            )
 
     @bind_action(
         "push", "P", desc="Push current branch (set upstream if needed)", tip="Push"

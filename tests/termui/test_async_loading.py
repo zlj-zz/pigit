@@ -10,10 +10,27 @@ from __future__ import annotations
 import threading
 import time
 
+from unittest.mock import Mock
+
 from pigit.termui import run_with_spinner
-from pigit.termui.async_task import AsyncTask
+from pigit.termui.async_task import (
+    AsyncTask,
+    pending_count,
+    shutdown_pending_tasks,
+)
 from pigit.termui.component import Component
 from pigit.termui.event_loop import AppEventLoop
+
+
+def _drained(predicate, timeout: float = 3.0) -> bool:
+    """Poll the result queue until *predicate* holds or time runs out."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return False
 
 
 class _FakeInput:
@@ -389,3 +406,74 @@ def test_run_async_dedup(mocker):
 
     assert "new" in received
     assert "old" not in received
+
+
+# ── In-flight accounting (quit must know what it is about to abandon) ──
+
+
+def test_pending_count_tracks_a_running_worker():
+    release = threading.Event()
+    task = AsyncTask()
+    task.start(lambda: release.wait(3.0), lambda _r: None, label="Slow")
+
+    assert _drained(lambda: pending_count() == 1)
+    release.set()
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_returns_to_zero_after_a_failure():
+    """The decrement lives in ``finally``: a leaked count would make the quit
+    confirmation impossible to get past — ``q`` would ask every single time."""
+    task = AsyncTask()
+
+    def _boom():
+        raise RuntimeError("nope")
+
+    task.start(_boom, lambda _r: None, label="Booming")
+
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_covers_streaming_tasks():
+    release = threading.Event()
+
+    def _stream(emit):
+        emit("first")
+        release.wait(3.0)
+
+    task = AsyncTask()
+    task.start_stream(_stream, lambda _batch: None, label="Streaming")
+
+    assert _drained(lambda: pending_count() == 1)
+    release.set()
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_ignores_work_that_never_starts(monkeypatch):
+    """Counting around ``submit`` instead of inside the worker would leave a
+    task cancelled before it ran counted forever."""
+    captured: dict = {}
+    fake = Mock()
+
+    def _submit(fn):
+        captured["fn"] = fn  # never run: as if cancelled before starting
+
+    fake.submit.side_effect = _submit
+    monkeypatch.setattr("pigit.termui.async_task._executor", fake)
+
+    task = AsyncTask()
+    task.start(lambda: None, lambda _r: None, label="Queued")
+
+    assert captured["fn"] is not None
+    assert pending_count() == 0
+
+
+def test_shutdown_pending_tasks_does_not_wait(monkeypatch):
+    """``wait=False`` is the whole point: waiting here would reintroduce the
+    hang this exists to avoid. Only queued work can be dropped."""
+    fake = Mock()
+    monkeypatch.setattr("pigit.termui.async_task._executor", fake)
+
+    shutdown_pending_tasks()
+
+    fake.shutdown.assert_called_once_with(wait=False, cancel_futures=True)

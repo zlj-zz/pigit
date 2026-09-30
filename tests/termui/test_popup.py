@@ -8,6 +8,10 @@ Date: 2026-08-28
 
 from __future__ import annotations
 
+from unittest.mock import Mock
+
+import pytest
+
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx, set_overlay_host
 from pigit.termui.component import Component
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
@@ -132,3 +136,38 @@ def test_dismiss_on_miss_release_does_not_close():
         assert popup.open is False  # a real outside press closes
     finally:
         _runtime_ctx.reset(token)
+
+
+# ── The overlay callback boundary ──
+
+
+def test_alert_on_result_may_quit():
+    """An answer may legitimately decide to quit — "N operations are still
+    running, quit anyway?" is exactly that. This boundary swallows ordinary
+    callback failures, but swallowing a quit request would leave the key
+    doing nothing at all."""
+    from pigit.termui.event_loop import ExitEventLoop
+    from pigit.termui.widgets.popup import AlertDialog
+
+    dialog = AlertDialog(on_result=lambda _ok: None)
+    dialog.end_session = lambda: None
+    dialog.hide = lambda: None
+    dialog._pane.reset_state = lambda: None
+    dialog._pane._on_result = Mock(
+        side_effect=ExitEventLoop("Quit", force=True)
+    )
+
+    with pytest.raises(ExitEventLoop):
+        dialog._finish_alert(True)
+
+
+def test_alert_on_result_failures_are_still_contained():
+    from pigit.termui.widgets.popup import AlertDialog
+
+    dialog = AlertDialog(on_result=lambda _ok: None)
+    dialog.end_session = lambda: None
+    dialog.hide = lambda: None
+    dialog._pane.reset_state = lambda: None
+    dialog._pane._on_result = Mock(side_effect=RuntimeError("boom"))
+
+    dialog._finish_alert(True)  # must not raise

@@ -29,6 +29,35 @@ _GLOBAL_QUEUE: queue.Queue[tuple[Callable[[Any], None], Any]] = queue.Queue()
 
 _DEFAULT_LABEL = "Background task"
 
+# Workers currently executing. Counted inside the worker rather than around
+# ``_executor.submit`` so a task cancelled before it ever starts (see
+# :func:`shutdown_pending_tasks`) is not counted — this number is what the
+# quit confirmation shows the user, and it claims the tasks are *running*.
+_in_flight = 0
+_in_flight_lock = threading.Lock()
+
+
+def _counted(work: Callable[[], None]) -> Callable[[], None]:
+    """Wrap a worker so it is counted for as long as it actually runs.
+
+    The decrement lives in ``finally`` because every other exit — a raised
+    exception, the failure path, cancellation — must still release the count.
+    A leaked count would make :func:`pending_count` permanent, and the quit
+    confirmation would then never let the user past it.
+    """
+
+    def _run() -> None:
+        global _in_flight
+        with _in_flight_lock:
+            _in_flight += 1
+        try:
+            work()
+        finally:
+            with _in_flight_lock:
+                _in_flight -= 1
+
+    return _run
+
 
 class AsyncTask(Generic[T]):
     """Cancellable background task that delivers results to the main thread.
@@ -87,7 +116,7 @@ class AsyncTask(Generic[T]):
                     return
                 _GLOBAL_QUEUE.put((callback, result))
 
-        _executor.submit(_run)
+        _executor.submit(_counted(_run))
 
     def start_stream(
         self,
@@ -127,7 +156,7 @@ class AsyncTask(Generic[T]):
                 _logger.exception("AsyncTask stream failed: %s", label)
                 self._put_failure(current_gen, label, exc)
 
-        _executor.submit(_run)
+        _executor.submit(_counted(_run))
 
     def _put_failure(self, current_gen: int, label: str, exc: BaseException) -> None:
         """Hand a worker failure to the main thread, unless superseded.
@@ -177,6 +206,24 @@ class AsyncTask(Generic[T]):
             from ._runtime_context import request_render
 
             request_render()
+
+
+def pending_count() -> int:
+    """Number of background workers currently executing."""
+    with _in_flight_lock:
+        return _in_flight
+
+
+def shutdown_pending_tasks() -> None:
+    """Discard queued work and stop accepting more.
+
+    Called on the way out so quitting does not have to wait for a backlog the
+    user never asked to finish; it shortens the tail to the longest single
+    task already running. Those running tasks cannot be cancelled — a thread
+    has no cancellation point — so ``wait=False`` here still leaves the
+    interpreter's own shutdown joining them.
+    """
+    _executor.shutdown(wait=False, cancel_futures=True)
 
 
 def run_async(
