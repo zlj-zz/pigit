@@ -204,7 +204,7 @@ def test_recover_confirm_text_warns_commit_loss(app):
     app._recover_from_reflog("HEAD@{1}")
     assert "Recover to bbbbbbb" in seen["message"]
     assert "git reset --hard bbbbbbb" in seen["message"]
-    assert "reflog 可找回" in seen["message"]
+    assert "recoverable from the reflog" in seen["message"]
     assert seen["kind"] is FeedbackKind.ERROR
 
 

@@ -100,7 +100,7 @@ class HistoryRecord:
 
     def describe_commands(self) -> str:
         """Join the commands this reversal will run, for confirm dialogs."""
-        return "、".join(cmd.describe() for cmd in self.commands)
+        return ", ".join(cmd.describe() for cmd in self.commands)
 
 
 def _estimate_memory(record: HistoryRecord) -> int:

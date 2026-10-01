@@ -109,6 +109,11 @@ FOOTER_HEIGHT = 2
 # the panel hints the footer exists to show.
 FOOTER_ACTIONS = ("universal.inspector", "universal.quit")
 
+# Same wording as handlers.repo_picker.EMPTY_MANAGED_REPOS_MSG so the same
+# condition reads the same from the CLI and the TUI. Spelled out rather than
+# imported: handlers is the CLI layer, and the app does not depend on it.
+NO_MANAGED_REPOS_MSG = "No managed repos; use `pigit repo add`."
+
 
 class _SwitchResult(NamedTuple):
     """Outcome of a background RepoSession.build for repo switch."""
@@ -1090,7 +1095,7 @@ class PigitApplication(Application):
         """
         if self._managed_repos is None:
             show_toast(
-                "未配置 repos.json（repos.json 未找到）",
+                NO_MANAGED_REPOS_MSG,
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1223,14 +1228,14 @@ class PigitApplication(Application):
             target = info.path
         if target == session:
             show_toast(
-                "先切换到其他工作树再移除",
+                "Cannot remove the worktree you are in",
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
             return
         if info.is_main:
             show_toast(
-                "不能移除主工作树",
+                "Cannot remove the main worktree",
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1385,7 +1390,7 @@ class PigitApplication(Application):
         """Add ``path`` to ManagedRepos, then switch the TUI session to it."""
         if self._managed_repos is None:
             show_toast(
-                "未配置 repos.json（repos.json 未找到）",
+                NO_MANAGED_REPOS_MSG,
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1955,10 +1960,10 @@ class PigitApplication(Application):
             )
             return
         self._alert_dialog.alert(
-            f"Recover to {entry.sha[:7]}（{entry.message} · "
-            f"{relative_time(entry.when)}）\n"
+            f"Recover to {entry.sha[:7]} ({entry.message} · "
+            f"{relative_time(entry.when)})\n"
             f"Run: git reset --hard {entry.sha[:7]}\n"
-            "之后的 commit 将从分支移除（reflog 可找回）",
+            "Later commits leave the branch (recoverable from the reflog)",
             lambda ok: self._do_recover_reflog(entry) if ok else None,
             kind=FeedbackKind.ERROR,
         )

@@ -182,7 +182,7 @@ def test_open_repo_switcher_none_managed_toasts():
     with patch("pigit.app.show_toast") as toast:
         app.open_repo_switcher()
         toast.assert_called()
-        assert "repos.json" in toast.call_args.args[0]
+        assert "No managed repos" in toast.call_args.args[0]
 
 
 def test_open_repo_switcher_shows_sheet():
