@@ -12,7 +12,15 @@ from unittest.mock import Mock
 import pytest
 
 from pigit.git.model import Branch
+from pigit.session_history import SessionHistory
+from pigit.viewmodels.base import WorktreeGate
 from pigit.viewmodels.branch import BranchViewModel
+
+
+def _history() -> SessionHistory:
+    history = SessionHistory()
+    history.attach_repo("/tmp/repo")
+    return history
 
 
 @pytest.fixture
@@ -24,13 +32,13 @@ def branch_vm():
         Branch("remotes/origin/main", "?", "?", False, is_remote=True),
     ]
     git.get_head.return_value = "main"
-    vm = BranchViewModel(git)
+    vm = BranchViewModel(git, worktree_gate=WorktreeGate())
     vm._items.set(vm._git.load_branches.return_value)
     return vm
 
 
 def test_scope_defaults_to_local():
-    vm = BranchViewModel(Mock())
+    vm = BranchViewModel(Mock(), worktree_gate=WorktreeGate())
     assert vm.scope == "local"
 
 
@@ -164,7 +172,7 @@ def test_current_branch(branch_vm):
 def test_current_branch_empty():
     git = Mock()
     git.get_head.return_value = None
-    vm = BranchViewModel(git)
+    vm = BranchViewModel(git, worktree_gate=WorktreeGate())
     assert vm.current_branch() == ""
 
 
@@ -219,6 +227,50 @@ def test_can_rebase_blocked_by_untracked(branch_vm):
     ok, msg = branch_vm.can_rebase()
     assert ok is False
     assert "Uncommitted changes" in msg
+
+
+def test_create_branch_undo_checks_out_before_deleting(branch_vm):
+    """``reverse()`` walks commands backwards, so the checkout-back has to be
+    listed last — deleting the branch HEAD is sitting on would fail."""
+    git = Mock()
+    git.get_head.return_value = "main"
+    vm = BranchViewModel(git, history=_history(), worktree_gate=WorktreeGate())
+
+    vm.create_branch("feat")
+
+    records = vm._history.peek()
+    assert len(records) == 1
+    order: list[str] = []
+    git.checkout_branch.side_effect = lambda _b: order.append("checkout")
+    git.delete_branch.side_effect = lambda _n: order.append("delete")
+
+    assert records[0].reverse(git).success is True
+    assert order == ["checkout", "delete"]
+    git.checkout_branch.assert_called_once_with("main")
+    git.delete_branch.assert_called_once_with("feat")
+
+
+def test_create_branch_without_history_records_nothing(branch_vm):
+    branch_vm.create_branch("feat")
+    branch_vm._git.create_branch.assert_called_once_with("feat")
+
+
+def test_can_merge_probe_failure_blocks(branch_vm):
+    """A probe that raised must not read as "go ahead" — the merge would start
+    on a worktree whose state we could not even inspect."""
+    branch_vm._git.has_staged_changes.side_effect = RuntimeError("git unavailable")
+    ok, msg = branch_vm.can_merge()
+    assert ok is False
+    assert "git unavailable" not in msg  # the user gets plain text, not the trace
+    assert "Cannot read working tree state" in msg
+
+
+def test_can_rebase_probe_failure_blocks(branch_vm):
+    branch_vm._git.has_staged_changes.side_effect = RuntimeError("git unavailable")
+    ok, msg = branch_vm.can_rebase()
+    assert ok is False
+    assert "git unavailable" not in msg
+    assert "Cannot read working tree state" in msg
 
 
 def test_load_log_graph_splits_lines(branch_vm):

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from .. import _runtime_context, keys, palette
 from ..feedback import FeedbackKind, style_for
 from ..component import Component
+from ..event_loop import ExitEventLoop
 from ..primitives.frame import BoxFrame
 from ..mouse import MouseButton, MouseEvent, MouseKind
 from .._runtime_context import get_focus_manager
@@ -527,6 +528,12 @@ class AlertDialog(Popup):
             return
         try:
             fn(value)
+        except ExitEventLoop:
+            # An answer may legitimately decide to quit — "N operations are
+            # still running, quit anyway?" is exactly that. Swallowing it
+            # here would leave the key doing nothing at all. Same contract as
+            # the key-handler boundary in AppEventLoop.
+            raise
         except Exception:
             _logger.exception("AlertDialog on_result failed")
 

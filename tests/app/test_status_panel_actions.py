@@ -8,13 +8,29 @@ Date: 2026-08-18
 
 from __future__ import annotations
 
+import threading
+import time
+
+import pytest
 from unittest.mock import Mock, patch
 
 from pigit.app_status import StatusPanel
+from pigit.termui import AsyncTask
 from pigit.git.model import File
 from pigit.termui.reactive import Signal
 from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.status import IStatusViewModel
+
+
+@pytest.fixture(autouse=True)
+def _inline_spinner(monkeypatch):
+    """Run spinner-wrapped work inline so panel assertions stay synchronous."""
+
+    def _run(work, on_done, *, label):
+        on_done(work())
+        return Mock()
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", _run)
 
 
 def _file(
@@ -23,6 +39,7 @@ def _file(
     short_status: str = " M",
     has_staged: bool = False,
     has_unstaged: bool = True,
+    conflicts: bool = False,
 ) -> File:
     return File(
         name=name,
@@ -33,7 +50,7 @@ def _file(
         tracked=True,
         deleted=False,
         added=False,
-        has_merged_conflicts=False,
+        has_merged_conflicts=conflicts,
         has_inline_merged_conflicts=False,
     )
 
@@ -122,6 +139,189 @@ def test_discard_on_dir_confirms_then_discards_children() -> None:
     vm.discard_indices.assert_not_called()
     captured["on_result"](True)
     vm.discard_indices.assert_called_once_with({0, 1})
+
+
+def test_checkout_ours_confirms_before_discarding_theirs() -> None:
+    """Taking one side of a conflict destroys the other with no backup."""
+    files = [_file("a.py", short_status="UU", conflicts=True)]
+    panel, vm = _panel(files, tree=False)
+    captured: dict = {}
+
+    def fake_alert(text, on_result, kind=None):
+        captured["text"] = text
+        captured["on_result"] = on_result
+        return True
+
+    panel._alert_dialog.alert = fake_alert
+    panel.checkout_ours()
+
+    assert captured["text"] == "Discard theirs, keep ours in 'a.py' ?"
+    vm.checkout_ours.assert_not_called()
+    captured["on_result"](True)
+    vm.checkout_ours.assert_called_once_with(0)
+
+
+def test_checkout_ours_cancel_touches_nothing() -> None:
+    files = [_file("a.py", short_status="UU", conflicts=True)]
+    panel, vm = _panel(files, tree=False)
+    captured: dict = {}
+    panel._alert_dialog.alert = lambda text, on_result, kind=None: (
+        captured.update(on_result=on_result) or True
+    )
+
+    panel.checkout_ours()
+    captured["on_result"](False)
+    vm.checkout_ours.assert_not_called()
+
+
+def test_checkout_theirs_on_a_clean_file_does_not_confirm() -> None:
+    """A non-conflicted row must not raise a dialog that leads nowhere."""
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    alerts: list = []
+    panel._alert_dialog.alert = lambda *a, **k: alerts.append(a) or True
+
+    with patch("pigit.app_status.show_toast") as toast:
+        panel.checkout_theirs()
+
+    assert alerts == []
+    vm.checkout_theirs.assert_not_called()
+    assert toast.call_args[0][0] == "No conflicts"
+
+
+def test_confirm_says_so_when_a_modal_blocks_the_dialog() -> None:
+    """``alert`` returns False while another modal is open; the action then
+    silently never runs, which is indistinguishable from a dead key."""
+    files = [_file("a.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel._alert_dialog.alert = lambda *a, **k: False
+
+    with patch("pigit.app_status.show_toast") as toast:
+        panel._confirm("Discard?", lambda _ok: None)
+
+    assert toast.call_args[0][0] == "Close the open dialog first"
+
+
+def test_stage_single_file_runs_through_the_worker() -> None:
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    panel.curr_no = 0
+    panel.stage()
+    vm.stage.assert_called_once_with(0)
+
+
+def test_ignore_on_dir_dispatches_child_indices() -> None:
+    """Tree-mode ``i`` on a directory is its own entry point: it never goes
+    through ``_run_action``, so it needs its own worker wrap."""
+    files = [_file("src/a.py"), _file("src/b.py")]
+    panel, vm = _panel(files)
+    vm.ignore_indices.return_value = ActionResult(True, "ok", False)
+    panel.curr_no = 0
+    panel.ignore()
+    vm.ignore_indices.assert_called_once_with({0, 1})
+
+
+def test_ignore_visual_batch_runs_through_the_worker() -> None:
+    """Visual mode with ``needs_confirm=False`` reaches ``_run_action``'s own
+    batch branch — a third sync path, separate from the confirm helper."""
+    files = [_file("a.py"), _file("b.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.ignore_indices.return_value = ActionResult(True, "ok", False)
+    panel._visual_mode = True
+    panel._selected = {0, 1}
+
+    panel.ignore()
+
+    vm.ignore_indices.assert_called_once_with({0, 1})
+    # Cleared in `after`, i.e. once the report has refreshed the list.
+    assert panel._visual_mode is False
+
+
+def test_ignore_single_file_runs_through_the_worker() -> None:
+    """The non-confirm single path is a fourth entry of its own."""
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.ignore.return_value = ActionResult(True, "ok", False)
+    panel.curr_no = 0
+    panel.ignore()
+    vm.ignore.assert_called_once_with(0)
+
+
+def test_after_runs_only_once_the_result_has_been_reported() -> None:
+    """``after`` reads the row list ``_handle_result`` just refreshed; running
+    it first clears the selection against the stale list."""
+    panel, _vm = _panel([_file("a.py")])
+    order: list[str] = []
+    panel._handle_result = lambda _result: order.append("report")
+
+    panel._run_file_action(
+        lambda: ActionResult(True, "ok", False),
+        label="Staging",
+        after=lambda: order.append("after"),
+    )
+
+    assert order == ["report", "after"]
+
+
+def test_file_action_runs_off_the_ui_thread(monkeypatch, mocker) -> None:
+    """End-to-end through the real ``run_with_spinner``: the VM call happens
+    on a worker thread and the report lands on the main thread via poll_all."""
+    from pigit.termui import run_with_spinner as real_spinner
+
+    # This file's autouse fixture inlines the spinner; put the real one back.
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+
+    files = [_file("a.py"), _file("b.py"), _file("c.py")]
+    panel, vm = _panel(files, tree=False)
+    seen: dict = {}
+
+    def _stage_all(_indices):
+        seen["thread"] = threading.current_thread()
+        return ActionResult(True, "Staged 3 file(s)", False)
+
+    vm.stage_indices.side_effect = _stage_all
+    reported: list[str] = []
+    panel._handle_result = lambda result: reported.append(result.message)
+
+    panel.stage_all()
+    # The worker may already have started — what must not happen is the result
+    # being applied here, on this thread.
+    assert reported == []
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not reported:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert seen["thread"] is not threading.main_thread()
+    assert reported == ["Staged 3 file(s)"]
+
+
+def test_worker_failure_names_the_action(monkeypatch, mocker) -> None:
+    """AsyncTask reports a failure to the error callback, never to ``done``.
+    Without the label the toast would not say which action died."""
+    from pigit.termui import run_with_spinner as real_spinner
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+    toast = mocker.patch("pigit.termui.overlay.show_toast")
+
+    panel, _vm = _panel([_file("a.py")], tree=False)
+
+    def _boom(_idx):
+        raise RuntimeError("index locked")
+
+    panel._run_file_action(lambda: _boom(0), label="Staging")
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not toast.called:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert toast.call_args[0][0] == "Staging failed: index locked"
 
 
 def test_stage_all_stages_every_listed_file() -> None:

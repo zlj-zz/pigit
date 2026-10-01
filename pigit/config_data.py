@@ -53,6 +53,9 @@ class AppConfig:
     diff_preview_default: bool = True
     log_graph_default: bool = True
     commit_report_default: bool = True
+    # Max commits the commit panel loads from ``git log``; 0 means no limit.
+    # The listing streams in, so this only bounds memory on huge histories.
+    commit_log_limit: int = 20000
     show_footer: bool = True
     show_welcome: bool = True
     # Nerd Font icon strategy for the Status list: "auto" (detect NF

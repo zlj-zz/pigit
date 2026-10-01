@@ -34,7 +34,6 @@ htmlcov/
 useless/
 
 # other
-tests/test_repo
 tests/ignore_test
 tests/pigit.conf
 coverage.json

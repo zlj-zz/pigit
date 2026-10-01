@@ -10,9 +10,27 @@ from __future__ import annotations
 import threading
 import time
 
-from pigit.termui.async_task import AsyncTask
+from unittest.mock import Mock
+
+from pigit.termui import run_with_spinner
+from pigit.termui.async_task import (
+    AsyncTask,
+    pending_count,
+    shutdown_pending_tasks,
+)
 from pigit.termui.component import Component
 from pigit.termui.event_loop import AppEventLoop
+
+
+def _drained(predicate, timeout: float = 3.0) -> bool:
+    """Poll the result queue until *predicate* holds or time runs out."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return False
 
 
 class _FakeInput:
@@ -104,6 +122,86 @@ def test_async_task_multiple_polls_are_safe():
     AsyncTask.poll_all()
     AsyncTask.poll_all()  # second poll should be no-op
     assert received == ["x"]
+
+
+# --- Failure visibility ---
+#
+# A worker that raises used to be logged at DEBUG and dropped, so the panel
+# simply kept whatever it had — indistinguishable from "nothing more to show".
+
+
+def _spy_failures(monkeypatch) -> list[tuple[str, BaseException]]:
+    from pigit.termui import overlay
+
+    seen: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(overlay, "report_async_failure", seen.append)
+    return seen
+
+
+def test_failed_work_is_reported_on_the_main_thread(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+    received: list[str] = []
+
+    def boom():
+        raise RuntimeError("git blew up")
+
+    AsyncTask().start(boom, received.append, label="Commit history")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert received == []
+    assert len(seen) == 1
+    label, exc = seen[0]
+    assert isinstance(exc, RuntimeError)
+    assert (label, str(exc)) == ("Commit history", "git blew up")
+
+
+def test_failure_label_is_the_caller_supplied_one(monkeypatch):
+    """The label must not be derived from ``callback``: every VM wraps its
+    callback in ``ViewModelBase._guarded``, whose closure is named ``deliver``
+    — so every failure would read "deliver failed"."""
+    seen = _spy_failures(monkeypatch)
+
+    def deliver(_data):
+        raise AssertionError("the success callback must not run")
+
+    def boom():
+        raise ValueError("nope")
+
+    AsyncTask().start(boom, deliver, label="Branches")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert [label for label, _ in seen] == ["Branches"]
+
+
+def test_superseded_failure_is_not_reported(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+
+    def slow_boom():
+        time.sleep(0.05)
+        raise RuntimeError("stale")
+
+    task = AsyncTask()
+    task.start(slow_boom, lambda _r: None, label="Branches")
+    task.cancel()
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert seen == []
+
+
+def test_stream_failure_is_reported(monkeypatch):
+    seen = _spy_failures(monkeypatch)
+
+    def work(_emit):
+        raise RuntimeError("stream died")
+
+    AsyncTask().start_stream(work, lambda _b: None, label="Commit history")
+    time.sleep(0.1)
+    AsyncTask.poll_all()
+
+    assert [label for label, _ in seen] == ["Commit history"]
 
 
 # --- Integration with AppEventLoop ---
@@ -244,6 +342,31 @@ def test_run_async_clipboard_callback(mocker):
     assert received == [True]
 
 
+def test_run_with_spinner_hides_the_spinner_before_on_done(mocker):
+    """``on_done`` must run with the spinner already gone, so a toast it shows
+    is not the thing the spinner teardown dismisses."""
+    from pigit.termui import overlay
+
+    order: list[str] = []
+    mocker.patch.object(overlay, "show_spinner", lambda *a, **k: order.append("show"))
+    mocker.patch.object(overlay, "hide_spinner", lambda: order.append("hide"))
+
+    run_with_spinner(
+        lambda: "ok",
+        lambda result: order.append(f"done:{result}"),
+        label="Checking out",
+    )
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        AsyncTask.poll_all()
+        if any(step.startswith("done:") for step in order):
+            break
+        time.sleep(0.01)
+
+    assert order == ["show", "hide", "done:ok"]
+
+
 def test_run_async_dedup(mocker):
     """Rapid run_async calls cancel the old task when caller manages the handle."""
     import pigit.ext.utils
@@ -283,3 +406,74 @@ def test_run_async_dedup(mocker):
 
     assert "new" in received
     assert "old" not in received
+
+
+# ── In-flight accounting (quit must know what it is about to abandon) ──
+
+
+def test_pending_count_tracks_a_running_worker():
+    release = threading.Event()
+    task = AsyncTask()
+    task.start(lambda: release.wait(3.0), lambda _r: None, label="Slow")
+
+    assert _drained(lambda: pending_count() == 1)
+    release.set()
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_returns_to_zero_after_a_failure():
+    """The decrement lives in ``finally``: a leaked count would make the quit
+    confirmation impossible to get past — ``q`` would ask every single time."""
+    task = AsyncTask()
+
+    def _boom():
+        raise RuntimeError("nope")
+
+    task.start(_boom, lambda _r: None, label="Booming")
+
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_covers_streaming_tasks():
+    release = threading.Event()
+
+    def _stream(emit):
+        emit("first")
+        release.wait(3.0)
+
+    task = AsyncTask()
+    task.start_stream(_stream, lambda _batch: None, label="Streaming")
+
+    assert _drained(lambda: pending_count() == 1)
+    release.set()
+    assert _drained(lambda: pending_count() == 0)
+
+
+def test_pending_count_ignores_work_that_never_starts(monkeypatch):
+    """Counting around ``submit`` instead of inside the worker would leave a
+    task cancelled before it ran counted forever."""
+    captured: dict = {}
+    fake = Mock()
+
+    def _submit(fn):
+        captured["fn"] = fn  # never run: as if cancelled before starting
+
+    fake.submit.side_effect = _submit
+    monkeypatch.setattr("pigit.termui.async_task._executor", fake)
+
+    task = AsyncTask()
+    task.start(lambda: None, lambda _r: None, label="Queued")
+
+    assert captured["fn"] is not None
+    assert pending_count() == 0
+
+
+def test_shutdown_pending_tasks_does_not_wait(monkeypatch):
+    """``wait=False`` is the whole point: waiting here would reintroduce the
+    hang this exists to avoid. Only queued work can be dropped."""
+    fake = Mock()
+    monkeypatch.setattr("pigit.termui.async_task._executor", fake)
+
+    shutdown_pending_tasks()
+
+    fake.shutdown.assert_called_once_with(wait=False, cancel_futures=True)

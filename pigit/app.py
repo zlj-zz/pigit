@@ -29,7 +29,9 @@ from pigit.termui import (
     hide_spinner,
     keys,
     AsyncTask,
+    pending_count,
     request_render,
+    shutdown_pending_tasks,
     resolve_presentation_leaf,
     run_async,
     Segment,
@@ -52,7 +54,11 @@ from pigit.termui.widgets import (
     RepoSlot,
     TabSlot,
 )
-from pigit.termui.bindings import ExecutableBinding
+from pigit.termui.bindings import (
+    ExecutableBinding,
+    merge_footer_pairs,
+    resolve_action_keys,
+)
 from pigit.termui.reactive import Signal
 from pigit.termui.mouse import MouseEvent
 from pigit.termui.types import LayerKind
@@ -61,7 +67,7 @@ from .app_merge_state import MergeStateStore
 from .app_observe import ObserveDeps, ObserveHost
 from .app_panel_nav import PanelNavigator
 from .app_network_git import NetworkGit, NetworkGitOutcome
-from .app_merge_workflow import MergeWorkflow
+from .app_merge_workflow import MergeStepOutcome, MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
 from .git.model import ReflogEntry
@@ -80,6 +86,7 @@ from .app_status import StatusPanel
 from .app_theme import THEME, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
+from .app_bisect import guard_worktree_busy
 from .repo_session import RepoSession
 from .session_history import (
     HistoryRecord,
@@ -95,6 +102,12 @@ from .config_data import AppConfig
 # or sheets.
 HEADER_HEIGHT = 2
 FOOTER_HEIGHT = 2
+
+# Universal actions that earn a permanent footer slot. Deliberately a short
+# list rather than "every universal binding with a tip": the tab jumps,
+# bisect, recent, push, pull and welcome all carry tips and would crowd out
+# the panel hints the footer exists to show.
+FOOTER_ACTIONS = ("universal.inspector", "universal.quit")
 
 
 class _SwitchResult(NamedTuple):
@@ -138,7 +151,12 @@ class PigitApplication(Application):
         self._managed_repos = managed_repos
         # Undo stack must exist before RepoSession.build (Status/Branch VMs).
         self._session_history = SessionHistory(max_items=100, max_memory_mb=50)
-        self._session = RepoSession.build(self._git_api, None, self._session_history)
+        self._session = RepoSession.build(
+            self._git_api,
+            None,
+            self._session_history,
+            commit_log_limit=config.commit_log_limit,
+        )
         # Aliases keep existing lambdas (get_git=lambda: self._git, …) working.
         self._git = self._session.git
         self._repo_path = self._session.repo_path
@@ -181,6 +199,7 @@ class PigitApplication(Application):
         self._inspector_token: object = None
         # Background push/pull (must not use exec_external on the worker)
         self._network_sync_task: AsyncTask[NetworkGitOutcome] = AsyncTask()
+        self._merge_task: AsyncTask[MergeStepOutcome] = AsyncTask()
         self._network_git = NetworkGit(
             store=self._merge_state_store,
             get_git=lambda: self._git,
@@ -189,6 +208,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_alert_dialog=lambda: self._alert_dialog,
+            get_worktree_gate=lambda: self._session.worktree_gate,
             guard_async=self._guard_repo_async,
         )
         self._merge_workflow = MergeWorkflow(
@@ -201,6 +221,8 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_schedule_reload_header=lambda: self._schedule_reload_header(),
             get_record_rewind=lambda: self._record_rewind,
+            get_worktree_gate=lambda: self._session.worktree_gate,
+            get_merge_task=lambda: self._merge_task,
         )
         self._sequencer = SequencerControl(
             get_git=lambda: self._git,
@@ -210,6 +232,7 @@ class PigitApplication(Application):
             get_refresh_git_vms=lambda: self._refresh_git_vms(),
             get_refresh_active_panel=lambda: self._refresh_active_panel(),
             get_record_rewind=lambda: self._record_rewind,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         # Adaptive split state
         self._preview_panel: PreviewPanel | None = None
@@ -221,7 +244,7 @@ class PigitApplication(Application):
 
     def build_root(self) -> Component:
         footer = AppFooter(theme=THEME, id="footer")
-        footer.set_global_help([("I", "Inspector"), ("Q", "Quit")])
+        footer.set_global_help(self._global_footer_entries())
 
         # Side previews are created at app level but only inserted into the
         # layout on large screens: Status/Stash use diff preview, Branch uses
@@ -379,6 +402,7 @@ class PigitApplication(Application):
                 get_is_large_screen=lambda: self._is_large_screen,
                 get_root=lambda: self._root,
                 get_loop=lambda: self._loop,
+                get_worktree_busy=lambda: self._session.worktree_gate.busy,
                 schedule_reload_header=self._schedule_reload_header,
                 refresh_header_dirty=self._refresh_header_dirty,
                 refresh_list_panel=self._refresh_list_panel,
@@ -535,6 +559,11 @@ class PigitApplication(Application):
             edge_fg=THEME.fg_accent,
         )
 
+    # Deliberately keyless. The guide opens itself on first run
+    # (``_maybe_show_welcome_on_first_run``); after that it is reached from the
+    # Help panel (``?``), which lists every action including the keyless ones
+    # and runs the selected row. A global shortcut would be one more key to
+    # keep clear for a screen most people read once.
     @bind_action("show_welcome", desc="Show welcome guide", tip="Welcome")
     def show_welcome(self) -> None:
         """Open the onboarding Welcome sheet (no-op when another overlay is open)."""
@@ -579,6 +608,22 @@ class PigitApplication(Application):
         self._bind_session_vm_tokens(self._session)
         return self._repo_token
 
+    def _global_footer_entries(self) -> list[tuple[str, str]]:
+        """Resolve the app's permanent footer hints from their bindings.
+
+        Resolving the keys instead of hardcoding the letters means a remapped
+        key shows what the user actually has to press; the previous literal
+        ``[("I", "Inspector"), ("Q", "Quit")]`` also hid that ``q`` works.
+        """
+        wanted = set(FOOTER_ACTIONS)
+        raw = [
+            (key, binding.tip)
+            for binding in self._action_bindings
+            if binding.action in wanted and binding.tip is not None
+            for key in resolve_action_keys(binding)
+        ]
+        return merge_footer_pairs(raw)
+
     def _can_switch(self) -> bool:
         """Block repo switch while network sync or a git sequencer is active."""
         from .app_bisect import guard_bisect_active, guard_sequencer_active
@@ -589,6 +634,10 @@ class PigitApplication(Application):
                 duration=2.0,
                 kind=FeedbackKind.ERROR,
             )
+            return False
+        # Abandoning a checkout/stash mid-rewrite to open another repo would
+        # leave this one half-applied, so hold the switch until it finishes.
+        if guard_worktree_busy(self._session.worktree_gate.busy):
             return False
         if guard_sequencer_active(self._git):
             return False
@@ -618,7 +667,12 @@ class PigitApplication(Application):
 
         def work() -> _SwitchResult:
             try:
-                session = RepoSession.build(self._git_api, path, self._session_history)
+                session = RepoSession.build(
+                    self._git_api,
+                    path,
+                    self._session_history,
+                    commit_log_limit=self._config.commit_log_limit,
+                )
                 if not session.repo_path:
                     session.dispose()
                     return _SwitchResult(False, error="Not a git repository")
@@ -997,6 +1051,12 @@ class PigitApplication(Application):
 
     def _do_reverse_last(self) -> None:
         """Execute the reversal of the most recent session action."""
+        # Reversals write the working tree too (restore/checkout/rewind), so
+        # they take the same gate as the panel actions. Undoing a checkout
+        # while another rewrite is mid-flight is how a `reset --hard` guard
+        # reads a half-written tree and passes.
+        if guard_worktree_busy(self._session.worktree_gate.busy):
+            return
         recent = self._session_history.peek(1)
         was_checkout = bool(
             recent
@@ -1448,6 +1508,7 @@ class PigitApplication(Application):
             self._git,
             on_done=_on_done,
             confirm_reverse=self._confirm_reverse_range,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         show_sheet(panel, title_core=sheet_core("Recent"), edge_fg=THEME.fg_accent)
 
@@ -1564,7 +1625,44 @@ class PigitApplication(Application):
 
     @bind_action("quit", "Q", "q", desc="Quit Pigit", tip="Quit")
     def quit(self, *, exit_code: int = 0, result_message: str | None = None):
-        raise ExitEventLoop("Quit", exit_code=exit_code, result_message=result_message)
+        """Quit, asking first when background work is still running.
+
+        Quitting is not instant: the interpreter joins every worker thread on
+        the way out, so a pull against an unreachable remote would leave the
+        process hanging with the terminal already restored and nothing saying
+        why. Asking turns that into a choice.
+        """
+        pending = pending_count()
+        if not pending:
+            raise ExitEventLoop(
+                "Quit", exit_code=exit_code, result_message=result_message
+            )
+
+        def on_answer(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            shutdown_pending_tasks()
+            # Raises from inside the dialog callback: the exception unwinds
+            # through the event loop exactly as it would from the key handler.
+            raise ExitEventLoop(
+                "Quit",
+                exit_code=exit_code,
+                result_message=result_message,
+                force=True,
+            )
+
+        if not self._alert_dialog.alert(
+            f"{pending} background operation(s) still running. Quit anyway?",
+            on_answer,
+            kind=FeedbackKind.WARNING,
+        ):
+            # Another modal owns the screen, so the question cannot be asked.
+            # Refusing to quit would strand the user behind it; quit normally
+            # instead — that is the pre-existing behaviour, not a new hang.
+            logging.warning("Quit confirmation blocked by another modal")
+            raise ExitEventLoop(
+                "Quit", exit_code=exit_code, result_message=result_message
+            )
 
     @bind_action(
         "push", "P", desc="Push current branch (set upstream if needed)", tip="Push"
@@ -1910,10 +2008,6 @@ class PigitApplication(Application):
         """Delegate to SequencerControl.on_cherry_pick()."""
         self._sequencer.on_cherry_pick(sha, is_merge)
 
-    def _exec_cherry_pick(self, sha: str) -> None:
-        """Delegate to SequencerControl.exec_cherry_pick()."""
-        self._sequencer.exec_cherry_pick(sha)
-
     def _on_merge_request(self, source: str, target: str) -> None:
         """Delegate to MergeWorkflow.on_merge_request()."""
         self._merge_workflow.on_merge_request(source, target)
@@ -1945,10 +2039,6 @@ class PigitApplication(Application):
         if new_lines is None and new_sha is not None and path:
             new_lines = git.load_worktree_file(path)
         return old_lines, new_lines
-
-    def _do_merge_workflow(self, source: str, target: str) -> None:
-        """Delegate to MergeWorkflow.do_merge_workflow()."""
-        self._merge_workflow.do_merge_workflow(source, target)
 
     def _confirm_push_and_finish(self, target: str, source: str) -> None:
         """Delegate to MergeWorkflow.confirm_push_and_finish()."""

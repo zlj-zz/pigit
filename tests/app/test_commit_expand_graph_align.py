@@ -84,14 +84,16 @@ def test_expanded_long_message_reads_row_by_row():
     vm.items = Signal([])
     vm.remotes = ()
     vm.graph_rows = []
-    vm.get_bodies.return_value = {commit_a.sha: "subject a\n\n" + "\n".join(body_lines)}
+    vm.get_commit_bodies.return_value = {
+        commit_a.sha: "subject a\n\n" + "\n".join(body_lines)
+    }
     panel = CommitPanel(vm=vm)
     panel.commits = [commit_a, commit_b]
     panel._expanded = True
     panel.resize(
         (80, 6)
     )  # viewport first: resize on an unmounted lazy panel wipes content
-    panel._ensure_bodies()
+    panel._ensure_bodies_near(0)
     panel._rebuild_rows()
 
     # commit_a spans COMMIT+AUTHOR+DATE+BLANK+12 body lines+TAIL = 17 rows.
@@ -165,3 +167,130 @@ def test_expanded_author_row_omits_absent_email():
     text = _expanded_author_row_text(commit)
     assert "Author: Zev" in text
     assert "<" not in text
+
+
+def test_bodies_are_fetched_for_the_window_only_and_cached():
+    """Expanded mode reads a bounded neighbourhood, never the whole history."""
+    commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(200)]
+    vm = Mock(spec=ICommitViewModel)
+    vm.items = Signal([])
+    vm.remotes = ()
+    vm.graph_rows = []
+    # A successful batch answers every sha it was asked for.
+    vm.get_commit_bodies.side_effect = lambda shas: {
+        sha: "subject\n\nbody" for sha in shas
+    }
+    panel = CommitPanel(vm=vm)
+    panel.commits = commits
+
+    assert panel._ensure_bodies_near(100) is True
+    wanted = vm.get_commit_bodies.call_args[0][0]
+    assert len(wanted) == 2 * panel.BODY_WINDOW + 1
+    assert commits[100].sha in wanted and commits[0].sha not in wanted
+
+    # Second call is a no-op: everything in the window is cached, no git call.
+    vm.get_commit_bodies.reset_mock()
+    assert panel._ensure_bodies_near(100) is False
+    vm.get_commit_bodies.assert_not_called()
+
+    # Painting never runs git, even for an uncached commit.
+    assert panel._body_lines(commits[0]) == []
+    vm.get_commit_bodies.assert_not_called()
+
+
+def test_body_cache_is_bounded():
+    commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(20)]
+    vm = Mock(spec=ICommitViewModel)
+    vm.items = Signal([])
+    vm.remotes = ()
+    vm.graph_rows = []
+    vm.get_commit_bodies.side_effect = lambda shas: {
+        sha: "subject\n\nbody" for sha in shas
+    }
+    panel = CommitPanel(vm=vm)
+    panel.commits = commits
+    panel.BODY_CACHE_MAX = 5
+
+    panel._ensure_bodies_near(0)
+    assert len(panel._body_lines_cache) <= 5
+
+
+def _panel_with(vm: Mock) -> CommitPanel:
+    panel = CommitPanel(vm=vm)
+    panel.mount()
+    return panel
+
+
+def _vm_for(commits: list[Commit]) -> Mock:
+    vm = Mock(spec=ICommitViewModel)
+    vm.items = Signal([])
+    vm.remotes = ()
+    vm.graph_rows = []
+    return vm
+
+
+def test_streamed_batches_match_a_single_load():
+    """Appending batches must land in the same state as one full list."""
+    commits = [
+        Commit(f"{i:08x}", f"msg {i}", "Zev", 1700000000 + i, "pushed", "", [])
+        for i in range(6)
+    ]
+    streamed = _panel_with(_vm_for(commits))
+    full = _panel_with(_vm_for(commits))
+
+    streamed._vm.items.set(commits[:2])
+    streamed._vm.items.set(commits[:5])
+    streamed._vm.items.set(commits)
+    full._vm.items.set(commits)
+
+    assert [c.sha for c in streamed.commits] == [c.sha for c in full.commits]
+    assert streamed.content == full.content
+    assert streamed._item_starts == full._item_starts
+    assert streamed._max_meta_w == full._max_meta_w
+
+
+def test_appending_a_batch_keeps_cursor_and_sub_row():
+    """A batch lands below the reader: neither the cursor nor its sub-row moves."""
+    commits = [
+        Commit(f"{i:08x}", f"msg {i}", "Zev", 1700000000 + i, "pushed", "", [])
+        for i in range(6)
+    ]
+    panel = _panel_with(_vm_for(commits))
+    panel._vm.items.set(commits[:3])
+    panel._expanded = True
+    panel._rebuild_rows()
+    panel.curr_no = 2
+    panel._cursor_sub = 2  # somewhere inside the third commit's rows
+
+    panel._vm.items.set(commits)  # a streamed batch arrives
+
+    assert panel.curr_no == 2
+    assert panel._cursor_sub == 2
+    assert len(panel.commits) == 6
+    # Rows of the already-shown commits are untouched.
+    assert panel._item_starts[:3] == [0, 4, 8]
+
+
+def test_failed_body_batch_is_not_cached():
+    """A failed read must be retried, not remembered as an empty body."""
+    commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(3)]
+    vm = _vm_for(commits)
+    vm.get_commit_bodies.return_value = {}  # the batch read failed
+    panel = CommitPanel(vm=vm)
+    panel.commits = commits
+
+    assert panel._ensure_bodies_near(0) is False
+    assert panel._body_lines_cache == {}
+
+
+def test_mount_replays_items_gathered_while_unmounted():
+    """Signals only fire on change: mount must replay the current items."""
+    commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(3)]
+    vm = _vm_for(commits)
+    panel = CommitPanel(vm=vm)
+    vm.items.set(commits)  # a stream lands while the panel is unmounted
+
+    panel.mount()
+
+    assert [c.sha for c in panel.commits] == [c.sha for c in commits]
+    vm.refresh.assert_called_once()

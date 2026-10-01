@@ -55,10 +55,15 @@ class ExitEventLoop(Exception):
         *,
         exit_code: int = 0,
         result_message: Any | None = None,
+        force: bool = False,
     ) -> None:
         super().__init__(msg)
         self.exit_code = exit_code
         self.result_message = result_message
+        #: Skip waiting for background workers. Interpreter shutdown joins
+        #: them unconditionally, so a hung network call would otherwise keep
+        #: the process alive after the user asked it to quit.
+        self.force = force
 
 
 class AppEventLoop:

@@ -21,6 +21,12 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import AlertDialog
 
+from .app_bisect import (
+    guard_bisect_active,
+    guard_sequencer_active,
+    guard_worktree_busy,
+)
+
 _SEQUENCER_PAUSED = {
     "rebase": "Rebase paused. Resolve/edit, then ';' → rebase-continue/abort/skip",
     "cherry-pick": "Cherry-pick paused. Resolve, then ';' → cherry-pick-continue/abort/skip",
@@ -46,6 +52,7 @@ class SequencerControl:
         get_refresh_git_vms: Callable[[], None],
         get_refresh_active_panel: Callable[[], None],
         get_record_rewind: Callable[[], Callable[[str, str], None]],
+        get_worktree_busy: Callable[[], bool],
     ) -> None:
         """
         Args:
@@ -56,6 +63,7 @@ class SequencerControl:
             refresh_git_vms: Callback to refresh Status/Branch/Commit VMs.
             refresh_active_panel: Callback after rebase sheet completes.
             get_record_rewind: Late-bound recorder for successful HEAD moves.
+            get_worktree_busy: True while another working-tree rewrite runs.
         """
         self._get_git = get_git
         self._get_repo_path = get_repo_path
@@ -64,6 +72,7 @@ class SequencerControl:
         self._get_refresh_git_vms = get_refresh_git_vms
         self._get_refresh_active_panel = get_refresh_active_panel
         self._get_record_rewind = get_record_rewind
+        self._get_worktree_busy = get_worktree_busy
 
     def on_rebase_request(self, target: str) -> None:
         """Open the interactive-rebase todo panel for ``target``."""
@@ -78,6 +87,7 @@ class SequencerControl:
             target,
             on_done=_on_done,
             get_record_rewind=self._get_record_rewind,
+            get_worktree_busy=self._get_worktree_busy,
         )
         show_sheet(
             panel,
@@ -125,6 +135,11 @@ class SequencerControl:
 
     def do_rebase_control(self, flag: str) -> None:
         """Execute ``git rebase --<flag>`` via exec_external and refresh panels."""
+        # Checked here rather than in run_rebase_control: the abort path waits
+        # on a confirm dialog in between, so the gate could have been taken by
+        # the time the user answers.
+        if guard_worktree_busy(self._get_worktree_busy()):
+            return
         try:
             result = exec_external(
                 ["git", "rebase", f"--{flag}"], cwd=self._get_repo_path()
@@ -160,6 +175,8 @@ class SequencerControl:
 
     def do_cherry_pick_control(self, flag: str) -> None:
         """Execute ``git cherry-pick --<flag>`` via exec_external."""
+        if guard_worktree_busy(self._get_worktree_busy()):
+            return
         argv = ["git", "cherry-pick", f"--{flag}"]
         if flag == "continue":
             argv.append("--no-edit")
@@ -181,12 +198,13 @@ class SequencerControl:
 
     def on_cherry_pick(self, sha: str, is_merge: bool) -> None:
         """Guard, confirm, then copy ``sha`` onto HEAD via exec_external."""
-        from .app_bisect import guard_bisect_active, guard_sequencer_active
-
         git = self._get_git()
         if guard_bisect_active(git):
             return
         if guard_sequencer_active(git):
+            return
+        # Cherry-pick rewrites HEAD and the worktree.
+        if guard_worktree_busy(self._get_worktree_busy()):
             return
         try:
             if sha == git.resolve_head_sha():

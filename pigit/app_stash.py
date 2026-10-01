@@ -16,6 +16,7 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     palette,
+    run_with_spinner,
     Segment,
     show_badge,
     show_toast,
@@ -98,12 +99,20 @@ class StashPanel(OptionList):
             return None
         return self.stashes[self.curr_no]
 
-    def _run_on_current(self, op: Callable[[str], ActionResult]) -> None:
-        """Run a stash-ref operation on the current row."""
+    def _run_on_current(self, op: Callable[[Stash], ActionResult], verb: str) -> None:
+        """Run an operation on the stash under the cursor, off the UI thread.
+
+        The ``Stash`` is captured here, on the UI thread: the worker must act
+        on the row the user picked, not on wherever the cursor moved to since.
+        """
         stash = self._current_stash()
         if stash is None:
             return
-        self._handle_result(op(stash.ref))
+        run_with_spinner(
+            lambda: op(stash),
+            self._handle_result,
+            label=f"{verb} {stash.ref}",
+        )
 
     @bind_action("next", "j", "down", desc="Navigate stash list", tip="Navigate")
     def next_item(self, step: int = 1) -> None:
@@ -157,16 +166,18 @@ class StashPanel(OptionList):
 
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:
-        self._run_on_current(self._vm.stash_pop)
+        # Hand over the sha too: popping drops the entry, so the captured
+        # commit id is the undo path's only handle on it.
+        self._run_on_current(lambda s: self._vm.stash_pop(s.ref, s.sha), "Popping")
 
     @bind_action(
         "apply",
         "a",
-        desc="Apply selected stash onto working tree (keep in list)",
+        desc="Apply selected stash onto working tree (keep in list; not undoable)",
         tip="Apply",
     )
     def apply(self) -> None:
-        self._run_on_current(self._vm.stash_apply)
+        self._run_on_current(lambda s: self._vm.stash_apply(s.ref), "Applying")
 
     @bind_action(
         "drop", "d", desc="Drop selected stash permanently (irreversible)", tip="Drop"

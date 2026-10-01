@@ -358,3 +358,49 @@ class TestSurfaceRGBWideChars:
         assert row[1].char == "中"
         assert row[2].char == ""  # spacer
         assert row[3].char == "B"  # C is clipped
+
+
+class TestCombiningMarks:
+    """Zero-width marks belong in their base glyph's cell."""
+
+    def test_mark_joins_its_base_glyph(self):
+        s = Surface(10, 1)
+        s.draw_text_rgb(0, 0, "éx")
+        assert [c.char for c in s._rows[0][:3]] == ["é", "x", " "]
+
+    def test_mark_joins_a_wide_base_not_its_spacer(self):
+        s = Surface(10, 1)
+        s.draw_text_rgb(0, 0, "中́")
+        cells = s._rows[0]
+        assert cells[0].char == "中́"
+        assert cells[1].char == ""  # the wide-glyph spacer
+
+    def test_leading_mark_is_dropped(self):
+        s = Surface(10, 1)
+        s.draw_text_rgb(0, 1, "́abc")
+        assert [c.char for c in s._rows[0][1:5]] == ["a", "b", "c", " "]
+
+    def test_mark_after_a_clipped_glyph_is_dropped(self):
+        """No base was drawn, so there is nothing to attach to — it must not
+        reach back and edit whatever the row already held."""
+        s = Surface(10, 1)
+        s.draw_text_rgb(0, 3, "AB")
+        s.draw_text_rgb(
+            0,
+            0,
+            "́",
+        )  # mark with no base at this position
+        assert [c.char for c in s._rows[0][:5]] == [" ", " ", " ", "A", "B"]
+
+    def test_shared_blank_singleton_is_never_mutated(self):
+        """Rows are filled with the shared singleton and ``clear`` writes it
+        back every frame, so editing one would poison every blank cell for the
+        rest of the process."""
+        from pigit.termui.surface import _BLANK_CELL, _SPACER_CELL
+
+        s = Surface(10, 1)
+        s.draw_text_rgb(0, 0, "́")
+        s.clear()
+        s.draw_text_rgb(0, 0, "́")
+        assert _BLANK_CELL.char == " "
+        assert _SPACER_CELL.char == ""

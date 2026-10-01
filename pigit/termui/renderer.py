@@ -8,7 +8,6 @@ Date: 2026-08-20
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from collections.abc import Sequence
 
 from . import palette
 from ._color import ColorAdapter
@@ -89,27 +88,6 @@ class Renderer:
         """
         self._cursor_pos = (row, col)
 
-    def draw_block(
-        self, lines: Sequence[str], row: int, col: int, width: int, height: int
-    ) -> None:
-        """
-        Fill a rectangular area with lines, clipping to ``width`` / ``height``.
-
-        Use this for a fixed viewport: each line is truncated or padded to
-        ``width`` within ``height`` rows. Prefer :meth:`draw_panel` for block
-        regions that mirror the historical full-screen component contract (erase
-        full width per row, then paint content and blank trailing rows up to a
-        last row index).
-        """
-
-        cur = row
-        for i in range(height):
-            line = lines[i] if i < len(lines) else ""
-            self.move_cursor(cur, col)
-            self._out.write(line[:width].ljust(min(len(line), width)))
-            cur += 1
-        self.flush()
-
     def draw_panel(
         self, content: list[str], x: int, y: int, size: tuple[int, int]
     ) -> None:
@@ -121,10 +99,9 @@ class Renderer:
         content through ``size[1]`` (last row index) are blanked the same way.
         ``size`` is ``(column_width, last_row_1_based)`` as in the legacy API.
 
-        Do not substitute :meth:`draw_block` here: ``draw_block`` clips to a
-        height/width window with ``ljust`` truncation; ``draw_panel`` erases
-        the full width per row and uses the second component of ``size`` as an
-        inclusive end row for blanking.
+        Unlike a fixed height/width window, this erases the full width per row
+        and reads the second component of ``size`` as an inclusive end row for
+        blanking.
         """
 
         col_width, row_end = size

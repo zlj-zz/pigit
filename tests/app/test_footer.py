@@ -264,3 +264,21 @@ class TestAppFooter:
             assert ("b", "Bad") in f._help_pairs()
         finally:
             _runtime_ctx.reset(token)
+
+
+def test_global_footer_entries_follow_key_overrides():
+    """The footer hardcoded the letters, so a remapped key still showed the old
+    one — and never showed that ``q`` also quits."""
+    from pigit.app import PigitApplication
+    from pigit.config_data import AppConfig
+    from pigit.termui import set_key_overrides
+
+    app = PigitApplication(config=AppConfig(repo_observe=False))
+    assert ("I", "Inspector") in app._global_footer_entries()
+    assert ("Q/q", "Quit") in app._global_footer_entries()
+
+    set_key_overrides({"universal.quit": ("X",)})
+    try:
+        assert ("X", "Quit") in app._global_footer_entries()
+    finally:
+        set_key_overrides({})

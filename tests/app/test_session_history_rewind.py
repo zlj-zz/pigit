@@ -143,17 +143,68 @@ def test_describe_stash_ops():
         ReverseCommand(op_type="stash_push", payload={}).describe()
         == "git stash pop stash@{0}"
     )
+    # The reversal re-stores the entry at stash@{0}; say so rather than
+    # implying the original index comes back.
     assert (
         ReverseCommand(
             op_type="stash_pop", payload={"stash_sha": "0123456789abcdef"}
         ).describe()
-        == "git stash store 0123456"
+        == "git stash store 0123456 (as stash@{0})"
     )
-    # SHA not yet captured on push → honest placeholder instead of a guess.
+    # No SHA (a record the VM refuses to push today) → honest placeholder
+    # instead of a guess. describe renders inside the confirm dialog, so it
+    # must not raise on this payload either.
     assert (
         ReverseCommand(op_type="stash_pop", payload={}).describe()
         == "git stash store <sha>"
     )
+
+
+def test_create_branch_reverse_deletes_without_force():
+    """Non-force on purpose: if commits landed on the branch since, git
+    refuses and the user keeps them."""
+    git = _git()
+    result = ReverseCommand(op_type="create_branch", payload={"name": "feat"}).execute(
+        git
+    )
+    assert result.success
+    git.delete_branch.assert_called_once_with("feat")
+
+
+def test_amend_reverse_soft_resets_to_pre_sha():
+    git = _git()
+    result = ReverseCommand(
+        op_type="amend", payload={"pre_sha": "0123456789abcdef"}
+    ).execute(git)
+    assert result.success
+    git.soft_reset_head.assert_called_once_with("0123456789abcdef")
+
+
+def test_describe_create_branch_and_amend():
+    assert (
+        ReverseCommand(op_type="create_branch", payload={"name": "feat"}).describe()
+        == "git branch -d feat"
+    )
+    assert (
+        ReverseCommand(
+            op_type="amend", payload={"pre_sha": "0123456789abcdef"}
+        ).describe()
+        == "git reset --soft 0123456"
+    )
+
+
+def test_stash_pop_reverse_stores_the_captured_sha():
+    """Regression: an empty payload made the reversal fail with 'stash_sha'.
+
+    The record is popped off the stack before its reversal runs, so that
+    failure silently ate the user's only chance to undo the pop.
+    """
+    git = _git()
+    result = ReverseCommand(
+        op_type="stash_pop", payload={"stash_sha": "0123456789abcdef"}
+    ).execute(git)
+    assert result.success
+    git.stash_store.assert_called_once_with("0123456789abcdef")
 
 
 def test_history_describe_commands_joins():

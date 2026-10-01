@@ -82,7 +82,7 @@ class _FakeTask:
         pass
 
 
-def _run_sync(work, callback):
+def _run_sync(work, callback, **_kwargs):
     callback(work())
     return _FakeTask()
 
@@ -253,7 +253,7 @@ def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
 
     pending: list[tuple] = []
 
-    def _defer(work, callback):
+    def _defer(work, callback, **_kwargs):
         pending.append((work, callback))
         return _FakeTask()
 

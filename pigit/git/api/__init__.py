@@ -176,8 +176,8 @@ class GitApi:
             branch_name, limit, filter_path, path, max_commits
         )
 
-    def get_commit_bodies(self, branch_name, max_commits=300, path=None):
-        return self._commit.get_commit_bodies(branch_name, max_commits, path)
+    def get_commit_bodies(self, shas, path=None):
+        return self._commit.get_commit_bodies(shas, path)
 
     def list_commits_in_range(self, base, path=None):
         return self._commit.list_commits_in_range(base, path)
@@ -284,6 +284,9 @@ class GitApi:
 
     def soft_reset_head1(self, path=None):
         return self._worktree.soft_reset_head1(path)
+
+    def soft_reset_head(self, sha, path=None):
+        return self._worktree.soft_reset_head(sha, path)
 
     def hard_reset_head(self, sha, path=None):
         return self._worktree.hard_reset_head(sha, path)

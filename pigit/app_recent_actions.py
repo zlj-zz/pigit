@@ -20,6 +20,7 @@ from pigit.termui import (
     show_toast,
 )
 from pigit.termui.widgets import OptionList
+from .app_bisect import guard_worktree_busy
 
 from .app_theme import THEME
 
@@ -40,12 +41,14 @@ class RecentActionsPanel(OptionList):
         git: GitApi,
         on_done: Callable[[], None],
         confirm_reverse: Callable[[list[HistoryRecord], Callable[[], None]], None],
+        get_worktree_busy: Callable[[], bool],
     ) -> None:
         super().__init__(on_selection_changed=None)
         self._history = history
         self._git = git
         self._on_done = on_done
         self._confirm_reverse = confirm_reverse
+        self._get_worktree_busy = get_worktree_busy
         self._records: list[HistoryRecord] = []
 
     def preferred_sheet_height(self, term_h: int) -> int:
@@ -82,6 +85,10 @@ class RecentActionsPanel(OptionList):
 
     def _do_reverse(self, target_idx: int) -> None:
         """Reverse the selected range and refresh; called after confirmation."""
+        # Reversals write the working tree; they take the same gate as the
+        # panel actions so they cannot overlap a running rewrite.
+        if guard_worktree_busy(self._get_worktree_busy()):
+            return
         result = self._history.reverse_to(target_idx, self._git)
         if result.success:
             show_badge(result.message, duration=1.5, kind=FeedbackKind.SUCCESS)

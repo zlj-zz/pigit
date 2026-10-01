@@ -27,6 +27,37 @@ _executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 # Global queue for delivering async results back to the main thread.
 _GLOBAL_QUEUE: queue.Queue[tuple[Callable[[Any], None], Any]] = queue.Queue()
 
+_DEFAULT_LABEL = "Background task"
+
+# Workers currently executing. Counted inside the worker rather than around
+# ``_executor.submit`` so a task cancelled before it ever starts (see
+# :func:`shutdown_pending_tasks`) is not counted — this number is what the
+# quit confirmation shows the user, and it claims the tasks are *running*.
+_in_flight = 0
+_in_flight_lock = threading.Lock()
+
+
+def _counted(work: Callable[[], None]) -> Callable[[], None]:
+    """Wrap a worker so it is counted for as long as it actually runs.
+
+    The decrement lives in ``finally`` because every other exit — a raised
+    exception, the failure path, cancellation — must still release the count.
+    A leaked count would make :func:`pending_count` permanent, and the quit
+    confirmation would then never let the user past it.
+    """
+
+    def _run() -> None:
+        global _in_flight
+        with _in_flight_lock:
+            _in_flight += 1
+        try:
+            work()
+        finally:
+            with _in_flight_lock:
+                _in_flight -= 1
+
+    return _run
+
 
 class AsyncTask(Generic[T]):
     """Cancellable background task that delivers results to the main thread.
@@ -55,8 +86,20 @@ class AsyncTask(Generic[T]):
         self,
         work: Callable[[], T],
         callback: Callable[[T], None],
+        *,
+        label: str = _DEFAULT_LABEL,
     ) -> None:
-        """Start a new background task, cancelling any previous one."""
+        """Start a new background task, cancelling any previous one.
+
+        Args:
+            work: Blocking callable executed on the worker thread.
+            callback: Invoked on the main thread with the result.
+            label: Human name for the task, used when reporting a failure.
+                Resolve it here — at the call site — rather than deriving it
+                from ``callback``: callers overwhelmingly pass a
+                ``ViewModelBase._guarded`` wrapper, whose ``__name__`` is
+                ``deliver`` for every task in the app.
+        """
         with self._lock:
             self._gen += 1
             current_gen = self._gen
@@ -64,15 +107,70 @@ class AsyncTask(Generic[T]):
         def _run() -> None:
             try:
                 result = work()
-            except Exception:
-                _logger.debug("AsyncTask work failed", exc_info=True)
+            except Exception as exc:
+                _logger.exception("AsyncTask work failed: %s", label)
+                self._put_failure(current_gen, label, exc)
                 return
             with self._lock:
                 if current_gen != self._gen:
                     return
                 _GLOBAL_QUEUE.put((callback, result))
 
-        _executor.submit(_run)
+        _executor.submit(_counted(_run))
+
+    def start_stream(
+        self,
+        work: Callable[[Callable[[T], bool]], None],
+        callback: Callable[[T], None],
+        *,
+        label: str = _DEFAULT_LABEL,
+    ) -> None:
+        """Start a streaming task whose result arrives in batches.
+
+        ``work`` receives an ``emit`` callable and may call it any number of
+        times from the worker thread; each batch reaches ``callback`` on the
+        main thread, exactly like :meth:`start`. ``emit`` returns ``False``
+        once the task has been superseded (``cancel`` or a newer
+        ``start``/``start_stream``), and the worker is expected to stop
+        producing — which is what actually cancels a long read such as a
+        ``git log`` generator: dropping it closes the pipe.
+
+        Batches already queued when the stream is superseded are still
+        delivered, so the callback must also validate what it applies.
+        """
+        with self._lock:
+            self._gen += 1
+            current_gen = self._gen
+
+        def emit(batch: T) -> bool:
+            with self._lock:
+                if current_gen != self._gen:
+                    return False
+            _GLOBAL_QUEUE.put((callback, batch))
+            return True
+
+        def _run() -> None:
+            try:
+                work(emit)
+            except Exception as exc:
+                _logger.exception("AsyncTask stream failed: %s", label)
+                self._put_failure(current_gen, label, exc)
+
+        _executor.submit(_counted(_run))
+
+    def _put_failure(self, current_gen: int, label: str, exc: BaseException) -> None:
+        """Hand a worker failure to the main thread, unless superseded.
+
+        Rides the same ``(callback, result)`` queue as successful results, so
+        ``poll_all`` needs no type branch. The import is lazy because the
+        overlay layer sits above this one.
+        """
+        from .overlay import report_async_failure
+
+        with self._lock:
+            if current_gen != self._gen:
+                return
+            _GLOBAL_QUEUE.put((report_async_failure, (label, exc)))
 
     def cancel(self) -> None:
         """Mark the current task as cancelled.
@@ -110,19 +208,40 @@ class AsyncTask(Generic[T]):
             request_render()
 
 
+def pending_count() -> int:
+    """Number of background workers currently executing."""
+    with _in_flight_lock:
+        return _in_flight
+
+
+def shutdown_pending_tasks() -> None:
+    """Discard queued work and stop accepting more.
+
+    Called on the way out so quitting does not have to wait for a backlog the
+    user never asked to finish; it shortens the tail to the longest single
+    task already running. Those running tasks cannot be cancelled — a thread
+    has no cancellation point — so ``wait=False`` here still leaves the
+    interpreter's own shutdown joining them.
+    """
+    _executor.shutdown(wait=False, cancel_futures=True)
+
+
 def run_async(
     work: Callable[[], T],
     callback: Callable[[T], Any],
+    *,
+    label: str = _DEFAULT_LABEL,
 ) -> AsyncTask[T]:
     """Run blocking work in a background thread; deliver result to main thread.
 
     Args:
         work: Blocking function executed in ThreadPoolExecutor.
         callback: Invoked on the main thread with the result.
+        label: Human name for the task, used when reporting a failure.
 
     Returns:
         AsyncTask handle; caller can ``.cancel()`` to drop the result.
     """
     task = AsyncTask[T]()
-    task.start(work, callback)
+    task.start(work, callback, label=label)
     return task

@@ -8,6 +8,7 @@ Date: 2026-08-17
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import Mock, patch
 
 from pigit.app_stash import StashPanel
@@ -17,6 +18,17 @@ from pigit.termui.surface import Surface
 from pigit.termui.reactive import Signal
 from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.status import IStatusViewModel
+
+
+@pytest.fixture(autouse=True)
+def _inline_spinner(monkeypatch):
+    """Run spinner-wrapped work inline so panel assertions stay synchronous."""
+
+    def _run(work, on_done, *, label):
+        on_done(work())
+        return Mock()
+
+    monkeypatch.setattr("pigit.app_stash.run_with_spinner", _run)
 
 
 def _panel_with_stashes(msgs: list[str]) -> StashPanel:

@@ -58,6 +58,7 @@ from .overlay import (
     get_badge,
     get_badge_signal,
     hide_spinner,
+    run_with_spinner,
     show_badge,
     show_sheet,
     show_spinner,
@@ -81,7 +82,12 @@ from . import palette
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from .mouse import MouseButton, MouseEvent, MouseKind
-from .async_task import AsyncTask, run_async
+from .async_task import (
+    AsyncTask,
+    pending_count,
+    run_async,
+    shutdown_pending_tasks,
+)
 
 __all__ = [
     # Types
@@ -129,7 +135,9 @@ __all__ = [
     "MouseEvent",
     "MouseKind",
     "AsyncTask",
+    "pending_count",
     "run_async",
+    "shutdown_pending_tasks",
     # Overlay context
     "show_toast",
     "show_sheet",
@@ -140,6 +148,7 @@ __all__ = [
     "get_badge_signal",
     "show_spinner",
     "hide_spinner",
+    "run_with_spinner",
     "request_render",
     # Session context
     "exec_external",

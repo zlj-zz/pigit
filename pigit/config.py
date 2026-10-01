@@ -53,6 +53,20 @@ def _flatten_keybindings(raw: dict, prefix: str = "") -> dict:
     return out
 
 
+def _coerce_non_negative_int(raw: object, default: int) -> int:
+    """Return *raw* as a non-negative int, falling back to *default*.
+
+    ``0`` (and any negative value) means "no limit" for the commit listing, so
+    a negative entry is clamped rather than rejected.
+    """
+    if raw is None:
+        return default
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return default
+
+
 def _resolve_icons_policy(app_raw: dict) -> str:
     """Resolve the Nerd Font icons policy from raw ``[app]`` values.
 
@@ -156,6 +170,10 @@ class Config:
         # (bool) Show the Commit contribution-graph report below the list on
         # tall screens (> 19 rows). Ctrl+r toggles at runtime.
         commit_report_default = {app_commit_report_default}
+
+        # (int) Max commits the Commit panel reads from `git log`; 0 = no limit.
+        # The listing streams in, so this only bounds memory on huge histories.
+        commit_log_limit = {app_commit_log_limit}
 
         # (bool) Show the footer key-hint bar.
         show_footer = {app_show_footer}
@@ -350,6 +368,9 @@ class Config:
             diff_preview_default=app_raw.get("diff_preview_default", True),
             log_graph_default=app_raw.get("log_graph_default", True),
             commit_report_default=app_raw.get("commit_report_default", True),
+            commit_log_limit=_coerce_non_negative_int(
+                app_raw.get("commit_log_limit"), 20000
+            ),
             show_footer=app_raw.get("show_footer", True),
             show_welcome=app_raw.get("show_welcome", True),
             # PIGIT_ICONS=0 forces icons off regardless of config; see
@@ -433,6 +454,7 @@ class Config:
                         app_commit_report_default=str(
                             data.app.commit_report_default
                         ).lower(),
+                        app_commit_log_limit=str(data.app.commit_log_limit),
                         app_show_footer=str(data.app.show_footer).lower(),
                         app_show_welcome=str(data.app.show_welcome).lower(),
                         keybindings=keybindings_block,

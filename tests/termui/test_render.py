@@ -135,15 +135,6 @@ class TestRendererUtilities:
         assert "\033[K" in written
         assert "hello" in written
 
-    def test_draw_block(self):
-        sess = FakeSession()
-        r = Renderer(sess)
-        r.draw_block(["ab", "cd"], 1, 1, 3, 2)
-        written = _capture_output(sess)
-        assert "\033[1;1f" in written
-        assert "ab" in written
-        assert "cd" in written
-
     def test_draw_panel(self):
         sess = FakeSession()
         r = Renderer(sess)

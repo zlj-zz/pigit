@@ -26,8 +26,9 @@ from pigit.termui import (
     dismiss_sheet,
     exec_external,
     palette,
-    Segment,
     run_async,
+    run_with_spinner,
+    Segment,
     show_badge,
     show_sheet,
     show_toast,
@@ -58,6 +59,14 @@ class StatusAction(Enum):
     STAGE = auto()
     DISCARD = auto()
     IGNORE = auto()
+
+
+#: Spinner / failure-toast label per action, shared by every path that runs one.
+_ACTION_LABEL = {
+    StatusAction.STAGE: "Staging",
+    StatusAction.DISCARD: "Discarding",
+    StatusAction.IGNORE: "Ignoring",
+}
 
 
 def _staged_fg(ch: str) -> tuple[int, int, int]:
@@ -522,15 +531,27 @@ class StatusPanel(OptionList):
             if hit is not None:
                 f, source_idx = hit
                 if f.has_merged_conflicts or f.has_inline_merged_conflicts:
-                    self._check_via_alert(self._vm.stage, msg="Stage conflicted file")
+                    self._check_via_alert(
+                        self._vm.stage,
+                        msg="Stage conflicted file",
+                        label=_ACTION_LABEL[StatusAction.STAGE],
+                    )
                     return
-                result = self._vm.stage(source_idx)
-                self._handle_result(result)
+                self._run_file_action(
+                    lambda: self._vm.stage(source_idx),
+                    label=_ACTION_LABEL[StatusAction.STAGE],
+                )
                 return
-        result = self._dispatch_batch(StatusAction.STAGE, indices)
-        self._handle_result(result)
-        if self._visual_mode:
-            self._clear_visual_mode()
+
+        def after_stage() -> None:
+            if self._visual_mode:
+                self._clear_visual_mode()
+
+        self._run_file_action(
+            lambda: self._dispatch_batch(StatusAction.STAGE, indices),
+            label=_ACTION_LABEL[StatusAction.STAGE],
+            after=after_stage,
+        )
 
     @bind_action(
         "stage_all",
@@ -541,8 +562,10 @@ class StatusPanel(OptionList):
     def stage_all(self) -> None:
         if not self.files:
             return
-        result = self._vm.stage_indices(set(self._source_map))
-        self._handle_result(result)
+        self._run_file_action(
+            lambda: self._vm.stage_indices(set(self._source_map)),
+            label=_ACTION_LABEL[StatusAction.STAGE],
+        )
 
     @bind_action(
         "commit",
@@ -646,7 +669,7 @@ class StatusPanel(OptionList):
             else:
                 show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
-        self._alert_dialog.alert(
+        self._confirm(
             "Amend last commit with staged changes?",
             on_result,
             kind=FeedbackKind.WARNING,
@@ -692,8 +715,14 @@ class StatusPanel(OptionList):
 
     def _on_stash_submit(self, message: str) -> None:
         dismiss_sheet()
-        result = self._vm.stash_push(message.strip())
-        self._handle_result(result)
+        text = message.strip()
+        # Stashing walks the whole worktree (including untracked files), so it
+        # goes to the worker rather than freezing the UI.
+        run_with_spinner(
+            lambda: self._vm.stash_push(text),
+            self._handle_result,
+            label="Stashing",
+        )
 
     @bind_action(
         "visual_mode", "v", desc="Toggle visual multi-select mode", tip="Visual"
@@ -806,8 +835,10 @@ class StatusPanel(OptionList):
                         kind=FeedbackKind.WARNING,
                     )
                     return
-                result = self._dispatch_batch(StatusAction.IGNORE, indices)
-                self._handle_result(result)
+                self._run_file_action(
+                    lambda: self._dispatch_batch(StatusAction.IGNORE, indices),
+                    label=_ACTION_LABEL[StatusAction.IGNORE],
+                )
                 return
         self._run_action(
             self._vm.ignore,
@@ -824,10 +855,7 @@ class StatusPanel(OptionList):
         tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
     def checkout_ours(self) -> None:
-        hit = self.file_at_cursor()
-        if hit is not None:
-            result = self._vm.checkout_ours(hit[1])
-            self._handle_result(result)
+        self._resolve_conflict(self._vm.checkout_ours, "Discard theirs, keep ours in")
 
     @bind_action(
         "checkout_theirs",
@@ -837,10 +865,26 @@ class StatusPanel(OptionList):
         tip_when=lambda self: not self._visual_mode and self._cursor_has_conflict(),
     )
     def checkout_theirs(self) -> None:
+        self._resolve_conflict(self._vm.checkout_theirs, "Discard ours, keep theirs in")
+
+    def _resolve_conflict(
+        self, callee: Callable[[int], ActionResult], action: str
+    ) -> None:
+        """Confirm taking one side of a conflict for the file under the cursor.
+
+        The side not taken is gone for good (no backup is kept), so this always
+        confirms first — unlike the ordinary per-file actions, which only ask
+        when something would actually be destroyed.
+        """
         hit = self.file_at_cursor()
-        if hit is not None:
-            result = self._vm.checkout_theirs(hit[1])
-            self._handle_result(result)
+        if hit is None:
+            return
+        if not hit[0].has_merged_conflicts:
+            show_toast("No conflicts", duration=1.5, kind=FeedbackKind.WARNING)
+            return
+        self._check_via_alert(
+            callee, msg=action, label="Resolving conflict", kind=FeedbackKind.ERROR
+        )
 
     @bind_action("copy_path", "Y", desc="Copy file path")
     def copy_path(self) -> None:
@@ -858,6 +902,7 @@ class StatusPanel(OptionList):
                         kind=FeedbackKind.ERROR,
                     )
                 ),
+                label="Copy path",
             )
 
     def _update_visual_selection(self) -> None:
@@ -1179,6 +1224,37 @@ class StatusPanel(OptionList):
         if result.should_refresh:
             self._vm.refresh()
 
+    def _run_file_action(
+        self,
+        work: Callable[[], ActionResult],
+        *,
+        label: str,
+        after: Callable[[], None] | None = None,
+    ) -> None:
+        """Run a file action off the UI thread, then report and continue.
+
+        Every file action on this panel goes through here: they all end in
+        per-file ``git`` subprocesses, so running one inline freezes the UI
+        *and* swallows the feedback — ``show_spinner``/``show_badge`` only set
+        the render flag, which the event loop services once this key callback
+        returns.
+
+        Args:
+            work: The action to run on a worker thread.
+            label: Human name for the task, used when reporting a failure.
+            after: Runs on the main thread once :meth:`_handle_result` has
+                refreshed the list. Use it for state that depends on the new
+                row count — clearing the selection before the refresh lands
+                shows a mode with nothing selected in it.
+        """
+
+        def on_done(result: ActionResult) -> None:
+            self._handle_result(result)
+            if after is not None:
+                after()
+
+        run_with_spinner(work, on_done, label=label)
+
     def _open_external_editor(self, file: File) -> None:
         """Open file in external editor, suspending TUI."""
         editor = os.environ.get("EDITOR", "vim")
@@ -1244,9 +1320,11 @@ class StatusPanel(OptionList):
             if needs_confirm:
                 self._confirm_batch(batch_msg, action_type, kind=kind)
                 return
-            result = self._dispatch_batch(action_type, self._selected)
-            self._handle_result(result)
-            self._clear_visual_mode()
+            self._run_file_action(
+                lambda: self._dispatch_batch(action_type, self._selected),
+                label=_ACTION_LABEL[action_type],
+                after=self._clear_visual_mode,
+            )
             return
         # Single mode
         hit = self.file_at_cursor()
@@ -1254,16 +1332,23 @@ class StatusPanel(OptionList):
             return
         _, source_idx = hit
         if needs_confirm:
-            if self._check_via_alert(callee, msg=single_msg, kind=kind):
+            if self._check_via_alert(
+                callee, msg=single_msg, label=_ACTION_LABEL[action_type], kind=kind
+            ):
                 return
         else:
-            result = callee(source_idx)
-            self._handle_result(result)
+            self._run_file_action(
+                lambda: callee(source_idx), label=_ACTION_LABEL[action_type]
+            )
 
     def _dispatch_batch(
         self, action_type: StatusAction, indices: set[int]
     ) -> ActionResult:
         """Run a batch action on source-index set (indices are source indices)."""
+        # Callers hand over their live selection, which the follow-up clears
+        # once this returns. This now runs on a worker, so give it its own set
+        # rather than one another thread is free to empty underneath it.
+        indices = set(indices)
         match action_type:
             case StatusAction.STAGE:
                 return self._vm.stage_indices(indices)
@@ -1273,11 +1358,34 @@ class StatusPanel(OptionList):
                 return self._vm.ignore_indices(indices)
         return ActionResult(success=False, message="Unknown action")
 
+    def _confirm(
+        self,
+        text: str,
+        on_result: Callable[[bool], None],
+        *,
+        kind: FeedbackKind | None = None,
+    ) -> bool:
+        """Show a confirm dialog, or tell the user why none appeared.
+
+        ``AlertDialog.alert`` refuses to show while another modal owns the
+        screen and returns False; ignoring that makes the key look dead —
+        nothing happens, and nothing says why.
+        """
+        shown = self._alert_dialog.alert(text, on_result, kind=kind)
+        if not shown:
+            show_toast(
+                "Close the open dialog first",
+                duration=2.0,
+                kind=FeedbackKind.WARNING,
+            )
+        return shown
+
     def _check_via_alert(
         self,
         callee: Callable[[int], ActionResult],
         msg: str = "",
         *,
+        label: str,
         kind: FeedbackKind | None = None,
     ) -> bool:
         hit = self.file_at_cursor()
@@ -1286,17 +1394,18 @@ class StatusPanel(OptionList):
         file, source_idx = hit
         text = f"{msg} '{file}' ?"
 
-        def on_result(confirmed: bool) -> None:
-            if not confirmed:
-                self._vm.refresh()
-                return
-            result = callee(source_idx)
-            self._handle_result(result)
+        def after() -> None:
             n_rows = len(self._tree_rows) if self._tree_mode else len(self.files)
             if n_rows:
                 self.curr_no = min(max(self.curr_no, 0), n_rows - 1)
 
-        return self._alert_dialog.alert(text, on_result, kind=kind)
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                self._vm.refresh()
+                return
+            self._run_file_action(lambda: callee(source_idx), label=label, after=after)
+
+        return self._confirm(text, on_result, kind=kind)
 
     def _confirm_batch(
         self,
@@ -1311,13 +1420,18 @@ class StatusPanel(OptionList):
         count = len(target)
         text = f"{action} {count} files?"
 
-        def on_result(confirmed: bool) -> None:
-            if not confirmed:
-                return
-            result = self._dispatch_batch(action_type, target)
-            self._handle_result(result)
+        def after() -> None:
             self._selected.clear()
             self._visual_mode = False
             self._visual_anchor = None
 
-        self._alert_dialog.alert(text, on_result, kind=kind)
+        def on_result(confirmed: bool) -> None:
+            if not confirmed:
+                return
+            self._run_file_action(
+                lambda: self._dispatch_batch(action_type, target),
+                label=_ACTION_LABEL[action_type],
+                after=after,
+            )
+
+        self._confirm(text, on_result, kind=kind)

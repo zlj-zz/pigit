@@ -290,7 +290,7 @@ class TestMultilineMask:
         assert mask == ["docstring", "docstring", "docstring", None]
 
     def test_python_quote_inside_string_does_not_open(self, tok):
-        lines = ["+s = '\"\"\"'", "+t = 1"]
+        lines = ['+s = \'"""\'', "+t = 1"]
         mask = tok.compute_multiline_mask(lines, ["py"] * len(lines))
         assert mask == [None, None]
 

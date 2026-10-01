@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from pigit.ext.utils import split_at_most
 from pigit.git.api import GitError
+from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE
 from pigit.termui import (
     FeedbackKind,
     bind_action,
@@ -23,6 +24,19 @@ from pigit.termui.widgets import OptionList
 
 if TYPE_CHECKING:
     from pigit.git.api import BisectState, GitApi
+
+
+def guard_worktree_busy(busy: bool) -> bool:
+    """Return True when a working-tree rewrite is running; toast and block.
+
+    Sits with its siblings rather than in a module of its own: this is the
+    same "refuse the action because the repository is in a state" family, and
+    six entry points across the app already call it.
+    """
+    if not busy:
+        return False
+    show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+    return True
 
 
 def guard_bisect_active(git: GitApi) -> bool:

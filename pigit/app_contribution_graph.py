@@ -119,6 +119,17 @@ class ContributionGraph(Component):
         self._max_count = max(counts.values()) if counts else 0
         self._recompute_derived_data()
 
+    def add_commits(self, commits: list) -> None:
+        """Add commits to the tallies (counts only ever grow, so adding is exact)."""
+        for c in commits:
+            day = datetime.datetime.fromtimestamp(c.unix_timestamp).date()
+            count = self._day_counts.get(day, 0) + 1
+            self._day_counts[day] = count
+            self._max_count = max(self._max_count, count)
+            author_days = self._author_day_counts.setdefault(c.author, {})
+            author_days[day] = author_days.get(day, 0) + 1
+        self._recompute_derived_data()
+
     def _recompute_derived_data(self) -> None:
         """Pre-compute all derived data that depends on commit counts and current date."""
         today = datetime.date.today()

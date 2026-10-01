@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for the inline merge-graph layout algorithm."""
 
-from pigit.app_log_graph import compute_graph_rows, _alloc_lane
+from pigit.app_log_graph import GraphLayout, compute_graph_rows, _alloc_lane
 from pigit.git.model import Commit
 
 
@@ -184,3 +184,28 @@ class TestAllocLane:
         idx = _alloc_lane(lanes, prefer_after=0, exclude={0})
         assert idx == 1
         assert lanes == [None, None]
+
+
+class TestGraphLayoutStreaming:
+    """Batched ``extend`` must equal one-shot ``compute_graph_rows``."""
+
+    def _history(self, n: int) -> list[Commit]:
+        commits = []
+        for i in range(n):
+            parents = [f"{i + 1:04x}"] if i < n - 1 else []
+            if i % 7 == 3 and i + 1 < n:
+                parents.append(f"{min(i + 3, n - 1):04x}")  # a merge
+            commits.append(_mk(f"{i:04x}", parents))
+        return commits
+
+    def test_batched_equals_whole(self):
+        commits = self._history(40)
+        layout = GraphLayout()
+        batched = []
+        for start in range(0, len(commits), 3):
+            batched.extend(layout.extend(commits[start : start + 3]))
+        assert batched == compute_graph_rows(commits)
+
+    def test_empty_extend_is_a_noop(self):
+        layout = GraphLayout()
+        assert layout.extend([]) == []
