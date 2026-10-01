@@ -3,6 +3,30 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.9.0 (2026-10-01)
+
+### Features
+
+- **Streaming commit history**: the list was capped at 300 commits and read in one shot, so every refresh materialised the whole log on a worker and then rebuilt every row on the UI thread — raising the cap alone could only jank. History now arrives in batches of 500 and is appended as it arrives, keeping the cursor, its sub-row and the scroll offset where they were; a cancelled read drops the generator and closes the `git` pipe. The cap becomes the `commit_log_limit` setting (20000, `0` for unlimited). Commit bodies are read for the rows around the cursor instead of prefetching 300 messages up front, cached per sha, so painting never runs `git`.
+
+### Improvements
+
+- **Working-tree operations no longer freeze the UI**: merge (`m`) and every Status panel file action — stage, stage all, discard, ignore, checkout ours/theirs — ran inline on the UI thread, costing one `git` subprocess per file. A stage-all after a large refactor froze the screen for the whole loop. They now run on a worker behind a spinner. The spinner had never painted in these paths either: `show_spinner` only sets the render flag, which the event loop services once the key callback returns — and it was the callback that was blocking.
+- **Quitting no longer waits on background work**: the thread pool is not a daemon pool, so interpreter shutdown joined every worker. A `git pull` against an unreachable remote has no upper bound, which left the process alive after the terminal was restored, with nothing on screen saying why. Quitting with work in flight now asks first; answering yes drops the queued tasks and leaves without the join. An ordinary quit winds down exactly as before.
+
+### Bug Fixes
+
+- **Undo, failures and worktree rewrites**: `stash pop` recorded an empty undo payload, so `u` failed with `'stash_sha'` and silently consumed the record. Background worker failures were debug-logged and dropped, leaving a stale panel that read as "nothing more to show" — they now surface as a toast naming the action. A confirm-gated action whose dialog was refused (another modal open) did nothing at all, indistinguishable from a dead key. `can_merge`/`can_rebase` turned a failed probe into "go ahead" and would start a merge on a worktree they could not inspect. `create_branch` and `amend` were not reversible; both are now (amend reverses with a soft reset, so the pre-amend state comes back exactly).
+- **Worktree gate coverage**: the single-flight gate only covered the panel view models. Merge, rebase, cherry-pick, the sequencer controls, undo, pull and `ignore` all rewrite the working tree too, so each now defers to it. Undo matters most: `rewind_head` guards on a clean worktree, and a half-written tree is exactly what makes that guard pass wrongly. Nine copies of the same refusal collapsed into one helper, and pull releases only a gate it actually took.
+- **Wide characters**: horizontal scrolling clipped by character index while its offset was in columns, over-clipping any run starting with a wide glyph. A zero-width mark is now appended to the base cell the drawing loop is holding, never looked up in the row — reaching back risked editing a cell that is still the shared blank singleton, which would have drawn the mark on every blank cell for the life of the process. File-history subjects and the filter bar truncate by display width.
+- **`NO_COLOR`**: honoured, after `PIGIT_COLOR_MODE` so an explicit request for colour still wins.
+- **Diff viewer**: scrolling left hid the start of every line with nothing said about it, while the right edge has always drawn "…"; it now shows a matching marker. `slice_left_by_width` kept combining marks whose base it had just cut away, so a terminal drew the accent over the blank left by a half-cut wide glyph or over the previous word. The viewer also accepts arrow keys — it was the only list that did not — and global footer hints resolve from their bindings, so a remapped key shows up and `q` is no longer hidden.
+- **Merge key help direction**: the binding merges the current branch into the selected one (the confirmation asks "Merge `<source>` into `<target>`?"), but the help text claimed the opposite. In-app description and both doc tables now match.
+
+### Tests
+
+- `TestRepo` built a fixed `tests/test_repo`, so two concurrent pytest runs re-initialised it under each other; it now uses `tmp_path_factory`. The commit panel gained the observe-driven-refresh regression test the other list panels already had.
+
 ## 2.8.0 (2026-09-17)
 
 ### Features
