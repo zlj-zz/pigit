@@ -851,3 +851,77 @@ def test_refresh_meta_refetches_branch_after_head_change(tmp_path, tmp_repos_jso
     assert refreshed == ["gr"]
     data = json.loads(tmp_repos_json.read_text())
     assert data["gr"]["meta"]["branch"] == "main"
+
+
+# ── Crash-safe writes, and corruption that stays recoverable ──
+#
+# A truncated repos.json used to be indistinguishable from an empty one, and
+# before_hook writes on every TUI start — so one bad read erased the
+# registry on the next launch, with nothing said.
+
+
+def test_a_failed_write_leaves_the_previous_file_intact(tmp_repos_json):
+    """The old code truncated the file first, so a crash mid-write left a
+    half-written file that the next read took for "no repos"."""
+    tmp_repos_json.write_text(json.dumps({"keep": {"path": "/keep"}}))
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    with patch("pigit.git.managed_repos.os.replace", side_effect=OSError("disk full")):
+        assert mr.dump_repos({"new": {"path": "/new"}}) is False
+
+    assert json.loads(tmp_repos_json.read_text()) == {"keep": {"path": "/keep"}}
+
+
+def test_a_failed_write_does_not_leave_the_temp_file_behind(tmp_repos_json):
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    with patch("pigit.git.managed_repos.os.replace", side_effect=OSError("disk full")):
+        mr.dump_repos({"new": {"path": "/new"}})
+
+    assert list(tmp_repos_json.parent.glob(f"{tmp_repos_json.name}.tmp*")) == []
+
+
+def test_a_successful_write_leaves_no_temp_file(tmp_repos_json):
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    assert mr.dump_repos({"a": {"path": "/a"}}) is True
+
+    assert list(tmp_repos_json.parent.glob(f"{tmp_repos_json.name}.tmp*")) == []
+    assert json.loads(tmp_repos_json.read_text()) == {"a": {"path": "/a"}}
+
+
+def test_an_unreadable_file_is_kept_rather_than_treated_as_empty(tmp_repos_json):
+    """What the file held is unknown, so it must survive the next write."""
+    tmp_repos_json.write_text('{"broken": ')  # truncated JSON
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    assert mr.load_repos() == {}
+
+    backups = list(tmp_repos_json.parent.glob(f"{tmp_repos_json.name}.corrupt*"))
+    assert len(backups) == 1
+    assert backups[0].read_text() == '{"broken": '
+
+
+def test_a_second_corruption_does_not_overwrite_the_first_backup(tmp_repos_json):
+    """The first backup is the one worth most, and a fixed name would lose it."""
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    tmp_repos_json.write_text("first damage")
+    mr.load_repos()
+    tmp_repos_json.write_text("second damage")
+    mr.load_repos()
+
+    saved = sorted(
+        p.read_text()
+        for p in tmp_repos_json.parent.glob(f"{tmp_repos_json.name}.corrupt*")
+    )
+    assert saved == ["first damage", "second damage"]
+
+
+def test_a_missing_file_is_not_a_corruption(tmp_repos_json):
+    """Nothing registered yet is ordinary; it must not litter backups."""
+    mr = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
+
+    assert mr.load_repos() == {}
+
+    assert list(tmp_repos_json.parent.glob("*.corrupt*")) == []
