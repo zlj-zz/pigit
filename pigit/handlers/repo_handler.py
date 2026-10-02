@@ -3,6 +3,8 @@ from __future__ import annotations
 import textwrap
 from typing import TYPE_CHECKING
 
+from ..ext.utils import confirm
+
 if TYPE_CHECKING:
     from ..cmdparse.parser import Namespace
     from ..context import Context
@@ -116,7 +118,22 @@ class RepoCommandHandler:
         page_output(_lines())
 
     def clear(self) -> None:
+        """Drop every entry from the repo registry, after confirming.
+
+        The registry is an index, not the repos themselves — they stay on
+        disk and ``pigit repo add`` puts them back — so a single y/N is
+        proportionate. ``default=False`` because an unrecognised answer must
+        not delete anything.
+        """
+        repos = self.managed_repos.load_repos()
+        if not repos:
+            self.console.echo("No repos to clear.")
+            return
+        if not confirm(f"Clear all {len(repos)} repo(s)? [y/N]: ", default=False):
+            self.console.echo("Cancelled.")
+            return
         self.managed_repos.clear_repos()
+        self.console.echo(f"Cleared {len(repos)} repo(s).")
 
     def report(self, args: "Namespace") -> None:
         report = self.managed_repos.report_repos(

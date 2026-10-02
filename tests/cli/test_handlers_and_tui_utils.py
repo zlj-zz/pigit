@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 """Tests for CLI handlers and small TUI helpers."""
 
+import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from pigit.ext.executor_factory import MockExecutor
+from pigit.git.managed_repos import ManagedRepos
 from pigit.handlers.open_handler import OpenHandler
 from pigit.handlers.repo_handler import RepoCommandHandler
 from pigit.handlers.tui_handler import TuiHandler
@@ -64,9 +67,11 @@ def test_repo_handler_add_none(mock_ctx):
 
 def test_repo_handler_rm_rename_report_cd_open(mock_ctx):
     echo = MagicMock()
+    # `clear` asks first (it is the only handler that wipes the registry), so
+    # this dispatch test answers the prompt rather than asserting it is absent.
     with patch(
         "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
-    ):
+    ), patch("pigit.handlers.repo_handler.confirm", return_value=True):
         h = RepoCommandHandler(mock_ctx)
         h.rm(SimpleNamespace(repos=["n"], path=False))
         h.rename(SimpleNamespace(repo="a", new_name="b"))
@@ -391,3 +396,66 @@ def test_tui_utils_get_width_and_plain():
     assert get_width(0xF) == 0
     assert get_width(999999) == 1
     assert plain("\033[1;32mhi\033[0m") == "hi"
+
+
+# ── Clearing the registry asks first ──
+#
+# `clear` lives on the handler but reaches the registry, so it is tested
+# here with the other handlers rather than beside the registry's own tests.
+
+@pytest.fixture
+def tmp_repos_json(tmp_path):
+    return tmp_path / "repos.json"
+
+
+def _clear_handler(tmp_repos_json):
+    ctx = Mock()
+    ctx.managed_repos = ManagedRepos(
+        MockExecutor(), repo_json_path=str(tmp_repos_json)
+    )
+    handler = RepoCommandHandler.__new__(RepoCommandHandler)
+    handler.ctx = ctx
+    handler.console = Mock()
+    return handler, ctx.managed_repos
+
+
+def test_clear_keeps_everything_when_declined(tmp_repos_json):
+    """`clear` used to unlink the file with no question at all."""
+    tmp_repos_json.write_text(json.dumps({"a": {"path": "/a"}}))
+    handler, _mr = _clear_handler(tmp_repos_json)
+
+    with patch("pigit.handlers.repo_handler.confirm", return_value=False):
+        handler.clear()
+
+    assert tmp_repos_json.exists()
+
+
+def test_clear_deletes_once_confirmed(tmp_repos_json):
+    tmp_repos_json.write_text(json.dumps({"a": {"path": "/a"}}))
+    handler, _mr = _clear_handler(tmp_repos_json)
+
+    with patch("pigit.handlers.repo_handler.confirm", return_value=True):
+        handler.clear()
+
+    assert not tmp_repos_json.exists()
+
+
+def test_clear_asks_with_the_count(tmp_repos_json):
+    tmp_repos_json.write_text(json.dumps({"a": {"path": "/a"}, "b": {"path": "/b"}}))
+    handler, _mr = _clear_handler(tmp_repos_json)
+
+    with patch(
+        "pigit.handlers.repo_handler.confirm", return_value=False
+    ) as asked:
+        handler.clear()
+
+    assert "2" in asked.call_args[0][0]
+
+
+def test_clear_on_an_empty_registry_does_not_ask(tmp_repos_json):
+    handler, _mr = _clear_handler(tmp_repos_json)
+
+    with patch("pigit.handlers.repo_handler.confirm") as asked:
+        handler.clear()
+
+    asked.assert_not_called()

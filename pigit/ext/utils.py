@@ -124,18 +124,25 @@ def traceback_info(extra_msg: str = "null") -> str:
 
 def confirm(text: str = "Confirm[y/n]:", default: bool = True) -> bool:
     """Obtain confirmation results.
+
     Args:
         text (str): Confirmation prompt.
-        default (bool): Result returned when unexpected input.
+        default (bool): Result returned when the input is neither yes nor no.
 
     Returns:
-        (bool): Confirm result.
+        (bool): Confirm result. ``False`` when the prompt cannot be answered
+            at all — EOF (piped or CI stdin) or Ctrl-C. A question nobody can
+            answer must not be read as consent.
     """
-    input_command: str = input(text).strip().lower()
-
-    if input_command in {"n", "no", "N", "No"}:
+    try:
+        input_command: str = input(text).strip().lower()
+    except (EOFError, KeyboardInterrupt):
         return False
-    elif input_command in {"y", "yes", "Y", "Yes"}:
+
+    # Already lowered above, so only the lowercase spellings can match.
+    if input_command in {"n", "no"}:
+        return False
+    elif input_command in {"y", "yes"}:
         return True
     else:
         return default
