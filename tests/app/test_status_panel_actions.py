@@ -482,3 +482,83 @@ def test_status_panel_receives_resolved_nerd_icons() -> None:
         app_auto.build_root()
     detect.assert_called_once_with("auto")
     assert app_auto._status_panel._nerd_icons is True
+
+
+# ── Commit and amend run off the UI thread ──
+#
+# These two were the last file actions still calling git inline. Commit is
+# also the only one that can run a user's pre-commit hook, which is exactly
+# the case where an unbounded freeze shows up.
+
+
+def test_commit_runs_off_the_ui_thread_and_keeps_the_subject(monkeypatch, mocker):
+    """The success badge names the subject, which the view model's own
+    message does not, so this path reports through its own callback."""
+    from pigit.termui import run_with_spinner as real_spinner
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+    badge = mocker.patch("pigit.app_status.show_badge")
+    mocker.patch("pigit.app_status.dismiss_sheet")
+
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.staged_files = [files[0]]
+    seen: dict = {}
+
+    def _commit(message):
+        seen["thread"] = threading.current_thread()
+        return ActionResult(True, "Committed", True)
+
+    vm.commit.side_effect = _commit
+    with patch("pigit.app_status.show_sheet") as sheet:
+        panel.commit()
+        on_submit = sheet.call_args[0][0]._on_submit
+
+    on_submit("Fix the thing\n\nwith a body")
+    assert badge.call_args_list == []  # nothing applied on this thread yet
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not badge.called:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert seen["thread"] is not threading.main_thread()
+    assert badge.call_args[0][0] == "Committed: Fix the thing"
+
+
+def test_amend_runs_off_the_ui_thread(monkeypatch, mocker):
+    from pigit.termui import run_with_spinner as real_spinner
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+    badge = mocker.patch("pigit.app_status.show_badge")
+
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.staged_files = [files[0]]
+    seen: dict = {}
+
+    def _amend():
+        seen["thread"] = threading.current_thread()
+        return ActionResult(True, "Amended HEAD", True)
+
+    vm.amend.side_effect = _amend
+    captured: dict = {}
+    panel._alert_dialog.alert = lambda text, cb, kind=None: (
+        captured.update(cb=cb) or True
+    )
+
+    panel.amend()
+    captured["cb"](True)
+    assert badge.call_args_list == []
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not badge.called:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert seen["thread"] is not threading.main_thread()
+    assert badge.call_args[0][0] == "Amended HEAD"

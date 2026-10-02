@@ -7,7 +7,7 @@ Date: 2026-05-25
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -344,3 +344,45 @@ def test_stash_apply_keeps_entry(status_vm):
     assert result.message == "Applied stash"
     status_vm._git.stash_apply.assert_called_once_with("stash@{0}")
     status_vm._git.stash_pop.assert_not_called()
+
+
+def test_commit_refuses_while_the_gate_is_held(status_vm):
+    """A commit moves HEAD (the branch tip), so it must not land while a
+    checkout on a worker is moving the same tip."""
+    assert status_vm._worktree_gate.acquire() is True
+
+    result = status_vm.commit("msg")
+
+    assert result.success is False
+    assert result.message == WORKTREE_BUSY_MESSAGE
+    status_vm._git.commit.assert_not_called()
+
+
+def test_amend_refuses_while_the_gate_is_held(status_vm):
+    assert status_vm._worktree_gate.acquire() is True
+
+    result = status_vm.amend()
+
+    assert result.success is False
+    assert result.message == WORKTREE_BUSY_MESSAGE
+    status_vm._git.amend_head.assert_not_called()
+
+
+def test_a_refused_second_commit_cannot_land_on_top_of_the_first(status_vm):
+    """The submit key stays reachable while the commit worker runs — the
+    editor sheet is still up and hooks are the reason this went async. The
+    gate is what keeps that second press from committing twice."""
+    first = status_vm.commit("first")
+    assert first.success is True
+
+    status_vm._worktree_gate.acquire()  # the worker is still in flight
+    second = status_vm.commit("second")
+
+    assert second.success is False
+    assert second.message == WORKTREE_BUSY_MESSAGE
+    assert status_vm._git.commit.call_args_list == [call("first")]
+
+
+def test_commit_releases_the_gate(status_vm):
+    assert status_vm.commit("msg").success is True
+    assert status_vm._worktree_gate.busy is False

@@ -586,15 +586,25 @@ class StatusPanel(OptionList):
 
         def _do_commit(msg: str) -> None:
             subject = msg.split("\n", 1)[0].strip()
-            result = self._vm.commit(msg)
-            if result.success:
-                dismiss_sheet()
-                self._vm.refresh()
-                show_badge(
-                    f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
-                )
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            def done(result: ActionResult) -> None:
+                if result.success:
+                    dismiss_sheet()
+                    self._vm.refresh()
+                    show_badge(
+                        f"Committed: {subject}",
+                        duration=1.5,
+                        kind=FeedbackKind.SUCCESS,
+                    )
+                else:
+                    show_toast(
+                        result.message, duration=2.0, kind=FeedbackKind.ERROR
+                    )
+
+            # Not through _run_file_action: that reports the view model's own
+            # message, which is a bare "Committed" — this badge names the
+            # subject that was just committed.
+            run_with_spinner(lambda: self._vm.commit(msg), done, label="Committing")
 
         editor = CommitEditor(
             vm=self._vm,
@@ -662,12 +672,19 @@ class StatusPanel(OptionList):
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 return
-            result = self._vm.amend()
-            if result.success:
-                self._vm.refresh()
-                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            def done(result: ActionResult) -> None:
+                if result.success:
+                    self._vm.refresh()
+                    show_badge(
+                        "Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS
+                    )
+                else:
+                    show_toast(
+                        result.message, duration=2.0, kind=FeedbackKind.ERROR
+                    )
+
+            run_with_spinner(lambda: self._vm.amend(), done, label="Amending")
 
         self._confirm(
             "Amend last commit with staged changes?",
