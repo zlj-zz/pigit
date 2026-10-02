@@ -203,6 +203,18 @@ class AlertDialogBody(Component):
     ESC is handled by the :class:`Popup` shell.
     """
 
+    #: Frame title; :meth:`_scroll_title` appends the visible line range.
+    TITLE = "Confirm"
+    #: Rows the dialog spends on chrome rather than message: top and bottom
+    #: border, the blank line above the footer, and the footer itself.
+    #: A terminal shorter than this still clips the footer — the minimum
+    #: window the app accepts is 65x10, so it takes a resize far past the
+    #: usable range to reach.
+    CHROME_ROWS = 4
+    #: Fewest message rows kept, so terminals shorter than the chrome still
+    #: get a dialog with its buttons on screen.
+    MIN_BODY_ROWS = 1
+
     def __init__(
         self,
         shell: AlertDialog,
@@ -231,12 +243,23 @@ class AlertDialogBody(Component):
         self.outer_row_count = 8
         self._kind: FeedbackKind | None = None
         self._content_rows: list[list[Segment]] = []
+        #: First message line shown when the body does not fit; see
+        #: :meth:`_max_body_rows`.
+        self._scroll_i = 0
+        #: Total wrapped message lines, kept for the scroll indicator.
+        self._body_lines = 0
         self._needs_rebuild = True
         theme = get_theme()
         self._frame = BoxFrame(
-            0, 0, title="Confirm", fg=theme.fg_primary, bg=theme.bg_chrome
+            0, 0, title=self.TITLE, fg=theme.fg_primary, bg=theme.bg_chrome
         )
-        self.BINDINGS = [(self._confirm_key, "_confirm")]
+        self.BINDINGS = [
+            (self._confirm_key, "_confirm"),
+            (keys.KEY_UP, "_scroll_up"),
+            (keys.KEY_DOWN, "_scroll_down"),
+            (keys.KEY_PAGE_UP, "_scroll_page_up"),
+            (keys.KEY_PAGE_DOWN, "_scroll_page_down"),
+        ]
         super().__init__(x=x, y=y, size=size)
 
     def open_alert(self) -> None:
@@ -260,6 +283,8 @@ class AlertDialogBody(Component):
         self._message = sanitize_for_display(message)
         self._on_result = on_result
         self._kind = kind
+        # A fresh message starts at the top, whatever the last one scrolled to.
+        self._scroll_i = 0
         self._apply_chrome()
         self.open_alert()
         self._needs_rebuild = True
@@ -267,7 +292,7 @@ class AlertDialogBody(Component):
     def _apply_chrome(self) -> None:
         """Set border/title colors from theme and optional feedback kind."""
         theme = get_theme()
-        self._frame.title = "Confirm"
+        self._frame.title = self.TITLE
         self._frame.bg = theme.bg_chrome
         style = style_for(self._kind)
         if style is not None:
@@ -297,10 +322,53 @@ class AlertDialogBody(Component):
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
         self._content_rows = self._build_content_rows()
+        self._frame.title = self._scroll_title()
         self._frame.set_inner_size(self._inner_w, len(self._content_rows))
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
         self._needs_rebuild = False
+
+    def _max_body_rows(self) -> int:
+        """Message rows the dialog may show at once.
+
+        A dialog taller than the terminal is drawn from row 0 and clipped at
+        the bottom, which takes the footer — and with it the only visible way
+        to answer — off screen. Capping here keeps the chrome on screen for
+        any message length.
+        """
+        return max(self.MIN_BODY_ROWS, self._term_lines - self.CHROME_ROWS)
+
+    def _scroll_title(self) -> str:
+        """Frame title, showing which message lines are on screen."""
+        max_body = self._max_body_rows()
+        if self._body_lines <= max_body:
+            return self.TITLE
+        first = self._scroll_i + 1
+        last = min(self._scroll_i + max_body, self._body_lines)
+        return truncate_by_width(
+            f"{self.TITLE} ({first}-{last} of {self._body_lines})", self._inner_w
+        )
+
+    def _scroll_by(self, delta: int) -> None:
+        """Move the message window, clamped to the lines that exist."""
+        limit = max(0, self._body_lines - self._max_body_rows())
+        moved = max(0, min(self._scroll_i + delta, limit))
+        if moved == self._scroll_i:
+            return
+        self._scroll_i = moved
+        self._needs_rebuild = True
+
+    def _scroll_up(self) -> None:
+        self._scroll_by(-1)
+
+    def _scroll_down(self) -> None:
+        self._scroll_by(1)
+
+    def _scroll_page_up(self) -> None:
+        self._scroll_by(-self._max_body_rows())
+
+    def _scroll_page_down(self) -> None:
+        self._scroll_by(self._max_body_rows())
 
     def _confirm(self) -> None:
         self._shell._finish_alert(True)
@@ -383,8 +451,16 @@ class AlertDialogBody(Component):
         if not wrapped:
             wrapped = [""]
 
+        # Only a window of the message is turned into rows; the rest stays
+        # reachable with the scroll bindings. `_scroll_i` is re-clamped here
+        # rather than in `_scroll_by` so a resize (which changes how many
+        # lines fit) can never leave the window past the end.
+        self._body_lines = len(wrapped)
+        max_body = self._max_body_rows()
+        self._scroll_i = max(0, min(self._scroll_i, len(wrapped) - max_body))
+
         rows: list[list[Segment]] = []
-        for line in wrapped:
+        for line in wrapped[self._scroll_i : self._scroll_i + max_body]:
             rows.append(
                 [
                     Segment(

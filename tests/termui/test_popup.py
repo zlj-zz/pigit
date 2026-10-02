@@ -16,8 +16,9 @@ from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx, set_over
 from pigit.termui.component import Component
 from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 from pigit.termui.root import ComponentRoot
+from pigit.termui.surface import Surface
 from pigit.termui.types import LayerKind
-from pigit.termui.widgets.popup import Popup
+from pigit.termui.widgets.popup import AlertDialog, Popup
 
 
 class _FramedChild(Component):
@@ -169,3 +170,150 @@ def test_alert_on_result_failures_are_still_contained():
     dialog._pane._on_result = Mock(side_effect=RuntimeError("boom"))
 
     dialog._finish_alert(True)  # must not raise
+
+
+# ── AlertDialog height cap and scrolling ──
+#
+# A dialog taller than the terminal was drawn from row 0 and clipped at the
+# bottom, which took the footer with it: a batch-undo confirm of a dozen
+# records rendered 31 rows on an 80x24 terminal with neither OK nor Cancel
+# on screen, leaving Esc as the only visible-free way out.
+
+
+def _long_message(records: int = 12) -> str:
+    """The shape `_confirm_reverse_range` builds for a multi-record undo."""
+    lines = "\n".join(
+        f"  - Discarded a{i}.py: git checkout -- a{i}.py" for i in range(records)
+    )
+    return f"Undo: Staged {records} file(s)\n{lines}\nRun:  git add a.py"
+
+
+def _open_alert(message: str, size: tuple[int, int]):
+    """Open a real AlertDialog on a terminal of *size*; return it and a paint."""
+    token = _runtime_ctx.set(RuntimeContext())
+    body = _Body()
+    body.resize(size)
+    root = ComponentRoot(body)
+    root.resize(size)
+    root.mount()
+    set_overlay_host(root)
+    dialog = AlertDialog(on_result=lambda _ok: None)
+    dialog.resize(size)
+    dialog.alert(message, lambda _ok: None)
+    return token, dialog
+
+
+def _painted(dialog, size: tuple[int, int]) -> list[str]:
+    surface = Surface(*size)
+    dialog.paint(surface)
+    return ["".join(c.char for c in row).rstrip() for row in surface.rows()]
+
+
+@pytest.mark.parametrize("size", [(80, 24), (80, 12), (80, 6)])
+def test_a_long_message_never_pushes_the_buttons_off_screen(size):
+    """The footer carries the only visible way to answer the dialog."""
+    token, dialog = _open_alert(_long_message(), size)
+    try:
+        rows = _painted(dialog, size)
+        text = " ".join(rows)
+        assert "OK" in text
+        assert "Cancel" in text
+        assert dialog._pane.outer_row_count <= size[1]
+    finally:
+        _runtime_ctx.reset(token)
+
+
+def test_a_short_message_is_left_alone():
+    token, dialog = _open_alert("Merge feat into main?", (80, 24))
+    try:
+        rows = _painted(dialog, (80, 24))
+        assert "Merge feat into main?" in "\n".join(rows)
+        assert dialog._pane._frame.title == "Confirm"  # no scroll marker
+        assert dialog._pane._scroll_i == 0
+    finally:
+        _runtime_ctx.reset(token)
+
+
+def test_the_title_reports_which_lines_are_showing():
+    token, dialog = _open_alert(_long_message(), (80, 12))
+    try:
+        _painted(dialog, (80, 12))
+        pane = dialog._pane
+        assert pane._frame.title == f"Confirm (1-{pane._max_body_rows()} of {pane._body_lines})"
+
+        pane._scroll_down()
+        _painted(dialog, (80, 12))
+        assert pane._scroll_i == 1
+        assert pane._frame.title.startswith("Confirm (2-")
+    finally:
+        _runtime_ctx.reset(token)
+
+
+def test_scrolling_is_clamped_to_the_lines_that_exist():
+    token, dialog = _open_alert(_long_message(), (80, 12))
+    try:
+        _painted(dialog, (80, 12))
+        pane = dialog._pane
+        limit = pane._body_lines - pane._max_body_rows()
+
+        page = pane._max_body_rows()
+        pane._scroll_page_down()
+        assert pane._scroll_i == page
+        # Paging past the end stops at the last full window, not beyond it.
+        pane._scroll_page_down()
+        pane._scroll_page_down()
+        assert pane._scroll_i == limit
+        pane._scroll_down()
+        assert pane._scroll_i == limit
+        pane._scroll_up()
+        assert pane._scroll_i == limit - 1
+        pane._scroll_page_up()
+        pane._scroll_page_up()
+        pane._scroll_page_up()
+        assert pane._scroll_i == 0  # not before the start
+    finally:
+        _runtime_ctx.reset(token)
+
+
+def test_a_shrink_re_clamps_the_window_and_keeps_the_footer():
+    """A resize changes how many lines fit, so the window has to be re-clamped
+    — otherwise it opens past the end of a now-shorter message window."""
+    token, dialog = _open_alert(_long_message(), (80, 24))
+    try:
+        pane = dialog._pane
+        _painted(dialog, (80, 24))
+        pane._scroll_by(pane._body_lines)  # scroll to the very bottom
+        bottom = pane._scroll_i
+        assert bottom > 0
+
+        dialog.resize((80, 10))
+        rows = _painted(dialog, (80, 10))
+        assert pane._scroll_i <= pane._body_lines - pane._max_body_rows()
+        assert "OK" in " ".join(rows)
+    finally:
+        _runtime_ctx.reset(token)
+
+
+def test_the_footer_is_still_clickable_when_the_message_is_capped():
+    """Hit-testing reads the footer row's position, which the cap moves."""
+    from pigit.termui.mouse import MouseButton, MouseKind
+
+    size = (80, 12)
+    token, dialog = _open_alert(_long_message(), size)
+    try:
+        _painted(dialog, size)
+        pane = dialog._pane
+        cr, cc, _cw, ch = pane._frame.content_rect(0, 0)
+        footer_row0 = cr + min(ch, len(pane._content_rows)) - 1
+        footer = pane._footer_plain()
+        ok_col = cc + footer.index("OK")
+        answers: list[bool] = []
+        dialog._pane._on_result = answers.append
+
+        event = MouseEvent(
+            col=ok_col + 1, row=footer_row0 + 1,
+            button=MouseButton.LEFT, kind=MouseKind.PRESS,
+        )
+        assert pane.handle_mouse(event) is True
+    finally:
+        _runtime_ctx.reset(token)
