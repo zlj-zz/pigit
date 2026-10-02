@@ -95,6 +95,9 @@ class BranchPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Branches arrive asynchronously via vm.items; show the skeleton until
+        # they do, rather than an empty list that reads as "no branches".
+        self.loading = True
         self._vm.refresh()
 
     def unmount(self) -> None:
@@ -129,6 +132,7 @@ class BranchPanel(OptionList):
         branches = self._vm.items.value
         if not self.is_mounted():
             return
+        self.loading = False
         self.branches = branches
         if not branches:
             scope = self._SCOPES[self._scope_idx]

@@ -367,6 +367,10 @@ class CommitPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Content arrives asynchronously via vm.items; show the skeleton until
+        # then. A replay of already-loaded commits clears it straight away, so
+        # remounting a warm panel shows its rows instead of a skeleton.
+        self.loading = True
         # Signals only fire on change: a stream that finished while this panel
         # was unmounted must be replayed, or the list stays stale.
         if self._vm.items.value:
@@ -411,6 +415,10 @@ class CommitPanel(OptionList):
     def _on_items_changed(self) -> None:
         if not self.is_mounted():
             return
+        # Cleared before the early return below: an appended batch still means
+        # the load produced something, and the skeleton is drawn on every row
+        # while this stays True.
+        self.loading = False
         commits = list(self._vm.items.value)
         # Clear decoration caches BEFORE rebuild so row templates re-parse
         # ``extra_info`` (e.g. HEAD moved off a former tip). Body lines are
@@ -478,7 +486,12 @@ class CommitPanel(OptionList):
             self.commits = filtered
             self._source_map = mapping
         if not self.commits:
-            self.set_content(["No matching commits."])
+            # An empty repository and a filter that matched nothing are
+            # different states: with no query there was nothing to match
+            # against, so "No matching commits." would be a lie.
+            self.set_content(
+                ["No commits yet." if not query else "No matching commits."]
+            )
             self._max_meta_w = 0
             self._row_cache.clear()
             self._notify_change()
