@@ -398,6 +398,109 @@ def test_tui_utils_get_width_and_plain():
     assert plain("\033[1;32mhi\033[0m") == "hi"
 
 
+# ── bulk_cmd reports failures to the caller ──
+
+
+def _bulk_handler(results):
+    from pigit.handlers.repo_handler import RepoCommandHandler
+
+    ctx = MagicMock()
+    ctx.managed_repos.process_repos_option.return_value = results
+    handler = RepoCommandHandler.__new__(RepoCommandHandler)
+    handler.ctx = ctx
+    handler.console = MagicMock()
+    handler._pick_repos = lambda *_a, **_k: ["a", "b"]
+    return handler
+
+
+def test_bulk_cmd_reports_the_failure_count():
+    """The console summary is no use to a script; the return value is."""
+    handler = _bulk_handler([("a", 0, "", ""), ("b", 1, "boom", "")])
+
+    assert handler.bulk_cmd(SimpleNamespace(repos=[], ), "git pull") == 1
+
+
+def test_bulk_cmd_reports_zero_when_everything_succeeded():
+    handler = _bulk_handler([("a", 0, "", ""), ("b", 0, "", "")])
+
+    assert handler.bulk_cmd(SimpleNamespace(repos=[]), "git pull") == 0
+
+
+def test_bulk_cmd_treats_a_cancelled_pick_as_not_a_failure():
+    """Nothing ran, which is not the same as something failing."""
+    handler = _bulk_handler([("a", 0, "", "")])
+    handler._pick_repos = lambda *_a, **_k: None
+
+    assert handler.bulk_cmd(SimpleNamespace(repos=[]), "git pull") == 0
+
+
+def test_bulk_cmd_with_nothing_to_process_is_not_a_failure():
+    handler = _bulk_handler([])
+
+    assert handler.bulk_cmd(SimpleNamespace(repos=[]), "git pull") == 0
+
+
+def test_a_failed_bulk_run_exits_non_zero():
+    """The exit code is what a CI step reads; it used to be 0 either way."""
+    from pigit.entry import _bulk_cmd_handler
+
+    handler = _bulk_handler([("a", 0, "", ""), ("b", 1, "boom", "")])
+    with patch("pigit.entry._repo_handler", return_value=handler):
+        with pytest.raises(SystemExit) as exc:
+            _bulk_cmd_handler("git pull")(SimpleNamespace(repos=[]), None)
+
+    assert exc.value.code == 1
+
+
+def test_a_clean_bulk_run_exits_zero():
+    from pigit.entry import _bulk_cmd_handler
+
+    handler = _bulk_handler([("a", 0, "", "")])
+    with patch("pigit.entry._repo_handler", return_value=handler):
+        _bulk_cmd_handler("git pull")(SimpleNamespace(repos=[]), None)  # no raise
+
+
+def test_a_picker_that_cannot_run_is_a_failure_not_a_silent_success():
+    """With no terminal (CI, a pipe) and no explicit names, the picker exits
+    non-zero — and used to leave no output and exit 0, which is a false
+    success in exactly the environment scripts run in."""
+    from unittest.mock import patch as _patch
+
+    ctx = MagicMock()
+    ctx.managed_repos.load_repos.return_value = {"a": {"path": "/a"}}
+    handler = RepoCommandHandler.__new__(RepoCommandHandler)
+    handler.ctx = ctx
+    handler.console = MagicMock()
+
+    with _patch(
+        "pigit.handlers.repo_picker.run_multi_select_picker", return_value=(1, [])
+    ):
+        with pytest.raises(SystemExit) as exc:
+            handler.bulk_cmd(SimpleNamespace(repos=[]), "git pull")
+
+    assert exc.value.code == 1
+    assert handler.console.echo.called  # and it says why
+
+
+def test_a_picker_platform_error_keeps_its_own_message():
+    from unittest.mock import patch as _patch
+
+    ctx = MagicMock()
+    ctx.managed_repos.load_repos.return_value = {"a": {"path": "/a"}}
+    handler = RepoCommandHandler.__new__(RepoCommandHandler)
+    handler.ctx = ctx
+    handler.console = MagicMock()
+
+    with _patch(
+        "pigit.handlers.repo_picker.run_multi_select_picker",
+        return_value=(1, "NO PICKER ON THIS PLATFORM"),
+    ):
+        with pytest.raises(SystemExit):
+            handler.bulk_cmd(SimpleNamespace(repos=[]), "git pull")
+
+    assert handler.console.echo.call_args[0][0] == "NO PICKER ON THIS PLATFORM"
+
+
 # ── Clearing the registry asks first ──
 #
 # `clear` lives on the handler but reaches the registry, so it is tested

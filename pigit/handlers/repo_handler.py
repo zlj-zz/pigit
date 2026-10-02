@@ -258,25 +258,43 @@ class RepoCommandHandler:
             initial_filter=filter_regex,
         )
         if exit_code != 0:
-            if isinstance(selected, str):
-                self.console.echo(selected)
-            return None
+            # Not a cancellation: the picker could not run at all. Its rows
+            # are never empty by this point (an empty registry returned
+            # above), so a non-zero exit means either a platform it does not
+            # support or no terminal to draw it in. Nothing was executed, and
+            # returning as if it had worked is the same false success the
+            # bulk commands' exit code exists to prevent — silently so, in
+            # the no-TTY case, which is exactly where scripts run.
+            self.console.echo(
+                selected
+                if isinstance(selected, str)
+                else "Cannot pick repos: no interactive terminal. Name them "
+                "explicitly, or run this in a terminal."
+            )
+            raise SystemExit(1)
         if not isinstance(selected, list) or not selected:
-            return None
+            return None  # cancelled, or nothing selected: not a failure
         return selected
 
-    def bulk_cmd(self, args: "Namespace", cmd: str) -> None:
+    def bulk_cmd(self, args: "Namespace", cmd: str) -> int:
+        """Run *cmd* across repos; return how many of them failed.
+
+        Returning the count is what lets the caller leave a non-zero exit
+        code — a caller cannot tell a partial failure from a clean run by
+        reading the console. "Nothing ran" (no repos registered, the picker
+        cancelled, nothing selected) is not a failure: it returns 0.
+        """
         repo_names = self._pick_repos(
             getattr(args, "repos", []),
             title=f"pigit repo {cmd}",
         )
         if repo_names is None:
-            return
+            return 0
 
         results = self.managed_repos.process_repos_option(repo_names, cmd)
         if not results:
             self.console.echo("No repos to process.")
-            return
+            return 0
 
         for name, code, err, out in results:
             if out:
@@ -294,6 +312,7 @@ class RepoCommandHandler:
             self.console.echo(
                 f"@green(✓) @yellow({success})/{total} succeeded, @tomato({total - success}) failed"
             )
+        return total - success
 
     def mkbranch(self, args: "Namespace") -> None:
         branch_name = args.branch_name

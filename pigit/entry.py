@@ -498,7 +498,12 @@ def _bulk_cmd_handler(cmd: str):
     """
 
     def handler(args, _parser):
-        _repo_handler().bulk_cmd(args, cmd)
+        # Same shape as the `cmd` sub-command: a partial failure has to reach
+        # the caller as a non-zero exit, or a script cannot tell the run that
+        # pushed everywhere from the one that pushed nowhere.
+        failed = _repo_handler().bulk_cmd(args, cmd)
+        if failed:
+            raise SystemExit(1)
 
     return handler
 
