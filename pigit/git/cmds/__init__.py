@@ -7,7 +7,6 @@ Date: 2026-04-10
 
 from __future__ import annotations
 
-import os
 
 # Import all command modules to trigger registration
 from . import branch
@@ -92,6 +91,7 @@ class GitCommand:
         resolver: CommandResolver | None = None,
         config: UserCommandConfig | None = None,
         executor: SecureExecutor | None = None,
+        assume_yes: bool = False,
     ):
         """Initialize GitCommand processor.
 
@@ -100,7 +100,9 @@ class GitCommand:
             resolver: Command resolver instance
             config: User configuration
             executor: Secure executor instance
+            assume_yes: Skip danger confirmations, as ``--yes`` asks for.
         """
+        self._assume_yes = assume_yes
         self._registry = registry or get_registry()
         self._resolver = resolver or CommandResolver(self._registry)
         self._config = config or load_user_config()
@@ -217,11 +219,18 @@ class GitCommand:
     def _should_skip_confirmation(self) -> bool:
         """Check if confirmation should be skipped.
 
+        Both answers here are things a person chose: the ``--yes`` flag, or
+        turning ``confirm_dangerous`` off in their own config. The ``CI``
+        environment variable used to be a third one, which was wrong — CI
+        systems set it by themselves, so the same command silently ran with
+        different safety depending on where it happened to be invoked. A
+        non-interactive caller now says ``--yes`` and gets refused (rather
+        than confirmed) if it forgets.
+
         Returns:
-            True if in CI or confirmation is disabled
+            True if the caller asked to skip, or disabled it in config
         """
-        # Skip in CI environment
-        if os.environ.get("CI"):
+        if self._assume_yes:
             return True
 
         # Check user config

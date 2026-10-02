@@ -348,6 +348,13 @@ def pigit(args: Namespace, _) -> None:
     help="Print a shell widget for Alt+G picker integration.",
 )
 @argument(
+    "-y --yes",
+    action="store_true",
+    help="Skip the confirmation prompt on dangerous commands. Required in "
+    "non-interactive use: stdin is not a TTY there, so the prompt cannot be "
+    "answered and the command is cancelled.",
+)
+@argument(
     "command",
     nargs="*",
     help="Command to execute with arguments.",

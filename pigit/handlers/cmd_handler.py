@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 class CmdHandler:
     """Handler for cmd subcommand."""
 
-    def __init__(self):
-        self._processor = GitCommand()
+    def __init__(self, *, assume_yes: bool = False):
+        self._processor = GitCommand(assume_yes=assume_yes)
         self._console = get_console()
 
     @staticmethod
@@ -148,5 +148,5 @@ def handle_cmd(args: "Namespace") -> int:
     if args.widget:
         return CmdHandler._handle_widget(args.widget)
 
-    handler = CmdHandler()
+    handler = CmdHandler(assume_yes=getattr(args, "yes", False))
     return handler.handle(args)
