@@ -282,3 +282,14 @@ def test_global_footer_entries_follow_key_overrides():
         assert ("X", "Quit") in app._global_footer_entries()
     finally:
         set_key_overrides({})
+
+
+def test_help_earns_a_footer_slot():
+    """Help is the entry point to every binding that is not on screen. Without
+    it the other tips are only reachable by someone who already knows `?`."""
+    from pigit.app import PigitApplication
+    from pigit.config_data import AppConfig
+
+    app = PigitApplication(config=AppConfig(repo_observe=False))
+
+    assert ("?", "Help") in app._global_footer_entries()

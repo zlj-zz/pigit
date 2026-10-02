@@ -241,3 +241,33 @@ def test_show_welcome_noop_when_overlay_open(mount_welcome_app, state_path):
     app.toggle_help()
     app.show_welcome()
     assert app._help_popup.open is True
+
+
+def test_the_welcome_guide_covers_the_everyday_git_actions():
+    """The footer keeps to a few slots, so this guide is the only place a new
+    user meets push/pull — they carry tips like everything else, but nothing
+    else surfaces them."""
+    from pigit.app_welcome import _WELCOME_GLOBAL_ACTIONS
+
+    for action in (
+        "universal.push",
+        "universal.pull",
+        "universal.bisect",
+        "universal.recent",
+        "universal.switch_repo",
+    ):
+        assert action in _WELCOME_GLOBAL_ACTIONS
+
+
+def test_every_welcome_global_action_is_a_real_binding():
+    """The guide resolves actions out of the registry; a typo would render as
+    a missing row rather than an error."""
+    from pigit.app import PigitApplication
+    from pigit.app_welcome import _WELCOME_GLOBAL_ACTIONS
+    from pigit.config_data import AppConfig
+
+    app = PigitApplication(config=AppConfig(repo_observe=False))
+    app.build_root()
+    known = {b.action for b in app._action_bindings}
+
+    assert set(_WELCOME_GLOBAL_ACTIONS) <= known

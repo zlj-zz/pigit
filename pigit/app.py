@@ -107,7 +107,11 @@ FOOTER_HEIGHT = 2
 # list rather than "every universal binding with a tip": the tab jumps,
 # bisect, recent, push, pull and welcome all carry tips and would crowd out
 # the panel hints the footer exists to show.
-FOOTER_ACTIONS = ("universal.inspector", "universal.quit")
+#
+# Help earns its slot for a different reason than the other two: it is the
+# entry point to every binding that is not on screen, so without it those
+# tips are only discoverable by someone who already knows to press `?`.
+FOOTER_ACTIONS = ("universal.inspector", "universal.help", "universal.quit")
 
 # Same wording as handlers.repo_picker.EMPTY_MANAGED_REPOS_MSG so the same
 # condition reads the same from the CLI and the TUI. Spelled out rather than

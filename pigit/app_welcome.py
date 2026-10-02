@@ -77,6 +77,14 @@ _WELCOME_GLOBAL_ACTIONS = (
     "universal.prev_panel",
     "universal.quit",
     "universal.undo",
+    # The everyday git actions. They carry tips like everything above, but
+    # nothing else surfaces them: the footer keeps to two or three slots, so
+    # this guide is the only place a new user meets push/pull.
+    "universal.push",
+    "universal.pull",
+    "universal.bisect",
+    "universal.recent",
+    "universal.switch_repo",
 )
 
 _WELCOME_GLOBAL_DESC_OVERRIDES: dict[str, str] = {
