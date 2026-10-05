@@ -112,3 +112,50 @@ def test_the_same_branch_reads_differently_as_head_and_as_not():
     as_plain = _panel_with([Branch("dev", "0", "0", False)])
 
     assert _row_text(as_head, 0) != _row_text(as_plain, 0)
+
+
+# ── Tip dates ──
+
+
+def test_the_branch_row_shows_its_tip_date():
+    import time
+
+    panel = _panel_with([Branch("dev", "0", "0", True, committed_at=int(time.time()))])
+    assert "0s ago" in _row_text(panel, 0)
+
+
+def test_a_remote_branch_shows_its_date_too():
+    """Remote rows have no upstream line, but they are sorted by this same
+    date — so they need it shown at least as much as local ones do."""
+    import time
+
+    panel = _panel_with(
+        [
+            Branch(
+                "origin/main",
+                "0",
+                "0",
+                False,
+                is_remote=True,
+                committed_at=int(time.time()),
+            )
+        ]
+    )
+    assert "0s ago" in _row_text(panel, 0)
+
+
+def test_an_unknown_date_renders_nothing():
+    """relative_time(0) is not "a long time ago" — it computes weeks since
+    the epoch, which would render as a huge bogus age."""
+    panel = _panel_with([Branch("dev", "0", "0", True, committed_at=0)])
+    text = _row_text(panel, 0)
+    assert "ago" not in text
+
+
+def test_the_marker_and_the_date_coexist():
+    import time
+
+    panel = _panel_with([Branch("dev", "0", "0", True, committed_at=int(time.time()))])
+    text = _row_text(panel, 0)
+    assert text.startswith("*dev")
+    assert "ago" in text

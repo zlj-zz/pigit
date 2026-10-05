@@ -249,3 +249,42 @@ def test_apply_empty_list_is_noop():
     panel.mount()
     panel.apply()
     vm.stash_apply.assert_not_called()
+
+
+# ── Entry dates ──
+#
+# The age of a stash is how you pick which one to drop, and it was the one
+# piece of the row that was never shown.
+
+
+def _stash_row_text(panel: StashPanel, idx: int) -> str:
+    left, main, right = panel.describe_row(idx, is_cursor=False)
+    return "".join(seg.text for seg in left + (main or []) + right)
+
+
+def _panel_with_dated_stashes(entries: list[tuple[str, int]]) -> StashPanel:
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.load_stashes.return_value = [
+        Stash(ref=f"stash@{{{i}}}", sha=f"abc{i}", msg=msg, when=when)
+        for i, (msg, when) in enumerate(entries)
+    ]
+    panel = StashPanel(vm=vm)
+    panel.mount()
+    panel.on_focus()
+    return panel
+
+
+def test_the_stash_row_shows_its_age():
+    import time
+
+    panel = _panel_with_dated_stashes([("wip", int(time.time()))])
+    text = _stash_row_text(panel, 0)
+    assert "0s ago" in text
+    assert "stash@{0}" in text  # the ref is still there
+
+
+def test_an_unknown_stash_date_renders_nothing():
+    """relative_time(0) computes weeks since the epoch, not "unknown"."""
+    panel = _panel_with_dated_stashes([("wip", 0)])
+    assert "ago" not in _stash_row_text(panel, 0)

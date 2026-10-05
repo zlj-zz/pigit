@@ -39,7 +39,7 @@ class _StashOps(_OpsBase):
         """
         path = path or self.path
         _, err, resp = self.executor.exec(
-            'git stash list --format="%gd|%H|%s"',
+            'git stash list --format="%gd|%H|%at|%s"',
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -49,9 +49,20 @@ class _StashOps(_OpsBase):
         text = resp
         stashes: list[Stash] = []
         for line in text.strip().splitlines():
-            parts = line.split("|", 2)
-            if len(parts) >= 3:
-                stashes.append(Stash(ref=parts[0], sha=parts[1], msg=parts[2]))
+            # maxsplit=3, not 2: the subject is last and may itself contain
+            # "|" (it reads "WIP on main: <sha> <subject>"), so it has to be
+            # taken as the whole remainder. Adding a field means bumping this
+            # count, never letting the subject stop being last.
+            parts = line.split("|", 3)
+            if len(parts) >= 4:
+                stashes.append(
+                    Stash(
+                        ref=parts[0],
+                        sha=parts[1],
+                        when=int(parts[2]) if parts[2].isdigit() else 0,
+                        msg=parts[3],
+                    )
+                )
         return stashes
 
     def stash_push(

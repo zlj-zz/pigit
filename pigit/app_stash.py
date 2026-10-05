@@ -23,6 +23,7 @@ from pigit.termui import (
 )
 from pigit.termui.widgets import AlertDialog, OptionList, SectionRule
 
+from .ext.utils import relative_time
 from .app_diff import DiffType
 from .viewmodels.base import ActionResult
 
@@ -216,6 +217,11 @@ class StashPanel(OptionList):
         ]
         main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]
         right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
+        if stash.when:
+            right.append(Segment("  ", fg=self.presentation_fg("muted")))
+            right.append(
+                Segment(relative_time(stash.when), fg=self.presentation_fg("muted"))
+            )
         return left, main, right
 
     def _handle_result(self, result) -> None:

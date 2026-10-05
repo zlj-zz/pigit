@@ -18,6 +18,29 @@ from ._base import _OpsBase
 from ._errors import GitError
 from ._util import _RE_BRANCH_AHEAD, _RE_BRANCH_BEHIND
 
+#: Field separator in the ``--format`` above. A branch or upstream name may
+#: contain ``|``, which used to shift every field after it — the name, the
+#: upstream and the ahead/behind counts all came out wrong, silently. NUL
+#: cannot appear in a refname.
+#:
+#: Two traps, both learned the hard way:
+#:
+#: 1. It is written ``%00``, not ``%x00``. ``git branch --format`` is the
+#:    for-each-ref engine and expands only bare hex; the ``%xNN`` spelling
+#:    belongs to the pretty engine (``git log``), which is where the
+#:    same-looking precedents elsewhere in this package come from.
+#: 2. It must not be whitespace, or ``resp.strip()`` below eats the leading
+#:    separator along with ``%(HEAD)``'s padding space and the first field
+#:    vanishes — every field shifts and the row fails to parse. ``\x1f``
+#:    *is* whitespace to Python (``str.isspace()``); NUL is not.
+_FIELD_SEP = "\x00"
+
+
+def _as_unix(value: str) -> int:
+    """Parse a ``%(committerdate:unix)`` field, or 0 when it is not one."""
+    value = value.strip()
+    return int(value) if value.isdigit() else 0
+
 
 class _BranchOps(_OpsBase):
     """Branch listing and mutation."""
@@ -65,7 +88,8 @@ class _BranchOps(_OpsBase):
 
         _, _, resp = self.executor.exec(
             f"git branch {flag} --sort=-committerdate "
-            '--format="%(HEAD)|%(refname:short)|%(refname)|%(upstream:short)|%(upstream:track)" ',
+            "--format=\"%(HEAD)%00%(refname:short)%00%(refname)%00"
+            "%(upstream:short)%00%(upstream:track)%00%(committerdate:unix)\" ",
             flags=REPLY | DECODE,
             cwd=path,
         )
@@ -76,7 +100,7 @@ class _BranchOps(_OpsBase):
             return branches
 
         for line in resp.splitlines():
-            items = line.split("|")
+            items = line.split(_FIELD_SEP)
             short_name = cast(str, items[1])
             full_ref = cast(str, items[2])
             is_remote = full_ref.startswith("refs/remotes/")
@@ -91,6 +115,7 @@ class _BranchOps(_OpsBase):
                 behind="?",
                 is_head=items[0] == "*" and not is_remote,
                 is_remote=is_remote,
+                committed_at=_as_unix(items[5]),
             )
 
             upstream_name = items[3]

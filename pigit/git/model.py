@@ -123,6 +123,11 @@ class Branch:
     # True if this is a remote-tracking branch.
     is_remote: bool = False
 
+    # Unix seconds of the tip commit's committer date; 0 when unknown. The
+    # same timestamp the branch list is sorted by, so the user can see the
+    # order they are looking at.
+    committed_at: int = 0
+
 
 @dataclass(slots=True)
 class Stash:
@@ -131,6 +136,9 @@ class Stash:
     ref: str
     sha: str
     msg: str
+
+    # Unix seconds when the entry was made; 0 when unknown.
+    when: int = 0
 
 
 @dataclass(slots=True)

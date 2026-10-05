@@ -34,6 +34,7 @@ from pigit.termui.widgets import (
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
+from .ext.utils import relative_time
 from .app_theme import THEME
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
@@ -413,6 +414,21 @@ class BranchPanel(OptionList):
                 if right:
                     right.append(Segment(" ", fg=self.presentation_fg("muted")))
                 right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
+
+        # Deliberately outside the block above: remote branches have no
+        # upstream line to share, but they are sorted by this same date, so
+        # they need it shown at least as much as local ones do.
+        if branch.committed_at:
+            if right:
+                # Two spaces, like the Commit panel's meta column: the date is
+                # its own column, not a continuation of the tracking counts.
+                right.append(Segment("  ", fg=self.presentation_fg("muted")))
+            right.append(
+                Segment(
+                    relative_time(branch.committed_at),
+                    fg=self.presentation_fg("muted"),
+                )
+            )
 
         return left, None, right
 
