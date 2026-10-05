@@ -65,3 +65,50 @@ def test_describe_row_colors_local_vs_remote():
         assert remote_left[0].fg == THEME.fg_remote_branch
     finally:
         set_theme(prev)
+
+
+# ── The current branch is marked in text, not only in colour ──
+#
+# HEAD and a plain local branch rendered identical text; only the foreground
+# colour told them apart, which leaves colour-blind users, NO_COLOR users and
+# low-contrast terminals unable to see which branch they are on.
+
+
+def _row_text(panel: BranchPanel, idx: int) -> str:
+    left, main, right = panel.describe_row(idx, is_cursor=False)
+    return "".join(seg.text for seg in left + (main or []) + right)
+
+
+def test_the_current_branch_carries_a_marker():
+    panel = _panel_with([Branch("dev", "0", "0", True)])
+    assert _row_text(panel, 0).startswith("*dev")
+
+
+def test_other_branches_have_no_marker():
+    panel = _panel_with(
+        [Branch("dev", "0", "0", True), Branch("feature", "0", "0", False)]
+    )
+    assert _row_text(panel, 1).startswith(" feature")
+
+
+def test_the_marker_does_not_shift_the_name_column():
+    panel = _panel_with(
+        [Branch("dev", "0", "0", True), Branch("feature", "0", "0", False)]
+    )
+    marked = _row_text(panel, 0)
+    plain = _row_text(panel, 1)
+    assert marked.index("dev") == plain.index("feature")
+
+
+def test_the_same_branch_reads_differently_as_head_and_as_not():
+    """The point of the marker, stated so it can fail: hold everything but
+    ``is_head`` constant. Comparing rows that already differ by name would
+    prove nothing — those differ with or without a marker.
+
+    ``_row_text`` concatenates ``.text`` only, so this is the row as it reads
+    with every colour discarded.
+    """
+    as_head = _panel_with([Branch("dev", "0", "0", True)])
+    as_plain = _panel_with([Branch("dev", "0", "0", False)])
+
+    assert _row_text(as_head, 0) != _row_text(as_plain, 0)

@@ -48,6 +48,12 @@ class BranchPanel(OptionList):
 
     CURSOR = ACCENT_BAR
     CURSOR_ACCENT = True
+    #: Marks the current branch. The row's colour already says which branch is
+    #: HEAD, but colour is the only thing that does — this says it in text, the
+    #: way `git branch` does. Remote branches need no mark: their names carry
+    #: the remote prefix (`origin/main`), and git prefixes a local one with
+    #: `heads/` when the two would otherwise read the same.
+    HEAD_MARK = "*"
     keymap_namespace = "branch"
     TAB_NAME = "Branch"
     tab_key = "3"
@@ -385,7 +391,7 @@ class BranchPanel(OptionList):
             name_fg = self.presentation_fg("primary")
         left = [
             Segment(
-                f" {self.content[idx]}",
+                f"{self.HEAD_MARK if branch.is_head else ' '}{self.content[idx]}",
                 fg=name_fg,
                 style_flags=palette.STYLE_BOLD if is_cursor else 0,
             )
