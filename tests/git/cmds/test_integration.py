@@ -321,7 +321,9 @@ class TestDangerConfirmation:
         executor.confirm.return_value = False
         executor.exec.return_value = (0, "")
         processor = GitCommand(
-            registry=fresh_registry, config=config, executor=executor,
+            registry=fresh_registry,
+            config=config,
+            executor=executor,
             assume_yes=assume_yes,
         )
         return processor, executor

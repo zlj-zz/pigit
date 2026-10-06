@@ -247,9 +247,7 @@ class FlowBoard(Component):
             (vh - 1, mid_col, _MARK_DOWN, self._pan_x + vh < content_h),
         ):
             if overflowing:
-                surface.draw_text_rgb(
-                    row, col, mark, fg=DEFAULT_FG_DIM, bg=None
-                )
+                surface.draw_text_rgb(row, col, mark, fg=DEFAULT_FG_DIM, bg=None)
 
     def handle_mouse(self, event: MouseEvent) -> bool:
         """Wheel events pan the window; block-local clicks are not routed."""

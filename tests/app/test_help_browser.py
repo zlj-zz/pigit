@@ -69,7 +69,9 @@ def test_help_popup_over_cjk_rows_keeps_every_row_width(runtime):
     app, root = _mount(runtime)
     app.goto_commit()
     app._commit_panel.commits = [
-        Commit(f"sha{i:04d}", "修复提交面板的中文信息显示问题", "Zev", 0, "pushed", "", [])
+        Commit(
+            f"sha{i:04d}", "修复提交面板的中文信息显示问题", "Zev", 0, "pushed", "", []
+        )
         for i in range(10)
     ]
     app._commit_panel._rebuild_rows()

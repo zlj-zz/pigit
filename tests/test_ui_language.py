@@ -31,7 +31,9 @@ HEADER_FIELD = re.compile(r"^\s*(Module|Description|Author|Date):", re.M)
 def _module_header_end(source: str) -> int:
     """Last line of the module docstring, or 0 when there is none."""
     lines = source.splitlines()
-    start = next((i for i, l in enumerate(lines[:5]) if l.strip().startswith('"""')), None)
+    start = next(
+        (i for i, l in enumerate(lines[:5]) if l.strip().startswith('"""')), None
+    )
     if start is None:
         return 0
     for end in range(start + 1, min(len(lines), 40)):

@@ -239,7 +239,10 @@ def test_the_title_reports_which_lines_are_showing():
     try:
         _painted(dialog, (80, 12))
         pane = dialog._pane
-        assert pane._frame.title == f"Confirm (1-{pane._max_body_rows()} of {pane._body_lines})"
+        assert (
+            pane._frame.title
+            == f"Confirm (1-{pane._max_body_rows()} of {pane._body_lines})"
+        )
 
         pane._scroll_down()
         _painted(dialog, (80, 12))
@@ -311,8 +314,10 @@ def test_the_footer_is_still_clickable_when_the_message_is_capped():
         dialog._pane._on_result = answers.append
 
         event = MouseEvent(
-            col=ok_col + 1, row=footer_row0 + 1,
-            button=MouseButton.LEFT, kind=MouseKind.PRESS,
+            col=ok_col + 1,
+            row=footer_row0 + 1,
+            button=MouseButton.LEFT,
+            kind=MouseKind.PRESS,
         )
         assert pane.handle_mouse(event) is True
     finally:

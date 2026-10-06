@@ -7,7 +7,6 @@ Date: 2026-04-10
 
 from __future__ import annotations
 
-
 # Import all command modules to trigger registration
 from . import branch
 from . import commit

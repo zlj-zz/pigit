@@ -25,15 +25,15 @@ def _branch_line(head: str, name: str, ref: str, upstream: str, track: str, ts: 
 
 def _git(output: str) -> GitApi:
     """A GitApi whose every command returns *output*."""
-    return GitApi(
-        executor=MockExecutor(default=(0, "", output)), path="/repo"
-    )
+    return GitApi(executor=MockExecutor(default=(0, "", output)), path="/repo")
 
 
 def test_a_branch_name_may_contain_a_pipe():
     """`|` was the old separator, so such a name shifted every field after it:
     the name, the upstream and the ahead/behind counts all came out wrong."""
-    out = _branch_line(" ", "feature/a|b", "refs/heads/feature/a|b", "", "", "1791206613")
+    out = _branch_line(
+        " ", "feature/a|b", "refs/heads/feature/a|b", "", "", "1791206613"
+    )
 
     branches = _git(out).load_branches()
 

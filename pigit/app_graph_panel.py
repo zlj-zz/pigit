@@ -21,17 +21,13 @@ from .viewmodels.commit import ICommitViewModel
 #: were checked, and none renders this -- so the five rows are the data. Each
 #: line is drawn as-is and the panel's right edge clips it: no wrapping, no
 #: shrinking, and it does not pan with the graphs.
-_BANNER: tuple[str, ...] = tuple(
-    line.rstrip()
-    for line in r"""
+_BANNER: tuple[str, ...] = tuple(line.rstrip() for line in r"""
  ______   __     ______     __     ______
 /\  == \ /\ \   /\  ___\   /\ \   /\__  _\
 \ \  _-/ \ \ \  \ \ \__ \  \ \ \  \/_/\ \/
  \ \_\    \ \_\  \ \_____\  \ \_\    \ \_\
   \/_/     \/_/   \/_____/   \/_/     \/_/
-""".splitlines()
-    if line.strip()
-)
+""".splitlines() if line.strip())
 _BANNER_H = len(_BANNER)
 #: Blank column between the panel's left edge and the mark: the art's own left
 #: edge is ragged, so without it the `/\` of the second row sits flush against
@@ -180,7 +176,9 @@ class ContributionPanel(Component):
         commits = list(self._vm.items.value)
         # Decide once, then tell every block the same thing: recounting a whole
         # history per streamed batch costs ~8x more and runs on the main thread.
-        added = commits[len(self._commits) :] if self._extends_current(commits) else None
+        added = (
+            commits[len(self._commits) :] if self._extends_current(commits) else None
+        )
         for block in self._blocks:
             if added is None:
                 block.set_commits(commits)

@@ -69,9 +69,10 @@ def test_repo_handler_rm_rename_report_cd_open(mock_ctx):
     echo = MagicMock()
     # `clear` asks first (it is the only handler that wipes the registry), so
     # this dispatch test answers the prompt rather than asserting it is absent.
-    with patch(
-        "pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)
-    ), patch("pigit.handlers.repo_handler.confirm", return_value=True):
+    with (
+        patch("pigit.termui.cli_output.get_console", return_value=MagicMock(echo=echo)),
+        patch("pigit.handlers.repo_handler.confirm", return_value=True),
+    ):
         h = RepoCommandHandler(mock_ctx)
         h.rm(SimpleNamespace(repos=["n"], path=False))
         h.rename(SimpleNamespace(repo="a", new_name="b"))
@@ -417,7 +418,15 @@ def test_bulk_cmd_reports_the_failure_count():
     """The console summary is no use to a script; the return value is."""
     handler = _bulk_handler([("a", 0, "", ""), ("b", 1, "boom", "")])
 
-    assert handler.bulk_cmd(SimpleNamespace(repos=[], ), "git pull") == 1
+    assert (
+        handler.bulk_cmd(
+            SimpleNamespace(
+                repos=[],
+            ),
+            "git pull",
+        )
+        == 1
+    )
 
 
 def test_bulk_cmd_reports_zero_when_everything_succeeded():
@@ -506,6 +515,7 @@ def test_a_picker_platform_error_keeps_its_own_message():
 # `clear` lives on the handler but reaches the registry, so it is tested
 # here with the other handlers rather than beside the registry's own tests.
 
+
 @pytest.fixture
 def tmp_repos_json(tmp_path):
     return tmp_path / "repos.json"
@@ -513,9 +523,7 @@ def tmp_repos_json(tmp_path):
 
 def _clear_handler(tmp_repos_json):
     ctx = Mock()
-    ctx.managed_repos = ManagedRepos(
-        MockExecutor(), repo_json_path=str(tmp_repos_json)
-    )
+    ctx.managed_repos = ManagedRepos(MockExecutor(), repo_json_path=str(tmp_repos_json))
     handler = RepoCommandHandler.__new__(RepoCommandHandler)
     handler.ctx = ctx
     handler.console = Mock()
@@ -547,9 +555,7 @@ def test_clear_asks_with_the_count(tmp_repos_json):
     tmp_repos_json.write_text(json.dumps({"a": {"path": "/a"}, "b": {"path": "/b"}}))
     handler, _mr = _clear_handler(tmp_repos_json)
 
-    with patch(
-        "pigit.handlers.repo_handler.confirm", return_value=False
-    ) as asked:
+    with patch("pigit.handlers.repo_handler.confirm", return_value=False) as asked:
         handler.clear()
 
     assert "2" in asked.call_args[0][0]

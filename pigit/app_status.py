@@ -597,9 +597,7 @@ class StatusPanel(OptionList):
                         kind=FeedbackKind.SUCCESS,
                     )
                 else:
-                    show_toast(
-                        result.message, duration=2.0, kind=FeedbackKind.ERROR
-                    )
+                    show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
             # Not through _run_file_action: that reports the view model's own
             # message, which is a bare "Committed" — this badge names the
@@ -676,13 +674,9 @@ class StatusPanel(OptionList):
             def done(result: ActionResult) -> None:
                 if result.success:
                     self._vm.refresh()
-                    show_badge(
-                        "Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS
-                    )
+                    show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
                 else:
-                    show_toast(
-                        result.message, duration=2.0, kind=FeedbackKind.ERROR
-                    )
+                    show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
 
             run_with_spinner(lambda: self._vm.amend(), done, label="Amending")
 

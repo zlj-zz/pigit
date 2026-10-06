@@ -87,8 +87,11 @@ class TestExecutor:
         # stdin is pinned to DEVNULL so a command that reads it cannot block
         # on an EOF that never comes (see the stdin tests further down).
         mock_shell.assert_called_once_with(
-            "ls -l", start_new_session=True, stdin=subprocess.DEVNULL,
-            stdout=-1, stderr=-1,
+            "ls -l",
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=-1,
+            stderr=-1,
         )
 
     @pytest.mark.asyncio

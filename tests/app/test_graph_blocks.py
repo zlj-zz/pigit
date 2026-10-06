@@ -121,7 +121,9 @@ class TestContributionHeatmap:
         grid_rows = range(_TOP_MARGIN, _TOP_MARGIN + _HEATMAP_ROWS)
 
         def column(c: int):
-            return [(surface._rows[r][c].char, surface._rows[r][c].fg) for r in grid_rows]
+            return [
+                (surface._rows[r][c].char, surface._rows[r][c].fg) for r in grid_rows
+            ]
 
         assert column(col) != column(col - 1)
         # Tinting must not reach the week before it: with no commits anywhere

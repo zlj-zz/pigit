@@ -743,8 +743,9 @@ class TestContributionPanel:
             return patch.object(block, key, wrapper)
 
         vm, panel = self._panel()
-        counters = [{name: 0 for name in ("set_commits", "add_commits")}
-                    for _ in panel._blocks]
+        counters = [
+            {name: 0 for name in ("set_commits", "add_commits")} for _ in panel._blocks
+        ]
         with ExitStack() as stack:
             for block, counter in zip(panel._blocks, counters, strict=True):
                 for name in ("set_commits", "add_commits"):
@@ -756,9 +757,9 @@ class TestContributionPanel:
             assert [c["add_commits"] for c in counters] == [0] * len(panel._blocks)
 
             vm.items.set([*first, *_commits_on_day(1, 2)])
-            assert [c["set_commits"] for c in counters] == [1] * len(panel._blocks), (
-                "an extension must not rebuild"
-            )
+            assert [c["set_commits"] for c in counters] == [1] * len(
+                panel._blocks
+            ), "an extension must not rebuild"
             assert [c["add_commits"] for c in counters] == [1] * len(panel._blocks)
 
         assert sum(panel._heatmap._day_counts.values()) == 5

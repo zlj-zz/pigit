@@ -110,7 +110,9 @@ class TestReloadNotifiesTheApp:
 
     def _panel(self, vm: Mock):
         seen: list[bool] = []
-        panel = StashPanel(vm=vm, on_items_changed=lambda: seen.append(panel.is_empty()))
+        panel = StashPanel(
+            vm=vm, on_items_changed=lambda: seen.append(panel.is_empty())
+        )
         return panel, seen
 
     def test_loaded_list(self):

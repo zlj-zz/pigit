@@ -88,8 +88,8 @@ class _BranchOps(_OpsBase):
 
         _, _, resp = self.executor.exec(
             f"git branch {flag} --sort=-committerdate "
-            "--format=\"%(HEAD)%00%(refname:short)%00%(refname)%00"
-            "%(upstream:short)%00%(upstream:track)%00%(committerdate:unix)\" ",
+            '--format="%(HEAD)%00%(refname:short)%00%(refname)%00'
+            '%(upstream:short)%00%(upstream:track)%00%(committerdate:unix)" ',
             flags=REPLY | DECODE,
             cwd=path,
         )

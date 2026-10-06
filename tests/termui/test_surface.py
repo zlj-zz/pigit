@@ -485,9 +485,9 @@ class TestWideGlyphHalves:
                 for dst_col in range(8):
                     dst = Surface(self.W, 1)
                     dst.blit(self._ground(), 0, src_col, span, 1, 0, dst_col)
-                    assert self._width(dst) == self.W, (
-                        f"blit {src_col}+{span} -> {dst_col}"
-                    )
+                    assert (
+                        self._width(dst) == self.W
+                    ), f"blit {src_col}+{span} -> {dst_col}"
 
     def test_blit_over_text_keeps_the_width(self):
         for dst_col in range(8):

@@ -349,9 +349,7 @@ class AuthorChart(Component):
         size: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(x, y, size)
-        self._author_day_counts: dict[str, dict[datetime.date, int]] = defaultdict(
-            dict
-        )
+        self._author_day_counts: dict[str, dict[datetime.date, int]] = defaultdict(dict)
         self._chart = StepLineChart(
             plot_w=_PLOT_W,
             plot_h=_PLOT_H,
@@ -497,9 +495,7 @@ class PunchCard(Component):
         label_row = _TITLE_ROWS
         for hour in _LABELLED_HOURS:
             col = _PADDING_LEFT + _LEFT_MARGIN + hour * _CELL_CHAR_W
-            surface.draw_text_rgb(
-                label_row, col, str(hour), fg=THEME.fg_muted, bg=None
-            )
+            surface.draw_text_rgb(label_row, col, str(hour), fg=THEME.fg_muted, bg=None)
         for weekday, label in {0: "Mon", 2: "Wed", 4: "Fri"}.items():
             surface.draw_text_rgb(
                 _GRID_TOP + weekday,

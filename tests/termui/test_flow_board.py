@@ -32,7 +32,9 @@ class _Block(Component):
             surface.draw_text_rgb(row, 0, self.char * surface.width)
 
 
-def _board(*sizes: tuple[int, int], viewport: tuple[int, int]) -> tuple[FlowBoard, list]:
+def _board(
+    *sizes: tuple[int, int], viewport: tuple[int, int]
+) -> tuple[FlowBoard, list]:
     blocks = [_Block(w, h, chr(ord("A") + i)) for i, (w, h) in enumerate(sizes)]
     board = FlowBoard(blocks)
     board.resize(viewport)
