@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import sys
 import time
 import textwrap
@@ -83,8 +84,11 @@ class TestExecutor:
         )
 
         assert result == [(0, "error", "output")]
+        # stdin is pinned to DEVNULL so a command that reads it cannot block
+        # on an EOF that never comes (see the stdin tests further down).
         mock_shell.assert_called_once_with(
-            "ls -l", start_new_session=True, stdout=-1, stderr=-1
+            "ls -l", start_new_session=True, stdin=subprocess.DEVNULL,
+            stdout=-1, stderr=-1,
         )
 
     @pytest.mark.asyncio
@@ -140,3 +144,31 @@ class TestExecutor:
 
         results2 = self.executor.exec_parallel(*cmds, flags=REPLY | DECODE)
         assert results2 == [(0, "", "{0}{0}".format(i)) for i in range(3, 0, -1)]
+
+
+# ── Children must not inherit our stdin ──
+#
+# A command that reads stdin then waits for an EOF that never arrives when
+# stdin is an open pipe — CI, a task runner, anything upstream still writing.
+# `git shortlog` with no revision is one: it reads the log from stdin whenever
+# stdin is not a terminal, so it hung its caller forever with no error.
+
+
+def test_stdin_is_devnull_by_default():
+    executor = Executor()
+    kws: dict = {}
+
+    executor.generate_popen_state(REPLY | DECODE, kws)
+
+    assert kws["stdin"] is subprocess.DEVNULL
+
+
+def test_a_caller_supplied_stdin_is_kept():
+    """The default is a floor, not an override: a caller feeding a command
+    must still be able to say so."""
+    executor = Executor()
+    kws: dict = {"stdin": subprocess.PIPE}
+
+    executor.generate_popen_state(REPLY | DECODE, kws)
+
+    assert kws["stdin"] is subprocess.PIPE

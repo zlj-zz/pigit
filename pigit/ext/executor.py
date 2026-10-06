@@ -6,7 +6,7 @@ import logging
 import os
 import shlex
 import sys
-from subprocess import Popen, PIPE
+from subprocess import DEVNULL, Popen, PIPE
 from typing import Any, Final, cast
 from collections.abc import Iterator
 
@@ -93,6 +93,15 @@ class Executor:
             ExecState: The state ctx.
         """
         es = ExecState(decoding=bool(flags & DECODE))
+
+        # Children must not inherit our stdin. A command that decides to read
+        # it then waits for an EOF that never arrives when stdin is an open
+        # pipe — CI, a task runner, anything upstream still writing — and
+        # blocks its caller forever with no error. `git shortlog` with no
+        # revision is one such command: it reads the log from stdin whenever
+        # stdin is not a terminal. Callers that really mean to feed a command
+        # can still pass ``stdin`` and win.
+        popen_kws.setdefault("stdin", DEVNULL)
 
         if flags & REPLY:
             es.reply = True

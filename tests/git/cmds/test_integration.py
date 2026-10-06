@@ -374,3 +374,25 @@ class TestDangerConfirmation:
 
         executor.confirm.assert_not_called()
         assert exit_code == 0
+
+
+def test_log_contributors_names_the_revision_when_none_is_given():
+    """The bare form used to leave the revision off, which makes `git
+    shortlog` read the log from stdin whenever stdin is not a terminal — the
+    same command summarised the current branch in a terminal and nothing at
+    all under a pipe."""
+    from pigit.git.cmds.history import log_contributors
+
+    # `@command` replaces the function with a CommandDef; the raw callable
+    # is its handler.
+    assert log_contributors.handler([]).endswith("HEAD")
+
+
+def test_log_contributors_leaves_an_explicit_revision_alone():
+    """With arguments the revision is the caller's to give — they may be
+    passing one, or only options."""
+    from pigit.git.cmds.history import log_contributors
+
+    build = log_contributors.handler
+    assert build(["v1.0"]) == "git shortlog --summary --numbered v1.0"
+    assert build(["-n", "10"]) == "git shortlog --summary --numbered -n 10"
