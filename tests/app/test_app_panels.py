@@ -808,6 +808,52 @@ class TestContributionPanel:
         assert panel.handle_mouse(_Event()) is True
         assert panel._board.pan[1] > 0  # pan is (rows, cols)
 
+    def test_the_banner_takes_its_rows_off_the_top(self):
+        """The wordmark is fixed panel chrome, so the board gets the rest."""
+        from pigit.app_graph_panel import _BANNER_H
+
+        _, panel = self._panel()
+        panel.resize((100, 30))
+        assert panel._board.viewport_size == (100, 30 - _BANNER_H)
+
+    def test_the_banner_does_not_pan_with_the_board(self):
+        """It is part of the panel, not a block on the canvas."""
+        from pigit.app_graph_panel import _BANNER, _BANNER_H, _BANNER_PAD_LEFT
+
+        _, panel = self._panel()
+        panel.resize((120, 30))
+
+        def banner_rows() -> list[str]:
+            surface = Surface(120, 30)
+            panel.paint(surface)
+            return ["".join(cell.char for cell in row) for row in surface._rows[:5]]
+
+        before = banner_rows()
+        pad = " " * _BANNER_PAD_LEFT
+        assert before[0].rstrip() == pad + _BANNER[0]
+        assert before[_BANNER_H - 1].rstrip() == pad + _BANNER[-1]
+        assert before[1][_BANNER_PAD_LEFT] == "/", "the mark is inset from the edge"
+
+        panel._board.pan_by(rows=5, cols=5)
+        assert banner_rows() == before
+
+    def test_a_narrow_panel_clips_the_banner_rather_than_wrapping_it(self):
+        _, panel = self._panel()
+        panel.resize((20, 30))
+        surface = Surface(20, 30)
+        panel.paint(surface)
+        rows = ["".join(cell.char for cell in row) for row in surface._rows]
+        assert rows[0].startswith("  ______")
+        assert all(len(row) == 20 for row in rows)
+
+    def test_a_panel_shorter_than_the_banner_does_not_crash(self):
+        from pigit.app_graph_panel import _BANNER_H
+
+        _, panel = self._panel()
+        panel.resize((40, _BANNER_H - 1))
+        assert panel._board.viewport_size[1] == 0
+        panel.paint(Surface(40, _BANNER_H - 1))
+
     def test_resize_relays_out_the_board(self):
         """Wrapping follows the width, so the panel has to forward resizes."""
         _, panel = self._panel()

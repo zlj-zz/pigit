@@ -14,13 +14,36 @@ from pigit.termui.containers import FlowBoard
 from pigit.termui.containers.flow_board import PAN_STEP
 
 from .app_graph_blocks import AuthorChart, ContributionHeatmap, PunchCard
+from .app_theme import THEME
 from .viewmodels.commit import ICommitViewModel
+
+#: Fixed wordmark above the board. Not a figlet font -- all 163 installed ones
+#: were checked, and none renders this -- so the five rows are the data. Each
+#: line is drawn as-is and the panel's right edge clips it: no wrapping, no
+#: shrinking, and it does not pan with the graphs.
+_BANNER: tuple[str, ...] = tuple(
+    line.rstrip()
+    for line in r"""
+ ______   __     ______     __     ______
+/\  == \ /\ \   /\  ___\   /\ \   /\__  _\
+\ \  _-/ \ \ \  \ \ \__ \  \ \ \  \/_/\ \/
+ \ \_\    \ \_\  \ \_____\  \ \_\    \ \_\
+  \/_/     \/_/   \/_____/   \/_/     \/_/
+""".splitlines()
+    if line.strip()
+)
+_BANNER_H = len(_BANNER)
+#: Blank column between the panel's left edge and the mark: the art's own left
+#: edge is ragged, so without it the `/\` of the second row sits flush against
+#: the border while every other row is inset.
+_BANNER_PAD_LEFT = 1
 
 
 class ContributionPanel(Component):
     """Commit graphs on a board that wraps them to the width it is given.
 
-    As a footer band this only appeared on panels taller than 19 rows; a tab is
+    A fixed wordmark takes the top rows and the board gets the rest. As a
+    footer band this only appeared on panels taller than 19 rows; a tab is
     always reachable, and the board gives each graph the size it asks for
     instead of one layout with the geometry written into it.
 
@@ -61,10 +84,27 @@ class ContributionPanel(Component):
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
-        self._board.resize(size)
+        width, height = size
+        self._board.resize((width, max(0, height - _BANNER_H)))
 
     def paint(self, surface: Surface) -> None:
-        self._board.paint(surface)
+        self._draw_banner(surface)
+        self._board.paint(self._board_surface(surface))
+
+    def _board_surface(self, surface: Surface) -> Surface:
+        """The part of the panel under the wordmark."""
+        return surface.subsurface(
+            _BANNER_H, 0, surface.width, max(0, surface.height - _BANNER_H)
+        )
+
+    def _draw_banner(self, surface: Surface) -> None:
+        """Draw the fixed wordmark; the surface clips whatever does not fit."""
+        for row, line in enumerate(_BANNER):
+            if row >= surface.height:
+                return
+            surface.draw_text_rgb(
+                row, _BANNER_PAD_LEFT, line, fg=THEME.fg_accent, bg=None
+            )
 
     def handle_mouse(self, event) -> bool:
         """Wheel events pan the board."""
