@@ -681,99 +681,110 @@ class TestStatusPanelLifecycle:
         assert [f.name for f in panel.files] == ["fresh.py"]
 
 
-class TestCommitReport:
-    """Bottom contribution-graph report strip on the Commit panel."""
+def _commits_on_day(days_ago: int, count: int) -> list:
+    """*count* commits sharing one day, ``days_ago`` days back."""
+    import datetime
 
-    def _panel(self, report_default: bool = True):
+    from pigit.git.model import Commit
+
+    stamp = datetime.datetime.now() - datetime.timedelta(days=days_ago, hours=1)
+    ts = int(stamp.timestamp())
+    return [
+        Commit(f"{days_ago:04x}{i:04x}", f"msg {i}", "Zev", ts, "pushed", "", [])
+        for i in range(count)
+    ]
+
+
+class TestContributionPanel:
+    """The Graph tab: contribution counts fed by the commit item signal."""
+
+    def _panel(self, commits=None):
         from unittest.mock import Mock
-        from pigit.viewmodels.commit import ICommitViewModel
+
+        from pigit.app_graph_panel import ContributionPanel
         from pigit.termui.reactive import Signal
-        from pigit.app_commit import CommitPanel
+        from pigit.viewmodels.commit import ICommitViewModel
 
         vm = Mock(spec=ICommitViewModel)
-        vm.items = Signal([])
-        vm.graph_rows = []
-        panel = CommitPanel(vm=vm, report_default=report_default)
+        vm.items = Signal(commits or [])
+        panel = ContributionPanel(vm=vm)
         panel.mount()
-        return panel
+        return vm, panel
 
-    def test_hidden_at_or_below_19_rows(self):
-        panel = self._panel()
-        panel.resize((80, 10))
-        assert panel._footer_h == 0
-        panel.resize((80, 19))
-        assert panel._footer_h == 0  # 19 is not > 19
+    def test_replaced_list_rebuilds_instead_of_appending(self):
+        """A longer list of new commits is a re-pin, not a streamed batch.
 
-    def test_visible_above_19_rows(self):
-        panel = self._panel()
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
+        Only length is compared by the naive rule, so re-pinning to a longer
+        ref would count the old ref's commits and then top up with the new
+        ref's tail — inflating the peak day.
+        """
+        vm, panel = self._panel()
+        vm.items.set(_commits_on_day(0, 3))
+        assert sum(panel._graph._day_counts.values()) == 3
 
-    def test_hidden_when_default_off(self):
-        panel = self._panel(report_default=False)
-        panel.resize((80, 50))
-        assert panel._footer_h == 0
+        vm.items.set(_commits_on_day(1, 5))
+        assert panel._graph._max_count == 5
+        assert sum(panel._graph._day_counts.values()) == 5
 
-    def test_toggle_report_flips_strip(self):
-        panel = self._panel()
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
-        panel.toggle_report()
-        assert not panel._report_enabled
-        assert panel._footer_h == 0
-        panel.toggle_report()
-        assert panel._report_enabled
-        assert panel._footer_h == 15
-
-    def test_toggle_report_toasts_when_panel_too_short(self):
+    def test_streamed_batch_appends_without_rebuilding(self):
         from unittest.mock import patch
 
-        panel = self._panel()
-        panel.resize((80, 15))  # below the > 19 gate
-        assert panel._footer_h == 0
-        with patch("pigit.app_commit.show_toast") as toast:
-            panel.toggle_report()
-        toast.assert_called_once()
-        msg, _kwargs = toast.call_args
-        assert "rows" in msg[0].lower()
+        vm, panel = self._panel()
+        with (
+            patch.object(
+                panel._graph, "set_commits", wraps=panel._graph.set_commits
+            ) as rebuilt,
+            patch.object(
+                panel._graph, "add_commits", wraps=panel._graph.add_commits
+            ) as appended,
+        ):
+            first = _commits_on_day(0, 3)
+            vm.items.set(first)
+            assert rebuilt.call_count == 1
+            assert appended.call_count == 0
 
-    def test_render_splits_list_and_report(self):
-        import datetime
+            vm.items.set([*first, *_commits_on_day(1, 2)])
+            assert rebuilt.call_count == 1, "extension must not rebuild"
+            assert appended.call_count == 1
+        assert sum(panel._graph._day_counts.values()) == 5
 
+    def test_mount_replays_items_loaded_before_mount(self):
         from unittest.mock import Mock
-        from pigit.git.model import Commit
-        from pigit.viewmodels.commit import ICommitViewModel
+
+        from pigit.app_graph_panel import ContributionPanel
         from pigit.termui.reactive import Signal
-        from pigit.termui.surface import Surface
-        from pigit.app_commit import CommitPanel
+        from pigit.viewmodels.commit import ICommitViewModel
 
         vm = Mock(spec=ICommitViewModel)
-        vm.items = Signal([])
-        vm.graph_rows = []
-        panel = CommitPanel(vm=vm)
+        vm.items = Signal(_commits_on_day(0, 2))
+        panel = ContributionPanel(vm=vm)
         panel.mount()
-        now = int(datetime.datetime.now().timestamp())
-        commits = [
-            Commit(
-                f"{i:08x}",
-                f"msg {i}",
-                "Zev",
-                now - i * 86400,
-                "pushed",
-                "",
-                [],
-            )
-            for i in range(30)
-        ]
-        vm.items.set(commits)
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
-        surface = Surface(80, 50)
-        panel.paint(surface)
-        rows = ["".join(c.char for c in r) for r in surface._rows]
-        # List rows occupy the top 35; report cells fill the bottom 15.
-        assert any("msg" in row for row in rows[:35])
-        assert any("■" in row for row in rows[35:])
+        assert sum(panel._graph._day_counts.values()) == 2
+
+    def test_set_vm_drops_the_previous_repo_counts(self):
+        from unittest.mock import Mock
+
+        from pigit.termui.reactive import Signal
+        from pigit.viewmodels.commit import ICommitViewModel
+
+        vm, panel = self._panel()
+        vm.items.set(_commits_on_day(0, 4))
+        assert sum(panel._graph._day_counts.values()) == 4
+
+        other = Mock(spec=ICommitViewModel)
+        other.items = Signal(_commits_on_day(1, 1))
+        panel.set_vm(other)
+        assert sum(panel._graph._day_counts.values()) == 1
+
+    def test_mouse_wheel_pans_the_graph(self):
+        from pigit.termui import MouseButton, MouseKind
+
+        class _Event:
+            kind = MouseKind.PRESS
+            button = MouseButton.WHEEL_RIGHT
+
+        _, panel = self._panel()
+        assert panel.handle_mouse(_Event()) is True
 
 
 class TestScrollLeftMarker:
