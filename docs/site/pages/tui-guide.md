@@ -95,7 +95,6 @@ Push stash from Status with ++s++ (message prompt).
 | ++c++ | Cherry-pick onto HEAD |
 | ++o++ | Show another branch's log |
 | ++z++ | Toggle expanded commit rows |
-| ++ctrl+r++ | Toggle contribution graph (tall layouts) |
 | ++slash++ | Filter by message or SHA |
 | ++y++ | Copy SHA |
 

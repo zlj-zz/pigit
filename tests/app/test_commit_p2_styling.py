@@ -225,7 +225,7 @@ def test_current_week_highlight_column() -> None:
         canvas.draw_text_rgb(1 + day, 4, "■", fg=heat_fg, bg=None)
     window = {(1, day): 2 for day in range(3)}
     graph._max_count = 2
-    graph._draw_current_week_frame(
+    graph._tint_current_week(
         canvas,
         today=today,
         first_monday=first_monday,
@@ -250,7 +250,7 @@ def test_current_week_highlight_skips_out_of_range() -> None:
     canvas = Surface(20, 12)
     today = datetime.date(2026, 8, 27)
     first_monday = datetime.date(2026, 7, 28)
-    graph._draw_current_week_frame(
+    graph._tint_current_week(
         canvas,
         today=today,
         first_monday=first_monday,

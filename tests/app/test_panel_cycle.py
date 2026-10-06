@@ -357,5 +357,4 @@ def test_help_lists_ctrl_p_on_preview_panels_not_global(runtime) -> None:
 
     commit = {key: desc for key, desc in app._commit_panel.get_help_entries()}
     assert "Ctrl+p" not in commit
-    assert "Ctrl+r" in commit
-    assert "report" in commit["Ctrl+r"].lower()
+    assert "Ctrl+r" not in commit  # the graph moved to its own tab

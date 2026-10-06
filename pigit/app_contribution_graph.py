@@ -251,14 +251,12 @@ class ContributionGraph(Component):
         surface,
         start_col: int,
         width: int,
-        height: int,
     ) -> None:
-        """Render the author commit line chart into the right region."""
-        if height < self._line_chart.min_size[1]:
-            return
-        if not self._line_chart_series:
-            return
+        """Render the author commit line chart into the right region.
 
+        The caller has already checked that there is a chart to draw and room
+        for it; the height is the chart's own, asked of the chart.
+        """
         self._line_chart.set_series(
             self._line_chart_series,
             x_labels=self._line_chart_labels,
@@ -267,7 +265,9 @@ class ContributionGraph(Component):
                 for author in self._line_chart_series
             },
         )
-        chart_surface = surface.subsurface(0, start_col, width, height)
+        chart_surface = surface.subsurface(
+            0, start_col, width, self._line_chart.total_h
+        )
         self._line_chart.paint(chart_surface)
 
     def render_into(self, surface) -> None:
@@ -298,12 +298,16 @@ class ContributionGraph(Component):
 
         # Natural layout: the heatmap keeps its full week width and the line
         # chart its minimum width. The chart also needs room for its x-axis
-        # labels, which extend past the plot's right edge. The report shows a
+        # labels, which extend past the plot's right edge. The panel shows a
         # pannable horizontal window of the combined content instead of
         # compressing either graph.
         chart_w = self._line_chart.min_size[0] + max(
             (len(label) for _, label in self._line_chart_labels), default=0
         )
+        # Hand the chart exactly its own height: it parks its series legend on
+        # a fixed row, so a taller box would strand the legend below the plot.
+        chart_h = self._line_chart.total_h
+        chart_visible = bool(self._line_chart_series) and content_h >= chart_h
         gap = 2
         heatmap_w = _PADDING_LEFT + _LEFT_MARGIN + num_weeks * cell_w
         content_w = heatmap_w + gap + chart_w
@@ -346,7 +350,7 @@ class ContributionGraph(Component):
         self._heatmap.set_values(window, max_value=self._max_count)
         self._heatmap.resize_grid(cols=num_weeks)
         self._heatmap.paint(canvas)
-        self._draw_current_week_frame(
+        self._tint_current_week(
             canvas,
             today=today,
             first_monday=first_monday,
@@ -355,12 +359,18 @@ class ContributionGraph(Component):
             window=window,
         )
 
-        # --- Legend (Less → More) near the bottom, stats below it ---
-        # Anchored to the content height so a taller report spreads the spacer
-        # between the cells and the legend instead of leaving a gap below the
-        # stats; the report's bottom blank row is the only empty space.
-        legend_row = content_h - 2
-        stats_row = content_h - 1
+        # --- Legend (Less → More) and stats, on the chart's own legend row ---
+        # The two legends read as one band: aim at the row the chart reserves
+        # for its series keys rather than at the bottom of the content box,
+        # which drifts with the panel height. With no chart there is nothing to
+        # share, so the legend follows the grid.
+        legend_row = (
+            self._line_chart.legend_row
+            if chart_visible
+            else _TOP_MARGIN + _HEATMAP_ROWS
+        )
+        legend_row = max(0, min(legend_row, content_h - 2))
+        stats_row = legend_row + 1
         if legend_row < content_h:
             x = _PADDING_LEFT
             canvas.draw_text_rgb(legend_row, x, "Less", fg=THEME.fg_dim, bg=None)
@@ -381,15 +391,15 @@ class ContributionGraph(Component):
         if stats_row < content_h:
             self._draw_stats_horizontal(canvas, self._stats, stats_row)
 
-        # --- Author line chart (right region, full content height) ---
+        # --- Author line chart (right region, its own height) ---
         chart_x = heatmap_w + gap
-        if content_h >= self._line_chart.min_size[1]:
-            self._render_line_chart(canvas, chart_x, chart_w, content_h)
+        if chart_visible:
+            self._render_line_chart(canvas, chart_x, chart_w)
 
         # --- Show the pannable window ---
         surface.blit(canvas, 0, pan, w, content_h, _TOP_PAD, 0)
 
-    def _draw_current_week_frame(
+    def _tint_current_week(
         self,
         canvas: Surface,
         *,
@@ -399,11 +409,12 @@ class ContributionGraph(Component):
         content_h: int,
         window: dict[tuple[int, int], int],
     ) -> None:
-        """Highlight the current week column without clobbering adjacent weeks.
+        """Tint the current week's elapsed days toward ``fg_contrib_week_frame``.
 
-        Single-column weeks have no gutter between columns, so side ``│`` bars
-        are drawn only in margin space (before the grid or after the last week).
-        The week column itself is tinted toward ``fg_contrib_week_frame``.
+        Cells only, no box: week columns are one wide with no gutter, so a
+        frame could never be drawn on both sides. The right bar was drawn every
+        time (today is always in the last week) and the left never, which read
+        as a stray vertical border on the heatmap's right edge.
         """
         today_week = (today - first_monday).days // 7
         if today_week < 0 or today_week >= num_weeks:
@@ -413,7 +424,6 @@ class ContributionGraph(Component):
         col_start = _LEFT_MARGIN + today_week * cell_w
         col_end = col_start + cell_w - 1
         frame_fg = THEME.fg_contrib_week_frame
-        heatmap_right = _LEFT_MARGIN + num_weeks * cell_w
 
         side_top = max(_TOP_MARGIN, 0)
         side_bottom = min(_TOP_MARGIN + _HEATMAP_ROWS - 1, content_h - 1)
@@ -435,16 +445,8 @@ class ContributionGraph(Component):
             for col in range(col_start, col_end + 1):
                 canvas.draw_text_rgb(row, col, ch, fg=tint_fg, bg=None)
 
-        left_bar = col_start - 1
-        right_bar = col_end + 1
-        for row in range(side_top, side_bottom + 1):
-            if left_bar >= 0 and left_bar < _LEFT_MARGIN:
-                canvas.draw_text_rgb(row, left_bar, "│", fg=frame_fg, bg=None)
-            if right_bar < canvas.width and right_bar >= heatmap_right:
-                canvas.draw_text_rgb(row, right_bar, "│", fg=frame_fg, bg=None)
-
     def handle_mouse(self, event) -> bool:
-        """Horizontal wheel over the report pans the combined graph."""
+        """Horizontal wheel over the panel pans the combined graph."""
         if event.kind is not MouseKind.PRESS:
             return False
         if event.button is MouseButton.WHEEL_LEFT:

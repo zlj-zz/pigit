@@ -73,6 +73,10 @@ class OptionList(Component):
         on_search_changed: Callable[[], None] | None = None,
         id: str | None = None,
         header: Component | None = None,
+        # Shared chrome-band slot: ``header`` is used by Branch/Status/Stash.
+        # ``footer`` has no production caller since the contribution graph
+        # became its own tab; kept because it shares ``_fit_slot`` with
+        # ``header`` and tests/termui/test_option_list_chrome.py covers it.
         footer: Component | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)

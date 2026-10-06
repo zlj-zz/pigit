@@ -84,7 +84,6 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++c++ | Cherry-pick onto HEAD |
 | ++o++ | Browse another ref's log |
 | ++z++ | Toggle expanded commit rows |
-| ++ctrl+r++ | Toggle contribution graph strip |
 | ++slash++ | Filter by message or SHA |
 | ++y++ | Copy commit SHA |
 
