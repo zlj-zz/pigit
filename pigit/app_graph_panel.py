@@ -1,6 +1,6 @@
 """
 Module: pigit/app_graph_panel.py
-Description: Contribution heatmap as a standalone Graph tab panel.
+Description: Graph tab — a board of self-contained commit graphs.
 Author: Zev
 Date: 2026-10-06
 """
@@ -10,17 +10,18 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pigit.termui import Component, Surface, bind_signals, request_render
+from pigit.termui.containers import FlowBoard
 
-from .app_contribution_graph import ContributionGraph
+from .app_graph_blocks import AuthorChart, ContributionHeatmap
 from .viewmodels.commit import ICommitViewModel
 
 
 class ContributionPanel(Component):
-    """The contribution heatmap, given a whole tab instead of a footer band.
+    """Commit graphs on a board that wraps them to the width it is given.
 
-    As a band it only appeared on panels taller than 19 rows; a tab is always
-    reachable. The cost is that it no longer sits in the corner of your eye
-    while you read commits — a deliberate trade.
+    As a footer band this only appeared on panels taller than 19 rows; a tab is
+    always reachable, and the board gives each graph the size it asks for
+    instead of one layout with the geometry written into it.
 
     It subscribes to ``commit_vm.items`` and never runs git itself.
     """
@@ -31,31 +32,37 @@ class ContributionPanel(Component):
     def __init__(self, *, vm: ICommitViewModel, id: str | None = None) -> None:
         super().__init__(id=id)
         self._vm = vm
-        self._graph = ContributionGraph()
+        self._heatmap = ContributionHeatmap()
+        self._chart = AuthorChart()
+        self._board = FlowBoard([self._heatmap, self._chart])
         # Commits already counted, for the append check in ``_extends_current``.
         self._commits: list = []
         self._vm_unsubs: list[Callable[[], None]] = []
 
-    def paint(self, surface: Surface) -> None:
-        """Draw the heatmap sized to this panel."""
-        self._graph.resize((surface.width, surface.height))
-        self._graph.paint(surface)
-
-    def handle_mouse(self, event) -> bool:
-        """Forward wheel events so the graph can pan horizontally."""
-        return self._graph.handle_mouse(event)
-
     def mount(self) -> None:
         super().mount()
+        self._board.mount()
         self._bind_vm_signals()
         # Signals only fire on change: a stream that finished while this panel
-        # was unmounted must be replayed, or the graph stays blank.
+        # was unmounted must be replayed, or the graphs stay blank.
         if self._vm.items.value:
             self._on_items_changed()
 
     def unmount(self) -> None:
+        self._board.unmount()
         super().unmount()
         self._unbind_vm_signals()
+
+    def resize(self, size: tuple[int, int]) -> None:
+        super().resize(size)
+        self._board.resize(size)
+
+    def paint(self, surface: Surface) -> None:
+        self._board.paint(surface)
+
+    def handle_mouse(self, event) -> bool:
+        """Wheel events pan the board."""
+        return self._board.handle_mouse(event)
 
     def set_vm(self, vm: ICommitViewModel) -> None:
         """Retarget this panel to a new Commit ViewModel (repo session switch).
@@ -65,7 +72,8 @@ class ContributionPanel(Component):
         self._unbind_vm_signals()
         self._vm = vm
         self._commits = []
-        self._graph.set_commits([])
+        self._heatmap.set_commits([])
+        self._chart.set_commits([])
         if self.is_mounted():
             self._bind_vm_signals()
             self._on_items_changed()
@@ -87,12 +95,14 @@ class ContributionPanel(Component):
         if not self.is_mounted():
             return
         commits = list(self._vm.items.value)
-        if self._extends_current(commits):
-            # Incremental: recounting the whole history per streamed batch costs
-            # ~8x more, and the callback runs on the main thread.
-            self._graph.add_commits(commits[len(self._commits) :])
-        else:
-            self._graph.set_commits(commits)
+        # Decide once, then tell every block the same thing: recounting a whole
+        # history per streamed batch costs ~8x more and runs on the main thread.
+        added = commits[len(self._commits) :] if self._extends_current(commits) else None
+        for block in (self._heatmap, self._chart):
+            if added is None:
+                block.set_commits(commits)
+            else:
+                block.add_commits(added)
         self._commits = commits
         request_render()
 
@@ -102,8 +112,7 @@ class ContributionPanel(Component):
         Length alone is not enough: the stream's first batch *replaces*
         ``vm.items`` rather than appending to it, so re-pinning to a longer ref
         grows the list while swapping every entry. Comparing identity catches
-        both — a replaced list fails on its first element. Nothing counted yet
-        is a rebuild by definition.
+        both — a replaced list fails on its first element.
         """
         current = self._commits
         return (

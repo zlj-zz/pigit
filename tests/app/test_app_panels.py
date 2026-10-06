@@ -696,7 +696,7 @@ def _commits_on_day(days_ago: int, count: int) -> list:
 
 
 class TestContributionPanel:
-    """The Graph tab: contribution counts fed by the commit item signal."""
+    """The Graph tab: a board of blocks fed by the commit item signal."""
 
     def _panel(self, commits=None):
         from unittest.mock import Mock
@@ -720,33 +720,42 @@ class TestContributionPanel:
         """
         vm, panel = self._panel()
         vm.items.set(_commits_on_day(0, 3))
-        assert sum(panel._graph._day_counts.values()) == 3
+        assert sum(panel._heatmap._day_counts.values()) == 3
 
         vm.items.set(_commits_on_day(1, 5))
-        assert panel._graph._max_count == 5
-        assert sum(panel._graph._day_counts.values()) == 5
+        assert panel._heatmap._max_count == 5
+        assert sum(panel._heatmap._day_counts.values()) == 5
 
     def test_streamed_batch_appends_without_rebuilding(self):
+        """Both blocks see the same decision, and neither recounts everything."""
         from unittest.mock import patch
 
         vm, panel = self._panel()
         with (
             patch.object(
-                panel._graph, "set_commits", wraps=panel._graph.set_commits
-            ) as rebuilt,
+                panel._heatmap, "set_commits", wraps=panel._heatmap.set_commits
+            ) as heat_rebuilt,
             patch.object(
-                panel._graph, "add_commits", wraps=panel._graph.add_commits
-            ) as appended,
+                panel._heatmap, "add_commits", wraps=panel._heatmap.add_commits
+            ) as heat_appended,
+            patch.object(
+                panel._chart, "set_commits", wraps=panel._chart.set_commits
+            ) as chart_rebuilt,
+            patch.object(
+                panel._chart, "add_commits", wraps=panel._chart.add_commits
+            ) as chart_appended,
         ):
             first = _commits_on_day(0, 3)
             vm.items.set(first)
-            assert rebuilt.call_count == 1
-            assert appended.call_count == 0
+            assert (heat_rebuilt.call_count, chart_rebuilt.call_count) == (1, 1)
+            assert (heat_appended.call_count, chart_appended.call_count) == (0, 0)
 
             vm.items.set([*first, *_commits_on_day(1, 2)])
-            assert rebuilt.call_count == 1, "extension must not rebuild"
-            assert appended.call_count == 1
-        assert sum(panel._graph._day_counts.values()) == 5
+            assert heat_rebuilt.call_count == 1, "extension must not rebuild"
+            assert chart_rebuilt.call_count == 1, "extension must not rebuild"
+            assert (heat_appended.call_count, chart_appended.call_count) == (1, 1)
+        assert sum(panel._heatmap._day_counts.values()) == 5
+        assert sum(panel._chart._chart._series["Zev"]) == 5
 
     def test_mount_replays_items_loaded_before_mount(self):
         from unittest.mock import Mock
@@ -759,7 +768,8 @@ class TestContributionPanel:
         vm.items = Signal(_commits_on_day(0, 2))
         panel = ContributionPanel(vm=vm)
         panel.mount()
-        assert sum(panel._graph._day_counts.values()) == 2
+        assert sum(panel._heatmap._day_counts.values()) == 2
+        assert panel._chart._chart._series
 
     def test_set_vm_drops_the_previous_repo_counts(self):
         from unittest.mock import Mock
@@ -769,14 +779,14 @@ class TestContributionPanel:
 
         vm, panel = self._panel()
         vm.items.set(_commits_on_day(0, 4))
-        assert sum(panel._graph._day_counts.values()) == 4
+        assert sum(panel._heatmap._day_counts.values()) == 4
 
         other = Mock(spec=ICommitViewModel)
         other.items = Signal(_commits_on_day(1, 1))
         panel.set_vm(other)
-        assert sum(panel._graph._day_counts.values()) == 1
+        assert sum(panel._heatmap._day_counts.values()) == 1
 
-    def test_mouse_wheel_pans_the_graph(self):
+    def test_mouse_wheel_pans_the_board(self):
         from pigit.termui import MouseButton, MouseKind
 
         class _Event:
@@ -784,7 +794,22 @@ class TestContributionPanel:
             button = MouseButton.WHEEL_RIGHT
 
         _, panel = self._panel()
+        panel.resize((40, 10))
+        assert panel._board.content_size[0] > 40, "nothing to pan otherwise"
+
         assert panel.handle_mouse(_Event()) is True
+        assert panel._board.pan[0] > 0
+
+    def test_resize_relays_out_the_board(self):
+        """Wrapping follows the width, so the panel has to forward resizes."""
+        _, panel = self._panel()
+        panel.resize((240, 30))
+        wide = panel._board.content_size
+        panel.resize((80, 30))
+        narrow = panel._board.content_size
+
+        assert narrow[0] < wide[0]
+        assert narrow[1] > wide[1]
 
 
 class TestScrollLeftMarker:

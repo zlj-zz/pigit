@@ -1,0 +1,192 @@
+"""
+Module: tests/termui/test_flow_board.py
+Description: Tests for the wrapping, pannable block layout.
+Author: Zev
+Date: 2026-10-06
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from pigit.termui import Component, Surface
+from pigit.termui.containers import FlowBoard
+from pigit.termui.containers.flow_board import COL_GAP, ROW_GAP, PAN_STEP
+from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+
+class _Block(Component):
+    """A block that fills its own box with one character."""
+
+    def __init__(self, width: int, height: int, char: str) -> None:
+        super().__init__()
+        self._natural = (width, height)
+        self.char = char
+
+    @property
+    def natural_size(self) -> tuple[int, int]:
+        return self._natural
+
+    def paint(self, surface: Surface) -> None:
+        for row in range(surface.height):
+            surface.draw_text_rgb(row, 0, self.char * surface.width)
+
+
+def _board(*sizes: tuple[int, int], viewport: tuple[int, int]) -> tuple[FlowBoard, list]:
+    blocks = [_Block(w, h, chr(ord("A") + i)) for i, (w, h) in enumerate(sizes)]
+    board = FlowBoard(blocks)
+    board.resize(viewport)
+    return board, blocks
+
+
+def _at(board: FlowBoard, char: str) -> tuple[int, int]:
+    """Where *char* was placed, as ``(row, column)``."""
+    for block, x, y in board._placements:
+        if block.char == char:
+            return (x, y)
+    raise AssertionError(f"block {char} was not placed")
+
+
+def _rows(board: FlowBoard, width: int, height: int) -> list[str]:
+    surface = Surface(width, height)
+    board.paint(surface)
+    return ["".join(cell.char for cell in row) for row in surface._rows]
+
+
+def test_blocks_share_one_row_while_they_fit():
+    board, _ = _board((10, 3), (10, 3), viewport=(40, 10))
+    assert _at(board, "A") == (0, 0)
+    assert _at(board, "B") == (0, 10 + COL_GAP)
+    assert board.content_size == (10 + COL_GAP + 10, 3)
+
+
+def test_a_block_wraps_when_less_than_half_of_it_would_show():
+    """The rule the layout is built on: half visible, or go to the next row."""
+    board, _ = _board((10, 3), (10, 3), viewport=(16, 10))
+    # 10 + COL_GAP = 12 leaves 4 columns, which is under half of 10.
+    assert _at(board, "B") == (3 + ROW_GAP, 0)
+
+
+def test_an_overhang_of_exactly_half_stays_on_the_row():
+    """Half visible is enough to keep it; only *under* half wraps."""
+    board, _ = _board((10, 3), (10, 3), viewport=(18, 10))
+    assert _at(board, "B") == (0, 10 + COL_GAP)  # 18 - 12 == 6 == 10 / 2
+
+
+def test_a_wrapped_block_is_drawn_below_not_to_the_right():
+    """Pins the axis order: placements are (row, column), as Component.x/y are."""
+    board, _ = _board((10, 3), (10, 3), viewport=(16, 10))
+    rows = _rows(board, 16, 10)
+    assert rows[0].startswith("A" * 10)
+    assert rows[3 + ROW_GAP].startswith("B" * 10)
+
+
+def test_a_block_wider_than_the_viewport_is_still_placed():
+    """Wrapping must not loop forever on a block that can never fit."""
+    board, _ = _board((30, 4), viewport=(10, 20))
+    assert _at(board, "A") == (0, 0)
+    assert board.content_size == (30, 4)
+
+
+def test_every_row_gets_at_least_one_block():
+    """The guard protects the first block of each row, not just the first."""
+    board, _ = _board((40, 3), (40, 3), viewport=(10, 20))
+    assert _at(board, "A") == (0, 0)
+    assert _at(board, "B") == (3 + ROW_GAP, 0)
+
+
+def test_content_width_has_no_trailing_gap():
+    board, _ = _board((10, 3), (10, 3), viewport=(40, 10))
+    assert board.content_size[0] == 10 + COL_GAP + 10
+
+
+def test_a_row_is_as_tall_as_its_tallest_block():
+    # 24 wide fits A + B (10 + gap + 10) and leaves too little for C.
+    board, _ = _board((10, 3), (10, 7), (10, 3), viewport=(24, 40))
+    assert _at(board, "A") == (0, 0)
+    assert _at(board, "B") == (0, 10 + COL_GAP)
+    assert _at(board, "C")[0] == 7 + ROW_GAP
+
+
+def test_resize_relays_out():
+    """Wrapping depends on the width, so a narrower board means more rows."""
+    board, _ = _board((30, 3), (30, 3), viewport=(100, 20))
+    assert board.content_size == (30 + COL_GAP + 30, 3)
+    board.resize((40, 20))
+    assert board.content_size == (30, 3 + ROW_GAP + 3)
+
+
+def test_pan_is_clamped_to_the_content():
+    board, _ = _board((100, 5), viewport=(40, 10))
+    board.pan_by(dx=10_000, dy=10_000)
+    assert board.pan == (100 - 40, 0)
+    board.pan_by(dx=-10_000, dy=-10_000)
+    assert board.pan == (0, 0)
+
+
+def test_pan_home_returns_to_the_origin():
+    board, _ = _board((100, 5), viewport=(40, 10))
+    board.pan_by(dx=PAN_STEP)
+    board.pan_home()
+    assert board.pan == (0, 0)
+
+
+def test_wheel_pans_in_both_axes():
+    board, _ = _board((100, 50), viewport=(40, 10))
+
+    def wheel(button: MouseButton) -> bool:
+        return board.handle_mouse(MouseEvent(1, 1, button, MouseKind.PRESS))
+
+    assert wheel(MouseButton.WHEEL_RIGHT) is True
+    assert board.pan == (PAN_STEP, 0)
+    assert wheel(MouseButton.WHEEL_LEFT) is True
+    assert board.pan == (0, 0)
+    assert wheel(MouseButton.WHEEL_DOWN) is True
+    assert board.pan == (0, PAN_STEP)
+    assert wheel(MouseButton.WHEEL_UP) is True
+    assert board.pan == (0, 0)
+
+
+def test_a_block_without_a_natural_size_is_refused():
+    """Guessing a fallback would silently clip or hide the block."""
+
+    class Sizeless(Component):
+        def paint(self, surface):  # pragma: no cover - never reached
+            pass
+
+    board = FlowBoard([Sizeless()])
+    with pytest.raises(ValueError, match="natural_size"):
+        board.resize((40, 10))
+
+
+def test_painting_a_block_that_scrolled_off_does_not_move_its_neighbours():
+    """A window onto the canvas, not a rearranged row."""
+    # 50 wide keeps both on one row (40 would wrap B) and is under the 62 the
+    # two blocks need, so the right-hand one is only partly on screen.
+    board, _ = _board((30, 3), (30, 3), viewport=(50, 10))
+    assert _at(board, "A") == (0, 0)
+    assert _at(board, "B") == (0, 30 + COL_GAP)
+    assert board.content_size == (30 + COL_GAP + 30, 3)
+    assert _rows(board, 50, 3)[0] == "A" * 30 + " " * COL_GAP + "B" * 18
+
+
+def test_panning_down_reveals_the_rows_that_did_not_fit():
+    board, _ = _board((50, 12), (50, 6), viewport=(40, 10))
+    assert board.content_size == (50, 12 + ROW_GAP + 6)
+
+    top = _rows(board, 40, 10)
+    assert {char for row in top for char in row} == {"A"}
+
+    board.pan_by(dy=12 + ROW_GAP)  # clamps to content_h - viewport_h
+    assert any("B" in row for row in _rows(board, 40, 10))
+
+
+def test_mount_reaches_the_blocks():
+    """Blocks are not framework children, so the board mounts them itself."""
+    board, blocks = _board((10, 3), viewport=(40, 10))
+    board.mount()
+    try:
+        assert all(block.is_mounted() for block in blocks)
+    finally:
+        board.unmount()
+    assert not any(block.is_mounted() for block in blocks)

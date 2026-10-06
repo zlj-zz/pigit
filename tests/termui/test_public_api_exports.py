@@ -29,6 +29,7 @@ REQUIRED_ROOT: frozenset[str] = frozenset(
         "set_key_overrides",
         "keys",
         "palette",
+        "blend",
         "Theme",
         "DEFAULT_THEME",
         "get_theme",

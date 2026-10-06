@@ -74,7 +74,6 @@ _EXEMPT_FILES = {
     "app_theme.py",
     # Chart/lane colors are intentionally raw palette constants (not semantic roles)
     "app_commit.py",
-    "app_contribution_graph.py",
 }
 
 # Allowed palette attributes (style flags only)

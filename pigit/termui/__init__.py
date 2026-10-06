@@ -79,6 +79,7 @@ from . import keys
 from .surface import Surface
 from .segment import Segment
 from . import palette
+from .palette import blend
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from .mouse import MouseButton, MouseEvent, MouseKind
@@ -124,6 +125,7 @@ __all__ = [
     "Surface",
     "Segment",
     "palette",
+    "blend",
     "Theme",
     "DEFAULT_THEME",
     "get_theme",

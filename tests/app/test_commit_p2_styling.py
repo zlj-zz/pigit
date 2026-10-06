@@ -10,9 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-import datetime
 
-from pigit.app_contribution_graph import ContributionGraph
 from pigit.app_theme import THEME
 from pigit.app_types import GraphRow
 from pigit.git.model import Commit
@@ -201,7 +199,7 @@ def test_chart_author_colors_distinct_hues() -> None:
 
 
 def test_author_chart_color_stable_by_name() -> None:
-    from pigit.app_contribution_graph import _author_chart_color
+    from pigit.app_graph_blocks import _author_chart_color
 
     a = _author_chart_color("chengjian")
     b = _author_chart_color("chengjian")
@@ -209,55 +207,3 @@ def test_author_chart_color_stable_by_name() -> None:
     assert a == b
     assert a in THEME.chart_author_colors
     assert c in THEME.chart_author_colors
-
-
-def test_current_week_highlight_column() -> None:
-    graph = ContributionGraph()
-    first_monday = datetime.date(2026, 8, 25)
-    today = datetime.date(2026, 9, 1)
-    num_weeks = 4
-    content_h = 12
-    from pigit.termui.surface import Surface
-
-    canvas = Surface(20, content_h)
-    heat_fg = THEME.contrib_heatmap_colors[3]
-    for day in range(3):
-        canvas.draw_text_rgb(1 + day, 4, "■", fg=heat_fg, bg=None)
-    window = {(1, day): 2 for day in range(3)}
-    graph._max_count = 2
-    graph._tint_current_week(
-        canvas,
-        today=today,
-        first_monday=first_monday,
-        num_weeks=num_weeks,
-        content_h=content_h,
-        window=window,
-    )
-    rows = canvas.rows()
-    today_week = (today - first_monday).days // 7
-    assert today_week == 1
-    assert rows[1][4].char == "■"
-    assert rows[1][4].fg == heat_fg
-    assert rows[1][5].char == "■"
-    assert rows[1][5].fg != heat_fg
-    assert not any(cell.char == "─" for row in rows for cell in row)
-
-
-def test_current_week_highlight_skips_out_of_range() -> None:
-    from pigit.termui.surface import Surface
-
-    graph = ContributionGraph()
-    canvas = Surface(20, 12)
-    today = datetime.date(2026, 8, 27)
-    first_monday = datetime.date(2026, 7, 28)
-    graph._tint_current_week(
-        canvas,
-        today=today,
-        first_monday=first_monday,
-        num_weeks=4,
-        content_h=12,
-        window={},
-    )
-    assert not any(
-        cell.fg == THEME.fg_contrib_week_frame for row in canvas.rows() for cell in row
-    )
