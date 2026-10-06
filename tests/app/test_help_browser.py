@@ -14,8 +14,10 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.config_data import AppConfig
+from pigit.git.model import Commit
 from pigit.termui.root import ComponentRoot
 from pigit.termui.widgets import BindingBrowser
+from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.surface import Surface
 from pigit.termui import by_id
@@ -53,6 +55,32 @@ def test_setup_uses_binding_browser(runtime):
     app, _root = _mount(runtime)
     assert isinstance(app._help_browser, BindingBrowser)
     assert app._help_popup._child is app._help_browser
+
+
+def test_help_popup_over_cjk_rows_keeps_every_row_width(runtime):
+    """The popup paints over the rows behind it, not onto a blank screen.
+
+    A border cell that lands on half of a wide glyph strands the other half,
+    which still renders a column -- so the row comes out one column off the
+    terminal width, and with it the whole frame: the border no longer lines up
+    between rows. Widths are probed because whether an edge lands on a glyph
+    half depends on the terminal width.
+    """
+    app, root = _mount(runtime)
+    app.goto_commit()
+    app._commit_panel.commits = [
+        Commit(f"sha{i:04d}", "修复提交面板的中文信息显示问题", "Zev", 0, "pushed", "", [])
+        for i in range(10)
+    ]
+    app._commit_panel._rebuild_rows()
+    for width in (100, 114, 120):
+        root.resize((width, 30))
+        app._open_help_browser()
+        root.resize((width, 30))
+        surface = Surface(width, 30)
+        root.paint(surface)
+        for i, line in enumerate(surface.lines()):
+            assert wcswidth(line) == width, f"row {i} at width {width}: |{line}|"
 
 
 def test_help_groups_are_executable_bindings(runtime):

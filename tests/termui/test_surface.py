@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pigit.termui.surface import FlatCell, Surface
 from pigit.termui.palette import DEFAULT_BG, DEFAULT_FG, STYLE_BOLD
+from pigit.termui.wcwidth_table import wcswidth
 
 
 class TestCell:
@@ -404,3 +405,106 @@ class TestCombiningMarks:
         s.draw_text_rgb(0, 0, "́")
         assert _BLANK_CELL.char == " "
         assert _SPACER_CELL.char == ""
+
+
+class TestWideGlyphHalves:
+    """A wide glyph is a lead cell plus an empty continuation cell.
+
+    Replacing only one of the two strands the other, and a stranded half still
+    renders its own column -- so the row comes out a column wider or narrower
+    than its width. The renderer emits a row as a single string, so every cell
+    after the split shifts with it: an overlay's border drawn across CJK text
+    lands a column off on each row it crosses.
+    """
+
+    W = 24
+    CJK = "修复提交面板的中文信息"  # 11 glyphs, 22 columns
+
+    def _ground(self) -> Surface:
+        s = Surface(self.W, 1)
+        s.draw_text_rgb(0, 0, self.CJK, fg=DEFAULT_FG, bg=DEFAULT_BG)
+        return s
+
+    @staticmethod
+    def _width(surface: Surface) -> int:
+        return wcswidth(surface.lines()[0])
+
+    def test_writing_over_either_half_keeps_the_width(self):
+        for col in range(self.W):
+            s = self._ground()
+            s.draw_text_rgb(0, col, "│", fg=DEFAULT_FG, bg=DEFAULT_BG)
+            assert self._width(s) == self.W, f"split at column {col}"
+
+    def test_overwriting_a_lead_clears_its_continuation(self):
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "中文", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(0, 2, "X", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        assert s.lines()[0] == "中X "
+
+    def test_overwriting_a_continuation_clears_its_lead(self):
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "中文", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(0, 3, "X", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        assert s.lines()[0] == "中 X"
+
+    def test_the_cleared_half_keeps_its_colors(self):
+        """The stranded half is not painted over, so blanking it must not
+        repaint the background it was drawn on."""
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "中", fg=(10, 20, 30), bg=(1, 2, 3))
+        s.draw_text_rgb(0, 1, "X", fg=(90, 90, 90), bg=(9, 9, 9))
+        lead = s._rows[0][0]
+        assert lead.char == " "
+        assert (lead.fg, lead.bg) == ((10, 20, 30), (1, 2, 3))
+
+    def test_fill_rect_edges_do_not_split_glyphs(self):
+        for col in range(self.W):
+            for span in (1, 2, 3, 7):
+                s = self._ground()
+                s.fill_rect_rgb(0, col, span, 1, bg=DEFAULT_BG)
+                assert self._width(s) == self.W, f"fill {span} at {col}"
+
+    def test_draw_box_over_text_keeps_every_row_width(self):
+        for col in range(self.W - 12):
+            for width in (2, 3, 8, 13):
+                s = Surface(self.W, 4)
+                for r in range(4):
+                    s.draw_text_rgb(r, 0, self.CJK, fg=DEFAULT_FG, bg=DEFAULT_BG)
+                s.draw_box_rgb(0, col, width, 4, fg=DEFAULT_FG, bg=DEFAULT_BG)
+                for r in range(4):
+                    assert (
+                        wcswidth(s.lines()[r]) == self.W
+                    ), f"box {width} at {col}, row {r}"
+
+    def test_blit_from_a_non_glyph_aligned_source(self):
+        """A copied window need not fall on glyph boundaries: its first cell
+        can be a continuation whose lead is outside it, and its last a lead
+        whose continuation is."""
+        for src_col in range(8):
+            for span in (1, 5, 9, 13):
+                for dst_col in range(8):
+                    dst = Surface(self.W, 1)
+                    dst.blit(self._ground(), 0, src_col, span, 1, 0, dst_col)
+                    assert self._width(dst) == self.W, (
+                        f"blit {src_col}+{span} -> {dst_col}"
+                    )
+
+    def test_blit_over_text_keeps_the_width(self):
+        for dst_col in range(8):
+            src = Surface(self.W, 1)
+            src.draw_text_rgb(0, 0, "另一个内容测试", fg=DEFAULT_FG, bg=DEFAULT_BG)
+            dst = self._ground()
+            dst.blit(src, 0, 0, 10, 1, 0, dst_col)
+            assert self._width(dst) == self.W, f"blit over text at {dst_col}"
+
+    def test_blit_landing_on_a_continuation_clears_the_lead(self):
+        """Only the left seam moves here, so nothing cancels the extra column.
+
+        Blitting a single narrow cell onto a continuation leaves the lead
+        glyph covering two columns with a second cell after it.
+        """
+        dst = self._ground()
+        src = Surface(self.W, 1)
+        src.draw_text_rgb(0, 0, "X", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        dst.blit(src, 0, 0, 1, 1, 0, 1)  # column 1 is 修's continuation
+        assert self._width(dst) == self.W

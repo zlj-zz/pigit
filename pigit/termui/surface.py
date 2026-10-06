@@ -76,7 +76,23 @@ class FlatCell:
 
 
 _BLANK_CELL = FlatCell()
+#: Continuation cell of a wide glyph: it carries no glyph of its own, because
+#: the lead cell's glyph already covers both of their columns.
 _SPACER_CELL = FlatCell("")
+
+
+def _glyph_width(cell: FlatCell) -> int:
+    """Display width of *cell*'s own glyph; 0 when it holds none."""
+    char = cell.char
+    if not char:
+        return 0
+    base = char[0]
+    return _char_width(ord(base)) if not base.isascii() else 1
+
+
+def _blank_like(cell: FlatCell) -> FlatCell:
+    """A space in *cell*'s colors, so clearing a half-glyph does not repaint it."""
+    return FlatCell(" ", fg=cell.fg, bg=cell.bg, style_flags=cell.style_flags)
 
 
 class Surface:
@@ -176,6 +192,49 @@ class Surface:
             for i in range(self.width):
                 row[i] = _BLANK_CELL
 
+    def _unsplit_wide_glyphs(self, row: int, col: int, span: int) -> None:
+        """Blank the wide-glyph halves that overwriting *span* cells would strand.
+
+        A wide glyph is stored as a lead cell plus an empty continuation cell.
+        Replacing only one of the two strands the other, and a stranded half
+        still renders its column -- the row comes out one column wider or
+        narrower than its width. The renderer emits a row as a single string,
+        so every cell after the split shifts with it, and an overlay's border
+        drawn across CJK text lands a column off on each row it crosses.
+
+        Call before writing, while the cells being replaced are still there:
+        only a glyph lying *outside* the span can be stranded by it.
+        """
+        if span <= 0:
+            return
+        cells = self._rows[row]
+        if col > 0 and _glyph_width(cells[col - 1]) == 2:
+            cells[col - 1] = _blank_like(cells[col - 1])
+        last = col + span - 1
+        if last + 1 < self.width and _glyph_width(cells[last]) == 2:
+            cells[last + 1] = _blank_like(cells[last + 1])
+
+    def _drop_orphan_half_glyphs(self, row: int, col: int, span: int) -> None:
+        """Blank half-glyphs that a copied window left without their partner.
+
+        A blit copies a window that need not fall on glyph boundaries, so the
+        first cell it lands on can be the continuation of a glyph whose lead is
+        outside the window, and the last can be a lead whose continuation is.
+        Neither half covers its two columns alone, so the row would come out a
+        column short -- the same break as splitting a glyph, reached from the
+        copying side. This also catches a cell the copy skipped: the unpaired
+        lead ``_unsplit_wide_glyphs`` is about to leave when it clears the
+        continuation for a write that then does not happen.
+        """
+        if span <= 0:
+            return
+        cells = self._rows[row]
+        if cells[col].char == "":
+            cells[col] = _blank_like(cells[col])
+        last = col + span - 1
+        if _glyph_width(cells[last]) == 2:
+            cells[last] = _blank_like(cells[last])
+
     def blit(
         self,
         src: Surface,
@@ -205,12 +264,14 @@ class Surface:
             drow = root_r + r
             if not (0 <= srow < src.height):
                 continue
+            self._unsplit_wide_glyphs(drow, root_c, cw)
             for c in range(cw):
                 scol = src_col + skip_c + c
                 dcol = root_c + c
                 if not (0 <= scol < src.width):
                     continue
                 self._rows[drow][dcol] = src._rows[srow][scol]
+            self._drop_orphan_half_glyphs(drow, root_c, cw)
 
     def subsurface(self, row: int, col: int, width: int, height: int) -> Surface:
         """Return a view with origin flattened onto root (no parent chain)."""
@@ -282,6 +343,7 @@ class Surface:
             if clipped is not None:
                 root_r, root_c, cw, _ = clipped
                 if cw == w:
+                    self._unsplit_wide_glyphs(root_r, root_c, w)
                     base_cell = FlatCell(ch, fg=fg, bg=bg, style_flags=style_flags)
                     self._rows[root_r][root_c] = base_cell
                     if w == 2:
@@ -322,6 +384,7 @@ class Surface:
         root_r, root_c, cw, ch = clipped
         cell = FlatCell(" ", bg=bg)
         for r in range(root_r, root_r + ch):
+            self._unsplit_wide_glyphs(r, root_c, cw)
             for c in range(root_c, root_c + cw):
                 self._rows[r][c] = cell
 
