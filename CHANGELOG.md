@@ -1,5 +1,29 @@
 # Changelog of pigit
 
+## 2.9.1 (2026-10-06)
+
+### Breaking Changes
+
+- **Skipping the danger confirmation is now something you ask for.** `pigit cmd` skipped it whenever the `CI` environment variable was set — a variable CI systems set by themselves — so a force push, a branch delete, a stash drop or a file restore ran unconfirmed there, including the double confirmation for destructive commands, with the user never choosing it. It now takes `--yes` (`-y`). Existing CI scripts that relied on the old behaviour need the flag; without it the command is refused rather than assumed, which is the safe direction.
+
+### Improvements
+
+- **commit and amend no longer block the UI**: they were the last two file actions still calling `git` on the UI thread, and `commit` is the one that runs a pre-commit hook — the case where the freeze is unbounded. Both now run on a worker behind a spinner. They also take the worktree gate, because they move HEAD and not just the index: a checkout running on a worker would otherwise move the tip the commit lands on. That gate incidentally closes a double-submit window the change opened — the editor sheet stays up while the worker runs, so a second `submit` is now refused with the busy message instead of racing the first.
+- **Commit and Branch show a skeleton while loading**: only Status had one, so "empty" and "still loading" looked the same on the other two.
+- **The footer shows `? Help`.** It listed only Inspect and Quit, so nothing pointed at `?` — the entry point to every binding that is not on screen.
+- **The current branch is marked in text.** HEAD and an ordinary local branch rendered identical text, leaving colour as the only difference; the row now carries a `*`, the way `git branch` writes it.
+- **Branch and Stash rows show their age.** Both lists were already sorted by date and neither displayed it — Branch asked git for `--sort=-committerdate` and then threw the date away. A missing date renders as nothing rather than a bogus age.
+
+### Bug Fixes
+
+- **The confirmation dialog could push its own buttons off screen.** `AlertDialog` took its height straight from the message, and a dialog taller than the terminal is drawn from row 0 and clipped at the bottom — taking the footer with it. A batch-undo confirm of a dozen records needed 31 rows on an 80x24 terminal, leaving neither OK nor Cancel visible and nothing to say Esc still worked. The body is now capped at what fits, the rest is reachable with the arrow and page keys, and the window position rides the frame title so the indicator costs no message rows.
+- **Every user-facing string is English.** Seven were not: two identically worded toasts, two worktree guards, the reflog confirm, a fullwidth comma joining commands in the undo confirm, and one module header. The separator was the one that would have been missed — it is not a message but `describe_commands`'s join, which renders on the `Run:` line of every undo confirmation. A test now tokenizes every module and fails on a non-English string literal.
+- **The repo registry is written atomically, and damage stays recoverable.** `dump_repos` truncated the destination and wrote in place, so a crash mid-write left a half-written file; `load_repos` folded "cannot parse" in with "not there" and returned empty for both. Together with `before_hook`, which rewrites the registry on every start, that turned damage into data loss: the next launch replaced the unreadable file with just the current repo. Writes now go beside the target and are moved into place, and a file that will not parse is set aside under a numbered `.corrupt` name first.
+- **`repo clear` asks first.** It unlinked the registry with no prompt at all, which no other destructive path in the tool does.
+- **A failed bulk run reaches the caller.** `repo fetch/pull/push` printed a summary and returned nothing, so the process exited 0 whether every repo succeeded or none did. A picker that could not run at all was worse: with no terminal and no explicit names it exited non-zero without a message, which was read as a cancellation — nothing printed, exit 0, in exactly the environment scripts run in.
+- **An empty repository no longer reports a filter it never had.** The Commit panel printed "No matching commits." whenever the list was empty, including a fresh repository where no query had been typed.
+- **Branch fields are split on NUL, not `|`.** A branch name may contain `|`, and such a name shifted every field after it — the name, the upstream and the ahead/behind counts all came out wrong, silently.
+
 ## 2.9.0 (2026-10-01)
 
 ### Features
