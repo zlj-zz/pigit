@@ -1,6 +1,6 @@
 """
 Module: pigit/app_panel_nav.py
-Description: Panel ring navigation for Status, Stash, Branch, and Commit tabs.
+Description: Panel ring navigation for Status, Stash, Branch, Commit, and Graph tabs.
 Author: Zev
 Date: 2026-08-24
 """
@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
+from pigit.app_graph_panel import ContributionPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.termui import Component, resolve_presentation_leaf
@@ -18,7 +19,7 @@ from pigit.termui.containers import Column, TabView
 
 
 class PanelNavigator:
-    """Cycle and goto helpers for the four main list panels.
+    """Cycle and goto helpers for the main panels.
 
     Ring index is derived from the product TabView (never Diff detail focus).
     """
@@ -32,6 +33,7 @@ class PanelNavigator:
         get_stash_panel: Callable[[], StashPanel],
         get_branch_panel: Callable[[], BranchPanel],
         get_commit_panel: Callable[[], CommitPanel],
+        get_graph_panel: Callable[[], ContributionPanel],
     ) -> None:
         self._get_tab_view = get_tab_view
         self._get_status_stack = get_status_stack
@@ -39,14 +41,16 @@ class PanelNavigator:
         self._get_stash_panel = get_stash_panel
         self._get_branch_panel = get_branch_panel
         self._get_commit_panel = get_commit_panel
+        self._get_graph_panel = get_graph_panel
 
     def panel_ring(self) -> tuple[Component, ...]:
-        """Return the four panels that Tab/Shift+Tab cycle through, in order."""
+        """Return the panels that Tab/Shift+Tab cycle through, in order."""
         return (
             self._get_status_panel(),
             self._get_stash_panel(),
             self._get_branch_panel(),
             self._get_commit_panel(),
+            self._get_graph_panel(),
         )
 
     def ring_index(self) -> int | None:
@@ -81,6 +85,9 @@ class PanelNavigator:
             return
         if panel is self._get_commit_panel():
             self._get_tab_view().route_to("commit")
+            return
+        if panel is self._get_graph_panel():
+            self._get_tab_view().route_to("graph")
 
     def resolve_panel(self, target: object) -> Component | None:
         """Map a ring panel identity or product id string to a ring panel."""
@@ -94,6 +101,7 @@ class PanelNavigator:
             "stash": self._get_stash_panel(),
             "branch": self._get_branch_panel(),
             "commit": self._get_commit_panel(),
+            "graph": self._get_graph_panel(),
         }
         return by_id.get(target)
 

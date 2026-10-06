@@ -102,6 +102,7 @@ def test_welcome_panel_keys_match_app_bindings(mount_welcome_app):
         "universal.goto_stash",
         "universal.goto_branch",
         "universal.goto_commit",
+        "universal.goto_graph",
     ):
         assert panels[0].keys_display  # non-empty
         assert by_action[action].keys_display == app_rows[action].keys_display
@@ -131,7 +132,10 @@ def test_welcome_preferred_height_uses_two_thirds_cap(mount_welcome_app):
     cap = int(term_h * WELCOME_SHEET_MAX_FRACTION)
     assert sheet.preferred_sheet_height(term_h) == min(want, cap)
     tall = WelcomeSheet(on_dismiss=lambda: None, rows=rows)
-    assert tall.preferred_sheet_height(60) == want
+    # Derived rather than a fixed height, so growing the guide by a row cannot
+    # turn "there is room" into "the cap bit" and read as a regression.
+    tall_h = int(want / WELCOME_SHEET_MAX_FRACTION) + 2
+    assert tall.preferred_sheet_height(tall_h) == want
     from pigit.termui.widgets.sheet import Sheet
 
     assert Sheet.resolve_height(

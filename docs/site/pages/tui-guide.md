@@ -19,7 +19,8 @@ diff detail, and global overlays cover everyday Git work.
 | **Status** | ++1++ | Stage / unstage / discard / ignore; inline commit; visual multi-select; tree view; side diff preview |
 | **Stash** | ++2++ | Apply, pop, drop; diff preview |
 | **Branch** | ++3++ | Checkout, create, merge, rebase, rename, delete; log graph preview; open PR page |
-| **Commit** | ++4++ | Browse log; cherry-pick; another ref's history; contribution graph |
+| **Commit** | ++4++ | Browse log; cherry-pick; another ref's history |
+| **Graph** | ++5++ | Contribution heatmap and per-author commit chart |
 
 ## Navigation
 

@@ -54,6 +54,7 @@ def _app_with_panels() -> PigitApplication:
     app._stash_panel = MagicMock()
     app._branch_panel = MagicMock()
     app._commit_panel = MagicMock()
+    app._graph_panel = MagicMock()
     app._preview_panel = MagicMock()
     app._log_graph_preview = MagicMock()
     app._tab_view = MagicMock()

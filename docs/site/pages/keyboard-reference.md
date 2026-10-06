@@ -8,7 +8,7 @@ keys. Everything below is remappable — see
 
 | Key | Action |
 |-----|--------|
-| ++1++ / ++2++ / ++3++ / ++4++ | Status / Stash / Branch / Commit |
+| ++1++ / ++2++ / ++3++ / ++4++ / ++5++ | Status / Stash / Branch / Commit / Graph |
 | ++tab++ / ++shift+tab++ | Cycle panels |
 | ++semicolon++ | Command palette |
 | ++question++ | Help (click row, double-click to run binding) |

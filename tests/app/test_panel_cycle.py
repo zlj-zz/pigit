@@ -60,9 +60,10 @@ def test_help_lists_tab_cycle_and_numbered_goto():
     assert by_key["2"].lower().find("stash") >= 0
     assert by_key["3"].lower().find("branch") >= 0
     assert by_key["4"].lower().find("commit") >= 0
+    assert by_key["5"].lower().find("graph") >= 0
 
 
-def test_tab_cycles_status_stash_branch_commit(runtime):
+def test_tab_cycles_status_stash_branch_commit_graph(runtime):
     app, root = _mount(runtime)
     assert _leaf(root) is app._status_panel
 
@@ -76,11 +77,16 @@ def test_tab_cycles_status_stash_branch_commit(runtime):
     assert _leaf(root) is app._commit_panel
 
     root._handle_event(keys.KEY_TAB)
+    assert _leaf(root) is app._graph_panel
+
+    root._handle_event(keys.KEY_TAB)
     assert _leaf(root) is app._status_panel
 
 
 def test_shift_tab_cycles_backward(runtime):
     app, root = _mount(runtime)
+    root._handle_event(keys.KEY_SHIFT_TAB)
+    assert _leaf(root) is app._graph_panel
     root._handle_event(keys.KEY_SHIFT_TAB)
     assert _leaf(root) is app._commit_panel
     root._handle_event(keys.KEY_SHIFT_TAB)
@@ -105,7 +111,7 @@ def test_tab_on_diff_closes_detail_and_cycles(runtime):
     assert _leaf(root) is app._stash_panel
 
 
-def test_number_keys_land_on_four_panels(runtime):
+def test_number_keys_land_on_each_panel(runtime):
     app, root = _mount(runtime)
     root._handle_event("2")
     assert _leaf(root) is app._stash_panel
@@ -113,6 +119,8 @@ def test_number_keys_land_on_four_panels(runtime):
     assert _leaf(root) is app._branch_panel
     root._handle_event("4")
     assert _leaf(root) is app._commit_panel
+    root._handle_event("5")
+    assert _leaf(root) is app._graph_panel
     root._handle_event("1")
     assert _leaf(root) is app._status_panel
 

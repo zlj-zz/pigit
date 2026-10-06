@@ -75,6 +75,7 @@ from .ext.utils import relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
+from .app_graph_panel import ContributionPanel
 from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
@@ -144,6 +145,7 @@ class PigitApplication(Application):
     _stash_panel: StashPanel
     _branch_panel: BranchPanel
     _commit_panel: CommitPanel
+    _graph_panel: ContributionPanel
     _diff_panel: DiffViewer
     _panel_nav: PanelNavigator
 
@@ -311,9 +313,13 @@ class PigitApplication(Application):
         self._commit_panel = CommitPanel(
             vm=self._commit_vm,
             id="commit",
-            report_default=self._config.commit_report_default,
         )
         commit_panel = self._commit_panel
+        self._graph_panel = ContributionPanel(
+            vm=self._commit_vm,
+            id="graph",
+        )
+        graph_panel = self._graph_panel
         self._diff_panel = DiffViewer(
             id="diff",
             word_diff=self._config.word_diff,
@@ -326,6 +332,7 @@ class PigitApplication(Application):
                 status_stack,
                 branch_panel,
                 commit_panel,
+                graph_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
@@ -394,6 +401,7 @@ class PigitApplication(Application):
             get_stash_panel=lambda: stash_panel,
             get_branch_panel=lambda: branch_panel,
             get_commit_panel=lambda: commit_panel,
+            get_graph_panel=lambda: graph_panel,
         )
         self._observe_host = ObserveHost(
             ObserveDeps(
@@ -753,6 +761,7 @@ class PigitApplication(Application):
         self._stash_panel.set_vm(session.status_vm)
         self._branch_panel.set_vm(session.branch_vm)
         self._commit_panel.set_vm(session.commit_vm)
+        self._graph_panel.set_vm(session.commit_vm)
         if self._preview_panel is not None:
             self._preview_panel.set_vm(session.status_vm)
         if self._log_graph_preview is not None:
@@ -950,28 +959,34 @@ class PigitApplication(Application):
         self._close_detail_if_open()
         self._focus_destination(self._commit_panel)
 
+    @bind_action("goto_graph", "5", desc="Switch to Graph tab", tip="Graph")
+    def goto_graph(self):
+        """Switch focus to the contribution graph panel."""
+        self._close_detail_if_open()
+        self._focus_destination(self._graph_panel)
+
     @bind_action(
         "next_panel",
         "tab",
-        desc="Cycle to next panel (Status, Stash, Branch, Commit)",
+        desc="Cycle to next panel (Status, Stash, Branch, Commit, Graph)",
     )
     def next_panel(self) -> None:
-        """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        """Cycle focus to the next panel in the Status → Stash → Branch → Commit → Graph ring."""
         self._close_detail_if_open()
         self._cycle_panel(1)
 
     @bind_action(
         "prev_panel",
         "shift tab",
-        desc="Cycle to previous panel (Status, Stash, Branch, Commit)",
+        desc="Cycle to previous panel (Status, Stash, Branch, Commit, Graph)",
     )
     def prev_panel(self) -> None:
-        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit → Graph ring."""
         self._close_detail_if_open()
         self._cycle_panel(-1)
 
     def _panel_ring(self) -> tuple[Component, ...]:
-        """Return the four panels that Tab/Shift+Tab cycle through, in order."""
+        """Return the panels that Tab/Shift+Tab cycle through, in order."""
         return self._panel_nav.panel_ring()
 
     def _ring_index(self) -> int | None:
