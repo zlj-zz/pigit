@@ -15,8 +15,11 @@ import pytest
 from pigit.app_graph_blocks import (
     AuthorChart,
     ContributionHeatmap,
+    PunchCard,
     _CELL_CHAR_W,
+    _GRID_TOP,
     _HEATMAP_ROWS,
+    _HOURS,
     _LEFT_MARGIN,
     _TOP_MARGIN,
 )
@@ -190,3 +193,54 @@ def test_blocks_ask_for_a_size(block_cls):
     """FlowBoard refuses to place a block that cannot say how big it is."""
     width, height = block_cls().natural_size
     assert width > 0 and height > 0
+
+
+def _at_weekday(days_ago: int, hour: int) -> SimpleNamespace:
+    """A commit on a given local hour, ``days_ago`` days back."""
+    stamp = datetime.datetime.now() - datetime.timedelta(days=days_ago)
+    stamp = stamp.replace(hour=hour, minute=0, second=0, microsecond=0)
+    return SimpleNamespace(unix_timestamp=int(stamp.timestamp()))
+
+
+class TestPunchCard:
+    def test_natural_size_covers_every_hour(self):
+        width, height = PunchCard().natural_size
+        assert width > _HOURS, "24 one-column cells plus the day labels"
+        assert height == _GRID_TOP + 7
+
+    def test_counts_by_hour_and_weekday(self):
+        card = PunchCard()
+        card.set_commits([_at_weekday(0, 10), _at_weekday(0, 10), _at_weekday(1, 3)])
+        weekday = datetime.datetime.now().weekday()
+        yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).weekday()
+        assert card._hour_counts == {(10, weekday): 2, (3, yesterday): 1}
+        assert card._max_count == 2
+
+    def test_add_commits_is_the_same_as_setting_the_whole_list(self):
+        whole = PunchCard()
+        whole.set_commits([_at_weekday(0, 10), _at_weekday(1, 3)])
+
+        streamed = PunchCard()
+        streamed.set_commits([_at_weekday(0, 10)])
+        streamed.add_commits([_at_weekday(1, 3)])
+
+        assert streamed._hour_counts == whole._hour_counts
+        assert streamed._max_count == whole._max_count
+
+    def test_renders_title_axes_and_a_cell(self):
+        card = PunchCard()
+        card.set_commits([_at_weekday(0, 10)])
+        rows, _ = _paint(card)
+
+        assert "Commits by Hour" in rows[0]
+        assert [row[6:8] for row in rows[1:2]] == ["0 "]
+        assert [row[2:5] for row in rows[_GRID_TOP : _GRID_TOP + 6 : 2]] == [
+            "Mon",
+            "Wed",
+            "Fri",
+        ]
+        assert any("■" in row for row in rows[_GRID_TOP:])
+
+    def test_an_empty_history_draws_no_cells(self):
+        rows, _ = _paint(PunchCard())
+        assert not any("■" in row for row in rows)

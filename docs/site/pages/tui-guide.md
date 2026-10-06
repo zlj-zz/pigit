@@ -20,7 +20,7 @@ diff detail, and global overlays cover everyday Git work.
 | **Stash** | ++2++ | Apply, pop, drop; diff preview |
 | **Branch** | ++3++ | Checkout, create, merge, rebase, rename, delete; log graph preview; open PR page |
 | **Commit** | ++4++ | Browse log; cherry-pick; another ref's history |
-| **Graph** | ++5++ | Contribution heatmap and per-author commit chart |
+| **Graph** | ++5++ | Contribution heatmap, per-author chart, commits by hour |
 
 ## Navigation
 
@@ -122,8 +122,10 @@ Branch ++r++ opens the todo editor before git runs:
 
 ## Graph panel
 
-The heatmap and the per-author chart lay themselves out side by side, wrapping
-onto further rows when the panel is too narrow for the next one.
+Three graphs, each carrying its own labels and legend: a contribution heatmap
+(*which day*), a per-author chart, and a punch card of commits by weekday and
+hour (*what time of day*). They lay themselves out side by side, wrapping onto
+further rows when the panel is too narrow for the next one.
 
 | Key | Action |
 |-----|--------|

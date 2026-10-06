@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
+
 import pytest
 
 from pigit.app_diff import DiffViewer
@@ -727,35 +729,41 @@ class TestContributionPanel:
         assert sum(panel._heatmap._day_counts.values()) == 5
 
     def test_streamed_batch_appends_without_rebuilding(self):
-        """Both blocks see the same decision, and neither recounts everything."""
+        """Every block sees the same decision, and none recounts everything."""
         from unittest.mock import patch
 
+        def counting(block, counter, key):
+            """Wrap one method so the call is counted as well as run."""
+            original = getattr(block, key)
+
+            def wrapper(*args, **kwargs):
+                counter[key] += 1
+                return original(*args, **kwargs)
+
+            return patch.object(block, key, wrapper)
+
         vm, panel = self._panel()
-        with (
-            patch.object(
-                panel._heatmap, "set_commits", wraps=panel._heatmap.set_commits
-            ) as heat_rebuilt,
-            patch.object(
-                panel._heatmap, "add_commits", wraps=panel._heatmap.add_commits
-            ) as heat_appended,
-            patch.object(
-                panel._chart, "set_commits", wraps=panel._chart.set_commits
-            ) as chart_rebuilt,
-            patch.object(
-                panel._chart, "add_commits", wraps=panel._chart.add_commits
-            ) as chart_appended,
-        ):
+        counters = [{name: 0 for name in ("set_commits", "add_commits")}
+                    for _ in panel._blocks]
+        with ExitStack() as stack:
+            for block, counter in zip(panel._blocks, counters, strict=True):
+                for name in ("set_commits", "add_commits"):
+                    stack.enter_context(counting(block, counter, name))
+
             first = _commits_on_day(0, 3)
             vm.items.set(first)
-            assert (heat_rebuilt.call_count, chart_rebuilt.call_count) == (1, 1)
-            assert (heat_appended.call_count, chart_appended.call_count) == (0, 0)
+            assert [c["set_commits"] for c in counters] == [1] * len(panel._blocks)
+            assert [c["add_commits"] for c in counters] == [0] * len(panel._blocks)
 
             vm.items.set([*first, *_commits_on_day(1, 2)])
-            assert heat_rebuilt.call_count == 1, "extension must not rebuild"
-            assert chart_rebuilt.call_count == 1, "extension must not rebuild"
-            assert (heat_appended.call_count, chart_appended.call_count) == (1, 1)
+            assert [c["set_commits"] for c in counters] == [1] * len(panel._blocks), (
+                "an extension must not rebuild"
+            )
+            assert [c["add_commits"] for c in counters] == [1] * len(panel._blocks)
+
         assert sum(panel._heatmap._day_counts.values()) == 5
         assert sum(panel._chart._chart._series["Zev"]) == 5
+        assert sum(panel._punch_card._hour_counts.values()) == 5
 
     def test_mount_replays_items_loaded_before_mount(self):
         from unittest.mock import Mock

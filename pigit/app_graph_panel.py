@@ -13,7 +13,7 @@ from pigit.termui import Component, Surface, bind_action, bind_signals, request_
 from pigit.termui.containers import FlowBoard
 from pigit.termui.containers.flow_board import PAN_STEP
 
-from .app_graph_blocks import AuthorChart, ContributionHeatmap
+from .app_graph_blocks import AuthorChart, ContributionHeatmap, PunchCard
 from .viewmodels.commit import ICommitViewModel
 
 
@@ -36,7 +36,11 @@ class ContributionPanel(Component):
         self._vm = vm
         self._heatmap = ContributionHeatmap()
         self._chart = AuthorChart()
-        self._board = FlowBoard([self._heatmap, self._chart])
+        self._punch_card = PunchCard()
+        # Every block, in the order the board lays them out. Adding a graph is
+        # one entry here plus one in ``_blocks``' consumers below.
+        self._blocks: list[Component] = [self._heatmap, self._chart, self._punch_card]
+        self._board = FlowBoard(self._blocks)
         # Commits already counted, for the append check in ``_extends_current``.
         self._commits: list = []
         self._vm_unsubs: list[Callable[[], None]] = []
@@ -111,8 +115,8 @@ class ContributionPanel(Component):
         self._unbind_vm_signals()
         self._vm = vm
         self._commits = []
-        self._heatmap.set_commits([])
-        self._chart.set_commits([])
+        for block in self._blocks:
+            block.set_commits([])
         if self.is_mounted():
             self._bind_vm_signals()
             self._on_items_changed()
@@ -137,7 +141,7 @@ class ContributionPanel(Component):
         # Decide once, then tell every block the same thing: recounting a whole
         # history per streamed batch costs ~8x more and runs on the main thread.
         added = commits[len(self._commits) :] if self._extends_current(commits) else None
-        for block in (self._heatmap, self._chart):
+        for block in self._blocks:
             if added is None:
                 block.set_commits(commits)
             else:

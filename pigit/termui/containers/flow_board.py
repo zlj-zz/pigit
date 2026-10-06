@@ -87,9 +87,20 @@ class FlowBoard(Component):
         # Which block the window is looking at has to be read before the new
         # size lands, or the anchor is computed against a window that never
         # existed.
-        anchor = self._visible_block()
+        anchor = self._anchored_block()
         super().resize(size)
         self._relayout(anchor)
+
+    def _anchored_block(self) -> Component | None:
+        """The block the window was scrolled to look at, if any.
+
+        At the origin nothing has been chosen: the window is showing the start
+        of the content, and that is what a relayout should go on showing. Only
+        once the window has been panned is there a block to keep hold of.
+        """
+        if self.pan == (0, 0):
+            return None
+        return self._visible_block()
 
     def _relayout(self, anchor: Component | None = None) -> None:
         """Place every block for the current width, then keep the pan in range.

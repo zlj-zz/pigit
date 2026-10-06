@@ -45,6 +45,17 @@ _PLOT_H = 7
 _CHART_DAYS = 30
 _CHART_AUTHORS = 6
 
+# Punch card geometry: one row per weekday, one column per hour.
+_WEEKDAYS = 7
+_HOURS = 24
+_TITLE_ROWS = 1
+_HOUR_LABEL_ROWS = 1
+# Hour labels worth printing; the gaps between them are six columns wide, so
+# the two-digit ones cannot run into the next.
+_LABELLED_HOURS = (0, 6, 12, 18)
+# Rows above the grid: the title, then the hour labels.
+_GRID_TOP = _TITLE_ROWS + _HOUR_LABEL_ROWS
+
 
 def _author_chart_color(author: str) -> tuple[int, int, int]:
     """Stable series color from author name (hash into chart_author_colors)."""
@@ -57,6 +68,12 @@ def _author_chart_color(author: str) -> tuple[int, int, int]:
 def _commit_day(commit) -> datetime.date:
     """Local date a commit landed on."""
     return datetime.datetime.fromtimestamp(commit.unix_timestamp).date()
+
+
+def _commit_slot(commit) -> tuple[int, int]:
+    """``(hour, weekday)`` a commit landed in, in local time."""
+    stamp = datetime.datetime.fromtimestamp(commit.unix_timestamp)
+    return (stamp.hour, stamp.weekday())
 
 
 class ContributionHeatmap(Component):
@@ -415,3 +432,81 @@ class AuthorChart(Component):
     def paint(self, surface: Surface) -> None:
         self._chart.resize((surface.width, surface.height))
         self._chart.paint(surface)
+
+
+class PunchCard(Component):
+    """Commits by weekday and hour: when the work actually happens.
+
+    The calendar heatmap answers *which day*; this answers *what time of day*,
+    which is a different question about the same commits.
+    """
+
+    def __init__(
+        self,
+        x: int = 1,
+        y: int = 1,
+        size: tuple[int, int] | None = None,
+    ) -> None:
+        super().__init__(x, y, size)
+        # {(hour, weekday): count} -- HeatmapGrid addresses cells as (col, row).
+        self._hour_counts: dict[tuple[int, int], int] = {}
+        self._max_count = 0
+        self._grid = HeatmapGrid(
+            rows=_WEEKDAYS,
+            cols=_HOURS,
+            colors=list(THEME.contrib_heatmap_colors),
+            bg=None,
+            cell_char=_CELL_CHAR,
+            empty_char=_EMPTY_CHAR,
+            margin_left=_PADDING_LEFT + _LEFT_MARGIN,
+            margin_top=_GRID_TOP,
+        )
+
+    @property
+    def natural_size(self) -> tuple[int, int]:
+        """Every hour column wide, title + labels + one row per weekday tall."""
+        return (
+            _PADDING_LEFT + _LEFT_MARGIN + _HOURS * _CELL_CHAR_W,
+            _GRID_TOP + _WEEKDAYS,
+        )
+
+    def set_commits(self, commits: list) -> None:
+        """Rebuild the weekday-by-hour counts from a full commit list."""
+        counts: dict[tuple[int, int], int] = defaultdict(int)
+        for commit in commits:
+            counts[_commit_slot(commit)] += 1
+        self._hour_counts = dict(counts)
+        self._max_count = max(counts.values()) if counts else 0
+
+    def add_commits(self, commits: list) -> None:
+        """Add commits to the tallies (counts only ever grow, so adding is exact)."""
+        for commit in commits:
+            slot = _commit_slot(commit)
+            count = self._hour_counts.get(slot, 0) + 1
+            self._hour_counts[slot] = count
+            self._max_count = max(self._max_count, count)
+
+    def paint(self, surface: Surface) -> None:
+        surface.draw_text_rgb(
+            0,
+            _PADDING_LEFT,
+            "Commits by Hour",
+            fg=THEME.fg_primary,
+            bg=None,
+        )
+        label_row = _TITLE_ROWS
+        for hour in _LABELLED_HOURS:
+            col = _PADDING_LEFT + _LEFT_MARGIN + hour * _CELL_CHAR_W
+            surface.draw_text_rgb(
+                label_row, col, str(hour), fg=THEME.fg_muted, bg=None
+            )
+        for weekday, label in {0: "Mon", 2: "Wed", 4: "Fri"}.items():
+            surface.draw_text_rgb(
+                _GRID_TOP + weekday,
+                _PADDING_LEFT,
+                label,
+                fg=THEME.fg_muted,
+                bg=None,
+            )
+        self._grid.set_values(self._hour_counts, max_value=self._max_count)
+        self._grid.paint(surface)

@@ -295,3 +295,12 @@ def test_blocks_always_get_their_natural_size():
     assert board.content_size == (80, 6 + ROW_GAP + 4)
     for block in blocks:
         assert block._size == block.natural_size
+
+
+def test_a_relayout_at_the_origin_stays_at_the_origin():
+    """Nothing was chosen yet, so nothing should be chased."""
+    board, _ = _board((60, 8), (68, 12), (30, 9), viewport=(240, 30))
+    assert board.content_size == (60 + COL_GAP + 68 + COL_GAP + 30, 12)
+
+    board.resize((100, 30))
+    assert board.pan == (0, 0), "a window at the origin keeps showing the start"
