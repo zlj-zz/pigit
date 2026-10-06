@@ -198,6 +198,65 @@ def test_top_bar_borderless_skipped():
     assert dv._file_nav_counter_cols is None
 
 
+def _top_row(dv: DiffViewer, *, line_i: int, width: int = 80) -> str:
+    dv._line_i = line_i
+    dv.resize((width, 20))
+    surface = Surface(width, 20)
+    dv.paint(surface)
+    return "".join(c.char for c in surface._rows[0])
+
+
+def test_file_sections_count_changed_lines():
+    """``---``/``+++`` start with ``-``/``+`` but are headers, not changes."""
+    dv = _viewer_with_commit(_multi_file_diff())
+    a_py, b_py, binary = dv._file_sections
+    assert (a_py.adds, a_py.dels) == (1, 1)
+    assert (b_py.adds, b_py.dels) == (1, 1)
+    assert (binary.adds, binary.dels) == (0, 0)
+
+
+def test_top_bar_shows_change_counts():
+    """Asserted as one string: the gaps must be spaces, not the box border."""
+    dv = _viewer_with_commit(_multi_file_diff())
+    top = _top_row(dv, line_i=9)  # b.py
+    assert "▸ 2/3 +1 −1 b.py" in top
+
+
+def test_top_bar_counts_only_the_side_that_changed():
+    dv = _viewer_with_commit(
+        [
+            "diff --git a/new.py b/new.py",
+            "--- /dev/null",
+            "+++ b/new.py",
+            "@@ -0,0 +1,2 @@",
+            "+one",
+            "+two",
+        ]
+    )
+    section = dv._file_sections[0]
+    assert (section.adds, section.dels) == (2, 0)
+    top = _top_row(dv, line_i=0)
+    assert "▸ 1/1 +2 new.py" in top
+
+
+def test_top_bar_hides_counts_for_binary_file():
+    """No counts beats ``+0 −0``, which reads as a change that did not happen."""
+    dv = _viewer_with_commit(_multi_file_diff())
+    top = _top_row(dv, line_i=12)  # bin.dat
+    assert "▸ 3/3 bin.dat" in top
+    assert "+0" not in top
+    assert "−0" not in top
+
+
+def test_narrow_top_bar_keeps_counter_drops_counts():
+    dv = _viewer_with_commit(_multi_file_diff())
+    # "▸ 2/3" is 5 wide and the budget is w - 4, so at w=9 the counter just
+    # fits and the counts do not. The counter is the clickable control.
+    top = _top_row(dv, line_i=9, width=9)
+    assert "▸ 2/3" in top
+    assert "+1" not in top
+
+
 def test_global_origin_sums_parent_chain():
     parent = Component(x=3, y=5, size=(40, 20))
     child = DiffViewer(x=4, y=6, size=(30, 15))
