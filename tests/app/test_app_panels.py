@@ -798,7 +798,7 @@ class TestContributionPanel:
         assert panel._board.content_size[0] > 40, "nothing to pan otherwise"
 
         assert panel.handle_mouse(_Event()) is True
-        assert panel._board.pan[0] > 0
+        assert panel._board.pan[1] > 0  # pan is (rows, cols)
 
     def test_resize_relays_out_the_board(self):
         """Wrapping follows the width, so the panel has to forward resizes."""

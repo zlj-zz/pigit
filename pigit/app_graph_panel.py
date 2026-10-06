@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pigit.termui import Component, Surface, bind_signals, request_render
+from pigit.termui import Component, Surface, bind_action, bind_signals, request_render
 from pigit.termui.containers import FlowBoard
+from pigit.termui.containers.flow_board import PAN_STEP
 
 from .app_graph_blocks import AuthorChart, ContributionHeatmap
 from .viewmodels.commit import ICommitViewModel
@@ -28,6 +29,7 @@ class ContributionPanel(Component):
 
     TAB_NAME = "Graph"
     tab_key = "5"
+    keymap_namespace = "graph"
 
     def __init__(self, *, vm: ICommitViewModel, id: str | None = None) -> None:
         super().__init__(id=id)
@@ -63,6 +65,43 @@ class ContributionPanel(Component):
     def handle_mouse(self, event) -> bool:
         """Wheel events pan the board."""
         return self._board.handle_mouse(event)
+
+    @bind_action("scroll_up", "k", "up", desc="Pan the graphs up", tip="Pan")
+    def scroll_up(self) -> None:
+        """Scroll the board up."""
+        self._board.pan_by(rows=-PAN_STEP)
+
+    @bind_action("scroll_down", "j", "down", desc="Pan the graphs down", tip="Pan")
+    def scroll_down(self) -> None:
+        """Scroll the board down."""
+        self._board.pan_by(rows=PAN_STEP)
+
+    @bind_action("scroll_left", "h", "left", desc="Pan the graphs left", tip="Pan")
+    def scroll_left(self) -> None:
+        """Scroll the board left."""
+        self._board.pan_by(cols=-PAN_STEP)
+
+    @bind_action("scroll_right", "l", "right", desc="Pan the graphs right", tip="Pan")
+    def scroll_right(self) -> None:
+        """Scroll the board right."""
+        self._board.pan_by(cols=PAN_STEP)
+
+    @bind_action("pan_home", "home", desc="Back to the first graph", tip="Origin")
+    def pan_home(self) -> None:
+        """Return the board to its origin."""
+        self._board.pan_home()
+
+    @bind_action("page_down", "ctrl d", desc="Pan the graphs half a screen down")
+    def page_down(self) -> None:
+        """Scroll the board down by half the window."""
+        _, viewport_h = self._board.viewport_size
+        self._board.pan_by(rows=max(1, viewport_h // 2))
+
+    @bind_action("page_up", "ctrl u", desc="Pan the graphs half a screen up")
+    def page_up(self) -> None:
+        """Scroll the board up by half the window."""
+        _, viewport_h = self._board.viewport_size
+        self._board.pan_by(rows=-max(1, viewport_h // 2))
 
     def set_vm(self, vm: ICommitViewModel) -> None:
         """Retarget this panel to a new Commit ViewModel (repo session switch).

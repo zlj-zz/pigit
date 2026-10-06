@@ -47,10 +47,19 @@ def _at(board: FlowBoard, char: str) -> tuple[int, int]:
     raise AssertionError(f"block {char} was not placed")
 
 
-def _rows(board: FlowBoard, width: int, height: int) -> list[str]:
+_MARKS = frozenset("‹›▲▼")
+
+
+def _rows(
+    board: FlowBoard, width: int, height: int, *, keep_marks: bool = False
+) -> list[str]:
+    """The board's rows; overflow marks blanked unless asked for."""
     surface = Surface(width, height)
     board.paint(surface)
-    return ["".join(cell.char for cell in row) for row in surface._rows]
+    rows = ["".join(cell.char for cell in row) for row in surface._rows]
+    if keep_marks:
+        return rows
+    return ["".join(" " if ch in _MARKS else ch for ch in row) for row in rows]
 
 
 def test_blocks_share_one_row_while_they_fit():
@@ -118,15 +127,16 @@ def test_resize_relays_out():
 
 def test_pan_is_clamped_to_the_content():
     board, _ = _board((100, 5), viewport=(40, 10))
-    board.pan_by(dx=10_000, dy=10_000)
-    assert board.pan == (100 - 40, 0)
-    board.pan_by(dx=-10_000, dy=-10_000)
+    board.pan_by(rows=10_000, cols=10_000)
+    # Wider than the window, not taller: the clamp follows each axis.
+    assert board.pan == (0, 100 - 40)
+    board.pan_by(rows=-10_000, cols=-10_000)
     assert board.pan == (0, 0)
 
 
 def test_pan_home_returns_to_the_origin():
     board, _ = _board((100, 5), viewport=(40, 10))
-    board.pan_by(dx=PAN_STEP)
+    board.pan_by(cols=PAN_STEP)
     board.pan_home()
     assert board.pan == (0, 0)
 
@@ -138,11 +148,11 @@ def test_wheel_pans_in_both_axes():
         return board.handle_mouse(MouseEvent(1, 1, button, MouseKind.PRESS))
 
     assert wheel(MouseButton.WHEEL_RIGHT) is True
-    assert board.pan == (PAN_STEP, 0)
+    assert board.pan == (0, PAN_STEP)
     assert wheel(MouseButton.WHEEL_LEFT) is True
     assert board.pan == (0, 0)
     assert wheel(MouseButton.WHEEL_DOWN) is True
-    assert board.pan == (0, PAN_STEP)
+    assert board.pan == (PAN_STEP, 0)
     assert wheel(MouseButton.WHEEL_UP) is True
     assert board.pan == (0, 0)
 
@@ -174,11 +184,9 @@ def test_panning_down_reveals_the_rows_that_did_not_fit():
     board, _ = _board((50, 12), (50, 6), viewport=(40, 10))
     assert board.content_size == (50, 12 + ROW_GAP + 6)
 
-    top = _rows(board, 40, 10)
-    assert {char for row in top for char in row} == {"A"}
-
-    board.pan_by(dy=12 + ROW_GAP)  # clamps to content_h - viewport_h
-    assert any("B" in row for row in _rows(board, 40, 10))
+    assert "B" not in "".join(_rows(board, 40, 10))
+    board.pan_by(rows=12 + ROW_GAP)  # clamps to content_h - viewport_h
+    assert "B" in "".join(_rows(board, 40, 10))
 
 
 def test_mount_reaches_the_blocks():
@@ -190,3 +198,100 @@ def test_mount_reaches_the_blocks():
     finally:
         board.unmount()
     assert not any(block.is_mounted() for block in blocks)
+
+
+def test_overflow_marks_appear_only_where_content_continues():
+    """Otherwise a window onto a larger canvas looks like all there is."""
+    board, _ = _board((100, 40), viewport=(40, 10))
+
+    at_origin = _rows(board, 40, 10, keep_marks=True)
+    assert at_origin[5][0] != "‹" and at_origin[0][20] != "▲"
+    assert at_origin[5][39] == "›" and at_origin[9][20] == "▼"
+
+    board.pan_by(rows=5, cols=5)
+    panned = _rows(board, 40, 10, keep_marks=True)
+    assert panned[5][0] == "‹" and panned[0][20] == "▲"
+    assert panned[5][39] == "›" and panned[9][20] == "▼"
+
+
+def test_no_marks_when_everything_fits():
+    board, _ = _board((30, 5), viewport=(40, 10))
+    rows = _rows(board, 40, 10, keep_marks=True)
+    assert not _MARKS & {char for row in rows for char in row}
+
+
+class _Ruler(Component):
+    """Numbers its own cells along one axis, so a pan is visible."""
+
+    def __init__(self, width: int, height: int, *, axis: str) -> None:
+        super().__init__()
+        self._natural = (width, height)
+        self._axis = axis
+
+    @property
+    def natural_size(self) -> tuple[int, int]:
+        return self._natural
+
+    def paint(self, surface: Surface) -> None:
+        for row in range(surface.height):
+            cells = range(surface.width)
+            surface.draw_text_rgb(
+                row,
+                0,
+                "".join(
+                    str(((col if self._axis == "col" else row) // 10) % 10)
+                    for col in cells
+                ),
+            )
+
+
+def test_panning_right_shifts_the_window_not_the_blocks():
+    """A window moves over the canvas; it does not re-lay the blocks out."""
+    board = FlowBoard([_Ruler(100, 5, axis="col")])
+    board.resize((40, 10))
+    assert _rows(board, 40, 5)[0].startswith("0000000000")
+
+    board.pan_by(cols=30)
+    assert _rows(board, 40, 5)[0].startswith("3333333333")
+
+
+def test_panning_down_shifts_the_window_vertically():
+    board = FlowBoard([_Ruler(40, 100, axis="row")])
+    board.resize((40, 10))
+    assert _rows(board, 40, 10)[0].startswith("0000000000")
+
+    board.pan_by(rows=30)
+    assert _rows(board, 40, 10)[0].startswith("3333333333")
+
+
+def test_a_relayout_keeps_the_block_the_window_was_looking_at():
+    """Widening re-flows the blocks, and the clamp alone loses the one in view.
+
+    Three 30x8 blocks stack one per row at 40 columns. Scrolled down to the
+    middle one, then widened, the middle block moves onto the first row beside
+    a neighbour -- and clamping the old offset would leave its top cut off.
+    """
+    board, blocks = _board((30, 8), (30, 8), (30, 8), viewport=(40, 12))
+    assert [_at(board, char) for char in "ABC"] == [(0, 0), (9, 0), (18, 0)]
+
+    board.pan_by(rows=9)  # the middle block fills the window
+    assert board._visible_block() is blocks[1]
+
+    board.resize((70, 12))
+    assert [_at(board, char)[0] for char in "ABC"] == [0, 0, 9]
+    assert board.pan[0] == 0, "the block in view keeps its top row"
+
+    rows = _rows(board, 70, 12)
+    assert rows[0].startswith("A" * 30 + " " * COL_GAP + "B" * 30)
+
+
+def test_blocks_always_get_their_natural_size():
+    """A smaller box makes some widgets vanish rather than clip, so never give one.
+
+    The window is what limits what is on screen; the block is laid out at the
+    size it asked for and the board blits a window over it.
+    """
+    board, blocks = _board((80, 6), (60, 4), viewport=(20, 10))
+    assert board.content_size == (80, 6 + ROW_GAP + 4)
+    for block in blocks:
+        assert block._size == block.natural_size

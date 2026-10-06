@@ -17,6 +17,7 @@ from .app_bisect import BisectSheet
 from .app_branch import BranchPanel
 from .app_commit import CommitPanel
 from .app_diff import DiffViewer
+from .app_graph_panel import ContributionPanel
 from .app_inspector import InspectorSheet
 from .app_log_ref import LogRefSheet
 from .app_rebase import RebasePanel
@@ -35,6 +36,7 @@ _KEYMAP_CLASSES: tuple[type, ...] = (
     StashPanel,
     BranchPanel,
     CommitPanel,
+    ContributionPanel,
     DiffViewer,
     RebasePanel,
     RecentActionsPanel,
