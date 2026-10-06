@@ -167,10 +167,6 @@ class Config:
         # Ctrl+p on Branch toggles at runtime; this is the startup default only.
         log_graph_default = {app_log_graph_default}
 
-        # (bool) Show the Commit contribution-graph report below the list on
-        # tall screens (> 19 rows). Ctrl+r toggles at runtime.
-        commit_report_default = {app_commit_report_default}
-
         # (int) Max commits the Commit panel reads from `git log`; 0 = no limit.
         # The listing streams in, so this only bounds memory on huge histories.
         commit_log_limit = {app_commit_log_limit}
@@ -360,6 +356,11 @@ class Config:
                 'Config key "app.auto_refresh_interval" is ignored; '
                 "use app.repo_observe instead."
             )
+        if "commit_report_default" in app_raw:
+            self._warnings.append(
+                'Config key "app.commit_report_default" is ignored; '
+                "the contribution graph is the Graph tab now."
+            )
         app = AppConfig(
             repo_observe=app_raw.get("repo_observe", True),
             observe_worktree=app_raw.get("observe_worktree", True),
@@ -367,7 +368,6 @@ class Config:
             status_view=status_view,
             diff_preview_default=app_raw.get("diff_preview_default", True),
             log_graph_default=app_raw.get("log_graph_default", True),
-            commit_report_default=app_raw.get("commit_report_default", True),
             commit_log_limit=_coerce_non_negative_int(
                 app_raw.get("commit_log_limit"), 20000
             ),
@@ -451,9 +451,6 @@ class Config:
                             data.app.diff_preview_default
                         ).lower(),
                         app_log_graph_default=str(data.app.log_graph_default).lower(),
-                        app_commit_report_default=str(
-                            data.app.commit_report_default
-                        ).lower(),
                         app_commit_log_limit=str(data.app.commit_log_limit),
                         app_show_footer=str(data.app.show_footer).lower(),
                         app_show_welcome=str(data.app.show_welcome).lower(),

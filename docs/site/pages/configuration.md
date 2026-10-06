@@ -25,7 +25,6 @@ for a full template.
 | `status_view` | str | `tree` | Status layout: `flat` or `tree` |
 | `diff_preview_default` | bool | `true` | Side diff preview on large screens |
 | `log_graph_default` | bool | `true` | Branch log-graph preview on large screens |
-| `commit_report_default` | bool | `true` | Contribution graph below commit list |
 | `show_footer` | bool | `true` | Footer key-hint bar |
 | `icons` | str | `auto` | Nerd Font icons: `auto`, `on`, `off` |
 

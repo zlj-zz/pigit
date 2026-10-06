@@ -6,11 +6,13 @@ from pigit.config_data import ConfigData
 from paths import TEST_CONFIG
 
 
-def test_commit_report_default_read_from_toml(tmp_path):
+def test_commit_report_default_is_retired_with_a_warning(tmp_path):
+    """The graph moved out of the Commit panel into its own tab."""
     config_path = tmp_path / "pigit-report.toml"
     config_path.write_text("[app]\ncommit_report_default = false\n")
     c = Config(str(config_path), version="test", auto_load=True)
-    assert c.get().app.commit_report_default is False
+    assert not hasattr(c.get().app, "commit_report_default")
+    assert any("commit_report_default" in w for w in c._warnings)
 
 
 @patch("builtins.input", lambda _: "yes")
@@ -30,7 +32,7 @@ def test_create(tmp_path):
     assert "[tui]" not in content
     assert "diff_preview_default" in content
     assert "log_graph_default" in content
-    assert "commit_report_default" in content
+    assert "commit_report_default" not in content
 
 
 def test_load():
@@ -81,7 +83,6 @@ def test_default_values_when_no_config_file():
     assert data.log.output is False
     assert data.app.diff_preview_default is True
     assert data.app.log_graph_default is True
-    assert data.app.commit_report_default is True
     assert data.app.icons == "auto"
 
 
@@ -232,7 +233,7 @@ def test_legacy_tui_and_keybindings_sections_warn_and_are_ignored(tmp_path):
     )
     c = Config(str(config_path), version="test", auto_load=True)
     data = c.get()
-    assert data.app.commit_report_default is True
+    assert not hasattr(data.app, "commit_report_default")
     assert data.app.keybindings == {}
     assert any("[tui]" in w for w in c._warnings)
     assert any("[app.keybindings]" in w for w in c._warnings)
