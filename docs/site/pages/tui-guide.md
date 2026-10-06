@@ -120,6 +120,20 @@ Branch ++r++ opens the todo editor before git runs:
 - ++p++ / ++s++ / ++f++ / ++r++ / ++e++ / ++d++ set pick / squash / fixup / reword / edit / drop
 - ++enter++ confirm
 
+## Graph panel
+
+The heatmap and the per-author chart lay themselves out side by side, wrapping
+onto further rows when the panel is too narrow for the next one.
+
+| Key | Action |
+|-----|--------|
+| ++h++ / ++l++, ++left++ / ++right++ | Pan left / right |
+| ++j++ / ++k++, ++down++ / ++up++ | Pan down / up |
+| ++ctrl+d++ / ++ctrl+u++ | Pan half a screen |
+| ++home++ | Back to the first graph |
+
+A mark on an edge means the graphs continue that way; the mouse wheel pans too.
+
 ## Undo and recovery
 
 | Key | Action |

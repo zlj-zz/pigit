@@ -174,8 +174,8 @@ class StepLineChart(Component):
     def legend_row(self) -> int:
         """Row the series legend sits on, counted from the chart's top.
 
-        A caller laying the chart out beside another graph aims its own legend
-        at this row, so the two legends read as one band.
+        Part of the chart's own layout, not of the surface it was handed: a
+        caller with a taller box must not move it.
         """
         return self.total_h - self._LEGEND_H
 

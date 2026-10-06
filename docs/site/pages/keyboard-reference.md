@@ -87,6 +87,15 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++slash++ | Filter by message or SHA |
 | ++y++ | Copy commit SHA |
 
+## Graph panel
+
+| Key | Action |
+|-----|--------|
+| ++h++ / ++l++, ++left++ / ++right++ | Pan left / right |
+| ++j++ / ++k++, ++down++ / ++up++ | Pan down / up |
+| ++ctrl+d++ / ++ctrl+u++ | Pan half a screen |
+| ++home++ | Back to the first graph |
+
 ## Diff viewer
 
 | Key | Action |
