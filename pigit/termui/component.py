@@ -100,6 +100,21 @@ class Component(ABC):
         """Header tab label for this component."""
         return self.TAB_NAME
 
+    @property
+    def natural_size(self) -> tuple[int, int] | None:
+        """Size this component needs to render in full, or ``None``.
+
+        The intrinsic counterpart to ``preferred_width`` /
+        ``preferred_sheet_height``, which ask "how much do you want within
+        this cap". ``natural_size`` says "how much do you need at all", so a
+        container can lay several components out side by side without being
+        told their sizes in advance.
+
+        ``None`` (the default, and every component but the graphs) means the
+        component takes whatever its parent gives it.
+        """
+        return None
+
     def __init__(
         self,
         x: int = 1,

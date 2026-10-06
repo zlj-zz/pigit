@@ -185,6 +185,22 @@ class StepLineChart(Component):
         min_w = self._padding_left + self._y_axis_label_w + 1 + self._plot_w
         return (min_w, self.total_h)
 
+    @property
+    def natural_size(self) -> tuple[int, int]:
+        """Size that fits every label, not just the plot.
+
+        ``min_size`` stops at the plot's right edge. X-axis labels are drawn
+        past it, and one that does not fit is dropped silently, so the width
+        this chart needs is where the rightmost label ends. Uses the same
+        geometry as :meth:`paint`, so the two cannot drift.
+        """
+        axis_col = self._padding_left + self._y_axis_label_w
+        label_end = max(
+            (axis_col + 1 + col + len(text) for col, text in self._x_labels),
+            default=0,
+        )
+        return (max(self.min_size[0], label_end), self.total_h)
+
     def set_series(
         self,
         series: dict[str, list[int]],
