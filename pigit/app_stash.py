@@ -46,6 +46,7 @@ class StashPanel(OptionList):
         vm: IStatusViewModel,
         id: str | None = None,
         on_toggle_preview: Callable[[], None] | None = None,
+        on_items_changed: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             empty_state=[
@@ -57,8 +58,12 @@ class StashPanel(OptionList):
         )
         self._vm = vm
         self._on_toggle_preview = on_toggle_preview
+        self._on_items_changed = on_items_changed
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self.stashes: list[Stash] = []
+        # True while a load is running, so the resize it can trigger does not
+        # start a second one.
+        self._loading_stashes = False
 
     def mount(self) -> None:
         # Warm-mounted under Status Column: do not run git here — load on focus.
@@ -77,19 +82,43 @@ class StashPanel(OptionList):
         if self.is_mounted():
             self._load_stashes()
 
+    def is_empty(self) -> bool:
+        """True when there are no stashes, so only the empty state shows."""
+        return not self.stashes
+
     def _load_stashes(self) -> None:
+        """Reload the list, then tell the app in case its size changed.
+
+        One flow for all three outcomes: an empty list, a failed load and a
+        loaded list all end with the content set and the hook run. The hook is
+        the app's only way to see the panel go from empty to full or back --
+        an empty list emits no ``EVT_SELECTION_CHANGED``.
+
+        A load already in flight wins: the hook re-fits the panel's height,
+        and a height change resizes the panel, which reloads it. Without this
+        guard that reload runs ``git stash list`` a second time for the rows
+        we are holding, and emits the selection event twice.
+        """
+        if self._loading_stashes:
+            return
+        self._loading_stashes = True
+        try:
+            self._load_stashes_once()
+        finally:
+            self._loading_stashes = False
+
+    def _load_stashes_once(self) -> None:
+        """Fetch the list and publish it; see ``_load_stashes``."""
         try:
             self.stashes = self._vm.load_stashes()
         except Exception as exc:
             self.stashes = []
-            self.set_content([])
             show_toast(str(exc), duration=2.0, kind=FeedbackKind.ERROR)
-            return
-        if not self.stashes:
-            self.set_content([])
-            return
         self.set_content([s.msg for s in self.stashes])
-        self.emit(EVT_SELECTION_CHANGED)
+        if self.stashes:
+            self.emit(EVT_SELECTION_CHANGED)
+        if self._on_items_changed is not None:
+            self._on_items_changed()
 
     def refresh(self):
         self._load_stashes()

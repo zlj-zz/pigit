@@ -134,6 +134,11 @@ class PigitApplication(Application):
     keymap_namespace = "universal"
     min_terminal_size: tuple[int, int] = (65, 10)
     LARGE_SCREEN_COLS = 120
+    #: Rows for the Stash panel: a populated one takes a quarter of the screen
+    #: up to STASH_MAX_ROWS, and an empty one takes only STASH_MIN_ROWS -- the
+    #: two empty-state lines plus their header rule, which is all it draws.
+    STASH_MIN_ROWS = 3
+    STASH_MAX_ROWS = 10
 
     # Body tree — assigned in build_root; required for a live TUI session.
     _tab_view: TabView
@@ -290,6 +295,7 @@ class PigitApplication(Application):
             vm=self._status_vm,
             id="stash",
             on_toggle_preview=self.toggle_side_preview,
+            on_items_changed=self._on_stash_items_changed,
         )
         status_panel = self._status_panel
         stash_panel = self._stash_panel
@@ -1713,8 +1719,22 @@ class PigitApplication(Application):
             self._root.dismiss_sheet()
 
     def _sync_stash_height(self, rows: int) -> None:
-        """Set StashPanel height to 25% of rows, capped at 10, min 3."""
-        self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
+        """Size the Stash panel to what it is showing.
+
+        A quarter of the screen was held for an empty panel, and every one of
+        those rows came out of Status's flex row.
+        """
+        if self._stash_panel.is_empty():
+            height = self.STASH_MIN_ROWS
+        else:
+            height = min(
+                max(self.STASH_MIN_ROWS, int(rows * 0.25)), self.STASH_MAX_ROWS
+            )
+        self._status_stack.set_heights(["flex", height])
+
+    def _on_stash_items_changed(self) -> None:
+        """Re-fit Stash after a reload gave it stashes or took them away."""
+        self._sync_stash_height(terminal_size()[1])
 
     def resize(self, size: tuple[int, int]) -> None:
         """Recompute layout widths and stash height on terminal resize.
