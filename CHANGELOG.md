@@ -1,5 +1,31 @@
 # Changelog of pigit
 
+## 2.10.0 (2026-10-08)
+
+### Breaking Changes
+
+- **The contribution graph left the Commit panel.** It was a strip under the commit list, toggled with `Ctrl+r`, and it only appeared on panels taller than 19 rows — so on a short terminal it did not exist at all. It is the **Graph** tab now (`5`), reachable at any height, and `Ctrl+r` went with the strip.
+- **`app.commit_report_default` is retired.** The key turned that strip on and off; there is no strip. A config that still carries it now warns and is ignored rather than failing, the way `auto_refresh_interval` is, so nothing has to be edited by hand.
+
+### Features
+
+- **A Graph tab: the contribution heatmap, a per-author chart, and a punch card.** Commits by weekday and hour answer what the heatmap cannot — *what time of day* rather than *which day*. Each graph is a whole block now (its plot, its labels, its legend) reporting the size it needs, and the panel lays them out on a board that wraps them to the width it is given, so the arrangement follows the terminal instead of constants chosen for one size. A fixed wordmark takes the top rows: it does not wrap and does not pan with the graphs, and the panel's right edge clips whatever of it does not fit.
+- **The graphs say what is off screen, and keep what you were reading in view.** A window onto a larger canvas looked like all there was, so each edge now carries a mark when the canvas continues that way. Narrowing the terminal re-flows the blocks — which wraps more, makes the canvas *smaller*, and used to drag the window back and lose the block you were on; the board now remembers the block the window was nearest to and scrolls it back into view.
+- **The diff's file bar shows each file's `+N −M`.** It said which file of how many, not how big it was, so a commit touching twenty files opened onto a wall with no skeleton. The counts come from lines already in memory, so the bar costs no extra `git`.
+- **An error toast is copied to the clipboard.** A toast lives three seconds and the clipboard does not — and a failure message is exactly what you would paste into an issue. Every toast is announced on a signal and the app copies the error ones; an empty message is skipped, because copying it would clear the clipboard.
+
+### Improvements
+
+- **The list panels share one row grammar.** Each had invented its own, so the column a row's identity started in depended on which panel you were looking at — and inside the Status panel, on which row: directory rows reserved one cell where file rows reserved four, putting their icons, and therefore their names, three columns apart. Prefixes are fixed-width lanes in a fixed order now, and an unused lane reserves its cells instead of collapsing. Two consequences are visible: the Commit panel's subject column no longer moves with the width of that row's refs — a commit carrying `(HEAD -> main, v0.4.0)` used to push its subject 24 columns right of the next row's — and the cursor is drawn with the same accent bar in every panel.
+- **The Stash panel stops holding a quarter of the screen when it is empty.** Two lines of empty state under a header rule were being given a quarter of the screen, capped at ten rows, and every one of those rows came out of Status's own.
+- **The diff gutter numbers only lines that are in a file.** It numbered whatever it could not classify, so a `git show` stream ran 0,1,2,… through the commit subject, then through `diff --git`, `index` and `new file mode`, and only then restarted at the hunk's own first line — three unrelated sequences sharing one column.
+
+### Bug Fixes
+
+- **An overlay drawn across wide characters threw its own row off by a column.** A wide glyph is stored as two cells, and every write replaced one half and left the other — which still renders a column, so the row came out one column wider or narrower than the terminal and everything after the split shifted with it. Opening Help over commit rows carrying CJK text put the popup's border a column off on each row it crossed, and whether it happened at all came down to the terminal width.
+- **`exec` left its children an inherited stdin, and `git shortlog` reads the log from it.** A command that decides to read stdin waits for an EOF that never arrives while ours is an open pipe, and blocks its caller with nothing reported. `shortlog` with no revision is exactly such a command, which is how the test suite came to hang intermittently; it is now given `HEAD` explicitly, since feeding it an immediate EOF would trade a visible hang for a silently empty answer.
+- **A merge commit's diff was read as a single file.** A combined diff opens each file with `diff --cc` and names one path, while every reader that decides where a file's block ends looked for `diff --git` — so the file bar listed no files at all, the second file's headers fell inside the first file's hunk, and not one content line of the merge was syntax-highlighted. The boundary is one predicate now, and it takes `diff --cc` and `diff --combined` the way it takes `diff --git`.
+
 ## 2.9.1 (2026-10-06)
 
 ### Breaking Changes
