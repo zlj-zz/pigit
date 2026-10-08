@@ -36,6 +36,8 @@ from pigit.termui.reactive import Signal
 from .app_types import BranchSnapshot
 from .ext.utils import relative_time
 from .app_theme import THEME
+from .app_row_slots import pad_to_width, status_lane
+from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
 
@@ -82,6 +84,7 @@ class BranchPanel(OptionList):
         self._branch_signal = branch_signal
         self._get_git = get_git
         self.branches: list[Branch] = []
+        self._max_right_w = 0
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
         self._rename_input = InputLine(
@@ -141,6 +144,7 @@ class BranchPanel(OptionList):
             return
         self.loading = False
         self.branches = branches
+        self._recompute_meta_width()
         if not branches:
             scope = self._SCOPES[self._scope_idx]
             self.set_content([f"No {scope} branches found."])
@@ -149,6 +153,23 @@ class BranchPanel(OptionList):
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
         self._notify_change()
+
+    def _recompute_meta_width(self) -> None:
+        """Measure the widest metadata block, to give every row a common edge.
+
+        A right-anchored block sits at ``w - block_width``, so rows whose
+        tracking counts differ would start theirs at different columns and the
+        date would shift under them. Padding each row's block to this width
+        lines their left edges up. Colours do not affect width, so measuring
+        with the presentation-independent path is enough.
+        """
+        self._max_right_w = max(
+            (
+                sum(wcswidth(seg.text) for seg in self._right_segments(branch))
+                for branch in self.branches
+            ),
+            default=0,
+        )
 
     def _handle_result(self, result: ActionResult) -> None:
         if result.success:
@@ -380,7 +401,7 @@ class BranchPanel(OptionList):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]."""
+        """Return row description: [HEAD mark][branch name][tracking, date]."""
         if idx >= len(self.branches):
             return ([], None, [])
         branch = self.branches[idx]
@@ -390,14 +411,42 @@ class BranchPanel(OptionList):
             name_fg = THEME.fg_local_branch
         else:
             name_fg = self.presentation_fg("primary")
-        left = [
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
+        # The mark is status, not part of the name: fusing them moved the name
+        # column with the mark, and put a flexible string in the fixed prefix.
+        left = status_lane(
+            [
+                Segment(
+                    self.HEAD_MARK if branch.is_head else " ",
+                    fg=name_fg,
+                    style_flags=cursor_flags,
+                )
+            ],
+            pad_fg=self.presentation_fg("primary"),
+        )
+        main = [
             Segment(
-                f"{self.HEAD_MARK if branch.is_head else ' '}{self.content[idx]}",
+                self.content[idx],
                 fg=name_fg,
-                style_flags=palette.STYLE_BOLD if is_cursor else 0,
+                style_flags=cursor_flags,
             )
         ]
 
+        right = self._right_segments(branch)
+        if right and self._max_right_w:
+            # Pad to the widest row's block so the tracking counts and the date
+            # start at the same column on every row, not just end there.
+            right = pad_to_width(
+                right,
+                self._max_right_w,
+                pad_fg=self.presentation_fg("muted"),
+                at_front=True,
+            )
+
+        return left, main, right
+
+    def _right_segments(self, branch) -> list[Segment]:
+        """The metadata column: upstream, tracking counts, then the date."""
         right: list[Segment] = []
         if not branch.is_remote:
             if branch.upstream_name:
@@ -429,8 +478,7 @@ class BranchPanel(OptionList):
                     fg=self.presentation_fg("muted"),
                 )
             )
-
-        return left, None, right
+        return right
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""

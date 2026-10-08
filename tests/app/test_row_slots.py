@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: tests/app/test_row_slots.py
-Description: Shared row-prefix lanes for the list panels.
+Description: Shared row-prefix lanes and the panels' cursor marker.
 Author: Zev
 Date: 2026-10-07
 """
@@ -10,18 +10,26 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
+from pigit.app_branch import BranchPanel
+from pigit.app_commit import CommitPanel
+from pigit.app_log_ref import LogRefSheet
+from pigit.app_rebase import RebasePanel
+from pigit.app_recent_actions import RecentActionsPanel
 from pigit.app_row_slots import (
     SLOT_ICON_W,
     SLOT_STATUS_W,
     icon_lane,
     status_lane,
 )
+from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.app_theme import THEME
-from pigit.git.model import File
+from pigit.git.model import Branch, File, Stash
 from pigit.termui import Segment
 from pigit.termui.reactive import Signal
 from pigit.termui.wcwidth_table import wcswidth
+from pigit.termui.widgets import ACCENT_BAR
+from pigit.viewmodels.branch import IBranchViewModel
 from pigit.viewmodels.status import IStatusViewModel
 
 FG = (200, 200, 200)
@@ -44,6 +52,28 @@ def _file(name: str, short_status: str = " M") -> File:
         has_merged_conflicts=False,
         has_inline_merged_conflicts=False,
     )
+
+
+def _branch_panel(branches: list[Branch]) -> BranchPanel:
+    vm = Mock(spec=IBranchViewModel)
+    vm.items = Signal(branches)
+    panel = BranchPanel(vm=vm, get_git=lambda: Mock())
+    panel.branches = branches
+    panel._recompute_meta_width()  # the app does this in _on_items_changed
+    panel.content = [b.name for b in branches]
+    return panel
+
+
+def _stash(msg: str, ref: str = "stash@{0}") -> Stash:
+    return Stash(ref=ref, sha="a1b2c3d4", msg=msg, when=1700000000)
+
+
+def _stash_panel(stashes: list[Stash]) -> StashPanel:
+    vm = Mock(spec=IStatusViewModel)
+    vm.load_stashes.return_value = stashes
+    panel = StashPanel(vm=vm)
+    panel._load_stashes()
+    return panel
 
 
 def _status_panel(files: list[File], *, tree: bool) -> StatusPanel:
@@ -123,3 +153,42 @@ class TestStatusPrefixIsTheSameOnEveryRow:
         left, main, _right = panel.describe_row(0, False)
         assert main[0].fg == THEME.fg_staged_renamed
         assert left[3].fg == main[0].fg  # the icon, inside the icon lane
+
+
+class TestMetadataBlocksShareOneLeftEdge:
+    """A right-anchored block sits at ``w - block_width``, so rows whose
+    metadata differs in width would start theirs at different columns and the
+    date would shift under each other. Padding every row's block to the
+    panel's widest pins them."""
+
+    def test_branch_rows_with_and_without_tracking_agree(self):
+        # Both must carry metadata: a row with none has nothing to align.
+        panel = _branch_panel(
+            [
+                Branch(
+                    "dev", "2", "1", True,
+                    upstream_name="origin/dev", committed_at=1700000000,
+                ),
+                Branch("feature", "?", "?", False, committed_at=1700000000),
+            ]
+        )
+        widths = {
+            _width(panel.describe_row(idx, False)[2]) for idx in range(2)
+        }
+        assert widths == {panel._max_right_w}
+
+    def test_stash_rows_agree(self):
+        # Different ref widths, or the padding would be a no-op and the
+        # assertion would hold with the alignment removed.
+        panel = _stash_panel([_stash("wip one"), _stash("wip two", ref="stash@{10}")])
+        widths = {
+            _width(panel.describe_row(idx, False)[2]) for idx in range(2)
+        }
+        assert widths == {panel._max_right_w}
+
+    def test_the_ref_still_precedes_the_time(self):
+        panel = _stash_panel([_stash("stash@{0}")])
+        right = panel.describe_row(0, False)[2]
+        text = "".join(seg.text for seg in right)
+        assert text.strip().startswith("stash@{0}")
+        assert text.rstrip().endswith("ago")

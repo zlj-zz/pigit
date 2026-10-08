@@ -21,10 +21,17 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, OptionList, SectionRule
+from pigit.termui.widgets import (
+    ACCENT_BAR,
+    AlertDialog,
+    OptionList,
+    SectionRule,
+)
 
 from .ext.utils import relative_time
 from .app_diff import DiffType
+from .app_row_slots import pad_to_width, status_lane
+from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
@@ -35,7 +42,8 @@ if TYPE_CHECKING:
 class StashPanel(OptionList):
     """Stash list panel with cursor navigation."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "stash"
     TAB_NAME = "Stash"
     tab_key = "2"
@@ -61,6 +69,7 @@ class StashPanel(OptionList):
         self._on_items_changed = on_items_changed
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self.stashes: list[Stash] = []
+        self._max_right_w = 0
         # True while a load is running, so the resize it can trigger does not
         # start a second one.
         self._loading_stashes = False
@@ -114,6 +123,13 @@ class StashPanel(OptionList):
         except Exception as exc:
             self.stashes = []
             show_toast(str(exc), duration=2.0, kind=FeedbackKind.ERROR)
+        self._max_right_w = max(
+            (
+                sum(wcswidth(seg.text) for seg in self._right_segments(st))
+                for st in self.stashes
+            ),
+            default=0,
+        )
         self.set_content([s.msg for s in self.stashes])
         if self.stashes:
             self.emit(EVT_SELECTION_CHANGED)
@@ -241,17 +257,27 @@ class StashPanel(OptionList):
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
-        left = [
-            Segment(" ", fg=fg_primary),
-        ]
+        left = status_lane([], pad_fg=fg_primary)
         main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]
+        right = self._right_segments(stash)
+        if right and self._max_right_w:
+            right = pad_to_width(
+                right,
+                self._max_right_w,
+                pad_fg=self.presentation_fg("muted"),
+                at_front=True,
+            )
+        return left, main, right
+
+    def _right_segments(self, stash: Stash) -> list[Segment]:
+        """The metadata column: the stash ref, then when it was made."""
         right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
         if stash.when:
             right.append(Segment("  ", fg=self.presentation_fg("muted")))
             right.append(
                 Segment(relative_time(stash.when), fg=self.presentation_fg("muted"))
             )
-        return left, main, right
+        return right
 
     def _handle_result(self, result) -> None:
         if result.success:

@@ -23,6 +23,7 @@ def _panel_with(branches: list[Branch]) -> BranchPanel:
         get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
     )
     panel.branches = branches
+    panel._recompute_meta_width()  # the app does this in _on_items_changed
     panel.content = [b.name for b in branches]
     return panel
 
@@ -79,16 +80,26 @@ def _row_text(panel: BranchPanel, idx: int) -> str:
     return "".join(seg.text for seg in left + (main or []) + right)
 
 
+def _prefix(panel: BranchPanel, idx: int) -> tuple[str, str]:
+    """The status lane's mark and the name, which are separate lanes now."""
+    left, main, _right = panel.describe_row(idx, is_cursor=False)
+    return left[0].text, main[0].text
+
+
 def test_the_current_branch_carries_a_marker():
     panel = _panel_with([Branch("dev", "0", "0", True)])
-    assert _row_text(panel, 0).startswith("*dev")
+    mark, name = _prefix(panel, 0)
+    assert mark == "*"
+    assert name == "dev"
 
 
 def test_other_branches_have_no_marker():
     panel = _panel_with(
         [Branch("dev", "0", "0", True), Branch("feature", "0", "0", False)]
     )
-    assert _row_text(panel, 1).startswith(" feature")
+    mark, name = _prefix(panel, 1)
+    assert mark != "*"
+    assert name == "feature"
 
 
 def test_the_marker_does_not_shift_the_name_column():
@@ -156,6 +167,6 @@ def test_the_marker_and_the_date_coexist():
     import time
 
     panel = _panel_with([Branch("dev", "0", "0", True, committed_at=int(time.time()))])
-    text = _row_text(panel, 0)
-    assert text.startswith("*dev")
-    assert "ago" in text
+    mark, name = _prefix(panel, 0)
+    assert (mark, name) == ("*", "dev")
+    assert "ago" in _row_text(panel, 0)
