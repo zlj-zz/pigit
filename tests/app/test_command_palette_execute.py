@@ -25,6 +25,10 @@ def app():
     application._root = MagicMock()
     application._branch_vm = MagicMock()
     application._status_vm = MagicMock()
+    # Dispatch looks the id up in the live catalog, which needs a real
+    # component tree. These tests are about the parameterized half, so the
+    # binding half is empty (see test_action_catalog.py for the catalog).
+    application.palette_rows = MagicMock(return_value={})
     from pigit.termui.reactive import Signal
 
     application._branch_vm.items = Signal([])
@@ -40,19 +44,14 @@ def test_unknown_command_toasts(app):
     assert toast.call_args[1]["kind"] is FeedbackKind.WARNING
 
 
-def test_stash_focuses_stash_panel(app):
-    with patch.object(app, "goto_stash") as goto:
-        app._on_palette_execute("stash")
-    goto.assert_called_once()
-
-
 def test_toggle_palette_sets_slots_from_root_and_opens_sheet(app):
-    from pigit.app_command_palette import CommandPalette
     from pigit.termui.reactive import Signal
+    from pigit.termui.widgets import CommandPalette, PaletteItem
     from pigit.termui.widgets.command_palette import list_slots_for_term
     from pigit.termui.widgets.sheet import Sheet
 
     app._palette = CommandPalette(
+        items=[],
         on_execute=app._on_palette_execute,
         on_dismiss=app._dismiss_palette,
     )
@@ -62,15 +61,19 @@ def test_toggle_palette_sets_slots_from_root_and_opens_sheet(app):
         [SimpleNamespace(name="main"), SimpleNamespace(name="dev")]
     )
     app._status_vm.items = Signal([SimpleNamespace(get_file_str=lambda: "a.py")])
+    # The catalog itself needs a live component tree; what this test is about
+    # is the sheet wiring around it (see test_action_catalog.py for the walk).
+    catalog = [PaletteItem("universal.goto_status", label="Switch to Status panel")]
 
-    app.toggle_palette()
+    with patch.object(app, "palette_catalog", return_value=catalog):
+        app.toggle_palette()
 
     expected_slots = list_slots_for_term(40)
     assert app._palette._list_slots == expected_slots
     ids = [i.id for i in app._palette._items]
     assert "checkout" in ids
     assert "stage" in ids
-    assert "status" in ids
+    assert "universal.goto_status" in ids
     app._branch_vm.refresh.assert_called_once()
     app._status_vm.refresh.assert_called_once()
     assert len(app._palette_vm_unsubs) == 2
@@ -87,11 +90,12 @@ def test_toggle_palette_sets_slots_from_root_and_opens_sheet(app):
 
 
 def test_toggle_palette_refresh_candidates_when_branch_items_update(app):
-    from pigit.app_command_palette import CommandPalette
     from pigit.termui import keys
     from pigit.termui.reactive import Signal
+    from pigit.termui.widgets import CommandPalette
 
     app._palette = CommandPalette(
+        items=[],
         on_execute=app._on_palette_execute,
         on_dismiss=app._dismiss_palette,
     )
@@ -100,7 +104,8 @@ def test_toggle_palette_refresh_candidates_when_branch_items_update(app):
     app._branch_vm.items = Signal([])
     app._status_vm.items = Signal([])
 
-    app.toggle_palette()
+    with patch.object(app, "palette_catalog", return_value=[]):
+        app.toggle_palette()
     for ch in "checkout ":
         app._palette.handle_key(ch)
     assert app._palette._arg_mode == "checkout"
@@ -116,38 +121,21 @@ def test_toggle_palette_refresh_candidates_when_branch_items_update(app):
     assert not app._palette.is_active
 
 
-def test_catalog_hides_sequencer_when_idle():
-    from pigit.app_command_palette import catalog_for_context
+def test_with_parameterized_appends_the_argument_taking_commands():
+    from pigit.app_command_palette import with_parameterized
+    from pigit.termui.widgets import PaletteItem
 
-    ids = [i.id for i in catalog_for_context(None)]
-    assert "status" in ids
-    assert "diff" not in ids
-    assert "continue-merge" not in ids
-    assert "rebase-continue" not in ids
-    assert "cherry-pick-abort" not in ids
-
-
-def test_catalog_includes_rebase_when_active():
-    from pigit.app_command_palette import catalog_for_context
-
-    ids = [i.id for i in catalog_for_context("rebase")]
-    assert "rebase-continue" in ids
-    assert "cherry-pick-continue" not in ids
-
-
-def test_build_catalog_injects_parameterized_and_filters_static():
-    from pigit.app_command_palette import build_catalog
-
-    catalog = build_catalog(
-        None,
+    catalog = with_parameterized(
+        [PaletteItem("universal.quit", label="Quit Pigit")],
         branch_names=lambda: ["main", "feature"],
         file_names=lambda: ["a.py", "b.py"],
     )
     by_id = {i.id: i for i in catalog}
-    assert "continue-merge" not in by_id
+    assert by_id["universal.quit"].label == "Quit Pigit"
     assert by_id["checkout"].args is not None
     assert by_id["checkout"].args.fetch("fea") == ["feature"]
     assert by_id["stage"].args.fetch("a") == ["a.py"]
+
 
 
 def test_checkout_resolves_exact_index_and_refreshes(app):
@@ -259,9 +247,3 @@ def test_gitignore_calls_ignore(app):
         app._on_palette_execute("gitignore tmp.log")
     app._status_vm.ignore.assert_called_once_with(0)
     refresh.assert_called_once()
-
-
-def test_static_commands_still_work_after_parameterized(app):
-    with patch.object(app, "navigate_product") as nav:
-        app._on_palette_execute("status")
-    nav.assert_called_once_with("status")

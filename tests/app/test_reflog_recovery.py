@@ -68,9 +68,9 @@ def _auto_confirm(app, *, confirmed: bool = True) -> None:
 
 
 def test_catalog_includes_reflog_parameterized_item():
-    from pigit.app_command_palette import build_catalog
+    from pigit.app_command_palette import with_parameterized
 
-    catalog = build_catalog(None, branch_names=lambda: [], file_names=lambda: [])
+    catalog = with_parameterized([], branch_names=lambda: [], file_names=lambda: [])
     by_id = {i.id: i for i in catalog}
     assert "reflog" in by_id
     assert by_id["reflog"].desc == "Recover from reflog"
@@ -78,10 +78,10 @@ def test_catalog_includes_reflog_parameterized_item():
 
 
 def test_reflog_fetch_returns_value_display_tuples():
-    from pigit.app_command_palette import build_catalog
+    from pigit.app_command_palette import with_parameterized
 
-    catalog = build_catalog(
-        None,
+    catalog = with_parameterized(
+        [],
         branch_names=lambda: [],
         file_names=lambda: [],
         reflog_entries=lambda: _entries(),

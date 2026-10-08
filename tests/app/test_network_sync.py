@@ -245,16 +245,19 @@ def test_merge_push_still_checkouts_back_on_push_failure(app):
     assert app._merge_state_store.state is None
 
 
-def test_palette_routes_push_to_network_git(app):
+def test_the_push_action_routes_to_network_git(app):
+    """``universal.push`` runs the same method the ``P`` key does."""
     app._network_git = MagicMock()
-    app._on_palette_execute("push")
+    app.push_upstream()
     app._network_git.run.assert_called_once_with("push")
 
 
-def test_palette_fetch_stays_on_run_git_action(app):
+def test_the_fetch_action_never_merges(app):
+    """``universal.fetch`` is its own action: fetching must not go through the
+    network-git path, which is what makes pull and push interactive."""
     app._sequencer = MagicMock()
     app._network_git = MagicMock()
-    app._on_palette_execute("fetch")
+    app.fetch_remote()
     app._sequencer.run_git_action.assert_called_once_with("fetch")
     app._network_git.run.assert_not_called()
 

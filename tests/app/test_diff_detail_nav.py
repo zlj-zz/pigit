@@ -114,13 +114,6 @@ def test_navigate_product_closes_detail(runtime):
     assert _leaf(root) is app._branch_panel
 
 
-def test_palette_has_no_diff_command():
-    from pigit.app_command_palette import DEFAULT_COMMANDS, KNOWN_COMMAND_IDS
-
-    assert "diff" not in KNOWN_COMMAND_IDS
-    assert all(item.id != "diff" for item in DEFAULT_COMMANDS)
-
-
 def test_reopen_detail_keeps_render_tokens_without_set_content():
     """Hide≠deactivate: Esc then show must not clear tokens."""
 
