@@ -89,6 +89,15 @@ class IListViewModel(Protocol, Generic[T]):
         """Current list of items. Panel subscribes via bind_signals()."""
         ...
 
+    @property
+    def load_error(self) -> Signal[BaseException | None]:
+        """Last load failure, or None.
+
+        A panel subscribes to this alongside ``items``: a failure never
+        reaches the success callback, so this is the only notice it gets.
+        """
+        ...
+
     def refresh(self) -> None:
         """Trigger async data refresh. VM updates ``items`` Signal when done."""
         ...
@@ -114,6 +123,8 @@ class ViewModelBase(Generic[T]):
     def __init__(self) -> None:
         self._loader = AsyncTask()
         self._items: Signal[list[T]] = Signal([])
+        # Last load failure, or None. Cleared by the next successful load.
+        self._load_error: Signal[BaseException | None] = Signal(None)
         self._unsubs: list[Callable[[], None]] = []
         self._inspector_key: object = self._NO_SNAPSHOT
         self._inspector_value: object | None = None
@@ -127,6 +138,10 @@ class ViewModelBase(Generic[T]):
     def items(self) -> Signal[list[T]]:
         return self._items
 
+    @property
+    def load_error(self) -> Signal[BaseException | None]:
+        return self._load_error
+
     def bind_repo_token(self, token: object | None) -> None:
         """Point this VM at the app's current repo generation token."""
         self._repo_token = token
@@ -136,6 +151,7 @@ class ViewModelBase(Generic[T]):
             self._do_load,
             self._guarded(self._on_loaded),
             label=self.load_label,
+            on_failure=self._guarded(self._on_load_failed),
         )
 
     def _guarded(self, callback: Callable[[_S], None]) -> Callable[[_S], None]:
@@ -158,11 +174,28 @@ class ViewModelBase(Generic[T]):
         # tree) must still notify so loading state clears and empty-state
         # renders; Signal.set alone would skip the unchanged value.
         self._items.set(data, force=True)
+        # Cleared after the rows, not before. Each signal wakes the panel
+        # separately, so a recovery is handled twice; this order makes the
+        # first pass see the old error beside the new rows and paint the
+        # failure state -- which is still true of the load that just ended --
+        # and the second pass clear it. Clearing first would instead have the
+        # first pass read the new rows with the error already gone, and
+        # announce an empty list that is not empty.
+        self._load_error.set(None)
         # A fresh load may have changed the underlying git state, so any
         # memoized inspector snapshot is stale.
         with self._inspector_lock:
             self._inspector_key = self._NO_SNAPSHOT
             self._inspector_value = None
+
+    def _on_load_failed(self, exc: BaseException) -> None:
+        """Record a failed load so the panel can stop claiming it is loading.
+
+        The worker's exception never reaches ``_on_loaded``, so without this
+        the panel keeps its old rows -- or, on a first load, its skeleton --
+        and the only sign anything went wrong is a toast that expires.
+        """
+        self._load_error.set(exc)
 
     def _memo_inspector(self, key: object, build: Callable[[], _S | None]) -> _S | None:
         """Return a memoized inspector snapshot for *key*.

@@ -45,6 +45,7 @@ def test_expanded_sub_rows_align_rails_with_commit_row():
     )
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = [
         GraphRow(
@@ -82,6 +83,7 @@ def test_expanded_long_message_reads_row_by_row():
     commit_b = Commit("b" * 12, "subject b", "B", 0, "", "", [])
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     vm.get_commit_bodies.return_value = {
@@ -122,6 +124,7 @@ def _expanded_author_row_text(commit: Commit) -> str:
     """Text of the expanded AUTHOR sub-row for a single non-merge commit."""
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = [
         GraphRow(
@@ -174,6 +177,7 @@ def test_bodies_are_fetched_for_the_window_only_and_cached():
     commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(200)]
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     # A successful batch answers every sha it was asked for.
@@ -202,6 +206,7 @@ def test_body_cache_is_bounded():
     commits = [Commit(f"{i:012x}", f"s{i}", "A", i, "", "", []) for i in range(20)]
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     vm.get_commit_bodies.side_effect = lambda shas: {
@@ -224,6 +229,7 @@ def _panel_with(vm: Mock) -> CommitPanel:
 def _vm_for(commits: list[Commit]) -> Mock:
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     return vm

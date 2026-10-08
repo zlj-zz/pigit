@@ -457,6 +457,7 @@ def test_cherry_pick_blocked_during_bisect():
 def test_branch_checkout_blocked_during_bisect():
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     git = Mock()
     git.bisect_status.return_value = _state()
     panel = BranchPanel(vm=vm, get_git=lambda: git)

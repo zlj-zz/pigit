@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pigit.termui import palette
+from pigit.termui import Segment, palette
+from pigit.termui.feedback import FeedbackKind, style_for
 from pigit.termui.theme import Theme
 
 # Fraction of the blend toward the brand accent for the hunk header tone:
@@ -157,3 +158,21 @@ def sheet_core(name: str) -> str:
     verbatim slot).
     """
     return f" · {name} · "
+
+
+#: Mark a panel wears beside its title while its last load failed, so the
+#: state outlives the toast that announced it. Spelled with the glyph the app
+#: already paints on an error toast, rather than a new one: this codebase has
+#: been bitten by glyphs whose width or coverage varies by terminal (see the
+#: ASCII-only note on Status's empty state), and this one is provably on
+#: screen already.
+LOAD_FAILED_MARK = style_for(FeedbackKind.ERROR).glyph
+
+
+def load_failed_segments(error: BaseException) -> list[Segment]:
+    """What a panel shows in place of a list it never managed to load.
+
+    Only reached when there is nothing older to keep: a panel that still holds
+    rows keeps them and lets the header mark say they are out of date.
+    """
+    return [Segment(f"Could not load — {error}", fg=THEME.fg_danger)]

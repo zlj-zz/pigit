@@ -25,6 +25,7 @@ def _commit(*, msg: str = "a commit") -> Commit:
 def _commit_panel(commits: list[Commit]) -> CommitPanel:
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal(commits)
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     return CommitPanel(vm=vm)
@@ -63,6 +64,7 @@ def test_commit_panel_shows_a_skeleton_until_items_arrive():
     the panel renders a blank row that reads as "no commits"."""
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     vm.graph_rows = []
     panel = CommitPanel(vm=vm)
@@ -77,6 +79,7 @@ def test_commit_panel_shows_a_skeleton_until_items_arrive():
 def test_branch_panel_shows_a_skeleton_until_items_arrive():
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     panel = BranchPanel(vm=vm, get_git=lambda: Mock())
 
     panel.mount()

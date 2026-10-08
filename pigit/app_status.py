@@ -45,7 +45,7 @@ from .app_diff import DiffType, DiffViewer
 from .app_row_slots import icon_lane, status_lane
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
-from .app_theme import THEME, sheet_core
+from .app_theme import LOAD_FAILED_MARK, THEME, load_failed_segments, sheet_core
 from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
@@ -320,6 +320,9 @@ class StatusPanel(OptionList):
         self._on_toggle_preview = on_toggle_preview
         self._nerd_icons = nerd_icons
         self.files: list[File] = []
+        #: What the panel shows when it has no rows; a failed load swaps in its
+        #: own message and a later success must put this back.
+        self._empty_state_default = self.empty_state
         self._all_files: list[File] = []
         self._source_map: list[int] = []
         self._alert_dialog = AlertDialog(
@@ -351,6 +354,9 @@ class StatusPanel(OptionList):
         self._bind_vm_signals()
         # Content arrives asynchronously via vm.items; show skeleton until then.
         self.loading = True
+        # The mark describes the load that is about to run, not the one before
+        # this panel was unmounted.
+        self._header.set_status(None)
         self._vm.refresh()
 
     def on_focus(self) -> None:
@@ -380,10 +386,15 @@ class StatusPanel(OptionList):
         self._vm_unsubs.clear()
 
     def _bind_vm_signals(self) -> None:
-        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        """Bind vm.items and vm.load_error; safe to call multiple times."""
         if not self._vm_unsubs:
             self._vm_unsubs.append(
-                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+                bind_signals(
+                    self,
+                    self._vm.items,
+                    self._vm.load_error,
+                    callback=self._on_items_changed,
+                )
             )
 
     def _on_items_changed(self) -> None:
@@ -395,9 +406,32 @@ class StatusPanel(OptionList):
         )
         if not self.is_mounted():
             return
-        self._all_files = list(files)
+        error = self._vm.load_error.value
         self.loading = False
+        self._show_load_failure(error)
+        if error is not None:
+            return
+        self._all_files = list(files)
         self._apply_filter()
+
+    def _show_load_failure(self, error: BaseException | None) -> None:
+        """Wear the failure in the header, or take the mark off again.
+
+        A failed load never reaches this panel through ``items``, so without
+        the mark the panel goes on claiming it is loading (nothing loaded yet)
+        or shows rows that are quietly out of date -- and the toast that said
+        so is gone in three seconds.
+        """
+        self._header.set_status(LOAD_FAILED_MARK if error is not None else None)
+        if error is None:
+            self.empty_state = self._empty_state_default
+        elif not self._all_files:
+            # Nothing older to keep, so say what happened rather than show a
+            # skeleton that would never end.
+            self.empty_state = load_failed_segments(error)
+            self.set_content([])
+        else:
+            self.empty_state = self._empty_state_default
 
     def _apply_filter(self) -> None:
         """Filter files by query and rebuild display state."""

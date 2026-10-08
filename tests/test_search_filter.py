@@ -51,6 +51,7 @@ def test_status_help_includes_search():
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     panel = StatusPanel(vm=vm)
     entries = panel.get_help_entries()
     assert ("/", "Filter file list by name") in entries
@@ -63,6 +64,7 @@ def test_commit_help_includes_search():
 
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     panel = CommitPanel(vm=vm)
     entries = panel.get_help_entries()
     assert ("/", "Filter commit list by message or SHA") in entries

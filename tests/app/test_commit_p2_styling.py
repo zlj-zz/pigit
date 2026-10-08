@@ -41,6 +41,7 @@ def _commit_panel(*, graph_rows: list | None = None) -> "CommitPanel":
 
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.graph_rows = graph_rows or []
     vm.remotes = ()
     return CommitPanel(vm=vm)

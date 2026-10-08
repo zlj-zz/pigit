@@ -58,6 +58,7 @@ def _file(name: str, short_status: str = " M") -> File:
 def _branch_panel(branches: list[Branch]) -> BranchPanel:
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal(branches)
+    vm.load_error = Signal(None)
     panel = BranchPanel(vm=vm, get_git=lambda: Mock())
     panel.branches = branches
     panel._recompute_meta_width()  # the app does this in _on_items_changed
@@ -92,6 +93,7 @@ def _commit(sha: str = "98085a19dd3c", refs: str = "") -> Commit:
 def _commit_panel(commits: list[Commit]) -> CommitPanel:
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.graph_rows = []
     vm.remotes = ()
     panel = CommitPanel(vm=vm)
@@ -103,6 +105,7 @@ def _commit_panel(commits: list[Commit]) -> CommitPanel:
 def _status_panel(files: list[File], *, tree: bool) -> StatusPanel:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal(files)
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     panel = StatusPanel(
         vm=vm, default_view="tree" if tree else "flat", nerd_icons=False

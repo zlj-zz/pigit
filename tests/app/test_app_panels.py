@@ -369,6 +369,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -385,6 +386,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -404,9 +406,10 @@ class TestBranchPanelLifecycle:
 
         old_vm = Mock(spec=IBranchViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = BranchPanel(
             get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm
         )
@@ -433,9 +436,10 @@ class TestBranchPanelLifecycle:
 
         old_vm = Mock(spec=IBranchViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = BranchPanel(
             get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm
         )  # not mounted
@@ -455,6 +459,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -474,6 +479,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.get_remote_url.return_value = "git@github.com:zlj-zz/pigit.git"
         opened: list[str] = []
         monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
@@ -498,6 +504,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
@@ -512,6 +519,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
@@ -529,9 +537,11 @@ class TestCommitPanelLifecycle:
 
         old_vm = Mock(spec=ICommitViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         old_vm.graph_rows = []
         new_vm = Mock(spec=ICommitViewModel)
         new_vm.items = Signal([])
+        new_vm.load_error = Signal(None)
         new_vm.graph_rows = []
 
         panel = CommitPanel(vm=old_vm)
@@ -559,6 +569,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.graph_rows = []
         vm.remotes = ()
         from pigit.app_commit import CommitPanel
@@ -583,6 +594,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.graph_rows = []
         vm.remotes = ()
         panel = CommitPanel(vm=vm)
@@ -645,9 +657,10 @@ class TestStatusPanelLifecycle:
 
         old_vm = Mock(spec=IStatusViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IStatusViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = StatusPanel(vm=old_vm, default_view="flat")
         panel.mount()
         old_vm.refresh.reset_mock()
@@ -722,6 +735,7 @@ class TestContributionPanel:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal(commits or [])
+        vm.load_error = Signal(None)
         panel = ContributionPanel(vm=vm)
         panel.mount()
         return vm, panel
@@ -788,6 +802,7 @@ class TestContributionPanel:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal(_commits_on_day(0, 2))
+        vm.load_error = Signal(None)
         panel = ContributionPanel(vm=vm)
         panel.mount()
         assert sum(panel._heatmap._day_counts.values()) == 2
@@ -805,6 +820,7 @@ class TestContributionPanel:
 
         other = Mock(spec=ICommitViewModel)
         other.items = Signal(_commits_on_day(1, 1))
+        other.load_error = Signal(None)
         panel.set_vm(other)
         assert sum(panel._heatmap._day_counts.values()) == 1
 

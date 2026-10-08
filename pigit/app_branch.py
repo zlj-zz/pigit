@@ -35,7 +35,7 @@ from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
 from .ext.utils import relative_time
-from .app_theme import THEME
+from .app_theme import LOAD_FAILED_MARK, THEME, load_failed_segments
 from .app_row_slots import pad_to_width, status_lane
 from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.branch import IBranchViewModel
@@ -84,6 +84,9 @@ class BranchPanel(OptionList):
         self._branch_signal = branch_signal
         self._get_git = get_git
         self.branches: list[Branch] = []
+        #: What the panel shows when it has no rows; a failed load swaps in its
+        #: own message and a later success must put this back.
+        self._empty_state_default = self.empty_state
         self._max_right_w = 0
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
@@ -108,6 +111,9 @@ class BranchPanel(OptionList):
         # Branches arrive asynchronously via vm.items; show the skeleton until
         # they do, rather than an empty list that reads as "no branches".
         self.loading = True
+        # The mark describes the load that is about to run, not the one before
+        # this panel was unmounted.
+        self._header.set_status(None)
         self._vm.refresh()
 
     def unmount(self) -> None:
@@ -132,17 +138,26 @@ class BranchPanel(OptionList):
         self._vm_unsubs.clear()
 
     def _bind_vm_signals(self) -> None:
-        """Bind vm.items; safe to call multiple times (idempotent)."""
+        """Bind vm.items and vm.load_error; safe to call multiple times."""
         if not self._vm_unsubs:
             self._vm_unsubs.append(
-                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+                bind_signals(
+                    self,
+                    self._vm.items,
+                    self._vm.load_error,
+                    callback=self._on_items_changed,
+                )
             )
 
     def _on_items_changed(self) -> None:
-        branches = self._vm.items.value
         if not self.is_mounted():
             return
         self.loading = False
+        error = self._vm.load_error.value
+        self._show_load_failure(error)
+        if error is not None:
+            return
+        branches = self._vm.items.value
         self.branches = branches
         self._recompute_meta_width()
         if not branches:
@@ -153,6 +168,25 @@ class BranchPanel(OptionList):
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
         self._notify_change()
+
+    def _show_load_failure(self, error: BaseException | None) -> None:
+        """Wear the failure in the header, or take the mark off again.
+
+        A failed load never reaches this panel through ``items``, so without
+        the mark the panel goes on claiming it is loading (nothing loaded yet)
+        or shows rows that are quietly out of date -- and the toast that said
+        so is gone in three seconds.
+        """
+        self._header.set_status(LOAD_FAILED_MARK if error is not None else None)
+        if error is None:
+            self.empty_state = self._empty_state_default
+        elif not self.branches:
+            # Nothing older to keep, so say what happened rather than show a
+            # skeleton that would never end.
+            self.empty_state = load_failed_segments(error)
+            self.set_content([])
+        else:
+            self.empty_state = self._empty_state_default
 
     def _recompute_meta_width(self) -> None:
         """Measure the widest metadata block, to give every row a common edge.

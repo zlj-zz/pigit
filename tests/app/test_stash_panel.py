@@ -34,6 +34,7 @@ def _inline_spinner(monkeypatch):
 def _panel_with_stashes(msgs: list[str]) -> StashPanel:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref=f"stash@{{{i}}}", sha=f"abc{i}", msg=msg)
         for i, msg in enumerate(msgs)
@@ -95,6 +96,7 @@ def test_drop_requires_confirmation():
     """Drop shows an ERROR-kind alert and only drops when confirmed."""
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
@@ -125,6 +127,7 @@ def test_drop_requires_confirmation():
 def test_drop_empty_list_is_noop():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
@@ -160,6 +163,7 @@ def test_section_rule_follows_panel_focus():
     try:
         vm = Mock(spec=IStatusViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.load_stashes.return_value = []
         stash = StashPanel(vm=vm)
         root = ComponentRoot(stash)
@@ -200,6 +204,7 @@ def test_section_rule_follows_panel_focus():
 def test_apply_keeps_stash_without_confirmation():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
@@ -219,6 +224,7 @@ def test_apply_keeps_stash_without_confirmation():
 def test_get_inspector_snapshot_delegates_to_vm():
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
@@ -234,6 +240,7 @@ def test_get_inspector_snapshot_delegates_to_vm():
 def test_get_inspector_snapshot_empty_is_none():
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     panel = StashPanel(vm=vm)
     panel.mount()
@@ -243,6 +250,7 @@ def test_get_inspector_snapshot_empty_is_none():
 def test_apply_empty_list_is_noop():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     vm.stash_apply = Mock()
     panel = StashPanel(vm=vm)
@@ -265,6 +273,7 @@ def _stash_row_text(panel: StashPanel, idx: int) -> str:
 def _panel_with_dated_stashes(entries: list[tuple[str, int]]) -> StashPanel:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref=f"stash@{{{i}}}", sha=f"abc{i}", msg=msg, when=when)
         for i, (msg, when) in enumerate(entries)

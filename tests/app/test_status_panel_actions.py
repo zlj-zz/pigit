@@ -58,6 +58,7 @@ def _file(
 def _panel(files: list[File], *, tree: bool = True) -> tuple[StatusPanel, Mock]:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal(files)
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     ok = ActionResult(success=True, message="ok", should_refresh=False)
     vm.stage.return_value = ok
@@ -386,6 +387,7 @@ def test_file_icon_name_prefix_when_enabled_and_fallback() -> None:
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([_file("main.py")])
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     file = _file("main.py")
 
@@ -416,6 +418,7 @@ def test_clean_tree_refresh_completion_clears_loading() -> None:
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.refresh = Mock()
     panel = StatusPanel(vm=vm)
     panel.unmount()
@@ -441,6 +444,7 @@ def test_remount_requests_reload_and_skeleton() -> None:
     force-notifies the (possibly unchanged) result."""
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.refresh = Mock()
     panel = StatusPanel(vm=vm)
     panel.mount()

@@ -19,6 +19,7 @@ from pigit.viewmodels.branch import IBranchViewModel
 def _panel_with(branches: list[Branch]) -> BranchPanel:
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal(branches)
+    vm.load_error = Signal(None)
     panel = BranchPanel(
         get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
     )

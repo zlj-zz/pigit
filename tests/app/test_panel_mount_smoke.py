@@ -25,6 +25,7 @@ def _branch(name: str) -> Branch:
 def test_branch_panel_rebinds_signal_after_unmount_remount():
     vm = MagicMock()
     vm.items = Signal([_branch("a")])
+    vm.load_error = Signal(None)
     vm.refresh = MagicMock()
     panel = BranchPanel(
         get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm, id="branch"
