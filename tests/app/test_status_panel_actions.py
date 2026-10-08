@@ -393,17 +393,19 @@ def test_file_icon_name_prefix_when_enabled_and_fallback() -> None:
     panel.files = [file]
     panel.set_content(["main.py"])
     left, main, _right = panel.describe_row(0, False)
-    assert main[0].text == get_file_icon(adjudgment_type("main.py")) + " main.py"
-    # Icon moved out of the leading status column.
+    # left = [staged][unstaged][icon][space]; the name follows bare in main.
     assert left[0].text == " "
-    assert left[2].text == "M"  # unstaged column
+    assert left[1].text == "M"  # unstaged column
+    assert left[3].text == get_file_icon(adjudgment_type("main.py"))
+    assert main[0].text == "main.py"
 
     panel_off = StatusPanel(vm=vm, default_view="flat", nerd_icons=False)
     panel_off.files = [file]
     panel_off.set_content(["main.py"])
-    _left, main_off, _r = panel_off.describe_row(0, False)
+    left_off, main_off, _r = panel_off.describe_row(0, False)
     fallback = resolve_icon(False, adjudgment_type("main.py"))
-    assert main_off[0].text == f"{fallback} main.py"
+    assert left_off[3].text == fallback  # never blank
+    assert main_off[0].text == "main.py"
 
 
 def test_clean_tree_refresh_completion_clears_loading() -> None:

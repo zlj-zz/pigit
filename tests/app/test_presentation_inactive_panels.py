@@ -85,14 +85,15 @@ def test_status_filename_inactive_under_steal_xy_semantic_kept() -> None:
     panel.files = [_status_file()]
     panel.content = [panel.files[0].display_str]
 
+    # left = [staged][unstaged][icon][space]; the status lanes lead now.
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
-    assert left[1].fg == THEME.fg_success  # staged M
+    assert left[0].fg == THEME.fg_success  # staged M
 
     _steal_presentation()
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_inactive
-    assert left[1].fg == THEME.fg_success
+    assert left[0].fg == THEME.fg_success
     assert right[0].fg == THEME.fg_success  # Staged label
 
 
