@@ -203,7 +203,8 @@ class TestCombinedMergeDiffsKeepTheirOldNumbers:
 
     def test_the_preamble_is_still_excluded(self):
         """The one thing the combined path does get right: `diff --cc` ends
-        the previous file, matched by prefix rather than by DIFF_GIT_RE."""
+        the previous file, matched by prefix rather than by the two-path
+        pattern."""
         numbers = _numbers(
             [
                 "commit abc1234",

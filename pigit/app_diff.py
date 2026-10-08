@@ -42,12 +42,11 @@ from pigit.termui.wcwidth_table import (
 
 from .app_theme import THEME
 from .diff_content import (
-    DIFF_GIT_RE,
     DiffContent,
     Hunk,
     RenderLine,
     needs_full_source,
-    path_from_diff_git_line,
+    path_from_diff_line,
 )
 from .git.api import parse_index_hashes
 
@@ -56,7 +55,7 @@ _logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class _FileSection:
-    """One file span in a multi-file unified diff (from a ``diff --git`` line)."""
+    """One file span in a multi-file unified diff (from a boundary line)."""
 
     path: str
     first_hunk_start: int
@@ -263,18 +262,18 @@ class DiffViewer(Component):
         self._rebuild_file_sections()
 
     def _path_from_header(self, idx: int) -> str | None:
-        """Extract the ``b/`` path from a ``diff --git`` line at ``idx``."""
+        """Extract the file path from the boundary line at ``idx``."""
         if idx < 0 or idx >= len(self._lines):
             return None
-        path = path_from_diff_git_line(self._lines[idx])
+        path = path_from_diff_line(self._lines[idx])
         return path or None
 
     def _rebuild_file_sections(self) -> None:
-        """Rebuild ``_file_sections`` from ``diff --git`` lines (incl. binary)."""
+        """Rebuild ``_file_sections`` from file-boundary lines (incl. binary)."""
         sections: list[_FileSection] = []
         headers: list[int] = []
         for i, line in enumerate(self._lines):
-            if DIFF_GIT_RE.match(line):
+            if DiffContent.is_file_boundary(line):
                 headers.append(i)
         for hi, header_start in enumerate(headers):
             path = self._path_from_header(header_start) or ""
@@ -522,6 +521,7 @@ class DiffViewer(Component):
 
     # Static helpers re-exported for tests that still call DiffViewer.* (thin aliases).
     _is_file_header = staticmethod(DiffContent.is_file_header)
+    _is_file_boundary = staticmethod(DiffContent.is_file_boundary)
     _is_add_line = staticmethod(DiffContent.is_add_line)
     _is_del_line = staticmethod(DiffContent.is_del_line)
     _word_diff_ranges = staticmethod(DiffContent.word_diff_ranges)
