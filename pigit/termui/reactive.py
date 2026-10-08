@@ -84,6 +84,17 @@ class Signal(Generic[T]):
         except ValueError:
             pass
 
+    def clear_subscribers(self) -> None:
+        """Drop every subscriber.
+
+        A subscriber lives as long as the object it belongs to, so anything
+        holding several such objects at once sees all of their handlers fire.
+        A process-global signal therefore needs a way back to a clean channel
+        -- tests that build an object per case, and any future code that
+        rebuilds the thing owning the subscription.
+        """
+        self._subs.clear()
+
 
 class Computed(Generic[T]):
     """Derived signal.  Two modes:

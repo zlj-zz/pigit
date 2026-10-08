@@ -26,6 +26,7 @@ from pigit.termui import (
     dismiss_sheet,
     ExitEventLoop,
     get_renderer,
+    get_toast_signal,
     hide_spinner,
     keys,
     AsyncTask,
@@ -71,7 +72,7 @@ from .app_merge_workflow import MergeStepOutcome, MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
 from .git.model import ReflogEntry
-from .ext.utils import relative_time, resolve_nerd_icons
+from .ext.utils import copy_to_clipboard, relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
@@ -190,6 +191,7 @@ class PigitApplication(Application):
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
+        self._toast_unsub = get_toast_signal().subscribe(self._on_toast_shown)
         self._merge_state_store = MergeStateStore(
             self._header_state,
             get_git_dir=self._git.get_git_dir,
@@ -465,6 +467,24 @@ class PigitApplication(Application):
     def _on_help_invoke_error(self, exc: BaseException) -> None:
         """Toast after Help dismiss when an invoked binding raises."""
         show_toast(str(exc) or "Action failed", duration=2.5, kind=FeedbackKind.ERROR)
+
+    def _on_toast_shown(self, toast: tuple[str, FeedbackKind | None] | None) -> None:
+        """Copy a failure to the clipboard; the toast itself is not durable.
+
+        A toast lives three seconds, so an error the user was not looking at is
+        gone before they can act on it -- and the message is exactly what they
+        would paste into an issue. Non-error toasts are left alone.
+
+        An empty message is skipped rather than copied: it would clear the
+        clipboard, which is worse than leaving it stale. Those are reachable --
+        the failure-toast sites format ``str(exc)``, which is ``""`` for a bare
+        ``Exception()`` -- so the guard is load-bearing, not defensive.
+        """
+        if toast is None:
+            return
+        message, kind = toast
+        if kind is FeedbackKind.ERROR and message:
+            copy_to_clipboard(message)
 
     def get_help_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
         """Help for the active presentation panel, then Global app bindings."""

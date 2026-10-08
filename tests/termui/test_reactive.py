@@ -61,6 +61,27 @@ class TestSignal:
         assert a.calls == [1]
         assert b.calls == [1]
 
+    def test_clear_subscribers_drops_them_all(self):
+        """A subscriber lives as long as its object, so a process-global signal
+        needs a way back to a clean channel -- otherwise every object still
+        alive from an earlier case reacts to the next one."""
+        s = Signal(0)
+        a, b = _Subscriber(), _Subscriber()
+        s.subscribe(a.on_change)
+        s.subscribe(b.on_change)
+        s.clear_subscribers()
+        s.set(1)
+        assert a.calls == []
+        assert b.calls == []
+
+    def test_clear_subscribers_leaves_the_signal_usable(self):
+        s = Signal(0)
+        s.clear_subscribers()
+        sub = _Subscriber()
+        s.subscribe(sub.on_change)
+        s.set(1)
+        assert sub.calls == [1]
+
 
 class TestComputed:
     def test_initial_value(self):

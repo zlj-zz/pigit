@@ -57,6 +57,7 @@ REQUIRED_ROOT: frozenset[str] = frozenset(
         "show_badge",
         "get_badge",
         "get_badge_signal",
+        "get_toast_signal",
         "show_spinner",
         "hide_spinner",
         "run_with_spinner",
