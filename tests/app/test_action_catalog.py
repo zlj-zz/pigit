@@ -126,7 +126,6 @@ class TestOnlyWhatIsOnScreen:
         assert len(owners) < 10
 
 
-
 class TestTheCatalogHoldsDeclaredActions:
     def test_every_listed_action_is_declared_somewhere(self, app):
         declared = {binding.action for _, binding in collect_all_action_bindings()}
@@ -207,9 +206,7 @@ class TestTheOldWordsStillFindTheirAction:
     )
     def test_typing_the_word_still_finds_the_action(self, app, word, action):
         matched = [
-            item.id
-            for item in app.palette_catalog()
-            if _default_match(word, item)
+            item.id for item in app.palette_catalog() if _default_match(word, item)
         ]
         assert action in matched
 
@@ -237,9 +234,7 @@ class TestHelpAndTheCatalogAgree:
         """Both read the same rows, so a binding cannot be described one way
         in Help and another in the palette."""
         catalog = {
-            row.action: row
-            for _, rows in app.collect_binding_groups()
-            for row in rows
+            row.action: row for _, rows in app.collect_binding_groups() for row in rows
         }
         groups = app.get_help_groups()
         assert groups

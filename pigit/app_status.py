@@ -1034,9 +1034,7 @@ class StatusPanel(OptionList):
             name_fg=filename_fg,
             cursor_flags=cursor_flags,
         )
-        main = [
-            Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)
-        ]
+        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -1092,9 +1090,7 @@ class StatusPanel(OptionList):
             name_fg=filename_fg,
             cursor_flags=cursor_flags,
         )
-        main = [
-            Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)
-        ]
+        main = [Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)

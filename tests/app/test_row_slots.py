@@ -163,9 +163,7 @@ class TestStatusPrefixIsTheSameOnEveryRow:
         assert len(set(self._left_widths(panel))) == 1
 
     def test_a_cjk_name_does_not_change_the_prefix_width(self):
-        panel = _status_panel(
-            [_file("src/中文模块.py"), _file("README.md")], tree=True
-        )
+        panel = _status_panel([_file("src/中文模块.py"), _file("README.md")], tree=True)
         assert len(set(self._left_widths(panel))) == 1
 
     def test_the_icon_takes_the_names_colour_on_a_selected_row(self):
@@ -190,24 +188,24 @@ class TestMetadataBlocksShareOneLeftEdge:
         panel = _branch_panel(
             [
                 Branch(
-                    "dev", "2", "1", True,
-                    upstream_name="origin/dev", committed_at=1700000000,
+                    "dev",
+                    "2",
+                    "1",
+                    True,
+                    upstream_name="origin/dev",
+                    committed_at=1700000000,
                 ),
                 Branch("feature", "?", "?", False, committed_at=1700000000),
             ]
         )
-        widths = {
-            _width(panel.describe_row(idx, False)[2]) for idx in range(2)
-        }
+        widths = {_width(panel.describe_row(idx, False)[2]) for idx in range(2)}
         assert widths == {panel._max_right_w}
 
     def test_stash_rows_agree(self):
         # Different ref widths, or the padding would be a no-op and the
         # assertion would hold with the alignment removed.
         panel = _stash_panel([_stash("wip one"), _stash("wip two", ref="stash@{10}")])
-        widths = {
-            _width(panel.describe_row(idx, False)[2]) for idx in range(2)
-        }
+        widths = {_width(panel.describe_row(idx, False)[2]) for idx in range(2)}
         assert widths == {panel._max_right_w}
 
     def test_the_ref_still_precedes_the_time(self):

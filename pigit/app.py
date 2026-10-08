@@ -1998,7 +1998,11 @@ class PigitApplication(Application):
         # appending it to whatever still collides settles it for good.
         seen = Counter(item.label for item in items)
         return [
-            item if seen[item.label] == 1 else item._replace(label=f"{item.label} · {item.id}")
+            (
+                item
+                if seen[item.label] == 1
+                else item._replace(label=f"{item.label} · {item.id}")
+            )
             for item in items
         ]
 

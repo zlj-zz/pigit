@@ -137,7 +137,6 @@ def test_with_parameterized_appends_the_argument_taking_commands():
     assert by_id["stage"].args.fetch("a") == ["a.py"]
 
 
-
 def test_checkout_resolves_exact_index_and_refreshes(app):
     branches = [
         SimpleNamespace(name="main"),

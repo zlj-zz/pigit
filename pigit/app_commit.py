@@ -735,7 +735,9 @@ class CommitPanel(OptionList):
             row_bg=row_bg,
         )
         if refs:
-            main.append(Segment(" ", fg=fg_primary, style_flags=cursor_flags, bg=row_bg))
+            main.append(
+                Segment(" ", fg=fg_primary, style_flags=cursor_flags, bg=row_bg)
+            )
             main.extend(refs)
         return left, main
 
