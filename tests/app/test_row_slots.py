@@ -24,12 +24,13 @@ from pigit.app_row_slots import (
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
 from pigit.app_theme import THEME
-from pigit.git.model import Branch, File, Stash
+from pigit.git.model import Branch, Commit, File, Stash
 from pigit.termui import Segment
 from pigit.termui.reactive import Signal
 from pigit.termui.wcwidth_table import wcswidth
 from pigit.termui.widgets import ACCENT_BAR
 from pigit.viewmodels.branch import IBranchViewModel
+from pigit.viewmodels.commit import ICommitViewModel
 from pigit.viewmodels.status import IStatusViewModel
 
 FG = (200, 200, 200)
@@ -73,6 +74,29 @@ def _stash_panel(stashes: list[Stash]) -> StashPanel:
     vm.load_stashes.return_value = stashes
     panel = StashPanel(vm=vm)
     panel._load_stashes()
+    return panel
+
+
+def _commit(sha: str = "98085a19dd3c", refs: str = "") -> Commit:
+    return Commit(
+        sha=sha,
+        msg="perf(engine): memoise parse results",
+        author="Zev",
+        unix_timestamp=1700000000,
+        status="pushed",
+        extra_info=refs,
+        tag=[],
+    )
+
+
+def _commit_panel(commits: list[Commit]) -> CommitPanel:
+    vm = Mock(spec=ICommitViewModel)
+    vm.items = Signal([])
+    vm.graph_rows = []
+    vm.remotes = ()
+    panel = CommitPanel(vm=vm)
+    panel.commits = commits
+    panel._rebuild_rows()
     return panel
 
 
@@ -192,3 +216,77 @@ class TestMetadataBlocksShareOneLeftEdge:
         text = "".join(seg.text for seg in right)
         assert text.strip().startswith("stash@{0}")
         assert text.rstrip().endswith("ago")
+
+
+class TestCommitSubjectColumn:
+    """The subject is the only column in a message list worth scanning, and it
+    used to move with the width of that row's refs."""
+
+    @staticmethod
+    def _starts(panel: CommitPanel) -> list[int]:
+        return [
+            _width(panel.describe_row(idx, False)[0])
+            for idx in range(len(panel.commits))
+        ]
+
+    def test_the_subject_starts_at_the_same_column_with_or_without_refs(self):
+        panel = _commit_panel(
+            [_commit(refs=" (HEAD -> main, tag: v0.4.0)"), _commit(refs="")]
+        )
+        assert len(set(self._starts(panel))) == 1
+
+    def test_refs_trail_the_subject(self):
+        panel = _commit_panel([_commit(refs=" (HEAD -> main)")])
+        _left, main, _right = panel.describe_row(0, False)
+        text = "".join(seg.text for seg in main)
+        assert text.index("memoise") < text.index("(HEAD")
+
+    def test_refs_keep_the_cursor_rows_background(self):
+        """The selected-row fill is painted from the segments, so refs that do
+        not carry it leave a gap in the middle of the highlighted row."""
+        panel = _commit_panel([_commit(refs=" (HEAD -> main)")])
+        _left, main, _right = panel.describe_row(0, True)
+        subject_bg = main[0].bg
+        refs = [seg for seg in main if "HEAD" in seg.text]
+        assert refs
+        assert all(seg.bg == subject_bg for seg in refs)
+
+    def test_refs_do_not_widen_the_right_block(self):
+        """The reason refs stayed in ``main``: ``right`` is dropped wholesale
+        once ``left + right + 2`` exceeds the terminal, so widening it with the
+        refs would take the author and the date down with them. Measured, that
+        moves the drop point from ~27 columns to ~42.
+
+        ``left`` already carries the framework's cursor cell by the time
+        ``_draw_row_layout`` sees it, hence the leading 1.
+        """
+        panel = _commit_panel([_commit(refs=" (HEAD -> main, tag: v0.4.0)")])
+        left, main, right = panel.describe_row(0, False)
+        subject = "perf(engine): memoise parse results"
+        assert _width(main) > len(subject)  # the row really does carry refs
+        assert 1 + _width(left) + _width(right) + 2 <= 27
+
+
+class TestEveryPanelUsesTheBrandCursor:
+    """``option_list.py`` declares ``ACCENT_BAR`` the brand marker for the
+    cursor column, and ``CURSOR_ACCENT`` makes it degrade to a space when the
+    panel is not focused -- which a literal glyph does not, so the column
+    keeps its width either way."""
+
+    PANELS = (
+        StatusPanel,
+        BranchPanel,
+        CommitPanel,
+        StashPanel,
+        LogRefSheet,
+        RecentActionsPanel,
+        RebasePanel,
+    )
+
+    def test_cursor_is_the_accent_bar(self):
+        for panel in self.PANELS:
+            assert panel.CURSOR == ACCENT_BAR, panel.__name__
+
+    def test_cursor_accent_is_enabled(self):
+        for panel in self.PANELS:
+            assert panel.CURSOR_ACCENT is True, panel.__name__

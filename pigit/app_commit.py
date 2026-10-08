@@ -30,7 +30,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import OptionList
+from pigit.termui.widgets import ACCENT_BAR, OptionList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
@@ -100,7 +100,8 @@ class _SubRow(Enum):
 class CommitPanel(OptionList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     GRAPH_COMMIT = "◉"
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
@@ -716,19 +717,26 @@ class CommitPanel(OptionList):
         )
         left.append(Segment(" ", fg=fg_primary, bg=row_bg))
 
-        main: list[Segment] = self._ref_segments(
-            commit,
-            cursor_flags=cursor_flags,
-            row_bg=row_bg,
-        )
-        main.append(
+        # Subject first, refs trailing. The other order made the subject's
+        # column move with the width of the refs on that row, so a commit with
+        # no refs sat thirty columns left of one with them. Refs last also
+        # means the group truncation drops them before it touches the subject.
+        main: list[Segment] = [
             Segment(
                 commit.msg,
                 fg=fg_primary,
                 style_flags=cursor_flags,
                 bg=row_bg,
             )
+        ]
+        refs = self._ref_segments(
+            commit,
+            cursor_flags=cursor_flags,
+            row_bg=row_bg,
         )
+        if refs:
+            main.append(Segment(" ", fg=fg_primary, style_flags=cursor_flags, bg=row_bg))
+            main.extend(refs)
         return left, main
 
     def _build_row_cache(self, from_index: int = 0) -> None:
