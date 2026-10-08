@@ -24,7 +24,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, OptionList
+from pigit.termui.widgets import ACCENT_BAR, AlertDialog, OptionList
 
 from .app_bisect import guard_worktree_busy
 from .app_theme import THEME
@@ -58,7 +58,8 @@ class _TodoItem:
 class RebasePanel(OptionList):
     """Sheet overlay for editing the interactive-rebase todo list."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "rebase"
 
     def __init__(

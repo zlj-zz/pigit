@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pigit.termui import bind_action, keys, palette, Segment
-from pigit.termui.widgets import OptionList
+from pigit.termui.widgets import ACCENT_BAR, OptionList
 
 from .app_theme import THEME
 
@@ -18,7 +18,8 @@ from .app_theme import THEME
 class LogRefSheet(OptionList):
     """Pick a git ref to show in the Commit log (no checkout)."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "log_ref"
 
     def __init__(
