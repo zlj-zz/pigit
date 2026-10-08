@@ -42,16 +42,29 @@ class TestDiffViewer:
 
     def testpaint_diff(self):
         d = DiffViewer()
-        d.set_content(["+added", "-removed", " context"])
-        d.resize((20, 5))
-        s = Surface(20, 5)
+        # A real fragment: the gutter numbers a hunk's own lines, so content
+        # with no @@ header has nothing to number (see the numbering tests).
+        d.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "--- a/f.py",
+                "+++ b/f.py",
+                "@@ -1,2 +1,2 @@",
+                "-removed",
+                "+added",
+            ]
+        )
+        d.resize((30, 10))
+        s = Surface(30, 10)
         d.paint(s)
         # With box border: row 0 = top border, row 1+ = content, last row = bottom border
         lines = s.lines()
         assert "\u250c" in lines[0]  # ┌ top-left corner
         assert "\u2510" in lines[0]  # ┐ top-right corner
-        assert "0" in lines[1]
-        assert "+added" in lines[1]
+        # Row 5 is content index 4: "-removed", old line 1 of the hunk.
+        assert lines[5].startswith("│   1")
+        assert "removed" in lines[5]
+        assert "+added" in lines[6]
         assert "\u2514" in lines[-1]  # └ bottom-left corner
         assert "\u2518" in lines[-1]  # ┘ bottom-right corner
 

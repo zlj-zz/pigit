@@ -789,10 +789,20 @@ class DiffContent:
 
     @classmethod
     def _compute_line_numbers(cls, content: list[str]) -> list[str]:
-        """Compute line numbers for each diff line by parsing @@ headers."""
+        """Compute line numbers for each diff line by parsing @@ headers.
+
+        A line is numbered only when it is a line of a file, which means it
+        lies inside a hunk. Everything else in the stream -- the ``git show``
+        preamble, a file's ``diff --git`` / ``index`` / ``new file mode``
+        headers, the hunk header itself -- is metadata and takes no number.
+        Classifying by first character instead numbered all of that as context
+        lines, so the column ran 0,1,2,... through the commit subject and then
+        restarted at the hunk's own first line.
+        """
         line_numbers: list[str] = []
         old_line = 0
         new_line = 0
+        in_hunk = False
         for line in content:
             if line.startswith("@@"):
                 m = _HUNK_HEADER_RE.search(line)
@@ -803,6 +813,16 @@ class DiffContent:
                     _logger.warning("Unexpected @@ line format: %r", line)
                     old_line = 0
                     new_line = 0
+                in_hunk = True
+                line_numbers.append("")
+            elif line.startswith("diff --"):
+                # Matched by prefix, not DIFF_GIT_RE: a combined merge diff
+                # ends the previous file with ``diff --cc``, which that pattern
+                # does not match -- and treating it as content would number the
+                # whole combined diff.
+                in_hunk = False
+                line_numbers.append("")
+            elif not in_hunk:
                 line_numbers.append("")
             elif cls.is_file_header(line):
                 line_numbers.append("")
