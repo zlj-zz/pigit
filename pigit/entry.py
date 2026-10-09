@@ -21,6 +21,22 @@ if TYPE_CHECKING:
 _TOOLS_GROUP = "tools"
 
 
+def _declare_git_policy() -> None:
+    """Tell every git child not to take optional locks on pigit's behalf.
+
+    pigit reads the worktree from a background pool while the UI thread writes
+    to it. ``git status`` is not read-only: it takes ``.git/index.lock`` to
+    write back the stat cache it just refreshed, so a poll landing on a
+    checkout or a commit makes that write fail with "Unable to create
+    index.lock". Nothing in pigit reads that cache back.
+
+    Declared at module scope, before any dispatch. ``Parser.main`` runs either
+    a subcommand callback or the root one -- never both -- so a policy set
+    inside a handler would miss every ``pigit cmd`` / ``pigit repo`` run.
+    """
+    os.environ.setdefault("GIT_OPTIONAL_LOCKS", "0")
+
+
 def _bootstrap_config() -> Context:
     """Module-level bootstrap: config + Context only (no git probes).
 
@@ -36,6 +52,7 @@ def _bootstrap_config() -> Context:
     return ctx
 
 
+_declare_git_policy()
 ctx = _bootstrap_config()
 
 _repo_bootstrapped = False
