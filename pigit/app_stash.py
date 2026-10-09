@@ -28,6 +28,7 @@ from pigit.termui.widgets import (
     SectionRule,
 )
 
+from .app_theme import report_refusal
 from .ext.utils import relative_time
 from .app_diff import DiffType
 from .app_row_slots import pad_to_width, status_lane
@@ -280,6 +281,8 @@ class StashPanel(OptionList):
         return right
 
     def _handle_result(self, result) -> None:
+        if report_refusal(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
             self._load_stashes()

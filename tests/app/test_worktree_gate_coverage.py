@@ -51,10 +51,10 @@ def test_merge_request_refuses_while_a_rewrite_runs():
     worktree that is still being rewritten."""
     workflow, dialog = _merge_workflow(_idle_git(), busy=True)
 
-    with patch("pigit.app_bisect.show_toast") as toast:
+    with patch("pigit.app_bisect.show_badge") as badge:
         workflow.on_merge_request("feat", "main")
 
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
     dialog.assert_not_called()  # never even asked to confirm
 
 
@@ -79,14 +79,14 @@ def test_sequencer_controls_refuse_while_a_rewrite_runs():
     )
 
     with (
-        patch("pigit.app_bisect.show_toast") as toast,
+        patch("pigit.app_bisect.show_badge") as badge,
         patch("pigit.app_sequencer.exec_external") as external,
     ):
         ctrl.do_rebase_control("continue")
         ctrl.do_cherry_pick_control("continue")
 
     external.assert_not_called()
-    assert [c[0][0] for c in toast.call_args_list] == [
+    assert [c[0][0] for c in badge.call_args_list] == [
         WORKTREE_BUSY_MESSAGE,
         WORKTREE_BUSY_MESSAGE,
     ]
@@ -102,13 +102,13 @@ def test_rebase_execute_refuses_while_a_rewrite_runs():
     )
 
     with (
-        patch("pigit.app_bisect.show_toast") as toast,
+        patch("pigit.app_bisect.show_badge") as badge,
         patch("pigit.app_rebase.exec_external") as external,
     ):
         panel._execute()
 
     external.assert_not_called()
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
 
 
 def _network(gate: WorktreeGate) -> tuple[NetworkGit, list]:
@@ -148,11 +148,11 @@ def test_pull_refuses_while_a_rewrite_runs():
     assert gate.acquire() is True
     network, calls = _network(gate)
 
-    with patch("pigit.app_network_git.show_toast") as toast:
+    with patch("pigit.app_network_git.show_badge") as badge:
         network.run("pull")
 
     assert calls == []  # no worker started
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
     assert gate.busy is True  # the other operation keeps its gate
 
 
@@ -176,11 +176,11 @@ def test_finish_merge_checkout_refuses_while_a_rewrite_runs():
     git = _idle_git()
     workflow, _dialog = _merge_workflow(git, busy=True)
 
-    with patch("pigit.app_bisect.show_toast") as toast:
+    with patch("pigit.app_bisect.show_badge") as badge:
         workflow.finish_merge_checkout("main", "feat")
 
     git.checkout_branch.assert_not_called()
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
 
 
 def test_cherry_pick_entry_refuses_while_a_rewrite_runs():
@@ -196,13 +196,13 @@ def test_cherry_pick_entry_refuses_while_a_rewrite_runs():
     )
 
     with (
-        patch("pigit.app_bisect.show_toast") as toast,
+        patch("pigit.app_bisect.show_badge") as badge,
         patch("pigit.app_sequencer.exec_external") as external,
     ):
         ctrl.on_cherry_pick("abcdef0", False)
 
     external.assert_not_called()
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
 
 
 def _capturing_merge_workflow(git: Mock, gate: WorktreeGate, calls: list):
@@ -260,7 +260,7 @@ def test_merge_refuses_when_the_gate_is_taken():
     calls: list = []
     workflow, _task, dialog = _capturing_merge_workflow(_idle_git(), gate, calls)
 
-    with patch("pigit.app_bisect.show_toast"):
+    with patch("pigit.app_bisect.show_badge"):
         # Refused at the entry probe, so the confirm dialog never opens.
         workflow.on_merge_request("feat", "main")
 
@@ -279,9 +279,9 @@ def test_merge_refuses_when_the_gate_is_taken_after_the_entry_check():
     workflow.on_merge_request("feat", "main")
     assert gate.acquire() is True  # another rewrite slips in before the answer
 
-    with patch("pigit.app_bisect.show_toast") as toast:
+    with patch("pigit.app_bisect.show_badge") as badge:
         dialog.alert.call_args[0][1](True)  # confirm
 
     assert calls == []  # no worker started
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
     assert gate.busy is True  # the other operation keeps its gate

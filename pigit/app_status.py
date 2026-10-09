@@ -45,7 +45,13 @@ from .app_diff import DiffType, DiffViewer
 from .app_row_slots import icon_lane, status_lane
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
-from .app_theme import LOAD_FAILED_MARK, THEME, load_failed_segments, sheet_core
+from .app_theme import (
+    LOAD_FAILED_MARK,
+    THEME,
+    load_failed_segments,
+    report_refusal,
+    sheet_core,
+)
 from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
@@ -623,6 +629,8 @@ class StatusPanel(OptionList):
             subject = msg.split("\n", 1)[0].strip()
 
             def done(result: ActionResult) -> None:
+                if report_refusal(result):
+                    return
                 if result.success:
                     dismiss_sheet()
                     self._vm.refresh()
@@ -707,6 +715,8 @@ class StatusPanel(OptionList):
                 return
 
             def done(result: ActionResult) -> None:
+                if report_refusal(result):
+                    return
                 if result.success:
                     self._vm.refresh()
                     show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
@@ -1271,6 +1281,8 @@ class StatusPanel(OptionList):
             result.should_refresh,
             result.message,
         )
+        if report_refusal(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:

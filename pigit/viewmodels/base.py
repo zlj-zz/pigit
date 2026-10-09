@@ -21,11 +21,17 @@ _S = TypeVar("_S")
 
 @dataclass
 class ActionResult:
-    """Result of a ViewModel action. Panel decides whether to refresh."""
+    """Result of a ViewModel action. Panel decides whether to refresh.
+
+    ``refused`` marks the third outcome: the action never ran, because another
+    one holds the worktree gate. It is not a failure -- nothing was attempted
+    -- and it is reported on a different channel for that reason.
+    """
 
     success: bool
     message: str = ""
     should_refresh: bool = False
+    refused: bool = False
 
 
 WORKTREE_BUSY_MESSAGE = "Another working-tree operation is still running"
@@ -73,7 +79,9 @@ def run_gated(gate: WorktreeGate, op: Callable[[], ActionResult]) -> ActionResul
     resolution started from the keyboard.
     """
     if not gate.acquire():
-        return ActionResult(success=False, message=WORKTREE_BUSY_MESSAGE)
+        return ActionResult(
+            success=False, message=WORKTREE_BUSY_MESSAGE, refused=True
+        )
     try:
         return op()
     finally:

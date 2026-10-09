@@ -35,7 +35,12 @@ from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
 from .ext.utils import relative_time
-from .app_theme import LOAD_FAILED_MARK, THEME, load_failed_segments
+from .app_theme import (
+    LOAD_FAILED_MARK,
+    THEME,
+    load_failed_segments,
+    report_refusal,
+)
 from .app_row_slots import pad_to_width, status_lane
 from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.branch import IBranchViewModel
@@ -206,6 +211,8 @@ class BranchPanel(OptionList):
         )
 
     def _handle_result(self, result: ActionResult) -> None:
+        if report_refusal(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:

@@ -224,12 +224,12 @@ def test_recent_panel_reversal_defers_to_a_running_rewrite():
     panel.mount()
     panel.curr_no = 0
 
-    with patch("pigit.app_bisect.show_toast") as toast:
+    with patch("pigit.app_bisect.show_badge") as badge:
         panel.reverse()
         seen["do_reverse"]()
 
     git.hard_reset_head.assert_not_called()
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
     assert history.peek() != []  # the record survives a refused reversal
 
 
@@ -239,8 +239,8 @@ def test_undo_refuses_while_a_rewrite_is_running(app):
     push_rewind(app._session_history, "Checked out feat", "aa", "Branch")
     app._session.worktree_gate.acquire()
 
-    with patch("pigit.app_bisect.show_toast") as toast:
+    with patch("pigit.app_bisect.show_badge") as badge:
         app._do_reverse_last()
 
-    assert toast.call_args[0][0] == WORKTREE_BUSY_MESSAGE
+    assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
     assert app._session_history.peek() != []  # record not consumed

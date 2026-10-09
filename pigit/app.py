@@ -87,7 +87,7 @@ from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
-from .app_theme import THEME, sheet_core
+from .app_theme import THEME, report_refusal, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .app_bisect import guard_worktree_busy
@@ -426,6 +426,7 @@ class PigitApplication(Application):
             get_branch_panel=lambda: branch_panel,
             get_commit_panel=lambda: commit_panel,
             get_graph_panel=lambda: graph_panel,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         self._observe_host = ObserveHost(
             ObserveDeps(
@@ -2048,6 +2049,8 @@ class PigitApplication(Application):
 
     def _toast_palette_result(self, result) -> None:
         """Show action result and refresh VMs when the action asks for it."""
+        if report_refusal(result):
+            return
         kind = FeedbackKind.SUCCESS if result.success else FeedbackKind.ERROR
         show_toast(result.message, duration=1.5 if result.success else 2.0, kind=kind)
         if result.success and result.should_refresh:

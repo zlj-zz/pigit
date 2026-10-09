@@ -8,7 +8,7 @@ Date: 2026-08-21
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -38,15 +38,22 @@ def app():
 
 
 def test_busy_guard_blocks_second_sync(app):
+    """A second sync is refused -- but the caller still hears the attempt is
+    over, or a merge sequence waiting on the push would hang. The refusal goes
+    to the badge, whose slot the running sync's spinner does not share."""
     app._network_sync_busy = True
+    done = Mock()
     with (
+        patch("pigit.app_network_git.show_badge") as badge,
         patch("pigit.app_network_git.show_toast") as toast,
         patch("pigit.app_network_git.show_spinner") as spin,
     ):
-        app._network_git.run("push")
+        app._network_git.run("push", on_complete=done)
     spin.assert_not_called()
     app._network_sync_task.start.assert_not_called()
-    assert "already in progress" in toast.call_args.args[0].lower()
+    toast.assert_not_called()
+    assert "already in progress" in badge.call_args.args[0].lower()
+    done.assert_called_once()
 
 
 def test_run_network_git_starts_worker_with_center_spinner(app):
@@ -208,10 +215,79 @@ def test_merge_push_chains_checkout_on_success(app):
         assert "done" in captured
         app._git.checkout_branch.assert_not_called()
         app._merge_state_store.clear = MagicMock(wraps=app._merge_state_store.clear)
+        app._refresh_git_vms = MagicMock()
         captured["done"](NetworkGitOutcome(ok=True))
 
     app._git.checkout_branch.assert_called_once_with("feature")
-    app._tab_view.route_to.assert_called_with("branch")
+    # The sequence ends where the user is: what they are looking at gets
+    # reloaded (the checkout back moved HEAD under it) instead of the flow
+    # pulling them over to Branch. Two refreshes run -- the push's own, then
+    # this one after the checkout back, which is the one that matters.
+    assert app._refresh_git_vms.called
+    app._tab_view.route_to.assert_not_called()
+
+
+def test_a_skipped_push_still_finishes_the_merge_sequence(app):
+    """NetworkGit refuses a second sync. The merge sequence asked for this push
+    and waits on it, so the refusal has to come back as "the attempt is over" --
+    otherwise the flow never checks out back and never clears its state."""
+    app._network_sync_busy = True
+    app._alert_dialog.alert = lambda message, on_result, kind=None: (
+        on_result(True),
+        True,
+    )[1]
+    app._merge_state_store.clear = MagicMock(wraps=app._merge_state_store.clear)
+    with (
+        patch("pigit.app_network_git.dismiss_sheet"),
+        patch("pigit.app_network_git.show_badge") as badge,
+        patch("pigit.app_merge_workflow.show_toast") as toast,
+    ):
+        app._confirm_push_and_finish("main", "feature")
+
+    app._git.push.assert_not_called()
+    app._git.checkout_branch.assert_called_once_with("feature")
+    assert badge.called, "the skipped push is said out loud"
+    app._merge_state_store.clear.assert_called_once()
+    assert app._merge_state_store.state is None
+    # The merge happened; the push did not. The wording must not imply both.
+    assert "Merged into main" in toast.call_args.args[0]
+    assert "push" not in toast.call_args.args[0].lower()
+
+
+def test_a_confirm_that_never_shows_does_not_hang_the_sequence(app):
+    """``alert`` returns False without registering the answer when another
+    modal is already open. Waiting for an answer that cannot come would leave
+    the merge sequence hanging with its state never cleared."""
+    app._alert_dialog.alert = lambda message, on_result, kind=None: False
+    app._merge_state_store.clear = MagicMock(wraps=app._merge_state_store.clear)
+    with (
+        patch("pigit.app_merge_workflow.show_toast") as toast,
+        patch("pigit.app_merge_workflow.show_badge") as badge,
+    ):
+        app._confirm_push_and_finish("main", "feature")
+
+    app._git.push.assert_not_called()
+    app._git.checkout_branch.assert_called_once_with("feature")
+    assert badge.called
+    app._merge_state_store.clear.assert_called_once()
+    assert app._merge_state_store.state is None
+    assert "Merged into main" in toast.call_args.args[0]
+
+
+def test_finish_merge_checkout_reloads_the_header_after_the_head_move(app):
+    """The checkout back moves HEAD to ``source``, and the header reads
+    branch/ahead/behind from HEAD. The push's own header reload was scheduled
+    before this checkout and races it, so the workflow re-runs it here -- else
+    the header keeps the merged-into branch, for good when repo_observe is off.
+    """
+    app._refresh_git_vms = MagicMock()
+    app._schedule_reload_header = MagicMock()
+    with patch("pigit.app_merge_workflow.show_toast"):
+        app._merge_workflow.finish_merge_checkout("main", "feature")
+
+    app._git.checkout_branch.assert_called_once_with("feature")
+    assert app._refresh_git_vms.called
+    app._schedule_reload_header.assert_called_once()
 
 
 def test_merge_push_still_checkouts_back_on_push_failure(app):

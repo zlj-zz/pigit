@@ -358,3 +358,60 @@ def test_help_lists_ctrl_p_on_preview_panels_not_global(runtime) -> None:
     commit = {key: desc for key, desc in app._commit_panel.get_help_entries()}
     assert "Ctrl+p" not in commit
     assert "Ctrl+r" not in commit  # the graph moved to its own tab
+
+
+class TestWhileARewriteRuns:
+    """Arriving at a panel mounts it, and Status reads the worktree the moment
+    it appears -- the half-applied state the observe defer already refuses to
+    poll for. So the user's own move is refused while a rewrite holds the gate."""
+
+    def test_the_number_keys_do_not_move(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        assert _leaf(root) is app._branch_panel
+
+        app._session.worktree_gate.acquire()
+        root._handle_event("1")
+        root._handle_event("4")
+
+        assert _leaf(root) is app._branch_panel
+
+    def test_tab_does_not_cycle(self, runtime):
+        app, root = _mount(runtime)
+        app._session.worktree_gate.acquire()
+
+        root._handle_event(keys.KEY_TAB)
+
+        assert _leaf(root) is app._status_panel
+
+    def test_navigation_resumes_when_the_rewrite_ends(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        app._session.worktree_gate.acquire()
+        root._handle_event("4")
+        assert _leaf(root) is app._branch_panel
+
+        app._session.worktree_gate.release()
+        root._handle_event("4")
+
+        assert _leaf(root) is app._commit_panel
+
+    def test_the_mouse_picker_takes_the_same_route(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        app._session.worktree_gate.acquire()
+
+        app._on_panel_picker_select(app._commit_panel)
+
+        assert _leaf(root) is app._branch_panel
+
+    def test_the_apps_own_navigation_is_not_guarded(self, runtime):
+        """The conflict handoff is the app moving the screen, not the user
+        moving themselves -- it has to keep working while the flow still holds
+        the gate, so it does not go through the navigator."""
+        app, _root = _mount(runtime)
+        app._session.worktree_gate.acquire()
+
+        app.navigate_product("commit")
+
+        assert app._tab_view.visible is app._commit_panel

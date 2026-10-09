@@ -15,7 +15,13 @@ from pigit.app_branch import BranchPanel
 from pigit.app_merge_state import MergeStateStore
 from pigit.app_network_git import NetworkGit
 from pigit.git.api import GitApi, GitError, RepoError
-from pigit.termui import FeedbackKind, hide_spinner, show_spinner, show_toast
+from pigit.termui import (
+    FeedbackKind,
+    hide_spinner,
+    show_badge,
+    show_spinner,
+    show_toast,
+)
 from pigit.termui import AsyncTask
 from pigit.termui.widgets import AlertDialog
 from pigit.viewmodels.base import WorktreeGate
@@ -231,7 +237,15 @@ class MergeWorkflow:
 
             self._network.run("push", on_complete=after_push)
 
-        self._get_alert_dialog().alert(f"Push {target} to remote?", on_push_confirmed)
+        shown = self._get_alert_dialog().alert(
+            f"Push {target} to remote?", on_push_confirmed
+        )
+        if not shown:
+            # The confirm never appeared -- another modal was open -- so waiting
+            # for an answer would leave the merge sequence hanging. Same shape
+            # as NetworkGit's own no-upstream confirm.
+            show_badge("Push skipped — a dialog was already open", duration=3.0)
+            self.finish_merge_checkout(target, source)
 
     def finish_merge_checkout(self, target: str, source: str) -> None:
         """Checkout back to source and clear merge state after merge push step."""
@@ -249,8 +263,14 @@ class MergeWorkflow:
             )
             return
         self._store.clear()
-        self._navigate_product("branch")
-        self._get_branch_panel().refresh()
+        # No navigation: the sequence ends where the user is. Whoever is
+        # elsewhere chose to be there, and moving them back would undo that
+        # choice -- but what they are looking at does need a reload, because
+        # the checkout back just moved HEAD underneath it. The header reads
+        # branch/ahead/behind from HEAD too, and the push's own reload raced
+        # this checkout, so it is re-run here instead of left to that one.
+        self._get_refresh_git_vms()
+        self._get_schedule_reload_header()
         show_toast(f"Merged into {target}", duration=2.0, kind=FeedbackKind.SUCCESS)
 
     def continue_merge(self) -> None:

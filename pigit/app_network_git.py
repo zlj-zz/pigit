@@ -18,6 +18,7 @@ from pigit.termui import (
     ToastPosition,
     dismiss_sheet,
     hide_spinner,
+    show_badge,
     show_spinner,
     show_toast,
 )
@@ -102,18 +103,21 @@ class NetworkGit:
     ) -> None:
         """Run push/pull on a worker with a center spinner; never use exec_external.
 
-        ``on_complete`` runs after the attempt finishes (success or failure), not when
-        the busy-guard rejects a second sync. Merge finish uses this to always
-        checkout back to ``source``. Cancelled set-upstream alerts also invoke it.
+        ``on_complete`` runs whenever the attempt is over -- success, failure,
+        a busy-guard rejection, or a cancelled set-upstream alert. Merge finish
+        uses it to always check out back to ``source``, so a path that skipped
+        the call would leave that sequence hanging.
         """
         if action not in ("push", "pull"):
             raise ValueError(f"Unsupported network git action: {action}")
         if self._busy:
-            show_toast(
-                "Push/Pull already in progress",
-                duration=1.5,
-                kind=FeedbackKind.INFO,
-            )
+            # A badge, not a toast: the toast slot holds the running sync's own
+            # spinner, and a notice that evicts it leaves the user unable to
+            # tell whether anything is still going. The caller hears the
+            # attempt is over either way -- "we did not push" is an outcome,
+            # not a reason to leave the sequence hanging.
+            show_badge("Push/Pull already in progress", duration=2.0)
+            self._invoke_complete(on_complete)
             return
 
         if action == "push":
@@ -125,7 +129,7 @@ class NetworkGit:
         # Pull merges or fast-forwards, rewriting the working tree.
         gate = self._get_worktree_gate()
         if not gate.acquire():
-            show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+            show_badge(WORKTREE_BUSY_MESSAGE, duration=2.0)
             self._invoke_complete(on_complete)
             return
         self._holds_worktree_gate = True

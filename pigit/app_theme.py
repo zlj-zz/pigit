@@ -8,10 +8,14 @@ Date: 2026-04-23
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from pigit.termui import Segment, palette
+from pigit.termui import Segment, palette, show_badge
 from pigit.termui.feedback import FeedbackKind, style_for
 from pigit.termui.theme import Theme
+
+if TYPE_CHECKING:
+    from pigit.viewmodels.base import ActionResult
 
 # Fraction of the blend toward the brand accent for the hunk header tone:
 # 0.30 reads as a clearly distinct block while keeping ~6:1 contrast.
@@ -167,6 +171,20 @@ def sheet_core(name: str) -> str:
 #: ASCII-only note on Status's empty state), and this one is provably on
 #: screen already.
 LOAD_FAILED_MARK = style_for(FeedbackKind.ERROR).glyph
+
+
+def report_refusal(result: ActionResult) -> bool:
+    """Report a refused result on the badge; return whether there was one.
+
+    A refusal means nothing ran: something else is holding the worktree gate.
+    It cannot go to the toast, because the toast slot holds that other
+    operation's spinner -- a refusal reported there evicts the only thing that
+    explains why the key did nothing.
+    """
+    if not result.refused:
+        return False
+    show_badge(result.message, duration=2.0)
+    return True
 
 
 def load_failed_segments(error: BaseException) -> list[Segment]:

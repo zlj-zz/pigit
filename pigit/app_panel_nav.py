@@ -34,6 +34,7 @@ class PanelNavigator:
         get_branch_panel: Callable[[], BranchPanel],
         get_commit_panel: Callable[[], CommitPanel],
         get_graph_panel: Callable[[], ContributionPanel],
+        get_worktree_busy: Callable[[], bool],
     ) -> None:
         self._get_tab_view = get_tab_view
         self._get_status_stack = get_status_stack
@@ -42,6 +43,7 @@ class PanelNavigator:
         self._get_branch_panel = get_branch_panel
         self._get_commit_panel = get_commit_panel
         self._get_graph_panel = get_graph_panel
+        self._get_worktree_busy = get_worktree_busy
 
     def panel_ring(self) -> tuple[Component, ...]:
         """Return the panels that Tab/Shift+Tab cycle through, in order."""
@@ -71,7 +73,16 @@ class PanelNavigator:
         return None
 
     def focus_destination(self, panel: Component) -> None:
-        """Move TabView + Status/Stash column focus to *panel*."""
+        """Move TabView + Status/Stash column focus to *panel*.
+
+        Refused, silently, while a working-tree rewrite is in flight: arriving
+        at a panel mounts it, and Status reads the worktree the moment it
+        appears -- the half-applied state the observe defer already refuses to
+        poll for. ``cycle_panel`` comes through here too, so both the number
+        keys and Tab are covered by the one check.
+        """
+        if self._get_worktree_busy():
+            return
         if panel is self._get_status_panel():
             self._get_tab_view().route_to("status")
             self._get_status_stack().set_focus_index(0)
