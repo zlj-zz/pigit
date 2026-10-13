@@ -3,6 +3,30 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.11.0 (2026-10-13)
+
+### Features
+
+- **Run the commit editor's shortcuts by clicking them.** `Ctrl+Enter` only works where the terminal volunteers an extended keyboard sequence, and pigit parses those without ever asking for them: kitty and wezterm send one, herdr sends a bare `\r`, which is the byte a plain Enter sends. The status bar went on advertising a key that could not arrive. Its `Ctrl+Enter commit`, `Tab body` and `Esc cancel` are mouse targets now — the label already names the action, and a click needs no protocol. A press that moved is a drag, not a click, so sliding across the strip cannot commit on the way to cancel.
+- **Check out a remote branch by creating the local one.** `c` refused a remote-tracking row outright. It now creates the branch the row implies, tracking it, and switches — the everyday `git checkout <name>` behaviour the CLI already had and the TUI did not. The remote ref goes in whole rather than as the name it shortens to, because two remotes can carry the same branch name. A local namesake is a warning rather than an error: there is nothing to create and nothing went wrong.
+- **Every declared action is reachable from the command palette by name.** The palette was a hand-written list of 15 ids in a vocabulary of its own, so not one of the 152 declared actions could be found by typing its name. It is derived from the bindings now — the same rows the Help panel reads — and each row prints the description rather than the id. Fetch, continue-merge and the six sequencer controls existed only in the palette and are keyless bindings now, and each refuses when no such sequencer is running instead of running `git` and surfacing its error.
+- **A panel whose load failed says so until it succeeds.** The failure reached only a three-second toast, so the panel went on claiming it was loading — on a first load, its skeleton was drawn for good — and with rows already loaded every key acted on a list that was quietly out of date. The header wears the error glyph now until a load succeeds, and a panel with nothing to show explains why in place of the skeleton. The toast stays: it says *this just happened*, where the mark says *this is still true* — and for a load nobody asked for, the toast is the only thing that reaches someone looking at another tab.
+
+### Improvements
+
+- **Stash is its own page.** It was a band pinned under Status, so the five panels the number keys and `Tab` cycled through were not the four pages that existed: pressing the Stash key moved the focus without ever changing the page. The five ring entries and the five pages are the same five things now, and Status gets back the rows the band held.
+- **The cursor row is marked the same way on every list panel.** Commit banded its cursor row; Status, Stash and Branch marked theirs with an accent bar on the cursor column alone, which on a wide screen put the mark and the row it belonged to a hundred columns apart. All four wear the same band, which dims rather than disappears while a sheet is over the panel.
+- **The darker surfaces are further apart.** The panel background, the hover row and the active row sat 6–12 values apart and read as a single tone; each rung is now about 10 from the next — the smallest step that still separates on a dark terminal without turning the surfaces grey.
+- **The command palette no longer offers what would quietly do nothing.** Only the focus path is listed: leaving a tab cold-unmounts the panel you left, and nothing reloads it.
+
+### Bug Fixes
+
+- **pigit's status poll no longer takes the index lock.** `git status` is not read-only — it takes `.git/index.lock` to write back the stat cache it just refreshed — so a background poll landing on a checkout or a commit made that write fail with "Unable to create index.lock", which is how a merge flow ended in "Checkout back failed". Measured through pigit's own path, a poll against a checkout broke 231 of 240 checkouts; with `GIT_OPTIONAL_LOCKS=0`, none of 240. Nothing pigit does reads that cache back, and `setdefault` leaves a user who set the variable their own value.
+- **A key pressed while a working-tree rewrite was running was reported as a failure.** A refusal is not an error: nothing was attempted. It goes to the header badge now, whose slot the spinner does not share — the old toast evicted the spinner, the one thing explaining why nothing had happened. Panel navigation is refused for the same reason: arriving at a panel mounts it, and Status reads the worktree the moment it appears.
+- **The merge sequence stops hanging when the push never runs.** A busy network or an alert that never showed left it waiting on a callback that could not come, so it never checked out back and never cleared its state. It also leaves you on the page you were on instead of routing to Branch, and reloads the header as well as the panels — the push's own reload raced the checkout back.
+- **The Branch page went blank when its scope matched nothing.** It set its message into the rows, but the row description returned no segments at all once the list was empty, so the page read as empty while quietly holding the text. Commit had a placeholder branch for exactly that case; every list page carries its message in the same place now.
+- **A sheet stopped answering clicks after the terminal got shorter.** A sheet is anchored to the bottom edge and paints from the live surface height, but its click region was derived from the terminal height when it was last sized. Any height-only resize moved the sheet on screen and left the hit region behind, so a click was swallowed by whatever the stale region now covered. It reached every sheet, not only the commit editor.
+
 ## 2.10.0 (2026-10-08)
 
 ### Breaking Changes
