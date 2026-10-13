@@ -50,7 +50,7 @@ _WELCOME_INTRO_WIDTH = 72
 _INTRO_BODY = (
     "Pigit is a keyboard-driven Git TUI for everyday work in the terminal: "
     "stage, commit, branch, and browse history without memorizing long git "
-    "commands or leaving the shell. Beyond the four-panel UI, you get "
+    "commands or leaving the shell. Beyond the tabbed UI, you get "
     "hunk-level staging, session undo (u/U), remappable keybindings, "
     "multi-repo management (pigit repo), and CLI short-commands (pigit cmd) "
     "— one install for repo work and git ergonomics."
@@ -61,13 +61,15 @@ _PANEL_ACTIONS = (
     "universal.goto_stash",
     "universal.goto_branch",
     "universal.goto_commit",
+    "universal.goto_graph",
 )
 
 _PANEL_WELCOME_DESC: dict[str, str] = {
     "universal.goto_status": "Status — stage, commit, discard working tree changes",
-    "universal.goto_stash": "Stash — stash stack (column with Status)",
+    "universal.goto_stash": "Stash — stash stack",
     "universal.goto_branch": "Branch — checkout, merge, create branches",
-    "universal.goto_commit": "Commit — history, graph, cherry-pick",
+    "universal.goto_commit": "Commit — history, cherry-pick",
+    "universal.goto_graph": "Graph — contribution heatmap and per-author chart",
 }
 
 _WELCOME_GLOBAL_ACTIONS = (
@@ -77,6 +79,14 @@ _WELCOME_GLOBAL_ACTIONS = (
     "universal.prev_panel",
     "universal.quit",
     "universal.undo",
+    # The everyday git actions. They carry tips like everything above, but
+    # nothing else surfaces them: the footer keeps to two or three slots, so
+    # this guide is the only place a new user meets push/pull.
+    "universal.push",
+    "universal.pull",
+    "universal.bisect",
+    "universal.recent",
+    "universal.switch_repo",
 )
 
 _WELCOME_GLOBAL_DESC_OVERRIDES: dict[str, str] = {

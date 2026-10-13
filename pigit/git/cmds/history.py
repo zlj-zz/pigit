@@ -102,11 +102,18 @@ def log_patch(args: list[str]) -> str:
     related=["l", "l.s"],
 )
 def log_contributors(args: list[str]) -> str:
-    """Show contributor statistics."""
+    """Show contributor statistics.
+
+    The bare form names ``HEAD`` instead of leaving the revision off: with no
+    revision, ``git shortlog`` reads the log from stdin whenever stdin is not a
+    terminal, so the same command summarised the current branch in a terminal
+    and nothing at all under a pipe. With arguments the revision is left to the
+    caller — they may be giving one, or only options.
+    """
     base = "git shortlog --summary --numbered"
     if args:
         return f"{base} {' '.join(args)}"
-    return base
+    return f"{base} HEAD"
 
 
 # Stash commands

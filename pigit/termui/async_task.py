@@ -88,6 +88,7 @@ class AsyncTask(Generic[T]):
         callback: Callable[[T], None],
         *,
         label: str = _DEFAULT_LABEL,
+        on_failure: Callable[[BaseException], None] | None = None,
     ) -> None:
         """Start a new background task, cancelling any previous one.
 
@@ -99,6 +100,11 @@ class AsyncTask(Generic[T]):
                 from ``callback``: callers overwhelmingly pass a
                 ``ViewModelBase._guarded`` wrapper, whose ``__name__`` is
                 ``deliver`` for every task in the app.
+            on_failure: Invoked on the main thread with the exception when
+                ``work`` raises. Without it the failure only reaches the
+                global toast, which is gone in three seconds — a caller that
+                owns state (a panel that must stop saying "loading") passes
+                this to hear about it too.
         """
         with self._lock:
             self._gen += 1
@@ -109,7 +115,7 @@ class AsyncTask(Generic[T]):
                 result = work()
             except Exception as exc:
                 _logger.exception("AsyncTask work failed: %s", label)
-                self._put_failure(current_gen, label, exc)
+                self._put_failure(current_gen, label, exc, on_failure)
                 return
             with self._lock:
                 if current_gen != self._gen:
@@ -158,7 +164,13 @@ class AsyncTask(Generic[T]):
 
         _executor.submit(_counted(_run))
 
-    def _put_failure(self, current_gen: int, label: str, exc: BaseException) -> None:
+    def _put_failure(
+        self,
+        current_gen: int,
+        label: str,
+        exc: BaseException,
+        on_failure: Callable[[BaseException], None] | None = None,
+    ) -> None:
         """Hand a worker failure to the main thread, unless superseded.
 
         Rides the same ``(callback, result)`` queue as successful results, so
@@ -170,6 +182,11 @@ class AsyncTask(Generic[T]):
         with self._lock:
             if current_gen != self._gen:
                 return
+            # Both destinations are fed: the caller's handler updates whatever
+            # state it owns, and the toast is how the failure reaches a user
+            # who is not looking at that state.
+            if on_failure is not None:
+                _GLOBAL_QUEUE.put((on_failure, exc))
             _GLOBAL_QUEUE.put((report_async_failure, (label, exc)))
 
     def cancel(self) -> None:

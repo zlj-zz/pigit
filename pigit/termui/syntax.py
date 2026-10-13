@@ -520,7 +520,9 @@ class SyntaxTokenizer:
         mask: list[str | None] = [None] * len(lines)
 
         def _reset(line: str) -> bool:
-            return line.startswith(("diff --git", "+++ ", "@@ "))
+            # "diff --" by prefix: a combined merge diff opens a file with
+            # "diff --cc", which "diff --git" does not match.
+            return line.startswith(("diff --", "+++ ", "@@ "))
 
         total = len(lines)
         i = 0

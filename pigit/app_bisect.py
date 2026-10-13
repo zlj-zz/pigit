@@ -18,6 +18,7 @@ from pigit.termui import (
     FeedbackKind,
     bind_action,
     dismiss_sheet,
+    show_badge,
     show_toast,
 )
 from pigit.termui.widgets import OptionList
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def guard_worktree_busy(busy: bool) -> bool:
-    """Return True when a working-tree rewrite is running; toast and block.
+    """Return True when a working-tree rewrite is running; say so and block.
 
     Sits with its siblings rather than in a module of its own: this is the
     same "refuse the action because the repository is in a state" family, and
@@ -35,7 +36,7 @@ def guard_worktree_busy(busy: bool) -> bool:
     """
     if not busy:
         return False
-    show_toast(WORKTREE_BUSY_MESSAGE, duration=2.0, kind=FeedbackKind.ERROR)
+    show_badge(WORKTREE_BUSY_MESSAGE, duration=2.0)
     return True
 
 

@@ -241,6 +241,48 @@ class TestComponentRoot:
         assert root._focus_manager.get_focus_leaf() is body
         assert not root.has_overlay_open()
 
+    def test_a_height_only_resize_moves_the_sheet_hit_region(self):
+        """The sheet hangs off the terminal's bottom edge, so a shorter
+        terminal moves it. It paints from the live surface height, so the hit
+        region -- which is derived from the terminal height at resize time --
+        has to follow it, or a click lands on whatever the stale region now
+        covers."""
+        from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
+
+        clicked: list[tuple[int, int]] = []
+
+        class _Inner(Component):
+            def paint(self, surface):
+                pass
+
+            def refresh(self):
+                pass
+
+            def handle_mouse(self, event):
+                clicked.append((event.col, event.row))
+                return True
+
+        root = ComponentRoot(DummyBody())
+        root.resize((80, 24))
+        sheet = root.show_sheet(_Inner(), height=10, max_fraction=0.5)
+        assert sheet._size == (80, 10)
+
+        # Height only: the sheet keeps its size, so nothing about the sheet
+        # itself changes -- but it now sits four rows higher.
+        root.resize((80, 20))
+
+        assert sheet._size == (80, 10)
+        assert sheet.x == sheet._origin_row(20, 10) + 1, "hit region is stale"
+        # One row down from the top edge: that edge is the sheet's own rule.
+        painted_row = sheet.x + 1
+        assert root._handle_mouse(
+            MouseEvent(
+                col=2, row=painted_row, button=MouseButton.LEFT, kind=MouseKind.PRESS
+            )
+        )
+        # Local to the child, which starts at its own top-left corner.
+        assert clicked == [(2, 1)]
+
     def test_sheet_mouse_miss_falls_through_to_body(self):
         from pigit.termui.mouse import MouseButton, MouseEvent, MouseKind
 

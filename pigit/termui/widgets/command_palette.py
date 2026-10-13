@@ -43,11 +43,19 @@ class PaletteArgs:
 
 
 class PaletteItem(NamedTuple):
-    """One palette entry: executable id plus short description."""
+    """One palette entry: executable id plus its display label.
+
+    ``id`` is what the palette hands to ``on_execute`` -- a value that has to
+    round-trip, so it may be machine-shaped (``branch.delete``). ``label`` is
+    what the row prints when the two differ; ``desc`` stays the secondary text
+    for entries that carry one (a label and a desc on the same row would print
+    the same sentence twice).
+    """
 
     id: str
     desc: str = ""
     args: PaletteArgs | None = None
+    label: str | None = None
 
 
 def list_slots_for_term(term_h: int) -> int:
@@ -81,9 +89,13 @@ def _coerce_items(
 
 
 def _default_match(needle: str, item: PaletteItem) -> bool:
-    """Return True when *needle* matches id or description (case-insensitive)."""
+    """Return True when *needle* matches id, label or description."""
     n = needle.lower()
-    return n in item.id.lower() or n in item.desc.lower()
+    return (
+        n in item.id.lower()
+        or n in item.desc.lower()
+        or (item.label is not None and n in item.label.lower())
+    )
 
 
 class CommandPalette(Component):
@@ -269,19 +281,33 @@ class CommandPalette(Component):
         """Callback fired by InputLine when value changes."""
         self._update_candidates()
 
+    def _ranked_matches(self, needle: str) -> list[PaletteItem]:
+        """The catalog entries matching *needle*, best first.
+
+        The filter reads descriptions too, so a bare word reaches unrelated
+        rows -- typing ``merge`` also matches "Undo last action (… reverses
+        merge …)". An id equal to the needle is what was meant, so it is
+        ranked ahead of everything that merely contains the word.
+        """
+        matches = [item for item in self._items if self._match(needle, item)]
+        lowered = needle.lower()
+        matches.sort(key=lambda item: item.id.lower() != lowered)
+        return matches[:MAX_MATCHED]
+
+    def _matched_or_catalog(self, value: str) -> list[PaletteItem]:
+        """The rows to show: everything until something is typed, else matches."""
+        needle = value.strip()
+        if not needle:
+            return self._items[:MAX_MATCHED]
+        return self._ranked_matches(needle)
+
     def _update_candidates(self) -> None:
         """Refresh matched catalog; switch to arg completion after a space."""
         value = self._input_line.value
         idx = value.find(" ")
         if idx < 0:
             self._arg_mode = None
-            needle = value.strip()
-            if not needle:
-                self._matched = self._items[:MAX_MATCHED]
-            else:
-                self._matched = [
-                    item for item in self._items if self._match(needle, item)
-                ][:MAX_MATCHED]
+            self._matched = self._matched_or_catalog(value)
             self._selected = 0
             self._scroll = 0
             return
@@ -295,13 +321,7 @@ class CommandPalette(Component):
                 break
         if hit is None or hit.args is None:
             self._arg_mode = None
-            needle = value.strip()
-            if not needle:
-                self._matched = self._items[:MAX_MATCHED]
-            else:
-                self._matched = [
-                    item for item in self._items if self._match(needle, item)
-                ][:MAX_MATCHED]
+            self._matched = self._matched_or_catalog(value)
             self._selected = 0
             self._scroll = 0
             return
@@ -407,7 +427,7 @@ class CommandPalette(Component):
         name_fg = theme.fg_primary if selected else theme.fg_muted
         name_flags = palette.STYLE_BOLD if selected else 0
         desc_fg = theme.fg_muted if selected else theme.fg_dim
-        name = f"  {item.id}"
+        name = f"  {item.label or item.id}"
         desc = f"  {item.desc}" if item.desc else ""
         cue = ""
         if more_below:

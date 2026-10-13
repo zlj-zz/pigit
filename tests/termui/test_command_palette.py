@@ -393,3 +393,80 @@ class TestPaletteArgsMode:
         assert palette._input_line.value == "stash"
         assert palette.is_active
         assert _ids(palette) == ["stash"]
+
+
+class TestLabel:
+    """A row prints ``label`` when it differs from ``id``.
+
+    An id has to round-trip through ``on_execute``, so it can be machine-shaped
+    (``branch.delete``); the label is what a reader sees.
+    """
+
+    @staticmethod
+    def _text(item: PaletteItem) -> str:
+        palette = CommandPalette(items=[item], list_slots=10)
+        palette.open()
+        surface = Surface(60, 6)
+        palette.resize((60, 6))
+        palette.paint(surface)
+        return " ".join(surface.lines())
+
+    def test_the_label_is_what_the_row_prints(self):
+        text = self._text(PaletteItem("branch.delete", label="Delete branch"))
+        assert "Delete branch" in text
+        assert "branch.delete" not in text
+
+    def test_an_item_without_a_label_still_prints_its_id(self):
+        text = self._text(PaletteItem("checkout", "Checkout branch"))
+        assert "checkout" in text
+        assert "Checkout branch" in text
+
+    def test_a_label_and_a_desc_do_not_print_the_same_sentence_twice(self):
+        """The second column carries ``desc``, so a binding row states its
+        sentence once -- in ``label`` -- and leaves ``desc`` empty."""
+        text = self._text(PaletteItem("branch.delete", label="Delete branch"))
+        assert text.count("Delete branch") == 1
+
+    def test_the_label_is_searchable(self):
+        item = PaletteItem("x.y", label="Delete branch")
+        palette = CommandPalette(items=[item], list_slots=10)
+        palette.open()
+        _type(palette, "delete")
+        assert _ids(palette) == ["x.y"]
+
+
+class TestRanking:
+    """The filter reads descriptions too, so a bare word reaches unrelated
+    rows -- typing ``merge`` also matches "Undo last action (… reverses merge
+    …)". An id equal to the needle is what was meant and has to come first."""
+
+    _ITEMS = [
+        PaletteItem("universal.undo", label="Undo last action (reverses merge)"),
+        PaletteItem("merge", label="Merge branch"),
+    ]
+
+    def test_an_exact_id_outranks_a_description_that_contains_the_word(self):
+        palette = CommandPalette(items=self._ITEMS, list_slots=10)
+        palette.open()
+        _type(palette, "merge")
+        assert _ids(palette) == ["merge", "universal.undo"]
+
+    def test_enter_runs_the_exact_id(self):
+        executed: list[str] = []
+        palette = CommandPalette(
+            items=self._ITEMS, on_execute=executed.append, list_slots=10
+        )
+        palette.open()
+        _type(palette, "merge")
+        palette.handle_key(keys.KEY_ENTER)
+        assert executed == ["merge"]
+
+    def test_without_an_exact_id_the_catalog_order_stands(self):
+        items = [
+            PaletteItem("universal.goto_status", label="Switch to Status panel"),
+            PaletteItem("status.next", label="Navigate file list"),
+        ]
+        palette = CommandPalette(items=items, list_slots=10)
+        palette.open()
+        _type(palette, "status")
+        assert _ids(palette) == ["universal.goto_status", "status.next"]

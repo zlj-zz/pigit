@@ -20,8 +20,6 @@ from pigit.termui import (
     EVT_SELECTION_CHANGED,
     EventType,
     FeedbackKind,
-    Component,
-    Surface,
     bind_action,
     bind_signals,
     dismiss_sheet,
@@ -32,13 +30,12 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import OptionList
+from pigit.termui.widgets import ACCENT_BAR, OptionList
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
 from .app_diff import DiffType
 from .app_theme import THEME, sheet_core
-from .app_contribution_graph import ContributionGraph
 from .viewmodels.base import ActionResult
 from .viewmodels.commit import ICommitViewModel
 
@@ -100,54 +97,17 @@ class _SubRow(Enum):
     TAIL = auto()  # blank trailer between commits
 
 
-class _CommitReportBand(Component):
-    """OptionList footer band for the contribution-graph report strip.
-
-    Height is all-or-nothing: ``REPORT_H`` when enabled and the panel is tall
-    enough, otherwise 0 so the list keeps the full viewport.
-    """
-
-    def __init__(
-        self,
-        graph: ContributionGraph,
-        *,
-        report_h: int,
-        min_panel_h: int,
-        enabled: bool = True,
-    ) -> None:
-        super().__init__()
-        self._graph = graph
-        self._report_h = report_h
-        self._min_panel_h = min_panel_h
-        self.enabled = enabled
-
-    def chrome_band_height(self, width: int, panel_height: int) -> int:
-        """Return fitted report height for ``OptionList`` band layout."""
-        del width
-        if not self.enabled or panel_height <= self._min_panel_h:
-            return 0
-        return self._report_h
-
-    def paint(self, surface: Surface) -> None:
-        self._graph.resize((surface.width, surface.height))
-        self._graph.paint(surface)
-
-    def handle_mouse(self, event) -> bool:
-        return self._graph.handle_mouse(event)
-
-
 class CommitPanel(OptionList):
     """Commit panel with list view, relative time, and inline merge graph."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     GRAPH_COMMIT = "◉"
     GRAPH_VERTICAL = "│"
     GRAPH_OPEN = "╮"
     GRAPH_CLOSE = "╯"
     # One column between OptionList cursor mark and graph rails (all row kinds).
     GRAPH_PAD = " "
-    REPORT_H = 15  # top pad (2) + content (12) + bottom blank (1)
-    REPORT_MIN_HEIGHT = 19
 
     def __init__(
         self,
@@ -155,27 +115,17 @@ class CommitPanel(OptionList):
         on_selection_changed: Callable | None = None,
         vm: ICommitViewModel,
         id: str | None = None,
-        report_default: bool = True,
     ) -> None:
-        self._contrib_graph = ContributionGraph()
-        self._report_band = _CommitReportBand(
-            self._contrib_graph,
-            report_h=self.REPORT_H,
-            min_panel_h=self.REPORT_MIN_HEIGHT,
-            enabled=report_default,
-        )
         super().__init__(
             on_selection_changed=on_selection_changed,
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
-            footer=self._report_band,
         )
         self._vm = vm
         self.commits: list[Commit] = []
         self._all_commits: list[Commit] = []
         self._source_map: list[int] = []
-        self._report_enabled = report_default
         self._rel_time_cache: dict[str, str] = {}
         self._abs_time_cache: dict[str, str] = {}
         self._max_meta_w = 0
@@ -297,24 +247,6 @@ class CommitPanel(OptionList):
             self.curr_no = max(0, min(saved_idx, len(self.commits) - 1))
             self._scroll_into_view()
 
-    @bind_action(
-        "toggle_report", "ctrl r", desc="Toggle commit report (contribution graph)"
-    )
-    def toggle_report(self) -> None:
-        """Toggle the bottom contribution-graph report strip."""
-        self._report_enabled = not self._report_enabled
-        self._report_band.enabled = self._report_enabled
-        h = self._size[1] if self._size else 0
-        if h <= self.REPORT_MIN_HEIGHT:
-            show_toast(
-                f"Need more than {self.REPORT_MIN_HEIGHT} rows for the commit report",
-                duration=2.0,
-                kind=FeedbackKind.WARNING,
-            )
-        self.invalidate_chrome_bands()
-        self._scroll_into_view()
-        self._request_render()
-
     @bind_action("search", "/", desc="Filter commit list by message or SHA")
     def search(self) -> None:
         """Activate the commit-list search filter."""
@@ -367,6 +299,10 @@ class CommitPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Content arrives asynchronously via vm.items; show the skeleton until
+        # then. A replay of already-loaded commits clears it straight away, so
+        # remounting a warm panel shows its rows instead of a skeleton.
+        self.loading = True
         # Signals only fire on change: a stream that finished while this panel
         # was unmounted must be replayed, or the list stays stale.
         if self._vm.items.value:
@@ -411,6 +347,10 @@ class CommitPanel(OptionList):
     def _on_items_changed(self) -> None:
         if not self.is_mounted():
             return
+        # Cleared before the early return below: an appended batch still means
+        # the load produced something, and the skeleton is drawn on every row
+        # while this stays True.
+        self.loading = False
         commits = list(self._vm.items.value)
         # Clear decoration caches BEFORE rebuild so row templates re-parse
         # ``extra_info`` (e.g. HEAD moved off a former tip). Body lines are
@@ -421,7 +361,6 @@ class CommitPanel(OptionList):
             return
         self._all_commits = commits
         self._apply_filter()
-        self._contrib_graph.set_commits(commits)
 
     def _extends_current(self, commits: list[Commit]) -> bool:
         """True when *commits* only adds to what is already listed.
@@ -455,7 +394,6 @@ class CommitPanel(OptionList):
             self._max_meta_w = max(self._max_meta_w, max_meta_w)
             self.append_rows(lines)
         self._build_row_cache(from_index=len(commits) - len(added))
-        self._contrib_graph.add_commits(added)
         self._notify_change()
 
     def _apply_filter(self) -> None:
@@ -478,11 +416,18 @@ class CommitPanel(OptionList):
             self.commits = filtered
             self._source_map = mapping
         if not self.commits:
-            self.set_content(["No matching commits."])
+            # An empty repository and a filter that matched nothing are
+            # different states: with no query there was nothing to match
+            # against, so "No matching commits." would be a lie.
+            self.empty_state = [
+                Segment("No commits yet." if not query else "No matching commits.")
+            ]
+            self.set_content([])
             self._max_meta_w = 0
             self._row_cache.clear()
             self._notify_change()
             return
+        self.empty_state = None
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
         for commit in self.commits:
@@ -655,22 +600,6 @@ class CommitPanel(OptionList):
         Compact mode: ``[cursor][graph rails][SHA][refs][msg][meta]``.
         Expanded mode dispatches to per-sub-row helpers.
         """
-        # Placeholder ("No commits found.") — the only case where content
-        # outranks commits.
-        if not self.commits:
-            cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-            return (
-                [
-                    Segment(
-                        self.content[idx],
-                        fg=self.presentation_fg("muted"),
-                        style_flags=cursor_flags,
-                    )
-                ],
-                None,
-                [],
-            )
-
         if item_idx is not None:
             commit = self.commits[item_idx]
             kind, payload = self._schema_for(commit)[sub_row]
@@ -774,19 +703,28 @@ class CommitPanel(OptionList):
         )
         left.append(Segment(" ", fg=fg_primary, bg=row_bg))
 
-        main: list[Segment] = self._ref_segments(
-            commit,
-            cursor_flags=cursor_flags,
-            row_bg=row_bg,
-        )
-        main.append(
+        # Subject first, refs trailing. The other order made the subject's
+        # column move with the width of the refs on that row, so a commit with
+        # no refs sat thirty columns left of one with them. Refs last also
+        # means the group truncation drops them before it touches the subject.
+        main: list[Segment] = [
             Segment(
                 commit.msg,
                 fg=fg_primary,
                 style_flags=cursor_flags,
                 bg=row_bg,
             )
+        ]
+        refs = self._ref_segments(
+            commit,
+            cursor_flags=cursor_flags,
+            row_bg=row_bg,
         )
+        if refs:
+            main.append(
+                Segment(" ", fg=fg_primary, style_flags=cursor_flags, bg=row_bg)
+            )
+            main.extend(refs)
         return left, main
 
     def _build_row_cache(self, from_index: int = 0) -> None:

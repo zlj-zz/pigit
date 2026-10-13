@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/app_log_graph_preview.py
-Description: 大屏 Branch 页只读 git log --graph 预览面板。
+Description: Read-only git log --graph preview beside the Branch panel.
 Author: Zev
 Date: 2026-08-18
 """

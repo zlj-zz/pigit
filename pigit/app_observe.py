@@ -238,10 +238,10 @@ class ObserveHost:
         self._observe_ctx = replace(self._observe_ctx, preview_target=rel)
 
     def build_roots(self) -> list[WatchRoot]:
-        """Build watch roots; attach worktree when the Status tab is focused.
+        """Build watch roots; attach worktree when Status or Stash is focused.
 
-        Stash is the Status panel's Column sibling (one tab), so its focus
-        also needs the worktree root — stash pop restores worktree changes.
+        Both need the worktree root: a stash pop restores worktree changes the
+        same way a discard does.
         """
         ctx = self._observe_ctx
         if ctx is None:
@@ -296,9 +296,9 @@ class ObserveHost:
             return
 
         if isinstance(active, (StatusPanel, StashPanel)):
-            # The Status tab owns two sibling panels: worktree/index changes
-            # refresh Status, stash/ref changes refresh the Stash list —
-            # regardless of which sibling currently holds focus.
+            # Status and Stash read one repository from two angles: worktree /
+            # index changes refresh Status, stash / ref changes refresh the
+            # Stash list -- both, whichever of the two pages the user is on.
             if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
                 status = self._deps.get_status_panel()
                 if status is not None:

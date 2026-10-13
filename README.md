@@ -245,7 +245,6 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 | `[app]` | `status_view` | str | `tree` | status panel default view: `flat` or `tree` |
 | `[app]` | `diff_preview_default` | bool | `True` | show Status/Stash side diff preview on large screens (Ctrl+p on Status/Stash) |
 | `[app]` | `log_graph_default` | bool | `True` | show Branch log-graph preview on large screens (Ctrl+p on Branch) |
-| `[app]` | `commit_report_default` | bool | `True` | show the Commit contribution-graph report below the list when the panel is taller than 19 rows (Ctrl+r toggles) |
 | `[app]` | `show_footer` | bool | `True` | show the footer key-hint bar |
 | `[app]` | `icons` | str | `auto` | Nerd Font icon policy in the Status list: `auto` (detect kitty/WezTerm/Alacritty/Ghostty), `on`, `off` (fall back to plain symbols; `PIGIT_ICONS=0` forces off) |
 

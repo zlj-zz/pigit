@@ -29,8 +29,12 @@ class _DisplayOps(_OpsBase):
     def get_summary(self, path: str | None = None, plain: bool = True) -> str:
         path = path or self.path
         color = "never" if plain else "always"
+        # ``HEAD`` is explicit rather than assumed: with no revision at all,
+        # `git shortlog` reads the log from stdin whenever stdin is not a
+        # terminal, so it would summarise nothing (or wait forever) anywhere
+        # without a tty. The revision it is meant to summarise is HEAD.
         code, _err, summary = self.executor.exec(
-            f"git shortlog --summary --numbered --color={color}",
+            f"git shortlog --summary --numbered --color={color} HEAD",
             flags=REPLY | DECODE,
             cwd=path,
         )

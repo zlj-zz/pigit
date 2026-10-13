@@ -289,3 +289,112 @@ class TestGitCommandPreview:
         exit_code, output = processor.preview("st")
         assert exit_code == 1
         assert "Did you mean" in output
+
+
+class TestDangerConfirmation:
+    """Who gets to skip the danger prompt, and who does not.
+
+    The `CI` environment variable used to be the answer, which meant the same
+    command ran with different safety depending on where it was invoked —
+    CI systems set that variable by themselves.
+    """
+
+    def _processor(self, fresh_registry, *, assume_yes: bool, confirm_dangerous=True):
+        from unittest.mock import Mock
+
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="w.R",
+                    category=CommandCategory.WORKING_TREE,
+                    help="Restore files",
+                    dangerous=True,
+                    security_level=SecurityLevel.DESTRUCTIVE,
+                    confirm_msg="Restore files? Local changes will be lost.",
+                ),
+                handler="git restore .",
+            )
+        )
+        config = create_mock_config()
+        config.settings["confirm_dangerous"] = confirm_dangerous
+        executor = Mock()
+        executor.confirm.return_value = False
+        executor.exec.return_value = (0, "")
+        processor = GitCommand(
+            registry=fresh_registry,
+            config=config,
+            executor=executor,
+            assume_yes=assume_yes,
+        )
+        return processor, executor
+
+    def test_ci_is_not_a_reason_to_skip(self, fresh_registry, monkeypatch):
+        """This is the regression: `CI` is set by the environment, not the
+        user, and used to switch the safety net off silently."""
+        monkeypatch.setenv("CI", "true")
+        processor, executor = self._processor(fresh_registry, assume_yes=False)
+
+        exit_code, output = processor.execute("w.R")
+
+        executor.confirm.assert_called_once()
+        assert (exit_code, output) == (1, "Cancelled")
+
+    def test_yes_skips_the_prompt(self, fresh_registry, monkeypatch):
+        monkeypatch.setenv("CI", "true")
+        processor, executor = self._processor(fresh_registry, assume_yes=True)
+
+        exit_code, _output = processor.execute("w.R")
+
+        executor.confirm.assert_not_called()
+        assert exit_code == 0
+
+    def test_the_users_own_switch_still_works(self, fresh_registry):
+        """`confirm_dangerous = false` is an explicit choice and stays."""
+        processor, executor = self._processor(
+            fresh_registry, assume_yes=False, confirm_dangerous=False
+        )
+
+        exit_code, _output = processor.execute("w.R")
+
+        executor.confirm.assert_not_called()
+        assert exit_code == 0
+
+    def test_assume_yes_does_not_touch_ordinary_commands(self, fresh_registry):
+        fresh_registry.register(
+            CommandDef(
+                meta=CommandMeta(
+                    short="b",
+                    category=CommandCategory.BRANCH,
+                    help="List branches",
+                ),
+                handler="git branch",
+            )
+        )
+        processor, executor = self._processor(fresh_registry, assume_yes=True)
+
+        exit_code, _output = processor.execute("b")
+
+        executor.confirm.assert_not_called()
+        assert exit_code == 0
+
+
+def test_log_contributors_names_the_revision_when_none_is_given():
+    """The bare form used to leave the revision off, which makes `git
+    shortlog` read the log from stdin whenever stdin is not a terminal — the
+    same command summarised the current branch in a terminal and nothing at
+    all under a pipe."""
+    from pigit.git.cmds.history import log_contributors
+
+    # `@command` replaces the function with a CommandDef; the raw callable
+    # is its handler.
+    assert log_contributors.handler([]).endswith("HEAD")
+
+
+def test_log_contributors_leaves_an_explicit_revision_alone():
+    """With arguments the revision is the caller's to give — they may be
+    passing one, or only options."""
+    from pigit.git.cmds.history import log_contributors
+
+    build = log_contributors.handler
+    assert build(["v1.0"]) == "git shortlog --summary --numbered v1.0"
+    assert build(["-n", "10"]) == "git shortlog --summary --numbered -n 10"

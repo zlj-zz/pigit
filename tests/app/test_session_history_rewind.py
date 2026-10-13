@@ -217,4 +217,6 @@ def test_history_describe_commands_joins():
         timestamp=0.0,
         panel_hint="status",
     )
-    assert record.describe_commands() == "git add a.py、git reset --soft HEAD~1"
+    # Shown in the undo confirm dialog's "Run:" line, so the separator is
+    # the UI's own comma, not a fullwidth one.
+    assert record.describe_commands() == "git add a.py, git reset --soft HEAD~1"

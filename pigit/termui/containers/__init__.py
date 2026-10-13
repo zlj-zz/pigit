@@ -10,11 +10,13 @@ from __future__ import annotations
 from .tab_view import TabView
 from .column import Column
 from .row import Row
+from .flow_board import FlowBoard
 from .split_pane import SplitPane
 from .exclusive_view import ExclusiveView
 
 __all__ = [
     "Column",
+    "FlowBoard",
     "Row",
     "SplitPane",
     "TabView",

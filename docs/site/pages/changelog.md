@@ -3,6 +3,80 @@
 Release notes for **2.0.0 and later**. Older versions are in the repository
 [CHANGELOG.md](https://github.com/zlj-zz/pigit/blob/main/CHANGELOG.md).
 
+## 2.11.0 (2026-10-13)
+
+### Features
+
+- **Run the commit editor's shortcuts by clicking them.** `Ctrl+Enter` only works where the terminal volunteers an extended keyboard sequence, and pigit parses those without ever asking for them: kitty and wezterm send one, herdr sends a bare `\r`, which is the byte a plain Enter sends. The status bar went on advertising a key that could not arrive. Its `Ctrl+Enter commit`, `Tab body` and `Esc cancel` are mouse targets now — the label already names the action, and a click needs no protocol. A press that moved is a drag, not a click, so sliding across the strip cannot commit on the way to cancel.
+- **Check out a remote branch by creating the local one.** `c` refused a remote-tracking row outright. It now creates the branch the row implies, tracking it, and switches — the everyday `git checkout <name>` behaviour the CLI already had and the TUI did not. The remote ref goes in whole rather than as the name it shortens to, because two remotes can carry the same branch name. A local namesake is a warning rather than an error: there is nothing to create and nothing went wrong.
+- **Every declared action is reachable from the command palette by name.** The palette was a hand-written list of 15 ids in a vocabulary of its own, so not one of the 152 declared actions could be found by typing its name. It is derived from the bindings now — the same rows the Help panel reads — and each row prints the description rather than the id. Fetch, continue-merge and the six sequencer controls existed only in the palette and are keyless bindings now, and each refuses when no such sequencer is running instead of running `git` and surfacing its error.
+- **A panel whose load failed says so until it succeeds.** The failure reached only a three-second toast, so the panel went on claiming it was loading — on a first load, its skeleton was drawn for good — and with rows already loaded every key acted on a list that was quietly out of date. The header wears the error glyph now until a load succeeds, and a panel with nothing to show explains why in place of the skeleton. The toast stays: it says *this just happened*, where the mark says *this is still true* — and for a load nobody asked for, the toast is the only thing that reaches someone looking at another tab.
+
+### Improvements
+
+- **Stash is its own page.** It was a band pinned under Status, so the five panels the number keys and `Tab` cycled through were not the four pages that existed: pressing the Stash key moved the focus without ever changing the page. The five ring entries and the five pages are the same five things now, and Status gets back the rows the band held.
+- **The cursor row is marked the same way on every list panel.** Commit banded its cursor row; Status, Stash and Branch marked theirs with an accent bar on the cursor column alone, which on a wide screen put the mark and the row it belonged to a hundred columns apart. All four wear the same band, which dims rather than disappears while a sheet is over the panel.
+- **The darker surfaces are further apart.** The panel background, the hover row and the active row sat 6–12 values apart and read as a single tone; each rung is now about 10 from the next — the smallest step that still separates on a dark terminal without turning the surfaces grey.
+- **The command palette no longer offers what would quietly do nothing.** Only the focus path is listed: leaving a tab cold-unmounts the panel you left, and nothing reloads it.
+
+### Bug Fixes
+
+- **pigit's status poll no longer takes the index lock.** `git status` is not read-only — it takes `.git/index.lock` to write back the stat cache it just refreshed — so a background poll landing on a checkout or a commit made that write fail with "Unable to create index.lock", which is how a merge flow ended in "Checkout back failed". Measured through pigit's own path, a poll against a checkout broke 231 of 240 checkouts; with `GIT_OPTIONAL_LOCKS=0`, none of 240. Nothing pigit does reads that cache back, and `setdefault` leaves a user who set the variable their own value.
+- **A key pressed while a working-tree rewrite was running was reported as a failure.** A refusal is not an error: nothing was attempted. It goes to the header badge now, whose slot the spinner does not share — the old toast evicted the spinner, the one thing explaining why nothing had happened. Panel navigation is refused for the same reason: arriving at a panel mounts it, and Status reads the worktree the moment it appears.
+- **The merge sequence stops hanging when the push never runs.** A busy network or an alert that never showed left it waiting on a callback that could not come, so it never checked out back and never cleared its state. It also leaves you on the page you were on instead of routing to Branch, and reloads the header as well as the panels — the push's own reload raced the checkout back.
+- **The Branch page went blank when its scope matched nothing.** It set its message into the rows, but the row description returned no segments at all once the list was empty, so the page read as empty while quietly holding the text. Commit had a placeholder branch for exactly that case; every list page carries its message in the same place now.
+- **A sheet stopped answering clicks after the terminal got shorter.** A sheet is anchored to the bottom edge and paints from the live surface height, but its click region was derived from the terminal height when it was last sized. Any height-only resize moved the sheet on screen and left the hit region behind, so a click was swallowed by whatever the stale region now covered. It reached every sheet, not only the commit editor.
+
+## 2.10.0 (2026-10-08)
+
+### Breaking Changes
+
+- **The contribution graph left the Commit panel.** It was a strip under the commit list, toggled with `Ctrl+r`, and it only appeared on panels taller than 19 rows — so on a short terminal it did not exist at all. It is the **Graph** tab now (`5`), reachable at any height, and `Ctrl+r` went with the strip.
+- **`app.commit_report_default` is retired.** The key turned that strip on and off; there is no strip. A config that still carries it now warns and is ignored rather than failing, the way `auto_refresh_interval` is, so nothing has to be edited by hand.
+
+### Features
+
+- **A Graph tab: the contribution heatmap, a per-author chart, and a punch card.** Commits by weekday and hour answer what the heatmap cannot — *what time of day* rather than *which day*. Each graph is a whole block now (its plot, its labels, its legend) reporting the size it needs, and the panel lays them out on a board that wraps them to the width it is given, so the arrangement follows the terminal instead of constants chosen for one size. A fixed wordmark takes the top rows: it does not wrap and does not pan with the graphs, and the panel's right edge clips whatever of it does not fit.
+- **The graphs say what is off screen, and keep what you were reading in view.** A window onto a larger canvas looked like all there was, so each edge now carries a mark when the canvas continues that way. Narrowing the terminal re-flows the blocks — which wraps more, makes the canvas *smaller*, and used to drag the window back and lose the block you were on; the board now remembers the block the window was nearest to and scrolls it back into view.
+- **The diff's file bar shows each file's `+N −M`.** It said which file of how many, not how big it was, so a commit touching twenty files opened onto a wall with no skeleton. The counts come from lines already in memory, so the bar costs no extra `git`.
+- **An error toast is copied to the clipboard.** A toast lives three seconds and the clipboard does not — and a failure message is exactly what you would paste into an issue. Every toast is announced on a signal and the app copies the error ones; an empty message is skipped, because copying it would clear the clipboard.
+
+### Improvements
+
+- **The list panels share one row grammar.** Each had invented its own, so the column a row's identity started in depended on which panel you were looking at — and inside the Status panel, on which row: directory rows reserved one cell where file rows reserved four, putting their icons, and therefore their names, three columns apart. Prefixes are fixed-width lanes in a fixed order now, and an unused lane reserves its cells instead of collapsing. Two consequences are visible: the Commit panel's subject column no longer moves with the width of that row's refs — a commit carrying `(HEAD -> main, v0.4.0)` used to push its subject 24 columns right of the next row's — and the cursor is drawn with the same accent bar in every panel.
+- **The Stash panel stops holding a quarter of the screen when it is empty.** Two lines of empty state under a header rule were being given a quarter of the screen, capped at ten rows, and every one of those rows came out of Status's own.
+- **The diff gutter numbers only lines that are in a file.** It numbered whatever it could not classify, so a `git show` stream ran 0,1,2,… through the commit subject, then through `diff --git`, `index` and `new file mode`, and only then restarted at the hunk's own first line — three unrelated sequences sharing one column.
+
+### Bug Fixes
+
+- **An overlay drawn across wide characters threw its own row off by a column.** A wide glyph is stored as two cells, and every write replaced one half and left the other — which still renders a column, so the row came out one column wider or narrower than the terminal and everything after the split shifted with it. Opening Help over commit rows carrying CJK text put the popup's border a column off on each row it crossed, and whether it happened at all came down to the terminal width.
+- **`exec` left its children an inherited stdin, and `git shortlog` reads the log from it.** A command that decides to read stdin waits for an EOF that never arrives while ours is an open pipe, and blocks its caller with nothing reported. `shortlog` with no revision is exactly such a command, which is how the test suite came to hang intermittently; it is now given `HEAD` explicitly, since feeding it an immediate EOF would trade a visible hang for a silently empty answer.
+- **A merge commit's diff was read as a single file.** A combined diff opens each file with `diff --cc` and names one path, while every reader that decides where a file's block ends looked for `diff --git` — so the file bar listed no files at all, the second file's headers fell inside the first file's hunk, and not one content line of the merge was syntax-highlighted. The boundary is one predicate now, and it takes `diff --cc` and `diff --combined` the way it takes `diff --git`.
+
+## 2.9.1 (2026-10-06)
+
+### Breaking Changes
+
+- **Skipping the danger confirmation is now something you ask for.** `pigit cmd` skipped it whenever the `CI` environment variable was set — a variable CI systems set by themselves — so a force push, a branch delete, a stash drop or a file restore ran unconfirmed there, including the double confirmation for destructive commands, with the user never choosing it. It now takes `--yes` (`-y`). Existing CI scripts that relied on the old behaviour need the flag; without it the command is refused rather than assumed, which is the safe direction.
+
+### Improvements
+
+- **commit and amend no longer block the UI**: they were the last two file actions still calling `git` on the UI thread, and `commit` is the one that runs a pre-commit hook — the case where the freeze is unbounded. Both now run on a worker behind a spinner. They also take the worktree gate, because they move HEAD and not just the index: a checkout running on a worker would otherwise move the tip the commit lands on. That gate incidentally closes a double-submit window the change opened — the editor sheet stays up while the worker runs, so a second `submit` is now refused with the busy message instead of racing the first.
+- **Commit and Branch show a skeleton while loading**: only Status had one, so "empty" and "still loading" looked the same on the other two.
+- **The footer shows `? Help`.** It listed only Inspect and Quit, so nothing pointed at `?` — the entry point to every binding that is not on screen.
+- **The current branch is marked in text.** HEAD and an ordinary local branch rendered identical text, leaving colour as the only difference; the row now carries a `*`, the way `git branch` writes it.
+- **Branch and Stash rows show their age.** Both lists were already sorted by date and neither displayed it — Branch asked git for `--sort=-committerdate` and then threw the date away. A missing date renders as nothing rather than a bogus age.
+
+### Bug Fixes
+
+- **The confirmation dialog could push its own buttons off screen.** `AlertDialog` took its height straight from the message, and a dialog taller than the terminal is drawn from row 0 and clipped at the bottom — taking the footer with it. A batch-undo confirm of a dozen records needed 31 rows on an 80x24 terminal, leaving neither OK nor Cancel visible and nothing to say Esc still worked. The body is now capped at what fits, the rest is reachable with the arrow and page keys, and the window position rides the frame title so the indicator costs no message rows.
+- **Every user-facing string is English.** Seven were not: two identically worded toasts, two worktree guards, the reflog confirm, a fullwidth comma joining commands in the undo confirm, and one module header. The separator was the one that would have been missed — it is not a message but `describe_commands`'s join, which renders on the `Run:` line of every undo confirmation. A test now tokenizes every module and fails on a non-English string literal.
+- **The repo registry is written atomically, and damage stays recoverable.** `dump_repos` truncated the destination and wrote in place, so a crash mid-write left a half-written file; `load_repos` folded "cannot parse" in with "not there" and returned empty for both. Together with `before_hook`, which rewrites the registry on every start, that turned damage into data loss: the next launch replaced the unreadable file with just the current repo. Writes now go beside the target and are moved into place, and a file that will not parse is set aside under a numbered `.corrupt` name first.
+- **`repo clear` asks first.** It unlinked the registry with no prompt at all, which no other destructive path in the tool does.
+- **A failed bulk run reaches the caller.** `repo fetch/pull/push` printed a summary and returned nothing, so the process exited 0 whether every repo succeeded or none did. A picker that could not run at all was worse: with no terminal and no explicit names it exited non-zero without a message, which was read as a cancellation — nothing printed, exit 0, in exactly the environment scripts run in.
+- **An empty repository no longer reports a filter it never had.** The Commit panel printed "No matching commits." whenever the list was empty, including a fresh repository where no query had been typed.
+- **Branch fields are split on NUL, not `|`.** A branch name may contain `|`, and such a name shifted every field after it — the name, the upstream and the ahead/behind counts all came out wrong, silently.
+
 ## 2.9.0 (2026-10-01)
 
 ### Features

@@ -8,7 +8,7 @@ keys. Everything below is remappable — see
 
 | Key | Action |
 |-----|--------|
-| ++1++ / ++2++ / ++3++ / ++4++ | Status / Stash / Branch / Commit |
+| ++1++ / ++2++ / ++3++ / ++4++ / ++5++ | Status / Stash / Branch / Commit / Graph |
 | ++tab++ / ++shift+tab++ | Cycle panels |
 | ++semicolon++ | Command palette |
 | ++question++ | Help (click row, double-click to run binding) |
@@ -84,9 +84,17 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++c++ | Cherry-pick onto HEAD |
 | ++o++ | Browse another ref's log |
 | ++z++ | Toggle expanded commit rows |
-| ++ctrl+r++ | Toggle contribution graph strip |
 | ++slash++ | Filter by message or SHA |
 | ++y++ | Copy commit SHA |
+
+## Graph panel
+
+| Key | Action |
+|-----|--------|
+| ++h++ / ++l++, ++left++ / ++right++ | Pan left / right |
+| ++j++ / ++k++, ++down++ / ++up++ | Pan down / up |
+| ++ctrl+d++ / ++ctrl+u++ | Pan half a screen |
+| ++home++ | Back to the first graph |
 
 ## Diff viewer
 

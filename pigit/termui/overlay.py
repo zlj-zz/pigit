@@ -41,6 +41,11 @@ _logger = logging.getLogger(__name__)
 # Module-level badge signal (preserved from _runtime_context)
 _badge_signal: Signal[str | None] = Signal(None)
 
+#: Last toast shown, as ``(message, kind)``. The app subscribes to mirror
+#: failures somewhere durable: a toast is gone in seconds, whatever the reader
+#: meant to do with it is not.
+_toast_signal: Signal[tuple[str, FeedbackKind | None] | None] = Signal(None)
+
 
 def _with_host(fn: Callable[..., _R]) -> _R | None:
     """Call ``fn(host)`` if an overlay host is active; return ``None`` otherwise.
@@ -165,6 +170,9 @@ def show_toast(
     toast.resize(host.size)
     layer_push(LayerKind.TOAST, toast)
     request_render()
+    # Carries the kind as it was actually rendered, so a segments toast --
+    # whose kind is suppressed above -- reports no semantic level.
+    _toast_signal.set((message, kind))
     return toast
 
 
@@ -236,6 +244,16 @@ def dismiss_sheet() -> None:
 def get_badge_signal() -> Signal[str | None]:
     """Return the global badge-change signal for reactive header binding."""
     return _badge_signal
+
+
+def get_toast_signal() -> Signal[tuple[str, FeedbackKind | None] | None]:
+    """Return the global toast signal, carrying ``(message, kind)``.
+
+    Every toast writes it, including the ones ``report_async_failure`` raises
+    for a failed background task. Which of those deserve to outlive the toast
+    is the subscriber's call -- the framework has no idea what a clipboard is.
+    """
+    return _toast_signal
 
 
 def show_badge(

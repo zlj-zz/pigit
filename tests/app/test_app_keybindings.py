@@ -37,6 +37,7 @@ class TestCollectAllActionBindings:
             "rebase",
             "branch",
             "commit",
+            "graph",
             "stash",
             "recent",
             "repo_switcher",

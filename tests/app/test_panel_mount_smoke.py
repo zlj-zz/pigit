@@ -14,7 +14,6 @@ from pigit.app_branch import BranchPanel
 from pigit.app_recent_actions import RecentActionsPanel
 from pigit.app_stash import StashPanel
 from pigit.git.model import Branch, Stash
-from pigit.termui.containers import Column
 from pigit.termui.reactive import Signal
 
 
@@ -25,6 +24,7 @@ def _branch(name: str) -> Branch:
 def test_branch_panel_rebinds_signal_after_unmount_remount():
     vm = MagicMock()
     vm.items = Signal([_branch("a")])
+    vm.load_error = Signal(None)
     vm.refresh = MagicMock()
     panel = BranchPanel(
         get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm, id="branch"
@@ -68,22 +68,3 @@ def test_mount_sets_is_mounted():
     panel.mount()
     assert panel.is_mounted()
     history.peek.assert_called()
-
-
-def test_stash_does_not_load_on_column_mount_until_focused():
-    vm = MagicMock()
-    vm.load_stashes = MagicMock(
-        return_value=[Stash(ref="stash@{0}", sha="abc", msg="wip")]
-    )
-    status = MagicMock()
-    status.mount = MagicMock()
-    status.on_focus = MagicMock()
-    stash = StashPanel(vm=vm, id="stash")
-    col = Column(children=[status, stash], heights=["flex", "flex"], focus_index=0)
-    col.mount()
-    assert vm.load_stashes.call_count == 0
-    assert stash.stashes == []
-
-    col.set_focus_index(1)
-    assert vm.load_stashes.call_count == 1
-    assert len(stash.stashes) == 1

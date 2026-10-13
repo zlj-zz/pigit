@@ -35,17 +35,24 @@ _HUNK_HEADER_RE = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 # Plain ``a/path b/path`` or quoted ``"a/my file" "b/my file"`` (git quotes
 # paths that contain spaces). Alternate groups keep a single match object.
-DIFF_GIT_RE = re.compile(r'^diff --git (?:"a/(.+)"|a/(.+)) (?:"b/(.+)"|b/(.+))$')
+_DIFF_GIT_RE = re.compile(r'^diff --git (?:"a/(.+)"|a/(.+)) (?:"b/(.+)"|b/(.+))$')
+
+# A combined merge diff names a single path and carries no ``a/``/``b/``
+# prefix: ``diff --cc path`` (or ``diff --combined path``).
+_COMBINED_DIFF_RE = re.compile(r"^diff --(?:cc|combined) (.+)$")
 
 
-def path_from_diff_git_line(line: str) -> str:
-    """Return the real (new-side) file path from a ``diff --git`` line.
+def path_from_diff_line(line: str) -> str:
+    """Return the real (new-side) file path from a file-boundary line.
 
     ``git`` uses ``dev/null`` for the missing side of a diff: a deletion has
     ``b/dev/null`` and an addition has ``a/dev/null``. Fall back to the other
     side so a deleted file reads as its real path.
     """
-    m = DIFF_GIT_RE.match(line)
+    combined = _COMBINED_DIFF_RE.match(line)
+    if combined:
+        return combined.group(1).strip('"')
+    m = _DIFF_GIT_RE.match(line)
     if not m:
         return ""
     raw = (m.group(3) or m.group(4) or "").strip('"')
@@ -258,6 +265,20 @@ class DiffContent:
     def is_file_header(line: str) -> bool:
         """True for ``---`` / ``+++`` file headers."""
         return line.startswith("--- ") or line.startswith("+++ ")
+
+    @staticmethod
+    def is_file_boundary(line: str) -> bool:
+        """True for the line that opens a file's block in a diff.
+
+        Matched by prefix rather than :data:`_DIFF_GIT_RE` because a combined
+        merge diff opens a file with ``diff --cc`` (or ``diff --combined``),
+        which that pattern -- built for the two-path ``diff --git a/… b/…``
+        form -- does not match. Every reader of this predicate decides where
+        one file's block ends, so the narrow test let a combined diff's
+        headers be read as the previous file's content. Nothing in a hunk can
+        be mistaken for a boundary: git prefixes every content line.
+        """
+        return line.startswith("diff --")
 
     @staticmethod
     def is_add_line(line: str) -> bool:
@@ -552,7 +573,7 @@ class DiffContent:
         old_start = new_start = old_count = new_count = 0
 
         for i, line in enumerate(content):
-            if line.startswith("diff --git"):
+            if cls.is_file_boundary(line):
                 if current_start is not None:
                     hunks.append(
                         Hunk(
@@ -629,11 +650,11 @@ class DiffContent:
         current_lang = "generic"
         saw_diff = False
         for line in content:
-            if line.startswith("diff --git"):
+            if cls.is_file_boundary(line):
                 saw_diff = True
-                parts = line.split()
-                if len(parts) >= 4 and parts[3].startswith("b/"):
-                    current_lang = tokenizer.detect_language(parts[3][2:])
+                path = path_from_diff_line(line)
+                if path:
+                    current_lang = tokenizer.detect_language(path)
                 result.append("plain")
             elif not saw_diff:
                 result.append("plain")
@@ -693,7 +714,7 @@ class DiffContent:
         new_line = 0
         in_hunk = False
         for line in content:
-            if line.startswith("diff --git"):
+            if cls.is_file_boundary(line):
                 in_hunk = False
                 sides.append((None, None))
             elif line.startswith("@@"):
@@ -747,8 +768,8 @@ class DiffContent:
         current_path: str | None = None
 
         for i, line in enumerate(content):
-            if line.startswith("diff --git"):
-                current_path = path_from_diff_git_line(line)
+            if cls.is_file_boundary(line):
+                current_path = path_from_diff_line(line)
                 continue
             if line.startswith("@@") or line.startswith("\\"):
                 continue
@@ -789,10 +810,20 @@ class DiffContent:
 
     @classmethod
     def _compute_line_numbers(cls, content: list[str]) -> list[str]:
-        """Compute line numbers for each diff line by parsing @@ headers."""
+        """Compute line numbers for each diff line by parsing @@ headers.
+
+        A line is numbered only when it is a line of a file, which means it
+        lies inside a hunk. Everything else in the stream -- the ``git show``
+        preamble, a file's ``diff --git`` / ``index`` / ``new file mode``
+        headers, the hunk header itself -- is metadata and takes no number.
+        Classifying by first character instead numbered all of that as context
+        lines, so the column ran 0,1,2,... through the commit subject and then
+        restarted at the hunk's own first line.
+        """
         line_numbers: list[str] = []
         old_line = 0
         new_line = 0
+        in_hunk = False
         for line in content:
             if line.startswith("@@"):
                 m = _HUNK_HEADER_RE.search(line)
@@ -803,6 +834,12 @@ class DiffContent:
                     _logger.warning("Unexpected @@ line format: %r", line)
                     old_line = 0
                     new_line = 0
+                in_hunk = True
+                line_numbers.append("")
+            elif cls.is_file_boundary(line):
+                in_hunk = False
+                line_numbers.append("")
+            elif not in_hunk:
                 line_numbers.append("")
             elif cls.is_file_header(line):
                 line_numbers.append("")

@@ -13,7 +13,7 @@ from typing import Any
 import logging
 
 from .. import keys, palette
-from ..theme import get_theme
+from ..theme import get_theme, selected_row_bg
 from ..component import Component, ComponentError, is_on_visible_paint_path
 from ..mouse import MouseButton, MouseKind, MouseEvent
 from .._runtime_context import request_render
@@ -73,6 +73,10 @@ class OptionList(Component):
         on_search_changed: Callable[[], None] | None = None,
         id: str | None = None,
         header: Component | None = None,
+        # Shared chrome-band slot: ``header`` is used by Branch/Status/Stash.
+        # ``footer`` has no production caller since the contribution graph
+        # became its own tab; kept because it shares ``_fit_slot`` with
+        # ``header`` and tests/termui/test_option_list_chrome.py covers it.
         footer: Component | None = None,
     ) -> None:
         super().__init__(x, y, size, id=id)
@@ -747,18 +751,54 @@ class OptionList(Component):
             return truncate_by_width(text, max_width - 1) + "…"
         return text
 
+    def _band_cursor_row(self, left: list[Segment], is_cursor: bool) -> None:
+        """Give the cursor row its selection band.
+
+        Declared on one segment and left to ``_draw_row_layout`` to fill the
+        row from: it pre-fills when any segment carries a background, and
+        ``_with_cursor_mark`` reads this same segment for the cursor column.
+        Rows with no segments to declare it on (an out-of-range index) keep
+        none -- and their cursor mark carries none either.
+        """
+        if not is_cursor or not left or left[0].bg is not None:
+            return
+        # The row's first drawn segment, so the band starts at the cursor
+        # column rather than after it.
+        left[0].bg = selected_row_bg(get_theme(), active=self.is_presentation_active())
+
     def _draw_segments(
         self,
         surface: Surface,
         row: int,
         col: int,
         segments: Sequence[Segment],
+        *,
+        bg: tuple[int, int, int] | None = None,
     ) -> int:
         """Draw a sequence of segments starting at ``col``.
 
+        ``bg`` fills the segments that carry no background of their own, so a
+        row that declares its band on one segment gets it across the whole row
+        instead of a band with the text punched out of it.
+
+        Deliberately not ``Surface.draw_segments``: that one passes each
+        segment's own ``bg`` through, so delegating to it would punch the band
+        back out at every segment that declares none. If it ever grows logic
+        of its own, this copy has to grow it too.
+
         Returns the column position after the last segment.
         """
-        return surface.draw_segments(row, col, segments)
+        for seg in segments:
+            surface.draw_text_rgb(
+                row,
+                col,
+                seg.text,
+                fg=seg.fg,
+                bg=seg.bg if seg.bg is not None else bg,
+                style_flags=seg.style_flags,
+            )
+            col += wcswidth(seg.text)
+        return col
 
     def _draw_row_layout(
         self,
@@ -815,7 +855,7 @@ class OptionList(Component):
                 col,
                 text,
                 fg=seg.fg,
-                bg=seg.bg,
+                bg=seg.bg if seg.bg is not None else row_bg,
                 style_flags=seg.style_flags,
             )
             col += text_w
@@ -836,7 +876,7 @@ class OptionList(Component):
                         col,
                         text,
                         fg=seg.fg,
-                        bg=seg.bg,
+                        bg=seg.bg if seg.bg is not None else row_bg,
                         style_flags=seg.style_flags,
                     )
                     col += text_w
@@ -848,7 +888,7 @@ class OptionList(Component):
         if right:
             right_start = w - right_w
             if right_start >= left_w + min_gap:
-                surface.draw_segments(row, right_start, right)
+                self._draw_segments(surface, row, right_start, right, bg=row_bg)
 
     def _draw_right_aligned(
         self,

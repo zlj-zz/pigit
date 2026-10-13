@@ -31,12 +31,12 @@ VIOLET_RED: tuple[int, int, int] = (199, 21, 133)
 PALE_GREEN: tuple[int, int, int] = (152, 251, 152)
 
 # Dark theme specific
-CHARCOAL: tuple[int, int, int] = (24, 24, 24)
-GRAPHITE: tuple[int, int, int] = (30, 30, 30)
-GUNMETAL: tuple[int, int, int] = (42, 45, 46)
-STEEL: tuple[int, int, int] = (55, 55, 61)
+CHARCOAL: tuple[int, int, int] = (26, 26, 31)
+GRAPHITE: tuple[int, int, int] = (35, 35, 41)
+GUNMETAL: tuple[int, int, int] = (47, 48, 55)
+STEEL: tuple[int, int, int] = (61, 62, 71)
 NAVY_GRAY: tuple[int, int, int] = (40, 45, 55)
-SLATE_DARK: tuple[int, int, int] = (45, 45, 50)
+SLATE_DARK: tuple[int, int, int] = (49, 50, 58)
 
 # Semantic dark colors
 FOREST: tuple[int, int, int] = (35, 65, 45)

@@ -34,7 +34,15 @@ from pigit.termui.widgets import (
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
-from .app_theme import THEME
+from .ext.utils import relative_time
+from .app_theme import (
+    LOAD_FAILED_MARK,
+    THEME,
+    load_failed_segments,
+    report_nonerror,
+)
+from .app_row_slots import pad_to_width, status_lane
+from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.branch import IBranchViewModel
 from .viewmodels.base import ActionResult
 
@@ -48,6 +56,12 @@ class BranchPanel(OptionList):
 
     CURSOR = ACCENT_BAR
     CURSOR_ACCENT = True
+    #: Marks the current branch. The row's colour already says which branch is
+    #: HEAD, but colour is the only thing that does — this says it in text, the
+    #: way `git branch` does. Remote branches need no mark: their names carry
+    #: the remote prefix (`origin/main`), and git prefixes a local one with
+    #: `heads/` when the two would otherwise read the same.
+    HEAD_MARK = "*"
     keymap_namespace = "branch"
     TAB_NAME = "Branch"
     tab_key = "3"
@@ -75,6 +89,11 @@ class BranchPanel(OptionList):
         self._branch_signal = branch_signal
         self._get_git = get_git
         self.branches: list[Branch] = []
+        #: What a successful load falls back to when it has rows to show. The
+        #: no-rows message is not this: it names the scope that came up empty,
+        #: so it is built per pass.
+        self._empty_state_default = self.empty_state
+        self._max_right_w = 0
         self._scope_idx: int = 0
         self._rename_branch_name: str = ""
         self._rename_input = InputLine(
@@ -95,6 +114,12 @@ class BranchPanel(OptionList):
     def mount(self) -> None:
         super().mount()
         self._bind_vm_signals()
+        # Branches arrive asynchronously via vm.items; show the skeleton until
+        # they do, rather than an empty list that reads as "no branches".
+        self.loading = True
+        # The mark describes the load that is about to run, not the one before
+        # this panel was unmounted.
+        self._header.set_status(None)
         self._vm.refresh()
 
     def unmount(self) -> None:
@@ -119,27 +144,77 @@ class BranchPanel(OptionList):
         self._vm_unsubs.clear()
 
     def _bind_vm_signals(self) -> None:
-        """Bind vm.items; safe to call multiple times (idempotent)."""
+        """Bind vm.items and vm.load_error; safe to call multiple times."""
         if not self._vm_unsubs:
             self._vm_unsubs.append(
-                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+                bind_signals(
+                    self,
+                    self._vm.items,
+                    self._vm.load_error,
+                    callback=self._on_items_changed,
+                )
             )
 
     def _on_items_changed(self) -> None:
-        branches = self._vm.items.value
         if not self.is_mounted():
             return
+        self.loading = False
+        error = self._vm.load_error.value
+        self._show_load_failure(error)
+        if error is not None:
+            return
+        branches = self._vm.items.value
         self.branches = branches
+        self._recompute_meta_width()
         if not branches:
             scope = self._SCOPES[self._scope_idx]
-            self.set_content([f"No {scope} branches found."])
+            self.empty_state = [Segment(f"No {scope} branches found.")]
+            self.set_content([])
             self._notify_change()
             return
         lines = [self._format_branch(b) for b in branches]
         self.set_content(lines)
         self._notify_change()
 
+    def _show_load_failure(self, error: BaseException | None) -> None:
+        """Wear the failure in the header, or take the mark off again.
+
+        A failed load never reaches this panel through ``items``, so without
+        the mark the panel goes on claiming it is loading (nothing loaded yet)
+        or shows rows that are quietly out of date -- and the toast that said
+        so is gone in three seconds.
+        """
+        self._header.set_status(LOAD_FAILED_MARK if error is not None else None)
+        if error is None:
+            self.empty_state = self._empty_state_default
+        elif not self.branches:
+            # Nothing older to keep, so say what happened rather than show a
+            # skeleton that would never end.
+            self.empty_state = load_failed_segments(error)
+            self.set_content([])
+        else:
+            self.empty_state = self._empty_state_default
+
+    def _recompute_meta_width(self) -> None:
+        """Measure the widest metadata block, to give every row a common edge.
+
+        A right-anchored block sits at ``w - block_width``, so rows whose
+        tracking counts differ would start theirs at different columns and the
+        date would shift under them. Padding each row's block to this width
+        lines their left edges up. Colours do not affect width, so measuring
+        with the presentation-independent path is enough.
+        """
+        self._max_right_w = max(
+            (
+                sum(wcswidth(seg.text) for seg in self._right_segments(branch))
+                for branch in self.branches
+            ),
+            default=0,
+        )
+
     def _handle_result(self, result: ActionResult) -> None:
+        if report_nonerror(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:
@@ -223,14 +298,10 @@ class BranchPanel(OptionList):
                 "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
             )
             return
-        if local_branch.is_remote:
-            show_toast(
-                "Cannot checkout remote branch directly.",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
         if guard_bisect_active(self._get_git()):
+            return
+        if local_branch.is_remote:
+            self._create_tracking_branch(local_branch)
             return
         # Capture the index now: the worker must check out the branch the user
         # chose, not wherever the cursor drifted to while it ran.
@@ -249,6 +320,25 @@ class BranchPanel(OptionList):
         if self._branch_signal is not None:
             self._branch_signal.set(name)
         self.emit(EventType("action_requested"), cmd="follow-head", ref=name)
+
+    def _create_tracking_branch(self, branch) -> None:
+        """Check a remote-tracking branch out by creating the local one it tracks.
+
+        The names are resolved here, before the worker starts, and passed as
+        strings: the worker must act on the row the user chose, not wherever
+        the cursor drifted to while it ran.
+        """
+        from pigit.git.hosting import short_branch_name
+
+        # The whole ref, not the name it shortens to: two remotes can carry the
+        # same branch name, and only the ref on this row says which one.
+        remote_ref = branch.name
+        name = short_branch_name(name=remote_ref, is_remote=branch.is_remote)
+        run_with_spinner(
+            lambda: self._vm.create_branch(name, remote_ref),
+            lambda result: self._after_checkout(result, name),
+            label=f"Creating {name}",
+        )
 
     @bind_action(
         "new_branch", "n", desc="Create new branch from current HEAD", tip="New"
@@ -369,7 +459,7 @@ class BranchPanel(OptionList):
         list[Segment] | None,
         list[Segment],
     ]:
-        """Return row description: [cursor][branch_name.......][↑ahead ↓behind]."""
+        """Return row description: [HEAD mark][branch name][tracking, date]."""
         if idx >= len(self.branches):
             return ([], None, [])
         branch = self.branches[idx]
@@ -379,14 +469,43 @@ class BranchPanel(OptionList):
             name_fg = THEME.fg_local_branch
         else:
             name_fg = self.presentation_fg("primary")
-        left = [
+        cursor_flags = palette.STYLE_BOLD if is_cursor else 0
+        # The mark is status, not part of the name: fusing them moved the name
+        # column with the mark, and put a flexible string in the fixed prefix.
+        left = status_lane(
+            [
+                Segment(
+                    self.HEAD_MARK if branch.is_head else " ",
+                    fg=name_fg,
+                    style_flags=cursor_flags,
+                )
+            ],
+            pad_fg=self.presentation_fg("primary"),
+        )
+        main = [
             Segment(
-                f" {self.content[idx]}",
+                self.content[idx],
                 fg=name_fg,
-                style_flags=palette.STYLE_BOLD if is_cursor else 0,
+                style_flags=cursor_flags,
             )
         ]
 
+        right = self._right_segments(branch)
+        if right and self._max_right_w:
+            # Pad to the widest row's block so the tracking counts and the date
+            # start at the same column on every row, not just end there.
+            right = pad_to_width(
+                right,
+                self._max_right_w,
+                pad_fg=self.presentation_fg("muted"),
+                at_front=True,
+            )
+
+        self._band_cursor_row(left, is_cursor)
+        return left, main, right
+
+    def _right_segments(self, branch) -> list[Segment]:
+        """The metadata column: upstream, tracking counts, then the date."""
         right: list[Segment] = []
         if not branch.is_remote:
             if branch.upstream_name:
@@ -404,7 +523,21 @@ class BranchPanel(OptionList):
                     right.append(Segment(" ", fg=self.presentation_fg("muted")))
                 right.append(Segment(f"\u2193{behind}", fg=THEME.fg_warning))
 
-        return left, None, right
+        # Deliberately outside the block above: remote branches have no
+        # upstream line to share, but they are sorted by this same date, so
+        # they need it shown at least as much as local ones do.
+        if branch.committed_at:
+            if right:
+                # Two spaces, like the Commit panel's meta column: the date is
+                # its own column, not a continuation of the tracking counts.
+                right.append(Segment("  ", fg=self.presentation_fg("muted")))
+            right.append(
+                Segment(
+                    relative_time(branch.committed_at),
+                    fg=self.presentation_fg("muted"),
+                )
+            )
+        return right
 
     def _trigger_delete(self) -> None:
         """Validate constraints and show confirmation before deleting a branch."""

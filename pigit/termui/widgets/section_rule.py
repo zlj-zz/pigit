@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .. import palette
+from .._runtime_context import request_render
 from ..component import Component
 from ..theme import get_theme
 from ..wcwidth_table import wcswidth
@@ -25,16 +26,30 @@ class SectionRule(Component):
     """One-row rule: leading dashes, bold label, trailing ``──``.
 
     Follows the parent panel's presentation: brand ``fg_accent`` when the
-    panel is the active focus surface, otherwise ``fg_dim``.
+    panel is the active focus surface, otherwise ``fg_dim``. An optional
+    *status* rides after the label and turns the rule ``fg_danger`` -- the
+    panel can then say "this is not right" and go on saying it, which a toast
+    that expires in three seconds cannot.
     """
 
     def __init__(self, label: str, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._label = label
+        self._status: str | None = None
+
+    def set_status(self, status: str | None) -> None:
+        """Show *status* after the label; ``None`` clears it."""
+        if status == self._status:
+            return
+        self._status = status
+        request_render()
 
     def _rule_fg(self) -> tuple[int, int, int]:
-        """Brand accent when the owning panel presents; dim otherwise."""
+        """Danger while a status stands; brand accent when the owning panel
+        presents; dim otherwise."""
         theme = get_theme()
+        if self._status is not None:
+            return theme.fg_danger
         parent = self.parent
         if parent is not None and parent.is_presentation_active():
             return theme.fg_accent
@@ -46,8 +61,8 @@ class SectionRule(Component):
             return
         theme = get_theme()
         label = self._label
-        title_fg = theme.fg_panel_title
-        suffix = f" {label} {_TAIL}"
+        status = f" {self._status}" if self._status is not None else ""
+        suffix = f" {label}{status} {_TAIL}"
         suffix_w = wcswidth(suffix)
         fill_w = max(0, w - suffix_w)
         rule_fg = self._rule_fg()
@@ -60,8 +75,17 @@ class SectionRule(Component):
             0,
             col,
             label,
-            fg=title_fg,
+            fg=theme.fg_panel_title,
             style_flags=palette.STYLE_BOLD,
         )
         col += wcswidth(label)
+        if status:
+            surface.draw_text_rgb(
+                0,
+                col,
+                status,
+                fg=theme.fg_danger,
+                style_flags=palette.STYLE_BOLD,
+            )
+            col += wcswidth(status)
         surface.draw_text_rgb(0, col, f" {_TAIL}", fg=rule_fg)

@@ -58,6 +58,7 @@ def _file(
 def _panel(files: list[File], *, tree: bool = True) -> tuple[StatusPanel, Mock]:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal(files)
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     ok = ActionResult(success=True, message="ok", should_refresh=False)
     vm.stage.return_value = ok
@@ -386,6 +387,7 @@ def test_file_icon_name_prefix_when_enabled_and_fallback() -> None:
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([_file("main.py")])
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     file = _file("main.py")
 
@@ -393,17 +395,19 @@ def test_file_icon_name_prefix_when_enabled_and_fallback() -> None:
     panel.files = [file]
     panel.set_content(["main.py"])
     left, main, _right = panel.describe_row(0, False)
-    assert main[0].text == get_file_icon(adjudgment_type("main.py")) + " main.py"
-    # Icon moved out of the leading status column.
+    # left = [staged][unstaged][icon][space]; the name follows bare in main.
     assert left[0].text == " "
-    assert left[2].text == "M"  # unstaged column
+    assert left[1].text == "M"  # unstaged column
+    assert left[3].text == get_file_icon(adjudgment_type("main.py"))
+    assert main[0].text == "main.py"
 
     panel_off = StatusPanel(vm=vm, default_view="flat", nerd_icons=False)
     panel_off.files = [file]
     panel_off.set_content(["main.py"])
-    _left, main_off, _r = panel_off.describe_row(0, False)
+    left_off, main_off, _r = panel_off.describe_row(0, False)
     fallback = resolve_icon(False, adjudgment_type("main.py"))
-    assert main_off[0].text == f"{fallback} main.py"
+    assert left_off[3].text == fallback  # never blank
+    assert main_off[0].text == "main.py"
 
 
 def test_clean_tree_refresh_completion_clears_loading() -> None:
@@ -414,6 +418,7 @@ def test_clean_tree_refresh_completion_clears_loading() -> None:
 
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.refresh = Mock()
     panel = StatusPanel(vm=vm)
     panel.unmount()
@@ -439,6 +444,7 @@ def test_remount_requests_reload_and_skeleton() -> None:
     force-notifies the (possibly unchanged) result."""
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.refresh = Mock()
     panel = StatusPanel(vm=vm)
     panel.mount()
@@ -482,3 +488,83 @@ def test_status_panel_receives_resolved_nerd_icons() -> None:
         app_auto.build_root()
     detect.assert_called_once_with("auto")
     assert app_auto._status_panel._nerd_icons is True
+
+
+# ── Commit and amend run off the UI thread ──
+#
+# These two were the last file actions still calling git inline. Commit is
+# also the only one that can run a user's pre-commit hook, which is exactly
+# the case where an unbounded freeze shows up.
+
+
+def test_commit_runs_off_the_ui_thread_and_keeps_the_subject(monkeypatch, mocker):
+    """The success badge names the subject, which the view model's own
+    message does not, so this path reports through its own callback."""
+    from pigit.termui import run_with_spinner as real_spinner
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+    badge = mocker.patch("pigit.app_status.show_badge")
+    mocker.patch("pigit.app_status.dismiss_sheet")
+
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.staged_files = [files[0]]
+    seen: dict = {}
+
+    def _commit(message):
+        seen["thread"] = threading.current_thread()
+        return ActionResult(True, "Committed", True)
+
+    vm.commit.side_effect = _commit
+    with patch("pigit.app_status.show_sheet") as sheet:
+        panel.commit()
+        on_submit = sheet.call_args[0][0]._on_submit
+
+    on_submit("Fix the thing\n\nwith a body")
+    assert badge.call_args_list == []  # nothing applied on this thread yet
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not badge.called:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert seen["thread"] is not threading.main_thread()
+    assert badge.call_args[0][0] == "Committed: Fix the thing"
+
+
+def test_amend_runs_off_the_ui_thread(monkeypatch, mocker):
+    from pigit.termui import run_with_spinner as real_spinner
+
+    monkeypatch.setattr("pigit.app_status.run_with_spinner", real_spinner)
+    mocker.patch("pigit.termui.overlay.show_spinner")
+    mocker.patch("pigit.termui.overlay.hide_spinner")
+    badge = mocker.patch("pigit.app_status.show_badge")
+
+    files = [_file("a.py")]
+    panel, vm = _panel(files, tree=False)
+    vm.staged_files = [files[0]]
+    seen: dict = {}
+
+    def _amend():
+        seen["thread"] = threading.current_thread()
+        return ActionResult(True, "Amended HEAD", True)
+
+    vm.amend.side_effect = _amend
+    captured: dict = {}
+    panel._alert_dialog.alert = lambda text, cb, kind=None: (
+        captured.update(cb=cb) or True
+    )
+
+    panel.amend()
+    captured["cb"](True)
+    assert badge.call_args_list == []
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not badge.called:
+        AsyncTask.poll_all()
+        time.sleep(0.01)
+
+    assert seen["thread"] is not threading.main_thread()
+    assert badge.call_args[0][0] == "Amended HEAD"

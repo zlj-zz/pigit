@@ -116,9 +116,28 @@ class SequencerControl:
                 f"Git {action} error: {exc}", duration=3.0, kind=FeedbackKind.ERROR
             )
 
-    def run_rebase_control(self, action: str) -> None:
-        """Run a rebase control flag (--continue/--abort/--skip)."""
-        flag = action[len("rebase-") :]
+    def require_sequencer(self, label: str, *kinds: str) -> bool:
+        """True when one of *kinds* is in progress; otherwise say so and refuse.
+
+        The palette offers every control by name at any time, so the refusal
+        has to live here: without it ``rebase --continue`` runs outside a
+        rebase and the user gets git's own error instead of ours.
+
+        Args:
+            label: Sequencer name for the message ("rebase").
+            kinds: ``sequencer_in_progress()`` values that permit the action.
+                Cherry-pick accepts ``"revert"`` because a paused revert is
+                resumed through the cherry-pick controls.
+        """
+        if self._get_git().sequencer_in_progress() in kinds:
+            return True
+        show_toast(f"No {label} in progress", duration=2.0, kind=FeedbackKind.WARNING)
+        return False
+
+    def run_rebase_control(self, flag: str) -> None:
+        """Run a rebase control flag (continue/abort/skip)."""
+        if not self.require_sequencer("rebase", "rebase"):
+            return
         if flag == "abort":
 
             def on_confirm(confirmed: bool) -> None:
@@ -156,9 +175,10 @@ class SequencerControl:
             failed_msg=f"Rebase {flag} failed",
         )
 
-    def run_cherry_pick_control(self, action: str) -> None:
-        """Run a cherry-pick control flag (--continue/--abort/--skip)."""
-        flag = action[len("cherry-pick-") :]
+    def run_cherry_pick_control(self, flag: str) -> None:
+        """Run a cherry-pick control flag (continue/abort/skip)."""
+        if not self.require_sequencer("cherry-pick", "cherry-pick", "revert"):
+            return
         if flag == "abort":
 
             def on_confirm(confirmed: bool) -> None:

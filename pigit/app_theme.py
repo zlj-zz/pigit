@@ -8,9 +8,14 @@ Date: 2026-04-23
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from pigit.termui import palette
+from pigit.termui import Segment, palette, show_badge, show_toast
+from pigit.termui.feedback import FeedbackKind, style_for
 from pigit.termui.theme import Theme
+
+if TYPE_CHECKING:
+    from pigit.viewmodels.base import ActionResult
 
 # Fraction of the blend toward the brand accent for the hunk header tone:
 # 0.30 reads as a clearly distinct block while keeping ~6:1 contrast.
@@ -157,3 +162,39 @@ def sheet_core(name: str) -> str:
     verbatim slot).
     """
     return f" · {name} · "
+
+
+#: Mark a panel wears beside its title while its last load failed, so the
+#: state outlives the toast that announced it. Spelled with the glyph the app
+#: already paints on an error toast, rather than a new one: this codebase has
+#: been bitten by glyphs whose width or coverage varies by terminal (see the
+#: ASCII-only note on Status's empty state), and this one is provably on
+#: screen already.
+LOAD_FAILED_MARK = style_for(FeedbackKind.ERROR).glyph
+
+
+def report_nonerror(result: ActionResult) -> bool:
+    """Report an outcome that is neither success nor failure; say if there was one.
+
+    Two of them, and they take different channels on purpose. A refusal goes to
+    the badge, because the toast slot holds the spinner of the operation that
+    refused -- evicting it would leave the user unable to tell whether anything
+    is still running. A warning is this panel's own "nothing to do", with no
+    spinner to displace, so it goes to the toast: worth saying, not red.
+    """
+    if result.refused:
+        show_badge(result.message, duration=2.0)
+        return True
+    if result.warning:
+        show_toast(result.message, duration=2.0, kind=FeedbackKind.WARNING)
+        return True
+    return False
+
+
+def load_failed_segments(error: BaseException) -> list[Segment]:
+    """What a panel shows in place of a list it never managed to load.
+
+    Only reached when there is nothing older to keep: a panel that still holds
+    rows keeps them and lets the header mark say they are out of date.
+    """
+    return [Segment(f"Could not load — {error}", fg=THEME.fg_danger)]

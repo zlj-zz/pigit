@@ -19,7 +19,7 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import OptionList
+from pigit.termui.widgets import ACCENT_BAR, OptionList
 from .app_bisect import guard_worktree_busy
 
 from .app_theme import THEME
@@ -32,7 +32,8 @@ if TYPE_CHECKING:
 class RecentActionsPanel(OptionList):
     """Sheet overlay for browsing and reversing session history records."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "recent"
 
     def __init__(

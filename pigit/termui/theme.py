@@ -95,11 +95,19 @@ def set_theme(theme: Theme) -> None:
     _theme_var.set(theme)
 
 
-def selected_row_bg(theme: Theme) -> tuple[int, int, int]:
-    """Cursor-row background: the commit panel's selected bg when present.
+def selected_row_bg(theme: Theme, *, active: bool = True) -> tuple[int, int, int]:
+    """Cursor-row background: the selected tone, or its dimmed twin.
 
-    ``PigitTheme`` extends the framework theme with ``bg_commit_selected``;
-    other themes fall back to the hover background.
+    ``PigitTheme`` extends the framework theme with ``bg_commit_selected`` and
+    ``bg_commit_selected_inactive``; a theme carrying neither falls back to the
+    hover background, which is all the framework can promise.
+
+    *active* is whether the panel holding the row is the presentation surface.
+    A sheet over it dims the band rather than dropping it, so the row stays
+    marked as the cursor row while it is no longer the one being driven.
     """
-    selected = getattr(theme, "bg_commit_selected", None)
-    return selected if selected is not None else theme.bg_hover
+    if active:
+        selected = getattr(theme, "bg_commit_selected", None)
+        return selected if selected is not None else theme.bg_hover
+    inactive = getattr(theme, "bg_commit_selected_inactive", None)
+    return inactive if inactive is not None else theme.bg_hover

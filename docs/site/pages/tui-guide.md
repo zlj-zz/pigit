@@ -1,7 +1,7 @@
 # TUI Guide
 
-Pigit's primary interface is a terminal UI. Four core panels plus stash,
-diff detail, and global overlays cover everyday Git work.
+Pigit's primary interface is a terminal UI. Five core panels, plus diff
+detail and global overlays, cover everyday Git work.
 
 <figure markdown="span">
   ![pigit TUI demo](assets/demo.gif){ width="720" }
@@ -19,7 +19,8 @@ diff detail, and global overlays cover everyday Git work.
 | **Status** | ++1++ | Stage / unstage / discard / ignore; inline commit; visual multi-select; tree view; side diff preview |
 | **Stash** | ++2++ | Apply, pop, drop; diff preview |
 | **Branch** | ++3++ | Checkout, create, merge, rebase, rename, delete; log graph preview; open PR page |
-| **Commit** | ++4++ | Browse log; cherry-pick; another ref's history; contribution graph |
+| **Commit** | ++4++ | Browse log; cherry-pick; another ref's history |
+| **Graph** | ++5++ | Contribution heatmap, per-author chart, commits by hour |
 
 ## Navigation
 
@@ -94,7 +95,6 @@ Push stash from Status with ++s++ (message prompt).
 | ++c++ | Cherry-pick onto HEAD |
 | ++o++ | Show another branch's log |
 | ++z++ | Toggle expanded commit rows |
-| ++ctrl+r++ | Toggle contribution graph (tall layouts) |
 | ++slash++ | Filter by message or SHA |
 | ++y++ | Copy SHA |
 
@@ -119,6 +119,22 @@ Branch ++r++ opens the todo editor before git runs:
 - ++shift+j++ / ++shift+k++ reorder commits
 - ++p++ / ++s++ / ++f++ / ++r++ / ++e++ / ++d++ set pick / squash / fixup / reword / edit / drop
 - ++enter++ confirm
+
+## Graph panel
+
+Three graphs, each carrying its own labels and legend: a contribution heatmap
+(*which day*), a per-author chart, and a punch card of commits by weekday and
+hour (*what time of day*). They lay themselves out side by side, wrapping onto
+further rows when the panel is too narrow for the next one.
+
+| Key | Action |
+|-----|--------|
+| ++h++ / ++l++, ++left++ / ++right++ | Pan left / right |
+| ++j++ / ++k++, ++down++ / ++up++ | Pan down / up |
+| ++ctrl+d++ / ++ctrl+u++ | Pan half a screen |
+| ++home++ | Back to the first graph |
+
+A mark on an edge means the graphs continue that way; the mouse wheel pans too.
 
 ## Undo and recovery
 

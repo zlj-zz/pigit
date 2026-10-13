@@ -68,3 +68,28 @@ class TestFunc:
         captured = capsys.readouterr()
         assert expected_output == result
         assert expected_time_unit in captured.out
+
+
+@pytest.mark.parametrize("answer", ["", "maybe", "Y E S", "1"])
+@patch("builtins.input")
+def test_confirm_fails_closed_with_default_false(mock_input, answer):
+    """The default decides what an unrecognised answer means — a destructive
+    caller passes False so a typo cannot be read as consent."""
+    mock_input.return_value = answer
+    assert confirm("confirm:", default=False) is False
+
+
+@pytest.mark.parametrize("answer", ["y", "Y", "yes", "YES"])
+@patch("builtins.input")
+def test_confirm_accepts_any_spelling_of_yes(mock_input, answer):
+    mock_input.return_value = answer
+    assert confirm("confirm:", default=False) is True
+
+
+@pytest.mark.parametrize("stop", [EOFError, KeyboardInterrupt])
+@patch("builtins.input")
+def test_confirm_fails_closed_when_it_cannot_be_answered(mock_input, stop):
+    """Piped or CI stdin raises EOF; Ctrl-C raises KeyboardInterrupt. A
+    question nobody can answer must not come back as consent."""
+    mock_input.side_effect = stop
+    assert confirm("confirm:", default=True) is False

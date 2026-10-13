@@ -80,15 +80,82 @@ class TestRebaseControl:
         assert ex.call_args.args[0] == ["git", "rebase", "--continue"]
 
 
-def test_palette_lists_cherry_pick_controls():
-    from pigit.app_command_palette import KNOWN_COMMAND_IDS
+def test_the_controls_are_declared_as_actions():
+    """They are reached by name, so they have to be bindings -- that is what
+    puts them in the palette and in Help."""
+    from pigit.app_keybindings import collect_all_action_bindings
 
+    declared = {binding.action for _, binding in collect_all_action_bindings()}
     for name in (
-        "cherry-pick-continue",
-        "cherry-pick-abort",
-        "cherry-pick-skip",
+        "universal.rebase_continue",
+        "universal.rebase_abort",
+        "universal.rebase_skip",
+        "universal.cherry_pick_continue",
+        "universal.cherry_pick_abort",
+        "universal.cherry_pick_skip",
+        "universal.continue_merge",
+        "universal.fetch",
     ):
-        assert name in KNOWN_COMMAND_IDS
+        assert name in declared
+
+
+class TestTheControlRefusesOutsideItsSequencer:
+    """The palette offers every control at any time, so the refusal has to be
+    in the handler -- otherwise ``git rebase --continue`` runs outside a rebase
+    and the user gets git's error instead of ours."""
+
+    def test_rebase_control_refuses_when_no_rebase_is_running(self, app):
+        app._git.sequencer_in_progress.return_value = None
+        app._sequencer._get_git = lambda: app._git
+        with (
+            patch("pigit.app_sequencer.exec_external") as ex,
+            patch("pigit.app_sequencer.show_toast") as toast,
+        ):
+            app._sequencer.run_rebase_control("continue")
+        ex.assert_not_called()
+        assert "No rebase in progress" in toast.call_args[0][0]
+        assert toast.call_args[1]["kind"] is FeedbackKind.WARNING
+
+    def test_rebase_control_runs_during_a_rebase(self, app):
+        app._git.sequencer_in_progress.return_value = "rebase"
+        app._sequencer._get_git = lambda: app._git
+        with (
+            patch("pigit.app_sequencer.exec_external") as ex,
+            patch("pigit.app_sequencer.show_toast"),
+        ):
+            ex.return_value.returncode = 0
+            app._sequencer.run_rebase_control("continue")
+        assert ex.call_args.args[0] == ["git", "rebase", "--continue"]
+
+    def test_cherry_pick_control_refuses_when_no_cherry_pick_is_running(self, app):
+        app._git.sequencer_in_progress.return_value = "rebase"
+        app._sequencer._get_git = lambda: app._git
+        with (
+            patch("pigit.app_sequencer.exec_external") as ex,
+            patch("pigit.app_sequencer.show_toast") as toast,
+        ):
+            app._sequencer.run_cherry_pick_control("continue")
+        ex.assert_not_called()
+        assert "No cherry-pick in progress" in toast.call_args[0][0]
+
+    def test_cherry_pick_control_resumes_a_paused_revert(self, app):
+        """A paused revert is resumed through the cherry-pick controls --
+        ``_SEQUENCER_PAUSED`` sends the user here -- so "revert" must be
+        allowed, not refused."""
+        app._git.sequencer_in_progress.return_value = "revert"
+        app._sequencer._get_git = lambda: app._git
+        with (
+            patch("pigit.app_sequencer.exec_external") as ex,
+            patch("pigit.app_sequencer.show_toast"),
+        ):
+            ex.return_value.returncode = 0
+            app._sequencer.run_cherry_pick_control("continue")
+        assert ex.call_args.args[0] == [
+            "git",
+            "cherry-pick",
+            "--continue",
+            "--no-edit",
+        ]
 
 
 class TestCherryPickControl:

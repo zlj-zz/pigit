@@ -567,6 +567,12 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         return [f for f in self._items.value if f.has_staged_change]
 
     def commit(self, message: str) -> ActionResult:
+        # Moves HEAD (the branch tip), not just the index, so it takes the
+        # gate for the same reason continue_merge does: a checkout running on
+        # a worker would otherwise move the tip this commit lands on.
+        return run_gated(self._worktree_gate, lambda: self._commit(message))
+
+    def _commit(self, message: str) -> ActionResult:
         head_sha: str | None = None
         try:
             if self._history is not None:
@@ -594,6 +600,9 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
 
     def amend(self) -> ActionResult:
         """Amend HEAD with currently staged changes (``--amend --no-edit``)."""
+        return run_gated(self._worktree_gate, self._amend)
+
+    def _amend(self) -> ActionResult:
         pre_sha: str | None = None
         try:
             if self._history is not None:

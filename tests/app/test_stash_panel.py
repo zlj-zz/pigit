@@ -34,13 +34,14 @@ def _inline_spinner(monkeypatch):
 def _panel_with_stashes(msgs: list[str]) -> StashPanel:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref=f"stash@{{{i}}}", sha=f"abc{i}", msg=msg)
         for i, msg in enumerate(msgs)
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     return panel
 
 
@@ -95,13 +96,14 @@ def test_drop_requires_confirmation():
     """Drop shows an ERROR-kind alert and only drops when confirmed."""
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
 
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
@@ -125,11 +127,12 @@ def test_drop_requires_confirmation():
 def test_drop_empty_list_is_noop():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
         panel.drop()
         alert.assert_not_called()
@@ -160,6 +163,7 @@ def test_section_rule_follows_panel_focus():
     try:
         vm = Mock(spec=IStatusViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.load_stashes.return_value = []
         stash = StashPanel(vm=vm)
         root = ComponentRoot(stash)
@@ -200,6 +204,7 @@ def test_section_rule_follows_panel_focus():
 def test_apply_keeps_stash_without_confirmation():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
@@ -208,7 +213,7 @@ def test_apply_keeps_stash_without_confirmation():
     )
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
     with patch("pigit.app_stash.show_badge"):
         panel.apply()
@@ -219,13 +224,14 @@ def test_apply_keeps_stash_without_confirmation():
 def test_get_inspector_snapshot_delegates_to_vm():
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
     vm.get_stash_snapshot.return_value = object()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
     assert panel.get_inspector_snapshot() is vm.get_stash_snapshot.return_value
     vm.get_stash_snapshot.assert_called_once_with("stash@{0}")
@@ -234,6 +240,7 @@ def test_get_inspector_snapshot_delegates_to_vm():
 def test_get_inspector_snapshot_empty_is_none():
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     panel = StashPanel(vm=vm)
     panel.mount()
@@ -243,9 +250,50 @@ def test_get_inspector_snapshot_empty_is_none():
 def test_apply_empty_list_is_noop():
     vm = Mock()
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = []
     vm.stash_apply = Mock()
     panel = StashPanel(vm=vm)
     panel.mount()
     panel.apply()
     vm.stash_apply.assert_not_called()
+
+
+# ── Entry dates ──
+#
+# The age of a stash is how you pick which one to drop, and it was the one
+# piece of the row that was never shown.
+
+
+def _stash_row_text(panel: StashPanel, idx: int) -> str:
+    left, main, right = panel.describe_row(idx, is_cursor=False)
+    return "".join(seg.text for seg in left + (main or []) + right)
+
+
+def _panel_with_dated_stashes(entries: list[tuple[str, int]]) -> StashPanel:
+    vm = Mock(spec=IStatusViewModel)
+    vm.items = Signal([])
+    vm.load_error = Signal(None)
+    vm.load_stashes.return_value = [
+        Stash(ref=f"stash@{{{i}}}", sha=f"abc{i}", msg=msg, when=when)
+        for i, (msg, when) in enumerate(entries)
+    ]
+    panel = StashPanel(vm=vm)
+    panel.mount()
+    panel.refresh()
+    return panel
+
+
+def test_the_stash_row_shows_its_age():
+    import time
+
+    panel = _panel_with_dated_stashes([("wip", int(time.time()))])
+    text = _stash_row_text(panel, 0)
+    assert "0s ago" in text
+    assert "stash@{0}" in text  # the ref is still there
+
+
+def test_an_unknown_stash_date_renders_nothing():
+    """relative_time(0) computes weeks since the epoch, not "unknown"."""
+    panel = _panel_with_dated_stashes([("wip", 0)])
+    assert "ago" not in _stash_row_text(panel, 0)

@@ -12,8 +12,10 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.config_data import AppConfig
+from pigit.git.model import Stash
 from pigit.termui import EVT_GOTO, keys
 from pigit.termui.root import ComponentRoot
+from pigit.termui.surface import Surface
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 
@@ -60,9 +62,10 @@ def test_help_lists_tab_cycle_and_numbered_goto():
     assert by_key["2"].lower().find("stash") >= 0
     assert by_key["3"].lower().find("branch") >= 0
     assert by_key["4"].lower().find("commit") >= 0
+    assert by_key["5"].lower().find("graph") >= 0
 
 
-def test_tab_cycles_status_stash_branch_commit(runtime):
+def test_tab_cycles_status_stash_branch_commit_graph(runtime):
     app, root = _mount(runtime)
     assert _leaf(root) is app._status_panel
 
@@ -76,11 +79,16 @@ def test_tab_cycles_status_stash_branch_commit(runtime):
     assert _leaf(root) is app._commit_panel
 
     root._handle_event(keys.KEY_TAB)
+    assert _leaf(root) is app._graph_panel
+
+    root._handle_event(keys.KEY_TAB)
     assert _leaf(root) is app._status_panel
 
 
 def test_shift_tab_cycles_backward(runtime):
     app, root = _mount(runtime)
+    root._handle_event(keys.KEY_SHIFT_TAB)
+    assert _leaf(root) is app._graph_panel
     root._handle_event(keys.KEY_SHIFT_TAB)
     assert _leaf(root) is app._commit_panel
     root._handle_event(keys.KEY_SHIFT_TAB)
@@ -105,7 +113,7 @@ def test_tab_on_diff_closes_detail_and_cycles(runtime):
     assert _leaf(root) is app._stash_panel
 
 
-def test_number_keys_land_on_four_panels(runtime):
+def test_number_keys_land_on_each_panel(runtime):
     app, root = _mount(runtime)
     root._handle_event("2")
     assert _leaf(root) is app._stash_panel
@@ -113,8 +121,81 @@ def test_number_keys_land_on_four_panels(runtime):
     assert _leaf(root) is app._branch_panel
     root._handle_event("4")
     assert _leaf(root) is app._commit_panel
+    root._handle_event("5")
+    assert _leaf(root) is app._graph_panel
     root._handle_event("1")
     assert _leaf(root) is app._status_panel
+
+
+def test_each_number_key_moves_the_page_not_only_the_focus(runtime):
+    """The focus leaf was already right before Stash had its own page: the
+    Column handed focus to the stash panel without the product tab ever moving.
+    The page is what has to change, so assert on the TabView as well."""
+    app, root = _mount(runtime)
+    for key, panel in (
+        ("2", app._stash_panel),
+        ("3", app._branch_panel),
+        ("4", app._commit_panel),
+        ("5", app._graph_panel),
+        ("1", app._status_panel),
+    ):
+        root._handle_event(key)
+        assert app._tab_view.visible is panel, f"key {key} did not switch the page"
+        assert _leaf(root) is panel
+
+
+def test_the_product_tabs_are_the_panel_ring(runtime):
+    """`panel_ring` and the TabView children are the same five things, in the
+    same order. That identity is the point of Stash having its own page, and
+    the tab bar depends on it."""
+    app, _root = _mount(runtime)
+    children = [c.id for c in app._tab_view.children]
+    assert children == ["status", "stash", "branch", "commit", "graph"]
+    assert children == [p.id for p in app._panel_nav.panel_ring()]
+
+
+def test_the_status_id_resolves_after_the_column_is_gone(runtime):
+    """`route_to("status")` is how the app returns to Status after a repo
+    switch, a merge conflict and a rebase. That id belonged to the Column that
+    held Status+Stash, so it has to resolve to the panel now."""
+    app, root = _mount(runtime)
+    root._handle_event("2")
+    assert app._tab_view.visible is app._stash_panel
+    app._tab_view.route_to("status")
+    assert app._tab_view.visible is app._status_panel
+
+
+def test_the_stash_page_paints_its_rows(runtime):
+    """Routing there mounts it and then loads it; the page has to carry rows,
+    not come up empty."""
+    app, root = _mount(runtime)
+    app._stash_panel._vm.load_stashes = lambda: [
+        Stash(ref="stash@{0}", sha="abc", msg="WIP on main")
+    ]
+    root._handle_event("2")
+    root.resize((80, 24))
+    surface = Surface(80, 24)
+    root.paint(surface)
+    assert "WIP on main" in "\n".join(surface.lines())
+
+
+def test_routing_to_stash_loads_it_once(runtime):
+    """`route_to` mounts the page and then calls its ``refresh``. Adding a
+    load to ``mount`` on top of that would run ``git stash list`` twice for
+    every visit."""
+    app, root = _mount(runtime)
+    calls: list[int] = []
+
+    def _load() -> list[Stash]:
+        calls.append(1)
+        return []
+
+    app._stash_panel._vm.load_stashes = _load
+    root._handle_event("2")
+    assert len(calls) == 1
+    root._handle_event("1")
+    root._handle_event("2")
+    assert len(calls) == 2
 
 
 def test_filter_consumes_digit_before_panel_goto(runtime):
@@ -183,8 +264,7 @@ def test_large_screen_commit_has_no_side_preview(runtime):
 def test_large_screen_stash_keeps_diff_preview(runtime):
     app, _root = _mount(runtime)
     app._is_large_screen = True
-    app._tab_view.route_to("status")
-    app._status_stack.set_focus_index(1)
+    app._tab_view.route_to("stash")
     app._apply_body_widths(140)
     ids = _body_ids(app)
     assert "preview" in ids
@@ -349,5 +429,61 @@ def test_help_lists_ctrl_p_on_preview_panels_not_global(runtime) -> None:
 
     commit = {key: desc for key, desc in app._commit_panel.get_help_entries()}
     assert "Ctrl+p" not in commit
-    assert "Ctrl+r" in commit
-    assert "report" in commit["Ctrl+r"].lower()
+    assert "Ctrl+r" not in commit  # the graph moved to its own tab
+
+
+class TestWhileARewriteRuns:
+    """Arriving at a panel mounts it, and Status reads the worktree the moment
+    it appears -- the half-applied state the observe defer already refuses to
+    poll for. So the user's own move is refused while a rewrite holds the gate."""
+
+    def test_the_number_keys_do_not_move(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        assert _leaf(root) is app._branch_panel
+
+        app._session.worktree_gate.acquire()
+        root._handle_event("1")
+        root._handle_event("4")
+
+        assert _leaf(root) is app._branch_panel
+
+    def test_tab_does_not_cycle(self, runtime):
+        app, root = _mount(runtime)
+        app._session.worktree_gate.acquire()
+
+        root._handle_event(keys.KEY_TAB)
+
+        assert _leaf(root) is app._status_panel
+
+    def test_navigation_resumes_when_the_rewrite_ends(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        app._session.worktree_gate.acquire()
+        root._handle_event("4")
+        assert _leaf(root) is app._branch_panel
+
+        app._session.worktree_gate.release()
+        root._handle_event("4")
+
+        assert _leaf(root) is app._commit_panel
+
+    def test_the_mouse_picker_takes_the_same_route(self, runtime):
+        app, root = _mount(runtime)
+        root._handle_event("3")
+        app._session.worktree_gate.acquire()
+
+        app._on_panel_picker_select(app._commit_panel)
+
+        assert _leaf(root) is app._branch_panel
+
+    def test_the_apps_own_navigation_is_not_guarded(self, runtime):
+        """The conflict handoff is the app moving the screen, not the user
+        moving themselves -- it has to keep working while the flow still holds
+        the gate, so it does not go through the navigator."""
+        app, _root = _mount(runtime)
+        app._session.worktree_gate.acquire()
+
+        app.navigate_product("commit")
+
+        assert app._tab_view.visible is app._commit_panel

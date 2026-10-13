@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Iterator
 from typing import NamedTuple, TypeVar
 
 T = TypeVar("T")
@@ -26,6 +27,7 @@ from pigit.termui import (
     dismiss_sheet,
     ExitEventLoop,
     get_renderer,
+    get_toast_signal,
     hide_spinner,
     keys,
     AsyncTask,
@@ -48,8 +50,10 @@ from pigit.termui.tty_io import terminal_size
 from pigit.termui.widgets import (
     AlertDialog,
     BindingBrowser,
+    CommandPalette,
     Header,
     InputLine,
+    PaletteItem,
     Popup,
     RepoSlot,
     TabSlot,
@@ -71,19 +75,19 @@ from .app_merge_workflow import MergeStepOutcome, MergeWorkflow
 from .app_sequencer import SequencerControl
 from .git.api import GitApi
 from .git.model import ReflogEntry
-from .ext.utils import relative_time, resolve_nerd_icons
+from .ext.utils import copy_to_clipboard, relative_time, resolve_nerd_icons
 from .app_branch import BranchPanel
 from .app_footer import AppFooter
 from .app_commit import CommitPanel
+from .app_graph_panel import ContributionPanel
 from .app_diff import DiffType, DiffViewer
 from .app_inspector import InspectorSheet
 from .app_types import InspectorHost, InspectorSnapshot
-from .app_command_palette import CommandPalette
 from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
-from .app_theme import THEME, sheet_core
+from .app_theme import THEME, report_nonerror, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .app_bisect import guard_worktree_busy
@@ -107,7 +111,27 @@ FOOTER_HEIGHT = 2
 # list rather than "every universal binding with a tip": the tab jumps,
 # bisect, recent, push, pull and welcome all carry tips and would crowd out
 # the panel hints the footer exists to show.
-FOOTER_ACTIONS = ("universal.inspector", "universal.quit")
+#
+# Help earns its slot for a different reason than the other two: it is the
+# entry point to every binding that is not on screen, so without it those
+# tips are only discoverable by someone who already knows to press `?`.
+FOOTER_ACTIONS = ("universal.inspector", "universal.help", "universal.quit")
+
+# Same wording as handlers.repo_picker.EMPTY_MANAGED_REPOS_MSG so the same
+# condition reads the same from the CLI and the TUI. Spelled out rather than
+# imported: handlers is the CLI layer, and the app does not depend on it.
+NO_MANAGED_REPOS_MSG = "No managed repos; use `pigit repo add`."
+
+_logger = logging.getLogger(__name__)
+
+#: Group title for the app's own actions, in Help and in the palette.
+_GLOBAL_GROUP_TITLE = "Global"
+
+
+def action_group_title(owner: Component) -> str:
+    """Title for *owner*'s group of actions in Help and in the palette."""
+    title_fn = getattr(owner, "get_help_title", None)
+    return str(title_fn()) if callable(title_fn) else type(owner).__name__
 
 
 class _SwitchResult(NamedTuple):
@@ -130,11 +154,11 @@ class PigitApplication(Application):
     _split_pane: SplitPane
     _body_view: ExclusiveView
     _palette: CommandPalette
-    _status_stack: Column
     _status_panel: StatusPanel
     _stash_panel: StashPanel
     _branch_panel: BranchPanel
     _commit_panel: CommitPanel
+    _graph_panel: ContributionPanel
     _diff_panel: DiffViewer
     _panel_nav: PanelNavigator
 
@@ -174,6 +198,7 @@ class PigitApplication(Application):
         self._header_state = HeaderState(THEME)
         self._branch_signal: Signal[str] = self._header_state.branch_signal
         self._header_unsub = self._header_state.bind_to_bus(self._event_bus)
+        self._toast_unsub = get_toast_signal().subscribe(self._on_toast_shown)
         self._merge_state_store = MergeStateStore(
             self._header_state,
             get_git_dir=self._git.get_git_dir,
@@ -270,7 +295,7 @@ class PigitApplication(Application):
 
         self._status_panel = StatusPanel(
             vm=self._status_vm,
-            id="status_panel",
+            id="status",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
             nerd_icons=resolve_nerd_icons(self._config.icons),
@@ -282,13 +307,6 @@ class PigitApplication(Application):
         )
         status_panel = self._status_panel
         stash_panel = self._stash_panel
-        self._status_stack = Column(
-            children=[status_panel, stash_panel],
-            heights=["flex", 4],
-            focus_index=0,
-            id="status",
-        )
-        status_stack = self._status_stack
 
         self._branch_panel = BranchPanel(
             vm=self._branch_vm,
@@ -302,9 +320,13 @@ class PigitApplication(Application):
         self._commit_panel = CommitPanel(
             vm=self._commit_vm,
             id="commit",
-            report_default=self._config.commit_report_default,
         )
         commit_panel = self._commit_panel
+        self._graph_panel = ContributionPanel(
+            vm=self._commit_vm,
+            id="graph",
+        )
+        graph_panel = self._graph_panel
         self._diff_panel = DiffViewer(
             id="diff",
             word_diff=self._config.word_diff,
@@ -314,9 +336,11 @@ class PigitApplication(Application):
         )
         self._tab_view = TabView(
             children=[
-                status_stack,
+                status_panel,
+                stash_panel,
                 branch_panel,
                 commit_panel,
+                graph_panel,
             ],
             start="status",
             on_switch=self._on_tab_switch,
@@ -338,7 +362,10 @@ class PigitApplication(Application):
             id="body",
         )
 
+        # The catalog is rebuilt on every open (which actions are reachable
+        # depends on what is on screen), so nothing is passed here.
         self._palette = CommandPalette(
+            items=[],
             on_execute=self._on_palette_execute,
             on_dismiss=self._dismiss_palette,
             id="palette",
@@ -380,11 +407,12 @@ class PigitApplication(Application):
 
         self._panel_nav = PanelNavigator(
             get_tab_view=lambda: tab_view,
-            get_status_stack=lambda: status_stack,
             get_status_panel=lambda: status_panel,
             get_stash_panel=lambda: stash_panel,
             get_branch_panel=lambda: branch_panel,
             get_commit_panel=lambda: commit_panel,
+            get_graph_panel=lambda: graph_panel,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
         )
         self._observe_host = ObserveHost(
             ObserveDeps(
@@ -443,20 +471,85 @@ class PigitApplication(Application):
         """Toast after Help dismiss when an invoked binding raises."""
         show_toast(str(exc) or "Action failed", duration=2.5, kind=FeedbackKind.ERROR)
 
+    def _on_toast_shown(self, toast: tuple[str, FeedbackKind | None] | None) -> None:
+        """Copy a failure to the clipboard; the toast itself is not durable.
+
+        A toast lives three seconds, so an error the user was not looking at is
+        gone before they can act on it -- and the message is exactly what they
+        would paste into an issue. Non-error toasts are left alone.
+
+        An empty message is skipped rather than copied: it would clear the
+        clipboard, which is worse than leaving it stale. Those are reachable --
+        the failure-toast sites format ``str(exc)``, which is ``""`` for a bare
+        ``Exception()`` -- so the guard is load-bearing, not defensive.
+        """
+        if toast is None:
+            return
+        message, kind = toast
+        if kind is FeedbackKind.ERROR and message:
+            copy_to_clipboard(message)
+
     def get_help_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
-        """Help for the active presentation panel, then Global app bindings."""
-        groups: list[tuple[str, list[ExecutableBinding]]] = []
+        """Help for the active presentation panel, then Global app bindings.
+
+        Both slices come from :meth:`binding_group`, the same function behind
+        the palette's catalog, so a row's keys and description cannot be stated
+        two ways. The selection differs on purpose: Help names the panel being
+        presented, the palette follows focus -- which is the open overlay's
+        leaf when there is one.
+        """
         active = self._resolve_active_panel()
-        if active is not None:
-            entries = active.get_executable_bindings()
-            if entries:
-                title_fn = getattr(active, "get_help_title", None)
-                title = str(title_fn()) if callable(title_fn) else type(active).__name__
-                groups.append((title, entries))
-        universal = self.get_executable_bindings()
-        if universal:
-            groups.append(("Global", universal))
-        return groups
+        candidates = [None if active is None else self.binding_group(active)]
+        candidates.append(self.binding_group(self))
+        return [group for group in candidates if group is not None]
+
+    def binding_group(
+        self, owner: Component
+    ) -> tuple[str, list[ExecutableBinding]] | None:
+        """The ``(title, rows)`` group for *owner*, or None if it declares none."""
+        rows = owner.get_executable_bindings()
+        if not rows:
+            return None
+        title = _GLOBAL_GROUP_TITLE if owner is self else action_group_title(owner)
+        return (title, rows)
+
+    def iter_action_owners(self) -> Iterator[Component]:
+        """Yield the app, then the mounted components on the path to the focus leaf.
+
+        Focus is the whole test, and it has to be. ``TabView`` cold-unmounts
+        the panel you leave, so its list is still ``[]``: the action would
+        quietly do nothing -- or, if the list were staler than empty, act on a
+        cursor nobody can see. Every panel loads on the way in (``route_to``
+        mounts it, then calls its ``refresh``), so a panel the user is *on* is
+        a panel with content.
+        """
+        yield self
+        node = self._focused_component()
+        seen: set[int] = set()
+        while node is not None:
+            if id(node) in seen:
+                _logger.warning("Cycle in the parent chain at %s", type(node).__name__)
+                return
+            seen.add(id(node))
+            if node.is_mounted():
+                yield node
+            node = node.parent
+
+    def _focused_component(self) -> Component | None:
+        """Where the keyboard is: an open overlay's leaf, else the body's."""
+        if self._root is None:
+            return None
+        return self._root._focus_manager.get_focus_leaf()
+
+    def collect_binding_groups(self) -> list[tuple[str, list[ExecutableBinding]]]:
+        """``(title, rows)`` for the app and the components the user is on.
+
+        The catalog the palette filters, in the order it shows: Global first,
+        then the focus path outward. Components that declare nothing are
+        dropped, so this is exactly the set of groups with rows.
+        """
+        groups = [self.binding_group(owner) for owner in self.iter_action_owners()]
+        return [group for group in groups if group is not None]
 
     def _open_help_browser(self) -> None:
         """Rebuild groups and show Help when the popup is closed."""
@@ -469,8 +562,7 @@ class PigitApplication(Application):
             popup.toggle()
 
     def after_start(self):
-        cols, rows = terminal_size()
-        self._sync_stash_height(rows)
+        cols, _ = terminal_size()
         if self._is_large_screen:
             self._apply_body_widths(cols)
 
@@ -744,6 +836,7 @@ class PigitApplication(Application):
         self._stash_panel.set_vm(session.status_vm)
         self._branch_panel.set_vm(session.branch_vm)
         self._commit_panel.set_vm(session.commit_vm)
+        self._graph_panel.set_vm(session.commit_vm)
         if self._preview_panel is not None:
             self._preview_panel.set_vm(session.status_vm)
         if self._log_graph_preview is not None:
@@ -877,7 +970,7 @@ class PigitApplication(Application):
         if self._palette.is_active:
             self._palette.close()
         else:
-            from pigit.app_command_palette import build_catalog
+            from pigit.app_command_palette import with_parameterized
             from pigit.termui.widgets import list_slots_for_term
 
             # Same height source as Sheet.resolve_height (root size, not a
@@ -886,13 +979,9 @@ class PigitApplication(Application):
             if term_h <= 0:
                 term_h = terminal_size()[1]
             slots = list_slots_for_term(term_h)
-            try:
-                sequencer = self._git.sequencer_in_progress()
-            except Exception:
-                sequencer = None
             self._palette.open(
-                items=build_catalog(
-                    sequencer,
+                items=with_parameterized(
+                    self.palette_catalog(),
                     branch_names=lambda: [b.name for b in self._branch_vm.items.value],
                     file_names=lambda: [
                         f.get_file_str() for f in self._status_vm.items.value
@@ -941,28 +1030,34 @@ class PigitApplication(Application):
         self._close_detail_if_open()
         self._focus_destination(self._commit_panel)
 
+    @bind_action("goto_graph", "5", desc="Switch to Graph tab", tip="Graph")
+    def goto_graph(self):
+        """Switch focus to the contribution graph panel."""
+        self._close_detail_if_open()
+        self._focus_destination(self._graph_panel)
+
     @bind_action(
         "next_panel",
         "tab",
-        desc="Cycle to next panel (Status, Stash, Branch, Commit)",
+        desc="Cycle to next panel (Status, Stash, Branch, Commit, Graph)",
     )
     def next_panel(self) -> None:
-        """Cycle focus to the next panel in the Status → Stash → Branch → Commit ring."""
+        """Cycle focus to the next panel in the Status → Stash → Branch → Commit → Graph ring."""
         self._close_detail_if_open()
         self._cycle_panel(1)
 
     @bind_action(
         "prev_panel",
         "shift tab",
-        desc="Cycle to previous panel (Status, Stash, Branch, Commit)",
+        desc="Cycle to previous panel (Status, Stash, Branch, Commit, Graph)",
     )
     def prev_panel(self) -> None:
-        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit ring."""
+        """Cycle focus to the previous panel in the Status → Stash → Branch → Commit → Graph ring."""
         self._close_detail_if_open()
         self._cycle_panel(-1)
 
     def _panel_ring(self) -> tuple[Component, ...]:
-        """Return the four panels that Tab/Shift+Tab cycle through, in order."""
+        """Return the panels that Tab/Shift+Tab cycle through, in order."""
         return self._panel_nav.panel_ring()
 
     def _ring_index(self) -> int | None:
@@ -970,7 +1065,7 @@ class PigitApplication(Application):
         return self._panel_nav.ring_index()
 
     def _focus_destination(self, panel: Component) -> None:
-        """Move TabView + Status/Stash column focus to *panel*."""
+        """Route the product TabView to *panel*."""
         self._panel_nav.focus_destination(panel)
 
     def _cycle_panel(self, step: int) -> None:
@@ -1090,7 +1185,7 @@ class PigitApplication(Application):
         """
         if self._managed_repos is None:
             show_toast(
-                "未配置 repos.json（repos.json 未找到）",
+                NO_MANAGED_REPOS_MSG,
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1223,14 +1318,14 @@ class PigitApplication(Application):
             target = info.path
         if target == session:
             show_toast(
-                "先切换到其他工作树再移除",
+                "Cannot remove the worktree you are in",
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
             return
         if info.is_main:
             show_toast(
-                "不能移除主工作树",
+                "Cannot remove the main worktree",
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1385,7 +1480,7 @@ class PigitApplication(Application):
         """Add ``path`` to ManagedRepos, then switch the TUI session to it."""
         if self._managed_repos is None:
             show_toast(
-                "未配置 repos.json（repos.json 未找到）",
+                NO_MANAGED_REPOS_MSG,
                 duration=2.5,
                 kind=FeedbackKind.WARNING,
             )
@@ -1676,6 +1771,44 @@ class PigitApplication(Application):
         """Pull into HEAD from its configured upstream (non-interactive)."""
         self._network_git.run("pull")
 
+    # Actions reached by name rather than by key. Binding them here is what
+    # puts them in the palette and in Help; none has a chord of its own yet,
+    # so they carry no keys and no footer tip.
+
+    @bind_action("fetch", desc="Fetch from remote")
+    def fetch_remote(self) -> None:
+        """Fetch without merging; the sequencer reports the outcome."""
+        self._sequencer.run_git_action("fetch")
+
+    @bind_action("continue_merge", desc="Continue merge")
+    def continue_merge_action(self) -> None:
+        """Resume a merge whose conflicts have been resolved."""
+        self._continue_merge()
+
+    @bind_action("rebase_continue", desc="Continue rebase")
+    def rebase_continue(self) -> None:
+        self._sequencer.run_rebase_control("continue")
+
+    @bind_action("rebase_abort", desc="Abort rebase")
+    def rebase_abort(self) -> None:
+        self._sequencer.run_rebase_control("abort")
+
+    @bind_action("rebase_skip", desc="Skip rebase step")
+    def rebase_skip(self) -> None:
+        self._sequencer.run_rebase_control("skip")
+
+    @bind_action("cherry_pick_continue", desc="Continue cherry-pick")
+    def cherry_pick_continue(self) -> None:
+        self._sequencer.run_cherry_pick_control("continue")
+
+    @bind_action("cherry_pick_abort", desc="Abort cherry-pick")
+    def cherry_pick_abort(self) -> None:
+        self._sequencer.run_cherry_pick_control("abort")
+
+    @bind_action("cherry_pick_skip", desc="Skip cherry-pick")
+    def cherry_pick_skip(self) -> None:
+        self._sequencer.run_cherry_pick_control("skip")
+
     def _on_palette_vm_items_changed(self, _items: object) -> None:
         """Refresh palette arg candidates when branch/status lists update."""
         self._palette.refresh_candidates()
@@ -1688,19 +1821,14 @@ class PigitApplication(Application):
         if self._root is not None:
             self._root.dismiss_sheet()
 
-    def _sync_stash_height(self, rows: int) -> None:
-        """Set StashPanel height to 25% of rows, capped at 10, min 3."""
-        self._status_stack.set_heights(["flex", min(max(3, int(rows * 0.25)), 10)])
-
     def resize(self, size: tuple[int, int]) -> None:
-        """Recompute layout widths and stash height on terminal resize.
+        """Recompute layout widths on terminal resize.
 
         The event loop resizes the component tree after this returns.
         """
-        cols, rows = size
+        cols, _ = size
         was_large = self._is_large_screen
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
-        self._sync_stash_height(rows)
         self._apply_body_widths(cols)
         if was_large and not self._is_large_screen:
             for panel in (self._preview_panel, self._log_graph_preview):
@@ -1802,9 +1930,52 @@ class PigitApplication(Application):
             )
         self._commit_panel._publish_tab_title()
 
+    def palette_rows(self) -> dict[str, ExecutableBinding]:
+        """Every action the user can take right now, keyed by action id."""
+        return {
+            row.action: row
+            for _title, rows in self.collect_binding_groups()
+            for row in rows
+        }
+
+    def palette_catalog(self) -> list[PaletteItem]:
+        """The palette's entries: every visible action, in the order it shows.
+
+        Built from the same groups Help reads, so a binding cannot be described
+        one way in Help and another here. The id is the action id -- what the
+        palette hands back to :meth:`_on_palette_execute` -- and the label is
+        the description, which is already written for a person to read.
+        """
+        rows = self.palette_rows()
+        repeated = Counter(row.desc for row in rows.values())
+        items: list[PaletteItem] = []
+        for action, row in rows.items():
+            label = row.desc
+            if repeated[label] > 1:
+                # Descriptions repeat: several panels have a "Next row", and
+                # ``status.next``/``status.previous`` share one inside a panel.
+                # Say which is which, by the action's own last segment.
+                tail = action.rsplit(".", 1)[-1]
+                siblings = [o for o, r in rows.items() if r.desc == label]
+                if sum(1 for o in siblings if o.rsplit(".", 1)[-1] == tail) == 1:
+                    label = f"{label} · {tail}"
+            items.append(PaletteItem(action, label=label))
+        # A description can itself read like a disambiguated one, so the pass
+        # above cannot promise uniqueness. The action id can: it is unique, so
+        # appending it to whatever still collides settles it for good.
+        seen = Counter(item.label for item in items)
+        return [
+            (
+                item
+                if seen[item.label] == 1
+                else item._replace(label=f"{item.label} · {item.id}")
+            )
+            for item in items
+        ]
+
     def _on_palette_execute(self, cmd: str) -> None:
-        """Handle command palette execution."""
-        from pigit.app_command_palette import KNOWN_COMMAND_IDS, PARAMETERIZED_ACTIONS
+        """Run the palette entry *cmd* names, or report that there is none."""
+        from pigit.app_command_palette import PARAMETERIZED_ACTIONS
 
         stripped = cmd.strip()
         space = stripped.find(" ")
@@ -1813,46 +1984,22 @@ class PigitApplication(Application):
         else:
             action, arg = stripped[:space].lower(), stripped[space + 1 :].lstrip()
 
+        # Checked first because a parameterized id is bare ("merge") while a
+        # binding id always carries its namespace ("branch.merge"). They cannot
+        # collide today; this keeps that true as bindings are added.
         if action in PARAMETERIZED_ACTIONS:
             self._dispatch_parameterized_palette(action, arg)
             return
 
-        lower = stripped.lower()
-        if lower not in KNOWN_COMMAND_IDS:
+        row = self.palette_rows().get(action)
+        if row is None:
             show_toast(
                 f"Unknown command: {cmd}",
                 duration=1.5,
                 kind=FeedbackKind.WARNING,
             )
             return
-        if lower == "quit":
-            self.quit()
-            return
-        if lower == "stash":
-            self.goto_stash()
-            return
-        if lower in ("status", "branch", "commit"):
-            self.navigate_product(lower)
-            return
-        if lower in ("pull", "push"):
-            self._network_git.run(lower)
-            return
-        if lower == "fetch":
-            self._sequencer.run_git_action("fetch")
-            return
-        if lower == "continue-merge":
-            self._continue_merge()
-            return
-        if lower in ("rebase-continue", "rebase-abort", "rebase-skip"):
-            self._sequencer.run_rebase_control(lower)
-            return
-        if lower in (
-            "cherry-pick-continue",
-            "cherry-pick-abort",
-            "cherry-pick-skip",
-        ):
-            self._sequencer.run_cherry_pick_control(lower)
-            return
+        row.invoke()
 
     def _resolve_index(
         self,
@@ -1868,6 +2015,8 @@ class PigitApplication(Application):
 
     def _toast_palette_result(self, result) -> None:
         """Show action result and refresh VMs when the action asks for it."""
+        if report_nonerror(result):
+            return
         kind = FeedbackKind.SUCCESS if result.success else FeedbackKind.ERROR
         show_toast(result.message, duration=1.5 if result.success else 2.0, kind=kind)
         if result.success and result.should_refresh:
@@ -1955,10 +2104,10 @@ class PigitApplication(Application):
             )
             return
         self._alert_dialog.alert(
-            f"Recover to {entry.sha[:7]}（{entry.message} · "
-            f"{relative_time(entry.when)}）\n"
+            f"Recover to {entry.sha[:7]} ({entry.message} · "
+            f"{relative_time(entry.when)})\n"
             f"Run: git reset --hard {entry.sha[:7]}\n"
-            "之后的 commit 将从分支移除（reflog 可找回）",
+            "Later commits leave the branch (recoverable from the reflog)",
             lambda ok: self._do_recover_reflog(entry) if ok else None,
             kind=FeedbackKind.ERROR,
         )

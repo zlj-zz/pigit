@@ -24,12 +24,6 @@ if TYPE_CHECKING:
 
 _HANDLED = OverlayDispatchResult.HANDLED_EXPLICIT
 
-_SHORTCUT_PAIRS: tuple[tuple[str, str], ...] = (
-    ("Tab", "body"),
-    ("Ctrl+Enter", "commit"),
-    ("Esc", "cancel"),
-)
-
 
 def _staged_row_style(_index: int, row: str) -> tuple[int, int, int] | None:
     """Map staged status letter in ``"  X name"`` rows to theme colors."""
@@ -71,14 +65,27 @@ class CommitEditor(Component):
         self._subject = InputLine(
             allow_newline=False,
             placeholder="Summary of the change",
-            on_submit=self._focus_body,
+            on_submit=lambda _text: self._focus_body(),
         )
         self._body = InputLine(
             allow_newline=True,
             placeholder="Detailed description of the change (optional)",
         )
         self._lint_bar = LintBar(self._subject, self._body)
-        self._shortcut_hints = ShortcutHints(_SHORTCUT_PAIRS, bg=THEME.bg_base)
+        # One table for the status bar: the painted label, its description and
+        # the action a click on it runs. The strip's pairs are read off it, so
+        # a label and the action it fires cannot drift apart.
+        shortcuts = (
+            ("Tab", "body", self._focus_body),
+            ("Ctrl+Enter", "commit", self._submit),
+            ("Esc", "cancel", self._on_cancel),
+        )
+        self._shortcuts = shortcuts
+        self._shortcut_hints = ShortcutHints(
+            [(label, desc) for label, desc, _action in shortcuts],
+            bg=THEME.bg_base,
+            on_click=self._on_hint_click,
+        )
         self._status_bar = Row(
             children=[self._lint_bar, self._shortcut_hints],
             widths=["flex", self._shortcut_hints.preferred_width],
@@ -123,6 +130,16 @@ class CommitEditor(Component):
     def paint(self, surface: Surface) -> None:
         self._root.paint(surface)
 
+    def _hit_test(self, col: int, row: int) -> tuple[Component, int, int] | None:
+        """Hit-test through ``_root``, the door :meth:`paint` draws through.
+
+        The editor drives ``_root`` directly instead of registering it as a
+        child, so the default tree walk would stop at the editor itself and
+        nothing inside it -- the clickable hint strip included -- could ever be
+        the click target.
+        """
+        return self._root._hit_test(col, row)
+
     def resize(self, size: tuple[int, int]) -> None:
         self._size = size
         self._root.resize(size)
@@ -152,15 +169,22 @@ class CommitEditor(Component):
             self._submit()
             return _HANDLED
         if key == keys.KEY_TAB:
-            self._focus_index = 1
+            self._focus_body()
             return _HANDLED
         if key == keys.KEY_SHIFT_TAB:
             self._focus_index = 0
             return _HANDLED
         return self._current_input().dispatch_overlay_key(key)
 
-    def _focus_body(self, _: str) -> None:
+    def _focus_body(self) -> None:
         self._focus_index = 1
+
+    def _on_hint_click(self, label: str) -> None:
+        """Run the action the hint strip bound to *label*."""
+        for name, _desc, action in self._shortcuts:
+            if name == label:
+                action()
+                return
 
     def _submit(self) -> None:
         subject = self._subject.value.strip()

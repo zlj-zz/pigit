@@ -6,6 +6,7 @@ import os
 import pprint
 import shlex
 from collections import Counter
+from itertools import count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,24 +118,75 @@ class ManagedRepos:
         return name
 
     def load_repos(self) -> dict[str, dict]:
-        """Load repos info from cache file."""
+        """Load repos info from cache file.
+
+        A missing file is ordinary — nothing has been registered yet. A file
+        that will not parse is not: treating it as "no repos" lets the next
+        write replace it for good, and ``before_hook`` writes on every TUI
+        start, so one corrupt read would silently erase the registry. The
+        unreadable file is moved aside first so it stays recoverable.
+        """
 
         try:
             with self.repo_json_path.open(mode="r") as fp:
                 return json.load(fp)
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError as e:
+            _logger.warning("Repos file is unreadable: %s", e)
+            kept = self._set_aside_corrupt_repos()
+            if kept is not None:
+                _logger.warning("Kept the unreadable file as %s", kept)
             return {}
 
-    def dump_repos(self, repos: dict) -> bool:
-        """Dump repos info to cache file, re-write mode."""
+    def _set_aside_corrupt_repos(self) -> Path | None:
+        """Move an unparseable repos file to a free ``.corrupt`` name.
 
+        The suffix is numbered because a fixed name loses the first backup to
+        the second corruption — exactly when the first one is worth most.
+        """
+        for n in count(1):
+            candidate = self.repo_json_path.with_name(
+                f"{self.repo_json_path.name}.corrupt{n}"
+            )
+            if candidate.exists():
+                continue
+            try:
+                self.repo_json_path.replace(candidate)
+            except OSError as e:
+                _logger.error("Could not set aside the unreadable file: %s", e)
+                return None
+            return candidate
+        return None  # unreachable: the loop returns on the first free name
+
+    def dump_repos(self, repos: dict) -> bool:
+        """Dump repos info to cache file, by atomic replace.
+
+        The file is written beside its destination and moved into place, so a
+        crash mid-write leaves the previous contents intact rather than a
+        truncated file. Concurrent writers still race — last one wins, which
+        can drop an auto-appended entry; only a cross-process lock fixes that,
+        and it is not worth one for a cache. See :meth:`load_repos` for the
+        damage a truncated file used to do.
+        """
+
+        # Per-process name: two pigit runs would otherwise write the same temp
+        # file and could replace the destination with each other's half.
+        tmp = self.repo_json_path.with_name(
+            f"{self.repo_json_path.name}.tmp{os.getpid()}"
+        )
         try:
-            with self.repo_json_path.open(mode="w") as fp:
+            with tmp.open(mode="w") as fp:
                 json.dump(repos, fp, indent=2)
-                return True
+            os.replace(tmp, self.repo_json_path)
+            return True
         except (OSError, TypeError) as e:
             _logger.error("Failed to dump repos: %s", e)
             return False
+        finally:
+            # os.replace consumed it on the happy path; anything that failed
+            # first would otherwise leave the temp file behind for good.
+            tmp.unlink(missing_ok=True)
 
     def clear_repos(self) -> None:
         self.repo_json_path.unlink(missing_ok=True)

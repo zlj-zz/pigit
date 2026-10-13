@@ -274,11 +274,15 @@ class Sheet(Component):
         )
         sheet_h = min(self._target_height, cap_rows)
         new_size = (size[0], sheet_h)
-        if getattr(self, "_size", None) == new_size:
+        # ``x`` is derived from the terminal height rather than from the
+        # sheet's own size, so a height-only resize must pass this guard even
+        # though ``new_size`` is unchanged -- otherwise the sheet paints at the
+        # new row while hit-testing still answers from the old one.
+        origin = self._origin_row(size[1], sheet_h) + 1
+        if getattr(self, "_size", None) == new_size and self.x == origin:
             return
         self._size = new_size
-        origin = self._origin_row(size[1], sheet_h)
-        self.x = origin + 1
+        self.x = origin
         self.y = 1
         rule_h = 1 if self._show_edge_rule else 0
         child_h = max(1, sheet_h - rule_h)

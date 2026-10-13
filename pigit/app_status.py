@@ -42,9 +42,16 @@ from pigit.termui.widgets import (
 )
 
 from .app_diff import DiffType, DiffViewer
+from .app_row_slots import icon_lane, status_lane
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
-from .app_theme import THEME, sheet_core
+from .app_theme import (
+    LOAD_FAILED_MARK,
+    THEME,
+    load_failed_segments,
+    report_nonerror,
+    sheet_core,
+)
 from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
 from .git.model import File
 from .viewmodels.base import ActionResult
@@ -319,6 +326,9 @@ class StatusPanel(OptionList):
         self._on_toggle_preview = on_toggle_preview
         self._nerd_icons = nerd_icons
         self.files: list[File] = []
+        #: What the panel shows when it has no rows; a failed load swaps in its
+        #: own message and a later success must put this back.
+        self._empty_state_default = self.empty_state
         self._all_files: list[File] = []
         self._source_map: list[int] = []
         self._alert_dialog = AlertDialog(
@@ -350,10 +360,9 @@ class StatusPanel(OptionList):
         self._bind_vm_signals()
         # Content arrives asynchronously via vm.items; show skeleton until then.
         self.loading = True
-        self._vm.refresh()
-
-    def on_focus(self) -> None:
-        """Refresh worktree status when returning focus within the Status column."""
+        # The mark describes the load that is about to run, not the one before
+        # this panel was unmounted.
+        self._header.set_status(None)
         self._vm.refresh()
 
     def unmount(self) -> None:
@@ -379,10 +388,15 @@ class StatusPanel(OptionList):
         self._vm_unsubs.clear()
 
     def _bind_vm_signals(self) -> None:
-        """Bind vm.items signal; safe to call multiple times (idempotent)."""
+        """Bind vm.items and vm.load_error; safe to call multiple times."""
         if not self._vm_unsubs:
             self._vm_unsubs.append(
-                bind_signals(self, self._vm.items, callback=self._on_items_changed)
+                bind_signals(
+                    self,
+                    self._vm.items,
+                    self._vm.load_error,
+                    callback=self._on_items_changed,
+                )
             )
 
     def _on_items_changed(self) -> None:
@@ -394,9 +408,32 @@ class StatusPanel(OptionList):
         )
         if not self.is_mounted():
             return
-        self._all_files = list(files)
+        error = self._vm.load_error.value
         self.loading = False
+        self._show_load_failure(error)
+        if error is not None:
+            return
+        self._all_files = list(files)
         self._apply_filter()
+
+    def _show_load_failure(self, error: BaseException | None) -> None:
+        """Wear the failure in the header, or take the mark off again.
+
+        A failed load never reaches this panel through ``items``, so without
+        the mark the panel goes on claiming it is loading (nothing loaded yet)
+        or shows rows that are quietly out of date -- and the toast that said
+        so is gone in three seconds.
+        """
+        self._header.set_status(LOAD_FAILED_MARK if error is not None else None)
+        if error is None:
+            self.empty_state = self._empty_state_default
+        elif not self._all_files:
+            # Nothing older to keep, so say what happened rather than show a
+            # skeleton that would never end.
+            self.empty_state = load_failed_segments(error)
+            self.set_content([])
+        else:
+            self.empty_state = self._empty_state_default
 
     def _apply_filter(self) -> None:
         """Filter files by query and rebuild display state."""
@@ -586,15 +623,25 @@ class StatusPanel(OptionList):
 
         def _do_commit(msg: str) -> None:
             subject = msg.split("\n", 1)[0].strip()
-            result = self._vm.commit(msg)
-            if result.success:
-                dismiss_sheet()
-                self._vm.refresh()
-                show_badge(
-                    f"Committed: {subject}", duration=1.5, kind=FeedbackKind.SUCCESS
-                )
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            def done(result: ActionResult) -> None:
+                if report_nonerror(result):
+                    return
+                if result.success:
+                    dismiss_sheet()
+                    self._vm.refresh()
+                    show_badge(
+                        f"Committed: {subject}",
+                        duration=1.5,
+                        kind=FeedbackKind.SUCCESS,
+                    )
+                else:
+                    show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            # Not through _run_file_action: that reports the view model's own
+            # message, which is a bare "Committed" — this badge names the
+            # subject that was just committed.
+            run_with_spinner(lambda: self._vm.commit(msg), done, label="Committing")
 
         editor = CommitEditor(
             vm=self._vm,
@@ -662,12 +709,17 @@ class StatusPanel(OptionList):
         def on_result(confirmed: bool) -> None:
             if not confirmed:
                 return
-            result = self._vm.amend()
-            if result.success:
-                self._vm.refresh()
-                show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
-            else:
-                show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            def done(result: ActionResult) -> None:
+                if report_nonerror(result):
+                    return
+                if result.success:
+                    self._vm.refresh()
+                    show_badge("Amended HEAD", duration=1.5, kind=FeedbackKind.SUCCESS)
+                else:
+                    show_toast(result.message, duration=2.0, kind=FeedbackKind.ERROR)
+
+            run_with_spinner(lambda: self._vm.amend(), done, label="Amending")
 
         self._confirm(
             "Amend last commit with staged changes?",
@@ -955,8 +1007,11 @@ class StatusPanel(OptionList):
     ]:
         """Split render into tree/flat modes instead of stacking if-branches."""
         if self._tree_mode:
-            return self._describe_tree_row(idx, is_cursor)
-        return self._describe_flat_row(idx, is_cursor)
+            left, main, right = self._describe_tree_row(idx, is_cursor)
+        else:
+            left, main, right = self._describe_flat_row(idx, is_cursor)
+        self._band_cursor_row(left, is_cursor)
+        return left, main, right
 
     def _file_icon_glyph(self, name: str, *, is_dir: bool) -> str:
         """Icon glyph for a row: Nerd Font glyph or a 1-cell fallback symbol.
@@ -966,6 +1021,36 @@ class StatusPanel(OptionList):
         symbol — the fallback keeps alignment without tofu blocks.
         """
         return resolve_icon(self._nerd_icons, adjudgment_type(name), is_dir=is_dir)
+
+    def _prefix_lanes(
+        self,
+        staged: str,
+        unstaged: str,
+        icon: str,
+        *,
+        name_fg: tuple[int, int, int],
+        cursor_flags: int,
+    ) -> list[Segment]:
+        """The row prefix: the git status lanes, then the entry's icon.
+
+        Directory rows pass no status, and the lanes still take their cells, so
+        the icon -- and therefore the name -- starts at the same column on
+        every row. The icon carries *name_fg* and *cursor_flags* because it
+        used to sit in the same segment as the name and inherit them from it;
+        as a lane of its own it has to be told.
+        """
+        pad_fg = self.presentation_fg("primary")
+        status = [
+            Segment(staged or " ", fg=_staged_fg(staged), style_flags=cursor_flags),
+            Segment(
+                unstaged or " ", fg=_unstaged_fg(unstaged), style_flags=cursor_flags
+            ),
+        ]
+        glyph = [
+            Segment(" ", fg=name_fg, style_flags=cursor_flags),
+            Segment(icon, fg=name_fg, style_flags=cursor_flags),
+        ]
+        return status_lane(status, pad_fg=pad_fg) + icon_lane(glyph, pad_fg=pad_fg)
 
     def _describe_flat_row(
         self, idx: int, is_cursor: bool
@@ -979,33 +1064,20 @@ class StatusPanel(OptionList):
 
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-        left = [
-            Segment(" ", fg=fg_primary),
-            Segment(
-                staged,
-                fg=_staged_fg(staged),
-                style_flags=cursor_flags,
-            ),
-            Segment(
-                unstaged,
-                fg=_unstaged_fg(unstaged),
-                style_flags=cursor_flags,
-            ),
-            Segment(" ", fg=fg_primary),
-        ]
-
         is_selected = self._source_index(idx) in self._selected
         if is_selected:
             filename_fg = THEME.fg_staged_renamed
         else:
             filename_fg = fg_primary
-        icon = self._file_icon_glyph(file.name, is_dir=False)
-        icon_prefix = f"{icon} " if icon else ""
-        main = [
-            Segment(
-                icon_prefix + file.display_str, fg=filename_fg, style_flags=cursor_flags
-            )
-        ]
+
+        left = self._prefix_lanes(
+            staged,
+            unstaged,
+            self._file_icon_glyph(file.name, is_dir=False),
+            name_fg=filename_fg,
+            cursor_flags=cursor_flags,
+        )
+        main = [Segment(file.display_str, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -1026,51 +1098,50 @@ class StatusPanel(OptionList):
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
         if row.kind == "dir":
+            # The arrow fills the icon lane: what the entry *is* here is an
+            # expandable directory, and the trailing slash already says so.
+            # Drawing the folder glyph as well would need four cells and push
+            # every file name two columns right.
             arrow = "▶" if row.path in self._collapsed_dirs else "▼"
-            left = [
-                Segment(" ", fg=fg_primary),
-            ]
-            icon = self._file_icon_glyph(row.name, is_dir=True)
-            icon_prefix = f"{icon} " if icon else ""
+            left = self._prefix_lanes(
+                "",
+                "",
+                arrow,
+                name_fg=fg_primary,
+                cursor_flags=cursor_flags,
+            )
             main = [
                 Segment(
-                    indent + arrow + " " + icon_prefix + row.name + "/",
+                    indent + row.name + "/",
                     fg=fg_primary,
                     style_flags=cursor_flags,
                 )
             ]
-            right = [Segment(row.summary, fg=THEME.fg_dim)] if row.summary else []
+            # Dim on the selection band is unreadable (1.8:1), and the band is
+            # the row's own background -- so lift the summary on the cursor row
+            # only. Every other row keeps the dim it has always had.
+            summary_fg = (
+                THEME.fg_muted
+                if is_cursor and self.is_presentation_active()
+                else THEME.fg_dim
+            )
+            right = [Segment(row.summary, fg=summary_fg)] if row.summary else []
             return left, main, right
 
         file = row.file
         assert file is not None  # dir rows returned above; file rows always carry one
         staged = file.short_status[0] if len(file.short_status) > 0 else " "
         unstaged = file.short_status[1] if len(file.short_status) > 1 else " "
-        left = [
-            Segment(" ", fg=fg_primary),
-            Segment(
-                staged,
-                fg=_staged_fg(staged),
-                style_flags=cursor_flags,
-            ),
-            Segment(
-                unstaged,
-                fg=_unstaged_fg(unstaged),
-                style_flags=cursor_flags,
-            ),
-            Segment(" ", fg=fg_primary),
-        ]
         is_selected = row.source_index in self._selected
         filename_fg = THEME.fg_staged_renamed if is_selected else fg_primary
-        icon = self._file_icon_glyph(file.name, is_dir=False)
-        icon_prefix = f"{icon} " if icon else ""
-        main = [
-            Segment(
-                indent + icon_prefix + row.name,
-                fg=filename_fg,
-                style_flags=cursor_flags,
-            )
-        ]
+        left = self._prefix_lanes(
+            staged,
+            unstaged,
+            self._file_icon_glyph(file.name, is_dir=False),
+            name_fg=filename_fg,
+            cursor_flags=cursor_flags,
+        )
+        main = [Segment(indent + row.name, fg=filename_fg, style_flags=cursor_flags)]
 
         right: list[Segment] = []
         label = _status_label(file)
@@ -1217,6 +1288,8 @@ class StatusPanel(OptionList):
             result.should_refresh,
             result.message,
         )
+        if report_nonerror(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
         else:

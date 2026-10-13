@@ -188,3 +188,19 @@ class TestRepo:
             has_inline_merged_conflicts=False,
         )
         git.discard_file(fake_file, path=test_repo)
+
+
+def test_repo_summary_names_the_revision():
+    """Without one, `git shortlog` reads the log from stdin whenever stdin is
+    not a terminal — so the same call summarised the current branch in a
+    terminal and nothing at all under a pipe. Pinning HEAD is what makes it
+    mean the same thing everywhere."""
+    from pigit.ext.executor_factory import MockExecutor
+    from pigit.git import GitApi
+
+    ex = MockExecutor(default=(0, "", ""))
+    GitApi(executor=ex, path="/repo").get_summary()
+
+    (cmd, _flags, _kw), *_ = ex.exec_calls
+    assert "shortlog" in cmd
+    assert cmd.rstrip().endswith("HEAD"), cmd

@@ -185,7 +185,7 @@ def test_remove_current_session_worktree_blocked(runtime):
         app._confirm_remove_worktree(info)
         toast.assert_called()
         msg = toast.call_args[0][0]
-        assert "先切换" in msg
+        assert msg == "Cannot remove the worktree you are in"
     app._alert_dialog.alert.assert_not_called()
 
 
@@ -194,7 +194,7 @@ def test_remove_main_worktree_blocked(runtime):
     info = WorktreeInfo("/elsewhere/main", "aaa", "main", True, False)
     with patch("pigit.app.show_toast") as toast:
         app._confirm_remove_worktree(info)
-        assert "主工作树" in toast.call_args[0][0]
+        assert "main worktree" in toast.call_args[0][0]
 
 
 def test_add_worktree_failure_toasts(runtime):

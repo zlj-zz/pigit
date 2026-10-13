@@ -42,12 +42,11 @@ from pigit.termui.wcwidth_table import (
 
 from .app_theme import THEME
 from .diff_content import (
-    DIFF_GIT_RE,
     DiffContent,
     Hunk,
     RenderLine,
     needs_full_source,
-    path_from_diff_git_line,
+    path_from_diff_line,
 )
 from .git.api import parse_index_hashes
 
@@ -56,11 +55,15 @@ _logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class _FileSection:
-    """One file span in a multi-file unified diff (from a ``diff --git`` line)."""
+    """One file span in a multi-file unified diff (from a boundary line)."""
 
     path: str
     first_hunk_start: int
     header_start: int
+    #: Changed lines in this span. Counted once, where the span is found, so
+    #: the top bar does not re-scan the file on every frame.
+    adds: int
+    dels: int
 
 
 @dataclasses.dataclass
@@ -259,18 +262,18 @@ class DiffViewer(Component):
         self._rebuild_file_sections()
 
     def _path_from_header(self, idx: int) -> str | None:
-        """Extract the ``b/`` path from a ``diff --git`` line at ``idx``."""
+        """Extract the file path from the boundary line at ``idx``."""
         if idx < 0 or idx >= len(self._lines):
             return None
-        path = path_from_diff_git_line(self._lines[idx])
+        path = path_from_diff_line(self._lines[idx])
         return path or None
 
     def _rebuild_file_sections(self) -> None:
-        """Rebuild ``_file_sections`` from ``diff --git`` lines (incl. binary)."""
+        """Rebuild ``_file_sections`` from file-boundary lines (incl. binary)."""
         sections: list[_FileSection] = []
         headers: list[int] = []
         for i, line in enumerate(self._lines):
-            if DIFF_GIT_RE.match(line):
+            if DiffContent.is_file_boundary(line):
                 headers.append(i)
         for hi, header_start in enumerate(headers):
             path = self._path_from_header(header_start) or ""
@@ -280,17 +283,36 @@ class DiffViewer(Component):
                 if header_start <= hunk.start < next_header:
                     first_hunk = hunk.start
                     break
+            adds, dels = self._count_changes(header_start, next_header)
             sections.append(
                 _FileSection(
                     path=path,
                     first_hunk_start=first_hunk,
                     header_start=header_start,
+                    adds=adds,
+                    dels=dels,
                 )
             )
         self._file_sections = sections
         self._file_nav_counter_cols = None
         self._cached_nav_line_i = -1
         self._cached_nav_index = -1
+
+    def _count_changes(self, start: int, end: int) -> tuple[int, int]:
+        """Added and deleted lines in ``_lines[start:end]``.
+
+        Uses the renderer's own predicates, so a file's ``---``/``+++``
+        headers -- which do start with ``-``/``+`` -- are not counted as a
+        change. A binary file, a rename or a mode change has neither and
+        comes back ``(0, 0)``.
+        """
+        adds = dels = 0
+        for line in self._lines[start:end]:
+            if self._is_add_line(line):
+                adds += 1
+            elif self._is_del_line(line):
+                dels += 1
+        return adds, dels
 
     def _tokens_at(
         self, idx: int, line: str, *, strip_diff_prefix: bool
@@ -499,6 +521,7 @@ class DiffViewer(Component):
 
     # Static helpers re-exported for tests that still call DiffViewer.* (thin aliases).
     _is_file_header = staticmethod(DiffContent.is_file_header)
+    _is_file_boundary = staticmethod(DiffContent.is_file_boundary)
     _is_add_line = staticmethod(DiffContent.is_add_line)
     _is_del_line = staticmethod(DiffContent.is_del_line)
     _word_diff_ranges = staticmethod(DiffContent.word_diff_ranges)
@@ -1278,10 +1301,11 @@ class DiffViewer(Component):
         surface.draw_text_rgb(0, col, trim, fg=fg, bg=bg, style_flags=style_flags)
 
     def _draw_file_nav_bar(self, surface: Surface) -> None:
-        """Paint ``▸ cur/total path`` on row 0; record counter hit columns.
+        """Paint ``▸ cur/total +N −M path`` on row 0; record counter hit columns.
 
         The counter renders in the accent color so it reads as the clickable
-        control; the path stays muted as content.
+        control; the change counts keep the diff's add/delete tones, and the
+        path stays muted as content.
         """
         self._file_nav_counter_cols = None
         if not self._file_nav_active():
@@ -1289,29 +1313,64 @@ class DiffViewer(Component):
         cur = self.current_file_index()
         if cur < 0:
             return
-        total = len(self._file_sections)
-        path = self._file_sections[cur].path
-        counter = f"▸ {cur + 1}/{total}"
-        col = 2
+        section = self._file_sections[cur]
+        counter = f"▸ {cur + 1}/{len(self._file_sections)}"
+        counter_col = 2
         w = surface.width
         budget = max(0, w - 4)
         counter_w = wcswidth(counter)
         if counter_w > budget:
             # Counter itself is truncated away; there is no clickable region.
-            self._file_nav_counter_cols = None
             return
         self._draw_top_bar(
-            surface, counter, fg=THEME.fg_accent, bg=THEME.bg_chrome, col=col
+            surface, counter, fg=THEME.fg_accent, bg=THEME.bg_chrome, col=counter_col
         )
-        rest = f" {path}"
-        rest_budget = budget - counter_w
-        if rest_budget > 0 and wcswidth(rest) > rest_budget:
-            rest = truncate_by_width(rest, rest_budget)
-        if rest_budget > 0:
-            surface.draw_text_rgb(
-                0, col + counter_w, rest, fg=THEME.fg_muted, bg=THEME.bg_chrome
-            )
-        self._file_nav_counter_cols = (col, col + counter_w)
+        col = counter_col + counter_w
+        budget -= counter_w
+
+        # Counts before path: the counts are a few fixed columns and the path
+        # is unbounded, so only the elastic part is ever cut on a narrow term.
+        stat_w = self._draw_change_counts(surface, section, col=col, budget=budget)
+        col += stat_w
+        budget -= stat_w
+
+        if budget > 0:
+            rest = f" {section.path}"
+            if wcswidth(rest) > budget:
+                rest = truncate_by_width(rest, budget)
+            surface.draw_text_rgb(0, col, rest, fg=THEME.fg_muted, bg=THEME.bg_chrome)
+        self._file_nav_counter_cols = (counter_col, counter_col + counter_w)
+
+    def _draw_change_counts(
+        self, surface: Surface, section: _FileSection, *, col: int, budget: int
+    ) -> int:
+        """Paint ``+N −M`` for *section*; return the columns it took.
+
+        A zero side is left out rather than shown as ``+0 −0``: a binary file,
+        a rename and a mode change all change no lines, and the pair would
+        read as a change that never happened. Nothing is drawn when both are
+        zero, or when the counts do not fit in *budget* -- they are one
+        segment, not something to show half of.
+        """
+        # Each part carries its own leading gap, drawn with the bar's
+        # background -- the way the path below is drawn. Reserving the gap
+        # without painting it leaves the box border showing between the
+        # numbers.
+        parts: list[tuple[str, tuple[int, int, int]]] = []
+        if section.adds:
+            parts.append((f" +{section.adds}", THEME.fg_success))
+        if section.dels:
+            parts.append((f" −{section.dels}", THEME.fg_danger))
+        if not parts:
+            return 0
+        width = sum(wcswidth(text) for text, _ in parts)
+        if width > budget:
+            return 0
+        x = col
+        for text, fg in parts:
+            surface.draw_text_rgb(0, x, text, fg=fg, bg=THEME.bg_chrome)
+            x += wcswidth(text)
+        return width
 
     def _file_history_header(self) -> str:
         """Build the header line for File History view."""

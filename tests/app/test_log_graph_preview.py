@@ -30,6 +30,7 @@ from pigit.viewmodels.branch import IBranchViewModel
 def vm() -> Mock:
     mock = Mock(spec=IBranchViewModel)
     mock.items = Signal([])
+    mock.load_error = Signal(None)
     mock.load_log_graph.return_value = ["* abc feat", "* def main"]
     return mock
 

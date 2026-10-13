@@ -729,3 +729,26 @@ class TestIterCommitsAuthorEmail:
             if str(cmd).startswith("git log")
         )
         assert "%ae" in log_cmd and "%aN" in log_cmd
+
+
+class TestCreateBranch:
+    def test_from_head_carries_no_start_point(self):
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+
+        git.create_branch("feature-x")
+
+        cmd, _flags, _kws = ex.exec_calls[-1]
+        assert cmd == "git checkout -b feature-x"
+
+    def test_a_start_point_is_tracked_explicitly(self):
+        """``--track`` is spelled out rather than left to git's
+        ``branch.autoSetupMerge``: the caller asked for a branch that tracks
+        that ref, and a global ``false`` must not leave it dangling."""
+        ex = MockExecutor(default=(0, "", ""))
+        git = GitApi(executor=ex, path="/repo")
+
+        git.create_branch("feature-x", "origin/feature-x")
+
+        cmd, _flags, _kws = ex.exec_calls[-1]
+        assert cmd == "git checkout -b feature-x --track origin/feature-x"

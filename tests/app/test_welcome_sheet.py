@@ -102,6 +102,7 @@ def test_welcome_panel_keys_match_app_bindings(mount_welcome_app):
         "universal.goto_stash",
         "universal.goto_branch",
         "universal.goto_commit",
+        "universal.goto_graph",
     ):
         assert panels[0].keys_display  # non-empty
         assert by_action[action].keys_display == app_rows[action].keys_display
@@ -131,7 +132,10 @@ def test_welcome_preferred_height_uses_two_thirds_cap(mount_welcome_app):
     cap = int(term_h * WELCOME_SHEET_MAX_FRACTION)
     assert sheet.preferred_sheet_height(term_h) == min(want, cap)
     tall = WelcomeSheet(on_dismiss=lambda: None, rows=rows)
-    assert tall.preferred_sheet_height(60) == want
+    # Derived rather than a fixed height, so growing the guide by a row cannot
+    # turn "there is room" into "the cap bit" and read as a regression.
+    tall_h = int(want / WELCOME_SHEET_MAX_FRACTION) + 2
+    assert tall.preferred_sheet_height(tall_h) == want
     from pigit.termui.widgets.sheet import Sheet
 
     assert Sheet.resolve_height(
@@ -241,3 +245,33 @@ def test_show_welcome_noop_when_overlay_open(mount_welcome_app, state_path):
     app.toggle_help()
     app.show_welcome()
     assert app._help_popup.open is True
+
+
+def test_the_welcome_guide_covers_the_everyday_git_actions():
+    """The footer keeps to a few slots, so this guide is the only place a new
+    user meets push/pull — they carry tips like everything else, but nothing
+    else surfaces them."""
+    from pigit.app_welcome import _WELCOME_GLOBAL_ACTIONS
+
+    for action in (
+        "universal.push",
+        "universal.pull",
+        "universal.bisect",
+        "universal.recent",
+        "universal.switch_repo",
+    ):
+        assert action in _WELCOME_GLOBAL_ACTIONS
+
+
+def test_every_welcome_global_action_is_a_real_binding():
+    """The guide resolves actions out of the registry; a typo would render as
+    a missing row rather than an error."""
+    from pigit.app import PigitApplication
+    from pigit.app_welcome import _WELCOME_GLOBAL_ACTIONS
+    from pigit.config_data import AppConfig
+
+    app = PigitApplication(config=AppConfig(repo_observe=False))
+    app.build_root()
+    known = {b.action for b in app._action_bindings}
+
+    assert set(_WELCOME_GLOBAL_ACTIONS) <= known

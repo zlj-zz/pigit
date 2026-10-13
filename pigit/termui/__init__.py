@@ -57,6 +57,7 @@ from .overlay import (
     exec_external,
     get_badge,
     get_badge_signal,
+    get_toast_signal,
     hide_spinner,
     run_with_spinner,
     show_badge,
@@ -79,6 +80,7 @@ from . import keys
 from .surface import Surface
 from .segment import Segment
 from . import palette
+from .palette import blend
 from .theme import DEFAULT_THEME, Theme, get_theme, set_theme
 
 from .mouse import MouseButton, MouseEvent, MouseKind
@@ -124,6 +126,7 @@ __all__ = [
     "Surface",
     "Segment",
     "palette",
+    "blend",
     "Theme",
     "DEFAULT_THEME",
     "get_theme",
@@ -146,6 +149,7 @@ __all__ = [
     "show_badge",
     "get_badge",
     "get_badge_signal",
+    "get_toast_signal",
     "show_spinner",
     "hide_spinner",
     "run_with_spinner",

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
+
 import pytest
 
 from pigit.app_diff import DiffViewer
@@ -40,16 +42,29 @@ class TestDiffViewer:
 
     def testpaint_diff(self):
         d = DiffViewer()
-        d.set_content(["+added", "-removed", " context"])
-        d.resize((20, 5))
-        s = Surface(20, 5)
+        # A real fragment: the gutter numbers a hunk's own lines, so content
+        # with no @@ header has nothing to number (see the numbering tests).
+        d.set_content(
+            [
+                "diff --git a/f.py b/f.py",
+                "--- a/f.py",
+                "+++ b/f.py",
+                "@@ -1,2 +1,2 @@",
+                "-removed",
+                "+added",
+            ]
+        )
+        d.resize((30, 10))
+        s = Surface(30, 10)
         d.paint(s)
         # With box border: row 0 = top border, row 1+ = content, last row = bottom border
         lines = s.lines()
         assert "\u250c" in lines[0]  # ┌ top-left corner
         assert "\u2510" in lines[0]  # ┐ top-right corner
-        assert "0" in lines[1]
-        assert "+added" in lines[1]
+        # Row 5 is content index 4: "-removed", old line 1 of the hunk.
+        assert lines[5].startswith("│   1")
+        assert "removed" in lines[5]
+        assert "+added" in lines[6]
         assert "\u2514" in lines[-1]  # └ bottom-left corner
         assert "\u2518" in lines[-1]  # ┘ bottom-right corner
 
@@ -354,6 +369,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -370,6 +386,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -389,9 +406,10 @@ class TestBranchPanelLifecycle:
 
         old_vm = Mock(spec=IBranchViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = BranchPanel(
             get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm
         )
@@ -418,9 +436,10 @@ class TestBranchPanelLifecycle:
 
         old_vm = Mock(spec=IBranchViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IBranchViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = BranchPanel(
             get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=old_vm
         )  # not mounted
@@ -440,6 +459,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_branch import BranchPanel
 
         panel = BranchPanel(
@@ -459,6 +479,7 @@ class TestBranchPanelLifecycle:
 
         vm = Mock(spec=IBranchViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.get_remote_url.return_value = "git@github.com:zlj-zz/pigit.git"
         opened: list[str] = []
         monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
@@ -483,6 +504,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
@@ -497,6 +519,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         from pigit.app_commit import CommitPanel
 
         panel = CommitPanel(vm=vm)
@@ -514,9 +537,11 @@ class TestCommitPanelLifecycle:
 
         old_vm = Mock(spec=ICommitViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         old_vm.graph_rows = []
         new_vm = Mock(spec=ICommitViewModel)
         new_vm.items = Signal([])
+        new_vm.load_error = Signal(None)
         new_vm.graph_rows = []
 
         panel = CommitPanel(vm=old_vm)
@@ -544,6 +569,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.graph_rows = []
         vm.remotes = ()
         from pigit.app_commit import CommitPanel
@@ -568,6 +594,7 @@ class TestCommitPanelLifecycle:
 
         vm = Mock(spec=ICommitViewModel)
         vm.items = Signal([])
+        vm.load_error = Signal(None)
         vm.graph_rows = []
         vm.remotes = ()
         panel = CommitPanel(vm=vm)
@@ -630,9 +657,10 @@ class TestStatusPanelLifecycle:
 
         old_vm = Mock(spec=IStatusViewModel)
         old_vm.items = Signal([])
+        old_vm.load_error = Signal(None)
         new_vm = Mock(spec=IStatusViewModel)
         new_vm.items = Signal([])
-
+        new_vm.load_error = Signal(None)
         panel = StatusPanel(vm=old_vm, default_view="flat")
         panel.mount()
         old_vm.refresh.reset_mock()
@@ -681,99 +709,191 @@ class TestStatusPanelLifecycle:
         assert [f.name for f in panel.files] == ["fresh.py"]
 
 
-class TestCommitReport:
-    """Bottom contribution-graph report strip on the Commit panel."""
+def _commits_on_day(days_ago: int, count: int) -> list:
+    """*count* commits sharing one day, ``days_ago`` days back."""
+    import datetime
 
-    def _panel(self, report_default: bool = True):
+    from pigit.git.model import Commit
+
+    stamp = datetime.datetime.now() - datetime.timedelta(days=days_ago, hours=1)
+    ts = int(stamp.timestamp())
+    return [
+        Commit(f"{days_ago:04x}{i:04x}", f"msg {i}", "Zev", ts, "pushed", "", [])
+        for i in range(count)
+    ]
+
+
+class TestContributionPanel:
+    """The Graph tab: a board of blocks fed by the commit item signal."""
+
+    def _panel(self, commits=None):
         from unittest.mock import Mock
-        from pigit.viewmodels.commit import ICommitViewModel
+
+        from pigit.app_graph_panel import ContributionPanel
         from pigit.termui.reactive import Signal
-        from pigit.app_commit import CommitPanel
+        from pigit.viewmodels.commit import ICommitViewModel
 
         vm = Mock(spec=ICommitViewModel)
-        vm.items = Signal([])
-        vm.graph_rows = []
-        panel = CommitPanel(vm=vm, report_default=report_default)
+        vm.items = Signal(commits or [])
+        vm.load_error = Signal(None)
+        panel = ContributionPanel(vm=vm)
         panel.mount()
-        return panel
+        return vm, panel
 
-    def test_hidden_at_or_below_19_rows(self):
-        panel = self._panel()
-        panel.resize((80, 10))
-        assert panel._footer_h == 0
-        panel.resize((80, 19))
-        assert panel._footer_h == 0  # 19 is not > 19
+    def test_replaced_list_rebuilds_instead_of_appending(self):
+        """A longer list of new commits is a re-pin, not a streamed batch.
 
-    def test_visible_above_19_rows(self):
-        panel = self._panel()
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
+        Only length is compared by the naive rule, so re-pinning to a longer
+        ref would count the old ref's commits and then top up with the new
+        ref's tail — inflating the peak day.
+        """
+        vm, panel = self._panel()
+        vm.items.set(_commits_on_day(0, 3))
+        assert sum(panel._heatmap._day_counts.values()) == 3
 
-    def test_hidden_when_default_off(self):
-        panel = self._panel(report_default=False)
-        panel.resize((80, 50))
-        assert panel._footer_h == 0
+        vm.items.set(_commits_on_day(1, 5))
+        assert panel._heatmap._max_count == 5
+        assert sum(panel._heatmap._day_counts.values()) == 5
 
-    def test_toggle_report_flips_strip(self):
-        panel = self._panel()
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
-        panel.toggle_report()
-        assert not panel._report_enabled
-        assert panel._footer_h == 0
-        panel.toggle_report()
-        assert panel._report_enabled
-        assert panel._footer_h == 15
-
-    def test_toggle_report_toasts_when_panel_too_short(self):
+    def test_streamed_batch_appends_without_rebuilding(self):
+        """Every block sees the same decision, and none recounts everything."""
         from unittest.mock import patch
 
-        panel = self._panel()
-        panel.resize((80, 15))  # below the > 19 gate
-        assert panel._footer_h == 0
-        with patch("pigit.app_commit.show_toast") as toast:
-            panel.toggle_report()
-        toast.assert_called_once()
-        msg, _kwargs = toast.call_args
-        assert "rows" in msg[0].lower()
+        def counting(block, counter, key):
+            """Wrap one method so the call is counted as well as run."""
+            original = getattr(block, key)
 
-    def test_render_splits_list_and_report(self):
-        import datetime
+            def wrapper(*args, **kwargs):
+                counter[key] += 1
+                return original(*args, **kwargs)
 
+            return patch.object(block, key, wrapper)
+
+        vm, panel = self._panel()
+        counters = [
+            {name: 0 for name in ("set_commits", "add_commits")} for _ in panel._blocks
+        ]
+        with ExitStack() as stack:
+            for block, counter in zip(panel._blocks, counters, strict=True):
+                for name in ("set_commits", "add_commits"):
+                    stack.enter_context(counting(block, counter, name))
+
+            first = _commits_on_day(0, 3)
+            vm.items.set(first)
+            assert [c["set_commits"] for c in counters] == [1] * len(panel._blocks)
+            assert [c["add_commits"] for c in counters] == [0] * len(panel._blocks)
+
+            vm.items.set([*first, *_commits_on_day(1, 2)])
+            assert [c["set_commits"] for c in counters] == [1] * len(
+                panel._blocks
+            ), "an extension must not rebuild"
+            assert [c["add_commits"] for c in counters] == [1] * len(panel._blocks)
+
+        assert sum(panel._heatmap._day_counts.values()) == 5
+        assert sum(panel._chart._chart._series["Zev"]) == 5
+        assert sum(panel._punch_card._hour_counts.values()) == 5
+
+    def test_mount_replays_items_loaded_before_mount(self):
         from unittest.mock import Mock
-        from pigit.git.model import Commit
-        from pigit.viewmodels.commit import ICommitViewModel
+
+        from pigit.app_graph_panel import ContributionPanel
         from pigit.termui.reactive import Signal
-        from pigit.termui.surface import Surface
-        from pigit.app_commit import CommitPanel
+        from pigit.viewmodels.commit import ICommitViewModel
 
         vm = Mock(spec=ICommitViewModel)
-        vm.items = Signal([])
-        vm.graph_rows = []
-        panel = CommitPanel(vm=vm)
+        vm.items = Signal(_commits_on_day(0, 2))
+        vm.load_error = Signal(None)
+        panel = ContributionPanel(vm=vm)
         panel.mount()
-        now = int(datetime.datetime.now().timestamp())
-        commits = [
-            Commit(
-                f"{i:08x}",
-                f"msg {i}",
-                "Zev",
-                now - i * 86400,
-                "pushed",
-                "",
-                [],
-            )
-            for i in range(30)
-        ]
-        vm.items.set(commits)
-        panel.resize((80, 50))
-        assert panel._footer_h == 15
-        surface = Surface(80, 50)
+        assert sum(panel._heatmap._day_counts.values()) == 2
+        assert panel._chart._chart._series
+
+    def test_set_vm_drops_the_previous_repo_counts(self):
+        from unittest.mock import Mock
+
+        from pigit.termui.reactive import Signal
+        from pigit.viewmodels.commit import ICommitViewModel
+
+        vm, panel = self._panel()
+        vm.items.set(_commits_on_day(0, 4))
+        assert sum(panel._heatmap._day_counts.values()) == 4
+
+        other = Mock(spec=ICommitViewModel)
+        other.items = Signal(_commits_on_day(1, 1))
+        other.load_error = Signal(None)
+        panel.set_vm(other)
+        assert sum(panel._heatmap._day_counts.values()) == 1
+
+    def test_mouse_wheel_pans_the_board(self):
+        from pigit.termui import MouseButton, MouseKind
+
+        class _Event:
+            kind = MouseKind.PRESS
+            button = MouseButton.WHEEL_RIGHT
+
+        _, panel = self._panel()
+        panel.resize((40, 10))
+        assert panel._board.content_size[0] > 40, "nothing to pan otherwise"
+
+        assert panel.handle_mouse(_Event()) is True
+        assert panel._board.pan[1] > 0  # pan is (rows, cols)
+
+    def test_the_banner_takes_its_rows_off_the_top(self):
+        """The wordmark is fixed panel chrome, so the board gets the rest."""
+        from pigit.app_graph_panel import _BANNER_H
+
+        _, panel = self._panel()
+        panel.resize((100, 30))
+        assert panel._board.viewport_size == (100, 30 - _BANNER_H)
+
+    def test_the_banner_does_not_pan_with_the_board(self):
+        """It is part of the panel, not a block on the canvas."""
+        from pigit.app_graph_panel import _BANNER, _BANNER_H, _BANNER_PAD_LEFT
+
+        _, panel = self._panel()
+        panel.resize((120, 30))
+
+        def banner_rows() -> list[str]:
+            surface = Surface(120, 30)
+            panel.paint(surface)
+            return ["".join(cell.char for cell in row) for row in surface._rows[:5]]
+
+        before = banner_rows()
+        pad = " " * _BANNER_PAD_LEFT
+        assert before[0].rstrip() == pad + _BANNER[0]
+        assert before[_BANNER_H - 1].rstrip() == pad + _BANNER[-1]
+        assert before[1][_BANNER_PAD_LEFT] == "/", "the mark is inset from the edge"
+
+        panel._board.pan_by(rows=5, cols=5)
+        assert banner_rows() == before
+
+    def test_a_narrow_panel_clips_the_banner_rather_than_wrapping_it(self):
+        _, panel = self._panel()
+        panel.resize((20, 30))
+        surface = Surface(20, 30)
         panel.paint(surface)
-        rows = ["".join(c.char for c in r) for r in surface._rows]
-        # List rows occupy the top 35; report cells fill the bottom 15.
-        assert any("msg" in row for row in rows[:35])
-        assert any("■" in row for row in rows[35:])
+        rows = ["".join(cell.char for cell in row) for row in surface._rows]
+        assert rows[0].startswith("  ______")
+        assert all(len(row) == 20 for row in rows)
+
+    def test_a_panel_shorter_than_the_banner_does_not_crash(self):
+        from pigit.app_graph_panel import _BANNER_H
+
+        _, panel = self._panel()
+        panel.resize((40, _BANNER_H - 1))
+        assert panel._board.viewport_size[1] == 0
+        panel.paint(Surface(40, _BANNER_H - 1))
+
+    def test_resize_relays_out_the_board(self):
+        """Wrapping follows the width, so the panel has to forward resizes."""
+        _, panel = self._panel()
+        panel.resize((240, 30))
+        wide = panel._board.content_size
+        panel.resize((80, 30))
+        narrow = panel._board.content_size
+
+        assert narrow[0] < wide[0]
+        assert narrow[1] > wide[1]
 
 
 class TestScrollLeftMarker:

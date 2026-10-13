@@ -154,13 +154,52 @@ class StepLineChart(Component):
         self._x_labels: list[tuple[int, str]] = []
         self._overall_max = 0
 
+    # Rows spent below the plot: the x-axis line and its tick labels, then a
+    # band of two — one for the series legend, one that a caller drawing
+    # another graph alongside shares with its own legend and stats line.
+    _X_AXIS_H = 2
+    _LEGEND_H = 2
+
+    @property
+    def _title_h(self) -> int:
+        """Rows the title costs; 0 when there is no title."""
+        return 1 if self._title else 0
+
+    @property
+    def total_h(self) -> int:
+        """Rows this chart needs to render in full."""
+        return self._title_h + self._plot_h + self._X_AXIS_H + self._LEGEND_H
+
+    @property
+    def legend_row(self) -> int:
+        """Row the series legend sits on, counted from the chart's top.
+
+        Part of the chart's own layout, not of the surface it was handed: a
+        caller with a taller box must not move it.
+        """
+        return self.total_h - self._LEGEND_H
+
     @property
     def min_size(self) -> tuple[int, int]:
         """Return (min_width, min_height) needed to render the chart."""
-        title_h = 1 if self._title else 0
-        total_h = title_h + self._plot_h + 2 + 2  # x_axis(2) + legend(2)
         min_w = self._padding_left + self._y_axis_label_w + 1 + self._plot_w
-        return (min_w, total_h)
+        return (min_w, self.total_h)
+
+    @property
+    def natural_size(self) -> tuple[int, int]:
+        """Size that fits every label, not just the plot.
+
+        ``min_size`` stops at the plot's right edge. X-axis labels are drawn
+        past it, and one that does not fit is dropped silently, so the width
+        this chart needs is where the rightmost label ends. Uses the same
+        geometry as :meth:`paint`, so the two cannot drift.
+        """
+        axis_col = self._padding_left + self._y_axis_label_w
+        label_end = max(
+            (axis_col + 1 + col + len(text) for col, text in self._x_labels),
+            default=0,
+        )
+        return (max(self.min_size[0], label_end), self.total_h)
 
     def set_series(
         self,
@@ -189,10 +228,8 @@ class StepLineChart(Component):
     def paint(self, surface: Surface) -> None:
         plot_w = self._plot_w
         plot_h = self._plot_h
-        title_h = 1 if self._title else 0
-        x_axis_h = 2
-        legend_h = 2
-        total_h = title_h + plot_h + x_axis_h + legend_h
+        title_h = self._title_h
+        total_h = self.total_h
 
         min_width = self._padding_left + self._y_axis_label_w + 1 + plot_w
         if surface.height < total_h or surface.width < min_width:
@@ -316,10 +353,9 @@ class StepLineChart(Component):
                             next_row, col, _BOX_CORNER_BL, fg=color, bg=self._bg
                         )
 
-        # Legend shares the report bottom band with heatmap "Less" (row surf_h-2).
-        legend_row = surf_h - 2
-        if legend_row <= x_axis_row + 1:
-            return
+        # A fixed row of the chart's own layout, not of the surface it was
+        # handed: a caller with a taller box must not move the legend.
+        legend_row = self.legend_row
         x = self._padding_left
         for aidx, (name, series) in enumerate(self._series.items()):
             color = self._series_color(name, aidx, num_colors)

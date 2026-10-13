@@ -21,9 +21,18 @@ from pigit.termui import (
     show_badge,
     show_toast,
 )
-from pigit.termui.widgets import AlertDialog, OptionList, SectionRule
+from pigit.termui.widgets import (
+    ACCENT_BAR,
+    AlertDialog,
+    OptionList,
+    SectionRule,
+)
 
+from .app_theme import report_nonerror
+from .ext.utils import relative_time
 from .app_diff import DiffType
+from .app_row_slots import pad_to_width, status_lane
+from pigit.termui.wcwidth_table import wcswidth
 from .viewmodels.base import ActionResult
 
 if TYPE_CHECKING:
@@ -34,7 +43,8 @@ if TYPE_CHECKING:
 class StashPanel(OptionList):
     """Stash list panel with cursor navigation."""
 
-    CURSOR = "●"
+    CURSOR = ACCENT_BAR
+    CURSOR_ACCENT = True
     keymap_namespace = "stash"
     TAB_NAME = "Stash"
     tab_key = "2"
@@ -58,14 +68,7 @@ class StashPanel(OptionList):
         self._on_toggle_preview = on_toggle_preview
         self._alert_dialog = AlertDialog(on_result=lambda _: None)
         self.stashes: list[Stash] = []
-
-    def mount(self) -> None:
-        # Warm-mounted under Status Column: do not run git here — load on focus.
-        super().mount()
-
-    def on_focus(self) -> None:
-        """Reload stash list when this panel becomes the focused Column child."""
-        self._load_stashes()
+        self._max_right_w = 0
 
     def set_vm(self, vm: IStatusViewModel) -> None:
         """Retarget this panel to a new Status ViewModel (repo session switch).
@@ -77,18 +80,22 @@ class StashPanel(OptionList):
             self._load_stashes()
 
     def _load_stashes(self) -> None:
+        """Fetch the list and publish it."""
         try:
             self.stashes = self._vm.load_stashes()
         except Exception as exc:
             self.stashes = []
-            self.set_content([])
             show_toast(str(exc), duration=2.0, kind=FeedbackKind.ERROR)
-            return
-        if not self.stashes:
-            self.set_content([])
-            return
+        self._max_right_w = max(
+            (
+                sum(wcswidth(seg.text) for seg in self._right_segments(st))
+                for st in self.stashes
+            ),
+            default=0,
+        )
         self.set_content([s.msg for s in self.stashes])
-        self.emit(EVT_SELECTION_CHANGED)
+        if self.stashes:
+            self.emit(EVT_SELECTION_CHANGED)
 
     def refresh(self):
         self._load_stashes()
@@ -211,14 +218,32 @@ class StashPanel(OptionList):
         fg_primary = self.presentation_fg("primary")
         cursor_flags = palette.STYLE_BOLD if is_cursor else 0
 
-        left = [
-            Segment(" ", fg=fg_primary),
-        ]
+        left = status_lane([], pad_fg=fg_primary)
         main = [Segment(stash.msg, fg=fg_primary, style_flags=cursor_flags)]
-        right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
+        right = self._right_segments(stash)
+        if right and self._max_right_w:
+            right = pad_to_width(
+                right,
+                self._max_right_w,
+                pad_fg=self.presentation_fg("muted"),
+                at_front=True,
+            )
+        self._band_cursor_row(left, is_cursor)
         return left, main, right
 
+    def _right_segments(self, stash: Stash) -> list[Segment]:
+        """The metadata column: the stash ref, then when it was made."""
+        right = [Segment(stash.ref, fg=self.presentation_fg("muted"))]
+        if stash.when:
+            right.append(Segment("  ", fg=self.presentation_fg("muted")))
+            right.append(
+                Segment(relative_time(stash.when), fg=self.presentation_fg("muted"))
+            )
+        return right
+
     def _handle_result(self, result) -> None:
+        if report_nonerror(result):
+            return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
             self._load_stashes()

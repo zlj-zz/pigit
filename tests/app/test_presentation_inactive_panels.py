@@ -80,25 +80,28 @@ def _status_file(name: str = "a.py", short_status: str = "M ") -> File:
 def test_status_filename_inactive_under_steal_xy_semantic_kept() -> None:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     panel = StatusPanel(vm=vm, default_view="flat", nerd_icons=False)
     panel.files = [_status_file()]
     panel.content = [panel.files[0].display_str]
 
+    # left = [staged][unstaged][icon][space]; the status lanes lead now.
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
-    assert left[1].fg == THEME.fg_success  # staged M
+    assert left[0].fg == THEME.fg_success  # staged M
 
     _steal_presentation()
     left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_inactive
-    assert left[1].fg == THEME.fg_success
+    assert left[0].fg == THEME.fg_success
     assert right[0].fg == THEME.fg_success  # Staged label
 
 
 def test_status_multiselect_keeps_renamed_color_under_steal() -> None:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     panel = StatusPanel(vm=vm, default_view="flat")
     panel.files = [_status_file()]
@@ -113,6 +116,7 @@ def test_status_multiselect_keeps_renamed_color_under_steal() -> None:
 def test_commit_message_inactive_refs_keep_color() -> None:
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.graph_rows = []
     vm.remotes = ()
     panel = CommitPanel(vm=vm)
@@ -160,6 +164,7 @@ def test_unpushed_commit_glyph_stays_semantic_under_steal() -> None:
 
     vm = Mock(spec=ICommitViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.remotes = ()
     commit = Commit("deadbeefaaaa", "wip", "Zev", 0, "unpushed", "", [])
     vm.graph_rows = [
@@ -185,6 +190,7 @@ def test_unpushed_commit_glyph_stays_semantic_under_steal() -> None:
 def test_status_dir_summary_stays_fg_dim() -> None:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.repo_path = "/tmp/repo"
     panel = StatusPanel(vm=vm, default_view="tree")
     panel._all_files = [
@@ -201,6 +207,7 @@ def test_status_dir_summary_stays_fg_dim() -> None:
 def test_branch_head_remote_keep_local_inactive_under_steal() -> None:
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     panel = BranchPanel(
         get_git=lambda: Mock(bisect_status=Mock(return_value=None)), vm=vm
     )
@@ -223,12 +230,13 @@ def test_branch_head_remote_keep_local_inactive_under_steal() -> None:
 def test_stash_message_and_ref_inactive_under_steal() -> None:
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal([])
+    vm.load_error = Signal(None)
     vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
 
     _left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
@@ -241,9 +249,11 @@ def test_stash_message_and_ref_inactive_under_steal() -> None:
 
 
 def test_status_stash_focus_switch_softens_non_leaf() -> None:
-    """Status↔Stash co-visible: non-leaf softens; semantic XY stays."""
+    """Two mounted panels, one on the focus chain: the other softens, and its
+    semantic colours survive the softening."""
     status_vm = Mock(spec=IStatusViewModel)
     status_vm.items = Signal([])
+    status_vm.load_error = Signal(None)
     status_vm.repo_path = "/tmp/repo"
     status = StatusPanel(vm=status_vm, default_view="flat")
     status.files = [_status_file()]
@@ -251,12 +261,13 @@ def test_status_stash_focus_switch_softens_non_leaf() -> None:
 
     stash_vm = Mock(spec=IStatusViewModel)
     stash_vm.items = Signal([])
+    stash_vm.load_error = Signal(None)
     stash_vm.load_stashes.return_value = [
         Stash(ref="stash@{0}", sha="abc0", msg="WIP on main")
     ]
     stash = StashPanel(vm=stash_vm)
     stash.mount()
-    stash.on_focus()
+    stash.refresh()
 
     root = ComponentRoot(status)
     root.resize((80, 24))
