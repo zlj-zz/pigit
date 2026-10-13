@@ -41,7 +41,7 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     return panel
 
 
@@ -103,7 +103,7 @@ def test_drop_requires_confirmation():
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
 
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
@@ -132,7 +132,7 @@ def test_drop_empty_list_is_noop():
     vm.stash_drop = Mock()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     with patch("pigit.app_stash.AlertDialog.alert") as alert:
         panel.drop()
         alert.assert_not_called()
@@ -213,7 +213,7 @@ def test_apply_keeps_stash_without_confirmation():
     )
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
     with patch("pigit.app_stash.show_badge"):
         panel.apply()
@@ -231,7 +231,7 @@ def test_get_inspector_snapshot_delegates_to_vm():
     vm.get_stash_snapshot.return_value = object()
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     panel.curr_no = 0
     assert panel.get_inspector_snapshot() is vm.get_stash_snapshot.return_value
     vm.get_stash_snapshot.assert_called_once_with("stash@{0}")
@@ -280,7 +280,7 @@ def _panel_with_dated_stashes(entries: list[tuple[str, int]]) -> StashPanel:
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
     return panel
 
 

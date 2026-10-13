@@ -12,8 +12,10 @@ import pytest
 
 from pigit.app import PigitApplication
 from pigit.config_data import AppConfig
+from pigit.git.model import Stash
 from pigit.termui import EVT_GOTO, keys
 from pigit.termui.root import ComponentRoot
+from pigit.termui.surface import Surface
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 
 
@@ -125,6 +127,77 @@ def test_number_keys_land_on_each_panel(runtime):
     assert _leaf(root) is app._status_panel
 
 
+def test_each_number_key_moves_the_page_not_only_the_focus(runtime):
+    """The focus leaf was already right before Stash had its own page: the
+    Column handed focus to the stash panel without the product tab ever moving.
+    The page is what has to change, so assert on the TabView as well."""
+    app, root = _mount(runtime)
+    for key, panel in (
+        ("2", app._stash_panel),
+        ("3", app._branch_panel),
+        ("4", app._commit_panel),
+        ("5", app._graph_panel),
+        ("1", app._status_panel),
+    ):
+        root._handle_event(key)
+        assert app._tab_view.visible is panel, f"key {key} did not switch the page"
+        assert _leaf(root) is panel
+
+
+def test_the_product_tabs_are_the_panel_ring(runtime):
+    """`panel_ring` and the TabView children are the same five things, in the
+    same order. That identity is the point of Stash having its own page, and
+    the tab bar depends on it."""
+    app, _root = _mount(runtime)
+    children = [c.id for c in app._tab_view.children]
+    assert children == ["status", "stash", "branch", "commit", "graph"]
+    assert children == [p.id for p in app._panel_nav.panel_ring()]
+
+
+def test_the_status_id_resolves_after_the_column_is_gone(runtime):
+    """`route_to("status")` is how the app returns to Status after a repo
+    switch, a merge conflict and a rebase. That id belonged to the Column that
+    held Status+Stash, so it has to resolve to the panel now."""
+    app, root = _mount(runtime)
+    root._handle_event("2")
+    assert app._tab_view.visible is app._stash_panel
+    app._tab_view.route_to("status")
+    assert app._tab_view.visible is app._status_panel
+
+
+def test_the_stash_page_paints_its_rows(runtime):
+    """Routing there mounts it and then loads it; the page has to carry rows,
+    not come up empty."""
+    app, root = _mount(runtime)
+    app._stash_panel._vm.load_stashes = lambda: [
+        Stash(ref="stash@{0}", sha="abc", msg="WIP on main")
+    ]
+    root._handle_event("2")
+    root.resize((80, 24))
+    surface = Surface(80, 24)
+    root.paint(surface)
+    assert "WIP on main" in "\n".join(surface.lines())
+
+
+def test_routing_to_stash_loads_it_once(runtime):
+    """`route_to` mounts the page and then calls its ``refresh``. Adding a
+    load to ``mount`` on top of that would run ``git stash list`` twice for
+    every visit."""
+    app, root = _mount(runtime)
+    calls: list[int] = []
+
+    def _load() -> list[Stash]:
+        calls.append(1)
+        return []
+
+    app._stash_panel._vm.load_stashes = _load
+    root._handle_event("2")
+    assert len(calls) == 1
+    root._handle_event("1")
+    root._handle_event("2")
+    assert len(calls) == 2
+
+
 def test_filter_consumes_digit_before_panel_goto(runtime):
     """An active search filter gets digits before the app-level goto bindings."""
     app, root = _mount(runtime)
@@ -191,8 +264,7 @@ def test_large_screen_commit_has_no_side_preview(runtime):
 def test_large_screen_stash_keeps_diff_preview(runtime):
     app, _root = _mount(runtime)
     app._is_large_screen = True
-    app._tab_view.route_to("status")
-    app._status_stack.set_focus_index(1)
+    app._tab_view.route_to("stash")
     app._apply_body_widths(140)
     ids = _body_ids(app)
     assert "preview" in ids

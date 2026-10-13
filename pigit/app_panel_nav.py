@@ -14,8 +14,8 @@ from pigit.app_commit import CommitPanel
 from pigit.app_graph_panel import ContributionPanel
 from pigit.app_stash import StashPanel
 from pigit.app_status import StatusPanel
-from pigit.termui import Component, resolve_presentation_leaf
-from pigit.termui.containers import Column, TabView
+from pigit.termui import Component
+from pigit.termui.containers import TabView
 
 
 class PanelNavigator:
@@ -28,7 +28,6 @@ class PanelNavigator:
         self,
         *,
         get_tab_view: Callable[[], TabView],
-        get_status_stack: Callable[[], Column],
         get_status_panel: Callable[[], StatusPanel],
         get_stash_panel: Callable[[], StashPanel],
         get_branch_panel: Callable[[], BranchPanel],
@@ -37,7 +36,6 @@ class PanelNavigator:
         get_worktree_busy: Callable[[], bool],
     ) -> None:
         self._get_tab_view = get_tab_view
-        self._get_status_stack = get_status_stack
         self._get_status_panel = get_status_panel
         self._get_stash_panel = get_stash_panel
         self._get_branch_panel = get_branch_panel
@@ -57,23 +55,16 @@ class PanelNavigator:
 
     def ring_index(self) -> int | None:
         """Index in the panel ring from the product TabView (ignore Diff detail)."""
-        tab = self._get_tab_view()
-        active = tab.visible
-        if active is self._get_status_stack():
-            leaf = self._get_status_stack().focus_child
-            if leaf is None:
-                leaf = resolve_presentation_leaf(active)
-        else:
-            leaf = active
-        if leaf is None:
+        active = self._get_tab_view().visible
+        if active is None:
             return None
         for idx, panel in enumerate(self.panel_ring()):
-            if leaf is panel:
+            if active is panel:
                 return idx
         return None
 
     def focus_destination(self, panel: Component) -> None:
-        """Move TabView + Status/Stash column focus to *panel*.
+        """Route the product TabView to *panel*.
 
         Refused, silently, while a working-tree rewrite is in flight: arriving
         at a panel mounts it, and Status reads the worktree the moment it
@@ -83,22 +74,7 @@ class PanelNavigator:
         """
         if self._get_worktree_busy():
             return
-        if panel is self._get_status_panel():
-            self._get_tab_view().route_to("status")
-            self._get_status_stack().set_focus_index(0)
-            return
-        if panel is self._get_stash_panel():
-            self._get_tab_view().route_to("status")
-            self._get_status_stack().set_focus_index(1)
-            return
-        if panel is self._get_branch_panel():
-            self._get_tab_view().route_to("branch")
-            return
-        if panel is self._get_commit_panel():
-            self._get_tab_view().route_to("commit")
-            return
-        if panel is self._get_graph_panel():
-            self._get_tab_view().route_to("graph")
+        self._get_tab_view().route_to(panel.id)
 
     def resolve_panel(self, target: object) -> Component | None:
         """Map a ring panel identity or product id string to a ring panel."""

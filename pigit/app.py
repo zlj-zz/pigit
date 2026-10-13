@@ -148,18 +148,12 @@ class PigitApplication(Application):
     keymap_namespace = "universal"
     min_terminal_size: tuple[int, int] = (65, 10)
     LARGE_SCREEN_COLS = 120
-    #: Rows for the Stash panel: a populated one takes a quarter of the screen
-    #: up to STASH_MAX_ROWS, and an empty one takes only STASH_MIN_ROWS -- the
-    #: two empty-state lines plus their header rule, which is all it draws.
-    STASH_MIN_ROWS = 3
-    STASH_MAX_ROWS = 10
 
     # Body tree — assigned in build_root; required for a live TUI session.
     _tab_view: TabView
     _split_pane: SplitPane
     _body_view: ExclusiveView
     _palette: CommandPalette
-    _status_stack: Column
     _status_panel: StatusPanel
     _stash_panel: StashPanel
     _branch_panel: BranchPanel
@@ -301,7 +295,7 @@ class PigitApplication(Application):
 
         self._status_panel = StatusPanel(
             vm=self._status_vm,
-            id="status_panel",
+            id="status",
             default_view=self._config.status_view,
             on_toggle_preview=self.toggle_side_preview,
             nerd_icons=resolve_nerd_icons(self._config.icons),
@@ -310,17 +304,9 @@ class PigitApplication(Application):
             vm=self._status_vm,
             id="stash",
             on_toggle_preview=self.toggle_side_preview,
-            on_items_changed=self._on_stash_items_changed,
         )
         status_panel = self._status_panel
         stash_panel = self._stash_panel
-        self._status_stack = Column(
-            children=[status_panel, stash_panel],
-            heights=["flex", 4],
-            focus_index=0,
-            id="status",
-        )
-        status_stack = self._status_stack
 
         self._branch_panel = BranchPanel(
             vm=self._branch_vm,
@@ -350,7 +336,8 @@ class PigitApplication(Application):
         )
         self._tab_view = TabView(
             children=[
-                status_stack,
+                status_panel,
+                stash_panel,
                 branch_panel,
                 commit_panel,
                 graph_panel,
@@ -420,7 +407,6 @@ class PigitApplication(Application):
 
         self._panel_nav = PanelNavigator(
             get_tab_view=lambda: tab_view,
-            get_status_stack=lambda: status_stack,
             get_status_panel=lambda: status_panel,
             get_stash_panel=lambda: stash_panel,
             get_branch_panel=lambda: branch_panel,
@@ -531,11 +517,11 @@ class PigitApplication(Application):
         """Yield the app, then the mounted components on the path to the focus leaf.
 
         Focus is the whole test, and it has to be. ``TabView`` cold-unmounts
-        the panel you leave and nothing reloads it, so its list is still
-        ``[]``; a warm-mounted sibling such as Stash loads only in ``on_focus``
-        (``app_stash.py:81``) and nothing has loaded it while the cursor is
-        elsewhere. Either way the action would quietly do nothing -- or, if the
-        list were staler than empty, act on a cursor nobody can see.
+        the panel you leave, so its list is still ``[]``: the action would
+        quietly do nothing -- or, if the list were staler than empty, act on a
+        cursor nobody can see. Every panel loads on the way in (``route_to``
+        mounts it, then calls its ``refresh``), so a panel the user is *on* is
+        a panel with content.
         """
         yield self
         node = self._focused_component()
@@ -576,8 +562,7 @@ class PigitApplication(Application):
             popup.toggle()
 
     def after_start(self):
-        cols, rows = terminal_size()
-        self._sync_stash_height(rows)
+        cols, _ = terminal_size()
         if self._is_large_screen:
             self._apply_body_widths(cols)
 
@@ -1080,7 +1065,7 @@ class PigitApplication(Application):
         return self._panel_nav.ring_index()
 
     def _focus_destination(self, panel: Component) -> None:
-        """Move TabView + Status/Stash column focus to *panel*."""
+        """Route the product TabView to *panel*."""
         self._panel_nav.focus_destination(panel)
 
     def _cycle_panel(self, step: int) -> None:
@@ -1836,33 +1821,14 @@ class PigitApplication(Application):
         if self._root is not None:
             self._root.dismiss_sheet()
 
-    def _sync_stash_height(self, rows: int) -> None:
-        """Size the Stash panel to what it is showing.
-
-        A quarter of the screen was held for an empty panel, and every one of
-        those rows came out of Status's flex row.
-        """
-        if self._stash_panel.is_empty():
-            height = self.STASH_MIN_ROWS
-        else:
-            height = min(
-                max(self.STASH_MIN_ROWS, int(rows * 0.25)), self.STASH_MAX_ROWS
-            )
-        self._status_stack.set_heights(["flex", height])
-
-    def _on_stash_items_changed(self) -> None:
-        """Re-fit Stash after a reload gave it stashes or took them away."""
-        self._sync_stash_height(terminal_size()[1])
-
     def resize(self, size: tuple[int, int]) -> None:
-        """Recompute layout widths and stash height on terminal resize.
+        """Recompute layout widths on terminal resize.
 
         The event loop resizes the component tree after this returns.
         """
-        cols, rows = size
+        cols, _ = size
         was_large = self._is_large_screen
         self._is_large_screen = cols >= self.LARGE_SCREEN_COLS
-        self._sync_stash_height(rows)
         self._apply_body_widths(cols)
         if was_large and not self._is_large_screen:
             for panel in (self._preview_panel, self._log_graph_preview):

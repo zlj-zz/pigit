@@ -236,7 +236,7 @@ def test_stash_message_and_ref_inactive_under_steal() -> None:
     ]
     panel = StashPanel(vm=vm)
     panel.mount()
-    panel.on_focus()
+    panel.refresh()
 
     _left, main, right = panel.describe_row(0, is_cursor=False)
     assert main[0].fg == THEME.fg_primary
@@ -249,7 +249,8 @@ def test_stash_message_and_ref_inactive_under_steal() -> None:
 
 
 def test_status_stash_focus_switch_softens_non_leaf() -> None:
-    """Status↔Stash co-visible: non-leaf softens; semantic XY stays."""
+    """Two mounted panels, one on the focus chain: the other softens, and its
+    semantic colours survive the softening."""
     status_vm = Mock(spec=IStatusViewModel)
     status_vm.items = Signal([])
     status_vm.load_error = Signal(None)
@@ -266,7 +267,7 @@ def test_status_stash_focus_switch_softens_non_leaf() -> None:
     ]
     stash = StashPanel(vm=stash_vm)
     stash.mount()
-    stash.on_focus()
+    stash.refresh()
 
     root = ComponentRoot(status)
     root.resize((80, 24))

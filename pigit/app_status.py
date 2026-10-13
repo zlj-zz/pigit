@@ -365,10 +365,6 @@ class StatusPanel(OptionList):
         self._header.set_status(None)
         self._vm.refresh()
 
-    def on_focus(self) -> None:
-        """Refresh worktree status when returning focus within the Status column."""
-        self._vm.refresh()
-
     def unmount(self) -> None:
         super().unmount()
         self._unbind_vm_signals()

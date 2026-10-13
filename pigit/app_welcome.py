@@ -66,7 +66,7 @@ _PANEL_ACTIONS = (
 
 _PANEL_WELCOME_DESC: dict[str, str] = {
     "universal.goto_status": "Status — stage, commit, discard working tree changes",
-    "universal.goto_stash": "Stash — stash stack (column with Status)",
+    "universal.goto_stash": "Stash — stash stack",
     "universal.goto_branch": "Branch — checkout, merge, create branches",
     "universal.goto_commit": "Commit — history, cherry-pick",
     "universal.goto_graph": "Graph — contribution heatmap and per-author chart",

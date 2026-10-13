@@ -103,11 +103,11 @@ class TestOnlyWhatIsOnScreen:
         app._branch_panel.unmount()
         assert not [a for a in _actions(app) if a.startswith("branch.")]
 
-    def test_a_panel_that_has_never_been_focused_contributes_nothing(self, app):
-        """Stash is mounted and painted as Status's sibling, but it loads its
-        list in ``on_focus`` -- so at startup its actions would be silent
-        no-ops. Focus, not visibility, is what makes them real."""
-        assert app._stash_panel.is_mounted()
+    def test_a_panel_that_is_not_mounted_contributes_nothing(self, app):
+        """Stash is its own tab, so at startup it is not mounted at all -- its
+        list is ``[]`` and its actions would be silent no-ops. Going there --
+        which mounts the page and then loads it -- is what makes them real."""
+        assert not app._stash_panel.is_mounted()
         assert not [a for a in _actions(app) if a.startswith("stash.")]
         app.goto_stash()
         assert [a for a in _actions(app) if a.startswith("stash.")]

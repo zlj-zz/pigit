@@ -1,7 +1,7 @@
 # TUI Guide
 
-Pigit's primary interface is a terminal UI. Four core panels plus stash,
-diff detail, and global overlays cover everyday Git work.
+Pigit's primary interface is a terminal UI. Five core panels, plus diff
+detail and global overlays, cover everyday Git work.
 
 <figure markdown="span">
   ![pigit TUI demo](assets/demo.gif){ width="720" }
