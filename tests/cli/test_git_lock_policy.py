@@ -76,8 +76,11 @@ class TestDeclaredBeforeDispatch:
 
     def test_importing_the_entry_point_declares_it(self):
         proc = subprocess.run(
-            [sys.executable, "-c",
-             f"import pigit.entry, os; print(os.environ.get('{_VAR}'))"],
+            [
+                sys.executable,
+                "-c",
+                f"import pigit.entry, os; print(os.environ.get('{_VAR}'))",
+            ],
             capture_output=True,
             text=True,
             env=self._env_without_the_var(),
@@ -89,8 +92,11 @@ class TestDeclaredBeforeDispatch:
         env = self._env_without_the_var()
         env[_VAR] = "1"
         proc = subprocess.run(
-            [sys.executable, "-c",
-             f"import pigit.entry, os; print(os.environ.get('{_VAR}'))"],
+            [
+                sys.executable,
+                "-c",
+                f"import pigit.entry, os; print(os.environ.get('{_VAR}'))",
+            ],
             capture_output=True,
             text=True,
             env=env,
@@ -103,9 +109,7 @@ class TestDeclaredBeforeDispatch:
         handler never runs. Its git child must still carry the policy."""
         repo = tmp_path / "repo"
         repo.mkdir()
-        subprocess.run(
-            ["git", "init", "-q", "-b", "main"], cwd=repo, check=True
-        )
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
         shim, log = _shim_dir()
         _pigit(["cmd", "w"], cwd=str(repo), shim=shim, log=log)
 
@@ -120,8 +124,7 @@ class TestChildrenInheritIt:
         _declare_git_policy()
 
         _, _, out = get_executor().exec(
-            [sys.executable, "-c",
-             f"import os; print(os.environ.get('{_VAR}'))"],
+            [sys.executable, "-c", f"import os; print(os.environ.get('{_VAR}'))"],
             flags=REPLY | DECODE,
         )
 

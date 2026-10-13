@@ -85,9 +85,7 @@ def run_gated(gate: WorktreeGate, op: Callable[[], ActionResult]) -> ActionResul
     resolution started from the keyboard.
     """
     if not gate.acquire():
-        return ActionResult(
-            success=False, message=WORKTREE_BUSY_MESSAGE, refused=True
-        )
+        return ActionResult(success=False, message=WORKTREE_BUSY_MESSAGE, refused=True)
     try:
         return op()
     finally:

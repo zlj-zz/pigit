@@ -24,7 +24,7 @@ from pigit.viewmodels.base import ViewModelBase
 # What a load is waited on: the ViewModel's own state, never the panel state
 # the test is about to assert.
 _FAILED = lambda vm: vm.load_error.value is not None  # noqa: E731
-_LOADED = lambda vm: bool(vm.items.value)             # noqa: E731
+_LOADED = lambda vm: bool(vm.items.value)  # noqa: E731
 
 
 def _drained(predicate, timeout: float = 3.0) -> None:

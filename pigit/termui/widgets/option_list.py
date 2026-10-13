@@ -764,9 +764,7 @@ class OptionList(Component):
             return
         # The row's first drawn segment, so the band starts at the cursor
         # column rather than after it.
-        left[0].bg = selected_row_bg(
-            get_theme(), active=self.is_presentation_active()
-        )
+        left[0].bg = selected_row_bg(get_theme(), active=self.is_presentation_active())
 
     def _draw_segments(
         self,

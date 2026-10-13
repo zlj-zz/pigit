@@ -95,9 +95,7 @@ def set_theme(theme: Theme) -> None:
     _theme_var.set(theme)
 
 
-def selected_row_bg(
-    theme: Theme, *, active: bool = True
-) -> tuple[int, int, int]:
+def selected_row_bg(theme: Theme, *, active: bool = True) -> tuple[int, int, int]:
     """Cursor-row background: the selected tone, or its dimmed twin.
 
     ``PigitTheme`` extends the framework theme with ``bg_commit_selected`` and

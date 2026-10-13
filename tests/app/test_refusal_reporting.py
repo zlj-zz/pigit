@@ -19,7 +19,12 @@ from pigit.termui._layer import LayerKind
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.overlay import show_spinner
 from pigit.termui.root import ComponentRoot
-from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE, ActionResult, WorktreeGate, run_gated
+from pigit.viewmodels.base import (
+    WORKTREE_BUSY_MESSAGE,
+    ActionResult,
+    WorktreeGate,
+    run_gated,
+)
 
 
 def _refused() -> ActionResult:
@@ -191,9 +196,10 @@ class TestTheNonActionResultRefusals:
     def test_the_busy_guard_uses_the_badge(self):
         from pigit import app_bisect
 
-        with patch("pigit.app_bisect.show_badge") as badge, patch(
-            "pigit.app_bisect.show_toast"
-        ) as toast:
+        with (
+            patch("pigit.app_bisect.show_badge") as badge,
+            patch("pigit.app_bisect.show_toast") as toast,
+        ):
             assert app_bisect.guard_worktree_busy(True) is True
         assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
         assert not toast.called

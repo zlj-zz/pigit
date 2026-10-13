@@ -41,7 +41,9 @@ def _branch_panel(branches: list[Branch]) -> BranchPanel:
     vm = Mock(spec=IBranchViewModel)
     vm.items = Signal(branches)
     vm.load_error = Signal(None)
-    panel = BranchPanel(vm=vm, get_git=lambda: Mock(bisect_status=Mock(return_value=None)))
+    panel = BranchPanel(
+        vm=vm, get_git=lambda: Mock(bisect_status=Mock(return_value=None))
+    )
     panel.branches = branches
     panel._recompute_meta_width()
     panel.content = [b.name for b in branches]
@@ -61,18 +63,20 @@ def _stash_panel(stashes: list[Stash]) -> StashPanel:
 
 def _tree_status_panel() -> StatusPanel:
     """A Status panel in tree view with one directory row."""
-    files = [File(
-        name="docs/a.md",
-        display_str="docs/a.md",
-        short_status="??",
-        has_staged_change=False,
-        has_unstaged_change=True,
-        tracked=False,
-        deleted=False,
-        added=False,
-        has_merged_conflicts=False,
-        has_inline_merged_conflicts=False,
-    )]
+    files = [
+        File(
+            name="docs/a.md",
+            display_str="docs/a.md",
+            short_status="??",
+            has_staged_change=False,
+            has_unstaged_change=True,
+            tracked=False,
+            deleted=False,
+            added=False,
+            has_merged_conflicts=False,
+            has_inline_merged_conflicts=False,
+        )
+    ]
     vm = Mock(spec=IStatusViewModel)
     vm.items = Signal(files)
     vm.load_error = Signal(None)
@@ -89,12 +93,16 @@ def _band(panel, idx: int, is_cursor: bool):
 
 
 def test_the_branch_cursor_row_wears_the_band():
-    panel = _branch_panel([Branch("dev", "0", "0", True), Branch("main", "0", "0", False)])
+    panel = _branch_panel(
+        [Branch("dev", "0", "0", True), Branch("main", "0", "0", False)]
+    )
     assert _band(panel, 0, True)[0].bg == THEME.bg_commit_selected
 
 
 def test_branch_rows_below_the_cursor_do_not():
-    panel = _branch_panel([Branch("dev", "0", "0", True), Branch("main", "0", "0", False)])
+    panel = _branch_panel(
+        [Branch("dev", "0", "0", True), Branch("main", "0", "0", False)]
+    )
     assert all(seg.bg is None for seg in _band(panel, 1, False))
 
 
