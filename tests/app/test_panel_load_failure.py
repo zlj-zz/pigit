@@ -147,8 +147,8 @@ class TestASuccessClearsIt:
         vm.refresh()
         _drained(lambda: _LOADED(vm))
 
-        assert ["No local branches found."] not in seen
         assert seen[-1] == ["main"]
+        assert panel.empty_state is None, "kept rows, so nothing is empty"
 
     def test_a_remount_does_not_wear_the_previous_failure(self):
         """The mark belongs to the load that produced it. A fresh one is in

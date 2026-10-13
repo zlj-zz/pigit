@@ -419,13 +419,15 @@ class CommitPanel(OptionList):
             # An empty repository and a filter that matched nothing are
             # different states: with no query there was nothing to match
             # against, so "No matching commits." would be a lie.
-            self.set_content(
-                ["No commits yet." if not query else "No matching commits."]
-            )
+            self.empty_state = [
+                Segment("No commits yet." if not query else "No matching commits.")
+            ]
+            self.set_content([])
             self._max_meta_w = 0
             self._row_cache.clear()
             self._notify_change()
             return
+        self.empty_state = None
         self._rel_time_cache.clear()
         self._abs_time_cache.clear()
         for commit in self.commits:
@@ -598,22 +600,6 @@ class CommitPanel(OptionList):
         Compact mode: ``[cursor][graph rails][SHA][refs][msg][meta]``.
         Expanded mode dispatches to per-sub-row helpers.
         """
-        # Placeholder ("No commits found.") — the only case where content
-        # outranks commits.
-        if not self.commits:
-            cursor_flags = palette.STYLE_BOLD if is_cursor else 0
-            return (
-                [
-                    Segment(
-                        self.content[idx],
-                        fg=self.presentation_fg("muted"),
-                        style_flags=cursor_flags,
-                    )
-                ],
-                None,
-                [],
-            )
-
         if item_idx is not None:
             commit = self.commits[item_idx]
             kind, payload = self._schema_for(commit)[sub_row]

@@ -89,8 +89,9 @@ class BranchPanel(OptionList):
         self._branch_signal = branch_signal
         self._get_git = get_git
         self.branches: list[Branch] = []
-        #: What the panel shows when it has no rows; a failed load swaps in its
-        #: own message and a later success must put this back.
+        #: What a successful load falls back to when it has rows to show. The
+        #: no-rows message is not this: it names the scope that came up empty,
+        #: so it is built per pass.
         self._empty_state_default = self.empty_state
         self._max_right_w = 0
         self._scope_idx: int = 0
@@ -167,7 +168,8 @@ class BranchPanel(OptionList):
         self._recompute_meta_width()
         if not branches:
             scope = self._SCOPES[self._scope_idx]
-            self.set_content([f"No {scope} branches found."])
+            self.empty_state = [Segment(f"No {scope} branches found.")]
+            self.set_content([])
             self._notify_change()
             return
         lines = [self._format_branch(b) for b in branches]

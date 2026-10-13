@@ -14,8 +14,23 @@ from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
 from pigit.git.model import Branch, Commit
 from pigit.termui.reactive import Signal
+from pigit.termui.surface import Surface
 from pigit.viewmodels.branch import IBranchViewModel
 from pigit.viewmodels.commit import ICommitViewModel
+
+
+def _painted(panel) -> str:
+    surface = Surface(80, 12)
+    panel.resize((80, 12))
+    panel.paint(surface)
+    return "\n".join(surface.lines())
+
+
+def _branch_panel(branches: list[Branch]) -> BranchPanel:
+    vm = Mock(spec=IBranchViewModel)
+    vm.items = Signal(branches)
+    vm.load_error = Signal(None)
+    return BranchPanel(vm=vm, get_git=lambda: Mock())
 
 
 def _commit(*, msg: str = "a commit") -> Commit:
@@ -37,7 +52,7 @@ def test_an_empty_repository_does_not_blame_the_filter():
     panel = _commit_panel([])
     panel._all_commits = []
     panel._apply_filter()
-    assert panel.content == ["No commits yet."]
+    assert [s.text for s in panel.empty_state] == ["No commits yet."]
 
 
 def test_a_filter_that_matches_nothing_still_says_so():
@@ -45,7 +60,7 @@ def test_a_filter_that_matches_nothing_still_says_so():
     panel._all_commits = [_commit(msg="unrelated")]
     panel._search_query = "zzz"
     panel._apply_filter()
-    assert panel.content == ["No matching commits."]
+    assert [s.text for s in panel.empty_state] == ["No matching commits."]
 
 
 def test_a_matching_filter_shows_the_commit():
@@ -54,6 +69,36 @@ def test_a_matching_filter_shows_the_commit():
     panel._search_query = "thing"
     panel._apply_filter()
     assert "fix the thing" in "\n".join(panel.content)
+
+
+# ── Every panel says it the same way: an empty state, not a row ──
+
+
+def _centred_line(painted: str, needle: str) -> str:
+    return next(line for line in painted.splitlines() if needle in line)
+
+
+def test_an_empty_branch_list_says_so_as_an_empty_state():
+    """Not a row: ``describe_row`` used to return no segments once
+    ``branches`` was empty, so a message held in ``content`` painted blank."""
+    panel = _branch_panel([])
+    panel.mount()
+    panel._vm.items.set([], force=True)
+    assert panel.content == []
+    assert [s.text for s in panel.empty_state] == ["No local branches found."]
+    painted = _painted(panel)
+    assert "No local branches found." in painted
+    assert _centred_line(painted, "No local branches found.").startswith(" ")
+
+
+def test_an_empty_commit_list_says_so_as_an_empty_state():
+    panel = _commit_panel([])
+    panel.mount()
+    panel._vm.items.set([], force=True)
+    assert panel.content == []
+    assert [s.text for s in panel.empty_state] == ["No commits yet."]
+    painted = _painted(panel)
+    assert _centred_line(painted, "No commits yet.").startswith(" ")
 
 
 # ── First-load skeletons ──
