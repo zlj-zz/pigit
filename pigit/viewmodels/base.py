@@ -23,15 +23,21 @@ _S = TypeVar("_S")
 class ActionResult:
     """Result of a ViewModel action. Panel decides whether to refresh.
 
-    ``refused`` marks the third outcome: the action never ran, because another
-    one holds the worktree gate. It is not a failure -- nothing was attempted
-    -- and it is reported on a different channel for that reason.
+    Two outcomes sit between success and failure. Neither is reported in red:
+    ``app_theme.report_nonerror`` owns both, and says which channel each takes.
+
+    ``refused``: the action never ran, because another one holds the worktree
+    gate.
+
+    ``warning``: the action ran its own checks, found there was nothing to do,
+    and has a reason worth saying out loud.
     """
 
     success: bool
     message: str = ""
     should_refresh: bool = False
     refused: bool = False
+    warning: bool = False
 
 
 WORKTREE_BUSY_MESSAGE = "Another working-tree operation is still running"

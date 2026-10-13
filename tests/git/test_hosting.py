@@ -118,3 +118,10 @@ class TestHeadBranchForPr:
 
         assert head_branch_for_pr(name="origin/dev", is_remote=True) == "dev"
         assert head_branch_for_pr(name="origin/feat/x", is_remote=True) == "feat/x"
+
+    def test_a_remote_name_with_nothing_to_strip_survives(self):
+        """Nothing to split on, so nothing may be lost: indexing past the
+        separator here is how a name becomes an IndexError."""
+        from pigit.git.hosting import head_branch_for_pr
+
+        assert head_branch_for_pr(name="dev", is_remote=True) == "dev"

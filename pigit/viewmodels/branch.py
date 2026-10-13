@@ -41,7 +41,7 @@ class IBranchViewModel(IListViewModel["Branch"]):
     def scope(self) -> str: ...
     def set_scope(self, scope: str) -> None: ...
     def checkout(self, idx: int) -> ActionResult: ...
-    def create_branch(self, name: str) -> ActionResult: ...
+    def create_branch(self, name: str, start_point: str | None = None) -> ActionResult: ...
     def rename_branch(self, idx: int, new_name: str) -> ActionResult: ...
     def delete_branch(self, idx: int, force: bool = False) -> ActionResult: ...
     def get_inspector_snapshot(self, idx: int) -> BranchSnapshot | None: ...
@@ -113,16 +113,28 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             )
         return result
 
-    def create_branch(self, name: str) -> ActionResult:
-        """Create *name* and switch to it (``git checkout -b``)."""
-        return run_gated(self._worktree_gate, lambda: self._create_branch(name))
+    def create_branch(self, name: str, start_point: str | None = None) -> ActionResult:
+        """Create *name* and switch to it (``git checkout -b``).
 
-    def _create_branch(self, name: str) -> ActionResult:
+        With *start_point*, the new branch starts there and tracks it -- the
+        remote-tracking branch the user pointed at.
+        """
+        return run_gated(
+            self._worktree_gate, lambda: self._create_branch(name, start_point)
+        )
+
+    def _create_branch(self, name: str, start_point: str | None = None) -> ActionResult:
+        if start_point is not None and name in self._git.get_branches():
+            # There is nothing to create: the local branch being asked for is
+            # already here. Nothing went wrong, so this is not an error.
+            return ActionResult(
+                success=False, warning=True, message=f"{name} already exists"
+            )
         current = self._git.get_head() or ""
         try:
             if self._history is not None:
                 self._history.on_pre_checkout(current)
-            self._git.create_branch(name)
+            self._git.create_branch(name, start_point)
         except Exception as e:
             return ActionResult(success=False, message=str(e))
         if self._history is not None and current:
@@ -144,7 +156,13 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             )
         return ActionResult(
             success=True,
-            message=f"Created and switched to {name}",
+            message=(
+                f"Created and switched to {name}"
+                if start_point is None
+                # `c` stays a generic "checkout" in the footer, so this toast
+                # is the only place that says a tracking branch was created.
+                else f"Created {name} tracking {start_point}"
+            ),
             should_refresh=True,
         )
 

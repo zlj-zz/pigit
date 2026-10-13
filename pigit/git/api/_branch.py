@@ -165,12 +165,22 @@ class _BranchOps(_OpsBase):
     def create_branch(
         self,
         branch_name: str,
+        start_point: str | None = None,
         path: str | None = None,
     ) -> None:
-        """Create a new branch from HEAD and switch to it."""
+        """Create a new branch and switch to it.
+
+        Without *start_point* the branch starts at HEAD. With one it starts
+        there and tracks it -- ``--track`` is spelled out so a global
+        ``branch.autoSetupMerge=false`` cannot leave the new branch dangling.
+        """
         path = path or self.path
+        branch = f"-b {shlex.quote(branch_name)}"
+        command = f"git checkout {branch}"
+        if start_point is not None:
+            command += f" --track {shlex.quote(start_point)}"
         code, err, out = self.executor.exec(
-            f"git checkout -b {shlex.quote(branch_name)}",
+            command,
             cwd=path,
             flags=WAITING | REPLY | DECODE,
         )

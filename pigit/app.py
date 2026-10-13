@@ -87,7 +87,7 @@ from .app_diff_preview import PreviewPanel
 from .app_log_graph_preview import LogGraphPreview
 from .app_stash import StashPanel
 from .app_status import StatusPanel
-from .app_theme import THEME, report_refusal, sheet_core
+from .app_theme import THEME, report_nonerror, sheet_core
 from .git.managed_repos import ManagedRepos
 from .observe.overlay import should_defer_repo_refresh
 from .app_bisect import guard_worktree_busy
@@ -2015,7 +2015,7 @@ class PigitApplication(Application):
 
     def _toast_palette_result(self, result) -> None:
         """Show action result and refresh VMs when the action asks for it."""
-        if report_refusal(result):
+        if report_nonerror(result):
             return
         kind = FeedbackKind.SUCCESS if result.success else FeedbackKind.ERROR
         show_toast(result.message, duration=1.5 if result.success else 2.0, kind=kind)

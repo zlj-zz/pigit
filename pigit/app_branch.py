@@ -39,7 +39,7 @@ from .app_theme import (
     LOAD_FAILED_MARK,
     THEME,
     load_failed_segments,
-    report_refusal,
+    report_nonerror,
 )
 from .app_row_slots import pad_to_width, status_lane
 from pigit.termui.wcwidth_table import wcswidth
@@ -213,7 +213,7 @@ class BranchPanel(OptionList):
         )
 
     def _handle_result(self, result: ActionResult) -> None:
-        if report_refusal(result):
+        if report_nonerror(result):
             return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)
@@ -298,14 +298,10 @@ class BranchPanel(OptionList):
                 "Already on this branch.", duration=1.5, kind=FeedbackKind.WARNING
             )
             return
-        if local_branch.is_remote:
-            show_toast(
-                "Cannot checkout remote branch directly.",
-                duration=1.5,
-                kind=FeedbackKind.WARNING,
-            )
-            return
         if guard_bisect_active(self._get_git()):
+            return
+        if local_branch.is_remote:
+            self._create_tracking_branch(local_branch)
             return
         # Capture the index now: the worker must check out the branch the user
         # chose, not wherever the cursor drifted to while it ran.
@@ -324,6 +320,25 @@ class BranchPanel(OptionList):
         if self._branch_signal is not None:
             self._branch_signal.set(name)
         self.emit(EventType("action_requested"), cmd="follow-head", ref=name)
+
+    def _create_tracking_branch(self, branch) -> None:
+        """Check a remote-tracking branch out by creating the local one it tracks.
+
+        The names are resolved here, before the worker starts, and passed as
+        strings: the worker must act on the row the user chose, not wherever
+        the cursor drifted to while it ran.
+        """
+        from pigit.git.hosting import short_branch_name
+
+        # The whole ref, not the name it shortens to: two remotes can carry the
+        # same branch name, and only the ref on this row says which one.
+        remote_ref = branch.name
+        name = short_branch_name(name=remote_ref, is_remote=branch.is_remote)
+        run_with_spinner(
+            lambda: self._vm.create_branch(name, remote_ref),
+            lambda result: self._after_checkout(result, name),
+            label=f"Creating {name}",
+        )
 
     @bind_action(
         "new_branch", "n", desc="Create new branch from current HEAD", tip="New"

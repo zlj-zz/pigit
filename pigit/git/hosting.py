@@ -137,13 +137,18 @@ def build_create_pr_url(
     return f"{root}/compare/{enc_head}"
 
 
-def head_branch_for_pr(*, name: str, is_remote: bool) -> str:
-    """
-    Normalize a BranchPanel row name to a PR source branch.
+def short_branch_name(*, name: str, is_remote: bool) -> str:
+    """The local name a remote-tracking ref would take: ``origin/dev`` → ``dev``.
 
-    Remote-tracking names like ``origin/dev`` become ``dev``.
+    A remote-tracking name with no ``/`` comes back unchanged: there is nothing
+    to strip, and splitting on a missing separator would lose the name.
     """
     name = (name or "").strip()
     if is_remote and "/" in name:
         return name.split("/", 1)[1]
     return name
+
+
+def head_branch_for_pr(*, name: str, is_remote: bool) -> str:
+    """Normalize a BranchPanel row name to a PR source branch."""
+    return short_branch_name(name=name, is_remote=is_remote)

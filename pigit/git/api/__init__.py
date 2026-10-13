@@ -127,8 +127,8 @@ class GitApi:
     def rename_branch(self, old_name, new_name, path=None):
         return self._branch.rename_branch(old_name, new_name, path)
 
-    def create_branch(self, branch_name, path=None):
-        return self._branch.create_branch(branch_name, path)
+    def create_branch(self, branch_name, start_point=None, path=None):
+        return self._branch.create_branch(branch_name, start_point, path)
 
     def delete_branch(self, branch_name, force=False, path=None):
         return self._branch.delete_branch(branch_name, force, path)

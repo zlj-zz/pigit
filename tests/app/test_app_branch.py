@@ -8,11 +8,13 @@ Date: 2026-08-18
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from pigit.app_branch import BranchPanel
 from pigit.git.model import Branch
+from pigit.termui import FeedbackKind
 from pigit.termui.reactive import Signal
+from pigit.viewmodels.base import ActionResult
 from pigit.viewmodels.branch import IBranchViewModel
 
 
@@ -171,3 +173,37 @@ def test_the_marker_and_the_date_coexist():
     mark, name = _prefix(panel, 0)
     assert (mark, name) == ("*", "dev")
     assert "ago" in _row_text(panel, 0)
+
+
+def test_checkout_on_a_remote_row_creates_the_local_branch_it_tracks():
+    """The local name comes from the row, but the create is handed the whole
+    remote-tracking ref: two remotes can carry the same branch name, and only
+    the ref the user pointed at says which one they meant."""
+    panel = _panel_with([Branch("origin/feature-x", "0", "0", False, is_remote=True)])
+
+    with patch("pigit.app_branch.run_with_spinner") as spinner:
+        panel.checkout()
+        work = spinner.call_args.args[0]
+        work()
+
+    panel._vm.create_branch.assert_called_once_with("feature-x", "origin/feature-x")
+
+
+def test_a_branch_that_already_exists_warns_rather_than_errors():
+    """The create decides there was nothing to do. That is not a failure, so
+    it must not land in the error channel."""
+    panel = _panel_with([Branch("origin/feature-x", "0", "0", False, is_remote=True)])
+    already = ActionResult(
+        success=False, warning=True, message="feature-x already exists"
+    )
+
+    with (
+        patch("pigit.app_branch.run_with_spinner") as spinner,
+        patch("pigit.app_theme.show_toast") as toast,
+    ):
+        panel.checkout()
+        done = spinner.call_args.args[1]
+        done(already)
+
+    assert toast.call_args.kwargs.get("kind") is FeedbackKind.WARNING
+    assert "already exists" in toast.call_args.args[0]

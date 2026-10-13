@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pigit.termui import Segment, palette, show_badge
+from pigit.termui import Segment, palette, show_badge, show_toast
 from pigit.termui.feedback import FeedbackKind, style_for
 from pigit.termui.theme import Theme
 
@@ -173,18 +173,22 @@ def sheet_core(name: str) -> str:
 LOAD_FAILED_MARK = style_for(FeedbackKind.ERROR).glyph
 
 
-def report_refusal(result: ActionResult) -> bool:
-    """Report a refused result on the badge; return whether there was one.
+def report_nonerror(result: ActionResult) -> bool:
+    """Report an outcome that is neither success nor failure; say if there was one.
 
-    A refusal means nothing ran: something else is holding the worktree gate.
-    It cannot go to the toast, because the toast slot holds that other
-    operation's spinner -- a refusal reported there evicts the only thing that
-    explains why the key did nothing.
+    Two of them, and they take different channels on purpose. A refusal goes to
+    the badge, because the toast slot holds the spinner of the operation that
+    refused -- evicting it would leave the user unable to tell whether anything
+    is still running. A warning is this panel's own "nothing to do", with no
+    spinner to displace, so it goes to the toast: worth saying, not red.
     """
-    if not result.refused:
-        return False
-    show_badge(result.message, duration=2.0)
-    return True
+    if result.refused:
+        show_badge(result.message, duration=2.0)
+        return True
+    if result.warning:
+        show_toast(result.message, duration=2.0, kind=FeedbackKind.WARNING)
+        return True
+    return False
 
 
 def load_failed_segments(error: BaseException) -> list[Segment]:

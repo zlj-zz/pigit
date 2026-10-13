@@ -49,7 +49,7 @@ from .app_theme import (
     LOAD_FAILED_MARK,
     THEME,
     load_failed_segments,
-    report_refusal,
+    report_nonerror,
     sheet_core,
 )
 from .ext.utils import adjudgment_type, copy_to_clipboard, resolve_icon
@@ -625,7 +625,7 @@ class StatusPanel(OptionList):
             subject = msg.split("\n", 1)[0].strip()
 
             def done(result: ActionResult) -> None:
-                if report_refusal(result):
+                if report_nonerror(result):
                     return
                 if result.success:
                     dismiss_sheet()
@@ -711,7 +711,7 @@ class StatusPanel(OptionList):
                 return
 
             def done(result: ActionResult) -> None:
-                if report_refusal(result):
+                if report_nonerror(result):
                     return
                 if result.success:
                     self._vm.refresh()
@@ -1277,7 +1277,7 @@ class StatusPanel(OptionList):
             result.should_refresh,
             result.message,
         )
-        if report_refusal(result):
+        if report_nonerror(result):
             return
         if result.success:
             show_badge(result.message, duration=1.0, kind=FeedbackKind.SUCCESS)

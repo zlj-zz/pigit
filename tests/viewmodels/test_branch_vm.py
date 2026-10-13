@@ -81,7 +81,7 @@ def test_create_branch_success(branch_vm):
     assert result.success is True
     assert "Created and switched to new-branch" in result.message
     assert result.should_refresh is True
-    branch_vm._git.create_branch.assert_called_once_with("new-branch")
+    branch_vm._git.create_branch.assert_called_once_with("new-branch", None)
 
 
 def test_create_branch_failure(branch_vm):
@@ -252,7 +252,61 @@ def test_create_branch_undo_checks_out_before_deleting(branch_vm):
 
 def test_create_branch_without_history_records_nothing(branch_vm):
     branch_vm.create_branch("feat")
-    branch_vm._git.create_branch.assert_called_once_with("feat")
+    branch_vm._git.create_branch.assert_called_once_with("feat", None)
+
+
+def test_create_branch_from_a_start_point_passes_it_through(branch_vm):
+    branch_vm._git.get_branches.return_value = ["main", "feat"]
+
+    result = branch_vm.create_branch("feature-x", "origin/feature-x")
+
+    assert result.success is True
+    branch_vm._git.create_branch.assert_called_once_with(
+        "feature-x", "origin/feature-x"
+    )
+
+
+def test_a_tracked_branch_says_what_it_tracks(branch_vm):
+    """`c` stays a generic "checkout" in the footer, so this toast is the only
+    place that says a tracking branch is what got created."""
+    branch_vm._git.get_branches.return_value = ["main"]
+
+    result = branch_vm.create_branch("feature-x", "origin/feature-x")
+
+    assert result.message == "Created feature-x tracking origin/feature-x"
+
+
+def test_a_local_branch_that_already_exists_warns_and_touches_nothing(branch_vm):
+    """There is nothing to create, and nothing went wrong: it must not read as
+    an error, and it must not run git over a worktree it has no business in."""
+    branch_vm._git.get_branches.return_value = ["main", "feat", "feature-x"]
+
+    result = branch_vm.create_branch("feature-x", "origin/feature-x")
+
+    assert result.warning is True
+    assert result.success is False
+    assert "already exists" in result.message
+    branch_vm._git.create_branch.assert_not_called()
+
+
+def test_a_tracked_branch_records_the_same_undo_as_a_plain_one():
+    """A branch created from a remote-tracking ref is still a branch this
+    command created, so ``u`` has to drop it the same way."""
+    git = Mock()
+    git.get_head.return_value = "main"
+    git.get_branches.return_value = ["main"]
+    vm = BranchViewModel(git, history=_history(), worktree_gate=WorktreeGate())
+
+    vm.create_branch("feature-x", "origin/feature-x")
+
+    records = vm._history.peek()
+    assert len(records) == 1
+    order: list[str] = []
+    git.checkout_branch.side_effect = lambda _b: order.append("checkout")
+    git.delete_branch.side_effect = lambda _n: order.append("delete")
+
+    assert records[0].reverse(git).success is True
+    assert order == ["checkout", "delete"]
 
 
 def test_can_merge_probe_failure_blocks(branch_vm):

@@ -12,9 +12,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from pigit.app_theme import report_refusal
+from pigit.app_theme import report_nonerror
 from pigit.git.model import Branch
-from pigit.termui import Component
+from pigit.termui import Component, FeedbackKind
 from pigit.termui._layer import LayerKind
 from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
 from pigit.termui.overlay import show_spinner
@@ -74,11 +74,22 @@ class TestTheOutcome:
 class TestTheChannel:
     def test_a_refusal_goes_to_the_badge(self, runtime):
         with patch("pigit.app_theme.show_badge") as badge:
-            assert report_refusal(_refused()) is True
+            assert report_nonerror(_refused()) is True
         assert badge.call_args[0][0] == WORKTREE_BUSY_MESSAGE
 
     def test_a_refusal_is_not_reported_again_by_the_caller(self):
-        assert report_refusal(ActionResult(success=True)) is False
+        assert report_nonerror(ActionResult(success=True)) is False
+
+    def test_a_warning_goes_to_the_toast_in_yellow(self, runtime):
+        """A warning holds no spinner, so it takes the toast -- but it is not
+        a failure, and red would say it was."""
+        with patch("pigit.app_theme.show_toast") as toast:
+            reported = report_nonerror(
+                ActionResult(success=False, warning=True, message="already exists")
+            )
+        assert reported is True
+        assert toast.call_args[0][0] == "already exists"
+        assert toast.call_args.kwargs["kind"] is FeedbackKind.WARNING
 
     def test_a_refusal_leaves_the_running_spinner_alone(self, runtime):
         """The point of the whole change: the toast slot holds the operation
@@ -86,7 +97,7 @@ class TestTheChannel:
         show_spinner("Merging main into feat")
         assert "Merging" in _top_message(runtime)
 
-        report_refusal(_refused())
+        report_nonerror(_refused())
 
         assert "Merging" in _top_message(runtime)
         assert WORKTREE_BUSY_MESSAGE not in _top_message(runtime)
@@ -94,7 +105,7 @@ class TestTheChannel:
 
 class TestEveryRendererUsesIt:
     """Each of these used to send a refusal to the toast. They share the
-    branch through :func:`report_refusal`, so they cannot drift apart."""
+    branch through :func:`report_nonerror`, so they cannot drift apart."""
 
     def test_the_status_panel(self):
         from pigit.app_status import StatusPanel
@@ -102,7 +113,7 @@ class TestEveryRendererUsesIt:
         vm = Mock()
         vm.items = Mock()
         panel = StatusPanel(vm=vm, default_view="flat")
-        with patch("pigit.app_status.report_refusal", return_value=True) as guard:
+        with patch("pigit.app_status.report_nonerror", return_value=True) as guard:
             panel._handle_result(_refused())
         guard.assert_called_once()
 
@@ -112,7 +123,7 @@ class TestEveryRendererUsesIt:
         vm = Mock(spec=object)
         vm.items = Mock()
         panel = BranchPanel(vm=vm, get_git=lambda: Mock())
-        with patch("pigit.app_branch.report_refusal", return_value=True) as guard:
+        with patch("pigit.app_branch.report_nonerror", return_value=True) as guard:
             panel._handle_result(_refused())
         guard.assert_called_once()
 
@@ -120,7 +131,7 @@ class TestEveryRendererUsesIt:
         from pigit.app_stash import StashPanel
 
         panel = StashPanel(vm=Mock(), id="stash")
-        with patch("pigit.app_stash.report_refusal", return_value=True) as guard:
+        with patch("pigit.app_stash.report_nonerror", return_value=True) as guard:
             panel._handle_result(_refused())
         guard.assert_called_once()
 
@@ -129,7 +140,7 @@ class TestEveryRendererUsesIt:
         from pigit.config_data import AppConfig
 
         app = PigitApplication(config=AppConfig())
-        with patch("pigit.app.report_refusal", return_value=True) as guard:
+        with patch("pigit.app.report_nonerror", return_value=True) as guard:
             app._toast_palette_result(_refused())
         guard.assert_called_once()
 
@@ -155,7 +166,7 @@ class TestEveryRendererUsesIt:
             editor.call_args.kwargs["on_submit"]("subject")
             done = spinner.call_args.args[1]
 
-        with patch("pigit.app_status.report_refusal", return_value=True) as guard:
+        with patch("pigit.app_status.report_nonerror", return_value=True) as guard:
             done(_refused())
 
         guard.assert_called_once()
@@ -170,7 +181,7 @@ class TestEveryRendererUsesIt:
             confirm.call_args.args[1](True)
             done = spinner.call_args.args[1]
 
-        with patch("pigit.app_status.report_refusal", return_value=True) as guard:
+        with patch("pigit.app_status.report_nonerror", return_value=True) as guard:
             done(_refused())
 
         guard.assert_called_once()
