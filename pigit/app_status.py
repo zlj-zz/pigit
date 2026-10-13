@@ -1007,8 +1007,11 @@ class StatusPanel(OptionList):
     ]:
         """Split render into tree/flat modes instead of stacking if-branches."""
         if self._tree_mode:
-            return self._describe_tree_row(idx, is_cursor)
-        return self._describe_flat_row(idx, is_cursor)
+            left, main, right = self._describe_tree_row(idx, is_cursor)
+        else:
+            left, main, right = self._describe_flat_row(idx, is_cursor)
+        self._band_cursor_row(left, is_cursor)
+        return left, main, right
 
     def _file_icon_glyph(self, name: str, *, is_dir: bool) -> str:
         """Icon glyph for a row: Nerd Font glyph or a 1-cell fallback symbol.
@@ -1114,7 +1117,15 @@ class StatusPanel(OptionList):
                     style_flags=cursor_flags,
                 )
             ]
-            right = [Segment(row.summary, fg=THEME.fg_dim)] if row.summary else []
+            # Dim on the selection band is unreadable (1.8:1), and the band is
+            # the row's own background -- so lift the summary on the cursor row
+            # only. Every other row keeps the dim it has always had.
+            summary_fg = (
+                THEME.fg_muted
+                if is_cursor and self.is_presentation_active()
+                else THEME.fg_dim
+            )
+            right = [Segment(row.summary, fg=summary_fg)] if row.summary else []
             return left, main, right
 
         file = row.file

@@ -501,6 +501,7 @@ class BranchPanel(OptionList):
                 at_front=True,
             )
 
+        self._band_cursor_row(left, is_cursor)
         return left, main, right
 
     def _right_segments(self, branch) -> list[Segment]:

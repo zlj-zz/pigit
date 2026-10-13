@@ -228,6 +228,7 @@ class StashPanel(OptionList):
                 pad_fg=self.presentation_fg("muted"),
                 at_front=True,
             )
+        self._band_cursor_row(left, is_cursor)
         return left, main, right
 
     def _right_segments(self, stash: Stash) -> list[Segment]:
