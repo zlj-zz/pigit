@@ -8,10 +8,7 @@ Date: 2026-04-19
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from .surface import Surface
+from typing import ClassVar, Protocol, runtime_checkable
 
 # ---------------------------------------------------------------------------
 # EventType — unified event identifier
@@ -104,18 +101,6 @@ class OverlayDispatchResult(Enum):
 # ---------------------------------------------------------------------------
 # Protocols
 # ---------------------------------------------------------------------------
-
-
-class OverlaySurface(Protocol):
-    """Modal shell that may occupy a MODAL slot on a ComponentRoot."""
-
-    open: bool
-
-    def dispatch_overlay_key(self, key: str) -> OverlayDispatchResult: ...
-
-    def hide(self) -> None: ...
-
-    def paint(self, surface: Surface) -> None: ...
 
 
 @runtime_checkable

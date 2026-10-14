@@ -8,7 +8,6 @@ Date: 2026-04-10
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
 from collections.abc import Callable
 from enum import Enum, auto
 
@@ -170,18 +169,3 @@ class ValidationResult:
 
     def __bool__(self) -> bool:
         return self.is_valid
-
-
-class CommandExecutor(Protocol):
-    """Protocol for command executors."""
-
-    def __call__(self, args: list[str]) -> str:
-        """Execute command with arguments.
-
-        Args:
-            args: Command arguments
-
-        Returns:
-            Command output as string
-        """
-        ...

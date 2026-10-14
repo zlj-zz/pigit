@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    TypedDict,
     overload,
 )
 from collections.abc import Callable, Iterable, Sequence
@@ -26,18 +25,6 @@ def _styled(*args, **kwargs):
     from ..termui.cli_output import styled
 
     return styled(*args, **kwargs)
-
-
-class ParserOptions(TypedDict, total=False):
-    title: str | None
-    description: str | None
-    parser_class: Parser | None
-    action: Action | None
-    option_string: str | None
-    dest: str | None
-    required: bool
-    help: str | None
-    metavar: str | None
 
 
 class ColorHelpFormatter(HelpFormatter):

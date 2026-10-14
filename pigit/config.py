@@ -37,10 +37,6 @@ def get_config(
     return _config_instance
 
 
-class ConfigError(Exception):
-    """Config error. Using by `Config`."""
-
-
 def _flatten_keybindings(raw: dict, prefix: str = "") -> dict:
     """Flatten a nested ``[app.keybindings]`` table into dotted ``"{ns}.{action}"`` keys."""
     out: dict = {}
