@@ -154,6 +154,33 @@ def test_hunk_mode_disables_file_nav():
     assert "▸" not in text
 
 
+def test_file_headers_survive_the_first_paint_before_tokenizing():
+    """The fallback used until syntax tokens land strips a diff prefix from
+    any line starting with ``+``, ``-`` or space. A file header starts with
+    ``---``/``+++`` but is not a change line -- the tokenizer's own path
+    already exempts it, so the fallback has to answer the same way, or the
+    header loses a character for the first frames."""
+    dv = DiffViewer()
+    dv.set_content(
+        [
+            "diff --git a/a.py b/a.py",
+            "--- a/a.py",
+            "+++ b/a.py",
+            "@@ -1 +1 @@",
+            "-old",
+            "+new",
+        ]
+    )
+    dv.resize((40, 10))
+    surface = Surface(40, 10)
+    dv.paint(surface)
+
+    text = "\n".join(surface.lines())
+    assert "--- a/a.py" in text
+    assert "+++ b/a.py" in text
+    assert "-old" in text and "+new" in text, "change lines still drop the sign"
+
+
 def test_top_bar_renders_and_bottom_badge_gone():
     dv = _viewer_with_commit(_multi_file_diff())
     dv._line_i = 9

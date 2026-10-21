@@ -320,7 +320,16 @@ class DiffViewer(Component):
         """Tokens for line ``idx``, or a plain-text fallback while tokenize is pending."""
         if idx < len(self._render_tokens):
             return self._render_tokens[idx]
-        if strip_diff_prefix and line and line[0] in "+- ":
+        # A file header starts with ``---``/``+++`` but is not a change line.
+        # ``DiffContent.pre_tokenize_with`` already exempts it; this fallback
+        # runs until that lands, so it has to answer the same way or the
+        # header loses a character for the first frames.
+        if (
+            strip_diff_prefix
+            and line
+            and line[0] in "+- "
+            and not self._is_file_header(line)
+        ):
             code = line[1:]
         else:
             code = line
