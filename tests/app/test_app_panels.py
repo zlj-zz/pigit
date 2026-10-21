@@ -838,17 +838,36 @@ class TestContributionPanel:
         assert panel.handle_mouse(_Event()) is True
         assert panel._board.pan[1] > 0  # pan is (rows, cols)
 
+    def test_the_page_names_itself_in_a_section_rule(self):
+        """The rule above the wordmark is the same one the list pages wear."""
+        from pigit.app_graph_panel import _RULE_H
+
+        _, panel = self._panel()
+        panel.resize((60, 20))
+        surface = Surface(60, 20)
+        panel.paint(surface)
+
+        rule = surface.lines()[0].rstrip()
+        assert rule.startswith("─")
+        assert rule.endswith("Graph ──")
+        assert "______" in surface.lines()[_RULE_H], "the mark starts below it"
+
     def test_the_banner_takes_its_rows_off_the_top(self):
-        """The wordmark is fixed panel chrome, so the board gets the rest."""
-        from pigit.app_graph_panel import _BANNER_H
+        """Rule and wordmark are fixed panel chrome, so the board gets the rest."""
+        from pigit.app_graph_panel import _BANNER_H, _RULE_H
 
         _, panel = self._panel()
         panel.resize((100, 30))
-        assert panel._board.viewport_size == (100, 30 - _BANNER_H)
+        assert panel._board.viewport_size == (100, 30 - _RULE_H - _BANNER_H)
 
     def test_the_banner_does_not_pan_with_the_board(self):
         """It is part of the panel, not a block on the canvas."""
-        from pigit.app_graph_panel import _BANNER, _BANNER_H, _BANNER_PAD_LEFT
+        from pigit.app_graph_panel import (
+            _BANNER,
+            _BANNER_H,
+            _BANNER_PAD_LEFT,
+            _RULE_H,
+        )
 
         _, panel = self._panel()
         panel.resize((120, 30))
@@ -856,7 +875,10 @@ class TestContributionPanel:
         def banner_rows() -> list[str]:
             surface = Surface(120, 30)
             panel.paint(surface)
-            return ["".join(cell.char for cell in row) for row in surface._rows[:5]]
+            return [
+                "".join(cell.char for cell in row)
+                for row in surface._rows[_RULE_H : _RULE_H + _BANNER_H]
+            ]
 
         before = banner_rows()
         pad = " " * _BANNER_PAD_LEFT
@@ -868,12 +890,14 @@ class TestContributionPanel:
         assert banner_rows() == before
 
     def test_a_narrow_panel_clips_the_banner_rather_than_wrapping_it(self):
+        from pigit.app_graph_panel import _RULE_H
+
         _, panel = self._panel()
         panel.resize((20, 30))
         surface = Surface(20, 30)
         panel.paint(surface)
         rows = ["".join(cell.char for cell in row) for row in surface._rows]
-        assert rows[0].startswith("  ______")
+        assert rows[_RULE_H].startswith("  ______")
         assert all(len(row) == 20 for row in rows)
 
     def test_a_panel_shorter_than_the_banner_does_not_crash(self):

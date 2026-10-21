@@ -30,7 +30,7 @@ from pigit.termui import (
     show_sheet,
     show_toast,
 )
-from pigit.termui.widgets import ACCENT_BAR, OptionList
+from pigit.termui.widgets import ACCENT_BAR, OptionList, SectionRule
 from pigit.termui.wcwidth_table import wcswidth
 
 from .app_types import CommitSnapshot, GraphRow
@@ -121,6 +121,7 @@ class CommitPanel(OptionList):
             lazy_load=True,
             id=id,
             on_search_changed=lambda: self._apply_filter(),
+            header=SectionRule("Commit"),
         )
         self._vm = vm
         self.commits: list[Commit] = []

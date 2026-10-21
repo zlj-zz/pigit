@@ -47,6 +47,22 @@ def _commit_panel(*, graph_rows: list | None = None) -> "CommitPanel":
     return CommitPanel(vm=vm)
 
 
+def test_the_page_names_itself_in_a_section_rule() -> None:
+    """Every page wears the same one-row header. Commit and Graph were the two
+    that did not, so their content started flush against the top edge -- and a
+    flat design has no other way to say where a region begins."""
+    from pigit.termui.surface import Surface
+    from pigit.termui.widgets import SectionRule
+
+    panel = _commit_panel()
+    panel.resize((80, 12))
+    surface = Surface(80, 12)
+    panel.paint(surface)
+
+    assert isinstance(panel._header, SectionRule)
+    assert surface.lines()[0].rstrip().endswith("Commit ──")
+
+
 def test_is_head_commit_via_extra_info() -> None:
     panel = _commit_panel()
     assert panel._is_head_commit(_head_commit()) is True
