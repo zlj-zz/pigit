@@ -762,6 +762,27 @@ class TestHelpPanel:
         combined = "".join(c.char for c in row_text)
         assert "j" in combined or "down" in combined
 
+    def test_help_panel_border_shows_the_scroll_position(self):
+        panel = HelpPanel()
+        panel.set_entries([(f"k{i}", f"action {i}") for i in range(40)])
+        panel.resize((80, 20))
+
+        def right_border(surface):
+            return "".join(
+                surface._rows[row][panel._outer_w - 1].char
+                for row in range(1, panel._frame.outer_height - 1)
+            )
+
+        # 9 track rows over 40 rendered lines -> a 2-cell thumb.
+        surface = Surface(80, 20)
+        panel.paint(surface)
+        assert right_border(surface) == "▐▐" + "│" * 7
+
+        panel.scroll_down(10**6)
+        surface = Surface(80, 20)
+        panel.paint(surface)
+        assert right_border(surface) == "│" * 7 + "▐▐"
+
     def test_help_panel_scroll_down_clamps(self):
         panel = HelpPanel()
         panel.set_entries([("a", "A")])

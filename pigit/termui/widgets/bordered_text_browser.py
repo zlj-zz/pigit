@@ -96,5 +96,15 @@ class BorderedTextBrowser(Component):
         inner_w = max(1, w - 2)
         self._frame.set_inner_size(inner_w, inner_h)
         self._frame.title = self._title or None
+        # The browser draws ``viewport_rows`` lines, while ``inner_h`` is what
+        # this surface has room for. Either can be the smaller one when paint
+        # and resize disagree, and the bar has to describe the rows actually
+        # drawn: using only ``inner_h`` would hide the bar when the browser
+        # renders fewer rows than the surface.
+        self._frame.set_scroll(
+            first=self._browser.scroll_i,
+            total=len(self._browser.lines),
+            visible=min(inner_h, self._browser.viewport_rows),
+        )
         self._frame.draw(surface, 0, 0)
         render_child(self._browser, surface, "BorderedTextBrowser")

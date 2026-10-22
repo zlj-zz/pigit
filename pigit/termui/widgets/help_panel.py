@@ -331,6 +331,11 @@ class HelpPanel(Component):
         surface.fill_rect_rgb(
             0, 0, self._outer_w, self.outer_row_count, theme.bg_chrome
         )
+        self._frame.set_scroll(
+            first=self._offset,
+            total=len(self._lines),
+            visible=self._scroll_h,
+        )
         self._frame.draw(surface, 0, 0)
 
         content_row, content_col, cw, _ch = self._frame.content_rect(0, 0)

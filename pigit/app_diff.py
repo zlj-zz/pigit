@@ -224,10 +224,24 @@ class DiffViewer(Component):
             return THEME.fg_inactive
         return THEME.fg_dim
 
-    def _draw_frame(self, surface: Surface) -> None:
-        """Draw the bordered chrome for the current surface size."""
+    def _draw_frame(self, surface: Surface, *, draw_title: bool = True) -> None:
+        """Draw the bordered chrome and its scrollbar for the current size.
+
+        *draw_title* is off for File History, whose own header writes the top
+        border: a title left under it would show through wherever the header
+        does not reach.
+        """
         self._sync_frame(surface.width, surface.height)
         self._frame.fg = self._border_fg()
+        if not draw_title:
+            self._frame.title = None
+        # Derived from the surface, not ``_viewport_rows``: the latter is only
+        # updated by ``resize``, and the paint loop below uses this same value.
+        self._frame.set_scroll(
+            first=self._line_i,
+            total=len(self._lines),
+            visible=max(0, surface.height - self.BORDER_ROWS),
+        )
         self._frame.draw(surface, 0, 0)
 
     def _drop_pending_tokenize(self) -> None:
@@ -1188,7 +1202,17 @@ class DiffViewer(Component):
                 clip_left=clip_left,
             )
         elif line.startswith("\\"):
-            surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
+            # The only branch without a right-edge clip: the standard
+            # "\ No newline at end of file" marker is 27 columns, so on a
+            # narrow surface it used to paint over the border (and now the
+            # scrollbar) -- every token path stops at ``max_col``.
+            surface.draw_text_rgb(
+                row,
+                text_start_col,
+                truncate_by_width(line, main_w),
+                fg=THEME.fg_dim,
+                bg=bg,
+            )
         else:
             tokens = self._tokens_at(idx, line, strip_diff_prefix=True)
             self._draw_tokens(
@@ -1405,7 +1429,10 @@ class DiffViewer(Component):
             self._render_file_history_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=self._border_fg())
+        # Through _draw_frame, not draw_box_rgb directly: this mode scrolls the
+        # same _line_i, and a bypass would leave it as the one framed view with
+        # no scrollbar. The header below owns the top border, so no title.
+        self._draw_frame(surface, draw_title=False)
 
         # Header row (overwrites top border)
         header = self._file_history_header()

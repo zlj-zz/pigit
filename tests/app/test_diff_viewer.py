@@ -6,6 +6,7 @@ import pytest
 
 from pigit.app_diff import DiffViewer, DiffType
 from pigit.app_theme import THEME
+from pigit.termui.surface import Surface
 
 _LOCALGIT_PATH = "pigit.git.api.GitApi"
 
@@ -79,6 +80,67 @@ class TestCurrentFilePath:
         assert dv._current_file_path() is None
 
 
+class TestBorderScrollbar:
+    """The right border carries the vertical scroll position."""
+
+    @staticmethod
+    def _right_border(surface) -> str:
+        return "".join(row[-1].char for row in surface.rows()[1:-1])
+
+    def test_the_border_shows_where_you_are(self):
+        # 10 track rows, 10 visible, 40 lines -> a 2-cell thumb.
+        dv = DiffViewer()
+        dv.set_content([f"line {i}" for i in range(40)])
+        dv.resize((40, 12))
+
+        surface = Surface(40, 12)
+        dv.paint(surface)
+        assert self._right_border(surface) == "▐▐" + "│" * 8
+
+        # Past the clamp on purpose: the frame has to clamp the offset itself.
+        dv.scroll_i = dv._max_viewport_i() + 5
+        surface = Surface(40, 12)
+        dv.paint(surface)
+        assert self._right_border(surface) == "│" * 8 + "▐▐"
+
+    def test_the_bar_describes_the_surface_being_painted(self):
+        """``_viewport_rows`` is resize-time; a paint at another size must use
+        the rows this surface can show, or the bar reports another window."""
+        dv = DiffViewer()
+        dv.set_content([f"line {i}" for i in range(40)])
+        dv.resize((40, 12))
+        dv.scroll_i = 20
+
+        surface = Surface(40, 6)
+        dv.paint(surface)
+
+        # 4 track rows, 4 visible, 40 lines, offset 20 of 36 -> middle.
+        assert self._right_border(surface) == "│▐││"
+
+    def test_short_content_leaves_the_border_alone(self):
+        dv = DiffViewer()
+        dv.set_content(["a", "b", "c"])
+        dv.resize((40, 12))
+        surface = Surface(40, 12)
+        dv.paint(surface)
+        assert self._right_border(surface) == "│" * 10
+
+    def test_a_no_newline_marker_does_not_paint_over_the_border(self):
+        """That branch is the only one without a right-edge clip, and the
+        standard marker is 27 columns -- on a narrow surface it reached the
+        border column and erased the thumb."""
+        dv = DiffViewer()
+        dv.set_content(
+            ["\\ No newline at end of file"] + [f" context {i}" for i in range(39)]
+        )
+        dv.resize((30, 10))
+        surface = Surface(30, 10)
+        dv.paint(surface)
+
+        right = self._right_border(surface)
+        assert right == "▐" + "│" * 7
+
+
 class TestFileHistoryState:
     """Enter/exit File History mode preserves and restores diff state."""
 
@@ -141,6 +203,55 @@ class TestFileHistoryState:
         assert viewer._lines == original_content
         assert viewer._diff_type == DiffType.COMMIT
         assert viewer.scroll_i == 2
+
+    @patch(_LOCALGIT_PATH)
+    def test_file_history_draws_the_scrollbar_too(self, mock_git_cls, viewer):
+        """This mode builds its own box path; a bypass would leave it as the
+        one framed view with no scroll position."""
+        mock_git = MagicMock()
+        mock_git.get_file_history.return_value = [
+            (f"{i:07x}", f"msg {i}") for i in range(40)
+        ]
+        mock_git.get_file_at_commit.return_value = "\n".join(
+            f"line {i}" for i in range(40)
+        )
+        mock_git_cls.return_value = mock_git
+
+        viewer._enter_file_history("src/main.py")
+        viewer.resize((60, 12))
+        surface = Surface(60, 12)
+        viewer.paint(surface)
+
+        right = "".join(row[-1].char for row in surface.rows()[1:-1])
+        assert right == "▐▐" + "│" * 8
+
+        viewer._line_i = viewer._max_viewport_i()
+        surface = Surface(60, 12)
+        viewer.paint(surface)
+        right = "".join(row[-1].char for row in surface.rows()[1:-1])
+        assert right == "│" * 8 + "▐▐"
+
+    @patch(_LOCALGIT_PATH)
+    def test_file_history_does_not_draw_the_diff_box_title(self, mock_git_cls, viewer):
+        """The header owns row 0: a title left under it would show through
+        wherever the header does not reach."""
+        mock_git = MagicMock()
+        mock_git.get_file_history.return_value = [("abc1234", "x")]
+        mock_git.get_file_at_commit.return_value = "a"
+        mock_git_cls.return_value = mock_git
+
+        viewer._enter_file_history("src/main.py")
+        viewer.resize((60, 12))
+
+        viewer.set_box_title("A TITLE LONG ENOUGH TO REACH BOTH SIDES OF THE TOP RULE")
+        titled = Surface(60, 12)
+        viewer.paint(titled)
+
+        viewer.set_box_title("")
+        untitled = Surface(60, 12)
+        viewer.paint(untitled)
+
+        assert titled.lines()[0] == untitled.lines()[0]
 
     @patch(_LOCALGIT_PATH)
     def test_multiple_enter_exit_cycles(self, mock_git_cls, viewer):
