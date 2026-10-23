@@ -64,3 +64,33 @@ def test_slice_drops_a_mark_left_behind_by_a_half_cut_glyph():
 
 def test_negative_skip_returns_text_unchanged():
     assert slice_left_by_width("中文", -1) == "中文"
+
+
+#: (text, columns, what the row pins). The combining rows are decomposed
+#: sequences -- base plus mark -- not the precomposed character they resemble.
+WIDTH_CASES = [
+    ("abc", 3, "ASCII"),
+    ("中文", 4, "CJK"),
+    ("Ａ", 2, "fullwidth"),
+    ("ｦ", 1, "halfwidth: H is not wide"),
+    ("☕", 2, "single-code-point W emoji"),
+    ("✅", 2, "single-code-point W emoji"),
+    ("が", 2, "combining checked before east_asian_width"),
+    ("é", 1, "combining acute"),
+    ("ְ", 0, "Hebrew niqqud"),
+    ("͏", 0, "CGJ: Mn with combining() == 0"),
+    ("〮", 0, "Mc with combining() != 0"),
+    ("1️⃣", 1, "keycap: per-code-point sum, known short"),
+    ("❤️", 1, "VS16 sequence: per-code-point sum, known short"),
+    ("\U0001f1fa\U0001f1f8", 2, "two regional indicators"),
+    ("\x0e", 1, "C0 control"),
+    ("\x7f", 1, "DEL"),
+    ("\x9b", 1, "C1 control"),
+    ("\u093e", 1, "spacing mark: Mc with ccc == 0"),
+    ("\u200b", 1, "ZWSP: documented as one column"),
+]
+
+
+@pytest.mark.parametrize("text, expected, why", WIDTH_CASES)
+def test_display_width(text, expected, why):
+    assert wcswidth(text) == expected, why

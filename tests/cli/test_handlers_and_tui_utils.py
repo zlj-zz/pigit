@@ -393,9 +393,13 @@ def test_tui_utils_get_width_and_plain():
     from pigit.termui.primitives.text import plain
     from pigit.termui.wcwidth_table import get_width
 
-    assert get_width(0xE) == 0
-    assert get_width(0xF) == 0
+    # Every C0 control counts as one column, the same convention ``_char_width``
+    # uses; the old table's 0xE/0xF special case only existed here.
+    assert get_width(0xE) == 1
+    assert get_width(0xF) == 1
     assert get_width(999999) == 1
+    assert get_width(0x110000) == 1, "out of range falls back to one column"
+    assert get_width(-1) == 1, "negative code points do not reach chr()"
     assert plain("\033[1;32mhi\033[0m") == "hi"
 
 
