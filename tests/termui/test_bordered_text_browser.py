@@ -72,10 +72,9 @@ class TestBorderScrollbar:
         # 3 painted rows, 27 rows of scroll room: offset 20 is the middle.
         assert self._right_border(surface, browser._frame) == "│▐│"
 
-    def test_a_taller_surface_still_reports_hidden_rows(self) -> None:
-        """A paint surface can be taller than the browser's last resize. The
-        bar must still say rows are cut off: ``visible`` is the smaller of the
-        two, so ``total >= visible`` cannot wrongly hide it."""
+    def test_a_taller_surface_shows_all_rows_and_no_bar(self) -> None:
+        """Paint resizes the browser to the surface, so a taller surface really
+        does show more: nothing is hidden and there is no bar to show."""
         browser = BorderedTextBrowser(id="bb")
         browser.resize((20, 10))
         browser.set_content([f"row {i:02d}" for i in range(20)])
@@ -83,7 +82,23 @@ class TestBorderScrollbar:
         surface = Surface(20, 30)
         browser.paint(surface)
 
-        assert "▐" in self._right_border(surface, browser._frame)
+        assert set(self._right_border(surface, browser._frame)) == {"│"}
+        assert "row 19" in "\n".join(surface.lines())
+
+    def test_a_narrower_surface_keeps_the_border(self) -> None:
+        """Before paint resized the browser, its stale wider size painted over
+        the right border -- and the scrollbar with it."""
+        browser = BorderedTextBrowser(id="bb")
+        browser.resize((30, 10))
+        browser.set_content(["row " + "y" * 40] * 60)
+        browser.scroll_down(10**6)
+
+        surface = Surface(20, 10)
+        browser.paint(surface)
+
+        right = self._right_border(surface, browser._frame)
+        assert set(right) <= {"▐", "│"}, right
+        assert "▐" in right
 
     def test_fitting_content_leaves_the_border_alone(self) -> None:
         browser = BorderedTextBrowser(id="bb")
