@@ -141,6 +141,51 @@ class TestBorderScrollbar:
         assert right == "▐" + "│" * 7
 
 
+class TestScrollOffsetClamp:
+    """The offset may sit past the viewport clamp near EOF, never past the
+    last line: paint starts at the offset, so the latter renders nothing."""
+
+    def test_an_offset_past_the_last_line_still_shows_content(self):
+        dv = DiffViewer()
+        dv.set_content([f"line {i}" for i in range(10)])
+        dv.resize((40, 12))
+
+        dv.scroll_i = 10**6
+
+        assert dv.scroll_i == len(dv._lines) - 1
+        surface = Surface(40, 12)
+        dv.paint(surface)
+        assert "line 9" in "\n".join(surface.lines())
+
+    def test_near_eof_offsets_are_left_alone(self):
+        """Past the viewport clamp but before the last line: a partial last
+        screen is the intended near-EOF behaviour."""
+        dv = DiffViewer()
+        dv.set_content([f"line {i}" for i in range(40)])
+        dv.resize((40, 12))
+        near = dv._max_viewport_i() + 5
+
+        dv.scroll_i = near
+
+        assert dv.scroll_i == near
+
+    def test_an_empty_diff_stays_at_zero(self):
+        dv = DiffViewer()
+        dv.set_content([])
+
+        dv.scroll_i = 99
+
+        assert dv.scroll_i == 0
+
+    def test_a_negative_offset_stays_at_zero(self):
+        dv = DiffViewer()
+        dv.set_content([f"line {i}" for i in range(10)])
+
+        dv.scroll_i = -5
+
+        assert dv.scroll_i == 0
+
+
 class TestFileHistoryState:
     """Enter/exit File History mode preserves and restores diff state."""
 

@@ -625,14 +625,23 @@ class DiffViewer(Component):
         """Set the optional label drawn on the viewer's own box border."""
         self._box_title = title
 
+    def _clamp_line_i(self, value: int) -> int:
+        """Clamp a first-visible index to the lines there are.
+
+        Near EOF the index may sit past the viewport clamp -- showing a
+        partial last screen is intended -- but never at or past the last line:
+        paint starts there, so such a value renders an empty screen.
+        """
+        return min(max(0, int(value)), max(0, len(self._lines) - 1))
+
     @property
     def scroll_i(self) -> int:
-        """First visible line index (may exceed clamped viewport when near EOF)."""
+        """First visible line index (may exceed the viewport clamp near EOF)."""
         return self._line_i
 
     @scroll_i.setter
     def scroll_i(self, value: int) -> None:
-        self._line_i = max(0, int(value))
+        self._line_i = self._clamp_line_i(value)
 
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the diff viewport up."""
@@ -672,7 +681,7 @@ class DiffViewer(Component):
                     self.set_content(content)
                 case str():
                     self.set_content(content.splitlines())
-            self._line_i = self.i_cache.get(self.i_cache_key, 0)
+            self._line_i = self._clamp_line_i(self.i_cache.get(self.i_cache_key, 0))
 
     @bind_action("down", "j", "down", desc="Navigate diff lines down", tip="Navigate")
     def _on_j(self) -> None:
@@ -938,7 +947,7 @@ class DiffViewer(Component):
         if snap is not None:
             self.set_content(snap.content)
             self._diff_type = snap.diff_type
-            self._line_i = snap.scroll_i
+            self._line_i = self._clamp_line_i(snap.scroll_i)
             self.come_from = snap.come_from
         self._saved_diff_state = None
 
