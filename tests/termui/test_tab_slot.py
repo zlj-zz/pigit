@@ -17,17 +17,30 @@ from pigit.termui.segment import Segment
 
 def test_tab_slot_click_forwards_event():
     seen: list[MouseEvent] = []
-    slot = TabSlot(tab_name="Status", tab_key="1", on_open=seen.append)
+    slot = TabSlot(
+        tab_name="Status", tab_key="1", tab_total="5", on_open=seen.append
+    )
     slot.resize((20, 1))
     ev = MouseEvent(col=3, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS)
     assert slot.handle_mouse(ev) is True
     assert seen == [ev]
-    assert "Status [1]" in slot.as_segments()[0].text
+    assert "Status [1/5]" in slot.as_segments()[0].text
     assert "▾" in slot.as_segments()[0].text
 
 
-def test_tab_slot_preferred_width_and_truncate():
+def test_tab_slot_without_a_total_keeps_the_plain_key():
     slot = TabSlot(tab_name="Status", tab_key="1")
+    assert slot.as_segments()[0].text == "Status [1] ▾"
+
+
+def test_tab_slot_without_a_key_shows_no_counter():
+    """The diff detail view has a name but no digit key."""
+    slot = TabSlot(tab_name="Display")
+    assert slot.as_segments()[0].text == "Display ▾"
+
+
+def test_tab_slot_preferred_width_and_truncate():
+    slot = TabSlot(tab_name="Status", tab_key="1", tab_total="5")
     full = slot.preferred_width()
     slot.resize((8, 1))
     surface = Surface(8, 1)
@@ -40,8 +53,10 @@ def test_tab_slot_preferred_width_and_truncate():
 def test_tab_slot_binds_signals():
     name = Signal("Status")
     key = Signal("1")
-    slot = TabSlot(tab_name=name, tab_key=key)
+    total = Signal("5")
+    slot = TabSlot(tab_name=name, tab_key=key, tab_total=total)
     assert slot.label_name == "Status"
+    assert slot.label_total == "5"
     name.set("Stash")
     key.set("2")
     assert slot.label_name == "Stash"
@@ -53,6 +68,7 @@ def test_header_right_child_hit_and_paint():
     slot = TabSlot(
         tab_name="Status",
         tab_key="1",
+        tab_total="5",
         on_open=lambda _ev: opened.append(1),
     )
     header = Header(
@@ -66,7 +82,7 @@ def test_header_right_child_hit_and_paint():
     surface = Surface(48, 1)
     header.paint(surface)
     line = surface.lines()[0]
-    assert "Status [1]" in line
+    assert "Status [1/5]" in line
     assert "▾" in line
     assert "[MERGE]" in line
 

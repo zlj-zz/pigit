@@ -371,6 +371,16 @@ class PigitApplication(Application):
             id="palette",
         )
 
+        self._panel_nav = PanelNavigator(
+            get_tab_view=lambda: tab_view,
+            get_status_panel=lambda: status_panel,
+            get_stash_panel=lambda: stash_panel,
+            get_branch_panel=lambda: branch_panel,
+            get_commit_panel=lambda: commit_panel,
+            get_graph_panel=lambda: graph_panel,
+            get_worktree_busy=lambda: self._session.worktree_gate.busy,
+        )
+
         # Most-recent anchored picker popup. Kept for tests/inspection (asserts
         # on `.open` right after showing) and replaced on each open; closing is
         # handled by the Popup shell (esc / dismiss_on_miss), so this may hold a
@@ -379,6 +389,9 @@ class PigitApplication(Application):
         self._tab_slot = TabSlot(
             tab_name=self._header_state.tab_signal,
             tab_key=self._header_state.tab_key_signal,
+            # The total comes from the ring, not a literal: the counter tells
+            # the reader the number keys run 1..N without a tab bar.
+            tab_total=str(len(self._panel_nav.panel_ring())),
             on_open=self.open_panel_picker,
             id="tab_slot",
         )
@@ -405,15 +418,6 @@ class PigitApplication(Application):
             children.append(footer)
             heights.append(FOOTER_HEIGHT)
 
-        self._panel_nav = PanelNavigator(
-            get_tab_view=lambda: tab_view,
-            get_status_panel=lambda: status_panel,
-            get_stash_panel=lambda: stash_panel,
-            get_branch_panel=lambda: branch_panel,
-            get_commit_panel=lambda: commit_panel,
-            get_graph_panel=lambda: graph_panel,
-            get_worktree_busy=lambda: self._session.worktree_gate.busy,
-        )
         self._observe_host = ObserveHost(
             ObserveDeps(
                 get_git=lambda: self._git,

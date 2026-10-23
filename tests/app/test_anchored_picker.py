@@ -134,6 +134,13 @@ def test_build_panel_picker_entries_from_ring():
     assert entries[1].is_current is False
 
 
+def test_the_header_counter_comes_from_the_panel_ring(runtime):
+    """The slot shows ``[key/total]``; the total is the ring length, not a
+    literal that could drift from the pages."""
+    app, _root = _mount(runtime)
+    assert app._tab_slot.label_total == "5"
+
+
 def test_panel_picker_enter_selects_and_toggles():
     selected: list[object] = []
     toggled: list[int] = []
