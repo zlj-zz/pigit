@@ -45,8 +45,8 @@ def _panel_with_stashes(msgs: list[str]) -> StashPanel:
     return panel
 
 
-def test_section_header_right_label_with_tail():
-    """Top row is fill dashes, bold Stash, then two trailing dashes."""
+def test_section_header_left_label_then_fill():
+    """Top row is two leading dashes, bold Stash, then fill."""
     from pigit.app_theme import THEME
     from pigit.termui.theme import get_theme, set_theme
 
@@ -59,7 +59,7 @@ def test_section_header_right_label_with_tail():
         panel.paint(surface)
 
         row = "".join(c.char for c in surface._rows[0]).rstrip("\x00").rstrip()
-        assert row.endswith("Stash ──")
+        assert row.startswith("── Stash ")
         assert "─" in row
         label_start = row.index("Stash")
         for col in range(label_start, label_start + 5):

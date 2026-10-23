@@ -848,8 +848,8 @@ class TestContributionPanel:
         panel.paint(surface)
 
         rule = surface.lines()[0].rstrip()
-        assert rule.startswith("─")
-        assert rule.endswith("Graph ──")
+        assert rule.startswith("── Graph ")
+        assert rule.endswith("─")
         assert "______" in surface.lines()[_RULE_H], "the mark starts below it"
 
     def test_the_banner_takes_its_rows_off_the_top(self):

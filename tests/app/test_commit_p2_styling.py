@@ -60,7 +60,9 @@ def test_the_page_names_itself_in_a_section_rule() -> None:
     panel.paint(surface)
 
     assert isinstance(panel._header, SectionRule)
-    assert surface.lines()[0].rstrip().endswith("Commit ──")
+    line = surface.lines()[0].rstrip()
+    assert line.startswith("── Commit ")
+    assert line.endswith("─")
 
 
 def test_is_head_commit_via_extra_info() -> None:

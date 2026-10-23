@@ -22,6 +22,7 @@ from ..surface import Surface
 from ..reactive import Signal
 from ..types import EVT_SELECTION_CHANGED
 from ..wcwidth_table import pad_by_width, truncate_by_width, wcswidth
+from .section_rule import SectionRule
 
 _logger = logging.getLogger(__name__)
 
@@ -571,6 +572,24 @@ class OptionList(Component):
     def update(self, action, **data):
         """No-op update handler for compatibility with the action system."""
 
+    def _sync_header_detail(self) -> None:
+        """Keep the one-row header's counter in step with the cursor.
+
+        The denominator is the number of *items*, not rendered rows: in
+        multi-row mode (a commit with an expanded body) ``curr_no`` selects an
+        item while ``content`` holds every sub-row. Other header components
+        have no such counter and are left alone.
+        """
+        header = self._header
+        if not isinstance(header, SectionRule):
+            return
+        total = (
+            len(self._item_starts)
+            if self._item_starts is not None
+            else len(self.content)
+        )
+        header.set_detail(f"{self.curr_no + 1}/{total}" if total else None)
+
     def paint(self, surface: Surface) -> None:
         """Paint chrome bands, then the list body (rows / empty / search)."""
         self._sync_chrome_bands()
@@ -586,6 +605,7 @@ class OptionList(Component):
             else surface.subsurface(0, 0, w, h)
         )
         if self._header_h and self._header is not None:
+            self._sync_header_detail()
             self._header.paint(panel.subsurface(0, 0, w, self._header_h))
         list_h = min(
             self.visible_row_count, max(0, h - self._header_h - self._footer_h)
