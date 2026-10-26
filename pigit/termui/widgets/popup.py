@@ -21,7 +21,7 @@ from ..segment import Segment
 from ..surface import Surface
 from ..primitives.text import sanitize_for_display
 from ..theme import get_theme
-from ..wcwidth_table import truncate_by_width, wcswidth
+from ..wcwidth_table import char_width_at, truncate_by_width, wcswidth
 from ..types import LayerKind, OverlayDispatchResult
 
 _logger = logging.getLogger(__name__)
@@ -434,8 +434,8 @@ class AlertDialogBody(Component):
             while wcswidth(chunk) > inner:
                 take = 0
                 width = 0
-                for ch in chunk:
-                    w = wcswidth(ch)
+                for index in range(len(chunk)):
+                    w = char_width_at(chunk, index)
                     if width + w > inner:
                         break
                     width += w

@@ -223,6 +223,24 @@ def test_a_long_message_never_pushes_the_buttons_off_screen(size):
         _runtime_ctx.reset(token)
 
 
+def test_a_wrapped_emoji_line_stays_inside_the_inner_width():
+    """The wrap measured every code point on its own, so an emoji the terminal
+    draws two columns wide counted as one: the line came out one cell past the
+    inner width and painted over the frame."""
+    from pigit.termui.wcwidth_table import wcswidth
+
+    token, dialog = _open_alert("seed", (40, 12))
+    try:
+        pane = dialog._pane
+        inner = pane._inner_w
+        # Fill the row up to the emoji so the break lands right after it.
+        pane._message = "x" * (inner - 1) + "❤️ tail"
+        for row in pane._build_content_rows():
+            assert sum(wcswidth(seg.text) for seg in row) <= inner
+    finally:
+        _runtime_ctx.reset(token)
+
+
 def test_a_short_message_is_left_alone():
     token, dialog = _open_alert("Merge feat into main?", (80, 24))
     try:

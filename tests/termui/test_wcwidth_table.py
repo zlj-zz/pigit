@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from pigit.termui.wcwidth_table import slice_left_by_width, wcswidth
+from pigit.termui.wcwidth_table import (
+    slice_left_by_width,
+    truncate_by_width,
+    wcswidth,
+)
 
 #: "e" + U+0301 (combining acute), used to check marks stay with their base.
 ACCENTED = "é"
@@ -29,6 +33,9 @@ CASES = [
     (f"{ACCENTED}x", 1, "x"),  # base dropped, mark goes with it
     ("中́x", 2, "x"),  # same, after a half-cut wide glyph
     (f"a{ACCENTED}x", 1, f"{ACCENTED}x"),  # mark keeps its base
+    # VS16 emoji: two columns, selector folded into the base
+    ("❤️x", 1, " x"),  # cut inside it: one column survives, drawn blank
+    ("❤️x", 2, "x"),  # cut after it: the orphan selector goes too
 ]
 
 
@@ -66,6 +73,12 @@ def test_negative_skip_returns_text_unchanged():
     assert slice_left_by_width("中文", -1) == "中文"
 
 
+def test_truncate_never_splits_a_selector_from_its_base():
+    """A lone base or lone selector is a different glyph than the pair."""
+    assert truncate_by_width("❤️a", 2) == "❤️"
+    assert truncate_by_width("❤️a", 1) == ""
+
+
 #: (text, columns, what the row pins). The combining rows are decomposed
 #: sequences -- base plus mark -- not the precomposed character they resemble.
 WIDTH_CASES = [
@@ -80,8 +93,12 @@ WIDTH_CASES = [
     ("ְ", 0, "Hebrew niqqud"),
     ("͏", 0, "CGJ: Mn with combining() == 0"),
     ("〮", 0, "Mc with combining() != 0"),
-    ("1️⃣", 1, "keycap: per-code-point sum, known short"),
-    ("❤️", 1, "VS16 sequence: per-code-point sum, known short"),
+    ("1️⃣", 2, "keycap: digit widened by VS16, enclosing mark zero"),
+    ("❤️", 2, "VS16 promotes a one-column base to an emoji"),
+    ("❤", 1, "the same base without its selector stays narrow"),
+    ("a❤️b", 4, "the promotion is positional, not a constant"),
+    ("A️", 1, "VS16 after a base outside UTS #51 widens nothing"),
+    ("✅︎", 2, "known gap: VS15 text presentation still counts wide"),
     ("\U0001f1fa\U0001f1f8", 2, "two regional indicators"),
     ("\x0e", 1, "C0 control"),
     ("\x7f", 1, "DEL"),
