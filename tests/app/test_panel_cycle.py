@@ -385,6 +385,42 @@ def test_ctrl_p_on_narrow_terminal_toasts_and_keeps_hidden(
     assert app._diff_preview_wanted is wanted
     assert toasts
     assert "120" in toasts[0]
+    assert "Enter" in toasts[0]  # the route that still works
+
+
+def test_narrow_preview_toast_names_the_log_route_on_branches(
+    runtime, monkeypatch
+) -> None:
+    """Branches have no Enter-to-diff path, so the hint differs by panel."""
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (80, 24))
+    toasts: list[str] = []
+    monkeypatch.setattr(
+        "pigit.app.show_toast", lambda msg, **_kwargs: toasts.append(msg)
+    )
+    app, root = _mount(runtime)
+    app._tab_view.route_to("branch")
+
+    root._handle_event("ctrl p")
+
+    assert toasts
+    assert "Graph" in toasts[0]
+    assert "Enter" not in toasts[0]
+
+
+def test_toggling_on_a_tab_without_a_preview_is_silent(runtime, monkeypatch) -> None:
+    """Commit has no side preview at any width, so a narrow terminal is not
+    the reason nothing happens there."""
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (80, 24))
+    toasts: list[str] = []
+    monkeypatch.setattr(
+        "pigit.app.show_toast", lambda msg, **_kwargs: toasts.append(msg)
+    )
+    app, _root = _mount(runtime)
+    app._tab_view.route_to("commit")
+
+    app.toggle_side_preview()
+
+    assert toasts == []
 
 
 def test_diff_and_log_graph_toggles_are_independent(runtime, monkeypatch) -> None:

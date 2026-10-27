@@ -1638,25 +1638,32 @@ class PigitApplication(Application):
         """Toggle the side preview that belongs to the focused panel."""
         if self._is_detail_open():
             return
+        active = resolve_presentation_leaf(self._tab_view.visible)
+        if not isinstance(active, (StatusPanel, StashPanel, BranchPanel)):
+            return
         cols, _ = terminal_size()
         if cols < self.LARGE_SCREEN_COLS:
+            # The preview is a wide-screen convenience, not the only way to
+            # see this content, so name the route that still works.
+            fallback = (
+                "Enter shows the full diff"
+                if isinstance(active, (StatusPanel, StashPanel))
+                else "The Graph tab has the log"
+            )
             show_toast(
-                f"Need at least {self.LARGE_SCREEN_COLS} columns for preview",
+                f"Preview needs {self.LARGE_SCREEN_COLS} columns. {fallback}",
                 duration=2.0,
                 kind=FeedbackKind.WARNING,
             )
             return
-        active = resolve_presentation_leaf(self._tab_view.visible)
         if isinstance(active, (StatusPanel, StashPanel)):
             self._diff_preview_wanted = not self._diff_preview_wanted
             showing = self._diff_preview_wanted
             hidden = self._preview_panel
-        elif isinstance(active, BranchPanel):
+        else:
             self._log_graph_wanted = not self._log_graph_wanted
             showing = self._log_graph_wanted
             hidden = self._log_graph_preview
-        else:
-            return
         self._apply_body_widths(cols)
         if showing:
             if self._tab_view.visible is not None:
