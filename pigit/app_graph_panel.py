@@ -103,9 +103,7 @@ class ContributionPanel(Component):
     def _board_surface(self, surface: Surface) -> Surface:
         """The part of the panel under the rule and the wordmark."""
         top = _RULE_H + _BANNER_H
-        return surface.subsurface(
-            top, 0, surface.width, max(0, surface.height - top)
-        )
+        return surface.subsurface(top, 0, surface.width, max(0, surface.height - top))
 
     def _draw_banner(self, surface: Surface) -> None:
         """Draw the fixed wordmark; the surface clips whatever does not fit."""

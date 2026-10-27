@@ -171,9 +171,7 @@ class PigitApplication(Application):
         takes the rest.
         """
         extra = max(0, cols - cls.SIDE_PREVIEW_MASTER_STEADY_COLS)
-        return cls.SIDE_PREVIEW_MASTER_MIN + int(
-            extra * cls.SIDE_PREVIEW_MASTER_GROWTH
-        )
+        return cls.SIDE_PREVIEW_MASTER_MIN + int(extra * cls.SIDE_PREVIEW_MASTER_GROWTH)
 
     # Body tree — assigned in build_root; required for a live TUI session.
     _tab_view: TabView

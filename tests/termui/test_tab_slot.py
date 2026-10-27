@@ -17,9 +17,7 @@ from pigit.termui.segment import Segment
 
 def test_tab_slot_click_forwards_event():
     seen: list[MouseEvent] = []
-    slot = TabSlot(
-        tab_name="Status", tab_key="1", tab_total="5", on_open=seen.append
-    )
+    slot = TabSlot(tab_name="Status", tab_key="1", tab_total="5", on_open=seen.append)
     slot.resize((20, 1))
     ev = MouseEvent(col=3, row=1, button=MouseButton.LEFT, kind=MouseKind.PRESS)
     assert slot.handle_mouse(ev) is True
