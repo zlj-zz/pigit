@@ -36,6 +36,11 @@ CASES = [
     # VS16 emoji: two columns, selector folded into the base
     ("❤️x", 1, " x"),  # cut inside it: one column survives, drawn blank
     ("❤️x", 2, "x"),  # cut after it: the orphan selector goes too
+    # ZWJ and skin-tone clusters measure two columns; slicing must agree
+    ("👩‍💻x", 1, " x"),
+    ("👩‍💻x", 2, "x"),
+    ("👩‍💻x", 3, ""),
+    ("👍🏽x", 2, "x"),
 ]
 
 
@@ -104,7 +109,22 @@ WIDTH_CASES = [
     ("\x7f", 1, "DEL"),
     ("\x9b", 1, "C1 control"),
     ("\u093e", 1, "spacing mark: Mc with ccc == 0"),
-    ("\u200b", 1, "ZWSP: documented as one column"),
+    ("\u200b", 0, "ZWSP: invisible format character"),
+    ("\ufeff", 0, "BOM: invisible format character"),
+    ("\u00ad", 1, "soft hyphen: Cf, but it can draw"),
+    ("\u0600", 1, "Arabic number sign: Cf, but it draws"),
+    ("\U0001f469\u200d\U0001f4bb", 2, "ZWJ: the joined glyph adds no column"),
+    (
+        "\U0001f468\u200d\U0001f469\u200d\U0001f467",
+        2,
+        "three emoji joined by ZWJ are one glyph",
+    ),
+    ("\U0001f44d\U0001f3fd", 2, "skin-tone modifier folds into its base"),
+    (
+        "\U0001f468\u200d\U0001f469\U0001f3fd",
+        2,
+        "the modifier looks past the joiner to the base",
+    ),
 ]
 
 

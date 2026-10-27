@@ -102,6 +102,17 @@ class TestSurfaceCJK:
         assert row[1].char == ""
         assert row[2].char == "a"
 
+    def test_a_zwj_cluster_occupies_one_wide_glyph(self):
+        """Zero-width joiners, modifiers and selectors all fold into the cell
+        of the glyph they belong to, so the terminal receives the sequence
+        whole and draws it once."""
+        s = Surface(5, 1)
+        s.draw_text_rgb(0, 0, "👩‍💻a", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        row = s.rows()[0]
+        assert row[0].char == "👩‍💻"
+        assert row[1].char == ""
+        assert row[2].char == "a"
+
     def test_overwriting_half_a_vs16_emoji_blanks_the_other_half(self):
         s = Surface(4, 1)
         s.draw_text_rgb(0, 0, "❤️", fg=DEFAULT_FG, bg=DEFAULT_BG)
