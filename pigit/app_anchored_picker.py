@@ -86,12 +86,21 @@ def build_panel_picker_entries(panel_nav: PanelNavigator) -> list[PanelPickerEnt
     return entries
 
 
-def format_panel_picker_row(entry: PanelPickerEntry) -> list[Segment]:
-    """Segments for one picker row: ``● Name  [key]`` (or two spaces when not current)."""
+def format_panel_picker_row(
+    entry: PanelPickerEntry, *, name_width: int | None = None
+) -> list[Segment]:
+    """Segments for one picker row: ``● Name  [key]`` (or two spaces when not current).
+
+    With *name_width*, short names are padded to it: the ``[key]`` column
+    belongs to the popup, not to the length of the name above it.
+    """
     marker = "● " if entry.is_current else "  "
+    name = entry.name
+    if name_width is not None:
+        name += " " * max(0, name_width - wcswidth(name))
     segs: list[Segment] = [
         Segment(marker, fg=THEME.fg_success if entry.is_current else THEME.fg_dim),
-        Segment(entry.name, fg=THEME.fg_muted, style_flags=palette.STYLE_BOLD),
+        Segment(name, fg=THEME.fg_muted, style_flags=palette.STYLE_BOLD),
     ]
     if entry.tab_key:
         segs.append(Segment(f"  [{entry.tab_key}]", fg=THEME.fg_primary))
@@ -323,6 +332,9 @@ class PanelPicker(_AnchoredListPicker[PanelPickerEntry]):
         id: str | None = None,
     ) -> None:
         self._panel_on_select = on_select
+        # Every name padded to the widest one, so the [key] column lines up.
+        # Set before ``super().__init__``, which builds the row segments.
+        self._name_width = max((wcswidth(e.name) for e in entries), default=0)
 
         def _select_panel(entry: PanelPickerEntry) -> None:
             if self._panel_on_select is not None:
@@ -338,7 +350,7 @@ class PanelPicker(_AnchoredListPicker[PanelPickerEntry]):
         )
 
     def format_row(self, entry: PanelPickerEntry, index: int) -> list[Segment]:
-        return format_panel_picker_row(entry)
+        return format_panel_picker_row(entry, name_width=self._name_width)
 
     def is_current_at(self, index: int) -> bool:
         if index < 0 or index >= len(self._entries):

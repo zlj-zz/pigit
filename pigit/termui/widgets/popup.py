@@ -21,7 +21,7 @@ from ..segment import Segment
 from ..surface import Surface
 from ..primitives.text import sanitize_for_display
 from ..theme import get_theme
-from ..wcwidth_table import truncate_by_width, wcswidth
+from ..wcwidth_table import char_width_at, truncate_by_width, wcswidth
 from ..types import LayerKind, OverlayDispatchResult
 
 _logger = logging.getLogger(__name__)
@@ -203,7 +203,8 @@ class AlertDialogBody(Component):
     ESC is handled by the :class:`Popup` shell.
     """
 
-    #: Frame title; :meth:`_scroll_title` appends the visible line range.
+    #: Frame title. The scroll position is the right border's thumb; a line
+    #: range in the title would only repeat it.
     TITLE = "Confirm"
     #: Rows the dialog spends on chrome rather than message: top and bottom
     #: border, the blank line above the footer, and the footer itself.
@@ -322,7 +323,7 @@ class AlertDialogBody(Component):
         inner_w = max(16, min(inner_w, self._term_cols - 4))
         self._inner_w = inner_w
         self._content_rows = self._build_content_rows()
-        self._frame.title = self._scroll_title()
+        self._frame.title = self.TITLE
         self._frame.set_inner_size(self._inner_w, len(self._content_rows))
         self._outer_w = self._frame.outer_width
         self.outer_row_count = self._frame.outer_height
@@ -337,17 +338,6 @@ class AlertDialogBody(Component):
         any message length.
         """
         return max(self.MIN_BODY_ROWS, self._term_lines - self.CHROME_ROWS)
-
-    def _scroll_title(self) -> str:
-        """Frame title, showing which message lines are on screen."""
-        max_body = self._max_body_rows()
-        if self._body_lines <= max_body:
-            return self.TITLE
-        first = self._scroll_i + 1
-        last = min(self._scroll_i + max_body, self._body_lines)
-        return truncate_by_width(
-            f"{self.TITLE} ({first}-{last} of {self._body_lines})", self._inner_w
-        )
 
     def _scroll_by(self, delta: int) -> None:
         """Move the message window, clamped to the lines that exist."""
@@ -406,6 +396,14 @@ class AlertDialogBody(Component):
         surface.fill_rect_rgb(
             0, 0, self._outer_w, self.outer_row_count, theme.bg_chrome
         )
+        # The track is the whole inner height, footer included -- the same
+        # border the other framed views use. It marks how much message is left,
+        # which is all a confirm dialog needs; the title no longer spells it out.
+        self._frame.set_scroll(
+            first=self._scroll_i,
+            total=self._body_lines,
+            visible=self._max_body_rows(),
+        )
         self._frame.draw(surface, 0, 0)
         cr, cc, cw, ch = self._frame.content_rect(0, 0)
         for i, row in enumerate(self._content_rows[:ch]):
@@ -436,8 +434,8 @@ class AlertDialogBody(Component):
             while wcswidth(chunk) > inner:
                 take = 0
                 width = 0
-                for ch in chunk:
-                    w = wcswidth(ch)
+                for index in range(len(chunk)):
+                    w = char_width_at(chunk, index)
                     if width + w > inner:
                         break
                     width += w

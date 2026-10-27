@@ -90,6 +90,29 @@ def test_format_panel_picker_row_marks_current():
     assert "[1]" in "".join(s.text for s in cur)
 
 
+def test_panel_picker_key_column_lines_up():
+    """The [key] column belongs to the popup, not to the name above it:
+    Status/Branch/Commit are one character longer than Stash/Graph, and the
+    brackets used to follow the name instead of sitting in their own column."""
+    picker = PanelPicker(
+        entries=[
+            PanelPickerEntry(Mock(), name, key)
+            for name, key in (
+                ("Status", "1"),
+                ("Stash", "2"),
+                ("Branch", "3"),
+                ("Commit", "4"),
+                ("Graph", "5"),
+            )
+        ]
+    )
+    columns = [
+        "".join(segment.text for segment in row).index("[")
+        for row in picker._row_segments
+    ]
+    assert len(set(columns)) == 1, columns
+
+
 def test_build_panel_picker_entries_from_ring():
     panels = []
     for name, key in (
@@ -109,6 +132,13 @@ def test_build_panel_picker_entries_from_ring():
     assert [e.panel for e in entries] == panels
     assert entries[0].is_current is True
     assert entries[1].is_current is False
+
+
+def test_the_header_counter_comes_from_the_panel_ring(runtime):
+    """The slot shows ``[key/total]``; the total is the ring length, not a
+    literal that could drift from the pages."""
+    app, _root = _mount(runtime)
+    assert app._tab_slot.label_total == "5"
 
 
 def test_panel_picker_enter_selects_and_toggles():

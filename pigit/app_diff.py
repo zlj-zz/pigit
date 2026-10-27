@@ -224,10 +224,24 @@ class DiffViewer(Component):
             return THEME.fg_inactive
         return THEME.fg_dim
 
-    def _draw_frame(self, surface: Surface) -> None:
-        """Draw the bordered chrome for the current surface size."""
+    def _draw_frame(self, surface: Surface, *, draw_title: bool = True) -> None:
+        """Draw the bordered chrome and its scrollbar for the current size.
+
+        *draw_title* is off for File History, whose own header writes the top
+        border: a title left under it would show through wherever the header
+        does not reach.
+        """
         self._sync_frame(surface.width, surface.height)
         self._frame.fg = self._border_fg()
+        if not draw_title:
+            self._frame.title = None
+        # Derived from the surface, not ``_viewport_rows``: the latter is only
+        # updated by ``resize``, and the paint loop below uses this same value.
+        self._frame.set_scroll(
+            first=self._line_i,
+            total=len(self._lines),
+            visible=max(0, surface.height - self.BORDER_ROWS),
+        )
         self._frame.draw(surface, 0, 0)
 
     def _drop_pending_tokenize(self) -> None:
@@ -320,7 +334,16 @@ class DiffViewer(Component):
         """Tokens for line ``idx``, or a plain-text fallback while tokenize is pending."""
         if idx < len(self._render_tokens):
             return self._render_tokens[idx]
-        if strip_diff_prefix and line and line[0] in "+- ":
+        # A file header starts with ``---``/``+++`` but is not a change line.
+        # ``DiffContent.pre_tokenize_with`` already exempts it; this fallback
+        # runs until that lands, so it has to answer the same way or the
+        # header loses a character for the first frames.
+        if (
+            strip_diff_prefix
+            and line
+            and line[0] in "+- "
+            and not self._is_file_header(line)
+        ):
             code = line[1:]
         else:
             code = line
@@ -602,14 +625,23 @@ class DiffViewer(Component):
         """Set the optional label drawn on the viewer's own box border."""
         self._box_title = title
 
+    def _clamp_line_i(self, value: int) -> int:
+        """Clamp a first-visible index to the lines there are.
+
+        Near EOF the index may sit past the viewport clamp -- showing a
+        partial last screen is intended -- but never at or past the last line:
+        paint starts there, so such a value renders an empty screen.
+        """
+        return min(max(0, int(value)), max(0, len(self._lines) - 1))
+
     @property
     def scroll_i(self) -> int:
-        """First visible line index (may exceed clamped viewport when near EOF)."""
+        """First visible line index (may exceed the viewport clamp near EOF)."""
         return self._line_i
 
     @scroll_i.setter
     def scroll_i(self, value: int) -> None:
-        self._line_i = max(0, int(value))
+        self._line_i = self._clamp_line_i(value)
 
     def scroll_up(self, step: int = 1) -> None:
         """Scroll the diff viewport up."""
@@ -649,7 +681,7 @@ class DiffViewer(Component):
                     self.set_content(content)
                 case str():
                     self.set_content(content.splitlines())
-            self._line_i = self.i_cache.get(self.i_cache_key, 0)
+            self._line_i = self._clamp_line_i(self.i_cache.get(self.i_cache_key, 0))
 
     @bind_action("down", "j", "down", desc="Navigate diff lines down", tip="Navigate")
     def _on_j(self) -> None:
@@ -915,7 +947,7 @@ class DiffViewer(Component):
         if snap is not None:
             self.set_content(snap.content)
             self._diff_type = snap.diff_type
-            self._line_i = snap.scroll_i
+            self._line_i = self._clamp_line_i(snap.scroll_i)
             self.come_from = snap.come_from
         self._saved_diff_state = None
 
@@ -1179,7 +1211,17 @@ class DiffViewer(Component):
                 clip_left=clip_left,
             )
         elif line.startswith("\\"):
-            surface.draw_text_rgb(row, text_start_col, line, fg=THEME.fg_dim, bg=bg)
+            # The only branch without a right-edge clip: the standard
+            # "\ No newline at end of file" marker is 27 columns, so on a
+            # narrow surface it used to paint over the border (and now the
+            # scrollbar) -- every token path stops at ``max_col``.
+            surface.draw_text_rgb(
+                row,
+                text_start_col,
+                truncate_by_width(line, main_w),
+                fg=THEME.fg_dim,
+                bg=bg,
+            )
         else:
             tokens = self._tokens_at(idx, line, strip_diff_prefix=True)
             self._draw_tokens(
@@ -1396,7 +1438,10 @@ class DiffViewer(Component):
             self._render_file_history_borderless(surface)
             return
 
-        surface.draw_box_rgb(0, 0, w, h, fg=self._border_fg())
+        # Through _draw_frame, not draw_box_rgb directly: this mode scrolls the
+        # same _line_i, and a bypass would leave it as the one framed view with
+        # no scrollbar. The header below owns the top border, so no title.
+        self._draw_frame(surface, draw_title=False)
 
         # Header row (overwrites top border)
         header = self._file_history_header()

@@ -12,10 +12,15 @@ from collections.abc import Callable
 from pigit.termui import Component, Surface, bind_action, bind_signals, request_render
 from pigit.termui.containers import FlowBoard
 from pigit.termui.containers.flow_board import PAN_STEP
+from pigit.termui.widgets import SectionRule
 
 from .app_graph_blocks import AuthorChart, ContributionHeatmap, PunchCard
 from .app_theme import THEME
 from .viewmodels.commit import ICommitViewModel
+
+#: Section rule above the wordmark: the same one-row header the list pages
+#: wear, so every page names itself in the same place.
+_RULE_H = 1
 
 #: Fixed wordmark above the board. Not a figlet font -- all 163 installed ones
 #: were checked, and none renders this -- so the five rows are the data. Each
@@ -53,6 +58,8 @@ class ContributionPanel(Component):
     def __init__(self, *, vm: ICommitViewModel, id: str | None = None) -> None:
         super().__init__(id=id)
         self._vm = vm
+        self._rule = SectionRule("Graph")
+        self._rule.parent = self
         self._heatmap = ContributionHeatmap()
         self._chart = AuthorChart()
         self._punch_card = PunchCard()
@@ -66,6 +73,7 @@ class ContributionPanel(Component):
 
     def mount(self) -> None:
         super().mount()
+        self._rule.mount()
         self._board.mount()
         self._bind_vm_signals()
         # Signals only fire on change: a stream that finished while this panel
@@ -75,31 +83,36 @@ class ContributionPanel(Component):
 
     def unmount(self) -> None:
         self._board.unmount()
+        self._rule.unmount()
         super().unmount()
         self._unbind_vm_signals()
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
         width, height = size
-        self._board.resize((width, max(0, height - _BANNER_H)))
+        self._rule.resize((width, _RULE_H))
+        self._board.resize((width, max(0, height - _RULE_H - _BANNER_H)))
 
     def paint(self, surface: Surface) -> None:
+        if surface.width <= 0 or surface.height <= 0:
+            return
+        self._rule.paint(surface.subsurface(0, 0, surface.width, _RULE_H))
         self._draw_banner(surface)
         self._board.paint(self._board_surface(surface))
 
     def _board_surface(self, surface: Surface) -> Surface:
-        """The part of the panel under the wordmark."""
-        return surface.subsurface(
-            _BANNER_H, 0, surface.width, max(0, surface.height - _BANNER_H)
-        )
+        """The part of the panel under the rule and the wordmark."""
+        top = _RULE_H + _BANNER_H
+        return surface.subsurface(top, 0, surface.width, max(0, surface.height - top))
 
     def _draw_banner(self, surface: Surface) -> None:
         """Draw the fixed wordmark; the surface clips whatever does not fit."""
         for row, line in enumerate(_BANNER):
-            if row >= surface.height:
+            target = _RULE_H + row
+            if target >= surface.height:
                 return
             surface.draw_text_rgb(
-                row, _BANNER_PAD_LEFT, line, fg=THEME.fg_accent, bg=None
+                target, _BANNER_PAD_LEFT, line, fg=THEME.fg_accent, bg=None
             )
 
     def handle_mouse(self, event) -> bool:

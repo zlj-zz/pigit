@@ -18,7 +18,7 @@ from .header_slot import HeaderSlot, _SUFFIX
 
 
 class TabSlot(HeaderSlot):
-    """Header right-slot child that paints ``{name} [{key}] ▾`` and opens the picker.
+    """Header right-slot child that paints ``{name} [{key}/{total}] ▾`` and opens the picker.
 
     Click (left press) invokes ``on_open`` with the local mouse event so the
     app can derive an anchored Popup offset from slot geometry + click column.
@@ -29,11 +29,12 @@ class TabSlot(HeaderSlot):
         *,
         tab_name: ValueRef[str] | str = "",
         tab_key: ValueRef[str] | str = "",
+        tab_total: ValueRef[str] | str = "",
         on_open: Callable[[MouseEvent], None] | None = None,
         fg: tuple[int, int, int] | None = None,
         id: str | None = None,
     ) -> None:
-        super().__init__(sources=[tab_name, tab_key], fg=fg, id=id)
+        super().__init__(sources=[tab_name, tab_key, tab_total], fg=fg, id=id)
         self._on_open = on_open
 
     @property
@@ -47,9 +48,18 @@ class TabSlot(HeaderSlot):
         values = self._values()
         return values[1] if len(values) > 1 else ""
 
+    @property
+    def label_total(self) -> str:
+        """Number of product pages, or empty when the slot was not given one."""
+        values = self._values()
+        return values[2] if len(values) > 2 else ""
+
     def _key_part(self) -> str:
         key = self.label_key
-        return f" [{key}]" if key else ""
+        total = self.label_total
+        if not key:
+            return ""
+        return f" [{key}/{total}]" if total else f" [{key}]"
 
     def _assemble(self, display_name: str) -> str:
         return f"{display_name}{self._key_part()}{_SUFFIX}"

@@ -762,6 +762,27 @@ class TestHelpPanel:
         combined = "".join(c.char for c in row_text)
         assert "j" in combined or "down" in combined
 
+    def test_help_panel_border_shows_the_scroll_position(self):
+        panel = HelpPanel()
+        panel.set_entries([(f"k{i}", f"action {i}") for i in range(40)])
+        panel.resize((80, 20))
+
+        def right_border(surface):
+            return "".join(
+                surface._rows[row][panel._outer_w - 1].char
+                for row in range(1, panel._frame.outer_height - 1)
+            )
+
+        # 9 track rows over 40 rendered lines -> a 2-cell thumb.
+        surface = Surface(80, 20)
+        panel.paint(surface)
+        assert right_border(surface) == "▐▐" + "│" * 7
+
+        panel.scroll_down(10**6)
+        surface = Surface(80, 20)
+        panel.paint(surface)
+        assert right_border(surface) == "│" * 7 + "▐▐"
+
     def test_help_panel_scroll_down_clamps(self):
         panel = HelpPanel()
         panel.set_entries([("a", "A")])
@@ -1009,6 +1030,40 @@ class TestAlertDialogBody:
         assert any("Test message" in line for line in plain)
         assert any("OK" in line for line in plain)
         assert any("Cancel" in line for line in plain)
+
+    @staticmethod
+    def _right_border(surface, body):
+        return "".join(
+            surface.rows()[row][body._outer_w - 1].char
+            for row in range(1, body._frame.outer_height - 1)
+        )
+
+    def _painted(self, message):
+        body = AlertDialogBody(
+            shell=MagicMock(), message=message, on_result=lambda x: None
+        )
+        body.resize((60, 12))
+        body._rebuild_frame()
+        body.open_alert()
+        surface = Surface(body._outer_w, body.outer_row_count)
+        body.paint(surface)
+        return body, surface
+
+    def test_a_long_message_scrolls_with_a_border_bar(self):
+        body, surface = self._painted("\n".join(f"line {i}" for i in range(40)))
+        right = self._right_border(surface, body)
+        assert right.startswith("▐")
+        assert body._frame.title == "Confirm"
+
+        body._scroll_by(10**6)
+        later = Surface(body._outer_w, body.outer_row_count)
+        body.paint(later)
+        assert self._right_border(later, body).endswith("▐")
+
+    def test_a_message_that_fits_has_no_bar(self):
+        body, surface = self._painted("short")
+        assert set(self._right_border(surface, body)) == {"│"}
+        assert body._frame.title == "Confirm"
 
     def test_alert_body_confirm_calls_shell_finish(self):
         shell = MagicMock()

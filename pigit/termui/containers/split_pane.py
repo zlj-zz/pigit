@@ -8,6 +8,7 @@ Date: 2026-08-20
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
 from ..component import Component, mount_children, unmount_children
@@ -24,7 +25,8 @@ class SplitPane(Component):
 
     Shows only the master when the terminal is narrow, detail is unwanted,
     or no detail component is set. Otherwise lays out master and detail with
-    a fixed master column width derived from terminal columns.
+    a master column width taken from *master_width* when given, else from
+    *master_ratio*, clamped between the floor and the cap.
     """
 
     def __init__(
@@ -32,9 +34,11 @@ class SplitPane(Component):
         master: Component,
         detail: Component | None = None,
         *,
-        breakpoint_cols: int = 120,
-        master_ratio: float = 0.35,
-        min_master: int = 50,
+        breakpoint_cols: int = 130,
+        master_ratio: float = 0.4,
+        min_master: int = 60,
+        max_master: int = 120,
+        master_width: Callable[[int], int] | None = None,
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
@@ -43,6 +47,8 @@ class SplitPane(Component):
         self._breakpoint_cols = breakpoint_cols
         self._master_ratio = master_ratio
         self._min_master = min_master
+        self._max_master = max_master
+        self._master_width = master_width
         self._detail_wanted = True
         self._last_cols: int | None = None
         self._widths: list[int | Literal["flex"]] = ["flex"]
@@ -69,6 +75,23 @@ class SplitPane(Component):
         if self._last_cols is not None:
             self.apply_terminal_width(self._last_cols)
 
+    def _master_columns(self, cols: int) -> int:
+        """Columns the master takes on a terminal *cols* wide, floor and cap
+        included.
+
+        *master_width* exists because the master's share is not always a
+        constant: a policy that tapers the ratio as the terminal grows makes
+        the master stop growing (and, once the ratio falls faster than the
+        width rises, shrink), while a policy that adds a column per few extra
+        ones keeps it rising.
+        """
+        width = (
+            self._master_width(cols)
+            if self._master_width is not None
+            else int(cols * self._master_ratio)
+        )
+        return min(self._max_master, max(self._min_master, width))
+
     def apply_terminal_width(self, cols: int) -> None:
         """Attach or detach detail and set horizontal widths from *cols*."""
         self._last_cols = cols
@@ -78,7 +101,7 @@ class SplitPane(Component):
             and self._detail is not None
         )
         if show_detail:
-            master_w = max(self._min_master, int(cols * self._master_ratio))
+            master_w = self._master_columns(cols)
             detail_w = max(1, cols - master_w)
             desired = [self._master, self._detail]
             widths: list[int | Literal["flex"]] = [master_w, detail_w]

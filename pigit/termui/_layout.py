@@ -7,25 +7,8 @@ Date: 2026-04-19
 
 from __future__ import annotations
 
-from typing import (
-    Literal,
-    Protocol,
-    runtime_checkable,
-)
+from typing import Literal
 from collections.abc import Sequence
-
-
-@runtime_checkable
-class SizeModifier(Protocol):
-    """Protocol for objects that modify available size and report an offset."""
-
-    def apply(self, available: tuple[int, int]) -> tuple[int, int]:
-        """Return the actual (width, height) after modification."""
-        ...
-
-    def offset(self) -> tuple[int, int]:
-        """Return the (top, left) offset introduced by this modifier."""
-        ...
 
 
 class Padding:

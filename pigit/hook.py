@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Module: pigit/hook.py
-Description: Lifecycle hooks for pigit startup and shutdown.
+Description: Lifecycle hooks for pigit startup.
 Author: Zev
 Date: 2026-05-21
 """
@@ -18,8 +18,3 @@ def before_hook(ctx) -> None:
             ctx.managed_repos.add_repos([repo_path], confirm=False)
         except Exception:
             ctx.log.debug("auto_append failed", exc_info=True)
-
-
-def after_hook(_ctx) -> None:
-    """Called after command execution completes."""
-    pass

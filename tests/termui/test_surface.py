@@ -91,6 +91,36 @@ class TestSurfaceCJK:
         row = s.rows()[0]
         assert row[2].char == " "  # not enough room for width-2 char
 
+    def test_vs16_emoji_occupies_two_cells_with_spacer(self):
+        """A terminal advances two columns for a variation sequence the emoji
+        data widens, so the buffer reserves the second one -- otherwise the
+        rest of the row lands a column to the left and the line overruns."""
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "❤️a", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        row = s.rows()[0]
+        assert row[0].char == "❤️"  # selector stays with its base
+        assert row[1].char == ""
+        assert row[2].char == "a"
+
+    def test_a_zwj_cluster_occupies_one_wide_glyph(self):
+        """Zero-width joiners, modifiers and selectors all fold into the cell
+        of the glyph they belong to, so the terminal receives the sequence
+        whole and draws it once."""
+        s = Surface(5, 1)
+        s.draw_text_rgb(0, 0, "👩‍💻a", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        row = s.rows()[0]
+        assert row[0].char == "👩‍💻"
+        assert row[1].char == ""
+        assert row[2].char == "a"
+
+    def test_overwriting_half_a_vs16_emoji_blanks_the_other_half(self):
+        s = Surface(4, 1)
+        s.draw_text_rgb(0, 0, "❤️", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        s.draw_text_rgb(0, 1, "x", fg=DEFAULT_FG, bg=DEFAULT_BG)
+        row = s.rows()[0]
+        assert row[0].char == " "
+        assert row[1].char == "x"
+
     def test_draw_box_rgb_title_centers_cjk_correctly(self):
         s = Surface(10, 3)
         s.draw_box_rgb(0, 0, 10, 3, fg=DEFAULT_FG, bg=DEFAULT_BG, title="中")

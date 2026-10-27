@@ -12,7 +12,7 @@ from collections.abc import Sequence
 
 from . import palette
 from .wcwidth_table import (
-    _char_width,
+    char_width_at,
     truncate_by_width,
     wcswidth,
 )
@@ -86,8 +86,7 @@ def _glyph_width(cell: FlatCell) -> int:
     char = cell.char
     if not char:
         return 0
-    base = char[0]
-    return _char_width(ord(base)) if not base.isascii() else 1
+    return char_width_at(char, 0)
 
 
 def _blank_like(cell: FlatCell) -> FlatCell:
@@ -330,8 +329,8 @@ class Surface:
         """
         cur_col = col
         base_cell: FlatCell | None = None
-        for ch in text:
-            w = _char_width(ord(ch)) if not ch.isascii() else 1
+        for index, ch in enumerate(text):
+            w = char_width_at(text, index)
             if cur_col >= self.width:
                 return
             if w == 0:

@@ -223,6 +223,24 @@ def test_a_long_message_never_pushes_the_buttons_off_screen(size):
         _runtime_ctx.reset(token)
 
 
+def test_a_wrapped_emoji_line_stays_inside_the_inner_width():
+    """The wrap measured every code point on its own, so an emoji the terminal
+    draws two columns wide counted as one: the line came out one cell past the
+    inner width and painted over the frame."""
+    from pigit.termui.wcwidth_table import wcswidth
+
+    token, dialog = _open_alert("seed", (40, 12))
+    try:
+        pane = dialog._pane
+        inner = pane._inner_w
+        # Fill the row up to the emoji so the break lands right after it.
+        pane._message = "x" * (inner - 1) + "❤️ tail"
+        for row in pane._build_content_rows():
+            assert sum(wcswidth(seg.text) for seg in row) <= inner
+    finally:
+        _runtime_ctx.reset(token)
+
+
 def test_a_short_message_is_left_alone():
     token, dialog = _open_alert("Merge feat into main?", (80, 24))
     try:
@@ -234,20 +252,31 @@ def test_a_short_message_is_left_alone():
         _runtime_ctx.reset(token)
 
 
-def test_the_title_reports_which_lines_are_showing():
+def _thumb_cells(dialog, size):
+    surface = Surface(*size)
+    dialog.paint(surface)
+    return [
+        (row, col)
+        for row, cells in enumerate(surface.rows())
+        for col, cell in enumerate(cells)
+        if cell.char == "▐"
+    ]
+
+
+def test_the_title_stays_put_and_the_border_carries_the_position():
+    """The line range moved out of the title and onto the right border, where
+    the rest of the framed views already show it."""
     token, dialog = _open_alert(_long_message(), (80, 12))
     try:
-        _painted(dialog, (80, 12))
+        before = _thumb_cells(dialog, (80, 12))
         pane = dialog._pane
-        assert (
-            pane._frame.title
-            == f"Confirm (1-{pane._max_body_rows()} of {pane._body_lines})"
-        )
+        assert pane._frame.title == "Confirm"
+        assert before, "a message taller than the dialog has a thumb"
 
-        pane._scroll_down()
-        _painted(dialog, (80, 12))
-        assert pane._scroll_i == 1
-        assert pane._frame.title.startswith("Confirm (2-")
+        pane._scroll_page_down()
+        after = _thumb_cells(dialog, (80, 12))
+        assert pane._frame.title == "Confirm"
+        assert after != before, "the thumb moved with the message"
     finally:
         _runtime_ctx.reset(token)
 

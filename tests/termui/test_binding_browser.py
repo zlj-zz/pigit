@@ -63,6 +63,34 @@ def test_dismiss_only_help() -> None:
     assert not _is_dismiss_only_action("demo.alpha")
 
 
+def test_the_border_shows_the_scroll_position() -> None:
+    """The app's Help is this browser, so its right border is where the user
+    looks for "how much more is there"."""
+    from pigit.termui.surface import Surface
+
+    owner = _Owner()
+    rows = derive_executable_bindings(owner._action_bindings, owner)
+    browser = BindingBrowser()
+    browser.set_groups([("Demo", rows * 10)])
+    browser.resize((120, 30))
+
+    def right_border(surface):
+        return "".join(
+            surface._rows[row][browser._outer_w - 1].char
+            for row in range(1, browser._frame.outer_height - 1)
+        )
+
+    # 14 track rows over 32 rendered rows -> a 6-cell thumb.
+    surface = Surface(120, 30)
+    browser.paint(surface)
+    assert right_border(surface) == "▐" * 6 + "│" * 8
+
+    browser._offset = len(browser._render) - browser._scroll_h
+    surface = Surface(120, 30)
+    browser.paint(surface)
+    assert right_border(surface) == "│" * 8 + "▐" * 6
+
+
 def test_binding_browser_cursor_skips_headers_and_clamps() -> None:
     owner = _Owner()
     rows = owner.get_executable_bindings()

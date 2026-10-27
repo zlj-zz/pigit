@@ -117,7 +117,7 @@ def test_expanded_long_message_reads_row_by_row():
     assert (panel.curr_no, panel._cursor_sub) == (1, 0)
 
     # The viewport followed so the tail of the message was actually reachable.
-    assert panel._r_start == 17 - 6 + 1
+    assert panel._r_start == 17 - panel.visible_row_count + 1
 
 
 def _expanded_author_row_text(commit: Commit) -> str:

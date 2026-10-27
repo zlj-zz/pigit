@@ -96,5 +96,15 @@ class BorderedTextBrowser(Component):
         inner_w = max(1, w - 2)
         self._frame.set_inner_size(inner_w, inner_h)
         self._frame.title = self._title or None
+        # The surface being painted is what is on screen: keep the browser at
+        # that size, or it renders its stale width/height -- over the right
+        # border and the scrollbar -- whenever paint and the last resize
+        # disagree. ``resize`` is a no-op when they already match.
+        self._browser.resize((inner_w, inner_h))
+        self._frame.set_scroll(
+            first=self._browser.scroll_i,
+            total=len(self._browser.lines),
+            visible=inner_h,
+        )
         self._frame.draw(surface, 0, 0)
         render_child(self._browser, surface, "BorderedTextBrowser")
