@@ -147,7 +147,33 @@ class PigitApplication(Application):
 
     keymap_namespace = "universal"
     min_terminal_size: tuple[int, int] = (65, 10)
-    LARGE_SCREEN_COLS = 120
+
+    #: Side preview starts here: the master floor plus a 70-column diff, which
+    #: is the narrowest one still worth reading.
+    LARGE_SCREEN_COLS = 130
+    #: The list holds 60 columns where the preview appears and gains one for
+    #: every five the terminal gains after 150, so the diff keeps the bulk of
+    #: the growth. Capped at 120, past which only the diff grows.
+    SIDE_PREVIEW_MASTER_MIN = 60
+    SIDE_PREVIEW_MASTER_MAX = 120
+    SIDE_PREVIEW_MASTER_STEADY_COLS = 150
+    SIDE_PREVIEW_MASTER_GROWTH = 0.2
+
+    @classmethod
+    def side_preview_master_width(cls, cols: int) -> int:
+        """Columns the list keeps while the side preview is up.
+
+        A share of the width was the wrong shape here: tapering the ratio as
+        the terminal grows stops the list growing -- it sat at 75 columns from
+        250 to 300 -- because the ratio falls faster than the width rises.
+        Counting columns per column instead keeps it rising and says what the
+        layout actually wants: the list is as wide as its rows need, the diff
+        takes the rest.
+        """
+        extra = max(0, cols - cls.SIDE_PREVIEW_MASTER_STEADY_COLS)
+        return cls.SIDE_PREVIEW_MASTER_MIN + int(
+            extra * cls.SIDE_PREVIEW_MASTER_GROWTH
+        )
 
     # Body tree — assigned in build_root; required for a live TUI session.
     _tab_view: TabView
@@ -354,6 +380,9 @@ class PigitApplication(Application):
         self._split_pane = SplitPane(
             master=tab_view,
             breakpoint_cols=self.LARGE_SCREEN_COLS,
+            master_width=self.side_preview_master_width,
+            min_master=self.SIDE_PREVIEW_MASTER_MIN,
+            max_master=self.SIDE_PREVIEW_MASTER_MAX,
             id="split_pane",
         )
         self._body_view = ExclusiveView(

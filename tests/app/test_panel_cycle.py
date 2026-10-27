@@ -384,8 +384,32 @@ def test_ctrl_p_on_narrow_terminal_toasts_and_keeps_hidden(
     assert "preview" not in _body_ids(app)
     assert app._diff_preview_wanted is wanted
     assert toasts
-    assert "120" in toasts[0]
+    assert str(app.LARGE_SCREEN_COLS) in toasts[0]
     assert "Enter" in toasts[0]  # the route that still works
+
+
+def test_the_list_grows_slower_than_the_preview(runtime) -> None:
+    """The list takes one column per five the terminal gains, so a wider
+    terminal mostly widens the diff."""
+    app, _root = _mount(runtime)
+    assert [
+        app.side_preview_master_width(cols) for cols in (130, 150, 200, 300)
+    ] == [60, 60, 70, 90]
+    # Never shrinks as the terminal grows.
+    widths = [app.side_preview_master_width(cols) for cols in range(130, 500)]
+    assert widths == sorted(widths)
+
+
+def test_the_split_uses_the_column_policy(runtime, monkeypatch) -> None:
+    """The policy has to reach the layout, not just exist on the class."""
+    monkeypatch.setattr("pigit.app.terminal_size", lambda: (200, 24))
+    app, root = _mount(runtime)
+    app._is_large_screen = True
+    root.resize((200, 24))
+    app._apply_body_widths(200)
+    master, detail = app._split_pane.children
+    assert master._size[0] == 70
+    assert detail._size[0] == 130
 
 
 def test_narrow_preview_toast_names_the_log_route_on_branches(
