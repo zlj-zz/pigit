@@ -27,8 +27,8 @@ _EMPTY_STATE = [
 class ListPickerSheet(OptionList):
     """Shared OptionList wiring for picker sheets (repos / worktrees).
 
-    Provides the cursor-row selected background, ``j/k`` + filter +
-    double-click activation, and ``close`` / ``toggle_mode``. Subclasses
+    Provides the cursor-row selected background, ``Tab`` / ``Shift+Tab`` +
+    filter + double-click activation, and ``close`` / ``toggle_mode``. Subclasses
     implement ``_row_segment_for(entry)`` and ``_handle_entry(entry)`` (dismiss
     then switch or run an action), plus their own footer / extra bindings.
     """
@@ -105,12 +105,12 @@ class ListPickerSheet(OptionList):
             return ([], segs, [])
         return super().describe_row(idx, is_cursor, item_idx=item_idx, sub_row=sub_row)
 
-    @bind_action("next", "j", "down", desc="Next row", tip="Navigate")
+    @bind_action("next", "tab", "down", desc="Next row", tip="Navigate")
     def next(self, step: int = 1) -> None:
         self._clear_double_click()
         super().next(step)
 
-    @bind_action("previous", "k", "up", desc="Previous row", tip="Navigate")
+    @bind_action("previous", "shift tab", "up", desc="Previous row", tip="Navigate")
     def previous(self, step: int = 1) -> None:
         self._clear_double_click()
         super().previous(step)
@@ -122,7 +122,17 @@ class ListPickerSheet(OptionList):
         self.enter_search()
 
     def capture_key(self, key: str) -> bool:
-        """Route keys into filter mode while active."""
+        """Route keys into filter mode while active.
+
+        Enter activates the highlighted row while the filter box is open --
+        the filter already applies on every keystroke, so consuming Enter just
+        to leave the box was a step with no effect of its own. With no rows to
+        activate, fall through: an empty result set must stay escapable with
+        Enter.
+        """
+        if key == keys.KEY_ENTER and self.search_active and self.content:
+            self.confirm()
+            return True
         return self.search_handle_key(key)
 
     def _sync_filter(self) -> None:

@@ -31,6 +31,30 @@ from pigit.termui.root import ComponentRoot
 from pigit.termui.types import LayerKind
 
 
+def test_worktree_sheet_inherits_tab_navigation():
+    """Both picker sheets share ListPickerSheet's navigation."""
+    infos = [
+        WorktreeInfo(
+            path=f"/work/{name}",
+            head_sha="abcdef0123456789",
+            branch=name,
+            is_main=False,
+            detached=False,
+        )
+        for name in ("aaa", "bbb")
+    ]
+    sheet = WorktreePickerSheet(
+        entries=[WorktreePickerEntry(info=i, is_current=False) for i in infos],
+        on_switch=lambda _p: None,
+    )
+    sheet.mount()
+
+    sheet._handle_event("tab")
+    assert sheet.curr_no == 1
+    sheet._handle_event("shift tab")
+    assert sheet.curr_no == 0
+
+
 def test_format_worktree_row_marks_current_and_detached():
     info = WorktreeInfo(
         path="/work/a",

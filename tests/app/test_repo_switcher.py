@@ -462,3 +462,115 @@ def test_open_repo_switcher_refreshes_async_and_updates_rows():
 
     assert managed.load_repos.call_count == 2
     assert panel._entries[0].meta["branch"] == "main"
+
+
+# ── Navigation and confirmation ──
+#
+# The sheet navigates with Tab / Shift+Tab (j/k are typing keys once the filter
+# box is open) and Enter activates the row even from inside that box.
+
+
+def _nav_sheet(names=("r0", "r1", "r2")):
+    """Sheet over *names*, plus the paths it reports switching to."""
+    switched: list[str] = []
+    entries = [
+        RepoSwitcherEntry(kind="repo", name=n, path=f"/tmp/{n}", meta={})
+        for n in names
+    ]
+    sheet = RepoSwitcherSheet(entries=entries, on_switch=switched.append)
+    sheet.mount()
+    return sheet, switched
+
+
+def test_tab_moves_down_and_shift_tab_moves_back():
+    sheet, _ = _nav_sheet()
+    sheet._handle_event("tab")
+    assert sheet.curr_no == 1
+    sheet._handle_event("shift tab")
+    assert sheet.curr_no == 0
+
+
+def test_j_and_k_no_longer_move():
+    sheet, _ = _nav_sheet()
+    sheet._handle_event("j")
+    sheet._handle_event("j")
+    assert sheet.curr_no == 0
+    sheet._handle_event("k")
+    assert sheet.curr_no == 0
+
+
+def test_tab_moves_while_the_filter_box_is_open():
+    """Tab has to navigate without disturbing the query being typed."""
+    sheet, _ = _nav_sheet(("alpha", "pixel", "pint"))
+    sheet._handle_event("/")
+    for ch in "pi":
+        sheet._handle_event(ch)
+    assert sheet.search_active is True
+    assert len(sheet.content) == 2
+
+    sheet._handle_event("tab")
+
+    assert sheet.search_query == "pi"
+    assert sheet.curr_no == 1
+
+
+def test_enter_activates_the_filtered_row():
+    sheet, switched = _nav_sheet(("alpha", "pixel", "pint"))
+    sheet._handle_event("/")
+    for ch in "pi":
+        sheet._handle_event(ch)
+    sheet._handle_event("tab")  # the second of the two matches
+    assert sheet.search_active is True
+
+    with patch("pigit.app_repo_switcher.dismiss_sheet"):
+        sheet._handle_event("enter")
+
+    assert switched == ["/tmp/pint"]
+
+
+def test_enter_with_no_matches_leaves_the_box_instead_of_activating():
+    """A dead Enter is worse than the old behaviour: with nothing to activate
+    it still has to get you out of the filter box."""
+    sheet, switched = _nav_sheet(("alpha",))
+    sheet._handle_event("/")
+    for ch in "zz":
+        sheet._handle_event(ch)
+    assert sheet.content == []
+
+    with patch("pigit.app_repo_switcher.dismiss_sheet") as dismiss:
+        sheet._handle_event("enter")
+
+    assert switched == []
+    assert dismiss.call_count == 0
+    assert sheet.search_active is False
+
+
+def test_enter_outside_the_filter_box_still_activates():
+    sheet, switched = _nav_sheet(("alpha",))
+    with patch("pigit.app_repo_switcher.dismiss_sheet"):
+        sheet._handle_event("enter")
+    assert switched == ["/tmp/alpha"]
+
+
+def test_escape_clears_the_query_and_keeps_the_sheet():
+    sheet, _ = _nav_sheet(("alpha", "beta"))
+    sheet._handle_event("/")
+    for ch in "be":
+        sheet._handle_event(ch)
+    assert len(sheet.content) == 1
+
+    with patch("pigit.app_repo_switcher.dismiss_sheet") as dismiss:
+        sheet._handle_event("esc")
+
+    assert sheet.search_query == ""
+    assert sheet.search_active is False
+    assert len(sheet.content) == 2
+    assert dismiss.call_count == 0
+
+
+def test_tab_on_an_empty_and_a_single_row_list():
+    for names in ((), ("only",)):
+        sheet, _ = _nav_sheet(names)
+        sheet._handle_event("tab")
+        sheet._handle_event("shift tab")
+        assert sheet.curr_no == 0
