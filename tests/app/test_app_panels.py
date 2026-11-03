@@ -9,6 +9,7 @@ import pytest
 
 from pigit.app_diff import DiffViewer
 from pigit.app_theme import THEME
+from pigit.termui import palette
 from pigit.termui.component import ComponentError
 from pigit.termui.surface import Surface
 
@@ -99,7 +100,14 @@ class TestDiffViewer:
         assert row[0] == "\u2502"  # border intact, nothing overwrites it
 
     def test_hunk_header_uses_accent_tone(self):
-        """@@ hunk headers render on the derived hunk tone with hunk fg."""
+        """@@ hunk headers render on the derived hunk tone, with the diff-meta
+        tokens keeping their own colour; only untokenized spans fall back to
+        the hunk fg.
+
+        The assertion used to read ``fg_diff_hunk`` because the viewer painted
+        before its tokens existed -- the hunk header spent a frame in the hunk
+        tone and then turned blue once the worker landed.
+        """
         d = DiffViewer()
         d.set_content(["@@ -1,3 +1,4 @@", "+added", " context"])
         d.resize((40, 5))
@@ -109,7 +117,7 @@ class TestDiffViewer:
         # Column 6 = 1 (border) + 4 (gutter) + 1 (prefix)
         cell = row[6]
         assert cell.bg == THEME.bg_diff_hunk
-        assert cell.fg == THEME.fg_diff_hunk
+        assert cell.fg == palette.BLUE  # the leading "@@", a diff_meta token
 
     def test_line_numbers_flush_against_prefix(self):
         """Gutter width matches formatting so numbers sit flush before +/-."""

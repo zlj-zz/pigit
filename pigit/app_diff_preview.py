@@ -46,6 +46,12 @@ class _PreviewRequest:
     stash_ref: str | None = None
 
 
+#: Diff lines plus the full side sources they were highlighted against.
+_PreviewLoad = tuple[
+    list[str], dict[str, tuple[list[str] | None, list[str] | None]]
+]
+
+
 class PreviewPanel(Component):
     """Host that loads Status/Stash diffs into a full-size DiffViewer.
 
@@ -81,7 +87,7 @@ class PreviewPanel(Component):
             source_loader=source_loader,
         )
         self._unsubs: list[Callable[[], None]] = []
-        self._load_task: AsyncTask[list[str]] | None = None
+        self._load_task: AsyncTask[_PreviewLoad] | None = None
         self._request: _PreviewRequest | None = None
 
     def mount(self) -> None:
@@ -148,7 +154,7 @@ class PreviewPanel(Component):
         self._load_task = run_async(
             lambda: self._load_lines(request),
             guard_or_identity(
-                self._guard_async, lambda lines: self._on_loaded(request, lines)
+                self._guard_async, lambda loaded: self._on_loaded(request, loaded)
             ),
             label="Diff preview",
         )
@@ -166,7 +172,7 @@ class PreviewPanel(Component):
         self._load_task = run_async(
             lambda: self._load_lines(request),
             guard_or_identity(
-                self._guard_async, lambda lines: self._on_loaded(request, lines)
+                self._guard_async, lambda loaded: self._on_loaded(request, loaded)
             ),
             label="Diff preview",
         )
@@ -209,30 +215,49 @@ class PreviewPanel(Component):
 
         return None
 
-    def _load_lines(self, request: _PreviewRequest) -> list[str]:
-        """Background: load diff lines for a captured request."""
+    def _load_lines(self, request: _PreviewRequest) -> _PreviewLoad:
+        """Background: load the diff and the sources its highlighting needs.
+
+        The sources ride along so the install can be complete on its first
+        paint: fetched after the fact, they change the multi-line mask and the
+        viewer repaints, which flickers the highlighting.
+        """
         vm = self._status_vm
         if vm is None:
-            return []
+            return [], {}
         if request.kind == "status":
-            return vm.load_diff_by_path(request.key)
-        if request.kind == "stash" and request.stash_ref is not None:
-            return vm.load_stash_diff(request.stash_ref)
-        return []
+            lines = vm.load_diff_by_path(request.key)
+        elif request.kind == "stash" and request.stash_ref is not None:
+            lines = vm.load_stash_diff(request.stash_ref)
+        else:
+            return [], {}
+        return lines, self._load_sources(request, lines)
 
-    def _on_loaded(self, request: _PreviewRequest, lines: list[str]) -> None:
+    def _load_sources(
+        self, request: _PreviewRequest, lines: list[str]
+    ) -> dict[str, tuple[list[str] | None, list[str] | None]]:
+        """Full side sources for *lines*; worker-safe, reads no panel state."""
+        if not lines:
+            return {}
+        repo_path = self._get_repo_path() if self._get_repo_path is not None else ""
+        return self._diff_viewer.load_sources(
+            lines, repo_path=repo_path, diff_type=request.diff_type
+        )
+
+    def _on_loaded(self, request: _PreviewRequest, loaded: _PreviewLoad) -> None:
         """Apply a completed load if the selection key is still current."""
         if not self.is_mounted() or not is_on_visible_paint_path(self):
             return
         if self._request is None or self._request.key != request.key:
             return
+        lines, sources = loaded
         if not lines:
             self.clear()
             return
         self.set_diff_type(request.diff_type)
         self._sync_repo_context()
         self._diff_viewer.set_box_title(request.title)
-        self._diff_viewer.set_content(lines)
+        self._diff_viewer.set_content(lines, sources=sources or None)
 
     def _sync_repo_context(self) -> None:
         """Push the current repo root into the inner viewer.

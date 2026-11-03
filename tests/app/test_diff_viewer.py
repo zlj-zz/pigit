@@ -549,7 +549,8 @@ class TestContentInstallInvariants:
 
     def test_stale_diff_tokenize_does_not_overwrite_plain(self):
         """File-history plain load must drop pending diff tokenize callbacks."""
-        dv = DiffViewer()
+        # A loader is what leaves the tokenize worker running for a small diff.
+        dv = DiffViewer(source_loader=lambda *_args: None)
         captured: dict[str, object] = {}
 
         def capture_start(work, callback):
@@ -713,3 +714,90 @@ def test_navigation_accepts_arrow_keys() -> None:
     assert {"k", "up"} <= set(keys["diff.up"])
     assert {"h", "left"} <= set(keys["diff.scroll_left"])
     assert {"l", "right"} <= set(keys["diff.scroll_right"])
+
+
+class TestInstallIsWhole:
+    """A content install settles the highlighting it will show.
+
+    Staging a file re-installs the preview's diff. An install that painted
+    with a mask guessed from the fragment flashed the highlighting off and on
+    when the real mask -- computed from the whole file -- arrived a frame
+    later."""
+
+    SMALL = [
+        "diff --git a/f.py b/f.py",
+        "--- a/f.py",
+        "+++ b/f.py",
+        "@@ -1 +1 @@",
+        "-old",
+        "+new",
+    ]
+
+    def _capture(self, dv: DiffViewer) -> tuple[dict, object]:
+        captured: dict = {}
+
+        def capture(work, callback, **_kwargs):
+            captured["work"] = work
+            captured["callback"] = callback
+
+        return captured, patch.object(dv._tokenize_task, "start", side_effect=capture)
+
+    def test_a_diff_with_nothing_to_resolve_installs_complete(self):
+        dv = DiffViewer()
+        captured, starter = self._capture(dv)
+        with starter:
+            dv.set_content(self.SMALL)
+
+        assert len(dv._render_tokens) == len(dv._lines)
+        assert captured == {}  # nothing left for a worker to settle
+
+    def test_supplied_sources_settle_the_mask_before_the_install(self):
+        """A hunk that opens inside a docstring only looks right against the
+        whole file. Given the sources, the install is complete and no worker
+        follows to correct it."""
+        dv = DiffViewer(source_loader=lambda *_args: None)
+        captured, starter = self._capture(dv)
+        in_docstring = [
+            "diff --git a/f.py b/f.py",
+            "--- a/f.py",
+            "+++ b/f.py",
+            "@@ -2,2 +2,2 @@",
+            " first line",
+            "-middle",
+            "+changed",
+        ]
+        with starter:
+            dv.set_content(
+                in_docstring, sources={"f.py": (['"""', "first line", "middle"], ['"""', "first line", "changed"])}
+            )
+
+        assert "docstring" in dv._multiline_mask  # the sources decided it
+        assert len(dv._render_tokens) == len(dv._lines)
+        assert captured == {}  # nothing left for a worker to settle
+
+    def test_missing_sources_leave_a_worker_to_settle_the_mask(self):
+        dv = DiffViewer(source_loader=lambda *_args: None)
+        captured, starter = self._capture(dv)
+        with starter:
+            dv.set_content(self.SMALL)
+        tokens_before = dv._render_tokens
+
+        result = captured["work"]()
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](result)
+
+        assert result[0] is None  # the mask did not change: no repaint
+        assert dv._render_tokens is tokens_before
+
+    def test_a_large_diff_installs_its_text_first(self):
+        dv = DiffViewer()
+        big = self.SMALL[:4]
+        big += [f"-old{i}" for i in range(DiffViewer.SYNC_TOKENIZE_MAX_LINES)]
+        big += [f"+new{i}" for i in range(DiffViewer.SYNC_TOKENIZE_MAX_LINES)]
+        captured, starter = self._capture(dv)
+        with starter:
+            dv.set_content(big)
+
+        assert len(dv._lines) > DiffViewer.SYNC_TOKENIZE_MAX_LINES
+        assert dv._render_tokens == []
+        assert "work" in captured  # the worker brings the tokens
