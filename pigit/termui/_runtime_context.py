@@ -31,11 +31,7 @@ __all__ = [
     "ComponentRegistry",
     "FocusManager",
     "RendererNotBoundError",
-    "set_session",
-    "reset_session",
     "get_session",
-    "set_renderer",
-    "reset_renderer",
     "get_renderer",
     "get_renderer_strict",
     "set_overlay_host",
@@ -46,8 +42,6 @@ __all__ = [
     "layer_top",
     "is_modal_open",
     "get_registry",
-    "set_registry",
-    "reset_registry",
     "by_id",
     "set_focus_manager",
     "reset_focus_manager",
@@ -248,20 +242,6 @@ class RuntimeContext:
 # --- Session context helpers ---
 
 
-def set_session(session: Session) -> None:
-    """Set the current TUI session in context."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.session = session
-
-
-def reset_session() -> None:
-    """Reset session context to ``None``."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.session = None
-
-
 def get_session() -> Session | None:
     """Get the current TUI session from context."""
     runtime = _runtime_ctx.get()
@@ -269,20 +249,6 @@ def get_session() -> Session | None:
 
 
 # --- Renderer context helpers ---
-
-
-def set_renderer(renderer: Renderer) -> None:
-    """Set renderer in current context."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.renderer = renderer
-
-
-def reset_renderer() -> None:
-    """Reset renderer context to ``None``."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.renderer = None
 
 
 def get_renderer() -> Renderer | None:
@@ -360,20 +326,6 @@ def get_registry() -> ComponentRegistry | None:
     """Get current registry from context."""
     runtime = _runtime_ctx.get()
     return runtime.registry if runtime is not None else None
-
-
-def set_registry(registry: ComponentRegistry) -> None:
-    """Set the current component registry in context."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.registry = registry
-
-
-def reset_registry() -> None:
-    """Reset registry context to ``None``."""
-    runtime = _runtime_ctx.get()
-    if runtime is not None:
-        runtime.registry = None
 
 
 def by_id(id: str, expect_type: type[T] | None = None) -> T:

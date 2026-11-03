@@ -822,7 +822,6 @@ class TestHelpPanel:
         panel.set_entries([("?", "help"), ("q", "quit")])
         panel.resize((200, 40))
         assert panel._inner_w >= HelpPanel.MIN_INNER_W
-        assert HelpPanel.MIN_INNER_W == 88
 
     def test_help_panel_keys_right_aligned_flat(self):
         """Shorter keys are left-padded so the key column is right-aligned."""

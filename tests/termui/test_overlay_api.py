@@ -225,12 +225,10 @@ class TestExecExternal:
             exec_external(["echo", "hi"])
 
     def test_runs_command_and_restores_session(self):
-        from pigit.termui._runtime_context import set_session
-
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
-        set_session(session)
+        runtime.session = session
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock()
             result = exec_external(["echo", "hi"])
@@ -242,13 +240,11 @@ class TestExecExternal:
             assert result is mock_run.return_value
 
     def test_resume_failure_is_logged_and_raised(self):
-        from pigit.termui._runtime_context import set_session
-
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
         session.resume.side_effect = RuntimeError("boom")
-        set_session(session)
+        runtime.session = session
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock()
             with pytest.raises(RuntimeError, match="boom"):
@@ -256,12 +252,12 @@ class TestExecExternal:
 
     def test_stops_keyboard_reader_while_external_owns_tty(self):
         """KeyboardInput must not read stdin while nvim queries DSR/OSC 11."""
-        from pigit.termui._runtime_context import set_overlay_host, set_session
+        from pigit.termui._runtime_context import set_overlay_host
 
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
-        set_session(session)
+        runtime.session = session
 
         input_handle = MagicMock()
         loop = MagicMock()

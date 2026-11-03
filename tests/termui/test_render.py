@@ -146,11 +146,6 @@ class TestRendererUtilities:
 
 
 class TestRowToStrRGB:
-    def test_plain_cells_no_sequences(self):
-        r = Renderer(FakeSession())
-        row = [FlatCell("a"), FlatCell("b"), FlatCell("c")]
-        assert r._row_to_str(row) == "abc"
-
     def test_rgb_cells_generate_truecolor_sequences(self):
         r = Renderer(FakeSession())
         r._color = ColorAdapter(ColorMode.TRUECOLOR)

@@ -10,9 +10,12 @@ from pigit.ext.func import time_it
 
 
 def test_doctest():
+    """``testmod`` reports failures in its result object rather than raising,
+    so the count has to be asserted or the test cannot fail."""
     import pigit.ext.utils
 
-    doctest.testmod(pigit.ext.utils, verbose=False)
+    result = doctest.testmod(pigit.ext.utils, verbose=False)
+    assert result.failed == 0
 
 
 def test_traceback_info():
