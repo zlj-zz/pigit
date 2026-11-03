@@ -355,7 +355,7 @@ class BranchPanel(OptionList):
     def merge(self) -> None:
         self._trigger_merge()
 
-    @bind_action("create_pull_request", "p", desc="Create pull request page in browser")
+    @bind_action("create_pull_request", "O", desc="Create pull request page in browser")
     def create_pull_request(self) -> None:
         """Open the hosting provider create-PR URL for the selected branch."""
         if not self.branches:

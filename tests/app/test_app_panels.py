@@ -493,6 +493,18 @@ class TestBranchPanelLifecycle:
 
         assert opened == ["https://github.com/zlj-zz/pigit/compare/dev?expand=1"]
 
+    def test_create_pr_is_bound_to_shift_o_not_p(self):
+        """`p` opened the PR page while `P` pushes the branch: one Shift apart,
+        opposite consequences. Shift+O carries no such collision."""
+        from pigit.app_branch import BranchPanel
+        from pigit.termui.bindings import collect_action_bindings
+
+        keys = {
+            binding.action: binding.keys
+            for binding in collect_action_bindings(BranchPanel)
+        }
+        assert keys["create_pull_request"] == ("O",)
+
 
 class TestCommitPanelLifecycle:
     """CommitPanel + ViewModel integration tests."""
