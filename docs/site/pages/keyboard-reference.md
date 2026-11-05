@@ -73,6 +73,7 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++shift+r++ | Rename |
 | ++d++ | Delete |
 | ++shift+o++ | Open create-PR URL in browser |
+| ++shift+y++ | Copy branch name |
 | ++ctrl+f++ | Cycle scope: local → remote → all |
 | ++shift+j++ / ++shift+k++ | Scroll log-graph preview |
 

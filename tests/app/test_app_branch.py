@@ -207,3 +207,45 @@ def test_a_branch_that_already_exists_warns_rather_than_errors():
 
     assert toast.call_args.kwargs.get("kind") is FeedbackKind.WARNING
     assert "already exists" in toast.call_args.args[0]
+
+
+def test_copy_name_copies_the_selected_branch():
+    panel = _panel_with(
+        [Branch("main", "0", "0", True), Branch("feature/x", "0", "0", False)]
+    )
+    panel.curr_no = 1
+    copied: list[str] = []
+    with (
+        patch(
+            "pigit.app_branch.copy_to_clipboard",
+            side_effect=lambda text: copied.append(text) or True,
+        ),
+        patch(
+            "pigit.app_branch.run_async",
+            side_effect=lambda work, done, **_kw: done(work()),
+        ),
+        patch("pigit.app_branch.show_toast") as toast,
+    ):
+        panel.copy_name()
+
+    assert copied == ["feature/x"]
+    assert "feature/x" in toast.call_args.args[0]
+
+
+def test_copy_name_without_branches_does_nothing():
+    panel = _panel_with([])
+    with (
+        patch("pigit.app_branch.copy_to_clipboard") as copy,
+        patch("pigit.app_branch.run_async"),
+    ):
+        panel.copy_name()
+
+    assert copy.call_count == 0
+
+
+def test_copy_name_is_bound_to_shift_y():
+    """`Y` is the copy key on Status and Commit too."""
+    from pigit.termui.bindings import collect_action_bindings
+
+    keys = {b.action: b.keys for b in collect_action_bindings(BranchPanel)}
+    assert keys["copy_name"] == ("Y",)
