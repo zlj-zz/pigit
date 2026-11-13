@@ -21,6 +21,7 @@ from .base import (
     run_gated,
 )
 
+from pigit.app_types import DiffType
 from pigit.session_history import SessionHistory, HistoryRecord, ReverseCommand
 from pigit.git.model import File
 
@@ -39,6 +40,16 @@ def _needs_stage(file: File) -> bool:
         or file.has_inline_merged_conflicts
         or file.has_unstaged_change
     )
+
+
+def _is_staged_only(file: File) -> bool:
+    """Return True when the file's only changes are in the index."""
+    return file.has_staged_change and not file.has_unstaged_change
+
+
+def _diff_type(file: File) -> DiffType:
+    """Return the diff type this file produces as it currently stands."""
+    return DiffType.STAGED if _is_staged_only(file) else DiffType.UNSTAGED
 
 
 class IStatusViewModel(IListViewModel["File"]):
@@ -61,7 +72,11 @@ class IStatusViewModel(IListViewModel["File"]):
 
     def load_diff(self, idx: int, plain: bool = True) -> list[str]: ...
 
-    def load_diff_by_path(self, rel: str, plain: bool = True) -> list[str]: ...
+    def load_diff_by_path(
+        self, rel: str, plain: bool = True
+    ) -> tuple[list[str], DiffType]: ...
+
+    def diff_type_at(self, idx: int) -> DiffType: ...
 
     def get_inspector_snapshot(self, idx: int) -> FileSnapshot | None: ...
 
@@ -291,16 +306,38 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         f = self.item_at(idx)
         if f is None:
             return []
-        cached = f.has_staged_change and not f.has_unstaged_change
-        text = self._git.load_file_diff(f.name, f.tracked, cached, plain=plain)
-        return text.splitlines()
+        return self._load_diff_for(f, plain)
 
-    def load_diff_by_path(self, rel: str, plain: bool = True) -> list[str]:
-        """Load a file diff by worktree-relative path (stable across refresh)."""
-        for idx, item in enumerate(self.items.value):
-            if item.get_file_str() == rel:
-                return self.load_diff(idx, plain=plain)
-        return []
+    def load_diff_by_path(
+        self, rel: str, plain: bool = True
+    ) -> tuple[list[str], DiffType]:
+        """Diff lines and the type they were produced as, keyed by path.
+
+        The pair travels together because staging or discarding moves a file
+        between the index and the worktree: whoever reloads and then acts on
+        a hunk must know which side it is now looking at. One ``File`` is
+        resolved so the lines and the type cannot describe different files.
+        """
+        file = next(
+            (item for item in self.items.value if item.get_file_str() == rel), None
+        )
+        if file is None:
+            return [], DiffType.UNSTAGED
+        return self._load_diff_for(file, plain), _diff_type(file)
+
+    def diff_type_at(self, idx: int) -> DiffType:
+        """Diff type the file at ``idx`` produces right now."""
+        file = self.item_at(idx)
+        if file is None:
+            return DiffType.UNSTAGED
+        return _diff_type(file)
+
+    def _load_diff_for(self, file: File, plain: bool) -> list[str]:
+        """Load one file's diff from its current status flags."""
+        text = self._git.load_file_diff(
+            file.name, file.tracked, _is_staged_only(file), plain=plain
+        )
+        return text.splitlines()
 
     def get_inspector_snapshot(self, idx: int):
         f = self.item_at(idx)

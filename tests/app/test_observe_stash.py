@@ -64,6 +64,7 @@ def _make_host(
         get_status_panel=lambda: status_panel,
         get_stash_panel=lambda: stash_panel,
         get_preview_panel=lambda: None,
+        get_detail_panel=lambda: None,
         get_log_graph_preview=lambda: None,
         get_diff_preview_wanted=lambda: False,
         get_log_graph_wanted=lambda: False,

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pigit.app import PigitApplication
-from pigit.app_diff import DiffViewer
+from pigit.app_diff import DiffViewer, DiffType
 from pigit.config_data import AppConfig
 from pigit.termui import EVT_GOTO, Component, keys
 from pigit.termui.containers import ExclusiveView
@@ -86,6 +86,34 @@ def test_enter_opens_detail_via_bubbled_goto(runtime):
     assert app._is_detail_open() is True
     assert _leaf(root) is app._diff_panel
     assert app._diff_panel.come_from is app._status_panel
+
+
+def test_open_diff_hands_the_detail_a_reload_loader(runtime):
+    """The detail re-reads its own file after a content change, by path."""
+    app, _root = _mount(runtime)
+    hit = MagicMock()
+    hit.name = "a.py"
+    hit.get_file_str.return_value = "src/a.py"
+    hit.has_staged_change = False
+    hit.has_unstaged_change = True
+    vm = app._status_panel._vm
+    with (
+        patch.object(vm, "load_diff", return_value=["+line\n"]),
+        patch.object(vm, "diff_type_at", return_value=DiffType.STAGED) as diff_type_at,
+        patch.object(
+            vm, "load_diff_by_path", return_value=(["+line"], DiffType.UNSTAGED)
+        ) as load_by_path,
+        patch.object(app._status_panel, "file_at_cursor", return_value=(hit, 0)),
+        patch.object(app._status_panel, "_tree_mode", False),
+    ):
+        app._status_panel.open_diff()
+        source = app._diff_panel._reload_source
+        assert source is not None
+        assert source() == (["+line"], DiffType.UNSTAGED)
+
+    assert app._diff_panel._diff_type is DiffType.STAGED
+    diff_type_at.assert_called_once_with(0)
+    load_by_path.assert_called_once_with("src/a.py")
 
 
 def test_esc_closes_detail_and_restores_status(runtime):

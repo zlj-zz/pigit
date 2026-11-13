@@ -568,3 +568,80 @@ def test_amend_runs_off_the_ui_thread(monkeypatch, mocker):
 
     assert seen["thread"] is not threading.main_thread()
     assert badge.call_args[0][0] == "Amended HEAD"
+
+
+# ── Visual mode ──
+#
+# One mode, the way a visual mode is expected to work: entering it selects the
+# row under the cursor, moving extends or shrinks the run, and space toggles a
+# row the cursor never crossed.
+
+
+def test_visual_mode_starts_with_the_cursor_row() -> None:
+    files = [_file("a.py"), _file("b.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel.curr_no = 1
+
+    panel.toggle_visual_mode()
+
+    assert panel._visual_mode is True
+    assert panel._selected == {1}
+
+
+def test_moving_extends_the_selection_and_coming_back_shrinks_it() -> None:
+    files = [_file(n) for n in ("a.py", "b.py", "c.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel.toggle_visual_mode()
+
+    panel.next()
+    panel.next()
+    assert panel._selected == {0, 1, 2}
+
+    panel.previous()
+    assert panel._selected == {0, 1}
+
+
+def test_space_adds_a_row_the_cursor_never_crossed() -> None:
+    files = [_file(n) for n in ("a.py", "b.py", "c.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel.toggle_visual_mode()
+
+    panel.curr_no = 2
+    panel.toggle_space_selection()
+
+    assert panel._selected == {0, 2}
+
+
+def test_a_stage_in_visual_mode_takes_the_rows_crossed() -> None:
+    """``v``, move, ``a`` -- the flow that used to answer "No files selected"."""
+    files = [_file(n) for n in ("a.py", "b.py", "c.py")]
+    panel, vm = _panel(files, tree=False)
+
+    panel.toggle_visual_mode()
+    panel.next()
+    panel.stage()
+
+    vm.stage_indices.assert_called_once_with({0, 1})
+
+
+def test_leaving_visual_mode_drops_the_selection() -> None:
+    files = [_file("a.py"), _file("b.py")]
+    panel, _vm = _panel(files, tree=False)
+    panel.toggle_visual_mode()
+    panel.next()
+
+    panel.toggle_visual_mode()
+
+    assert panel._visual_mode is False
+    assert panel._selected == set()
+
+
+def test_the_header_counts_the_selection_in_visual_mode() -> None:
+    files = [_file(n) for n in ("a.py", "b.py", "c.py")]
+    panel, _vm = _panel(files, tree=False)
+    assert panel._header_detail(3) == "1/3"
+
+    panel.toggle_visual_mode()
+    panel.next()
+
+    assert panel._header_detail(3) == "2 selected"

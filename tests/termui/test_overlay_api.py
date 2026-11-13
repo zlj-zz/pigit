@@ -8,12 +8,20 @@ Date: 2026-06-10
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 from unittest.mock import MagicMock, patch
 
 from pigit.termui._layer import LayerKind
 from pigit.termui.types import ToastPosition
-from pigit.termui._runtime_context import RuntimeContext, _runtime_ctx
+from pigit.termui._runtime_context import (
+    RuntimeContext,
+    _runtime_ctx,
+    set_overlay_host,
+)
+from pigit.termui.async_task import AsyncTask
 from pigit.termui.overlay import (
     dismiss_sheet,
     dismiss_toast,
@@ -21,6 +29,7 @@ from pigit.termui.overlay import (
     get_badge,
     get_badge_signal,
     hide_spinner,
+    run_with_spinner,
     show_badge,
     show_sheet,
     show_spinner,
@@ -225,12 +234,10 @@ class TestExecExternal:
             exec_external(["echo", "hi"])
 
     def test_runs_command_and_restores_session(self):
-        from pigit.termui._runtime_context import set_session
-
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
-        set_session(session)
+        runtime.session = session
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock()
             result = exec_external(["echo", "hi"])
@@ -242,13 +249,11 @@ class TestExecExternal:
             assert result is mock_run.return_value
 
     def test_resume_failure_is_logged_and_raised(self):
-        from pigit.termui._runtime_context import set_session
-
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
         session.resume.side_effect = RuntimeError("boom")
-        set_session(session)
+        runtime.session = session
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock()
             with pytest.raises(RuntimeError, match="boom"):
@@ -256,12 +261,12 @@ class TestExecExternal:
 
     def test_stops_keyboard_reader_while_external_owns_tty(self):
         """KeyboardInput must not read stdin while nvim queries DSR/OSC 11."""
-        from pigit.termui._runtime_context import set_overlay_host, set_session
+        from pigit.termui._runtime_context import set_overlay_host
 
         runtime = RuntimeContext()
         _runtime_ctx.set(runtime)
         session = MagicMock()
-        set_session(session)
+        runtime.session = session
 
         input_handle = MagicMock()
         loop = MagicMock()
@@ -281,3 +286,103 @@ class TestExecExternal:
             exec_external(["nvim", "file"])
 
         assert order == ["stop", "suspend", "run", "resume", "start"]
+
+
+class _FakeLoop:
+    """Interval scheduler for tests, without a running event loop."""
+
+    def __init__(self) -> None:
+        self._next_id = 0
+        self.timers: dict[int, object] = {}
+
+    def add_interval(self, interval, callback):
+        self._next_id += 1
+        self.timers[self._next_id] = callback
+        return self._next_id
+
+    def remove_interval(self, tid: int) -> None:
+        self.timers.pop(tid, None)
+
+    def fire(self) -> None:
+        """Run every armed timer once, as the event loop would."""
+        for callback in list(self.timers.values()):
+            callback()
+
+
+def _host_with(loop: _FakeLoop):
+    runtime = RuntimeContext()
+    _runtime_ctx.set(runtime)
+    host = MagicMock()
+    host._event_loop = loop
+    set_overlay_host(host)
+    return host
+
+
+def _drain_until(predicate, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not predicate():
+        AsyncTask.poll_all()
+        time.sleep(0.005)
+
+
+class TestSpinnerDelay:
+    """A spinner belongs to work that takes long enough to need one."""
+
+    def test_fast_work_never_shows_a_spinner(self, mocker) -> None:
+        spinner = mocker.patch("pigit.termui.overlay.show_spinner")
+        hidden = mocker.patch("pigit.termui.overlay.hide_spinner")
+        loop = _FakeLoop()
+        _host_with(loop)
+        finished: list[int] = []
+
+        run_with_spinner(lambda: 1, finished.append, label="Staging")
+        _drain_until(lambda: finished)
+
+        assert finished == [1]
+        assert spinner.call_count == 0
+        assert hidden.call_count == 0
+        assert loop.timers == {}  # the armed timer was cancelled, not left to fire
+
+    def test_slow_work_shows_the_spinner_then_dismisses_it(self, mocker) -> None:
+        spinner = mocker.patch("pigit.termui.overlay.show_spinner")
+        hidden = mocker.patch("pigit.termui.overlay.hide_spinner")
+        loop = _FakeLoop()
+        _host_with(loop)
+        gate = threading.Event()
+        finished: list[str] = []
+
+        def work() -> str:
+            gate.wait(2.0)
+            return "done"
+
+        run_with_spinner(work, finished.append, label="Staging")
+        loop.fire()  # the delay elapsed while the work runs on
+        assert spinner.call_count == 1
+        assert hidden.call_count == 0
+
+        gate.set()
+        _drain_until(lambda: finished)
+
+        assert finished == ["done"]
+        assert hidden.call_count == 1
+
+    def test_a_failed_worker_never_arms_the_spinner(self, mocker) -> None:
+        """The failure toast owns the toast slot; a timer armed before the
+        failure would fire over it and stay there for an hour."""
+        spinner = mocker.patch("pigit.termui.overlay.show_spinner")
+        toast = mocker.patch("pigit.termui.overlay.show_toast")
+        loop = _FakeLoop()
+        _host_with(loop)
+        finished: list[str] = []
+
+        def work() -> str:
+            raise RuntimeError("index locked")
+
+        run_with_spinner(work, finished.append, label="Staging")
+        _drain_until(lambda: toast.called)
+
+        loop.fire()
+
+        assert finished == []
+        assert spinner.call_count == 0
+        assert loop.timers == {}

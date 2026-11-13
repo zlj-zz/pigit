@@ -248,6 +248,7 @@ def run_async(
     callback: Callable[[T], Any],
     *,
     label: str = _DEFAULT_LABEL,
+    on_failure: Callable[[BaseException], None] | None = None,
 ) -> AsyncTask[T]:
     """Run blocking work in a background thread; deliver result to main thread.
 
@@ -255,10 +256,13 @@ def run_async(
         work: Blocking function executed in ThreadPoolExecutor.
         callback: Invoked on the main thread with the result.
         label: Human name for the task, used when reporting a failure.
+        on_failure: Invoked on the main thread when *work* raises, in addition
+            to the global failure toast. Callers that own state to unwind (a
+            pending spinner, a loading flag) pass this.
 
     Returns:
         AsyncTask handle; caller can ``.cancel()`` to drop the result.
     """
     task = AsyncTask[T]()
-    task.start(work, callback, label=label)
+    task.start(work, callback, label=label, on_failure=on_failure)
     return task

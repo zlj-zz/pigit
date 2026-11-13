@@ -41,8 +41,6 @@ def classify_path_signal(
         if rel is not None:
             rel_paths.add(rel)
             kinds.add(ChangeKind.WORKTREE_META)
-            if ctx.preview_target is not None and rel == ctx.preview_target:
-                kinds.add(ChangeKind.PREVIEW_FILE)
 
     return frozenset(kinds), frozenset(rel_paths)
 

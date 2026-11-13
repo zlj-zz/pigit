@@ -41,7 +41,7 @@ from pigit.termui.widgets import (
     SectionRule,
 )
 
-from .app_diff import DiffType, DiffViewer
+from .app_diff import DiffReload, DiffViewer
 from .app_row_slots import icon_lane, status_lane
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
@@ -344,9 +344,7 @@ class StatusPanel(OptionList):
 
         # Visual mode state
         self._visual_mode = False
-        self._visual_anchor: int | None = None
         self._selected: set[int] = set()
-        self._visual_scroll = False  # auto-select while navigating
         self._stash_input = InputLine(
             prompt="Stash message: ",
             placeholder="empty = git default",
@@ -486,23 +484,15 @@ class StatusPanel(OptionList):
 
     @bind_action("next", "j", "down", desc="Navigate file list", tip="Navigate")
     def next(self, step: int = 1) -> None:
+        before = self.curr_no
         super().next(step)
-        if (
-            self._visual_mode
-            and self._visual_scroll
-            and self._visual_anchor is not None
-        ):
-            self._update_visual_selection()
+        self._extend_selection(before, self.curr_no)
 
     @bind_action("previous", "k", "up", desc="Navigate file list", tip="Navigate")
     def previous(self, step: int = 1) -> None:
+        before = self.curr_no
         super().previous(step)
-        if (
-            self._visual_mode
-            and self._visual_scroll
-            and self._visual_anchor is not None
-        ):
-            self._update_visual_selection()
+        self._extend_selection(before, self.curr_no)
 
     @bind_action(
         "preview_down",
@@ -542,11 +532,6 @@ class StatusPanel(OptionList):
             return
         f, source_idx = hit
         diff = self._vm.load_diff(source_idx)
-        diff_type = (
-            DiffType.STAGED
-            if (f.has_staged_change and not f.has_unstaged_change)
-            else DiffType.UNSTAGED
-        )
         self.emit(
             EVT_GOTO,
             target="diff",
@@ -554,8 +539,15 @@ class StatusPanel(OptionList):
             key=f.name,
             content=diff,
             repo_path=self._vm.repo_path,
-            diff_type=diff_type,
+            diff_type=self._vm.diff_type_at(source_idx),
+            reload_source=self._reload_diff(f.get_file_str()),
         )
+
+    def _reload_diff(self, rel: str) -> DiffReload:
+        """Loader for the open detail, keyed by path so a refreshed list
+        cannot point it at another file."""
+        vm = self._vm
+        return lambda: vm.load_diff_by_path(rel)
 
     @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
     def stage(self) -> None:
@@ -780,35 +772,14 @@ class StatusPanel(OptionList):
         "visual_mode", "v", desc="Toggle visual multi-select mode", tip="Visual"
     )
     def toggle_visual_mode(self) -> None:
-        """Toggle visual (multi-select) mode."""
+        """Toggle visual mode: the row under the cursor starts the selection,
+        and moving the cursor extends or shrinks it."""
         if not self.files:
             return
         self._visual_mode = not self._visual_mode
+        self._selected.clear()
         if self._visual_mode:
-            self._visual_anchor = self.curr_no
-            self._selected = set()
-            self._visual_scroll = False
-        else:
-            self._visual_anchor = None
-            self._selected.clear()
-            self._visual_scroll = False
-        self._notify_mode()
-
-    @bind_action(
-        "visual_scroll",
-        "V",
-        desc="Toggle visual scroll mode (visual mode)",
-        tip="V-scroll",
-        tip_when=lambda self: self._visual_mode,
-    )
-    def toggle_visual_scroll(self) -> None:
-        """Toggle visual scroll mode (auto-select while navigating)."""
-        if not self._visual_mode:
-            return
-        self._visual_scroll = not self._visual_scroll
-        if self._visual_scroll:
-            self._visual_anchor = self.curr_no
-            self._update_visual_selection()
+            self._set_selected(self.curr_no, True)
         self._notify_mode()
 
     @bind_action(
@@ -819,29 +790,47 @@ class StatusPanel(OptionList):
         tip_when=lambda self: self._visual_mode,
     )
     def toggle_space_selection(self) -> None:
-        """Toggle selection of current row in visual mode (source-index based)."""
+        """Add or drop the row under the cursor, for a set that is not one
+        contiguous run."""
         if not self._visual_mode:
             return
+        indices = self._row_indices(self.curr_no)
+        self._set_selected(self.curr_no, not (indices and indices <= self._selected))
+
+    def _row_indices(self, visible_idx: int) -> set[int]:
+        """Source indices the row at *visible_idx* stands for.
+
+        A directory row stands for every file under it, so one toggle takes
+        the whole subtree.
+        """
         if not self._tree_mode:
-            idx = self._source_index(self.curr_no)
-            if idx in self._selected:
-                self._selected.discard(idx)
-            else:
-                self._selected.add(idx)
-            return
-        row = self._row(self.curr_no)
+            return {self._source_index(visible_idx)}
+        row = self._row(visible_idx)
         if row is None:
-            return
+            return set()
         if row.kind == "dir":
-            if row.child_indices and row.child_indices <= self._selected:
-                self._selected -= row.child_indices
-            else:
-                self._selected |= row.child_indices
-        elif row.source_index >= 0:
-            if row.source_index in self._selected:
-                self._selected.discard(row.source_index)
-            else:
-                self._selected.add(row.source_index)
+            return set(row.child_indices)
+        return {row.source_index} if row.source_index >= 0 else set()
+
+    def _set_selected(self, visible_idx: int, on: bool) -> None:
+        """Add or drop one row's indices in the selection."""
+        indices = self._row_indices(visible_idx)
+        if on:
+            self._selected |= indices
+        else:
+            self._selected -= indices
+
+    def _extend_selection(self, before: int, after: int) -> None:
+        """Walk the selection along with the cursor: the rows the cursor
+        arrives on join it, the rows it leaves drop out again."""
+        if not self._visual_mode or before == after:
+            return
+        if after > before:
+            for idx in range(before + 1, after + 1):
+                self._set_selected(idx, True)
+            return
+        for idx in range(before, after, -1):
+            self._set_selected(idx, False)
 
     @bind_action("search", "/", desc="Filter file list by name")
     def search(self) -> None:
@@ -956,24 +945,6 @@ class StatusPanel(OptionList):
                 ),
                 label="Copy path",
             )
-
-    def _update_visual_selection(self) -> None:
-        """Update selection based on visual anchor and cursor, in source indices."""
-        if self._visual_anchor is None:
-            return
-        start = min(self._visual_anchor, self.curr_no)
-        end = max(self._visual_anchor, self.curr_no)
-        if not self._tree_mode:
-            self._selected.update(self._source_index(i) for i in range(start, end + 1))
-            return
-        for idx in range(start, end + 1):
-            row = self._row(idx)
-            if row is None:
-                continue
-            if row.kind == "dir":
-                self._selected |= row.child_indices
-            elif row.source_index >= 0:
-                self._selected.add(row.source_index)
 
     def resize(self, size: tuple[int, int]) -> None:
         super().resize(size)
@@ -1186,16 +1157,6 @@ class StatusPanel(OptionList):
         _, source_idx = hit
         return self._vm.load_diff(source_idx)
 
-    def preview_diff_type(self) -> DiffType:
-        """Return staged vs unstaged diff type for the current file."""
-        hit = self.file_at_cursor()
-        if hit is None:
-            return DiffType.UNSTAGED
-        file, _ = hit
-        if file.has_staged_change and not file.has_unstaged_change:
-            return DiffType.STAGED
-        return DiffType.UNSTAGED
-
     def _target_indices(self) -> set[int]:
         """Source indices for the current Status action.
 
@@ -1216,11 +1177,6 @@ class StatusPanel(OptionList):
 
     def _begin_target_action(self) -> set[int] | None:
         """Return indices to act on, or None if the action should abort."""
-        if self._visual_mode and self._visual_scroll:
-            show_toast(
-                "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
-            )
-            return None
         indices = self._target_indices()
         if indices:
             return indices
@@ -1340,13 +1296,13 @@ class StatusPanel(OptionList):
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
-        if not self._visual_mode:
-            mode = ""
-        elif self._visual_scroll:
-            mode = "Visual-scroll"
-        else:
-            mode = "Visual"
-        self.emit(EventType("mode_changed"), mode=mode)
+        self.emit(EventType("mode_changed"), mode="Visual" if self._visual_mode else "")
+
+    def _header_detail(self, total: int) -> str | None:
+        """The header counts the selection while visual mode is on."""
+        if self._visual_mode:
+            return f"{len(self._selected)} selected"
+        return super()._header_detail(total)
 
     def get_help_title(self) -> str:
         return "Status"
@@ -1363,11 +1319,9 @@ class StatusPanel(OptionList):
         show_toast("No files selected", duration=2.0, kind=FeedbackKind.WARNING)
 
     def _clear_visual_mode(self) -> None:
-        """Exit visual mode and clear selection state."""
+        """Leave visual mode and drop the selection."""
         self._selected.clear()
         self._visual_mode = False
-        self._visual_anchor = None
-        self._visual_scroll = False
         self._notify_mode()
 
     def _run_action(
@@ -1382,11 +1336,6 @@ class StatusPanel(OptionList):
     ) -> None:
         """Unified handler for single / visual mode actions."""
         if self._visual_mode:
-            if self._visual_scroll:
-                show_toast(
-                    "Press V to exit scroll mode", duration=2.0, kind=FeedbackKind.INFO
-                )
-                return
             if not self._selected:
                 self._toast_no_selection()
                 return
@@ -1494,9 +1443,7 @@ class StatusPanel(OptionList):
         text = f"{action} {count} files?"
 
         def after() -> None:
-            self._selected.clear()
-            self._visual_mode = False
-            self._visual_anchor = None
+            self._clear_visual_mode()
 
         def on_result(confirmed: bool) -> None:
             if not confirmed:

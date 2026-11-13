@@ -24,6 +24,7 @@ class _FakeStatusVM:
         self.diff_path_calls: list[str] = []
         self.stash_diff_calls: list[str] = []
         self.diff_return: list[str] = ["diff line"]
+        self.diff_type_return: DiffType = DiffType.UNSTAGED
         self.stash_diff_return: list[str] = ["stash diff line"]
 
     def load_diff(
@@ -34,9 +35,9 @@ class _FakeStatusVM:
 
     def load_diff_by_path(
         self, rel: str, plain: bool = True, word_diff: bool = False
-    ) -> list[str]:
+    ) -> tuple[list[str], DiffType]:
         self.diff_path_calls.append(rel)
-        return list(self.diff_return)
+        return list(self.diff_return), self.diff_type_return
 
     def load_stash_diff(self, ref: str, word_diff: bool = False) -> list[str]:
         self.stash_diff_calls.append(ref)
@@ -132,6 +133,7 @@ def test_loads_file_diff_for_status_panel(preview: PreviewPanel) -> None:
         has_merged_conflicts=False,
         has_inline_merged_conflicts=False,
     )
+    vm.diff_type_return = DiffType.STAGED
     active = _FakeStatusPanel([file], curr_no=0, source_index=7, vm=vm)
 
     bus.publish(EVT_SELECTION_CHANGED, active=active)
@@ -241,13 +243,8 @@ def test_loads_stash_diff_for_stash_panel(preview: PreviewPanel) -> None:
 
 def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
     """A superseded async load must not overwrite a newer selection."""
-    targets: list[str | None] = []
     vm = _FakeStatusVM()
-    preview = PreviewPanel(
-        status_vm=vm,
-        on_preview_target=targets.append,
-        id="preview",
-    )
+    preview = PreviewPanel(status_vm=vm, id="preview")
     bus = EventBus()
     _mount(bus, preview)
 
@@ -292,7 +289,6 @@ def test_stale_guard_drops_outdated_preview_apply(monkeypatch) -> None:
         active=_FakeStatusPanel([file_b], curr_no=0, source_index=1, vm=vm),
     )
     assert len(pending) == 2
-    assert targets[-1] == "b.py"
 
     vm.diff_return = ["from a"]
     work_a, cb_a = pending[0]
@@ -333,6 +329,40 @@ def test_reload_refetches_current_status_preview(preview: PreviewPanel) -> None:
     assert vm.diff_path_calls == ["src/main.py", "src/main.py"]
     assert vm.diff_calls == []
     assert preview._diff_viewer._lines == ["updated"]
+
+
+def test_reload_with_unchanged_content_keeps_the_scroll_line(
+    preview: PreviewPanel,
+) -> None:
+    """The observe path reloads on every Status refresh; identical content
+    must not reset the preview's viewport."""
+    bus = EventBus()
+    _mount(bus, preview)
+    vm = preview._status_vm
+    assert isinstance(vm, _FakeStatusVM)
+    vm.diff_return = ["a", "b", "c", "d"]
+    file = File(
+        name="src/main.py",
+        display_str="src/main.py",
+        short_status=" M",
+        has_staged_change=False,
+        has_unstaged_change=True,
+        tracked=True,
+        deleted=False,
+        added=False,
+        has_merged_conflicts=False,
+        has_inline_merged_conflicts=False,
+    )
+    bus.publish(
+        EVT_SELECTION_CHANGED,
+        active=_FakeStatusPanel([file], curr_no=0, source_index=3, vm=vm),
+    )
+    preview._diff_viewer._line_i = 2
+
+    preview.reload()
+
+    assert preview._diff_viewer._line_i == 2
+    assert preview._diff_viewer._lines == ["a", "b", "c", "d"]
 
 
 def test_reload_uses_path_not_captured_source_index(preview: PreviewPanel) -> None:

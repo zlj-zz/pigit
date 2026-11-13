@@ -18,6 +18,7 @@ from pigit.termui import (
     by_id,
     dismiss_sheet,
     palette,
+    run_async,
     run_with_spinner,
     Segment,
     show_badge,
@@ -34,7 +35,7 @@ from pigit.termui.widgets import (
 from pigit.termui.reactive import Signal
 
 from .app_types import BranchSnapshot
-from .ext.utils import relative_time
+from .ext.utils import copy_to_clipboard, relative_time
 from .app_theme import (
     LOAD_FAILED_MARK,
     THEME,
@@ -355,7 +356,7 @@ class BranchPanel(OptionList):
     def merge(self) -> None:
         self._trigger_merge()
 
-    @bind_action("create_pull_request", "p", desc="Create pull request page in browser")
+    @bind_action("create_pull_request", "O", desc="Create pull request page in browser")
     def create_pull_request(self) -> None:
         """Open the hosting provider create-PR URL for the selected branch."""
         if not self.branches:
@@ -394,6 +395,28 @@ class BranchPanel(OptionList):
             return
 
         show_toast(f"Opened PR page for {head}", duration=1.5, kind=FeedbackKind.INFO)
+
+    @bind_action("copy_name", "Y", desc="Copy branch name to clipboard")
+    def copy_name(self) -> None:
+        """Copy the selected branch name to the clipboard."""
+        if not self.branches:
+            return
+        name = self.branches[self.curr_no].name
+        run_async(
+            lambda: copy_to_clipboard(name),
+            lambda ok, branch_name=name: (
+                show_toast(
+                    f"Copied {branch_name}", duration=1.5, kind=FeedbackKind.SUCCESS
+                )
+                if ok
+                else show_toast(
+                    "Failed to copy to clipboard",
+                    duration=2.0,
+                    kind=FeedbackKind.ERROR,
+                )
+            ),
+            label="Copy branch name",
+        )
 
     @bind_action(
         "scope",

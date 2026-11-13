@@ -19,8 +19,6 @@ from pigit.termui.input import InputTerminal
 from pigit.termui._runtime_context import (
     RuntimeContext,
     _runtime_ctx,
-    set_renderer,
-    reset_renderer,
 )
 
 EventLoop = AppEventLoop
@@ -39,11 +37,12 @@ def _runtime_context():
 def mock_renderer():
     """Provide a mock renderer in context for unit tests."""
     renderer = MagicMock()
-    set_renderer(renderer)
+    runtime = _runtime_ctx.get()
+    runtime.renderer = renderer
     try:
         yield renderer
     finally:
-        reset_renderer()
+        runtime.renderer = None
 
 
 from pigit.termui.types import OverlayDispatchResult
@@ -294,18 +293,17 @@ def test_loop_overlay_open_routes_to_child_handle_event(mock_renderer):
 
 
 def test_resize_calls_renderer_clear_cache():
-    from pigit.termui._runtime_context import set_renderer, reset_renderer
-
     component = ComponentMock()
     event_loop = EventLoop(component, alt=False)
     event_loop.get_term_size = Mock(return_value=(80, 24))
     mock_renderer = MagicMock()
-    set_renderer(mock_renderer)
+    runtime = _runtime_ctx.get()
+    runtime.renderer = mock_renderer
     try:
         event_loop.resize()
         mock_renderer.clear_cache.assert_called_once()
     finally:
-        reset_renderer()
+        runtime.renderer = None
 
 
 def testpaint_path(mock_renderer):
@@ -427,11 +425,7 @@ def test_layer_stack_question_mark_toggles_help_popup() -> None:
 def test_renderer_accessed_via_context():
     """Renderer is now accessed via ContextVar instead of explicit binding."""
     from pigit.termui.containers import TabView
-    from pigit.termui._runtime_context import (
-        set_renderer,
-        reset_renderer,
-        get_renderer,
-    )
+    from pigit.termui._runtime_context import get_renderer
 
     class _Leaf(Component):
         NAME = "leaf"
@@ -447,7 +441,8 @@ def test_renderer_accessed_via_context():
 
     # Set renderer via ContextVar
     renderer = MagicMock()
-    set_renderer(renderer)
+    runtime = _runtime_ctx.get()
+    runtime.renderer = renderer
     try:
         # All components can now access renderer via context
         assert root.renderer is renderer
@@ -455,7 +450,7 @@ def test_renderer_accessed_via_context():
         assert b.renderer is renderer
         assert get_renderer() is renderer
     finally:
-        reset_renderer()
+        runtime.renderer = None
 
 
 def test_clear_screen_when_renderer_none_does_not_crash():

@@ -14,7 +14,7 @@ keys. Everything below is remappable — see
 | ++question++ | Help (click row, double-click to run binding) |
 | ++u++ | Undo last session action (confirm) |
 | ++shift+u++ | Browse undo stack |
-| ++p++ / ++f++ | Push / Pull current branch |
+| ++shift+p++ / ++shift+f++ | Push / Pull current branch |
 | ++i++ | Inspector for current selection |
 | ++b++ | Bisect sheet |
 | ++ctrl+p++ | Toggle side preview (Status/Stash diff or Branch log graph) |
@@ -23,6 +23,10 @@ keys. Everything below is remappable — see
 
 Header clicks: repo name opens the switcher; tab slots open an anchored panel
 picker.
+
+Inside the repo and worktree sheets, ++tab++ / ++shift+tab++ move between rows
+and ++enter++ runs the highlighted one — including while a filter is open,
+where the filter already narrows the list on every keystroke.
 
 The welcome guide opens itself on first run. To see it again, run
 "Show welcome guide" from Help (`?`), which lists keyless actions too — it has
@@ -42,13 +46,13 @@ no shortcut of its own on purpose.
 | ++shift+c++ | External `$EDITOR` commit |
 | ++m++ | Amend HEAD with staged changes |
 | ++s++ | Stash (optional message prompt, includes untracked) |
-| ++v++ / ++shift+v++ | Visual multi-select / visual scroll |
+| ++v++ | Visual multi-select: move to extend, space to toggle a row |
 | ++space++ | Toggle row selection (visual mode) |
 | ++slash++ | Filter file list |
 | ++ctrl+t++ | Tree / flat layout |
 | ++h++ / ++l++ | Collapse / expand directory (tree) |
 | ++j++ / ++k++ (preview) | Scroll side preview (++shift+j++ / ++shift+k++ when not in visual mode) |
-| ++y++ | Copy file path |
+| ++shift+y++ | Copy file path |
 
 ## Stash
 
@@ -72,7 +76,8 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++r++ | Interactive rebase onto selected branch |
 | ++shift+r++ | Rename |
 | ++d++ | Delete |
-| ++p++ | Open create-PR URL in browser |
+| ++shift+o++ | Open create-PR URL in browser |
+| ++shift+y++ | Copy branch name |
 | ++ctrl+f++ | Cycle scope: local → remote → all |
 | ++shift+j++ / ++shift+k++ | Scroll log-graph preview |
 
@@ -85,7 +90,7 @@ Push stash from **Status** with ++s++ (optional message prompt).
 | ++o++ | Browse another ref's log |
 | ++z++ | Toggle expanded commit rows |
 | ++slash++ | Filter by message or SHA |
-| ++y++ | Copy commit SHA |
+| ++shift+y++ | Copy commit SHA |
 
 ## Graph panel
 

@@ -78,5 +78,5 @@ Scroll with ++j++ / ++k++, close with ++esc++ or ++i++.
 ## Create a pull request
 
 1. **Branch** panel → select your feature branch
-2. Press **++p++** to open the hosting provider's create-PR URL
+2. Press **++shift+o++** to open the hosting provider's create-PR URL
 3. Or use `pigit open` from the shell — see [CLI](cli.md)

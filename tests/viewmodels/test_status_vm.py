@@ -11,6 +11,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from pigit.app_types import DiffType
 from pigit.git.model import File
 from pigit.session_history import SessionHistory
 from pigit.viewmodels.base import WORKTREE_BUSY_MESSAGE, WorktreeGate
@@ -243,13 +244,39 @@ def test_load_diff_by_path_finds_file_after_reorder(status_vm):
             ),
         ]
     )
-    diff = status_vm.load_diff_by_path("a.py")
+    diff, diff_type = status_vm.load_diff_by_path("a.py")
     assert diff == ["diff a"]
+    assert diff_type is DiffType.UNSTAGED
     status_vm._git.load_file_diff.assert_called_with("a.py", True, False, plain=True)
 
 
+def test_load_diff_by_path_reports_the_type_it_loaded(status_vm):
+    """A staged-only file loads against the index and says so."""
+    status_vm._git.load_file_diff.return_value = "diff a\n"
+    status_vm._items.set(
+        [
+            File(
+                "a.py",
+                "a.py",
+                "M ",
+                True,
+                False,
+                True,
+                False,
+                False,
+                False,
+                False,
+            ),
+        ]
+    )
+    diff, diff_type = status_vm.load_diff_by_path("a.py")
+    assert diff == ["diff a"]
+    assert diff_type is DiffType.STAGED
+    status_vm._git.load_file_diff.assert_called_with("a.py", True, True, plain=True)
+
+
 def test_load_diff_by_path_missing_returns_empty(status_vm):
-    assert status_vm.load_diff_by_path("nope.py") == []
+    assert status_vm.load_diff_by_path("nope.py") == ([], DiffType.UNSTAGED)
 
 
 def test_amend_calls_git_amend_head(status_vm):

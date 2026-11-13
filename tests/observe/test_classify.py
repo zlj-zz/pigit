@@ -17,7 +17,6 @@ def _ctx(**kwargs) -> ObserveContext:
         repo_root="/repo",
         git_dir="/repo/.git",
         common_dir="/repo/.git",
-        preview_target=None,
     )
     base.update(kwargs)
     return ObserveContext(**base)
@@ -105,16 +104,6 @@ def test_worktree_file_maps_to_worktree_meta():
     )
     assert ChangeKind.WORKTREE_META in kinds
     assert paths == frozenset({"foo.py"})
-
-
-def test_preview_target_maps_to_preview_file():
-    kinds, paths = classify_path_signal(
-        PathSignal(path="/repo/foo.py", mtime_ns=1),
-        _ctx(preview_target="foo.py"),
-    )
-    assert ChangeKind.PREVIEW_FILE in kinds
-    assert ChangeKind.WORKTREE_META in kinds
-    assert "foo.py" in paths
 
 
 def test_common_dir_refs_when_separate_from_git_dir():

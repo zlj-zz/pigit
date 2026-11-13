@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import bisect
 import dataclasses
-import enum
 import logging
 import os
 import subprocess
@@ -41,6 +40,7 @@ from pigit.termui.wcwidth_table import (
 )
 
 from .app_theme import THEME
+from .app_types import DiffType
 from .diff_content import (
     DiffContent,
     Hunk,
@@ -66,6 +66,91 @@ class _FileSection:
     dels: int
 
 
+def _count_changes(lines: list[str], start: int, end: int) -> tuple[int, int]:
+    """Added and deleted lines in ``lines[start:end]``.
+
+    Uses the renderer's own predicates, so a file's ``---``/``+++`` headers --
+    which do start with ``-``/``+`` -- are not counted as a change. A binary
+    file, a rename or a mode change has neither and comes back ``(0, 0)``.
+    """
+    adds = dels = 0
+    for line in lines[start:end]:
+        if DiffContent.is_add_line(line):
+            adds += 1
+        elif DiffContent.is_del_line(line):
+            dels += 1
+    return adds, dels
+
+
+def _build_file_sections(lines: list[str], hunks: list[Hunk]) -> list[_FileSection]:
+    """Split a unified diff into one section per file boundary."""
+    sections: list[_FileSection] = []
+    headers = [i for i, line in enumerate(lines) if DiffContent.is_file_boundary(line)]
+    for hi, header_start in enumerate(headers):
+        path = path_from_diff_line(lines[header_start]) or ""
+        next_header = headers[hi + 1] if hi + 1 < len(headers) else len(lines)
+        first_hunk = header_start
+        for hunk in hunks:
+            if header_start <= hunk.start < next_header:
+                first_hunk = hunk.start
+                break
+        adds, dels = _count_changes(lines, header_start, next_header)
+        sections.append(
+            _FileSection(
+                path=path,
+                first_hunk_start=first_hunk,
+                header_start=header_start,
+                adds=adds,
+                dels=dels,
+            )
+        )
+    return sections
+
+
+def _section_language(line_langs: list[str], section: _FileSection) -> str | None:
+    """Language of a file section's first content line, or None."""
+    start = section.first_hunk_start + 1
+    for i in range(start, min(start + 4, len(line_langs))):
+        lang = line_langs[i]
+        if lang != "plain":
+            return lang
+    return None
+
+
+def _source_requests_for(
+    lines: list[str],
+    hunks: list[Hunk],
+    line_langs: list[str],
+    repo_path: str,
+    diff_type: DiffType,
+) -> list[tuple[str, str, str | None, str | None, DiffType]]:
+    """Per-file full-source requests for a diff.
+
+    Only files whose language tracks multi-line state -- the same predicate the
+    scanner uses -- and that carry an ``index`` header produce a request.
+    Sections without hunks (pure rename / binary) are skipped.
+    """
+    requests: list[tuple[str, str, str | None, str | None, DiffType]] = []
+    for section in _build_file_sections(lines, hunks):
+        if section.first_hunk_start == section.header_start:
+            continue
+        path = section.path
+        if not path:
+            continue
+        old_sha = new_sha = None
+        header_end = min(section.first_hunk_start, len(lines))
+        for i in range(section.header_start, header_end):
+            hashes = parse_index_hashes(lines[i])
+            if hashes is not None:
+                old_sha, new_sha = hashes
+                break
+        lang = _section_language(line_langs, section)
+        if lang is None or not needs_full_source(lang):
+            continue
+        requests.append((repo_path, path, old_sha, new_sha, diff_type))
+    return requests
+
+
 @dataclasses.dataclass
 class _DiffStateSnapshot:
     """Immutable snapshot of diff view state for later restoration."""
@@ -76,13 +161,6 @@ class _DiffStateSnapshot:
     come_from: Component | None
 
 
-class DiffType(enum.Enum):
-    UNSTAGED = "unstaged"
-    STAGED = "staged"
-    COMMIT = "commit"
-    STASH = "stash"
-
-
 # Compat aliases for tests / local type hints.
 _Hunk = Hunk
 _RenderLine = RenderLine
@@ -91,6 +169,15 @@ _RenderLine = RenderLine
 DiffSourceLoader = Callable[
     [str, str, str | None, str | None, DiffType],
     tuple[list[str] | None, list[str] | None] | None,
+]
+
+#: Re-runs the load behind a shown diff, off-thread: the lines and the diff
+#: type they were produced as.
+DiffReload = Callable[[], tuple[list[str], DiffType]]
+
+#: ``(lines, diff type, full side sources)`` for one completed reload.
+_ReloadResult = tuple[
+    list[str], DiffType, dict[str, tuple[list[str] | None, list[str] | None]]
 ]
 
 
@@ -118,6 +205,11 @@ class DiffViewer(Component):
     #: Shown in the first text column while scrolled left, mirroring the "…"
     #: the right edge has always drawn.
     SCROLL_LEFT_MARK = "‹"
+    #: Largest diff ``set_content`` tokenizes before installing. Measured at
+    #: about 5 ms for 400 lines; the word-diff pairing turns steep past that
+    #: (500 lines: 32 ms, 10k lines: 650 ms), so larger diffs install their
+    #: text first and let the worker bring the tokens.
+    SYNC_TOKENIZE_MAX_LINES = 400
 
     def _main_width(self, available: int, line_no_w: int) -> int:
         return available - line_no_w - self.DIFF_PREFIX_WIDTH - 1
@@ -141,6 +233,9 @@ class DiffViewer(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._lines: list[str] = []
+        # The lines the content was built from, as handed to set_content:
+        # the installed lines are normalised, so reload compares against these.
+        self._loaded_lines: list[str] = []
         self._line_i = 0
         self._viewport_rows = max(0, self._size[1] - self.BORDER_ROWS)
         self._box_title: str = ""
@@ -179,6 +274,9 @@ class DiffViewer(Component):
         )
         self._tokenize_gen: int = 0
         self._patch_gen: int = 0
+        self._reload_source: DiffReload | None = None
+        self._reload_task: AsyncTask[_ReloadResult] = AsyncTask()
+        self._reload_gen: int = 0
         self._guard_async = guard_async
 
         # Word-diff state
@@ -254,6 +352,7 @@ class DiffViewer(Component):
         doc: DiffContent,
         *,
         tokens: list[_RenderLine] | None,
+        mask: list[str | None] | None = None,
     ) -> None:
         """Atomically replace structure + tokens; always drop pending tokenize.
 
@@ -265,11 +364,17 @@ class DiffViewer(Component):
         self._line_i = 0
         self._hunks = doc.hunks
         self._hunk_starts = doc.hunk_starts
+        # The hunk cursor indexes the list replaced above; content that
+        # dropped its hunks leaves hunk mode.
+        self._hunk_index = (
+            min(self._hunk_index, len(self._hunks) - 1) if self._hunks else 0
+        )
+        self._hunk_mode = self._hunk_mode and bool(self._hunks)
         self._heatmap = doc.heatmap
         self._heatmap_colors = doc.heatmap_colors
         self._line_numbers = doc.line_numbers
         self._line_langs = doc.line_langs
-        self._multiline_mask = doc.multiline_mask
+        self._multiline_mask = doc.multiline_mask if mask is None else mask
         self._word_diff_segments = doc.word_diff_segments
         self._render_tokens = [] if tokens is None else tokens
         self._compute_max_col_offset()
@@ -284,49 +389,10 @@ class DiffViewer(Component):
 
     def _rebuild_file_sections(self) -> None:
         """Rebuild ``_file_sections`` from file-boundary lines (incl. binary)."""
-        sections: list[_FileSection] = []
-        headers: list[int] = []
-        for i, line in enumerate(self._lines):
-            if DiffContent.is_file_boundary(line):
-                headers.append(i)
-        for hi, header_start in enumerate(headers):
-            path = self._path_from_header(header_start) or ""
-            next_header = headers[hi + 1] if hi + 1 < len(headers) else len(self._lines)
-            first_hunk = header_start
-            for hunk in self._hunks:
-                if header_start <= hunk.start < next_header:
-                    first_hunk = hunk.start
-                    break
-            adds, dels = self._count_changes(header_start, next_header)
-            sections.append(
-                _FileSection(
-                    path=path,
-                    first_hunk_start=first_hunk,
-                    header_start=header_start,
-                    adds=adds,
-                    dels=dels,
-                )
-            )
-        self._file_sections = sections
+        self._file_sections = _build_file_sections(self._lines, self._hunks)
         self._file_nav_counter_cols = None
         self._cached_nav_line_i = -1
         self._cached_nav_index = -1
-
-    def _count_changes(self, start: int, end: int) -> tuple[int, int]:
-        """Added and deleted lines in ``_lines[start:end]``.
-
-        Uses the renderer's own predicates, so a file's ``---``/``+++``
-        headers -- which do start with ``-``/``+`` -- are not counted as a
-        change. A binary file, a rename or a mode change has neither and
-        comes back ``(0, 0)``.
-        """
-        adds = dels = 0
-        for line in self._lines[start:end]:
-            if self._is_add_line(line):
-                adds += 1
-            elif self._is_del_line(line):
-                dels += 1
-        return adds, dels
 
     def _tokens_at(
         self, idx: int, line: str, *, strip_diff_prefix: bool
@@ -473,7 +539,12 @@ class DiffViewer(Component):
         self._max_col_offset = max(0, max_text_w - main_w)
         self._col_offset = min(self._col_offset, self._max_col_offset)
 
-    def set_content(self, diff_lines: list[str]) -> None:
+    def set_content(
+        self,
+        diff_lines: list[str],
+        *,
+        sources: dict[str, tuple[list[str] | None, list[str] | None]] | None = None,
+    ) -> None:
         """Set diff content and pre-compute heatmap and line numbers.
 
         Tab characters are expanded to spaces (tabstop=8) because terminals
@@ -485,9 +556,19 @@ class DiffViewer(Component):
         ``\\r`` to reset the cursor to the start of the line, corrupting
         the rendered output.
 
-        Syntax highlighting is computed asynchronously to avoid freezing the
-        TUI on large diffs.  Lines render with plain text until tokenization
-        finishes.
+        The lines are kept as given, before that normalisation, so
+        :meth:`reload` can tell a fresh load apart from what is on screen.
+
+        *sources* are the full side sources for this diff, when the caller has
+        already loaded them (:meth:`load_sources` does that off-thread). A hunk
+        that starts inside a string is only highlighted right against them, so
+        supplying them is what lets the install be complete: without them the
+        viewer fetches the sources itself and repaints when they arrive, which
+        flickers the highlighting once.
+
+        A diff too large to tokenize within a frame (``SYNC_TOKENIZE_MAX_LINES``)
+        installs its text first and lets the worker fill the tokens in: waiting
+        for them would leave the view empty for a third of a second.
 
         When word-diff mode is active, intra-line changes are computed locally
         from the normal unified diff (old ``-`` line vs new ``+`` line) and
@@ -501,41 +582,130 @@ class DiffViewer(Component):
         )
         self._file_history_mode = False
         self._file_history_cache.clear()
-        self._install_content(doc, tokens=None)
+        mask = doc.multiline_mask
+        if sources:
+            mask = (
+                DiffContent.multiline_mask_from_sources(
+                    doc.lines, doc.line_langs, self._tokenizer, sources
+                )
+                or mask
+            )
+        tokens_installed = len(doc.lines) <= self.SYNC_TOKENIZE_MAX_LINES
+        tokens = None
+        if tokens_installed:
+            tokens = DiffContent.pre_tokenize_with(
+                doc.lines, doc.line_langs, mask, self._tokenizer, doc.word_diff_segments
+            )
+        self._loaded_lines = list(diff_lines)
+        self._install_content(doc, tokens=tokens, mask=mask)
 
-        # Async: syntax highlighting (slow for large files).
+        resolve_mask = (
+            not sources
+            and self._source_loader is not None
+            and bool(self._source_requests())
+        )
+        if tokens_installed and not resolve_mask:
+            return  # the install above is the whole story
+        self._start_tokenize(
+            doc, mask=mask, resolve_mask=resolve_mask, tokens_installed=tokens_installed
+        )
+
+    def is_showing(self, lines: list[str], diff_type: DiffType) -> bool:
+        """True when this content is already installed on screen."""
+        return lines == self._loaded_lines and diff_type is self._diff_type
+
+    def reload(self) -> None:
+        """Re-fetch the diff this viewer was opened on and reinstall it.
+
+        Content, not selection, drives this: an external edit or a hunk
+        applied from here changes what the file diff says while the open key
+        stays the same. Nothing is reinstalled when the fetched lines match
+        what is shown, so a redundant trigger costs one worker read and no
+        repaint.
+        """
+        source = self._reload_source
+        if source is None:
+            return
+        repo_path = self._repo_path
+        self._reload_gen += 1
+        reload_gen = self._reload_gen
+
+        def _work() -> _ReloadResult:
+            lines, diff_type = source()
+            return (
+                lines,
+                diff_type,
+                self.load_sources(lines, repo_path=repo_path, diff_type=diff_type),
+            )
+
+        def _callback(result: _ReloadResult) -> None:
+            if not self.is_mounted() or reload_gen != self._reload_gen:
+                return
+            lines, diff_type, sources = result
+            if self.is_showing(lines, diff_type):
+                return
+            line_i = self._line_i
+            self.set_diff_type(diff_type)
+            self.set_content(lines, sources=sources or None)
+            if self._hunk_mode:
+                # The cursor was clamped into the new hunk list; whatever
+                # ``s`` / ``d`` would act on now must be on screen.
+                self._scroll_to_hunk(self._hunk_index)
+            else:
+                self._line_i = self._clamp_line_i(line_i)
+
+        self._reload_task.start(_work, _callback)
+
+    def _start_tokenize(
+        self,
+        doc: DiffContent,
+        *,
+        mask: list[str | None],
+        resolve_mask: bool,
+        tokens_installed: bool,
+    ) -> None:
+        """Worker: tokenize the content already installed.
+
+        With *resolve_mask* it first loads the full side sources and works the
+        mask out again; when that leaves the mask unchanged, the tokens on
+        screen are already right and nothing is repainted.
+        """
         current_gen = self._tokenize_gen
         content = list(doc.lines)
         line_langs = list(doc.line_langs)
-        multiline_mask = list(doc.multiline_mask)
         word_diff_segments = list(doc.word_diff_segments)
         tokenizer = self._tokenizer
-        source_requests = self._source_requests()
+        installed_mask = mask
+        requests = self._source_requests() if resolve_mask else []
 
-        def _work() -> tuple[list[_RenderLine], list[str | None]]:
-            mask = multiline_mask
-            if source_requests and self._source_loader is not None:
+        def _work() -> tuple[list[_RenderLine] | None, list[str | None]]:
+            resolved = installed_mask
+            if requests:
                 # Worker: per-file cat-file / disk reads; the mask is then
                 # looked up from the real side sources instead of the fragment.
-                sources = self._load_sources(source_requests)
+                sources = self._load_sources(requests)
                 if sources:
-                    mask = DiffContent.multiline_mask_from_sources(
+                    resolved = DiffContent.multiline_mask_from_sources(
                         content, line_langs, tokenizer, sources
                     )
+            if tokens_installed and resolved == installed_mask:
+                return None, resolved
             tokens = DiffContent.pre_tokenize_with(
-                content, line_langs, mask, tokenizer, word_diff_segments
+                content, line_langs, resolved, tokenizer, word_diff_segments
             )
-            return tokens, mask
+            return tokens, resolved
 
         def _callback(
-            result: tuple[list[_RenderLine], list[str | None]],
+            result: tuple[list[_RenderLine] | None, list[str | None]],
         ) -> None:
             if not self.is_mounted() or current_gen != self._tokenize_gen:
                 return
-            tokens, mask = result
+            tokens, resolved = result
             # Expose the resolved (fragment or full-source) mask — asserted by
             # the diff-content end-to-end tests; not read by painting.
-            self._multiline_mask = mask
+            self._multiline_mask = resolved
+            if tokens is None:
+                return
             self._render_tokens = tokens
             if is_on_visible_paint_path(self):
                 request_render()
@@ -564,43 +734,44 @@ class DiffViewer(Component):
         """
         self._repo_path = repo_path
 
-    def _section_language(self, section: _FileSection) -> str | None:
-        """Language of a file section's first content line, or None."""
-        start = section.first_hunk_start + 1
-        for i in range(start, min(start + 4, len(self._line_langs))):
-            lang = self._line_langs[i]
-            if lang != "plain":
-                return lang
-        return None
-
     def _source_requests(
         self,
     ) -> list[tuple[str, str, str | None, str | None, DiffType]]:
-        """Per-file full-source requests (sync; repo context captured here).
+        """Full-source requests for the installed content (repo context here)."""
+        return _source_requests_for(
+            self._lines, self._hunks, self._line_langs, self._repo_path, self._diff_type
+        )
 
-        Only files whose language tracks multi-line state — the same predicate
-        the scanner uses — and that carry an ``index`` header produce a
-        request. Sections without hunks (pure rename / binary) are skipped.
+    def load_sources(
+        self,
+        diff_lines: list[str],
+        *,
+        repo_path: str,
+        diff_type: DiffType,
+    ) -> dict[str, tuple[list[str] | None, list[str] | None]]:
+        """Fetch the full side sources *diff_lines* needs to be highlighted.
+
+        Worker-safe: parses the lines without touching viewer state, so a panel
+        that already loads its diff off-thread can bring the sources along and
+        hand both to :meth:`set_content` at once.
+
+        Args:
+            diff_lines: The unified diff about to be installed.
+            repo_path: Repository root for the source read.
+            diff_type: Staged / unstaged / commit, as the loader expects.
+
+        Returns:
+            ``{path: (old_lines, new_lines)}``; empty when nothing needs them.
         """
-        requests: list[tuple[str, str, str | None, str | None, DiffType]] = []
-        for section in self._file_sections:
-            if section.first_hunk_start == section.header_start:
-                continue  # no hunks: pure rename / binary
-            path = section.path
-            if not path:
-                continue
-            old_sha = new_sha = None
-            header_end = min(section.first_hunk_start, len(self._lines))
-            for i in range(section.header_start, header_end):
-                hashes = parse_index_hashes(self._lines[i])
-                if hashes is not None:
-                    old_sha, new_sha = hashes
-                    break
-            lang = self._section_language(section)
-            if lang is None or not needs_full_source(lang):
-                continue
-            requests.append((self._repo_path, path, old_sha, new_sha, self._diff_type))
-        return requests
+        if self._source_loader is None:
+            return {}
+        doc = DiffContent.from_diff_lines(
+            diff_lines, word_diff=self._word_diff, tokenizer=self._tokenizer
+        )
+        requests = _source_requests_for(
+            doc.lines, doc.hunks, doc.line_langs, repo_path, diff_type
+        )
+        return self._load_sources(requests) if requests else {}
 
     def _load_sources(
         self,
@@ -658,6 +829,8 @@ class DiffViewer(Component):
 
     def update(self, action: EventType, **data) -> None:
         if action is EVT_GOTO:
+            # An in-flight reload belongs to the diff being replaced.
+            self._reload_gen += 1
             self.i_cache[self.i_cache_key] = self._line_i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
@@ -672,6 +845,7 @@ class DiffViewer(Component):
                 self._diff_type = DiffType(raw_type)
             else:
                 self._diff_type = DiffType.UNSTAGED
+            self._reload_source = data.get("reload_source")
             # Reset hunk mode on new diff
             self._hunk_mode = False
             self._hunk_index = 0
@@ -1019,8 +1193,10 @@ class DiffViewer(Component):
         reopen can reuse installed tokens without a full re-parse.
         """
         self._patch_task.cancel()
+        self._reload_task.cancel()
         self._drop_pending_tokenize()
         self._patch_gen += 1
+        self._reload_gen += 1
         show_badge("", duration=0)
 
     def on_hide(self) -> None:
@@ -1115,6 +1291,7 @@ class DiffViewer(Component):
 
             if returncode == 0:
                 show_badge(msg, duration=1.0, kind=FeedbackKind.SUCCESS)
+                self.reload()
             else:
                 show_toast(
                     f"Failed: {stderr[:100]}", duration=2.0, kind=FeedbackKind.ERROR

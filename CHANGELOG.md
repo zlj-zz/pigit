@@ -1,5 +1,23 @@
 # Changelog of pigit
 
+## 2.13.0 (2026-11-13)
+
+### Features
+
+- **The repo and worktree sheets move with Tab, and Enter confirms a filter.** Switching repos read `@ / p i Enter j Enter`: opening the sheet did not accept typing, and the Enter that left the filter box did nothing else, so a filtered selection needed two of them. `Tab` / `Shift+Tab` step forward and back — with the filter open, which is where `j` / `k` stopped working, since inside the box they are typing keys. The two sheets lose `j` / `k` rather than keep a shortcut that only works before you filter; the Welcome, Inspector and LogRef sheets keep them. Enter now activates the highlighted row while the filter is open, which is what `LogRefSheet` has always done, and a filter with no matches still lets Enter out. The sheet is keyboard-modal, so `Tab` means "next panel" again the moment it closes.
+- **`Y` copies the branch name.** `Y` is the copy key on the other two list panels — the file path on Status, the SHA on Commit — and Branch had nothing on it. It copies the name of the row under the cursor. The clipboard write shells out, so it runs on a worker like the other two and reports through a toast: the name on success, a failure otherwise.
+
+### Improvements
+
+- **Visual mode follows the cursor, the way vim's does.** Entering it now selects the row under the cursor, moving extends or shrinks that run, and `Space` toggles a row the cursor never crossed. `v`, move, `a` — the obvious sequence — used to answer "No files selected", because the mode only selected on `Space`, and the key that did follow the cursor (`V`) then refused to act until you left it. The second mode and its guard are gone, and the header counts the selection (`3 selected`) instead of the cursor position.
+
+### Bug Fixes
+
+- **The full-screen diff re-reads itself when the content under it changes.** It was a snapshot taken when you pressed Enter: an edit in another terminal, a `git add` run elsewhere, or a hunk staged from the panel itself left it showing the state it was opened on — the hunk you had just staged stayed on screen as though it had not. The viewer now carries a way to re-run its own load, the observer re-reads whichever diff is presented once the Status rows land, and the side preview follows the same rows. Side and type are resolved together, so hunk commands address the side actually shown, `HEAD` moves are covered too, and a reload whose content is unchanged neither repaints nor moves the scroll position.
+- **The preview stops repainting its highlighting after it appears.** The install painted with a mask guessed from the diff fragment alone, and the worker corrected it a frame later once it had read the whole file — so every diff whose hunk opened inside a docstring flickered, which was 5 of the last 12 commits. The sources now arrive with the diff and the mask is resolved before the install: one paint, nothing left to correct. A diff small enough to tokenize within a frame (400 lines) installs complete; a larger one still shows its text first, because waiting would leave the view empty.
+- **The spinner waits for work that takes long enough to notice.** Staging one file runs `git add` for about 12 ms, and the spinner appeared the moment the key was handled and was gone before the next frame — a blink, not progress. It is armed 150 ms in now: work that finishes sooner never creates one and is reported by the badge the caller already shows, while slow work still gets it. A worker failure cancels the pending timer, so no spinner outlives its error toast.
+- **`p` no longer opens a pull request.** On Branch, `p` opened the hosting provider's create-PR page while `P` — everywhere — pushes the branch: one Shift apart, one opens a web page and the other writes to the remote. Create-PR is `Shift+O`, which nothing else uses.
+
 ## 2.12.0 (2026-10-27)
 
 ### Features

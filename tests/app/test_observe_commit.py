@@ -44,6 +44,7 @@ def _make_host(app, *, visible, refresh=None, worktree_busy=None) -> ObserveHost
         get_status_panel=lambda: StatusPanel(vm=status_vm, nerd_icons=False),
         get_stash_panel=lambda: StashPanel(vm=stash_vm),
         get_preview_panel=lambda: None,
+        get_detail_panel=lambda: None,
         get_log_graph_preview=lambda: None,
         get_diff_preview_wanted=lambda: False,
         get_log_graph_wanted=lambda: False,

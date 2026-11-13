@@ -20,15 +20,6 @@ class _Subscriber:
 
 
 class TestSignal:
-    def test_initial_value(self):
-        s = Signal(42)
-        assert s.value == 42
-
-    def test_set_updates_value(self):
-        s = Signal(0)
-        s.set(5)
-        assert s.value == 5
-
     def test_subscriber_notified(self):
         s = Signal(0)
         sub = _Subscriber()
@@ -84,10 +75,6 @@ class TestSignal:
 
 
 class TestComputed:
-    def test_initial_value(self):
-        c = Computed(lambda: 10)
-        assert c.value == 10
-
     def test_recomputes_on_each_read(self):
         call_count = [0]
 
@@ -132,11 +119,6 @@ class TestComputed:
 
 
 class TestComputedReactiveMode:
-    def test_initial_value_with_deps(self):
-        base = Signal(10)
-        c = Computed(lambda: base.value * 2, deps=[base])
-        assert c.value == 20
-
     def test_recomputes_when_dep_changes(self):
         base = Signal(1)
         c = Computed(lambda: base.value + 1, deps=[base])

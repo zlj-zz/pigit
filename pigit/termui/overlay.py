@@ -315,28 +315,76 @@ def show_spinner(
     )
 
 
+#: How long work may run before a spinner appears. Most file actions finish in
+#: tens of milliseconds, and a spinner that exists for a single frame reads as
+#: a flicker rather than as progress.
+SPINNER_DELAY = 0.15
+
+
 def run_with_spinner(
     work: Callable[[], _R],
     on_done: Callable[[_R], None],
     *,
     label: str,
+    delay: float = SPINNER_DELAY,
 ) -> AsyncTask[_R]:
-    """Run ``work`` on the background pool with a spinner on screen.
+    """Run ``work`` on the background pool, spinning only if it drags on.
+
+    The spinner is armed after *delay* seconds, so work that finishes sooner
+    never puts one on screen -- its feedback is whatever ``on_done`` reports.
+    Staging one file runs ``git add`` for about 12 ms, which used to flash a
+    centred box for a single frame.
 
     ``on_done`` runs on the main thread after the spinner is dismissed. A
-    worker failure needs no handler here: the failure toast takes the spinner's
-    place through the single-slot toast layer (see
-    :func:`report_async_failure`), so the spinner cannot be left behind.
+    worker failure cancels the pending spinner before the failure toast
+    appears: the toast takes the spinner's place through the single-slot toast
+    layer (see :func:`report_async_failure`), but a timer armed before the
+    failure would otherwise fire over it and stay there.
     """
     from .async_task import run_async
 
-    show_spinner(label, position=ToastPosition.CENTER)
+    loop = getattr(get_overlay_host(), "_event_loop", None)
+    shown = False
+    timer_id: int | None = None
+    finished = False
+
+    def show() -> None:
+        nonlocal shown
+        if finished or shown:
+            return
+        shown = True
+        show_spinner(label, position=ToastPosition.CENTER)
+
+    def arm() -> None:
+        """Fire once, *delay* after the work started."""
+        nonlocal timer_id
+        if timer_id is not None:
+            loop.remove_interval(timer_id)
+            timer_id = None
+        show()
+
+    def stop() -> None:
+        nonlocal timer_id, finished
+        finished = True
+        if timer_id is not None:
+            loop.remove_interval(timer_id)
+            timer_id = None
 
     def done(result: _R) -> None:
-        hide_spinner()
+        stop()
+        if shown:
+            hide_spinner()
         on_done(result)
 
-    return run_async(work, done, label=label)
+    def failed(_exc: BaseException) -> None:
+        stop()
+
+    if loop is None or delay <= 0:
+        show()
+    else:
+        timer_id = loop.add_interval(delay, arm)
+
+    return run_async(work, done, label=label, on_failure=failed)
 
 
 def dismiss_toast() -> None:

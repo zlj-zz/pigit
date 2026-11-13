@@ -42,8 +42,16 @@ class _PreviewRequest:
     kind: Literal["status", "stash"]
     key: str
     title: str
-    diff_type: DiffType
     stash_ref: str | None = None
+
+
+#: Diff lines, the type they were produced as, and the full side sources
+#: they were highlighted against.
+_PreviewLoad = tuple[
+    list[str],
+    DiffType,
+    dict[str, tuple[list[str] | None, list[str] | None]],
+]
 
 
 class PreviewPanel(Component):
@@ -57,7 +65,6 @@ class PreviewPanel(Component):
         self,
         *,
         status_vm: IStatusViewModel | None = None,
-        on_preview_target: Callable[[str | None], None] | None = None,
         guard_async: (
             Callable[[Callable[[list[str]], None]], Callable[[list[str]], None]] | None
         ) = None,
@@ -70,7 +77,6 @@ class PreviewPanel(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._status_vm = status_vm
-        self._on_preview_target = on_preview_target
         self._guard_async = guard_async
         self._get_repo_path = get_repo_path
         self._diff_viewer = DiffViewer(
@@ -81,7 +87,7 @@ class PreviewPanel(Component):
             source_loader=source_loader,
         )
         self._unsubs: list[Callable[[], None]] = []
-        self._load_task: AsyncTask[list[str]] | None = None
+        self._load_task: AsyncTask[_PreviewLoad] | None = None
         self._request: _PreviewRequest | None = None
 
     def mount(self) -> None:
@@ -93,7 +99,6 @@ class PreviewPanel(Component):
     def unmount(self) -> None:
         """Cancel loads, unsubscribe, and unmount the inner diff viewer."""
         self._cancel_load()
-        self._set_preview_target(None)
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -110,7 +115,6 @@ class PreviewPanel(Component):
         self._request = None
         self._status_vm = vm
         if self.is_mounted():
-            self._set_preview_target(None)
             self.clear()
 
     def _on_selection(self, *, active: Component | None = None, **_) -> bool:
@@ -123,7 +127,6 @@ class PreviewPanel(Component):
         if not isinstance(active, PreviewPayload):
             self._cancel_load()
             self._request = None
-            self._set_preview_target(None)
             self.clear()
             return True
 
@@ -131,7 +134,6 @@ class PreviewPanel(Component):
         if request is None:
             self._cancel_load()
             self._request = None
-            self._set_preview_target(None)
             self.clear()
             return True
 
@@ -140,22 +142,18 @@ class PreviewPanel(Component):
 
         self._cancel_load()
         self._request = request
-        if request.kind == "status":
-            self._set_preview_target(request.key)
-        else:
-            self._set_preview_target(None)
 
         self._load_task = run_async(
             lambda: self._load_lines(request),
             guard_or_identity(
-                self._guard_async, lambda lines: self._on_loaded(request, lines)
+                self._guard_async, lambda loaded: self._on_loaded(request, loaded)
             ),
             label="Diff preview",
         )
         return True
 
     def reload(self) -> None:
-        """Re-fetch the last Status/Stash preview (observe ``PREVIEW_FILE`` sink)."""
+        """Re-fetch the last Status/Stash preview (observe sink)."""
         request = self._request
         if request is None or self._status_vm is None:
             return
@@ -166,7 +164,7 @@ class PreviewPanel(Component):
         self._load_task = run_async(
             lambda: self._load_lines(request),
             guard_or_identity(
-                self._guard_async, lambda lines: self._on_loaded(request, lines)
+                self._guard_async, lambda loaded: self._on_loaded(request, loaded)
             ),
             label="Diff preview",
         )
@@ -185,14 +183,10 @@ class PreviewPanel(Component):
             if hit is None:
                 return None
             file, _ = hit
-            diff_type = DiffType.STAGED
-            if hasattr(active, "preview_diff_type"):
-                diff_type = active.preview_diff_type()
             return _PreviewRequest(
                 kind="status",
                 key=file.get_file_str(),
                 title=title,
-                diff_type=diff_type,
             )
 
         if isinstance(active, StashPanel):
@@ -203,36 +197,60 @@ class PreviewPanel(Component):
                 kind="stash",
                 key=stash.ref,
                 title=title,
-                diff_type=DiffType.STASH,
                 stash_ref=stash.ref,
             )
 
         return None
 
-    def _load_lines(self, request: _PreviewRequest) -> list[str]:
-        """Background: load diff lines for a captured request."""
+    def _load_lines(self, request: _PreviewRequest) -> _PreviewLoad:
+        """Background: load the diff, its type, and the sources it needs.
+
+        The type is resolved with the lines, not kept on the selection: a
+        staged file can turn mixed while the preview sits on it, and the
+        sources must be fetched for the side actually being shown.
+
+        The sources ride along so the install can be complete on its first
+        paint: fetched after the fact, they change the multi-line mask and the
+        viewer repaints, which flickers the highlighting.
+        """
         vm = self._status_vm
         if vm is None:
-            return []
+            return [], DiffType.UNSTAGED, {}
         if request.kind == "status":
-            return vm.load_diff_by_path(request.key)
-        if request.kind == "stash" and request.stash_ref is not None:
-            return vm.load_stash_diff(request.stash_ref)
-        return []
+            lines, diff_type = vm.load_diff_by_path(request.key)
+        elif request.kind == "stash" and request.stash_ref is not None:
+            lines, diff_type = vm.load_stash_diff(request.stash_ref), DiffType.STASH
+        else:
+            return [], DiffType.UNSTAGED, {}
+        if not lines:
+            return lines, diff_type, {}
+        repo_path = self._get_repo_path() if self._get_repo_path is not None else ""
+        return (
+            lines,
+            diff_type,
+            self._diff_viewer.load_sources(
+                lines, repo_path=repo_path, diff_type=diff_type
+            ),
+        )
 
-    def _on_loaded(self, request: _PreviewRequest, lines: list[str]) -> None:
+    def _on_loaded(self, request: _PreviewRequest, loaded: _PreviewLoad) -> None:
         """Apply a completed load if the selection key is still current."""
         if not self.is_mounted() or not is_on_visible_paint_path(self):
             return
         if self._request is None or self._request.key != request.key:
             return
+        lines, diff_type, sources = loaded
         if not lines:
             self.clear()
             return
-        self.set_diff_type(request.diff_type)
+        # The observe path reloads on every Status refresh; re-installing
+        # identical content would reset the preview's scroll for nothing.
+        if self._diff_viewer.is_showing(lines, diff_type):
+            return
+        self.set_diff_type(diff_type)
         self._sync_repo_context()
         self._diff_viewer.set_box_title(request.title)
-        self._diff_viewer.set_content(lines)
+        self._diff_viewer.set_content(lines, sources=sources or None)
 
     def _sync_repo_context(self) -> None:
         """Push the current repo root into the inner viewer.
@@ -248,11 +266,6 @@ class PreviewPanel(Component):
         if self._load_task is not None:
             self._load_task.cancel()
             self._load_task = None
-
-    def _set_preview_target(self, rel: str | None) -> None:
-        """Notify the app of the Status file path used for observe classify."""
-        if self._on_preview_target is not None:
-            self._on_preview_target(rel)
 
     def set_preview(
         self, diff_lines: list[str], title: str, subtitle: str = ""
