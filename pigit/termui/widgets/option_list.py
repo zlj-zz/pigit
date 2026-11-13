@@ -588,7 +588,15 @@ class OptionList(Component):
             if self._item_starts is not None
             else len(self.content)
         )
-        header.set_detail(f"{self.curr_no + 1}/{total}" if total else None)
+        header.set_detail(self._header_detail(total))
+
+    def _header_detail(self, total: int) -> str | None:
+        """Text the header carries after its label: the cursor position here.
+
+        A panel whose header should mean something else overrides this rather
+        than the sync above.
+        """
+        return f"{self.curr_no + 1}/{total}" if total else None
 
     def paint(self, surface: Surface) -> None:
         """Paint chrome bands, then the list body (rows / empty / search)."""

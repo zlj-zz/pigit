@@ -42,7 +42,7 @@ no shortcut of its own on purpose.
 | ++shift+c++ | External `$EDITOR` commit |
 | ++m++ | Amend HEAD with staged changes |
 | ++s++ | Stash (optional message prompt, includes untracked) |
-| ++v++ / ++shift+v++ | Visual multi-select / visual scroll |
+| ++v++ | Visual multi-select: move to extend, space to toggle a row |
 | ++space++ | Toggle row selection (visual mode) |
 | ++slash++ | Filter file list |
 | ++ctrl+t++ | Tree / flat layout |
