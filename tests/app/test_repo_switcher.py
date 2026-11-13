@@ -474,8 +474,7 @@ def _nav_sheet(names=("r0", "r1", "r2")):
     """Sheet over *names*, plus the paths it reports switching to."""
     switched: list[str] = []
     entries = [
-        RepoSwitcherEntry(kind="repo", name=n, path=f"/tmp/{n}", meta={})
-        for n in names
+        RepoSwitcherEntry(kind="repo", name=n, path=f"/tmp/{n}", meta={}) for n in names
     ]
     sheet = RepoSwitcherSheet(entries=entries, on_switch=switched.append)
     sheet.mount()

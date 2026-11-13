@@ -770,7 +770,13 @@ class TestInstallIsWhole:
         ]
         with starter:
             dv.set_content(
-                in_docstring, sources={"f.py": (['"""', "first line", "middle"], ['"""', "first line", "changed"])}
+                in_docstring,
+                sources={
+                    "f.py": (
+                        ['"""', "first line", "middle"],
+                        ['"""', "first line", "changed"],
+                    )
+                },
             )
 
         assert "docstring" in dv._multiline_mask  # the sources decided it
@@ -960,7 +966,9 @@ class TestReload:
         def _run(work, callback):
             callback(work())
 
-        done = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        done = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=b"", stderr=b""
+        )
         with (
             patch.object(dv._patch_task, "start", side_effect=_run),
             patch("pigit.app_diff.subprocess.run", return_value=done),

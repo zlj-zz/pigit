@@ -1296,9 +1296,7 @@ class StatusPanel(OptionList):
 
     def _notify_mode(self) -> None:
         """Notify parent of current visual mode state."""
-        self.emit(
-            EventType("mode_changed"), mode="Visual" if self._visual_mode else ""
-        )
+        self.emit(EventType("mode_changed"), mode="Visual" if self._visual_mode else "")
 
     def _header_detail(self, total: int) -> str | None:
         """The header counts the selection while visual mode is on."""

@@ -99,9 +99,7 @@ def test_open_diff_hands_the_detail_a_reload_loader(runtime):
     vm = app._status_panel._vm
     with (
         patch.object(vm, "load_diff", return_value=["+line\n"]),
-        patch.object(
-            vm, "diff_type_at", return_value=DiffType.STAGED
-        ) as diff_type_at,
+        patch.object(vm, "diff_type_at", return_value=DiffType.STAGED) as diff_type_at,
         patch.object(
             vm, "load_diff_by_path", return_value=(["+line"], DiffType.UNSTAGED)
         ) as load_by_path,
