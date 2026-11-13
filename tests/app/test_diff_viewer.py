@@ -1,11 +1,13 @@
 """Tests for DiffViewer file history mode."""
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from pigit.app_diff import DiffViewer, DiffType
 from pigit.app_theme import THEME
+from pigit.termui import EVT_GOTO
 from pigit.termui.surface import Surface
 
 _LOCALGIT_PATH = "pigit.git.api.GitApi"
@@ -801,3 +803,169 @@ class TestInstallIsWhole:
         assert len(dv._lines) > DiffViewer.SYNC_TOKENIZE_MAX_LINES
         assert dv._render_tokens == []
         assert "work" in captured  # the worker brings the tokens
+
+
+class TestReload:
+    """A presented diff re-reads itself when its content changes."""
+
+    TWO_HUNKS = [
+        "diff --git a/f.py b/f.py",
+        "--- a/f.py",
+        "+++ b/f.py",
+        "@@ -1,1 +1,1 @@",
+        "-old",
+        "+new",
+        "@@ -10,1 +10,1 @@",
+        "-a",
+        "+b",
+    ]
+    ONE_HUNK = [
+        "diff --git a/f.py b/f.py",
+        "--- a/f.py",
+        "+++ b/f.py",
+        "@@ -1,1 +1,1 @@",
+        "-old",
+        "+newer",
+    ]
+
+    def _open(self, dv: DiffViewer, source=None) -> None:
+        dv.update(
+            EVT_GOTO,
+            key="f.py",
+            repo_path="/repo",
+            diff_type=DiffType.UNSTAGED,
+            content=list(self.TWO_HUNKS),
+            reload_source=source,
+        )
+
+    def _capture(self, dv: DiffViewer):
+        captured: dict[str, object] = {}
+
+        def _start(work, callback):
+            captured["work"] = work
+            captured["callback"] = callback
+
+        return captured, patch.object(dv._reload_task, "start", side_effect=_start)
+
+    def test_reload_installs_changed_lines_and_keeps_the_scroll_line(self):
+        dv = DiffViewer()
+        self._open(dv, source=lambda: (self.ONE_HUNK, DiffType.UNSTAGED))
+        dv.scroll_i = 3
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](captured["work"]())
+
+        assert "+newer" in dv._lines
+        assert dv._line_i == 3
+
+    def test_identical_content_is_not_reinstalled(self):
+        dv = DiffViewer()
+        self._open(dv, source=lambda: (self.TWO_HUNKS, DiffType.UNSTAGED))
+        dv.set_content = MagicMock()
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](captured["work"]())
+
+        dv.set_content.assert_not_called()
+
+    def test_a_newer_reload_wins_when_callbacks_arrive_out_of_order(self):
+        dv = DiffViewer()
+        self._open(dv)
+        started: list[tuple] = []
+
+        def _start(work, callback):
+            started.append((work, callback))
+
+        with patch.object(dv._reload_task, "start", side_effect=_start):
+            dv._reload_source = lambda: (self.TWO_HUNKS, DiffType.UNSTAGED)
+            dv.reload()
+            dv._reload_source = lambda: (self.ONE_HUNK, DiffType.UNSTAGED)
+            dv.reload()
+
+        with patch.object(dv, "is_mounted", return_value=True):
+            # The older reload lands second: it must not undo the newer one.
+            started[1][1](started[1][0]())
+            started[0][1](started[0][0]())
+
+        assert "+newer" in dv._lines
+
+    def test_opening_another_diff_drops_an_in_flight_reload(self):
+        dv = DiffViewer()
+        self._open(dv, source=lambda: (self.ONE_HUNK, DiffType.UNSTAGED))
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+        self._open(dv, source=None)  # replaced before the reload lands
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](captured["work"]())
+
+        assert "+newer" not in dv._lines
+        assert "-old" in dv._lines
+
+    def test_no_source_is_a_noop(self):
+        dv = DiffViewer()
+        self._open(dv, source=None)
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+
+        assert captured == {}
+
+    def test_reload_drops_hunk_mode_when_the_hunks_are_gone(self):
+        dv = DiffViewer()
+        self._open(dv, source=lambda: ([], DiffType.UNSTAGED))
+        dv._hunk_mode = True
+        dv._hunk_index = 1
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](captured["work"]())
+
+        assert dv._hunks == []
+        assert dv._hunk_mode is False
+        assert dv._hunk_index == 0
+
+    def test_reload_keeps_the_hunk_under_the_cursor_on_screen(self):
+        """Staging the last hunk moves the cursor; it must stay visible."""
+        dv = DiffViewer()
+        self._open(dv, source=lambda: (self.ONE_HUNK, DiffType.UNSTAGED))
+        dv._hunk_mode = True
+        dv._hunk_index = 1
+        dv.scroll_i = 5
+        captured, starter = self._capture(dv)
+
+        with starter:
+            dv.reload()
+        with patch.object(dv, "is_mounted", return_value=True):
+            captured["callback"](captured["work"]())
+
+        assert dv._hunk_index == 0
+        assert dv._line_i == dv._hunks[0].start
+
+    def test_a_successful_hunk_action_reloads(self):
+        dv = DiffViewer()
+        self._open(dv, source=lambda: ([], DiffType.UNSTAGED))
+        dv.reload = MagicMock()
+
+        def _run(work, callback):
+            callback(work())
+
+        done = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+        with (
+            patch.object(dv._patch_task, "start", side_effect=_run),
+            patch("pigit.app_diff.subprocess.run", return_value=done),
+            patch.object(dv, "is_mounted", return_value=True),
+        ):
+            dv._apply_patch("patch", action="stage")
+
+        dv.reload.assert_called_once()

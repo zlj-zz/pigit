@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import bisect
 import dataclasses
-import enum
 import logging
 import os
 import subprocess
@@ -41,6 +40,7 @@ from pigit.termui.wcwidth_table import (
 )
 
 from .app_theme import THEME
+from .app_types import DiffType
 from .diff_content import (
     DiffContent,
     Hunk,
@@ -161,13 +161,6 @@ class _DiffStateSnapshot:
     come_from: Component | None
 
 
-class DiffType(enum.Enum):
-    UNSTAGED = "unstaged"
-    STAGED = "staged"
-    COMMIT = "commit"
-    STASH = "stash"
-
-
 # Compat aliases for tests / local type hints.
 _Hunk = Hunk
 _RenderLine = RenderLine
@@ -176,6 +169,15 @@ _RenderLine = RenderLine
 DiffSourceLoader = Callable[
     [str, str, str | None, str | None, DiffType],
     tuple[list[str] | None, list[str] | None] | None,
+]
+
+#: Re-runs the load behind a shown diff, off-thread: the lines and the diff
+#: type they were produced as.
+DiffReload = Callable[[], tuple[list[str], DiffType]]
+
+#: ``(lines, diff type, full side sources)`` for one completed reload.
+_ReloadResult = tuple[
+    list[str], DiffType, dict[str, tuple[list[str] | None, list[str] | None]]
 ]
 
 
@@ -231,6 +233,9 @@ class DiffViewer(Component):
     ) -> None:
         super().__init__(x, y, size, id=id)
         self._lines: list[str] = []
+        # The lines the content was built from, as handed to set_content:
+        # the installed lines are normalised, so reload compares against these.
+        self._loaded_lines: list[str] = []
         self._line_i = 0
         self._viewport_rows = max(0, self._size[1] - self.BORDER_ROWS)
         self._box_title: str = ""
@@ -269,6 +274,9 @@ class DiffViewer(Component):
         )
         self._tokenize_gen: int = 0
         self._patch_gen: int = 0
+        self._reload_source: DiffReload | None = None
+        self._reload_task: AsyncTask[_ReloadResult] = AsyncTask()
+        self._reload_gen: int = 0
         self._guard_async = guard_async
 
         # Word-diff state
@@ -356,6 +364,12 @@ class DiffViewer(Component):
         self._line_i = 0
         self._hunks = doc.hunks
         self._hunk_starts = doc.hunk_starts
+        # The hunk cursor indexes the list replaced above; content that
+        # dropped its hunks leaves hunk mode.
+        self._hunk_index = (
+            min(self._hunk_index, len(self._hunks) - 1) if self._hunks else 0
+        )
+        self._hunk_mode = self._hunk_mode and bool(self._hunks)
         self._heatmap = doc.heatmap
         self._heatmap_colors = doc.heatmap_colors
         self._line_numbers = doc.line_numbers
@@ -542,6 +556,9 @@ class DiffViewer(Component):
         ``\\r`` to reset the cursor to the start of the line, corrupting
         the rendered output.
 
+        The lines are kept as given, before that normalisation, so
+        :meth:`reload` can tell a fresh load apart from what is on screen.
+
         *sources* are the full side sources for this diff, when the caller has
         already loaded them (:meth:`load_sources` does that off-thread). A hunk
         that starts inside a string is only highlighted right against them, so
@@ -579,6 +596,7 @@ class DiffViewer(Component):
             tokens = DiffContent.pre_tokenize_with(
                 doc.lines, doc.line_langs, mask, self._tokenizer, doc.word_diff_segments
             )
+        self._loaded_lines = list(diff_lines)
         self._install_content(doc, tokens=tokens, mask=mask)
 
         resolve_mask = (
@@ -591,6 +609,52 @@ class DiffViewer(Component):
         self._start_tokenize(
             doc, mask=mask, resolve_mask=resolve_mask, tokens_installed=tokens_installed
         )
+
+    def is_showing(self, lines: list[str], diff_type: DiffType) -> bool:
+        """True when this content is already installed on screen."""
+        return lines == self._loaded_lines and diff_type is self._diff_type
+
+    def reload(self) -> None:
+        """Re-fetch the diff this viewer was opened on and reinstall it.
+
+        Content, not selection, drives this: an external edit or a hunk
+        applied from here changes what the file diff says while the open key
+        stays the same. Nothing is reinstalled when the fetched lines match
+        what is shown, so a redundant trigger costs one worker read and no
+        repaint.
+        """
+        source = self._reload_source
+        if source is None:
+            return
+        repo_path = self._repo_path
+        self._reload_gen += 1
+        reload_gen = self._reload_gen
+
+        def _work() -> _ReloadResult:
+            lines, diff_type = source()
+            return (
+                lines,
+                diff_type,
+                self.load_sources(lines, repo_path=repo_path, diff_type=diff_type),
+            )
+
+        def _callback(result: _ReloadResult) -> None:
+            if not self.is_mounted() or reload_gen != self._reload_gen:
+                return
+            lines, diff_type, sources = result
+            if self.is_showing(lines, diff_type):
+                return
+            line_i = self._line_i
+            self.set_diff_type(diff_type)
+            self.set_content(lines, sources=sources or None)
+            if self._hunk_mode:
+                # The cursor was clamped into the new hunk list; whatever
+                # ``s`` / ``d`` would act on now must be on screen.
+                self._scroll_to_hunk(self._hunk_index)
+            else:
+                self._line_i = self._clamp_line_i(line_i)
+
+        self._reload_task.start(_work, _callback)
 
     def _start_tokenize(
         self,
@@ -765,6 +829,8 @@ class DiffViewer(Component):
 
     def update(self, action: EventType, **data) -> None:
         if action is EVT_GOTO:
+            # An in-flight reload belongs to the diff being replaced.
+            self._reload_gen += 1
             self.i_cache[self.i_cache_key] = self._line_i
             while len(self.i_cache) >= self._CACHE_MAX:
                 del self.i_cache[next(iter(self.i_cache))]
@@ -779,6 +845,7 @@ class DiffViewer(Component):
                 self._diff_type = DiffType(raw_type)
             else:
                 self._diff_type = DiffType.UNSTAGED
+            self._reload_source = data.get("reload_source")
             # Reset hunk mode on new diff
             self._hunk_mode = False
             self._hunk_index = 0
@@ -1126,8 +1193,10 @@ class DiffViewer(Component):
         reopen can reuse installed tokens without a full re-parse.
         """
         self._patch_task.cancel()
+        self._reload_task.cancel()
         self._drop_pending_tokenize()
         self._patch_gen += 1
+        self._reload_gen += 1
         show_badge("", duration=0)
 
     def on_hide(self) -> None:
@@ -1222,6 +1291,7 @@ class DiffViewer(Component):
 
             if returncode == 0:
                 show_badge(msg, duration=1.0, kind=FeedbackKind.SUCCESS)
+                self.reload()
             else:
                 show_toast(
                     f"Failed: {stderr[:100]}", duration=2.0, kind=FeedbackKind.ERROR

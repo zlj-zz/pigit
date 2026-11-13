@@ -167,10 +167,6 @@ class StashPanel(OptionList):
             return []
         return self._vm.load_stash_diff(stash.ref)
 
-    def preview_diff_type(self) -> DiffType:
-        """Return stash diff type for the side preview."""
-        return DiffType.STASH
-
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:
         # Hand over the sha too: popping drops the entry, so the captured

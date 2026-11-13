@@ -21,7 +21,6 @@ class ChangeKind(Enum):
     INDEX = "index"
     STASH = "stash"
     WORKTREE_META = "worktree_meta"
-    PREVIEW_FILE = "preview_file"
 
 
 class BackendHealth(Enum):
@@ -63,4 +62,3 @@ class ObserveContext:
     repo_root: str
     git_dir: str
     common_dir: str
-    preview_target: str | None = None

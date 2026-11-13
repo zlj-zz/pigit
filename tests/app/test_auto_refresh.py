@@ -197,8 +197,8 @@ class TestObserveBatchSinks:
         dirty.assert_called_once()
         schedule.assert_not_called()
 
-    def test_head_refreshes_header_but_not_status_list(self, app):
-        """HEAD on Status tab triggers header reload only (list stays)."""
+    def test_head_refreshes_header_and_status_list(self, app):
+        """A HEAD move re-bases what is staged, so the rows change too."""
         from pigit.app_status import StatusPanel
 
         schedule = MagicMock()
@@ -219,7 +219,7 @@ class TestObserveBatchSinks:
             )
 
         schedule.assert_called_once()
-        refresh.assert_not_called()
+        refresh.assert_called_once()
 
     def test_build_observe_roots_attaches_worktree_only_for_status(self, app):
         """Worktree root is present only while Status is the active panel."""
@@ -307,25 +307,25 @@ class TestObserveBatchSinks:
         assert any(p.endswith("src/renamed.txt") for p in file_roots)
         assert all("->" not in p for p in file_roots)
 
-    def test_preview_file_batch_reloads_status_preview(self, app):
-        """PREVIEW_FILE on Status with large-screen preview calls reload()."""
+    def test_worktree_batch_refreshes_status_list(self, app):
+        """A worktree edit reaches the list; fresh rows drive the preview reload."""
         from pigit.app_status import StatusPanel
 
-        app._tab_view = MagicMock()
-        app._schedule_reload_header = MagicMock()
-        app._refresh_list_panel = MagicMock()
-        app._diff_preview_wanted = True
-        app._is_large_screen = True
-        app._preview_panel = MagicMock()
+        schedule = MagicMock()
+        refresh = MagicMock()
+        app._observe_host._deps = replace(
+            app._observe_host._deps,
+            schedule_reload_header=schedule,
+            refresh_list_panel=refresh,
+        )
         panel = object.__new__(StatusPanel)
 
         with patch("pigit.app_observe.resolve_presentation_leaf", return_value=panel):
             app._on_observe_batch(
                 ChangeBatch(
-                    kinds=frozenset({ChangeKind.PREVIEW_FILE}),
+                    kinds=frozenset({ChangeKind.WORKTREE_META}),
                     paths=frozenset({"foo.py"}),
                 )
             )
 
-        app._preview_panel.reload.assert_called_once()
-        app._refresh_list_panel.assert_not_called()
+        refresh.assert_called_once()

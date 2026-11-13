@@ -7,9 +7,19 @@ Date: 2026-06-04
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
+
+
+class DiffType(enum.Enum):
+    """Which side of the index a diff was taken from."""
+
+    UNSTAGED = "unstaged"
+    STAGED = "staged"
+    COMMIT = "commit"
+    STASH = "stash"
 
 
 def guard_or_identity(

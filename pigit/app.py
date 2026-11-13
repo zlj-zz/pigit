@@ -302,11 +302,6 @@ class PigitApplication(Application):
         self._preview_panel = PreviewPanel(
             id="preview",
             status_vm=self._status_vm,
-            on_preview_target=lambda rel: (
-                self._observe_host.set_preview_target(rel)
-                if self._observe_host
-                else None
-            ),
             guard_async=self._guard_repo_async,
             source_loader=self._load_diff_source,
             get_repo_path=lambda: self._repo_path,
@@ -455,6 +450,9 @@ class PigitApplication(Application):
                 get_status_panel=lambda: status_panel,
                 get_stash_panel=lambda: stash_panel,
                 get_preview_panel=lambda: self._preview_panel,
+                get_detail_panel=lambda: (
+                    self._diff_panel if self._is_detail_open() else None
+                ),
                 get_log_graph_preview=lambda: self._log_graph_preview,
                 get_diff_preview_wanted=lambda: self._diff_preview_wanted,
                 get_log_graph_wanted=lambda: self._log_graph_wanted,

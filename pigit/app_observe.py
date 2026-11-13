@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from pigit.app_branch import BranchPanel
 from pigit.app_commit import CommitPanel
+from pigit.app_diff import DiffViewer
 from pigit.app_log_graph_preview import LogGraphPreview
 from pigit.app_diff_preview import PreviewPanel
 from pigit.app_stash import StashPanel
@@ -56,6 +57,7 @@ class ObserveDeps:
         get_status_panel: Late-bound StatusPanel accessor (may be None).
         get_stash_panel: Late-bound StashPanel accessor (may be None).
         get_preview_panel: Late-bound PreviewPanel accessor (may be None).
+        get_detail_panel: Diff detail accessor; None unless it is presented.
         get_log_graph_preview: Late-bound LogGraphPreview accessor (may be None).
         get_diff_preview_wanted: Whether diff side preview is visible.
         get_log_graph_wanted: Whether log-graph side preview is visible.
@@ -75,6 +77,7 @@ class ObserveDeps:
     get_status_panel: Callable[[], StatusPanel | None]
     get_stash_panel: Callable[[], StashPanel | None]
     get_preview_panel: Callable[[], PreviewPanel | None]
+    get_detail_panel: Callable[[], DiffViewer | None]
     get_log_graph_preview: Callable[[], LogGraphPreview | None]
     get_diff_preview_wanted: Callable[[], bool]
     get_log_graph_wanted: Callable[[], bool]
@@ -231,12 +234,6 @@ class ObserveHost:
         """Resync watch roots after TabView switches panels."""
         self.resync_roots()
 
-    def set_preview_target(self, rel: str | None) -> None:
-        """Update ObserveContext.preview_target for PREVIEW_FILE classification."""
-        if self._observe_ctx is None:
-            return
-        self._observe_ctx = replace(self._observe_ctx, preview_target=rel)
-
     def build_roots(self) -> list[WatchRoot]:
         """Build watch roots; attach worktree when Status or Stash is focused.
 
@@ -299,7 +296,12 @@ class ObserveHost:
             # Status and Stash read one repository from two angles: worktree /
             # index changes refresh Status, stash / ref changes refresh the
             # Stash list -- both, whichever of the two pages the user is on.
-            if ChangeKind.INDEX in kinds or ChangeKind.WORKTREE_META in kinds:
+            # A staged diff is index versus HEAD, so a HEAD move changes it.
+            if (
+                ChangeKind.INDEX in kinds
+                or ChangeKind.WORKTREE_META in kinds
+                or ChangeKind.HEAD in kinds
+            ):
                 status = self._deps.get_status_panel()
                 if status is not None:
                     self._deps.refresh_list_panel(status)
@@ -307,14 +309,6 @@ class ObserveHost:
                 stash = self._deps.get_stash_panel()
                 if stash is not None:
                     self._deps.refresh_list_panel(stash)
-            if ChangeKind.PREVIEW_FILE in kinds:
-                preview = self._deps.get_preview_panel()
-                if (
-                    self._deps.get_diff_preview_wanted()
-                    and preview is not None
-                    and self._deps.get_is_large_screen()
-                ):
-                    preview.reload()
             return
 
         if isinstance(active, BranchPanel):
@@ -362,8 +356,29 @@ class ObserveHost:
         return self._last_worktree_dirty
 
     def _on_status_items(self, _items: list) -> None:
-        """Refresh worktree path set when the Status list changes."""
+        """Re-point watch roots and re-read the diffs presented from these rows.
+
+        This runs after the fresh rows land, so a reload resolves the file's
+        side and type from the same snapshot the list is showing. The content
+        comparison inside a reload makes a redundant call cost one worker read
+        and no repaint.
+
+        The detail and the side preview are the two presentations of these
+        rows, and only one of them can be visible: the detail replaces the
+        split pane, preview included.
+        """
         self.resync_roots()
+        detail = self._deps.get_detail_panel()
+        if detail is not None:
+            detail.reload()
+            return  # the detail covers the split pane, preview included
+        preview = self._deps.get_preview_panel()
+        if (
+            preview is not None
+            and self._deps.get_diff_preview_wanted()
+            and self._deps.get_is_large_screen()
+        ):
+            preview.reload()
 
     def _context(self) -> ObserveContext:
         """Return the current ObserveContext (must be started)."""

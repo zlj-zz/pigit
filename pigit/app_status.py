@@ -41,7 +41,7 @@ from pigit.termui.widgets import (
     SectionRule,
 )
 
-from .app_diff import DiffType, DiffViewer
+from .app_diff import DiffReload, DiffViewer
 from .app_row_slots import icon_lane, status_lane
 from .app_diff_preview import PreviewPanel
 from .app_types import FileSnapshot
@@ -532,11 +532,6 @@ class StatusPanel(OptionList):
             return
         f, source_idx = hit
         diff = self._vm.load_diff(source_idx)
-        diff_type = (
-            DiffType.STAGED
-            if (f.has_staged_change and not f.has_unstaged_change)
-            else DiffType.UNSTAGED
-        )
         self.emit(
             EVT_GOTO,
             target="diff",
@@ -544,8 +539,15 @@ class StatusPanel(OptionList):
             key=f.name,
             content=diff,
             repo_path=self._vm.repo_path,
-            diff_type=diff_type,
+            diff_type=self._vm.diff_type_at(source_idx),
+            reload_source=self._reload_diff(f.get_file_str()),
         )
+
+    def _reload_diff(self, rel: str) -> DiffReload:
+        """Loader for the open detail, keyed by path so a refreshed list
+        cannot point it at another file."""
+        vm = self._vm
+        return lambda: vm.load_diff_by_path(rel)
 
     @bind_action("stage", "a", desc="Stage current file or selection", tip="Stage")
     def stage(self) -> None:
@@ -1154,16 +1156,6 @@ class StatusPanel(OptionList):
             return []
         _, source_idx = hit
         return self._vm.load_diff(source_idx)
-
-    def preview_diff_type(self) -> DiffType:
-        """Return staged vs unstaged diff type for the current file."""
-        hit = self.file_at_cursor()
-        if hit is None:
-            return DiffType.UNSTAGED
-        file, _ = hit
-        if file.has_staged_change and not file.has_unstaged_change:
-            return DiffType.STAGED
-        return DiffType.UNSTAGED
 
     def _target_indices(self) -> set[int]:
         """Source indices for the current Status action.
